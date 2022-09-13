@@ -30,7 +30,6 @@ import (
 
 // labelConsumer is the part of safescale client handling Labels/Tags
 type labelConsumer struct {
-	// session is not used currently
 	session *Session
 }
 

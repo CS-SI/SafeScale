@@ -14,26 +14,27 @@
  * limitations under the License.
  */
 
-package api
+package stacks
 
 import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
-// StackProxy ...
-type StackProxy struct {
+// Remediator ...
+type Remediator struct {
 	FullStack
 	Name string
 }
 
-func (s StackProxy) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, ferr fail.Error) {
+func (s Remediator) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	images, xerr := s.FullStack.ListImages(ctx, all)
@@ -43,7 +44,7 @@ func (s StackProxy) ListImages(ctx context.Context, all bool) (_ []*abstract.Ima
 	return images, xerr
 }
 
-func (s StackProxy) ListTemplates(ctx context.Context, all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
+func (s Remediator) ListTemplates(ctx context.Context, all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	templates, xerr := s.FullStack.ListTemplates(ctx, all)
@@ -53,7 +54,7 @@ func (s StackProxy) ListTemplates(ctx context.Context, all bool) (_ []*abstract.
 	return templates, xerr
 }
 
-func (s StackProxy) GetRawConfigurationOptions(ctx context.Context) (_ stacks.ConfigurationOptions, ferr fail.Error) {
+func (s Remediator) GetRawConfigurationOptions(ctx context.Context) (_ options.ConfigurationOptions, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	cfg, xerr := s.FullStack.GetRawConfigurationOptions(ctx)
@@ -63,7 +64,7 @@ func (s StackProxy) GetRawConfigurationOptions(ctx context.Context) (_ stacks.Co
 	return cfg, xerr
 }
 
-func (s StackProxy) GetRawAuthenticationOptions(ctx context.Context) (_ stacks.AuthenticationOptions, ferr fail.Error) {
+func (s Remediator) GetRawAuthenticationOptions(ctx context.Context) (_ options.AuthenticationOptions, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	cfg, xerr := s.FullStack.GetRawAuthenticationOptions(ctx)
@@ -73,14 +74,14 @@ func (s StackProxy) GetRawAuthenticationOptions(ctx context.Context) (_ stacks.A
 	return cfg, xerr
 }
 
-func (s StackProxy) GetStackName() (_ string, ferr fail.Error) {
+func (s Remediator) GetStackName() (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	cfg, xerr := s.FullStack.GetStackName()
 	return cfg, xerr
 }
 
-func (s StackProxy) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
+func (s Remediator) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	zones, xerr := s.FullStack.ListAvailabilityZones(ctx)
@@ -90,7 +91,7 @@ func (s StackProxy) ListAvailabilityZones(ctx context.Context) (_ map[string]boo
 	return zones, xerr
 }
 
-func (s StackProxy) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
+func (s Remediator) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	regions, xerr := s.FullStack.ListRegions(ctx)
@@ -100,7 +101,7 @@ func (s StackProxy) ListRegions(ctx context.Context) (_ []string, ferr fail.Erro
 	return regions, xerr
 }
 
-func (s StackProxy) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
+func (s Remediator) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	image, xerr := s.FullStack.InspectImage(ctx, id)
@@ -110,7 +111,7 @@ func (s StackProxy) InspectImage(ctx context.Context, id string) (_ *abstract.Im
 	return image, xerr
 }
 
-func (s StackProxy) InspectTemplate(ctx context.Context, id string) (_ *abstract.HostTemplate, ferr fail.Error) {
+func (s Remediator) InspectTemplate(ctx context.Context, id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	template, xerr := s.FullStack.InspectTemplate(ctx, id)
@@ -120,7 +121,7 @@ func (s StackProxy) InspectTemplate(ctx context.Context, id string) (_ *abstract
 	return template, xerr
 }
 
-func (s StackProxy) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyPair, ferr fail.Error) {
+func (s Remediator) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	pair, xerr := s.FullStack.CreateKeyPair(ctx, name)
@@ -130,7 +131,7 @@ func (s StackProxy) CreateKeyPair(ctx context.Context, name string) (_ *abstract
 	return pair, xerr
 }
 
-func (s StackProxy) InspectKeyPair(ctx context.Context, id string) (_ *abstract.KeyPair, ferr fail.Error) {
+func (s Remediator) InspectKeyPair(ctx context.Context, id string) (_ *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	pair, xerr := s.FullStack.InspectKeyPair(ctx, id)
@@ -140,7 +141,7 @@ func (s StackProxy) InspectKeyPair(ctx context.Context, id string) (_ *abstract.
 	return pair, xerr
 }
 
-func (s StackProxy) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fail.Error) {
+func (s Remediator) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	pair, xerr := s.FullStack.ListKeyPairs(ctx)
@@ -150,7 +151,7 @@ func (s StackProxy) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, fe
 	return pair, xerr
 }
 
-func (s StackProxy) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
+func (s Remediator) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.DeleteKeyPair(ctx, id)
@@ -160,7 +161,7 @@ func (s StackProxy) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Err
 	return xerr
 }
 
-func (s StackProxy) ListSecurityGroups(ctx context.Context, networkRef string) (_ []*abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) ListSecurityGroups(ctx context.Context, networkRef string) (_ []*abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.FullStack.ListSecurityGroups(ctx, networkRef)
@@ -170,7 +171,7 @@ func (s StackProxy) ListSecurityGroups(ctx context.Context, networkRef string) (
 	return groups, xerr
 }
 
-func (s StackProxy) CreateSecurityGroup(ctx context.Context, networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) CreateSecurityGroup(ctx context.Context, networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.FullStack.CreateSecurityGroup(ctx, networkRef, name, description, rules)
@@ -180,7 +181,7 @@ func (s StackProxy) CreateSecurityGroup(ctx context.Context, networkRef, name, d
 	return groups, xerr
 }
 
-func (s StackProxy) InspectSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) InspectSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.FullStack.InspectSecurityGroup(ctx, sgParam)
@@ -190,7 +191,7 @@ func (s StackProxy) InspectSecurityGroup(ctx context.Context, sgParam stacks.Sec
 	return groups, xerr
 }
 
-func (s StackProxy) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) ClearSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.FullStack.ClearSecurityGroup(ctx, sgParam)
@@ -200,7 +201,7 @@ func (s StackProxy) ClearSecurityGroup(ctx context.Context, sgParam stacks.Secur
 	return groups, xerr
 }
 
-func (s StackProxy) DeleteSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
+func (s Remediator) DeleteSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.DeleteSecurityGroup(ctx, group)
@@ -210,7 +211,7 @@ func (s StackProxy) DeleteSecurityGroup(ctx context.Context, group *abstract.Sec
 	return xerr
 }
 
-func (s StackProxy) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) AddRuleToSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rule *abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	group, xerr := s.FullStack.AddRuleToSecurityGroup(ctx, sgParam, rule)
@@ -220,7 +221,7 @@ func (s StackProxy) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.S
 	return group, xerr
 }
 
-func (s StackProxy) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rule *abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	group, xerr := s.FullStack.DeleteRuleFromSecurityGroup(ctx, sgParam, rule)
@@ -230,7 +231,7 @@ func (s StackProxy) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam sta
 	return group, xerr
 }
 
-func (s StackProxy) GetDefaultSecurityGroupName(ctx context.Context) (_ string, ferr fail.Error) {
+func (s Remediator) GetDefaultSecurityGroupName(ctx context.Context) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	cfg, xerr := s.FullStack.GetDefaultSecurityGroupName(ctx)
@@ -240,7 +241,7 @@ func (s StackProxy) GetDefaultSecurityGroupName(ctx context.Context) (_ string, 
 	return cfg, xerr
 }
 
-func (s StackProxy) EnableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
+func (s Remediator) EnableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.EnableSecurityGroup(ctx, group)
@@ -250,7 +251,7 @@ func (s StackProxy) EnableSecurityGroup(ctx context.Context, group *abstract.Sec
 	return xerr
 }
 
-func (s StackProxy) DisableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
+func (s Remediator) DisableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.DisableSecurityGroup(ctx, group)
@@ -260,7 +261,7 @@ func (s StackProxy) DisableSecurityGroup(ctx context.Context, group *abstract.Se
 	return xerr
 }
 
-func (s StackProxy) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (_ *abstract.Network, ferr fail.Error) {
+func (s Remediator) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (_ *abstract.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.FullStack.CreateNetwork(ctx, req)
@@ -270,7 +271,7 @@ func (s StackProxy) CreateNetwork(ctx context.Context, req abstract.NetworkReque
 	return network, xerr
 }
 
-func (s StackProxy) InspectNetwork(ctx context.Context, id string) (_ *abstract.Network, ferr fail.Error) {
+func (s Remediator) InspectNetwork(ctx context.Context, id string) (_ *abstract.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.FullStack.InspectNetwork(ctx, id)
@@ -280,7 +281,7 @@ func (s StackProxy) InspectNetwork(ctx context.Context, id string) (_ *abstract.
 	return network, xerr
 }
 
-func (s StackProxy) InspectNetworkByName(ctx context.Context, name string) (_ *abstract.Network, ferr fail.Error) {
+func (s Remediator) InspectNetworkByName(ctx context.Context, name string) (_ *abstract.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.FullStack.InspectNetworkByName(ctx, name)
@@ -290,7 +291,7 @@ func (s StackProxy) InspectNetworkByName(ctx context.Context, name string) (_ *a
 	return network, xerr
 }
 
-func (s StackProxy) ListNetworks(ctx context.Context) (_ []*abstract.Network, ferr fail.Error) {
+func (s Remediator) ListNetworks(ctx context.Context) (_ []*abstract.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.FullStack.ListNetworks(ctx)
@@ -300,7 +301,7 @@ func (s StackProxy) ListNetworks(ctx context.Context) (_ []*abstract.Network, fe
 	return network, xerr
 }
 
-func (s StackProxy) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
+func (s Remediator) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.DeleteNetwork(ctx, id)
@@ -310,27 +311,7 @@ func (s StackProxy) DeleteNetwork(ctx context.Context, id string) (ferr fail.Err
 	return xerr
 }
 
-func (s StackProxy) HasDefaultNetwork(ctx context.Context) (_ bool, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	cfg, xerr := s.FullStack.HasDefaultNetwork(ctx)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return cfg, xerr
-}
-
-func (s StackProxy) GetDefaultNetwork(ctx context.Context) (_ *abstract.Network, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	network, xerr := s.FullStack.GetDefaultNetwork(ctx)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return network, xerr
-}
-
-func (s StackProxy) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (_ *abstract.Subnet, ferr fail.Error) {
+func (s Remediator) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (_ *abstract.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.FullStack.CreateSubnet(ctx, req)
@@ -340,7 +321,7 @@ func (s StackProxy) CreateSubnet(ctx context.Context, req abstract.SubnetRequest
 	return network, xerr
 }
 
-func (s StackProxy) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet, ferr fail.Error) {
+func (s Remediator) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.FullStack.InspectSubnet(ctx, id)
@@ -350,7 +331,7 @@ func (s StackProxy) InspectSubnet(ctx context.Context, id string) (_ *abstract.S
 	return network, xerr
 }
 
-func (s StackProxy) InspectSubnetByName(ctx context.Context, networkID, name string) (_ *abstract.Subnet, ferr fail.Error) {
+func (s Remediator) InspectSubnetByName(ctx context.Context, networkID, name string) (_ *abstract.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.FullStack.InspectSubnetByName(ctx, networkID, name)
@@ -360,7 +341,7 @@ func (s StackProxy) InspectSubnetByName(ctx context.Context, networkID, name str
 	return network, xerr
 }
 
-func (s StackProxy) ListSubnets(ctx context.Context, networkID string) (_ []*abstract.Subnet, ferr fail.Error) {
+func (s Remediator) ListSubnets(ctx context.Context, networkID string) (_ []*abstract.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.FullStack.ListSubnets(ctx, networkID)
@@ -370,7 +351,7 @@ func (s StackProxy) ListSubnets(ctx context.Context, networkID string) (_ []*abs
 	return network, xerr
 }
 
-func (s StackProxy) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
+func (s Remediator) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.DeleteSubnet(ctx, id)
@@ -380,7 +361,7 @@ func (s StackProxy) DeleteSubnet(ctx context.Context, id string) (ferr fail.Erro
 	return xerr
 }
 
-func (s StackProxy) CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, ferr fail.Error) {
+func (s Remediator) CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.FullStack.CreateVIP(ctx, networkID, subnetID, name, securityGroups)
@@ -390,7 +371,7 @@ func (s StackProxy) CreateVIP(ctx context.Context, networkID, subnetID, name str
 	return network, xerr
 }
 
-func (s StackProxy) AddPublicIPToVIP(ctx context.Context, ip *abstract.VirtualIP) (ferr fail.Error) {
+func (s Remediator) AddPublicIPToVIP(ctx context.Context, ip *abstract.VirtualIP) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.AddPublicIPToVIP(ctx, ip)
@@ -400,7 +381,7 @@ func (s StackProxy) AddPublicIPToVIP(ctx context.Context, ip *abstract.VirtualIP
 	return xerr
 }
 
-func (s StackProxy) BindHostToVIP(ctx context.Context, ip *abstract.VirtualIP, s2 string) (ferr fail.Error) {
+func (s Remediator) BindHostToVIP(ctx context.Context, ip *abstract.VirtualIP, s2 string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.BindHostToVIP(ctx, ip, s2)
@@ -410,7 +391,7 @@ func (s StackProxy) BindHostToVIP(ctx context.Context, ip *abstract.VirtualIP, s
 	return xerr
 }
 
-func (s StackProxy) UnbindHostFromVIP(ctx context.Context, ip *abstract.VirtualIP, s2 string) (ferr fail.Error) {
+func (s Remediator) UnbindHostFromVIP(ctx context.Context, ip *abstract.VirtualIP, s2 string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.UnbindHostFromVIP(ctx, ip, s2)
@@ -420,7 +401,7 @@ func (s StackProxy) UnbindHostFromVIP(ctx context.Context, ip *abstract.VirtualI
 	return xerr
 }
 
-func (s StackProxy) DeleteVIP(ctx context.Context, ip *abstract.VirtualIP) (ferr fail.Error) {
+func (s Remediator) DeleteVIP(ctx context.Context, ip *abstract.VirtualIP) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.DeleteVIP(ctx, ip)
@@ -430,7 +411,7 @@ func (s StackProxy) DeleteVIP(ctx context.Context, ip *abstract.VirtualIP) (ferr
 	return xerr
 }
 
-func (s StackProxy) CreateHost(ctx context.Context, request abstract.HostRequest) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
+func (s Remediator) CreateHost(ctx context.Context, request abstract.HostRequest) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, content, xerr := s.FullStack.CreateHost(ctx, request)
@@ -440,7 +421,7 @@ func (s StackProxy) CreateHost(ctx context.Context, request abstract.HostRequest
 	return host, content, xerr
 }
 
-func (s StackProxy) ClearHostStartupScript(ctx context.Context, parameter stacks.HostParameter) (ferr fail.Error) {
+func (s Remediator) ClearHostStartupScript(ctx context.Context, parameter HostParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.ClearHostStartupScript(ctx, parameter)
@@ -450,7 +431,7 @@ func (s StackProxy) ClearHostStartupScript(ctx context.Context, parameter stacks
 	return xerr
 }
 
-func (s StackProxy) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
+func (s Remediator) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, _ string) fail.Error {
 	xerr := s.FullStack.ChangeSecurityGroupSecurity(ctx, b, b2, net, "")
 	if xerr != nil {
 		xerr.WithContext(ctx)
@@ -458,7 +439,7 @@ func (s StackProxy) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 
 	return xerr
 }
 
-func (s StackProxy) InspectHost(ctx context.Context, parameter stacks.HostParameter) (_ *abstract.HostFull, ferr fail.Error) {
+func (s Remediator) InspectHost(ctx context.Context, parameter HostParameter) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.FullStack.InspectHost(ctx, parameter)
@@ -468,7 +449,7 @@ func (s StackProxy) InspectHost(ctx context.Context, parameter stacks.HostParame
 	return host, xerr
 }
 
-func (s StackProxy) GetHostState(ctx context.Context, parameter stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
+func (s Remediator) GetHostState(ctx context.Context, parameter HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.FullStack.GetHostState(ctx, parameter)
@@ -478,7 +459,7 @@ func (s StackProxy) GetHostState(ctx context.Context, parameter stacks.HostParam
 	return host, xerr
 }
 
-func (s StackProxy) ListHosts(ctx context.Context, b bool) (_ abstract.HostList, ferr fail.Error) {
+func (s Remediator) ListHosts(ctx context.Context, b bool) (_ abstract.HostList, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.FullStack.ListHosts(ctx, b)
@@ -488,7 +469,7 @@ func (s StackProxy) ListHosts(ctx context.Context, b bool) (_ abstract.HostList,
 	return host, xerr
 }
 
-func (s StackProxy) DeleteHost(ctx context.Context, parameter stacks.HostParameter) (ferr fail.Error) {
+func (s Remediator) DeleteHost(ctx context.Context, parameter HostParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.DeleteHost(ctx, parameter)
@@ -498,7 +479,7 @@ func (s StackProxy) DeleteHost(ctx context.Context, parameter stacks.HostParamet
 	return xerr
 }
 
-func (s StackProxy) StopHost(ctx context.Context, host stacks.HostParameter, gracefully bool) (ferr fail.Error) {
+func (s Remediator) StopHost(ctx context.Context, host HostParameter, gracefully bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.StopHost(ctx, host, gracefully)
@@ -508,7 +489,7 @@ func (s StackProxy) StopHost(ctx context.Context, host stacks.HostParameter, gra
 	return xerr
 }
 
-func (s StackProxy) StartHost(ctx context.Context, parameter stacks.HostParameter) (ferr fail.Error) {
+func (s Remediator) StartHost(ctx context.Context, parameter HostParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.StartHost(ctx, parameter)
@@ -518,7 +499,7 @@ func (s StackProxy) StartHost(ctx context.Context, parameter stacks.HostParamete
 	return xerr
 }
 
-func (s StackProxy) RebootHost(ctx context.Context, parameter stacks.HostParameter) (ferr fail.Error) {
+func (s Remediator) RebootHost(ctx context.Context, parameter HostParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.RebootHost(ctx, parameter)
@@ -528,7 +509,7 @@ func (s StackProxy) RebootHost(ctx context.Context, parameter stacks.HostParamet
 	return xerr
 }
 
-func (s StackProxy) ResizeHost(ctx context.Context, parameter stacks.HostParameter, requirements abstract.HostSizingRequirements) (_ *abstract.HostFull, ferr fail.Error) {
+func (s Remediator) ResizeHost(ctx context.Context, parameter HostParameter, requirements abstract.HostSizingRequirements) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.FullStack.ResizeHost(ctx, parameter, requirements)
@@ -538,7 +519,7 @@ func (s StackProxy) ResizeHost(ctx context.Context, parameter stacks.HostParamet
 	return host, xerr
 }
 
-func (s StackProxy) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
+func (s Remediator) WaitHostReady(ctx context.Context, hostParam HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.FullStack.WaitHostReady(ctx, hostParam, timeout)
@@ -548,7 +529,7 @@ func (s StackProxy) WaitHostReady(ctx context.Context, hostParam stacks.HostPara
 	return host, xerr
 }
 
-func (s StackProxy) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s Remediator) BindSecurityGroupToHost(ctx context.Context, sgParam SecurityGroupParameter, hostParam HostParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.BindSecurityGroupToHost(ctx, sgParam, hostParam)
@@ -558,7 +539,7 @@ func (s StackProxy) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.
 	return xerr
 }
 
-func (s StackProxy) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s Remediator) UnbindSecurityGroupFromHost(ctx context.Context, sgParam SecurityGroupParameter, hostParam HostParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.UnbindSecurityGroupFromHost(ctx, sgParam, hostParam)
@@ -568,7 +549,7 @@ func (s StackProxy) UnbindSecurityGroupFromHost(ctx context.Context, sgParam sta
 	return xerr
 }
 
-func (s StackProxy) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
+func (s Remediator) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.FullStack.CreateVolume(ctx, request)
@@ -578,7 +559,7 @@ func (s StackProxy) CreateVolume(ctx context.Context, request abstract.VolumeReq
 	return volume, xerr
 }
 
-func (s StackProxy) InspectVolume(ctx context.Context, id string) (_ *abstract.Volume, ferr fail.Error) {
+func (s Remediator) InspectVolume(ctx context.Context, id string) (_ *abstract.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.FullStack.InspectVolume(ctx, id)
@@ -588,7 +569,7 @@ func (s StackProxy) InspectVolume(ctx context.Context, id string) (_ *abstract.V
 	return volume, xerr
 }
 
-func (s StackProxy) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail.Error) {
+func (s Remediator) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.FullStack.ListVolumes(ctx)
@@ -598,7 +579,7 @@ func (s StackProxy) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr
 	return volume, xerr
 }
 
-func (s StackProxy) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
+func (s Remediator) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.DeleteVolume(ctx, id)
@@ -608,7 +589,7 @@ func (s StackProxy) DeleteVolume(ctx context.Context, id string) (ferr fail.Erro
 	return xerr
 }
 
-func (s StackProxy) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
+func (s Remediator) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.FullStack.CreateVolumeAttachment(ctx, request)
@@ -618,7 +599,7 @@ func (s StackProxy) CreateVolumeAttachment(ctx context.Context, request abstract
 	return volume, xerr
 }
 
-func (s StackProxy) InspectVolumeAttachment(ctx context.Context, serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
+func (s Remediator) InspectVolumeAttachment(ctx context.Context, serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.FullStack.InspectVolumeAttachment(ctx, serverID, id)
@@ -628,7 +609,7 @@ func (s StackProxy) InspectVolumeAttachment(ctx context.Context, serverID, id st
 	return volume, xerr
 }
 
-func (s StackProxy) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
+func (s Remediator) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	volume, xerr := s.FullStack.ListVolumeAttachments(ctx, serverID)
@@ -638,7 +619,7 @@ func (s StackProxy) ListVolumeAttachments(ctx context.Context, serverID string) 
 	return volume, xerr
 }
 
-func (s StackProxy) DeleteVolumeAttachment(ctx context.Context, serverID, id string) (ferr fail.Error) {
+func (s Remediator) DeleteVolumeAttachment(ctx context.Context, serverID, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.DeleteVolumeAttachment(ctx, serverID, id)
@@ -648,7 +629,7 @@ func (s StackProxy) DeleteVolumeAttachment(ctx context.Context, serverID, id str
 	return xerr
 }
 
-func (s StackProxy) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
+func (s Remediator) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.Migrate(ctx, operation, params)
@@ -656,4 +637,10 @@ func (s StackProxy) Migrate(ctx context.Context, operation string, params map[st
 		xerr.WithContext(ctx)
 	}
 	return xerr
+}
+
+func (s Remediator) Timings() (_ temporal.Timings, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	return s.FullStack.Timings()
 }

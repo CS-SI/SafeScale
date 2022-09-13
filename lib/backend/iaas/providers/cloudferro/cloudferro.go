@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -32,7 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
@@ -47,7 +47,7 @@ var (
 
 // provider is the implementation of the CloudFerro provider
 type provider struct {
-	api.Stack
+	stacks.Stack
 
 	tenantParameters map[string]interface{}
 	templatesWithGPU []string
@@ -106,7 +106,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		floatingIPPool = providerNetwork
 	}
 
-	authOptions := stacks.AuthenticationOptions{
+	authOptions := stackoptions.AuthenticationOptions{
 		IdentityEndpoint: cloudferroIdentityEndpoint,
 		Username:         username,
 		Password:         password,
@@ -163,7 +163,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 next:
 
-	cfgOptions := stacks.ConfigurationOptions{
+	cfgOptions := stackoptions.ConfigurationOptions{
 		ProviderNetwork:           providerNetwork,
 		UseFloatingIP:             true,
 		UseLayer3Networking:       true,
@@ -189,7 +189,7 @@ next:
 
 	// Note: if timings have to be tuned, update stack.MutableTimings
 
-	wrapped := api.StackProxy{
+	wrapped := stacks.Remediator{
 		FullStack: stack,
 		Name:      "cloudferro",
 	}
@@ -199,7 +199,7 @@ next:
 		tenantParameters: params,
 	}
 
-	wp := providers.ProviderProxy{
+	wp := providers.Remediator{
 		Provider: newP,
 		Name:     wrapped.Name,
 	}
@@ -214,7 +214,7 @@ func (p provider) GetAuthenticationOptions(ctx context.Context) (providers.Confi
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
+	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +233,7 @@ func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
+	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Host
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(ctx, all)
+	allTemplates, xerr := p.Stack.(stacks.ReservedForProviderUse).ListTemplates(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -277,7 +277,7 @@ func (p provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, 
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allImages, xerr := p.Stack.(api.ReservedForProviderUse).ListImages(ctx, all)
+	allImages, xerr := p.Stack.(stacks.ReservedForProviderUse).ListImages(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -291,7 +291,7 @@ func (p provider) GetName() (string, fail.Error) {
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() (api.Stack, fail.Error) {
+func (p provider) GetStack() (stacks.Stack, fail.Error) {
 	return p.Stack, nil
 }
 
@@ -334,6 +334,24 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	}
 
 	return out, nil
+}
+
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (p provider) HasDefaultNetwork(ctx context.Context) (bool, fail.Error) {
+	if valid.IsNil(p) {
+		return false, fail.InvalidInstanceError()
+	}
+
+	return false, nil
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (p provider) GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	return nil, fail.NotFoundError("this provider has no default network")
 }
 
 func init() {

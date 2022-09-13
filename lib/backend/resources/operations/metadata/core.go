@@ -27,6 +27,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	serializer "github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -55,7 +56,7 @@ type Core struct {
 	sync.RWMutex
 
 	kind   string
-	folder Folder
+	folder storage.Folder
 
 	loaded            bool
 	committed         bool
@@ -100,7 +101,7 @@ func NewCore(svc iaas.Service, method string, kind string, path string, instance
 		shielded:   protected,
 	}
 	switch kind {
-	case clusterKind:
+	case "organization", "project", "cluster":
 		c.kindSplittedStore = false
 	default:
 		c.kindSplittedStore = true
@@ -586,7 +587,7 @@ func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					return fail.NotFoundError("%s was NOT found in the bucket", myself.folder.AbsolutePath("", ref))
+					// continue (otherwise, lookup by ID won't be tried
 				default:
 					return xerr
 				}
@@ -604,7 +605,7 @@ func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					return fail.NotFoundError("%s was NOT found in the bucket", myself.folder.AbsolutePath("", ref))
+					// continue
 				default:
 					return xerr
 				}

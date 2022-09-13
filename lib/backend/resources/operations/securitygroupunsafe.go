@@ -176,7 +176,7 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 		}
 
 		// delete Security Group metadata
-		xerr = instance.MetadataCore.Delete(ctx)
+		xerr = instance.Core.Delete(ctx)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return

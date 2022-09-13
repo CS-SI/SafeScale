@@ -30,6 +30,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
@@ -79,7 +80,7 @@ const (
 // Host ...
 // follows interface resources.Host
 type Host struct {
-	*MetadataCore
+	*metadata.Core
 
 	localCache struct {
 		sync.RWMutex
@@ -99,14 +100,14 @@ func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := NewCore(svc, hostKind, hostsFolderName, &abstract.HostCore{})
+	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, hostKind, hostsFolderName, &abstract.HostCore{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	instance := &Host{
-		MetadataCore: coreInstance,
+		Core: coreInstance,
 	}
 	return instance, nil
 }
@@ -510,7 +511,7 @@ func getOperatorUsernameFromCfg(ctx context.Context, svc iaas.Service) (string, 
 
 // IsNull ...
 func (instance *Host) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
+	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
 }
 
 // carry ...
@@ -519,7 +520,7 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		if instance.MetadataCore.IsTaken() {
+		if instance.Core.IsTaken() {
 			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 		}
 	}
@@ -528,7 +529,7 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(ctx, clonable)
+	xerr := instance.Core.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -558,7 +559,7 @@ func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCo
 	// instance.RLock()
 	// defer instance.RUnlock()
 
-	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
+	return instance.Core.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
 		ahc := abstract.NewHostCore()
 		var inErr fail.Error
 		if inErr = ahc.Deserialize(buf); inErr != nil {
@@ -628,7 +629,7 @@ func (instance *Host) Reload(ctx context.Context) (ferr fail.Error) {
 func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := instance.MetadataCore.Reload(ctx)
+	xerr := instance.Core.Reload(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -704,7 +705,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 			return innerXErr
 		}
 
-		// Updates Host property propertiesv1.HostNetworking from "ground" (Cloud Provider side)
+		// Updates Host property propertiesv1.HostNetworking from "ground" (Cloud provider side)
 		innerXErr = props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -820,8 +821,8 @@ func (instance *Host) Create(
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance.MetadataCore) {
-		if instance.MetadataCore.IsTaken() {
+	if !valid.IsNil(instance.Core) {
+		if instance.Core.IsTaken() {
 			return nil, fail.InconsistentError("already carrying information")
 		}
 	}
@@ -1076,7 +1077,7 @@ func (instance *Host) implCreate(
 			}
 		}()
 
-		// instruct Cloud Provider to create host
+		// instruct Cloud provider to create host
 		defaultSubnetID, err := defaultSubnet.GetID()
 		if err != nil {
 			return fail.ConvertError(err)
@@ -1116,7 +1117,7 @@ func (instance *Host) implCreate(
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !hostReq.KeepOnFailure {
-				if derr := instance.MetadataCore.Delete(context.Background()); derr != nil {
+				if derr := instance.Core.Delete(context.Background()); derr != nil {
 					logrus.WithContext(ctx).Errorf(
 						"cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name,
 						derr,
@@ -2160,12 +2161,12 @@ func (instance *Host) updateSubnets(ctx context.Context, req abstract.HostReques
 				hostName := instance.GetName()
 				svc := instance.Service()
 				for _, as := range req.Subnets {
-					rs, innerXErr := LoadSubnet(ctx, svc, "", as.ID)
+					subnetInstance, innerXErr := LoadSubnet(ctx, svc, "", as.ID)
 					if innerXErr != nil {
 						return innerXErr
 					}
 
-					innerXErr = rs.Alter(ctx, func(clonable data.Clonable, properties *serialize.JSONProperties) fail.Error {
+					innerXErr = subnetInstance.Alter(ctx, func(clonable data.Clonable, properties *serialize.JSONProperties) fail.Error {
 						return properties.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 							subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
 							if !ok {
@@ -2275,7 +2276,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	}
 	incrementExpVar("host.cache.hit")
 
-	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
+	// Reset userdata script for Host from Cloud provider metadata service (if stack is able to do so)
 	svc := instance.Service()
 
 	hostID, err := instance.GetID()
@@ -3082,7 +3083,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Deletes metadata from Object Storage
-	xerr = instance.MetadataCore.Delete(ctx)
+	xerr = instance.Core.Delete(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		// If entry not found, considered as a success

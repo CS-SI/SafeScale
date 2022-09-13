@@ -47,7 +47,7 @@ import (
 type Feature struct {
 	file       *FeatureFile
 	installers map[installmethod.Enum]Installer // defines the installers available for the Feature
-	svc        iaas.Service                     // is the iaas.Service to use to interact with Cloud Provider
+	svc        iaas.Service                     // is the iaas.Service to use to interact with Cloud provider
 
 	machines map[string]resources.Host
 

@@ -30,7 +30,6 @@ import (
 
 // networkConsumer is the part of safescale client handling Networking
 type networkConsumer struct {
-	// session is not used currently
 	session *Session
 }
 

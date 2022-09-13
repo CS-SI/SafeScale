@@ -34,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -67,7 +68,7 @@ const (
 
 // Subnet links Object Storage MetadataFolder and Subnet
 type Subnet struct {
-	*MetadataCore
+	*metadata.Core
 
 	localCache struct {
 		sync.RWMutex
@@ -120,14 +121,14 @@ func NewSubnet(svc iaas.Service) (_ *Subnet, ferr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := NewCore(svc, subnetKind, subnetsFolderName, &abstract.Subnet{})
+	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, subnetKind, subnetsFolderName, &abstract.Subnet{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	instance := &Subnet{
-		MetadataCore: coreInstance,
+		Core: coreInstance,
 	}
 	return instance, nil
 }
@@ -416,7 +417,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 
 // IsNull tells if the instance is a null value
 func (instance *Subnet) IsNull() bool {
-	return instance == nil || (instance != nil && ((instance.MetadataCore == nil) || (instance.MetadataCore != nil && valid.IsNil(instance.MetadataCore))))
+	return instance == nil || (instance != nil && ((instance.Core == nil) || (instance.Core != nil && valid.IsNil(instance.Core))))
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -444,7 +445,7 @@ func (instance *Subnet) Carry(ctx context.Context, clonable data.Clonable) (ferr
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	xerr := instance.MetadataCore.Carry(ctx, clonable)
+	xerr := instance.Core.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -461,8 +462,8 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance.MetadataCore) {
-		if instance.MetadataCore.IsTaken() {
+	if !valid.IsNil(instance.Core) {
+		if instance.Core.IsTaken() {
 			return fail.InconsistentError("already carrying information")
 		}
 	}
@@ -824,7 +825,7 @@ func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subn
 		return fail.InvalidParameterError("callback", "can't be nil")
 	}
 
-	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
+	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		as := abstract.NewSubnet()
 		xerr := as.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1326,7 +1327,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 		}
 
 		// Remove metadata
-		xerr = instance.MetadataCore.Delete(ctx)
+		xerr = instance.Core.Delete(ctx)
 		if xerr != nil {
 			ar := result{xerr}
 			chRes <- ar

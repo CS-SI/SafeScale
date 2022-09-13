@@ -641,7 +641,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !req.KeepOnFailure {
-				if derr := instance.MetadataCore.Delete(context.Background()); derr != nil {
+				if derr := instance.Core.Delete(context.Background()); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet metadata", ActionFromError(ferr)))
 				}
 			}

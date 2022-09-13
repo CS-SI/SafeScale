@@ -48,7 +48,6 @@ import (
 
 // ssh is the part of the safescale client that handles SSH stuff
 type sshConsumer struct {
-	// session is not used currently
 	session *Session
 }
 

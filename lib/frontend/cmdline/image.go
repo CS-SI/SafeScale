@@ -26,7 +26,6 @@ import (
 
 // imageConsumer is the safescale client part handling images
 type imageConsumer struct {
-	// session is not used currently
 	session *Session
 }
 

@@ -18,7 +18,9 @@ package metadata
 
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage/bucket"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage/consul"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -28,12 +30,12 @@ const (
 )
 
 // NewFolder creates a Folder corresponding to the method wanted
-func NewFolder(method string, svc iaas.Service, path string) (Folder, fail.Error) {
+func NewFolder(method string, svc iaas.Service, path string) (storage.Folder, fail.Error) {
 	switch method {
 	case MethodObjectStorage:
-		return objectstorage.NewFolder(svc, path)
+		return bucket.NewFolder(svc, path)
 	case MethodConsul:
-		return consul.NewFolder(path)
+		return consul.NewFolder(svc, path)
 	default:
 		return nil, fail.InvalidParameterError("method", "'%s' method is unsupported", method)
 	}

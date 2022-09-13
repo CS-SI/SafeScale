@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -48,7 +49,7 @@ const (
 
 // Network links Object Storage MetadataFolder and Networking
 type Network struct {
-	*MetadataCore
+	*metadata.Core
 }
 
 // NewNetwork creates an instance of Networking
@@ -57,14 +58,14 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := NewCore(svc, networkKind, networksFolderName, &abstract.Network{})
+	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, networkKind, networksFolderName, &abstract.Network{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	instance := &Network{
-		MetadataCore: coreInstance,
+		Core: coreInstance,
 	}
 	return instance, nil
 }
@@ -196,7 +197,7 @@ func onNetworkCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data
 
 // IsNull tells if the instance corresponds to subnet Null Value
 func (instance *Network) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
+	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -223,13 +224,13 @@ func (instance *Network) Exists(ctx context.Context) (bool, fail.Error) {
 //   - *fail.ErrInvalidParameter: one parameter is invalid
 //   - *failErrInvalidInstance: Create() is called from bad instance (nil or null value)
 //   - *fail.ErrNotAvailable: a Network with the same name is currently created
-//   - *fail.ErrDuplicate: a Network with the same name already exist on Provider Side (managed or not by SafeScale)
+//   - *fail.ErrDuplicate: a Network with the same name already exist on provider Side (managed or not by SafeScale)
 //   - *fail.ErrAborted: abort signal has been received
 func (instance *Network) Create(inctx context.Context, req abstract.NetworkRequest) (_ fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance.MetadataCore) && instance.MetadataCore.IsTaken() {
+	if !valid.IsNil(instance.Core) && instance.Core.IsTaken() {
 		return fail.NotAvailableError("already carrying information")
 	}
 	if inctx == nil {
@@ -358,12 +359,12 @@ func (instance *Network) carry(ctx context.Context, clonable data.Clonable) (fer
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if instance.MetadataCore.IsTaken() {
+	if instance.Core.IsTaken() {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(ctx, clonable)
+	xerr := instance.Core.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -379,7 +380,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) && instance.MetadataCore.IsTaken() {
+	if !valid.IsNil(instance) && instance.Core.IsTaken() {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if ctx == nil {
@@ -442,7 +443,7 @@ func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Net
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
+	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		an := abstract.NewNetwork()
 		xerr := an.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -691,7 +692,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 		}
 
 		// Remove metadata
-		xerr = instance.MetadataCore.Delete(ctx)
+		xerr = instance.Core.Delete(ctx)
 		if xerr != nil {
 			xerr.WithContext(ctx)
 			chRes <- result{xerr}

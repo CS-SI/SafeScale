@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -38,11 +38,11 @@ func (s stack) GetAuthOpts() (providers.Config, error) {
 }
 
 // GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
+func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.ConfigurationOptions, fail.Error) {
 	return s.cfgOpts, nil
 }
 
 // GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
+func (s stack) GetRawAuthenticationOptions(context.Context) (stackoptions.AuthenticationOptions, fail.Error) {
 	return s.authOpts, nil
 }

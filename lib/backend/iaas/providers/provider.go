@@ -20,7 +20,7 @@ import (
 	"context"
 	"regexp"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -30,7 +30,7 @@ import (
 // Provider is the interface to cloud stack
 // It has to recall Stack api, to serve as Provider AND as Stack
 type Provider interface {
-	api.Stack
+	stacks.Stack
 
 	// Build builds a new Client from configuration parameter and can be called from nil
 	Build(map[string]interface{}) (Provider, fail.Error)
@@ -47,14 +47,19 @@ type Provider interface {
 	// GetConfigurationOptions returns configuration options as a Config
 	GetConfigurationOptions(ctx context.Context) (Config, fail.Error)
 
-	GetName() (string, fail.Error)     // GetName returns the tenant name
-	GetStack() (api.Stack, fail.Error) // Returns the stack object used by the provider. Use with caution
+	GetName() (string, fail.Error)        // GetName returns the tenant name
+	GetStack() (stacks.Stack, fail.Error) // Returns the stack object used by the Provider. Use with caution
 
 	GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error)
 
-	// GetCapabilities returns the capabilities of the provider
+	// GetCapabilities returns the capabilities of the Provider
 	GetCapabilities(ctx context.Context) (Capabilities, fail.Error)
 
 	// GetTenantParameters returns the tenant parameters as read
 	GetTenantParameters() (map[string]interface{}, fail.Error)
+
+	// HasDefaultNetwork tells if the stack has a default network (defined in tenant settings)
+	HasDefaultNetwork(ctx context.Context) (bool, fail.Error)
+	// GetDefaultNetwork returns the abstract.Network used as default Network
+	GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error)
 }

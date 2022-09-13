@@ -38,7 +38,7 @@ const (
 	// defaultHostCleanupTimeout is the default timeout of host teardown operations
 	defaultHostCleanupTimeout = 5 * time.Minute
 
-	// defaultCommunicationTimeout is the default timeout for HTTP communication with Provider
+	// defaultCommunicationTimeout is the default timeout for HTTP communication with provider
 	defaultCommunicationTimeout = 3 * time.Minute
 
 	// defaultMetadataTimeout default timeout to handle object storage issues

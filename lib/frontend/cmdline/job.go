@@ -28,7 +28,6 @@ import (
 
 // jobConsumer is the part of the safescale client handling jobs
 type jobConsumer struct {
-	// session is not used currently.
 	session *Session
 }
 

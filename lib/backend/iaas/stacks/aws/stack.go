@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -37,8 +38,8 @@ import (
 )
 
 type stack struct {
-	Config      *stacks.ConfigurationOptions
-	AuthOptions *stacks.AuthenticationOptions
+	Config      *stackoptions.ConfigurationOptions
+	AuthOptions *stackoptions.AuthenticationOptions
 	AwsConfig   *stacks.AWSConfiguration
 
 	S3Service      *s3.S3
@@ -65,23 +66,23 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
+func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.ConfigurationOptions, fail.Error) {
 	if valid.IsNil(s) {
-		return stacks.ConfigurationOptions{}, fail.InvalidInstanceError()
+		return stackoptions.ConfigurationOptions{}, fail.InvalidInstanceError()
 	}
 	return *s.Config, nil
 }
 
 // GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
+func (s stack) GetRawAuthenticationOptions(context.Context) (stackoptions.AuthenticationOptions, fail.Error) {
 	if valid.IsNil(s) {
-		return stacks.AuthenticationOptions{}, fail.InvalidInstanceError()
+		return stackoptions.AuthenticationOptions{}, fail.InvalidInstanceError()
 	}
 	return *s.AuthOptions, nil
 }
 
 // New creates and initializes an AWS stack
-func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (*stack, error) { // nolint
+func New(auth stackoptions.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stackoptions.ConfigurationOptions) (*stack, error) { // nolint
 	if localCfg.Ec2Endpoint == "" {
 		localCfg.Ec2Endpoint = fmt.Sprintf("https://ec2.%s.amazonaws.com", localCfg.Region)
 	}

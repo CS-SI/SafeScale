@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
@@ -33,8 +34,8 @@ import (
 
 // stack ...
 type stack struct {
-	Config      *stacks.ConfigurationOptions
-	AuthOptions *stacks.AuthenticationOptions
+	Config      *stackoptions.ConfigurationOptions
+	AuthOptions *stackoptions.AuthenticationOptions
 	GcpConfig   *stacks.GCPConfiguration
 
 	ComputeService *compute.Service
@@ -59,23 +60,23 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
+func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.ConfigurationOptions, fail.Error) {
 	if valid.IsNil(s) || s.Config == nil {
-		return stacks.ConfigurationOptions{}, fail.InvalidInstanceError()
+		return stackoptions.ConfigurationOptions{}, fail.InvalidInstanceError()
 	}
 	return *s.Config, nil
 }
 
 // GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
+func (s stack) GetRawAuthenticationOptions(context.Context) (stackoptions.AuthenticationOptions, fail.Error) {
 	if valid.IsNil(s) || s.AuthOptions == nil {
-		return stacks.AuthenticationOptions{}, fail.InvalidInstanceError()
+		return stackoptions.AuthenticationOptions{}, fail.InvalidInstanceError()
 	}
 	return *s.AuthOptions, nil
 }
 
 // New Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
+func New(auth stackoptions.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stackoptions.ConfigurationOptions) (*stack, fail.Error) { // nolint
 	gcpStack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,

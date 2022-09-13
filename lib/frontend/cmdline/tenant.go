@@ -29,7 +29,6 @@ import (
 
 // tenantConsumer is the part of safescale client handling tenants
 type tenantConsumer struct {
-	// session is not used currently
 	session *Session
 }
 

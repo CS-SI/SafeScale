@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package api
+package stacks
 
 import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
@@ -60,15 +60,15 @@ type Stack interface {
 	// CreateSecurityGroup creates a security group
 	CreateSecurityGroup(ctx context.Context, networkRef, name, description string, rules abstract.SecurityGroupRules) (*abstract.SecurityGroup, fail.Error)
 	// InspectSecurityGroup returns information about a security group
-	InspectSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
+	InspectSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
 	// ClearSecurityGroup removes rules from group
-	ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
+	ClearSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
 	// DeleteSecurityGroup deletes a security group and all its rules
 	DeleteSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error
 	// AddRuleToSecurityGroup adds a rule to an existing security group
-	AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+	AddRuleToSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
-	DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+	DeleteRuleFromSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// GetDefaultSecurityGroupName returns the name of the default security group automatically bound to new host
 	GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error)
 	// EnableSecurityGroup enables a Security Group
@@ -86,10 +86,6 @@ type Stack interface {
 	ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error)
 	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(ctx context.Context, id string) fail.Error
-	// HasDefaultNetwork tells if the stack has a default network (defined in tenant settings)
-	HasDefaultNetwork(ctx context.Context) (bool, fail.Error)
-	// GetDefaultNetwork returns the abstract.Network used as default Network
-	GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error)
 
 	// CreateSubnet creates a subnet in an existing network
 	CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (*abstract.Subnet, fail.Error)
@@ -116,32 +112,32 @@ type Stack interface {
 	// CreateHost creates a host that fulfills the request
 	CreateHost(ctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error)
 	// ClearHostStartupScript clears the Startup Script of the Host (if the stack can do it)
-	ClearHostStartupScript(context.Context, stacks.HostParameter) fail.Error
+	ClearHostStartupScript(context.Context, HostParameter) fail.Error
 
 	ChangeSecurityGroupSecurity(context.Context, bool, bool, string, string) fail.Error
 
 	// InspectHost returns the information of the Host identified by id
-	InspectHost(context.Context, stacks.HostParameter) (*abstract.HostFull, fail.Error)
+	InspectHost(context.Context, HostParameter) (*abstract.HostFull, fail.Error)
 	// GetHostState returns the current state of the host identified by id
-	GetHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error)
+	GetHostState(context.Context, HostParameter) (hoststate.Enum, fail.Error)
 	// ListHosts lists all hosts
 	ListHosts(context.Context, bool) (abstract.HostList, fail.Error)
 	// DeleteHost deletes the host identified by id
-	DeleteHost(context.Context, stacks.HostParameter) fail.Error
+	DeleteHost(context.Context, HostParameter) fail.Error
 	// StopHost stops the host identified by id
-	StopHost(ctx context.Context, host stacks.HostParameter, gracefully bool) fail.Error
+	StopHost(ctx context.Context, host HostParameter, gracefully bool) fail.Error
 	// StartHost starts the host identified by id
-	StartHost(context.Context, stacks.HostParameter) fail.Error
+	StartHost(context.Context, HostParameter) fail.Error
 	// RebootHost reboots a host
-	RebootHost(context.Context, stacks.HostParameter) fail.Error
+	RebootHost(context.Context, HostParameter) fail.Error
 	// ResizeHost resizes a host
-	ResizeHost(context.Context, stacks.HostParameter, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error)
+	ResizeHost(context.Context, HostParameter, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error)
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
-	WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error)
+	WaitHostReady(ctx context.Context, hostParam HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error)
 	// BindSecurityGroupToHost attaches a security group to a host
-	BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error
+	BindSecurityGroupToHost(ctx context.Context, sgParam SecurityGroupParameter, hostParam HostParameter) fail.Error
 	// UnbindSecurityGroupFromHost detaches a security group from a host
-	UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error
+	UnbindSecurityGroupFromHost(ctx context.Context, sgParam SecurityGroupParameter, hostParam HostParameter) fail.Error
 
 	// CreateVolume creates a block volume
 	CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error)
@@ -170,10 +166,12 @@ type Stack interface {
 
 // ReservedForProviderUse is an interface about the methods only available to providers internally
 type ReservedForProviderUse interface {
-	ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error)                   // lists available OS images
-	ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error)         // lists available host templates
-	GetRawConfigurationOptions(ctx context.Context) (stacks.ConfigurationOptions, fail.Error)   // Returns a read-only struct containing configuration options
-	GetRawAuthenticationOptions(ctx context.Context) (stacks.AuthenticationOptions, fail.Error) // Returns a read-only struct containing authentication options
+	ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error)                    // list available OS images
+	ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error)          // list available host templates
+	GetRawConfigurationOptions(ctx context.Context) (options.ConfigurationOptions, fail.Error)   // Return a read-only struct containing configuration options
+	GetRawAuthenticationOptions(ctx context.Context) (options.AuthenticationOptions, fail.Error) // Return a read-only struct containing authentication options
+	HasDefaultNetwork(ctx context.Context) (bool, fail.Error)                                    // return true if the stack as a default network set (coming from tenants file)
+	GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error)                       // return the *abstract.Network corresponding to the default network
 }
 
 // FullStack is the interface that MUST actually implement all the providers; don't do it, and we can encounter runtime panics

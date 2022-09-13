@@ -25,6 +25,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/eko/gocache/v2/store"
@@ -57,7 +58,7 @@ const (
 
 // Volume links Object Storage MetadataFolder and unsafeGetVolumes
 type volume struct {
-	*MetadataCore
+	*metadata.Core
 }
 
 // NewVolume creates an instance of Volume
@@ -66,14 +67,14 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := NewCore(svc, volumeKind, volumesFolderName, &abstract.Volume{})
+	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, volumeKind, volumesFolderName, &abstract.Volume{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	instance := &volume{
-		MetadataCore: coreInstance,
+		Core: coreInstance,
 	}
 	return instance, nil
 }
@@ -206,7 +207,7 @@ func onVolumeCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.
 
 // IsNull tells if the instance is a null value
 func (instance *volume) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
+	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -234,7 +235,7 @@ func (instance *volume) carry(ctx context.Context, clonable data.Clonable) (ferr
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		if instance.MetadataCore.IsTaken() {
+		if instance.Core.IsTaken() {
 			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 		}
 	}
@@ -243,7 +244,7 @@ func (instance *volume) carry(ctx context.Context, clonable data.Clonable) (ferr
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(ctx, clonable)
+	xerr := instance.Core.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -329,7 +330,7 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume")).Entering()
 	defer tracer.Exiting()
 
-	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
+	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		av := abstract.NewVolume()
 		xerr := av.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -408,7 +409,7 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// remove metadata
-	return instance.MetadataCore.Delete(ctx)
+	return instance.Core.Delete(ctx)
 }
 
 // Create a volume
@@ -419,8 +420,8 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance.MetadataCore) {
-		if instance.MetadataCore.IsTaken() {
+	if !valid.IsNil(instance.Core) {
+		if instance.Core.IsTaken() {
 			return fail.InconsistentError("already carrying information")
 		}
 	}

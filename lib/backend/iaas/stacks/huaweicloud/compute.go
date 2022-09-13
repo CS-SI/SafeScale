@@ -463,7 +463,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		return nil, nil, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
-	// --- prepares data structures for Provider usage ---
+	// --- prepares data structures for provider usage ---
 
 	timings, xerr := s.Timings()
 	if xerr != nil {

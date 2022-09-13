@@ -109,7 +109,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 		tenantInCfg = true
 		provider, found = tenant["provider"].(string)
 		if !found {
-			provider, found = tenant["Provider"].(string)
+			provider, found = tenant["provider"].(string)
 			if !found {
 				provider, found = tenant["client"].(string)
 				if !found {
@@ -145,7 +145,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 		_, tenantObjectStorageFound := tenant["objectstorage"]
 		_, tenantMetadataFound := tenant["metadata"]
 
-		// Initializes Provider
+		// Initializes provider
 		providerInstance, xerr := svc.Build(tenant)
 		if xerr != nil {
 			return NullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)

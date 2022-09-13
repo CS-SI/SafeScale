@@ -19,15 +19,15 @@ package outscale
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
+func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.ConfigurationOptions, fail.Error) {
 	// FIXME: Wrong
-	return stacks.ConfigurationOptions{
+	return stackoptions.ConfigurationOptions{
 		ProviderNetwork:           "",
 		DNSList:                   s.Options.Compute.DNSList,
 		UseFloatingIP:             false,
@@ -57,8 +57,8 @@ func (s stack) GetRawConfigurationOptions(context.Context) (stacks.Configuration
 }
 
 // GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
-	return stacks.AuthenticationOptions{
+func (s stack) GetRawAuthenticationOptions(context.Context) (stackoptions.AuthenticationOptions, fail.Error) {
+	return stackoptions.AuthenticationOptions{
 		IdentityEndpoint: s.Options.Compute.URL,
 		Username:         "",
 		UserID:           "",

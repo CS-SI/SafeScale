@@ -26,7 +26,6 @@ import (
 
 // templateConsumer is the safescale client part handling templates
 type templateConsumer struct {
-	// session is not used currently
 	session *Session
 }
 

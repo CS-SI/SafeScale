@@ -34,7 +34,6 @@ import (
 
 // securityGroupConsumer is the SafeScale client part handling security groups
 type securityGroupConsumer struct {
-	// session is not used currently
 	session *Session
 }
 

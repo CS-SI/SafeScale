@@ -34,7 +34,6 @@ import (
 
 // clusterConsumer is the safescale client part handling clusters
 type clusterConsumer struct {
-	// session is not used currently
 	session *Session
 }
 

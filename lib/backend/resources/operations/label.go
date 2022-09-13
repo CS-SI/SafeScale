@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	"github.com/eko/gocache/v2/store"
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
@@ -48,7 +49,7 @@ const (
 
 // label links Object Storage MetadataFolder and Labels/Tags
 type label struct {
-	*MetadataCore
+	*metadata.Core
 }
 
 // verify that Label satisfies resources.Label
@@ -60,14 +61,14 @@ func NewLabel(svc iaas.Service) (_ resources.Label, ferr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := NewCore(svc, labelKind, labelsFolderName, abstract.NewLabel())
+	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, labelKind, labelsFolderName, abstract.NewLabel())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	instance := &label{
-		MetadataCore: coreInstance,
+		Core: coreInstance,
 	}
 	return instance, nil
 }
@@ -200,7 +201,7 @@ func onLabelCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.I
 
 // IsNull tells if the instance is a null value
 func (instance *label) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
+	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
 }
 
 // carry overloads rv.core.Carry() to add Label to service cache
@@ -209,7 +210,7 @@ func (instance *label) carry(ctx context.Context, clonable data.Clonable) (ferr 
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		if instance.MetadataCore.IsTaken() {
+		if instance.Core.IsTaken() {
 			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 		}
 	}
@@ -218,7 +219,7 @@ func (instance *label) carry(ctx context.Context, clonable data.Clonable) (ferr 
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(ctx, clonable)
+	xerr := instance.Core.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -245,7 +246,7 @@ func (instance *label) Browse(ctx context.Context, callback func(*abstract.Label
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label")).Entering()
 	defer tracer.Exiting()
 
-	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
+	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		at := abstract.NewLabel()
 		xerr := at.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -311,7 +312,7 @@ func (instance *label) Delete(inctx context.Context) fail.Error {
 			}
 
 			// remove metadata
-			return instance.MetadataCore.Delete(ctx)
+			return instance.Core.Delete(ctx)
 		}()
 		chRes <- result{gerr}
 	}()
@@ -333,8 +334,8 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance.MetadataCore) {
-		if instance.MetadataCore.IsTaken() {
+	if !valid.IsNil(instance.Core) {
+		if instance.Core.IsTaken() {
 			return fail.InconsistentError("already carrying information")
 		}
 	}

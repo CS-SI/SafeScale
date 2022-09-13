@@ -38,7 +38,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
@@ -493,7 +492,7 @@ func (e *ServiceTest) _reset() {
 	e.options.nameErr = nil
 	e.options.operatorusername = "safescale"
 	e.options.operatorusernameErr = nil
-	e.options.providername = "MyServiceTest-Provider"
+	e.options.providername = "MyServiceTest-provider"
 	e.options.providernameErr = nil
 	e.options.stackname = "MyServiceTest-Stack"
 	e.options.stacknameErr = nil
@@ -2811,7 +2810,7 @@ func (e *ServiceTest) Timings() (temporal.Timings, fail.Error) {
 
 // providers.Provider
 func (e *ServiceTest) Build(map[string]interface{}) (providers.Provider, fail.Error) {
-	return providers.ProviderProxy{Name: "ServiceTest"}, nil
+	return providers.Remediator{Name: "ServiceTest"}, nil
 }
 func (e *ServiceTest) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
 	e._survey("ServiceTest::ListImages (not implemented)")

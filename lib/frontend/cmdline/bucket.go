@@ -30,7 +30,6 @@ import (
 
 // bucketConsumer is the part of the safescale client handling buckets
 type bucketConsumer struct {
-	// session is not used currently.
 	session *Session
 }
 
