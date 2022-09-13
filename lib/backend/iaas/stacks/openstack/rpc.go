@@ -419,7 +419,7 @@ func (s stack) rpcChangePortSecurity(ctx context.Context, portID string, state b
 	return port, nil
 }
 
-// rpcCreatePort creates a port
+// rpcRemoveSGFromPort removes all SG from ports
 func (s stack) rpcRemoveSGFromPort(ctx context.Context, portID string) (_ *ports.Port, ferr fail.Error) {
 	var port *ports.Port
 

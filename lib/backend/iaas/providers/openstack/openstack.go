@@ -132,6 +132,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	isSafe, ok := compute["Safe"].(bool) // nolint
+	if !ok {
+		isSafe = true
+	}
+	params["Safe"] = isSafe
+
+	logrus.Warningf("Setting safety to: %t", isSafe)
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -179,6 +187,7 @@ next:
 		},
 		MaxLifeTime: maxLifeTime,
 		Timings:     timings,
+		Safe:        isSafe,
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -247,6 +256,7 @@ func (p *provider) GetConfigurationOptions(ctx context.Context) (providers.Confi
 	cfg.Set("ProviderName", provName)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
+	cfg.Set("Safe", opts.Safe)
 
 	return cfg, nil
 }

@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/schollz/progressbar/v3"
@@ -94,12 +95,29 @@ var sshRun = cli.Command{
 	},
 }
 
-func normalizeFileName(fileName string) (string, error) {
+func normalizeExistingFileName(fileName string) (string, error) {
+	if strings.Contains(fileName, ":") { // it's a remote reference, no need to normalize
+		return fileName, nil
+	}
+
 	absPath, err := filepath.Abs(fileName)
 	if err != nil {
 		return "", err
 	}
 	if _, err := os.Stat(absPath); err != nil {
+		return "", err
+	}
+
+	return absPath, nil
+}
+
+func normalizeFileName(fileName string) (string, error) {
+	if strings.Contains(fileName, ":") { // it's a remote reference, no need to normalize
+		return fileName, nil
+	}
+
+	absPath, err := filepath.Abs(fileName)
+	if err != nil {
 		return "", err
 	}
 
@@ -152,12 +170,13 @@ var sshCopy = cli.Command{
 			}()
 		}
 
-		first, err := normalizeFileName(c.Args().Get(0))
+		first, err := normalizeExistingFileName(c.Args().Get(0))
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))
 		}
 
+		// the second file name (destination) might not exist
 		second, err := normalizeFileName(c.Args().Get(1))
 		if err != nil {
 			err = fail.FromGRPCStatus(err)

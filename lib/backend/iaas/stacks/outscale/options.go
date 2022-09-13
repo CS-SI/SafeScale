@@ -26,7 +26,7 @@ import (
 
 // GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
-	// FIXME: Wrong
+	// FIXME: OPP Wrong
 	return stacks.ConfigurationOptions{
 		ProviderNetwork:           "",
 		DNSList:                   s.Options.Compute.DNSList,
@@ -52,12 +52,14 @@ func (s stack) GetRawConfigurationOptions(context.Context) (stacks.Configuration
 		WhitelistImageRegexp:     nil,
 		BlacklistImageRegexp:     nil,
 		MaxLifeTime:              0,
-		Timings:                  nil,
+		Timings:                  s.Options.Timings,
+		Safe:                     s.Options.Compute.Safe,
 	}, nil
 }
 
 // GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
+	// FIXME: OPP Wrong
 	return stacks.AuthenticationOptions{
 		IdentityEndpoint: s.Options.Compute.URL,
 		Username:         "",

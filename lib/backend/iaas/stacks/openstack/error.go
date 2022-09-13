@@ -138,6 +138,12 @@ func NormalizeError(err error) fail.Error {
 			tracer.Trace("received 'net.Error', normalized to 'fail.Error' with cause")
 			return fail.NewErrorWithCause(e)
 		default:
+			if strings.Contains(err.Error(), "Bad request with") {
+				return fail.InvalidRequestError(e.Error())
+			}
+			if strings.Contains(err.Error(), "NeutronError") {
+				return fail.InvalidRequestError(e.Error())
+			}
 			return fail.ConvertError(defaultErrorInterpreter(err))
 		}
 	}

@@ -1265,9 +1265,11 @@ func (instance *Host) implCreate(
 			}
 		}
 
-		if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
-			if val, ok := tpar["Safe"].(bool); ok {
-				safe = val
+		if cfg, xerr := svc.GetConfigurationOptions(ctx); xerr == nil {
+			if aval, ok := cfg.Get("Safe"); ok {
+				if val, ok := aval.(bool); ok {
+					safe = val
+				}
 			}
 		}
 
@@ -1703,9 +1705,11 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					}
 				}
 
-				if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
-					if val, ok := tpar["Safe"].(bool); ok {
-						safe = val
+				if cfg, xerr := svc.GetConfigurationOptions(ctx); xerr == nil {
+					if aval, ok := cfg.Get("Safe"); ok {
+						if val, ok := aval.(bool); ok {
+							safe = val
+						}
 					}
 				}
 

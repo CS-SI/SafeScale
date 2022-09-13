@@ -143,8 +143,8 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	return &nj, nil
 }
 
-// isNull tells if the instance represents a null value
-func (instance *job) isNull() bool {
+// IsNull tells if the instance represents a null value
+func (instance *job) IsNull() bool {
 	return instance == nil || instance.uuid == ""
 }
 
@@ -208,7 +208,7 @@ func (instance job) Aborted() (bool, fail.Error) {
 	return status == concurrency.ABORTED, nil
 }
 
-// Close tells the job to wait for end of operation; this ensure everything is cleaned up correctly
+// Close tells the job to wait for end of operation; this ensures everything is cleaned up correctly
 func (instance *job) Close() {
 	_ = deregister(instance)
 	if instance.cancel != nil {

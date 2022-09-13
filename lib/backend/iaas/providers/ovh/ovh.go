@@ -163,6 +163,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	isSafe, ok := compute["Safe"].(bool) // nolint
+	if !ok {
+		isSafe = false // all providers are safe by default except this, due to Stein
+	}
+	params["Safe"] = isSafe
+
+	logrus.Warningf("Setting safety to: %t", isSafe)
+
 	defaultImage, ok := compute["DefaultImage"].(string)
 	if !ok {
 		defaultImage = ovhDefaultImage
@@ -231,6 +239,7 @@ next:
 		DefaultImage:             defaultImage,
 		MaxLifeTime:              maxLifeTime,
 		Timings:                  timings,
+		Safe:                     isSafe,
 	}
 
 	serviceVersions := map[string]string{"volume": "v2"}
@@ -310,6 +319,7 @@ func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config
 	cfg.Set("ProviderName", provName)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
+	cfg.Set("Safe", opts.Safe)
 
 	return cfg, nil
 }

@@ -1230,9 +1230,11 @@ func (instance *Subnet) unsafeCreateGateways(
 					}
 				}
 
-				if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
-					if val, ok := tpar["Safe"].(bool); ok {
-						safe = val
+				if cfg, xerr := svc.GetConfigurationOptions(ctx); xerr == nil {
+					if aval, ok := cfg.Get("Safe"); ok {
+						if val, ok := aval.(bool); ok {
+							safe = val
+						}
 					}
 				}
 
@@ -1312,9 +1314,11 @@ func (instance *Subnet) unsafeCreateGateways(
 					}
 				}
 
-				if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
-					if val, ok := tpar["Safe"].(bool); ok {
-						safe = val
+				if cfg, xerr := svc.GetConfigurationOptions(ctx); xerr == nil {
+					if aval, ok := cfg.Get("Safe"); ok {
+						if val, ok := aval.(bool); ok {
+							safe = val
+						}
 					}
 				}
 
@@ -1327,7 +1331,7 @@ func (instance *Subnet) unsafeCreateGateways(
 				}
 				secondaryUserdata, ok = aresult["userdata"].(*userdata.Content)
 				if !ok {
-					xerr := fail.InvalidParameterError("result[userdata] shoulde be a *userdate.Content")
+					xerr := fail.InvalidParameterError("result[userdata] should be a *userdate.Content")
 					chRes <- result{xerr}
 					return xerr
 				}

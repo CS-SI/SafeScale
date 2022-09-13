@@ -34,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -137,6 +138,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	isSafe, ok := computeCfg["Safe"].(bool) // nolint
+	if !ok {
+		isSafe = true
+	}
+	params["Safe"] = isSafe
+
+	logrus.Warningf("Setting safety to: %t", isSafe)
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -201,6 +210,7 @@ next:
 		ProviderName:     providerName,
 		MaxLifeTime:      maxLifeTime,
 		Timings:          timings,
+		Safe:             isSafe,
 	}
 
 	gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)
@@ -267,6 +277,7 @@ func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("ProviderName", provName)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
+	cfg.Set("Safe", opts.Safe)
 	return cfg, nil
 }
 
