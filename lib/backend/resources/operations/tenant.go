@@ -20,7 +20,6 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
@@ -101,7 +100,7 @@ func SetCurrentTenant(ctx context.Context, tenantName string) error {
 }
 
 func loadTenant(ctx context.Context, tenantName string) (iaas.Service, fail.Error) {
-	service, xerr := iaas.UseService(tenantName, metadata.MinimumMetadataVersion)
+	service, xerr := iaas.UseService(tenantName /*, metadata.MinimumMetadataVersion*/)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

@@ -40,7 +40,7 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 
 	var tenant *operations.Tenant
 	if tenantID != "" {
-		service, xerr := iaas.UseService(tenantID, "")
+		service, xerr := iaas.UseService(tenantID /*, ""*/)
 		if xerr != nil {
 			return nil, xerr
 		}

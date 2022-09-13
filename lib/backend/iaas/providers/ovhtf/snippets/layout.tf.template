@@ -1,0 +1,26 @@
+terraform {
+    required_version = "{{ .TerraformRelease }}"
+    required_providers {
+    	{{ range $i := .RequiredProviders }}
+        {{ $i.Name }} = {
+            source  = "{{ $i.Source }}"
+            version = "{{ $i.Version }}"
+        }
+        {{ end }}
+    }
+
+    {{ if .ConsulConfiguration }}
+    {{ .ConsulConfiguration }}
+    {{ end }}
+}
+
+{{ .ProviderConfigurations }}
+
+{{ if .ConsulConfiguration }}
+data "terraform_remote_state" "consul-state" {
+  backend = "consul"
+  config = {
+    path = "full/path"
+  }
+}
+{{ .Resources }}
