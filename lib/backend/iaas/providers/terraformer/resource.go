@@ -22,8 +22,12 @@ type ResourceCore struct {
 }
 
 // NewResourceCore creates a new instance of ResourceCore
-func NewResourceCore(name string) ResourceCore {
-	return ResourceCore{name: name}
+func NewResourceCore(name string, snippet string) ResourceCore {
+	return ResourceCore{name: name, snippet: snippet}
+}
+
+func (rc ResourceCore) Name() string {
+	return rc.name
 }
 
 func (rc ResourceCore) Snippet() string {

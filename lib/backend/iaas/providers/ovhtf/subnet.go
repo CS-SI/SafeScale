@@ -29,8 +29,10 @@ import (
 )
 
 type subnetResource struct {
-	ResourceCore
+	terraformer.ResourceCore
 	networkID string
+	cidr      string
+	ipVersion string
 }
 
 const (
@@ -38,16 +40,17 @@ const (
 )
 
 func newSubnetResource(name string) terraformer.Resource {
-	out := &subnetResource{ResourceCore: NewResourceCore(name)}
-	out.ResourceCore.snippet = subnetResourceSnippetPath
+	out := &subnetResource{ResourceCore: terraformer.NewResourceCore(name, subnetResourceSnippetPath)}
 	return out
 }
 
 // ToMap returns a map of networkResource field to be used where needed
 func (nr *subnetResource) ToMap() map[string]any {
 	return map[string]any{
-		"Name": nr.Name(),
-		"ID":   nr.networkID,
+		"Name":      nr.Name(),
+		"ID":        nr.networkID,
+		"CIDR":      nr.cidr,
+		"IPVersion": nr.ipVersion,
 	}
 }
 

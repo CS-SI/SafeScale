@@ -1,6 +1,6 @@
 resource "openstack_networking_network_v2" "{{ .Resource.Name }}" {
     # count                   = length(var.request.networks)
-    provider                = {{ .tf_provider }} 						# openstack.ovh
+    provider                = {{ .Provider.Name }} 						# openstack.ovh
     name                    = "{{ .Resource.Name }}"					# var.request.networks[count.index].Name
     admin_state_up          = true
     port_security_enabled   = true

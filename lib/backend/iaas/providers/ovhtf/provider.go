@@ -77,15 +77,15 @@ var (
 
 // provider is the provider implementation of the OVH provider
 type provider struct {
-	stacks.Stack
-
+	// stacks.Stack
 	ExternalNetworkID string
-
-	tenantParameters map[string]interface{}
 
 	// go:embed snippets
 	efs embed.FS // contains embedded files used by the provider for any purpose
 
+	tenantParameters  map[string]interface{}
+	authOptions       stackoptions.AuthenticationOptions
+	configOptions     stackoptions.ConfigurationOptions
 	configSnippetPath string // contains the path of the provider configuration configSnippetPath in efs
 	tfWorkdir         string // contains the target work dir for terraform
 
@@ -93,7 +93,7 @@ type provider struct {
 
 // IsNull returns true if the instance is considered as a null value
 func (p *provider) IsNull() bool {
-	return p == nil || p.Stack == nil
+	return p == nil // || p.Stack == nil
 }
 
 // Build builds a new instance of Ovh using configuration parameters
@@ -247,15 +247,17 @@ next:
 	}
 
 	// Note: if timings have to be tuned, update stack.MutableTimings
-
-	wrapped := stacks.Remediator{
-		FullStack: stack,
-		Name:      providerName,
-	}
+	//
+	// wrapped := stacks.Remediator{
+	// 	FullStack: stack,
+	// 	Name:      providerName,
+	// }
 
 	newP := &provider{
-		Stack:            wrapped,
+		// Stack:            wrapped,
 		tenantParameters: params,
+		authOptions:      authOptions,
+		configOptions:    cfgOptions,
 	}
 
 	wp := providers.Remediator{
@@ -313,15 +315,6 @@ func (p *provider) GetConfigurationOptions(ctx context.Context) (providers.Confi
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
 	return cfg, nil
-}
-
-// ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
-	if valid.IsNull(p) {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	return p.Stack.(stacks.ReservedForProviderUse).ListImages(ctx, all)
 }
 
 // GetName returns the name of the driver

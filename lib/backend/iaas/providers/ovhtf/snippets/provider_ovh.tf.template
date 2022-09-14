@@ -1,17 +1,17 @@
 provider "openstack" {
-    auth_url            = "{{ .Provider.Identity.AuthURL }}" 			# "${var.tenant.objectstorage.AuthURL}"
-    domain_name         = "default"
-    tenant_id           = "{{ .Provider.Identity.ApplicationKey }}" 	# "${var.tenant.identity.ApplicationKey}"
-    tenant_name         = "{{ .Provider.Identity.ProjectName }}"		# "SAFESCALE-TEST"
-    user_name           = "{{ .Provider.Identity.AccountID }}" 			# "${var.tenant.identity.OpenstackID}"
-    password            = "{{ .Provider.Identity.AccountPassword }}"	# "${var.tenant.identity.OpenstackPassword}"
-    alias               = "ovh"                             			# Un alias
-    region              = "{{ .Provider.Compute.Region }}"				# "${var.tenant.compute.Region}"
+	auth_url    = "{{ .Provider.Identity.AuthURL }}" 			# "${var.tenant.objectstorage.AuthURL}"
+	domain_name = "default"
+	tenant_id   = "{{ .Provider.Identity.ApplicationKey }}" 	# "${var.tenant.identity.ApplicationKey}"
+	tenant_name = "{{ .Provider.Identity.ProjectName }}"		# "SAFESCALE-TEST"
+	user_name   = "{{ .Provider.Identity.AccountID }}" 			# "${var.tenant.identity.OpenstackID}"
+	password    = "{{ .Provider.Identity.AccountPassword }}"	# "${var.tenant.identity.OpenstackPassword}"
+	# alias       = "ovh"										# Un alias
+	region      = "{{ .Provider.Compute.Region }}"				# "${var.tenant.compute.Region}"
 }
 
-provider "ovh" {
-    alias              = "ovh"
-    endpoint           = "ovh-eu"
+provider "{{ .Provider.Name }}" {
+	alias    = "openstack"
+	endpoint = "ovh-eu"
 }
 
 # FIXME: outputs of provider name to use in resources

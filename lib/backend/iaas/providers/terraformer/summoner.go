@@ -16,31 +16,36 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
+type Configuration struct {
+	WorkDir       string
+	ExecPath      string
+	ConsulBackend struct {
+		Path string // "safescale/terraformstate/{{ or .CurrentOrganization "default" }}/{{ or .CurrentProject "default" }}"<
+		Use  bool
+	}
+}
+
 // summoner is an implementation of Summoner interface
 type summoner struct {
-	workDir  string // folder where terraform will find configuration files and more
-	execPath string // execution path of terraform binary
+	config Configuration
 }
 
 // NewSummoner instantiates a terraform file builder that will put file in 'workDir'
-func NewSummoner(workDir string, execPath string) (*summoner, fail.Error) {
-	if workDir == "" {
+func NewSummoner(conf Configuration) (*summoner, fail.Error) {
+	if conf.WorkDir == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("workDir")
 	}
-	if execPath == "" {
+	if conf.ExecPath == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("execPath")
 	}
 
-	out := &summoner{
-		workDir:  workDir,
-		execPath: execPath,
-	}
+	out := &summoner{conf}
 	return out, nil
 }
 
 // IsNull tells if the instance must be considered as a null/zero value
 func (instance *summoner) IsNull() bool {
-	return instance == nil || instance.workDir == "" || instance.execPath == ""
+	return instance == nil || instance.config.WorkDir == "" || instance.config.ExecPath == ""
 }
 
 // Build creates a main.tf file in the appropriate folder
@@ -77,10 +82,31 @@ func (instance *summoner) Build(provider ProviderInternals, resources ...Resourc
 	}
 	variables["Resources"] = resourceContent
 
-	// render provider configurations
-	variables["ProviderConfigurations"], xerr = instance.realizeTemplate(provider.EmbeddedFS(), provider.Snippet(), variables)
+	// render provider configuration
+	variables["ProviderConfiguration"], xerr = instance.realizeTemplate(provider.EmbeddedFS(), provider.Snippet(), variables)
 	if xerr != nil {
 		return xerr
+	}
+
+	// render optional consul backend configuration
+	if instance.config.ConsulBackend.Use {
+		lvars := variables.Clone()
+		lvars["ConsulBackend"] = instance.config.ConsulBackend
+		content, xerr := instance.realizeTemplate(provider.EmbeddedFS(), "snippets/consul-backend.tf.template", variables)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		variables["ConsulBackend"] = content
+
+		content, xerr = instance.realizeTemplate(provider.EmbeddedFS(), "snippets/consul-backend-data.tf.template", variables)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		variables["ConsulBackendData"] = content
 	}
 
 	// finally, render the layout
