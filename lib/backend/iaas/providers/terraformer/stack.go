@@ -14,16 +14,12 @@
  * limitations under the License.
  */
 
-package terraform // Package terraform contains the implemenation of a stack using terraform to request providers
+package terraformer // Package terraform contains the implemenation of a stack using terraform to request providers
 
 import (
-	"strings"
-
 	"golang.org/x/net/context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
@@ -64,82 +60,87 @@ func NullStack() *stack { // nolint
 // New authenticates and returns a stack pointer
 func New(auth stackoptions.AuthenticationOptions, cfg stackoptions.ConfigurationOptions) (*stack, fail.Error) { // nolint
 	ctx := context.Background()
+	_ = ctx
 
 	if auth.DomainName == "" && auth.DomainID == "" {
 		auth.DomainName = "Default"
 	}
 
-	if cfg.DefaultSecurityGroupName == "" {
-		cfg.DefaultSecurityGroupName = defaultSecurityGroupName
-	}
+	return nil, fail.NotImplementedError()
 
-	s := &stack{
-		DefaultSecurityGroupName: cfg.DefaultSecurityGroupName,
-
-		authOpts: auth,
-		cfgOpts:  cfg,
-	}
-
-	// Get provider network ID from network service
-	if cfg.ProviderNetwork != "" {
-		xerr = stacks.RetryableRemoteCall(ctx,
-			func() error {
-				var innerErr error
-				s.ProviderNetworkID, innerErr = getIDFromName(s.NetworkClient, cfg.ProviderNetwork)
-				return innerErr
-			},
-			NormalizeError,
-		)
-		if xerr != nil {
-			return nil, xerr
+	/*
+		if cfg.DefaultSecurityGroupName == "" {
+			cfg.DefaultSecurityGroupName = defaultSecurityGroupName
 		}
-	}
 
-	// TODO: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
-	validAvailabilityZones, xerr := s.ListAvailabilityZones(ctx)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// continue
-			debug.IgnoreError(xerr)
-		default:
-			return nil, xerr
+		s := &stack{
+			DefaultSecurityGroupName: cfg.DefaultSecurityGroupName,
+
+			authOpts: auth,
+			cfgOpts:  cfg,
 		}
-	} else if len(validAvailabilityZones) != 0 {
-		var validZones []string
-		zoneIsValidInput := false
-		for az, valid := range validAvailabilityZones {
-			if valid {
-				if az == auth.AvailabilityZone {
-					zoneIsValidInput = true
-				}
-				validZones = append(validZones, `'`+az+`'`)
+
+		// Get provider network ID from network service
+		if cfg.ProviderNetwork != "" {
+			xerr = stacks.RetryableRemoteCall(ctx,
+				func() error {
+					var innerErr error
+					s.ProviderNetworkID, innerErr = getIDFromName(s.NetworkClient, cfg.ProviderNetwork)
+					return innerErr
+				},
+				NormalizeError,
+			)
+			if xerr != nil {
+				return nil, xerr
 			}
 		}
-		if !zoneIsValidInput {
-			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", auth.AvailabilityZone, strings.Join(validZones, ","))
+
+		// TODO: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
+		validAvailabilityZones, xerr := s.ListAvailabilityZones(ctx)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// continue
+				debug.IgnoreError(xerr)
+			default:
+				return nil, xerr
+			}
+		} else if len(validAvailabilityZones) != 0 {
+			var validZones []string
+			zoneIsValidInput := false
+			for az, valid := range validAvailabilityZones {
+				if valid {
+					if az == auth.AvailabilityZone {
+						zoneIsValidInput = true
+					}
+					validZones = append(validZones, `'`+az+`'`)
+				}
+			}
+			if !zoneIsValidInput {
+				return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", auth.AvailabilityZone, strings.Join(validZones, ","))
+			}
 		}
-	}
 
-	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
-	if cfg.Timings != nil {
-		s.MutableTimings = cfg.Timings
-		_ = s.MutableTimings.Update(temporal.NewTimings())
-	} else {
-		s.MutableTimings = temporal.NewTimings()
-	}
+		// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
+		if cfg.Timings != nil {
+			s.MutableTimings = cfg.Timings
+			_ = s.MutableTimings.Update(temporal.NewTimings())
+		} else {
+			s.MutableTimings = temporal.NewTimings()
+		}
 
-	return s, nil
+		return s, nil
+	*/
 }
 
 // IsNull ...
 func (s *stack) IsNull() bool {
-	return s == nil || s.Driver == nil
+	return s == nil // || s.Driver == nil
 }
 
 // GetStackName returns the name of the stack
 func (s stack) GetStackName() (string, fail.Error) {
-	return "openstack", nil
+	return "terraform", nil
 }
 
 // Timings returns the instance containing current timeout settings

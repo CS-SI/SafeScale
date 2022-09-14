@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ovh_test
+package ovhtf_test
 
 import (
 	"context"

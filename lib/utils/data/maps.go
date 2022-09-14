@@ -52,6 +52,14 @@ func FromMap(m Map) (Map, error) {
 	return (&cm).Replace(&m)
 }
 
+func (m Map) Clone() Map {
+	out := make(Map, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
 func (m *Map) Replace(src *Map) (Map, error) {
 	*m = make(Map, len(*src))
 	for k, v := range *src {

@@ -1,4 +1,4 @@
-package terraform
+package terraformer
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/hashicorp/terraform-exec/tfexec"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -14,20 +15,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
-
-type ResourceCore struct {
-	name    string // contains the name of the resource
-	snippet string // contains the snippet to use to configure the resource
-}
-
-// NewResourceCore creates a new instance of ResourceCore
-func NewResourceCore(name string) ResourceCore {
-	return ResourceCore{name: name}
-}
-
-func (rc ResourceCore) Snippet() string {
-	return rc.snippet
-}
 
 // summoner is an implementation of Summoner interface
 type summoner struct {
@@ -52,50 +39,59 @@ func NewSummoner(workDir string, execPath string) (*summoner, fail.Error) {
 }
 
 // IsNull tells if the instance must be considered as a null/zero value
-func (b *summoner) IsNull() bool {
-	return b == nil || b.workDir == "" || b.execPath == ""
+func (instance *summoner) IsNull() bool {
+	return instance == nil || instance.workDir == "" || instance.execPath == ""
 }
 
-// CreateMain creates a main.tf file in the appropriate folder
-func (b *summoner) CreateMain(provider ProviderInternals, resource Resource) (ferr fail.Error) {
+// Build creates a main.tf file in the appropriate folder
+func (instance *summoner) Build(provider ProviderInternals, resources ...Resource) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNull(b) {
+	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if valid.IsNull(provider) {
 		return fail.InvalidParameterError("provider", "cannot be empty provider")
 	}
-	if valid.IsNil(resource) {
-		return fail.InvalidParameterCannotBeNilError("resource")
+	if valid.IsNull(resources) {
+		return fail.InvalidParameterCannotBeNilError("resources")
 	}
 
-	variables := map[string]any{}
-	variables["provider"] = provider
-	variables["Resource"] = resource
+	variables := data.NewMap()
+	variables["Provider"] = provider
 
-	// render the resource
-	var xerr fail.Error
-	variables["Resources"], xerr = b.realizeTemplate(provider.GetEmbeddedFS(), resource.Snippet(), variables)
-	if xerr != nil {
-		return xerr
+	// render the resources
+	var (
+		xerr fail.Error
+	)
+	resourceContent := make([][]byte, len(resources), 0)
+	for _, r := range resources {
+		lvars := variables.Clone()
+		lvars.Merge(r.ToMap())
+		content, xerr := instance.realizeTemplate(provider.EmbeddedFS(), r.Snippet(), lvars)
+		if xerr != nil {
+			return xerr
+		}
+
+		resourceContent = append(resourceContent, content)
 	}
+	variables["Resources"] = resourceContent
 
 	// render provider configurations
-	variables["ProviderConfigurations"], xerr = b.realizeTemplate(provider.GetEmbeddedFS(), provider.Snippet(), variables)
+	variables["ProviderConfigurations"], xerr = instance.realizeTemplate(provider.EmbeddedFS(), provider.Snippet(), variables)
 	if xerr != nil {
 		return xerr
 	}
 
-	// finally, renders the layout
-	content, xerr := b.realizeTemplate(provider.GetEmbeddedFS(), "snippets/layout.tf.template", variables)
+	// finally, render the layout
+	content, xerr := instance.realizeTemplate(provider.EmbeddedFS(), "snippets/layout.tf.template", variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Creates main.tf file
-	xerr = b.createMainFile(content)
+	xerr = instance.createMainFile(content)
 	if xerr != nil {
 		return xerr
 	}
@@ -104,7 +100,7 @@ func (b *summoner) CreateMain(provider ProviderInternals, resource Resource) (fe
 }
 
 // realizeTemplate generates a file from box template with variables updated
-func (b summoner) realizeTemplate(efs embed.FS, filename string, vars map[string]interface{}) ([]byte, fail.Error) {
+func (instance summoner) realizeTemplate(efs embed.FS, filename string, vars map[string]interface{}) ([]byte, fail.Error) {
 	tmplString, err := efs.ReadFile(filename)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
@@ -131,8 +127,8 @@ func (b summoner) realizeTemplate(efs embed.FS, filename string, vars map[string
 const mainFilename = "main.tf"
 
 // createFile creates the file in the appropriate path for terraform to execute it
-func (b summoner) createMainFile(content []byte) fail.Error {
-	path := filepath.Join(b.workDir, mainFilename)
+func (instance summoner) createMainFile(content []byte) fail.Error {
+	path := filepath.Join(instance.workDir, mainFilename)
 	err := ioutil.WriteFile(path, content, 0)
 	if err != nil {
 		return fail.Wrap(err, "failed to create main terraform file")
@@ -146,8 +142,12 @@ func (b summoner) createMainFile(content []byte) fail.Error {
 //   - false, fail.Error if an error occurred
 //   - false, nil if no error occurred and no change would be made
 //   - true, nil if no error occurred and changes would be made
-func (b summoner) Plan(ctx context.Context) (bool, fail.Error) {
-	tf, err := tfexec.NewTerraform(b.workDir, b.execPath)
+func (instance *summoner) Plan(ctx context.Context) (bool, fail.Error) {
+	if valid.IsNull(instance) {
+		return false, fail.InvalidInstanceError()
+	}
+
+	tf, err := tfexec.NewTerraform(instance.workDir, instance.execPath)
 	if err != nil {
 		return false, fail.Wrap(err, "failed to instantiate terraform executor")
 	}
@@ -166,8 +166,12 @@ func (b summoner) Plan(ctx context.Context) (bool, fail.Error) {
 }
 
 // Apply calls the terraform Apply command to operate changes
-func (b summoner) Apply(ctx context.Context) (any, fail.Error) {
-	tf, err := tfexec.NewTerraform(b.workDir, b.execPath)
+func (instance *summoner) Apply(ctx context.Context) (any, fail.Error) {
+	if valid.IsNull(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	tf, err := tfexec.NewTerraform(instance.workDir, instance.execPath)
 	if err != nil {
 		return nil, fail.Wrap(err, "failed to instanciate terraform executor")
 	}
@@ -191,8 +195,12 @@ func (b summoner) Apply(ctx context.Context) (any, fail.Error) {
 }
 
 // Destroy calls the terraform Destroy command to operate changes
-func (b summoner) Destroy(ctx context.Context) fail.Error {
-	tf, err := tfexec.NewTerraform(b.workDir, b.execPath)
+func (instance *summoner) Destroy(ctx context.Context) fail.Error {
+	if valid.IsNull(instance) {
+		return fail.InvalidInstanceError()
+	}
+
+	tf, err := tfexec.NewTerraform(instance.workDir, instance.execPath)
 	if err != nil {
 		return fail.Wrap(err, "failed to instanciate terraform executor")
 	}
