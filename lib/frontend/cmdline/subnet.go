@@ -30,7 +30,6 @@ import (
 
 // subnetConsumer is the part of safescale client handling Subnets
 type subnetConsumer struct {
-	// session is not used currently
 	session *Session
 }
 
@@ -134,7 +133,7 @@ func (s subnetConsumer) Inspect(networkRef, name string, timeout time.Duration) 
 
 }
 
-// Create calls the gRPC server to create a subnet
+// Create calls the gRPC currentServer to create a subnet
 // FIXME: do not use protocol as response
 func (s subnetConsumer) Create(
 	networkRef, name, cidr string, failover bool,
@@ -175,7 +174,7 @@ func (s subnetConsumer) Create(
 	return service.Create(newCtx, def)
 }
 
-// BindSecurityGroup calls the gRPC server to bind a security group to a subnet
+// BindSecurityGroup calls the gRPC currentServer to bind a security group to a subnet
 func (s subnetConsumer) BindSecurityGroup(networkRef, subnetRef, sgRef string, enable bool, timeout time.Duration) error {
 	s.session.Connect()
 	defer s.session.Disconnect()
@@ -211,7 +210,7 @@ func (s subnetConsumer) BindSecurityGroup(networkRef, subnetRef, sgRef string, e
 	return err
 }
 
-// UnbindSecurityGroup calls the gRPC server to unbind a security group from a subnet
+// UnbindSecurityGroup calls the gRPC currentServer to unbind a security group from a subnet
 func (s subnetConsumer) UnbindSecurityGroup(networkRef, subnetRef, sgRef string, timeout time.Duration) error {
 	s.session.Connect()
 	defer s.session.Disconnect()
@@ -239,7 +238,7 @@ func (s subnetConsumer) UnbindSecurityGroup(networkRef, subnetRef, sgRef string,
 	return err
 }
 
-// EnableSecurityGroup calls the gRPC server to enable a bound security group of a subnet
+// EnableSecurityGroup calls the gRPC currentServer to enable a bound security group of a subnet
 func (s subnetConsumer) EnableSecurityGroup(networkRef, subnetRef, sgRef string, timeout time.Duration) error {
 	s.session.Connect()
 	defer s.session.Disconnect()
@@ -267,7 +266,7 @@ func (s subnetConsumer) EnableSecurityGroup(networkRef, subnetRef, sgRef string,
 	return err
 }
 
-// DisableSecurityGroup calls the gRPC server to disable a bound security group of a subnet
+// DisableSecurityGroup calls the gRPC currentServer to disable a bound security group of a subnet
 func (s subnetConsumer) DisableSecurityGroup(networkRef, subnetRef, sgRef string, timeout time.Duration) error {
 	s.session.Connect()
 	defer s.session.Disconnect()
@@ -296,7 +295,7 @@ func (s subnetConsumer) DisableSecurityGroup(networkRef, subnetRef, sgRef string
 	return err
 }
 
-// ListSecurityGroups calls the gRPC server to list bound security groups of a subnet
+// ListSecurityGroups calls the gRPC currentServer to list bound security groups of a subnet
 // FIXME: do not use protocol as response
 func (s subnetConsumer) ListSecurityGroups(networkRef, subnetRef, state string, timeout time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
 	s.session.Connect()

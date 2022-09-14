@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -56,8 +57,8 @@ type stack struct {
 	VolumeClient   *gophercloud.ServiceClient
 	Driver         *gophercloud.ProviderClient
 	// Opts contains authentication options
-	authOpts stacks.AuthenticationOptions
-	cfgOpts  stacks.ConfigurationOptions
+	authOpts stackoptions.AuthenticationOptions
+	cfgOpts  stackoptions.ConfigurationOptions
 	// Instance of the default Network/VPC
 	vpc *abstract.Network
 
@@ -86,7 +87,7 @@ func NullStack() *stack { // nolint
 // New authenticates and return interface stack
 //
 //goland:noinspection GoExportedFuncWithUnexportedType
-func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
+func New(auth stackoptions.AuthenticationOptions, cfg stackoptions.ConfigurationOptions) (*stack, fail.Error) { // nolint
 	ctx := context.Background()
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.

@@ -17,7 +17,6 @@
 package iaas
 
 import (
-	"bytes"
 	"context"
 	"expvar"
 	"fmt"
@@ -74,7 +73,7 @@ func GetTenants() ([]map[string]interface{}, fail.Error) {
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(tenantName, metadataVersion string) (newService Service, ferr fail.Error) {
+func UseService(tenantName /*, metadataVersion*/ string) (newService Service, ferr fail.Error) {
 	ctx := context.Background() // FIXME: Check context
 
 	defer fail.OnExitLogError(ctx, &ferr)
@@ -109,7 +108,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 		tenantInCfg = true
 		provider, found = tenant["provider"].(string)
 		if !found {
-			provider, found = tenant["Provider"].(string)
+			provider, found = tenant["provider"].(string)
 			if !found {
 				provider, found = tenant["client"].(string)
 				if !found {
@@ -145,7 +144,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 		_, tenantObjectStorageFound := tenant["objectstorage"]
 		_, tenantMetadataFound := tenant["metadata"]
 
-		// Initializes Provider
+		// Initializes provider
 		providerInstance, xerr := svc.Build(tenant)
 		if xerr != nil {
 			return NullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
@@ -271,14 +270,14 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 					return NullService(), err
 				}
 
-				// Creates metadata version file
-				if metadataVersion != "" {
-					content := bytes.NewBuffer([]byte(metadataVersion))
-					_, xerr := metadataLocation.WriteObject(ctx, metadataLocationConfig.BucketName, "version", content, int64(content.Len()), nil)
-					if xerr != nil {
-						return NullService(), fail.Wrap(xerr, "failed to create version object in metadata Bucket")
-					}
-				}
+				// // Creates metadata version file
+				// if metadataVersion != "" {
+				// 	content := bytes.NewBuffer([]byte(metadataVersion))
+				// 	_, xerr := metadataLocation.WriteObject(ctx, metadataLocationConfig.BucketName, "version", content, int64(content.Len()), nil)
+				// 	if xerr != nil {
+				// 		return NullService(), fail.Wrap(xerr, "failed to create version object in metadata Bucket")
+				// 	}
+				// }
 			}
 			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {
 				if key, ok := metadataConfig["CryptKey"].(string); ok {
@@ -318,6 +317,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, ferr fa
 	if !tenantInCfg {
 		return NullService(), fail.NotFoundError("tenant '%s' not found in configuration", tenantName)
 	}
+
 	return NullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
 }
 

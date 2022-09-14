@@ -56,6 +56,7 @@ func InitApp() (ferr error) {
 			Short:            "safescale COMMAND",
 			Version:          VersionString(),
 			TraverseChildren: true,
+			SilenceUsage:     true,
 		}
 
 		// app.Authors = []cli.Author{

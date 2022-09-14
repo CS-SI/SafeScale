@@ -30,7 +30,6 @@ import (
 
 // volumeConsumer is the part of safescale client handing volumes
 type volumeConsumer struct {
-	// session is not used currently
 	session *Session
 }
 

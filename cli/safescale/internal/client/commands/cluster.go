@@ -338,7 +338,7 @@ func clusterCreateCommand() *cobra.Command {
 		- <gpu> is expecting an int as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)
 		- <ram> is expecting a float as memory size in GB, or an interval with minimum and maximum memory size
 		- <disk> is expecting an int as system disk size in GB
-		- <template> is expecting the name of a template from Cloud Provider; if template is not found, fallback to other components defined
+		- <template> is expecting the name of a template from Cloud provider; if template is not found, fallback to other components defined
 	examples:
 		--sizing "cpu <= 4, ram <= 10, disk = 100"
 		--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")

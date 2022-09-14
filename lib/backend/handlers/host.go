@@ -310,7 +310,7 @@ func (handler *hostHandler) Status(ref string) (_ hoststate.Enum, ferr fail.Erro
 		return hoststate.Unknown, xerr
 	}
 
-	// Gather host state from Cloud Provider
+	// Gather host state from Cloud provider
 	return hostInstance.ForceGetState(handler.job.Context())
 }
 

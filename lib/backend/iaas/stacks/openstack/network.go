@@ -696,7 +696,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 
 // createRouter creates a router satisfying req
 func (s stack) createRouter(ctx context.Context, req RouterRequest) (*Router, fail.Error) {
-	// Create a router to connect external Provider network
+	// Create a router to connect external provider network
 	gi := routers.GatewayInfo{
 		NetworkID: req.NetworkID,
 	}

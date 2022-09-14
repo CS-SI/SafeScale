@@ -158,7 +158,7 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 	}
 
 	// no need to set metadataVersion in UseService, we will remove content...
-	service, xerr := iaas.UseService(in.GetName(), "")
+	service, xerr := iaas.UseService(in.GetName() /*, ""*/)
 	if xerr != nil {
 		return empty, xerr
 	}

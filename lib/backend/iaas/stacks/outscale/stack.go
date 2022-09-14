@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/outscale/osc-sdk-go/osc"
 
@@ -93,7 +94,7 @@ type stack struct {
 	auth                 context.Context
 	CPUPerformanceMap    map[int]float32
 	VolumeSpeedsMap      map[string]volumespeed.Enum
-	configurationOptions *stacks.ConfigurationOptions
+	configurationOptions *stackoptions.ConfigurationOptions
 	deviceNames          []string
 	templates            []*abstract.HostTemplate
 	vpc                  *abstract.Network
@@ -143,7 +144,7 @@ func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 			3: 2.0,
 		},
 		deviceNames: deviceNames(),
-		configurationOptions: &stacks.ConfigurationOptions{
+		configurationOptions: &stackoptions.ConfigurationOptions{
 			ProviderNetwork:           "",
 			DNSList:                   options.Compute.DNSList,
 			UseFloatingIP:             true,

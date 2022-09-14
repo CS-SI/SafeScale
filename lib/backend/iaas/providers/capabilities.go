@@ -18,14 +18,14 @@ package providers
 
 // Capabilities represents key/value configuration.
 type Capabilities struct {
-	// PublicVirtualIP indicates if the provider has the capability to provide a Virtual IP with public IP address
+	// PublicVirtualIP indicates if the Provider has the capability to provide a Virtual IP with public IP address
 	PublicVirtualIP bool
-	// PrivateVirtualIP indicates if the provider has the capability to provide a Virtual IP with private IP address
+	// PrivateVirtualIP indicates if the Provider has the capability to provide a Virtual IP with private IP address
 	PrivateVirtualIP bool
-	// Layer3Networking indicates if the provider uses Layer3 networking
+	// Layer3Networking indicates if the Provider uses Layer3 networking
 	Layer3Networking bool
-	// CanDisableSecurityGroup indicates if the provider supports to disable a Security Group
+	// CanDisableSecurityGroup indicates if the Provider supports to disable a Security Group
 	CanDisableSecurityGroup bool
-	// // SubnetSecurityGroup indicates if the provider supports to bind security group to subnet
+	// // SubnetSecurityGroup indicates if the Provider supports to bind security group to subnet
 	// SubnetSecurityGroup bool
 }

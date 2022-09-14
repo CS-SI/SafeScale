@@ -809,7 +809,7 @@ func (s stack) rpcAllocateAddress(ctx context.Context, description string) (allo
 		return nil, nil, xerr
 	}
 	if resp == nil {
-		return nil, nil, fail.InconsistentError("nil response received from Cloud Provider")
+		return nil, nil, fail.InconsistentError("nil response received from Cloud provider")
 	}
 
 	defer func() {
@@ -888,7 +888,7 @@ func (s stack) rpcAssociateAddress(ctx context.Context, nicID, addressID *string
 		return nil, xerr
 	}
 	if resp == nil || resp.AssociationId == nil || aws.StringValue(resp.AssociationId) == "" {
-		return nil, fail.InconsistentError("invalid empty response from Cloud Provider")
+		return nil, fail.InconsistentError("invalid empty response from Cloud provider")
 	}
 	return resp.AssociationId, nil
 }
@@ -937,7 +937,7 @@ func (s stack) rpcDescribeAddressByIP(ctx context.Context, ip *string) (*ec2.Add
 		return nil, fail.NotFoundError("failed to find Elastic IP '%s'", aws.StringValue(ip))
 	}
 	if len(resp.Addresses) > 1 {
-		return nil, fail.InconsistentError("more than one Elastic IP '%s' returned by the Cloud Provider", aws.StringValue(ip))
+		return nil, fail.InconsistentError("more than one Elastic IP '%s' returned by the Cloud provider", aws.StringValue(ip))
 	}
 	return resp.Addresses[0], nil
 }
@@ -1778,7 +1778,7 @@ func (s stack) rpcRunInstance(ctx context.Context, name, zone, subnetID, templat
 		return nil, xerr
 	}
 	if len(resp.Instances) == 0 {
-		return nil, fail.InconsistentError("invalid empty response from Cloud Provider")
+		return nil, fail.InconsistentError("invalid empty response from Cloud provider")
 	}
 
 	defer func() {
@@ -1798,7 +1798,7 @@ func (s stack) rpcRunInstance(ctx context.Context, name, zone, subnetID, templat
 	}()
 
 	if len(resp.Instances) > 1 {
-		return nil, fail.InconsistentError("more than one instance has been created by Cloud Provider")
+		return nil, fail.InconsistentError("more than one instance has been created by Cloud provider")
 	}
 
 	instance := resp.Instances[0]
@@ -2116,7 +2116,7 @@ func (s stack) rpcCreateNetworkInterface(ctx context.Context, subnetID *string, 
 		return nil, xerr
 	}
 	if resp == nil {
-		return nil, fail.InconsistentError("nil response received from Cloud Provider")
+		return nil, fail.InconsistentError("nil response received from Cloud provider")
 	}
 	return resp.NetworkInterface, nil
 }
@@ -2162,7 +2162,7 @@ func (s stack) rpcAttachNetworkInterface(ctx context.Context, instanceID, nicID 
 		return nil, xerr
 	}
 	if resp == nil || resp.AttachmentId == nil || aws.StringValue(resp.AttachmentId) == "" {
-		return nil, fail.NewError("inconsistent response from Cloud Provider")
+		return nil, fail.NewError("inconsistent response from Cloud provider")
 	}
 	return resp.AttachmentId, nil
 }

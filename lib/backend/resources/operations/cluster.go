@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sanity-io/litter"
@@ -71,7 +72,7 @@ const (
 
 // Cluster is the implementation of resources.Cluster interface
 type Cluster struct {
-	*MetadataCore
+	*metadata.Core
 
 	localCache struct {
 		installMethods sync.Map
@@ -92,15 +93,15 @@ func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Er
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := NewCore(svc, clusterKind, clustersFolderName, &abstract.ClusterIdentity{})
+	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, clusterKind, clustersFolderName, &abstract.ClusterIdentity{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	instance := &Cluster{
-		MetadataCore: coreInstance,
-		machines:     make(map[string]resources.Host),
+		Core:     coreInstance,
+		machines: make(map[string]resources.Host),
 	}
 	xerr = instance.startRandomDelayGenerator(ctx, 0, 2000)
 	if xerr != nil {
@@ -477,7 +478,7 @@ func (instance *Cluster) updateCachedInformation(inctx context.Context) fail.Err
 
 // IsNull tells if the instance should be considered as a null value
 func (instance *Cluster) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
+	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
 }
 
 // carry ...
@@ -485,14 +486,12 @@ func (instance *Cluster) carry(ctx context.Context, clonable data.Clonable) (fer
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		if instance.MetadataCore.IsTaken() {
-			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
-		}
+	if !valid.IsNil(instance) && instance.Core.IsTaken() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(ctx, clonable)
+	xerr := instance.Core.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -519,8 +518,8 @@ func (instance *Cluster) Create(inctx context.Context, req abstract.ClusterReque
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			if !valid.IsNil(instance.MetadataCore) {
-				if instance.MetadataCore.IsTaken() {
+			if !valid.IsNil(instance.Core) {
+				if instance.Core.IsTaken() {
 					return fail.InconsistentError("already carrying information")
 				}
 			}
@@ -567,7 +566,7 @@ func (instance *Cluster) Sdump(ctx context.Context) (_ string, ferr fail.Error) 
 		return "", fail.InvalidInstanceError()
 	}
 
-	dumped, xerr := instance.MetadataCore.Sdump(ctx)
+	dumped, xerr := instance.Core.Sdump(ctx)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -618,7 +617,7 @@ func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
+	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		aci := abstract.NewClusterIdentity()
 		xerr := aci.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2572,7 +2571,7 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 		}
 
 		// --- Delete metadata ---
-		xerr = instance.MetadataCore.Delete(ctx)
+		xerr = instance.Core.Delete(ctx)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return xerr

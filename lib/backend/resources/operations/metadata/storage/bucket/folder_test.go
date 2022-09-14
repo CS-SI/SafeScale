@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package operations
+package bucket
 
 import (
 	"context"
@@ -29,22 +29,22 @@ import (
 
 func Test_NewMetadataFolder(t *testing.T) {
 
-	mf, xerr := NewMetadataFolder(nil, "myfolder")
+	mf, xerr := NewFolder(nil, "myfolder")
 	require.Contains(t, xerr.Error(), "invalid instance")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
 		svc._updateOption("metadatakey", "mykeyhere")
 
-		mf, xerr = NewMetadataFolder(svc, "myfolder")
+		mf, xerr = NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
-		require.EqualValues(t, reflect.TypeOf(mf).String(), "operations.MetadataFolder")
+		require.EqualValues(t, reflect.TypeOf(mf).String(), "operations.folder")
 
 		svc._reset()
 		svc._updateOption("metadatakey", "")
 		svc._updateOption("metadatakeyErr", fail.NotFoundError("No metadatakey"))
 
-		mf, xerr = NewMetadataFolder(svc, "myfolder")
+		mf, xerr = NewFolder(svc, "myfolder")
 		require.Nil(t, xerr) // Return empty one
 
 	})
@@ -54,14 +54,14 @@ func Test_NewMetadataFolder(t *testing.T) {
 
 func TestMetadataFolder_IsNull(t *testing.T) {
 
-	var mfa *MetadataFolder
+	var mfa *folder
 	require.EqualValues(t, mfa.IsNull(), true)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
 		svc._updateOption("metadatakey", "mykeyhere")
 
-		mf, xerr := NewMetadataFolder(svc, "myfolder")
+		mf, xerr := NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
 		require.EqualValues(t, mf.IsNull(), false)
 	})
@@ -71,7 +71,7 @@ func TestMetadataFolder_IsNull(t *testing.T) {
 
 func TestMetadataFolder_Service(t *testing.T) {
 
-	var mfa MetadataFolder
+	var mfa folder
 	svca := mfa.Service()
 	require.EqualValues(t, valid.IsNil(svca), true)
 
@@ -79,7 +79,7 @@ func TestMetadataFolder_Service(t *testing.T) {
 
 		svc._updateOption("metadatakey", "mykeyhere")
 
-		mf, xerr := NewMetadataFolder(svc, "myfolder")
+		mf, xerr := NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
 		require.EqualValues(t, svc, mf.Service())
 	})
@@ -91,7 +91,7 @@ func TestMetadataFolder_GetBucket(t *testing.T) {
 
 	ctx := context.Background()
 
-	var mfa MetadataFolder
+	var mfa folder
 	_, xerr := mfa.GetBucket(ctx)
 	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrInvalidInstance")
 
@@ -99,7 +99,7 @@ func TestMetadataFolder_GetBucket(t *testing.T) {
 
 		svc._updateOption("metadatakey", "mykeyhere")
 
-		mf, xerr := NewMetadataFolder(svc, "myfolder")
+		mf, xerr := NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
 		bucket, xerr := mf.GetBucket(ctx)
 		require.Nil(t, xerr)
@@ -111,7 +111,7 @@ func TestMetadataFolder_GetBucket(t *testing.T) {
 		svc._updateOption("metadatakey", "mykeyhere")
 		svc._updateOption("metadatabucketErr", fail.NewError("Fail to acces to bucket metadata"))
 
-		mf, xerr = NewMetadataFolder(svc, "myfolder")
+		mf, xerr = NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
 		_, xerr = mf.GetBucket(ctx)
 		require.EqualValues(t, xerr.Error(), "Fail to acces to bucket metadata")
@@ -122,7 +122,7 @@ func TestMetadataFolder_GetBucket(t *testing.T) {
 		svc._updateOption("metadatakey", "mykeyhere")
 		svc._updateOption("metadatabucketErr", fail.NewError("Fail to acces to bucket metadata"))
 
-		mf, xerr = NewMetadataFolder(svc, "myfolder")
+		mf, xerr = NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
 		_, xerr = mf.GetBucket(ctx)
 		require.EqualValues(t, xerr.Error(), "Fail to acces to bucket metadata")
@@ -136,7 +136,7 @@ func TestMetadataFolder_GetBucket(t *testing.T) {
 
 func TestMetadataFolder_Path(t *testing.T) {
 
-	var mfa MetadataFolder
+	var mfa folder
 	path := mfa.Path()
 	require.EqualValues(t, path, "")
 
@@ -144,7 +144,7 @@ func TestMetadataFolder_Path(t *testing.T) {
 
 		svc._updateOption("metadatakey", "mykeyhere")
 
-		mf, xerr := NewMetadataFolder(svc, "myfolder")
+		mf, xerr := NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
 		path := mf.Path()
 		require.EqualValues(t, path, "myfolder")
@@ -157,7 +157,7 @@ func TestMetadataFolder_Lookup(t *testing.T) {
 
 	ctx := context.Background()
 
-	var mfa MetadataFolder
+	var mfa folder
 	xerr := mfa.Lookup(ctx, "path", "name")
 	require.Contains(t, xerr.Error(), "invalid instance")
 
@@ -170,7 +170,7 @@ func TestMetadataFolder_Lookup(t *testing.T) {
 		svc._updateOption("metadatakey", "mykeyhere")
 		svc._updateOption("metadatabucketErr", fail.NewError("Fail to acces to bucket metadata"))
 
-		mf, xerr := NewMetadataFolder(svc, "myfolder")
+		mf, xerr := NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
 		xerr = mf.Lookup(ctx, "path", "name")
 		require.EqualValues(t, xerr.Error(), "Fail to acces to bucket metadata")
@@ -183,7 +183,7 @@ func TestMetadataFolder_Lookup(t *testing.T) {
 		err = svc._setInternalData("networks/byName/Network_Name", network)
 		require.Nil(t, err)
 
-		mf, xerr = NewMetadataFolder(svc, "myfolder")
+		mf, xerr = NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
 		xerr = mf.Lookup(ctx, "path", "name")
 		require.EqualValues(t, xerr.Error(), "Fail to list objects")
@@ -195,7 +195,7 @@ func TestMetadataFolder_Lookup(t *testing.T) {
 		err = svc._setInternalData("networks/byName/Network_Name", network)
 		require.Nil(t, err)
 
-		mf, xerr = NewMetadataFolder(svc, "networks")
+		mf, xerr = NewFolder(svc, "networks")
 		require.Nil(t, xerr)
 		xerr = mf.Lookup(ctx, "byName", "Network_Name2")
 		require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrNotFound")
@@ -209,7 +209,7 @@ func TestMetadataFolder_Delete(t *testing.T) {
 
 	ctx := context.Background()
 
-	var mfa MetadataFolder
+	var mfa folder
 	xerr := mfa.Delete(ctx, "path", "name")
 	require.Contains(t, xerr.Error(), "invalid instance")
 
@@ -222,7 +222,7 @@ func TestMetadataFolder_Delete(t *testing.T) {
 		svc._updateOption("metadatakey", "mykeyhere")
 		svc._updateOption("metadatabucketErr", fail.NewError("Fail to acces to bucket metadata"))
 
-		mf, xerr := NewMetadataFolder(svc, "myfolder")
+		mf, xerr := NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
 		xerr = mf.Delete(ctx, "path", "name")
 		require.EqualValues(t, xerr.Error(), "Fail to acces to bucket metadata")
@@ -234,7 +234,7 @@ func TestMetadataFolder_Delete(t *testing.T) {
 		err = svc._setInternalData("networks/byName/Network_Name", network)
 		require.Nil(t, err)
 
-		mf, xerr = NewMetadataFolder(svc, "networks")
+		mf, xerr = NewFolder(svc, "networks")
 		require.Nil(t, xerr)
 		xerr = mf.Delete(ctx, "byName", "Network_Name2")
 		require.Nil(t, xerr)
@@ -252,7 +252,7 @@ func TestMetadataFolder_Read(t *testing.T) {
 
 	ctx := context.Background()
 
-	var mfa MetadataFolder
+	var mfa folder
 	xerr := mfa.Read(ctx, "path", "name", func([]byte) fail.Error {
 		return nil
 	})
@@ -272,7 +272,7 @@ func TestMetadataFolder_Read(t *testing.T) {
 		err = svc._setInternalData("networks/byName/Network Name", network)
 		require.Nil(t, err)
 
-		mf, xerr := NewMetadataFolder(svc, "networks")
+		mf, xerr := NewFolder(svc, "networks")
 		require.Nil(t, xerr)
 		xerr = mf.Read(ctx, "byName", "Network_Name", callback)
 		require.Contains(t, xerr.Error(), "invalid parameter: callback")
@@ -295,7 +295,7 @@ func TestMetadataFolder_Read(t *testing.T) {
 		err = svc._setInternalData("networks/byName/Network Name", network)
 		require.Nil(t, err)
 
-		mf, xerr = NewMetadataFolder(svc, "networks")
+		mf, xerr = NewFolder(svc, "networks")
 		require.Nil(t, xerr)
 		xerr = mf.Read(ctx, "byName", "Network_Name", func(data []byte) fail.Error {
 			return nil
@@ -310,7 +310,7 @@ func TestMetadataFolder_Read(t *testing.T) {
 func TestMetadataFolder_Write(t *testing.T) {
 
 	ctx := context.Background()
-	var mfa MetadataFolder
+	var mfa folder
 	xerr := mfa.Write(ctx, "path", "name", []byte("data"))
 	require.Contains(t, xerr.Error(), "invalid instance")
 
@@ -326,7 +326,7 @@ func TestMetadataFolder_Write(t *testing.T) {
 		err = svc._setInternalData("networks/byName/Network Name", network)
 		require.Nil(t, err)
 
-		mf, xerr := NewMetadataFolder(svc, "networks")
+		mf, xerr := NewFolder(svc, "networks")
 		require.Nil(t, xerr)
 		serial, xerr := network.Serialize()
 		require.Nil(t, xerr)
@@ -348,7 +348,7 @@ func TestMetadataFolder_Write(t *testing.T) {
 		err = svc._setInternalData("networks/byName/Network Name", network)
 		require.Nil(t, err)
 
-		mf, xerr = NewMetadataFolder(svc, "networks")
+		mf, xerr = NewFolder(svc, "networks")
 		require.Nil(t, xerr)
 		serial, xerr = network.Serialize()
 		require.Nil(t, xerr)
@@ -362,7 +362,7 @@ func TestMetadataFolder_Write(t *testing.T) {
 
 func TestMetadataFolder_Browse(t *testing.T) {
 
-	var mfa MetadataFolder
+	var mfa folder
 	ctx := context.Background()
 	xerr := mfa.Browse(ctx, "path", func([]byte) fail.Error {
 		return nil
@@ -382,7 +382,7 @@ func TestMetadataFolder_Browse(t *testing.T) {
 		err = svc._setInternalData("networks/byName/Network Name", network)
 		require.Nil(t, err)
 
-		mf, xerr := NewMetadataFolder(svc, "myfolder")
+		mf, xerr := NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
 		xerr = mf.Browse(ctx, "path", func([]byte) fail.Error {
 			return nil
@@ -396,7 +396,7 @@ func TestMetadataFolder_Browse(t *testing.T) {
 		err = svc._setInternalData("networks/byName/Network Name", network)
 		require.Nil(t, err)
 
-		mf, xerr = NewMetadataFolder(svc, "networks")
+		mf, xerr = NewFolder(svc, "networks")
 		require.Nil(t, xerr)
 		xerr = mf.Browse(ctx, "/", func(data []byte) fail.Error {
 			require.Contains(t, string(data), "{\"id\":\"Network_ID\",\"name\":\"Network_Name\",\"mask\":\"\",\"tags\":")

@@ -39,17 +39,17 @@ type Config interface {
 
 // ConfigMap is a map[string]string that implements
 // the Config method.
-type ConfigMap map[string]interface{}
+type ConfigMap map[string]any
 
 // Config gets a string configuration value and a
 // bool indicating whether the value was present or not.
-func (c ConfigMap) Config(name string) (interface{}, bool) {
+func (c ConfigMap) Config(name string) (any, bool) {
 	val, ok := c[name]
 	return val, ok
 }
 
 // Get is an alias to Config()
-func (c ConfigMap) Get(name string) (interface{}, bool) {
+func (c ConfigMap) Get(name string) (any, bool) {
 	return c.Config(name)
 }
 

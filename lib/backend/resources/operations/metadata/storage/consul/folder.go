@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package operations
+package consul
 
 import (
 	"bytes"
@@ -22,24 +22,25 @@ import (
 	"strings"
 	"time"
 
-	datadef "github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
+	datadef "github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-// MetadataFolder describes a metadata MetadataFolder
-type MetadataFolder struct {
+// folder describes a metadata folder
+type folder struct {
 	// path contains the base path where to read/write record in Object Storage
 	path     string
 	service  iaas.Service
@@ -47,16 +48,13 @@ type MetadataFolder struct {
 	cryptKey *crypt.Key
 }
 
-// folderDecoderCallback is the prototype of the function that will decode data read from Metadata
-type folderDecoderCallback func([]byte) fail.Error
-
-// NewMetadataFolder creates a new Metadata MetadataFolder object, ready to help access the metadata inside it
-func NewMetadataFolder(svc iaas.Service, path string) (MetadataFolder, fail.Error) {
+// NewFolder creates a new Metadata folder object, ready to help access the metadata inside it
+func NewFolder(svc iaas.Service, path string) (*folder, fail.Error) {
 	if svc == nil {
-		return MetadataFolder{}, fail.InvalidInstanceError()
+		return &folder{}, fail.InvalidInstanceError()
 	}
 
-	f := MetadataFolder{
+	f := &folder{
 		path:    strings.Trim(path, "/"),
 		service: svc,
 	}
@@ -65,7 +63,7 @@ func NewMetadataFolder(svc iaas.Service, path string) (MetadataFolder, fail.Erro
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
-			return MetadataFolder{}, xerr
+			return &folder{}, xerr
 		}
 	} else {
 		f.crypt = cryptKey != nil && len(cryptKey) > 0
@@ -76,18 +74,18 @@ func NewMetadataFolder(svc iaas.Service, path string) (MetadataFolder, fail.Erro
 	return f, nil
 }
 
-// IsNull tells if the MetadataFolder instance should be considered as a null value
-func (instance *MetadataFolder) IsNull() bool {
+// IsNull tells if the folder instance should be considered as a null value
+func (instance *folder) IsNull() bool {
 	return instance == nil || instance.service == nil
 }
 
-// Service returns the service used by the MetadataFolder
-func (instance MetadataFolder) Service() iaas.Service {
+// Service returns the service used by the folder
+func (instance folder) Service() iaas.Service {
 	return instance.service
 }
 
-// GetBucket returns the bucket used by the MetadataFolder to store Object Storage
-func (instance MetadataFolder) GetBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
+// GetBucket returns the bucket used by the folder to store Object Storage
+func (instance folder) GetBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
 	if valid.IsNil(instance) {
 		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
 	}
@@ -101,7 +99,7 @@ func (instance MetadataFolder) GetBucket(ctx context.Context) (abstract.ObjectSt
 }
 
 // getBucket is the same as GetBucket without instance validation (for internal use)
-func (instance MetadataFolder) getBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
+func (instance folder) getBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
 	bucket, xerr := instance.service.GetMetadataBucket(ctx)
 	if xerr != nil {
 		return abstract.ObjectStorageBucket{}, xerr
@@ -109,13 +107,13 @@ func (instance MetadataFolder) getBucket(ctx context.Context) (abstract.ObjectSt
 	return bucket, nil
 }
 
-// Path returns the base path of the MetadataFolder
-func (instance MetadataFolder) Path() string {
+// Path returns the base path of the folder
+func (instance folder) Path() string {
 	return instance.path
 }
 
-// absolutePath returns the full path to reach the 'path'+'name' starting from the MetadataFolder path
-func (instance MetadataFolder) absolutePath(path ...string) string {
+// absolutePath returns the full path to reach the 'path'+'name' starting from the folder path
+func (instance folder) absolutePath(path ...string) string {
 	for len(path) > 0 && (path[0] == "" || path[0] == ".") {
 		path = path[1:]
 	}
@@ -137,8 +135,8 @@ func (instance MetadataFolder) absolutePath(path ...string) string {
 	return instance.path
 }
 
-// Lookup tells if the object named 'name' is inside the ObjectStorage MetadataFolder
-func (instance MetadataFolder) Lookup(ctx context.Context, path string, name string) fail.Error {
+// Lookup tells if the object named 'name' is inside the ObjectStorage folder
+func (instance folder) Lookup(ctx context.Context, path string, name string) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -168,7 +166,7 @@ func (instance MetadataFolder) Lookup(ctx context.Context, path string, name str
 }
 
 // Delete removes metadata passed as parameter
-func (instance MetadataFolder) Delete(ctx context.Context, path string, name string) fail.Error {
+func (instance folder) Delete(ctx context.Context, path string, name string) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -199,7 +197,7 @@ func (instance MetadataFolder) Delete(ctx context.Context, path string, name str
 // returns true, nil if the object has been found
 // returns false, fail.Error if an error occurred (including object not found)
 // The callback function has to know how to decode it and where to store the result
-func (instance MetadataFolder) Read(ctx context.Context, path string, name string, callback func([]byte) fail.Error, options ...datadef.ImmutableKeyValue) fail.Error {
+func (instance folder) Read(ctx context.Context, path string, name string, callback storage.FolderCallback, options ...datadef.ImmutableKeyValue) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -301,7 +299,7 @@ func (instance MetadataFolder) Read(ctx context.Context, path string, name strin
 // Returns nil on success (with assurance the write operation has been committed on remote side)
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
-func (instance MetadataFolder) Write(ctx context.Context, path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
+func (instance folder) Write(ctx context.Context, path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -392,7 +390,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 
 					return nil
 				},
-				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout), retry.Max(15)),
+				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout), retry.Max(3)),
 				retry.Linear(timings.SmallDelay()),
 				nil,
 				nil,
@@ -415,7 +413,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 			}
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Max(15)),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Max(3)),
 		retry.Constant(0),
 		nil,
 		nil,
@@ -440,13 +438,20 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 
 	if iterations > 1 {
 		logrus.WithContext(ctx).Warnf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
+	} else {
+		logrus.WithContext(ctx).Debugf("Read after write of '%s:%s' acknowledged after %s and %d iterations and %d reads", bucketName, absolutePath, time.Since(readAfterWrite), iterations, innerIterations)
 	}
 
 	return nil
 }
 
+// AbsolutePath returns the full path to reach the 'path'+'name' starting from the folder path
+func (instance folder) AbsolutePath(path ...string) string {
+	return storage.AbsolutePath(instance.path, path...)
+}
+
 // Browse browses the content of a specific path in Metadata and executes 'callback' on each entry
-func (instance MetadataFolder) Browse(ctx context.Context, path string, callback folderDecoderCallback) fail.Error {
+func (instance folder) Browse(ctx context.Context, path string, callback storage.FolderCallback) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -463,7 +468,7 @@ func (instance MetadataFolder) Browse(ctx context.Context, path string, callback
 		return fail.Wrap(xerr, "Error browsing metadata: listing objects")
 	}
 
-	// If there is a single entry equals to absolute path, then there is nothing, it's an empty MetadataFolder
+	// If there is a single entry equals to absolute path, then there is nothing, it's an empty folder
 	if len(list) == 1 && strings.Trim(list[0], "/") == absPath {
 		return nil
 	}

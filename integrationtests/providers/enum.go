@@ -90,5 +90,5 @@ func FromString(str string) (Enum, error) {
 		return OUTSCALE, nil
 	}
 
-	return UNKNOWN, fail.NotFoundError("%s is not a valid Provider", str)
+	return UNKNOWN, fail.NotFoundError("%s is not a valid provider", str)
 }

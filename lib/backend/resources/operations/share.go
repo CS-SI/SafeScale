@@ -26,6 +26,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/eko/gocache/v2/store"
 	"github.com/gofrs/uuid"
@@ -116,7 +117,7 @@ func (si *ShareIdentity) Replace(p data.Clonable) (data.Clonable, error) {
 
 // Share contains information to maintain in Object Storage a list of shared folders
 type Share struct {
-	*MetadataCore
+	*metadata.Core
 }
 
 // NewShare creates an instance of Share
@@ -125,14 +126,14 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := NewCore(svc, shareKind, sharesFolderName, &ShareIdentity{})
+	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, shareKind, sharesFolderName, &ShareIdentity{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	instance := &Share{
-		MetadataCore: coreInstance,
+		Core: coreInstance,
 	}
 	return instance, nil
 }
@@ -270,7 +271,7 @@ func onShareCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.I
 
 // IsNull tells if the instance should be considered as a null value
 func (instance *Share) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
+	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -284,7 +285,7 @@ func (instance *Share) carry(ctx context.Context, clonable data.Clonable) (ferr 
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) && instance.MetadataCore.IsTaken() {
+	if !valid.IsNil(instance) && instance.Core.IsTaken() {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if clonable == nil {
@@ -292,7 +293,7 @@ func (instance *Share) carry(ctx context.Context, clonable data.Clonable) (ferr 
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(ctx, clonable)
+	xerr := instance.Core.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -316,7 +317,7 @@ func (instance *Share) Browse(ctx context.Context, callback func(string, string)
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
+	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		si := &ShareIdentity{}
 		xerr := si.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -342,8 +343,8 @@ func (instance *Share) Create(
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance.MetadataCore) {
-		if instance.MetadataCore.IsTaken() {
+	if !valid.IsNil(instance.Core) {
+		if instance.Core.IsTaken() {
 			return fail.InconsistentError("already carrying information")
 		}
 	}
@@ -1209,7 +1210,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Remove Share metadata
-	return instance.MetadataCore.Delete(ctx)
+	return instance.Core.Delete(ctx)
 }
 
 func sanitize(in string) (string, fail.Error) {

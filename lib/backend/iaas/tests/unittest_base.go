@@ -23,11 +23,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/aws"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/huaweicloud"
@@ -58,7 +58,7 @@ type ServiceTester struct {
 
 // VerifyStacks checks at compile that initialized tenants are valid stacks
 func (tester *ServiceTester) VerifyStacks(t *testing.T) {
-	var stack api.Stack
+	var stack stacks.Stack
 
 	stack = aws.NullStack()         // nolint
 	stack = gcp.NullStack()         // nolint

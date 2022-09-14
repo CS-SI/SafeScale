@@ -70,10 +70,9 @@ type Service interface {
 	WaitHostState(context.Context, string, hoststate.Enum, time.Duration) fail.Error
 	WaitVolumeState(context.Context, string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
 
-	// Provider --- from interface iaas.Providers ---
-	providers.Provider
-
 	LookupRuleInSecurityGroup(context.Context, *abstract.SecurityGroup, *abstract.SecurityGroupRule) (bool, fail.Error)
+
+	providers.Provider
 
 	// Location --- from interface objectstorage.Location ---
 	objectstorage.Location

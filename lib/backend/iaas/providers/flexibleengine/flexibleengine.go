@@ -27,8 +27,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/huaweicloud"
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	imagefilters "github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract/filters/images"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
@@ -72,7 +72,7 @@ var gpuMap = map[string]gpuCfg{
 
 // provider is the implementation of FlexibleEngine provider
 type provider struct {
-	api.Stack
+	stacks.Stack
 
 	// defaultSecurityGroupName string
 
@@ -134,7 +134,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string)) // nolint
 	}
 
-	authOptions := stacks.AuthenticationOptions{
+	authOptions := stackoptions.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
 		Password:         password,
@@ -190,7 +190,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 next:
 
-	cfgOptions := stacks.ConfigurationOptions{
+	cfgOptions := stackoptions.ConfigurationOptions{
 		DNSList:             dnsServers,
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,
@@ -220,7 +220,7 @@ next:
 
 	// Note: if timings have to be tuned, update stack.MutableTimings
 
-	wrapped := api.StackProxy{
+	wrapped := stacks.Remediator{
 		FullStack: stack,
 		Name:      "flexibleengine",
 	}
@@ -230,7 +230,7 @@ next:
 		tenantParameters: params,
 	}
 
-	wp := providers.ProviderProxy{
+	wp := providers.Remediator{
 		Provider: newP,
 		Name:     wrapped.Name,
 	}
@@ -259,7 +259,7 @@ func (p *provider) InspectTemplate(ctx context.Context, id string) (*abstract.Ho
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
-	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(ctx, all)
+	allTemplates, xerr := p.Stack.(stacks.ReservedForProviderUse).ListTemplates(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -293,7 +293,7 @@ func isBMSImage(image *abstract.Image) bool {
 
 // ListImages lists available OS images
 func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
-	images, xerr := p.Stack.(api.ReservedForProviderUse).ListImages(ctx, all)
+	images, xerr := p.Stack.(stacks.ReservedForProviderUse).ListImages(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -309,7 +309,7 @@ func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image,
 func (p *provider) GetAuthenticationOptions(ctx context.Context) (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
+	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func (p *provider) GetAuthenticationOptions(ctx context.Context) (providers.Conf
 func (p *provider) GetConfigurationOptions(ctx context.Context) (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
+	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +358,7 @@ func (p *provider) GetName() (string, fail.Error) {
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() (api.Stack, fail.Error) {
+func (p provider) GetStack() (stacks.Stack, fail.Error) {
 	return p.Stack, nil
 }
 
@@ -396,6 +396,43 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	}
 
 	return out, nil
+}
+
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (p provider) HasDefaultNetwork(ctx context.Context) (bool, fail.Error) {
+	if valid.IsNil(p) {
+		return false, fail.InvalidInstanceError()
+	}
+
+	options, xerr := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
+	if xerr != nil {
+		return false, xerr
+	}
+
+	return options.DefaultNetworkName != "", nil
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (p provider) GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	options, xerr := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if options.DefaultNetworkName != "" {
+		networkAbstract, xerr := p.InspectNetwork(ctx, options.DefaultNetworkCIDR)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		return networkAbstract, nil
+	}
+
+	return nil, fail.NotFoundError("this provider has no default network")
 }
 
 func init() {

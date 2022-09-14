@@ -104,7 +104,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !req.KeepOnFailure && !cleanFailure {
 				logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
-				if derr := instance.MetadataCore.Delete(context.Background()); derr != nil {
+				if derr := instance.Core.Delete(context.Background()); derr != nil {
 					logrus.WithContext(context.Background()).Errorf(
 						"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
 					)
@@ -866,7 +866,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			switch xerr.(type) {
 			case *fail.ErrInvalidRequest:
 				// Some cloud providers do not allow to create a Subnet with the same CIDR than the Network; try with a sub-CIDR once
-				logrus.WithContext(ctx).Warnf("Cloud Provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
+				logrus.WithContext(ctx).Warnf("Cloud provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
 				_, ipNet, err := net.ParseCIDR(subnetReq.CIDR)
 				err = debug.InjectPlannedError(err)
 				if err != nil {

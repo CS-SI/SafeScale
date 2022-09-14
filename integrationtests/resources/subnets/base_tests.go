@@ -108,7 +108,7 @@ func Setup(t *testing.T, provider providers.Enum) {
 	}
 	require.Nil(t, err)
 	require.True(t, len(getStr) > 0)
-	// require.True(t, strings.Contains(getStr, fmt.Sprintf("\"Provider\":\"%s\"", name)))
+	// require.True(t, strings.Contains(getStr, fmt.Sprintf("\"provider\":\"%s\"", name)))
 }
 
 func Basic(t *testing.T, provider providers.Enum) {

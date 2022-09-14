@@ -19,6 +19,7 @@ package openstack // Package openstack contains the implemenation of a stack for
 import (
 	"strings"
 
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"golang.org/x/net/context"
@@ -38,8 +39,8 @@ type stack struct {
 	IdentityClient *gophercloud.ServiceClient
 	Driver         *gophercloud.ProviderClient
 
-	authOpts stacks.AuthenticationOptions
-	cfgOpts  stacks.ConfigurationOptions
+	authOpts stackoptions.AuthenticationOptions
+	cfgOpts  stackoptions.ConfigurationOptions
 
 	// DefaultSecurityGroupName is the name of the default security groups
 	DefaultSecurityGroupName string
@@ -64,7 +65,7 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and returns a stack pointer
-func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
+func New(auth stackoptions.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stackoptions.ConfigurationOptions, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
 	ctx := context.Background()
 
 	if auth.DomainName == "" && auth.DomainID == "" {

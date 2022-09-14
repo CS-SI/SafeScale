@@ -56,7 +56,7 @@ func (h hostConsumer) List(all bool, timeout time.Duration) (*protocol.HostList,
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.List(newCtx, &protocol.HostListRequest{TenantId: h.session.tenant, All: all})
+	return service.List(newCtx, &protocol.HostListRequest{TenantId: h.session.currentTenant, All: all})
 }
 
 // Inspect ...
@@ -78,7 +78,7 @@ func (h hostConsumer) Inspect(name string, timeout time.Duration) (*protocol.Hos
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.Inspect(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
+	return service.Inspect(newCtx, &protocol.Reference{TenantId: h.session.currentTenant, Name: name})
 }
 
 // GetStatus gets host status
@@ -100,7 +100,7 @@ func (h hostConsumer) GetStatus(name string, timeout time.Duration) (*protocol.H
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.Status(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
+	return service.Status(newCtx, &protocol.Reference{TenantId: h.session.currentTenant, Name: name})
 }
 
 // Reboot host
@@ -122,7 +122,7 @@ func (h hostConsumer) Reboot(name string, timeout time.Duration) error {
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	_, err := service.Reboot(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
+	_, err := service.Reboot(newCtx, &protocol.Reference{TenantId: h.session.currentTenant, Name: name})
 	return err
 }
 
@@ -145,7 +145,7 @@ func (h hostConsumer) Start(name string, timeout time.Duration) error {
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	_, err := service.Start(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
+	_, err := service.Start(newCtx, &protocol.Reference{TenantId: h.session.currentTenant, Name: name})
 	return err
 }
 
@@ -167,7 +167,7 @@ func (h hostConsumer) Stop(name string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
-	_, err := service.Stop(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
+	_, err := service.Stop(newCtx, &protocol.Reference{TenantId: h.session.currentTenant, Name: name})
 	return err
 }
 
@@ -224,7 +224,7 @@ func (h hostConsumer) Delete(names []string, timeout time.Duration) error {
 
 		defer wg.Done()
 
-		_, xerr := service.Delete(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: aname})
+		_, xerr := service.Delete(newCtx, &protocol.Reference{TenantId: h.session.currentTenant, Name: aname})
 		if xerr != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
@@ -255,7 +255,7 @@ func (h hostConsumer) SSHConfig(name string) (sshapi.Config, error) {
 	}
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	pbSSHCfg, err := service.SSH(ctx, &protocol.Reference{TenantId: h.session.tenant, Name: name})
+	pbSSHCfg, err := service.SSH(ctx, &protocol.Reference{TenantId: h.session.currentTenant, Name: name})
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +307,7 @@ func (h hostConsumer) ListFeatures(hostRef string, all bool, timeout time.Durati
 
 	req := protocol.FeatureListRequest{
 		TargetType:    protocol.FeatureTargetType_FT_HOST,
-		TargetRef:     &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
+		TargetRef:     &protocol.Reference{TenantId: h.session.currentTenant, Name: hostRef},
 		InstalledOnly: !all,
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
@@ -338,7 +338,7 @@ func (h hostConsumer) InspectFeature(hostRef, featureName string, embedded bool,
 
 	req := &protocol.FeatureDetailRequest{
 		TargetType: protocol.FeatureTargetType_FT_HOST,
-		TargetRef:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
+		TargetRef:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostRef},
 		Name:       featureName,
 		Embedded:   embedded,
 	}
@@ -366,7 +366,7 @@ func (h hostConsumer) ExportFeature(hostRef, featureName string, embedded bool, 
 
 	req := &protocol.FeatureDetailRequest{
 		TargetType: protocol.FeatureTargetType_FT_HOST,
-		TargetRef:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
+		TargetRef:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostRef},
 		Name:       featureName,
 		Embedded:   embedded,
 	}
@@ -395,7 +395,7 @@ func (h hostConsumer) CheckFeature(hostRef, featureName string, params map[strin
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_HOST,
-		TargetRef:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
+		TargetRef:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostRef},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -425,7 +425,7 @@ func (h hostConsumer) AddFeature(hostRef, featureName string, params map[string]
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_HOST,
-		TargetRef:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
+		TargetRef:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostRef},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -455,7 +455,7 @@ func (h hostConsumer) RemoveFeature(hostRef, featureName string, params map[stri
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_HOST,
-		TargetRef:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
+		TargetRef:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostRef},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -464,7 +464,7 @@ func (h hostConsumer) RemoveFeature(hostRef, featureName string, params map[stri
 	return err
 }
 
-// BindSecurityGroup calls the gRPC server to bind a security group to a host
+// BindSecurityGroup calls the gRPC currentServer to bind a security group to a host
 func (h hostConsumer) BindSecurityGroup(hostRef, sgRef string, enable bool, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -490,8 +490,8 @@ func (h hostConsumer) BindSecurityGroup(hostRef, sgRef string, enable bool, time
 		state = protocol.SecurityGroupState_SGS_DISABLED
 	}
 	req := &protocol.SecurityGroupHostBindRequest{
-		Group: &protocol.Reference{TenantId: h.session.tenant, Name: sgRef},
-		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
+		Group: &protocol.Reference{TenantId: h.session.currentTenant, Name: sgRef},
+		Host:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostRef},
 		State: state,
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
@@ -499,7 +499,7 @@ func (h hostConsumer) BindSecurityGroup(hostRef, sgRef string, enable bool, time
 	return err
 }
 
-// UnbindSecurityGroup calls the gRPC server to unbind a security group from a host
+// UnbindSecurityGroup calls the gRPC currentServer to unbind a security group from a host
 func (h hostConsumer) UnbindSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -518,15 +518,15 @@ func (h hostConsumer) UnbindSecurityGroup(hostRef, sgRef string, timeout time.Du
 	}
 
 	req := &protocol.SecurityGroupHostBindRequest{
-		Group: &protocol.Reference{TenantId: h.session.tenant, Name: sgRef},
-		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
+		Group: &protocol.Reference{TenantId: h.session.currentTenant, Name: sgRef},
+		Host:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.UnbindSecurityGroup(newCtx, req)
 	return err
 }
 
-// EnableSecurityGroup calls the gRPC server to enable a bound security group on host
+// EnableSecurityGroup calls the gRPC currentServer to enable a bound security group on host
 func (h hostConsumer) EnableSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -545,15 +545,15 @@ func (h hostConsumer) EnableSecurityGroup(hostRef, sgRef string, timeout time.Du
 	}
 
 	req := &protocol.SecurityGroupHostBindRequest{
-		Group: &protocol.Reference{TenantId: h.session.tenant, Name: sgRef},
-		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
+		Group: &protocol.Reference{TenantId: h.session.currentTenant, Name: sgRef},
+		Host:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.EnableSecurityGroup(newCtx, req)
 	return err
 }
 
-// DisableSecurityGroup calls the gRPC server to disable a bound security group on host
+// DisableSecurityGroup calls the gRPC currentServer to disable a bound security group on host
 func (h hostConsumer) DisableSecurityGroup(hostRef, sgRef string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -572,15 +572,15 @@ func (h hostConsumer) DisableSecurityGroup(hostRef, sgRef string, timeout time.D
 	}
 
 	req := &protocol.SecurityGroupHostBindRequest{
-		Group: &protocol.Reference{TenantId: h.session.tenant, Name: sgRef},
-		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
+		Group: &protocol.Reference{TenantId: h.session.currentTenant, Name: sgRef},
+		Host:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostRef},
 	}
 	service := protocol.NewHostServiceClient(h.session.connection)
 	_, err := service.DisableSecurityGroup(newCtx, req)
 	return err
 }
 
-// ListSecurityGroups calls the gRPC server to list bound security groups of a host
+// ListSecurityGroups calls the gRPC currentServer to list bound security groups of a host
 func (h hostConsumer) ListSecurityGroups(hostRef, state string, timeout time.Duration) (*protocol.SecurityGroupBondsResponse, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
@@ -601,7 +601,7 @@ func (h hostConsumer) ListSecurityGroups(hostRef, state string, timeout time.Dur
 	service := protocol.NewHostServiceClient(h.session.connection)
 
 	req := &protocol.SecurityGroupHostBindRequest{
-		Host: &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
+		Host: &protocol.Reference{TenantId: h.session.currentTenant, Name: hostRef},
 	}
 	switch strings.ToLower(strings.TrimSpace(state)) {
 	case "all":
@@ -638,7 +638,7 @@ func (h hostConsumer) ListLabels(hostName string, selectTags bool, timeout time.
 
 	req := &protocol.LabelBoundsRequest{
 		Host: &protocol.Reference{
-			TenantId: h.session.tenant,
+			TenantId: h.session.currentTenant,
 			Name:     hostName,
 		},
 		Tags: selectTags,
@@ -667,8 +667,8 @@ func (h hostConsumer) InspectLabel(hostName string, labelName string, timeout ti
 	}
 
 	req := &protocol.HostLabelRequest{
-		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostName},
-		Label: &protocol.Reference{TenantId: h.session.tenant, Name: labelName},
+		Host:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostName},
+		Label: &protocol.Reference{TenantId: h.session.currentTenant, Name: labelName},
 	}
 	return service.InspectLabel(newCtx, req)
 }
@@ -694,8 +694,8 @@ func (h hostConsumer) BindLabel(hostName string, labelName string, value string,
 	}
 
 	req := &protocol.LabelBindRequest{
-		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostName},
-		Label: &protocol.Reference{TenantId: h.session.tenant, Name: labelName},
+		Host:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostName},
+		Label: &protocol.Reference{TenantId: h.session.currentTenant, Name: labelName},
 		Value: value,
 	}
 	_, err := service.BindLabel(newCtx, req)
@@ -722,8 +722,8 @@ func (h hostConsumer) UnbindLabel(hostName string, labelName string, timeout tim
 
 	// FIXME: recover tenantConsumer ID from current session
 	req := &protocol.LabelBindRequest{
-		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostName},
-		Label: &protocol.Reference{TenantId: h.session.tenant, Name: labelName},
+		Host:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostName},
+		Label: &protocol.Reference{TenantId: h.session.currentTenant, Name: labelName},
 	}
 
 	_, err := service.UnbindLabel(newCtx, req)
@@ -751,8 +751,8 @@ func (h hostConsumer) UpdateLabel(hostName string, labelName string, value strin
 	}
 
 	req := &protocol.LabelBindRequest{
-		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostName},
-		Label: &protocol.Reference{TenantId: h.session.tenant, Name: labelName},
+		Host:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostName},
+		Label: &protocol.Reference{TenantId: h.session.currentTenant, Name: labelName},
 		Value: value,
 	}
 	_, err := service.UpdateLabel(newCtx, req)
@@ -780,8 +780,8 @@ func (h hostConsumer) ResetLabel(hostName string, labelName string, timeout time
 
 	// FIXME: recover tenantConsumer ID from current session
 	req := &protocol.LabelBindRequest{
-		Host:  &protocol.Reference{TenantId: h.session.tenant, Name: hostName},
-		Label: &protocol.Reference{TenantId: h.session.tenant, Name: labelName},
+		Host:  &protocol.Reference{TenantId: h.session.currentTenant, Name: hostName},
+		Label: &protocol.Reference{TenantId: h.session.currentTenant, Name: labelName},
 	}
 
 	_, err := service.ResetLabel(newCtx, req)

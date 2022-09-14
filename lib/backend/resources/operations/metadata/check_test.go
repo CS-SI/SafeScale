@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package operations
+package metadata
 
 import (
 	"context"
@@ -38,7 +38,7 @@ func Test_CheckMetadataVersion(t *testing.T) {
 		svc._updateOption("version", "")
 		svc._updateOption("versionErr", fail.NewError("There is no version"))
 
-		_, xerr = CheckMetadataVersion(ctx, svc)
+		_, xerr = CheckVersion(ctx, svc)
 		require.Contains(t, xerr.Error(), "failed to read content of 'version' file in metadata bucket")
 		require.Contains(t, xerr.Error(), "There is no version")
 
@@ -46,34 +46,34 @@ func Test_CheckMetadataVersion(t *testing.T) {
 		svc._updateOption("name", "")
 		svc._updateOption("nameErr", fail.NewError("Service has no name"))
 
-		_, xerr = CheckMetadataVersion(ctx, svc)
+		_, xerr = CheckVersion(ctx, svc)
 		require.Contains(t, xerr.Error(), "Service has no name")
 
 		svc._reset()
 		svc._updateOption("version", "")
 
-		version, xerr = CheckMetadataVersion(ctx, svc)
+		version, xerr = CheckVersion(ctx, svc)
 		require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrForbidden")
 		require.EqualValues(t, version, FirstMetadataVersion)
 
 		svc._reset()
 		svc._updateOption("version", "v19.00.0")
 
-		version, xerr = CheckMetadataVersion(ctx, svc)
+		version, xerr = CheckVersion(ctx, svc)
 		require.EqualValues(t, version, "v19.00.0")
 		require.Contains(t, xerr.Error(), "should consider upgrading")
 
 		svc._reset()
 		svc._updateOption("version", "v20.06.666")
 
-		version, xerr = CheckMetadataVersion(ctx, svc)
+		version, xerr = CheckVersion(ctx, svc)
 		require.Contains(t, xerr.Error(), "should consider upgrading")
 		require.EqualValues(t, version, "v20.06.666")
 
 		svc._reset()
 		svc._updateOption("version", MinimumMetadataVersion)
 
-		version, xerr = CheckMetadataVersion(ctx, svc)
+		version, xerr = CheckVersion(ctx, svc)
 		require.Nil(t, xerr)
 		require.EqualValues(t, version, MinimumMetadataVersion)
 

@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
@@ -57,7 +58,7 @@ const (
 // SecurityGroup ...
 // follows interface resources.SecurityGroup
 type SecurityGroup struct {
-	*MetadataCore
+	*metadata.Core
 }
 
 // NewSecurityGroup ...
@@ -66,14 +67,14 @@ func NewSecurityGroup(svc iaas.Service) (*SecurityGroup, fail.Error) {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
 
-	coreInstance, xerr := NewCore(svc, securityGroupKind, securityGroupsFolderName, &abstract.SecurityGroup{})
+	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, securityGroupKind, securityGroupsFolderName, &abstract.SecurityGroup{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	instance := &SecurityGroup{
-		MetadataCore: coreInstance,
+		Core: coreInstance,
 	}
 	return instance, nil
 }
@@ -208,7 +209,7 @@ func onSGCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Iden
 
 // IsNull tests if instance is nil or empty
 func (instance *SecurityGroup) IsNull() bool {
-	return valid.IsNil(instance.MetadataCore)
+	return valid.IsNil(instance.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -236,7 +237,7 @@ func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) && instance.MetadataCore.IsTaken() {
+	if !valid.IsNil(instance) && instance.Core.IsTaken() {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if clonable == nil {
@@ -244,7 +245,7 @@ func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(ctx, clonable)
+	xerr := instance.Core.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -270,7 +271,7 @@ func (instance *SecurityGroup) Browse(
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
+	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		asg := abstract.NewSecurityGroup()
 		xerr := asg.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -283,7 +284,7 @@ func (instance *SecurityGroup) Browse(
 }
 
 // Create creates a new SecurityGroup and its metadata.
-// If needed by Cloud Provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
+// If needed by Cloud provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
 // If the metadata is already carrying a SecurityGroup, returns fail.ErrNotAvailable
 func (instance *SecurityGroup) Create(
 	inctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules,
@@ -294,8 +295,8 @@ func (instance *SecurityGroup) Create(
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance.MetadataCore) {
-		if instance.MetadataCore.IsTaken() {
+	if !valid.IsNil(instance.Core) {
+		if instance.Core.IsTaken() {
 			return fail.InconsistentError("already carrying information")
 		}
 	}
@@ -407,7 +408,7 @@ func (instance *SecurityGroup) Create(
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				if derr := instance.MetadataCore.Delete(context.Background()); derr != nil {
+				if derr := instance.Core.Delete(context.Background()); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(ferr)))
 				}
 			}
@@ -498,7 +499,7 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (ferr fai
 	return instance.unsafeDelete(ctx, force)
 }
 
-// deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on Provider side
+// deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on provider side
 func deleteProviderSecurityGroup(ctx context.Context, svc iaas.Service, abstractSG *abstract.SecurityGroup) fail.Error {
 	timings, xerr := svc.Timings()
 	if xerr != nil {

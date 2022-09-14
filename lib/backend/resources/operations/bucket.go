@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
@@ -46,13 +47,13 @@ import (
 
 const (
 	bucketKind = "bucket"
-	// bucketsFolderName is the name of the object storage MetadataFolder used to store buckets info
+	// bucketsFolderName is the name of the object storage folder used to store buckets info
 	bucketsFolderName = "buckets"
 )
 
 // bucket describes a bucket and satisfies interface resources.ObjectStorageBucket
 type bucket struct {
-	*MetadataCore
+	*metadata.Core
 
 	lock sync.RWMutex
 }
@@ -63,19 +64,19 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := NewCore(svc, bucketKind, bucketsFolderName, &abstract.ObjectStorageBucket{})
+	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, bucketKind, bucketsFolderName, &abstract.ObjectStorageBucket{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	instance := &bucket{
-		MetadataCore: coreInstance,
+		Core: coreInstance,
 	}
 	return instance, nil
 }
 
-// LoadBucket instantiates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
+// LoadBucket instantiates a bucket struct and fill it with provider metadata of Object Storage ObjectStorageBucket
 func LoadBucket(inctx context.Context, svc iaas.Service, name string) (resources.Bucket, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -202,7 +203,7 @@ func onBucketCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.
 
 // IsNull tells if the instance corresponds to null value
 func (instance *bucket) IsNull() bool {
-	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
+	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -231,7 +232,7 @@ func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) {
-		if instance.MetadataCore.IsTaken() {
+		if instance.Core.IsTaken() {
 			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 		}
 	}
@@ -240,7 +241,7 @@ func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.MetadataCore.Carry(ctx, clonable)
+	xerr := instance.Core.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -272,7 +273,7 @@ func (instance *bucket) Browse(
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr := instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
+	xerr := instance.Core.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
 		ab := abstract.NewObjectStorageBucket()
 		var inErr fail.Error
 		if inErr = ab.Deserialize(buf); inErr != nil {
@@ -355,8 +356,8 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance.MetadataCore) {
-		if instance.MetadataCore.IsTaken() {
+	if !valid.IsNil(instance.Core) {
+		if instance.Core.IsTaken() {
 			return fail.InconsistentError("already carrying information")
 		}
 	}
@@ -475,7 +476,7 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// -- delete metadata
-	xerr = instance.MetadataCore.Delete(ctx)
+	xerr = instance.Core.Delete(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -592,7 +593,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 	desc.Endpoint = osConfig.Endpoint
 
-	// needed value for Description.ProjectName may come from various config entries depending on the Cloud Provider
+	// needed value for Description.ProjectName may come from various config entries depending on the Cloud provider
 	if anon, ok := authOpts.Config("ProjectName"); ok {
 		desc.ProjectName, ok = anon.(string)
 		if !ok {

@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
@@ -31,7 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	filters "github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract/filters/templates"
@@ -77,7 +77,7 @@ var (
 
 // provider is the provider implementation of the OVH provider
 type provider struct {
-	api.Stack
+	stacks.Stack
 
 	ExternalNetworkID string
 
@@ -173,7 +173,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 
-	authOptions := stacks.AuthenticationOptions{
+	authOptions := stackoptions.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         openstackID,
 		Password:         openstackPassword,
@@ -214,7 +214,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 next:
 
-	cfgOptions := stacks.ConfigurationOptions{
+	cfgOptions := stackoptions.ConfigurationOptions{
 		ProviderNetwork:           externalNetwork,
 		UseFloatingIP:             false,
 		UseLayer3Networking:       false,
@@ -242,7 +242,7 @@ next:
 
 	// Note: if timings have to be tuned, update stack.MutableTimings
 
-	wrapped := api.StackProxy{
+	wrapped := stacks.Remediator{
 		FullStack: stack,
 		Name:      "ovh",
 	}
@@ -252,7 +252,7 @@ next:
 		tenantParameters: params,
 	}
 
-	wp := providers.ProviderProxy{
+	wp := providers.Remediator{
 		Provider: newP,
 		Name:     wrapped.Name,
 	}
@@ -267,7 +267,7 @@ func (p provider) GetAuthenticationOptions(ctx context.Context) (providers.Confi
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
+	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +291,7 @@ func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
+	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +340,7 @@ func (p provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, 
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	return p.Stack.(api.ReservedForProviderUse).ListImages(ctx, all)
+	return p.Stack.(stacks.ReservedForProviderUse).ListImages(ctx, all)
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
@@ -348,7 +348,7 @@ func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Host
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(ctx, false)
+	allTemplates, xerr := p.Stack.(stacks.ReservedForProviderUse).ListTemplates(ctx, false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -456,7 +456,7 @@ func (p provider) GetName() (string, fail.Error) {
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() (api.Stack, fail.Error) {
+func (p provider) GetStack() (stacks.Stack, fail.Error) {
 	return p.Stack, nil
 }
 
@@ -528,6 +528,24 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	}
 
 	return out, nil
+}
+
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (p provider) HasDefaultNetwork(_ context.Context) (bool, fail.Error) {
+	if valid.IsNil(p) {
+		return false, fail.InvalidInstanceError()
+	}
+
+	return false, nil
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (p provider) GetDefaultNetwork(_ context.Context) (*abstract.Network, fail.Error) {
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	return nil, fail.NotFoundError("this provider has no default network")
 }
 
 func init() {

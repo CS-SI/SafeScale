@@ -91,7 +91,7 @@ func tenantGetCommand() *cobra.Command {
 	return out
 }
 
-// tenantSetCommand handles 'safescale tenant set'
+// userSetCommand handles 'safescale tenant set'
 func tenantSetCommand() *cobra.Command {
 	out := &cobra.Command{
 		Use:   "set",
@@ -116,7 +116,7 @@ func tenantSetCommand() *cobra.Command {
 	return out
 }
 
-// tenantInspectCommand handles 'safescale tenant inspect'
+// projectInspectCommand handles 'safescale tenant inspect'
 func tenantInspectCommand() *cobra.Command {
 	out := &cobra.Command{
 		Use:     "inspect",
@@ -185,7 +185,7 @@ func tenantScanCommand() *cobra.Command {
 
 const tenantMetadataCmdLabel = "metadata"
 
-// tenantMetadataCommands handles 'safescale tenant metadata' commands
+// organizationSecurityCommands handles 'safescale tenant metadata' commands
 func tenantMetadataCommands() *cobra.Command {
 	out := &cobra.Command{
 		Use:   tenantMetadataCmdLabel,

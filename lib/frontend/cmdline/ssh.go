@@ -48,7 +48,6 @@ import (
 
 // ssh is the part of the safescale client that handles SSH stuff
 type sshConsumer struct {
-	// session is not used currently
 	session *Session
 }
 
@@ -112,7 +111,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 
 			if retcode == 255 { // ssh connection drop
 				hn, _ := sshCfg.GetHostname()
-				return fail.NotAvailableError("Remote SSH server on Host '%s' is not available, failed to connect", hn)
+				return fail.NotAvailableError("Remote SSH currentServer on Host '%s' is not available, failed to connect", hn)
 			}
 
 			return nil

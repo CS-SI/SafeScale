@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/outscale"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
@@ -47,7 +47,7 @@ var (
 // provider is integration of outscale IaaS API
 // see https://docs.outscale.com/api
 type provider struct {
-	api.Stack
+	stacks.Stack
 
 	tenantParameters map[string]interface{}
 	templatesWithGPU []string
@@ -206,7 +206,7 @@ next:
 
 	// Note: if timings have to be tuned, update stack.MutableTimings
 
-	wrapped := api.StackProxy{
+	wrapped := stacks.Remediator{
 		FullStack: stack,
 		Name:      "outscale",
 	}
@@ -214,7 +214,7 @@ next:
 	p.Stack = wrapped
 	p.tenantParameters = opt
 
-	wp := providers.ProviderProxy{
+	wp := providers.Remediator{
 		Provider: p,
 		Name:     wrapped.Name,
 	}
@@ -228,7 +228,7 @@ func (p provider) GetAuthenticationOptions(ctx context.Context) (providers.Confi
 		return nil, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
+	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +247,7 @@ func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config
 		return nil, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
+	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +279,7 @@ func (p provider) GetName() (string, fail.Error) {
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() (api.Stack, fail.Error) {
+func (p provider) GetStack() (stacks.Stack, fail.Error) {
 	return p.Stack, nil
 }
 
@@ -302,12 +302,12 @@ func (p provider) GetCapabilities(context.Context) (providers.Capabilities, fail
 
 // ListImages ...
 func (p provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
-	return p.Stack.(api.ReservedForProviderUse).ListImages(ctx, all)
+	return p.Stack.(stacks.ReservedForProviderUse).ListImages(ctx, all)
 }
 
 // ListTemplates ...
 func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
-	return p.Stack.(api.ReservedForProviderUse).ListTemplates(ctx, all)
+	return p.Stack.(stacks.ReservedForProviderUse).ListTemplates(ctx, all)
 }
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
@@ -330,6 +330,24 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	}
 
 	return out, nil
+}
+
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (p provider) HasDefaultNetwork(ctx context.Context) (bool, fail.Error) {
+	if valid.IsNil(p) {
+		return false, fail.InvalidInstanceError()
+	}
+
+	return p.Stack.(stacks.ReservedForProviderUse).HasDefaultNetwork(ctx)
+}
+
+// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
+func (p provider) GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	return p.Stack.(stacks.ReservedForProviderUse).GetDefaultNetwork(ctx)
 }
 
 func init() {
