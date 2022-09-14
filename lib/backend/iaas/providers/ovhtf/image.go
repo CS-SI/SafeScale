@@ -56,3 +56,8 @@ func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image,
 	return nil, fail.NotImplementedError()
 	// return p.Stack.(stacks.ReservedForProviderUse).ListImages(ctx, all)
 }
+
+func (p *provider) InspectImage(ctx context.Context, id string) (*abstract.Image, fail.Error) {
+	// TODO implement me
+	panic("implement me")
+}

@@ -5,7 +5,9 @@ import (
 	"context"
 	"embed"
 	"io/ioutil"
+	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/hashicorp/terraform-exec/tfexec"
@@ -27,11 +29,17 @@ type Configuration struct {
 
 // summoner is an implementation of Summoner interface
 type summoner struct {
-	config Configuration
+	provider     ProviderInternals
+	config       Configuration
+	lastFilePath string
+	mu           *sync.Mutex
 }
 
 // NewSummoner instantiates a terraform file builder that will put file in 'workDir'
-func NewSummoner(conf Configuration) (*summoner, fail.Error) {
+func NewSummoner(provider ProviderInternals, conf Configuration) (Summoner, fail.Error) {
+	if valid.IsNull(provider) {
+		return nil, fail.InvalidInstanceError()
+	}
 	if conf.WorkDir == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("workDir")
 	}
@@ -39,31 +47,40 @@ func NewSummoner(conf Configuration) (*summoner, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("execPath")
 	}
 
-	out := &summoner{conf}
+	out := &summoner{provider: provider, config: conf, mu: &sync.Mutex{}}
 	return out, nil
 }
 
 // IsNull tells if the instance must be considered as a null/zero value
 func (instance *summoner) IsNull() bool {
-	return instance == nil || instance.config.WorkDir == "" || instance.config.ExecPath == ""
+	return instance == nil || instance.mu == nil || instance.config.WorkDir == "" || instance.config.ExecPath == ""
 }
 
 // Build creates a main.tf file in the appropriate folder
-func (instance *summoner) Build(provider ProviderInternals, resources ...Resource) (ferr fail.Error) {
+func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if valid.IsNull(provider) {
-		return fail.InvalidParameterError("provider", "cannot be empty provider")
-	}
 	if valid.IsNull(resources) {
 		return fail.InvalidParameterCannotBeNilError("resources")
 	}
 
+	instance.mu.Lock()
+	defer instance.mu.Unlock()
+
+	// If previous built file is still referenced in summoner, Cleanup wasn't called as expected
+	if instance.lastFilePath != "" {
+		return fail.InvalidRequestError("trying to create a new main.tf file without having cleaned up the Summoner")
+	}
+
 	variables := data.NewMap()
-	variables["Provider"] = provider
+	variables["Provider"] = map[string]any{
+		"Name":           instance.provider.Name(),
+		"Authentication": instance.provider.AuthenticationOptions(),
+		"Configuration":  instance.provider.ConfigurationOptions(),
+	}
 
 	// render the resources
 	var (
@@ -73,7 +90,7 @@ func (instance *summoner) Build(provider ProviderInternals, resources ...Resourc
 	for _, r := range resources {
 		lvars := variables.Clone()
 		lvars.Merge(r.ToMap())
-		content, xerr := instance.realizeTemplate(provider.EmbeddedFS(), r.Snippet(), lvars)
+		content, xerr := instance.realizeTemplate(instance.provider.EmbeddedFS(), r.Snippet(), lvars)
 		if xerr != nil {
 			return xerr
 		}
@@ -83,7 +100,7 @@ func (instance *summoner) Build(provider ProviderInternals, resources ...Resourc
 	variables["Resources"] = resourceContent
 
 	// render provider configuration
-	variables["ProviderConfiguration"], xerr = instance.realizeTemplate(provider.EmbeddedFS(), provider.Snippet(), variables)
+	variables["ProviderConfiguration"], xerr = instance.realizeTemplate(instance.provider.EmbeddedFS(), instance.provider.Snippet(), variables)
 	if xerr != nil {
 		return xerr
 	}
@@ -92,7 +109,7 @@ func (instance *summoner) Build(provider ProviderInternals, resources ...Resourc
 	if instance.config.ConsulBackend.Use {
 		lvars := variables.Clone()
 		lvars["ConsulBackend"] = instance.config.ConsulBackend
-		content, xerr := instance.realizeTemplate(provider.EmbeddedFS(), "snippets/consul-backend.tf.template", variables)
+		content, xerr := instance.realizeTemplate(instance.provider.EmbeddedFS(), "snippets/consul-backend.tf.template", variables)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -100,7 +117,7 @@ func (instance *summoner) Build(provider ProviderInternals, resources ...Resourc
 
 		variables["ConsulBackend"] = content
 
-		content, xerr = instance.realizeTemplate(provider.EmbeddedFS(), "snippets/consul-backend-data.tf.template", variables)
+		content, xerr = instance.realizeTemplate(instance.provider.EmbeddedFS(), "snippets/consul-backend-data.tf.template", variables)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -110,7 +127,7 @@ func (instance *summoner) Build(provider ProviderInternals, resources ...Resourc
 	}
 
 	// finally, render the layout
-	content, xerr := instance.realizeTemplate(provider.EmbeddedFS(), "snippets/layout.tf.template", variables)
+	content, xerr := instance.realizeTemplate(instance.provider.EmbeddedFS(), "snippets/layout.tf.template", variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -154,10 +171,14 @@ const mainFilename = "main.tf"
 
 // createFile creates the file in the appropriate path for terraform to execute it
 func (instance summoner) createMainFile(content []byte) fail.Error {
-	path := filepath.Join(instance.workDir, mainFilename)
-	err := ioutil.WriteFile(path, content, 0)
+	if instance.lastFilePath != "" {
+		return fail.InvalidRequestError("trying to create a new main.tf file without having cleaned up the Summoner")
+	}
+
+	instance.lastFilePath = filepath.Join(instance.config.WorkDir, mainFilename)
+	err := ioutil.WriteFile(instance.lastFilePath, content, 0)
 	if err != nil {
-		return fail.Wrap(err, "failed to create main terraform file")
+		return fail.Wrap(err, "failed to create terraform file '%s'", instance.lastFilePath)
 	}
 
 	return nil
@@ -173,7 +194,10 @@ func (instance *summoner) Plan(ctx context.Context) (bool, fail.Error) {
 		return false, fail.InvalidInstanceError()
 	}
 
-	tf, err := tfexec.NewTerraform(instance.workDir, instance.execPath)
+	instance.mu.Lock()
+	defer instance.mu.Unlock()
+
+	tf, err := tfexec.NewTerraform(instance.config.WorkDir, instance.config.ExecPath)
 	if err != nil {
 		return false, fail.Wrap(err, "failed to instantiate terraform executor")
 	}
@@ -197,7 +221,10 @@ func (instance *summoner) Apply(ctx context.Context) (any, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tf, err := tfexec.NewTerraform(instance.workDir, instance.execPath)
+	instance.mu.Lock()
+	defer instance.mu.Unlock()
+
+	tf, err := tfexec.NewTerraform(instance.config.WorkDir, instance.config.ExecPath)
 	if err != nil {
 		return nil, fail.Wrap(err, "failed to instanciate terraform executor")
 	}
@@ -226,7 +253,10 @@ func (instance *summoner) Destroy(ctx context.Context) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	tf, err := tfexec.NewTerraform(instance.workDir, instance.execPath)
+	instance.mu.Lock()
+	defer instance.mu.Unlock()
+
+	tf, err := tfexec.NewTerraform(instance.config.WorkDir, instance.config.ExecPath)
 	if err != nil {
 		return fail.Wrap(err, "failed to instanciate terraform executor")
 	}
@@ -239,6 +269,26 @@ func (instance *summoner) Destroy(ctx context.Context) fail.Error {
 	err = tf.Destroy(ctx)
 	if err != nil {
 		return fail.Wrap(err, "failed to apply terraform")
+	}
+
+	return nil
+}
+
+func (instance *summoner) Cleanup(ctx context.Context) fail.Error {
+	if valid.IsNull(instance) {
+		return fail.InvalidInstanceError()
+	}
+
+	instance.mu.Lock()
+	defer instance.mu.Unlock()
+
+	if instance.lastFilePath != "" {
+		err := os.Remove(instance.lastFilePath)
+		if err != nil {
+			return fail.Wrap(err)
+		}
+
+		instance.lastFilePath = ""
 	}
 
 	return nil

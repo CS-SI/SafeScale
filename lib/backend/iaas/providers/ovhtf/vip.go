@@ -28,7 +28,7 @@ import (
 
 type (
 	vipResource struct {
-		ResourceCore
+		terraformer.ResourceCore
 	}
 )
 
@@ -37,8 +37,7 @@ const (
 )
 
 func newVIPResource(name string) terraformer.Resource {
-	out := &vipResource{NewResourceCore(name)}
-	out.ResourceCore.snippet = vipResourceSnippetPath
+	out := &vipResource{terraformer.NewResourceCore(name, vipResourceSnippetPath)}
 	return out
 }
 

@@ -40,13 +40,12 @@ const (
 
 type (
 	networkResource struct {
-		ResourceCore
+		terraformer.ResourceCore
 	}
 )
 
 func newNetworkResource(name string) terraformer.Resource {
-	out := &networkResource{NewResourceCore(name)}
-	out.ResourceCore.snippet = networkResourceSnippetPath
+	out := &networkResource{terraformer.NewResourceCore(name, networkResourceSnippetPath)}
 	return out
 }
 
@@ -98,12 +97,16 @@ func (p provider) CreateNetwork(ctx context.Context, req abstract.NetworkRequest
 
 	netRsc := newNetworkResource(req.Name)
 
-	summoner, xerr := terraformer.NewSummoner(p.tfWorkdir, global.Settings.Backend.Terraform.ExecPath)
+	summonerConfig := terraformer.Configuration{
+		WorkDir:  "???", //p.tfWorkDir,
+		ExecPath: global.Settings.Backend.Terraform.ExecPath,
+	}
+	summoner, xerr := terraformer.NewSummoner(p, summonerConfig)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = summoner.Build(p, netRsc)
+	xerr = summoner.Build(netRsc)
 	if xerr != nil {
 		return nil, xerr
 	}

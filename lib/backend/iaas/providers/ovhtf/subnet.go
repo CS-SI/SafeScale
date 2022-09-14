@@ -22,6 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -30,16 +31,19 @@ import (
 
 type subnetResource struct {
 	terraformer.ResourceCore
-	networkID string
-	cidr      string
-	ipVersion string
+
+	id             string
+	networkID      string
+	cidr           string
+	ipVersion      ipversion.Enum
+	dnsNameServers []string
 }
 
 const (
 	subnetResourceSnippetPath = "snippets/resource_subnet.tf.template"
 )
 
-func newSubnetResource(name string) terraformer.Resource {
+func newSubnetResource(name string) *subnetResource {
 	out := &subnetResource{ResourceCore: terraformer.NewResourceCore(name, subnetResourceSnippetPath)}
 	return out
 }
@@ -47,10 +51,11 @@ func newSubnetResource(name string) terraformer.Resource {
 // ToMap returns a map of networkResource field to be used where needed
 func (nr *subnetResource) ToMap() map[string]any {
 	return map[string]any{
-		"Name":      nr.Name(),
-		"ID":        nr.networkID,
-		"CIDR":      nr.cidr,
-		"IPVersion": nr.ipVersion,
+		"Name":       nr.Name(),
+		"ID":         nr.networkID,
+		"CIDR":       nr.cidr,
+		"IPVersion":  nr.ipVersion,
+		"DNSServers": nr.dnsNameServers,
 	}
 }
 
@@ -63,57 +68,82 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	// Checks if CIDR is valid...
+	if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	subnetRsc := newSubnetResource(req.Name)
+	subnetRsc.cidr = req.CIDR
+	subnetRsc.ipVersion = req.IPVersion
+	subnetRsc.dnsNameServers = req.DNSServers
+
 	return nil, fail.NotImplementedError()
 
+	// // If req.IPVersion contains invalid value, force to IPv4
+	// var ipVersion gophercloud.IPVersion
+	// switch ToGophercloudIPVersion(req.IPVersion) {
+	// case gophercloud.IPv6:
+	// 	ipVersion = gophercloud.IPv6
+	// case gophercloud.IPv4:
+	// 	fallthrough
+	// default:
+	// 	ipVersion = gophercloud.IPv4
+	// }
+	//
+
+	// // You must associate a new subnet with an existing network - to do this you
+	// // need its UUID. You must also provide a well-formed CIDR value.
+	// dhcp := true
+	// opts := subnets.CreateOpts{
+	// 	NetworkID:  req.NetworkID,
+	// 	CIDR:       req.CIDR,
+	// 	IPVersion:  ipVersion,
+	// 	Name:       req.Name,
+	// 	EnableDHCP: &dhcp,
+	// }
+	if len(req.DNSServers) > 0 {
+		subnetRsc.dnsNameServers = req.DNSServers
+	}
+
+	if !p.configOptions.UseLayer3Networking {
+		// FIXME:
+		// noGateway := ""
+		// opts.GatewayIP = &noGateway
+	}
+
+	summoner, xerr := p.Terraformer()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = summoner.Build()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	outputs, xerr := summoner.Apply(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// FIXME:
+	_ = outputs
+	// subnetRsc.id = outputs.ID
+
+	// var subnet *subnets.Subnet
+	// // Execute the operation and get back a subnets.Subnet struct
+	// xerr := stacks.RetryableRemoteCall(ctx,
+	// 	func() (innerErr error) {
+	// 		subnet, innerErr = subnets.Create(s.NetworkClient, opts).Extract()
+	// 		return innerErr
+	// 	},
+	// 	NormalizeError,
+	// )
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 	/*
-		// Checks if CIDR is valid...
-		if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
-			return nil, fail.ConvertError(err)
-		}
-
-		// If req.IPVersion contains invalid value, force to IPv4
-		var ipVersion gophercloud.IPVersion
-		switch ToGophercloudIPVersion(req.IPVersion) {
-		case gophercloud.IPv6:
-			ipVersion = gophercloud.IPv6
-		case gophercloud.IPv4:
-			fallthrough
-		default:
-			ipVersion = gophercloud.IPv4
-		}
-
-		// You must associate a new subnet with an existing network - to do this you
-		// need its UUID. You must also provide a well-formed CIDR value.
-		dhcp := true
-		opts := subnets.CreateOpts{
-			NetworkID:  req.NetworkID,
-			CIDR:       req.CIDR,
-			IPVersion:  ipVersion,
-			Name:       req.Name,
-			EnableDHCP: &dhcp,
-		}
-		if len(req.DNSServers) > 0 {
-			opts.DNSNameservers = req.DNSServers
-		}
-
-		if !s.cfgOpts.UseLayer3Networking {
-			noGateway := ""
-			opts.GatewayIP = &noGateway
-		}
-
-		var subnet *subnets.Subnet
-		// Execute the operation and get back a subnets.Subnet struct
-		xerr := stacks.RetryableRemoteCall(ctx,
-			func() (innerErr error) {
-				subnet, innerErr = subnets.Create(s.NetworkClient, opts).Extract()
-				return innerErr
-			},
-			NormalizeError,
-		)
-		if xerr != nil {
-			return nil, xerr
-		}
-
 		// Starting from here, delete subnet if exit with error
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
@@ -165,6 +195,7 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		}
 		return out, nil
 	*/
+	return nil, nil
 }
 
 func (p *provider) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {

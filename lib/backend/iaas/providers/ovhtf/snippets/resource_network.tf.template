@@ -5,8 +5,8 @@ resource "openstack_networking_network_v2" "{{ .Resource.Name }}" {
     admin_state_up          = true
     port_security_enabled   = true
     shared                  = false
-    tenant_id               = "{{ .Provider.Identity.ApplicationKey }}"	# "${var.tenant.identity.ApplicationKey}"
-    region                  = "{{ .Provider.Compute.Region }}"			# "${var.tenant.compute.Region}"
+    tenant_id               = "{{ .Provider.Authentication.ApplicationKey }}"	# "${var.tenant.identity.ApplicationKey}"
+    region                  = "{{ .Provider.Authentication.Region }}"			# "${var.tenant.compute.Region}"
 }
 
 # FIXME: outputs for network id

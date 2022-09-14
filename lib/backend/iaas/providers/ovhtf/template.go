@@ -18,15 +18,10 @@ package ovhtf
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	filters "github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract/filters/templates"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -37,13 +32,17 @@ func (p *provider) InspectTemplate(ctx context.Context, id string) (*abstract.Ho
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tpl, xerr := p.Stack.InspectTemplate(ctx, id)
-	if xerr != nil {
-		return nil, xerr
-	}
+	return nil, fail.NotImplementedError()
 
-	addGPUCfg(tpl)
-	return tpl, nil
+	/*
+		tpl, xerr := p.Stack.InspectTemplate(ctx, id)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		addGPUCfg(tpl)
+		return tpl, nil
+	*/
 }
 
 func addGPUCfg(tpl *abstract.HostTemplate) {
@@ -59,83 +58,87 @@ func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Hos
 		return nil, fail.InvalidInstanceError()
 	}
 
-	allTemplates, xerr := p.Stack.(stacks.ReservedForProviderUse).ListTemplates(ctx, false)
-	if xerr != nil {
-		return nil, xerr
-	}
+	return nil, fail.NotImplementedError()
 
-	if !all {
-		// flavor["osType"].(string) == "linux" ?
-		filter := filters.NewFilter(isWindowsTemplate).Not().And(filters.NewFilter(isFlexTemplate).Not())
-		allTemplates = filters.FilterTemplates(allTemplates, filter)
-	}
+	/*
+		allTemplates, xerr := p.Stack.(stacks.ReservedForProviderUse).ListTemplates(ctx, false)
+		if xerr != nil {
+			return nil, xerr
+		}
 
-	// check flavor availability through OVH-API
-	authOpts, err := p.GetAuthenticationOptions(ctx)
-	if err != nil {
-		logrus.WithContext(context.Background()).Warnf("failed to get Authentication options, flavors availability will not be checked: %v", err)
-		return allTemplates, nil
-	}
-	service := authOpts.GetString("TenantID")
-	region := authOpts.GetString("Region")
+		if !all {
+			// flavor["osType"].(string) == "linux" ?
+			filter := filters.NewFilter(isWindowsTemplate).Not().And(filters.NewFilter(isFlexTemplate).Not())
+			allTemplates = filters.FilterTemplates(allTemplates, filter)
+		}
 
-	var listAvailableTemplates []*abstract.HostTemplate
-	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
-	flavors, xerr := p.requestOVHAPI(ctx, restURL, "GET")
-	if xerr != nil {
-		logrus.WithContext(context.Background()).Warnf("Unable to request OVH API, flavors availability will not be checked: %v", xerr)
-		listAvailableTemplates = allTemplates
-	} else {
-		flavorMap := map[string]map[string]interface{}{}
-		for _, flavor := range flavors.([]interface{}) {
-			// Removal of all the unavailable templates
-			if flavmap, ok := flavor.(map[string]interface{}); ok {
-				if val, ok := flavmap["available"].(bool); ok {
-					if val {
-						if aflav, ok := flavmap["id"]; ok {
-							if key, ok := aflav.(string); ok {
-								flavorMap[key] = flavmap
+		// check flavor availability through OVH-API
+		authOpts, err := p.GetAuthenticationOptions(ctx)
+		if err != nil {
+			logrus.WithContext(context.Background()).Warnf("failed to get Authentication options, flavors availability will not be checked: %v", err)
+			return allTemplates, nil
+		}
+		service := authOpts.GetString("TenantID")
+		region := authOpts.GetString("Region")
+
+		var listAvailableTemplates []*abstract.HostTemplate
+		restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
+		flavors, xerr := p.requestOVHAPI(ctx, restURL, "GET")
+		if xerr != nil {
+			logrus.WithContext(context.Background()).Warnf("Unable to request OVH API, flavors availability will not be checked: %v", xerr)
+			listAvailableTemplates = allTemplates
+		} else {
+			flavorMap := map[string]map[string]interface{}{}
+			for _, flavor := range flavors.([]interface{}) {
+				// Removal of all the unavailable templates
+				if flavmap, ok := flavor.(map[string]interface{}); ok {
+					if val, ok := flavmap["available"].(bool); ok {
+						if val {
+							if aflav, ok := flavmap["id"]; ok {
+								if key, ok := aflav.(string); ok {
+									flavorMap[key] = flavmap
+								}
 							}
 						}
 					}
 				}
 			}
-		}
 
-		for _, template := range allTemplates {
-			if _, ok := flavorMap[template.ID]; ok {
-				// update incomplete disk size of some templates
-				if strings.HasPrefix(template.Name, "i1-") {
-					template.DiskSize = 2000000
-				} else {
-					switch template.Name {
-					case "t1-180", "t2-180":
+			for _, template := range allTemplates {
+				if _, ok := flavorMap[template.ID]; ok {
+					// update incomplete disk size of some templates
+					if strings.HasPrefix(template.Name, "i1-") {
 						template.DiskSize = 2000000
-					default:
+					} else {
+						switch template.Name {
+						case "t1-180", "t2-180":
+							template.DiskSize = 2000000
+						default:
+						}
 					}
+
+					listAvailableTemplates = append(listAvailableTemplates, template)
+				} else {
+					logrus.WithContext(context.Background()).WithContext(ctx).Warnf("Flavor %s@%s is not available at the moment, ignored", template.Name, template.ID)
 				}
-
-				listAvailableTemplates = append(listAvailableTemplates, template)
-			} else {
-				logrus.WithContext(context.Background()).WithContext(ctx).Warnf("Flavor %s@%s is not available at the moment, ignored", template.Name, template.ID)
 			}
 		}
-	}
 
-	// update incomplete disk size of some templates
-	for k, template := range listAvailableTemplates {
-		if strings.HasPrefix(template.Name, "i1-") {
-			listAvailableTemplates[k].DiskSize += 2000
-		} else {
-			switch template.Name {
-			case "t1-180", "t2-180":
+		// update incomplete disk size of some templates
+		for k, template := range listAvailableTemplates {
+			if strings.HasPrefix(template.Name, "i1-") {
 				listAvailableTemplates[k].DiskSize += 2000
-			default:
+			} else {
+				switch template.Name {
+				case "t1-180", "t2-180":
+					listAvailableTemplates[k].DiskSize += 2000
+				default:
+				}
 			}
 		}
-	}
 
-	return listAvailableTemplates, nil
+		return listAvailableTemplates, nil
+	*/
 }
 
 func isWindowsTemplate(t *abstract.HostTemplate) bool {

@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/terraformer"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
@@ -31,7 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
 	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
@@ -80,15 +80,29 @@ type provider struct {
 	// stacks.Stack
 	ExternalNetworkID string
 
+	// FIXME: move these fields in a provider Core (TBD)
 	// go:embed snippets
-	efs embed.FS // contains embedded files used by the provider for any purpose
-
-	tenantParameters  map[string]interface{}
+	efs               embed.FS // contains embedded files used by the provider for any purpose
 	authOptions       stackoptions.AuthenticationOptions
 	configOptions     stackoptions.ConfigurationOptions
 	configSnippetPath string // contains the path of the provider configuration configSnippetPath in efs
-	tfWorkdir         string // contains the target work dir for terraform
+	terraformerConfig terraformer.Configuration
 
+	tenantParameters map[string]interface{}
+}
+
+func (p provider) GetStackName() (string, fail.Error) {
+	return "terraform", nil
+}
+
+func (p *provider) Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (p *provider) Timings() (temporal.Timings, fail.Error) {
+	// TODO implement me
+	panic("implement me")
 }
 
 // IsNull returns true if the instance is considered as a null value
@@ -239,12 +253,12 @@ next:
 		Timings:                  timings,
 	}
 
-	serviceVersions := map[string]string{"volume": "v2"}
+	// serviceVersions := map[string]string{"volume": "v2"}
 
-	stack, xerr := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
-	if xerr != nil {
-		return nil, xerr
-	}
+	// stack, xerr := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	// Note: if timings have to be tuned, update stack.MutableTimings
 	//
@@ -262,7 +276,7 @@ next:
 
 	wp := providers.Remediator{
 		Provider: newP,
-		Name:     wrapped.Name,
+		Name:     providerName,
 	}
 
 	return wp, nil
@@ -275,10 +289,11 @@ func (p *provider) GetAuthenticationOptions(ctx context.Context) (providers.Conf
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
-	if err != nil {
-		return nil, err
-	}
+	// opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	opts := p.authOptions
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("TenantID", opts.TenantID)
 	cfg.Set("DomainName", opts.DomainName)
@@ -299,11 +314,11 @@ func (p *provider) GetConfigurationOptions(ctx context.Context) (providers.Confi
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
-	if err != nil {
-		return nil, err
-	}
-
+	// opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	opts := p.configOptions
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
@@ -317,19 +332,20 @@ func (p *provider) GetConfigurationOptions(ctx context.Context) (providers.Confi
 	return cfg, nil
 }
 
-// GetName returns the name of the driver
-func (p *provider) GetName() (string, fail.Error) {
-	if valid.IsNull(p) {
-		return "", fail.InvalidInstanceError()
-	}
+// Name returns the name of the driver
+func (p provider) Name() string {
+	return providerName
+}
 
-	return providerName, nil
+// GetName is an alias to Name() (compatibility with legacy drivers)
+func (p provider) GetName() (string, fail.Error) {
+	return p.Name(), nil
 }
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
 func (p provider) GetStack() (stacks.Stack, fail.Error) {
-	return p.Stack, nil
+	return nil, nil //p.Stack, nil
 }
 
 func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
@@ -352,6 +368,23 @@ func (p provider) EmbeddedFS() embed.FS {
 
 func (p provider) Snippet() string {
 	return p.configSnippetPath
+}
+
+func (p provider) Terraformer() (terraformer.Summoner, fail.Error) {
+	out, xerr := terraformer.NewSummoner(p, p.terraformerConfig)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return out, nil
+}
+
+func (p provider) AuthenticationOptions() stackoptions.AuthenticationOptions {
+	return p.authOptions
+}
+
+func (p provider) ConfigurationOptions() stackoptions.ConfigurationOptions {
+	return p.configOptions
 }
 
 func init() {
