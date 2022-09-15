@@ -1,3 +1,7 @@
+//go:build disabled
+// +build disabled
+
+//FIXME: need to move NewServiceTest inside a package
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -21,14 +25,16 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 func Test_CheckMetadataVersion(t *testing.T) {
 
 	ctx := context.Background()
-	err := NewServiceTest(t, func(svc *ServiceTest) {
+	err := operations.NewServiceTest(t, func(svc *ServiceTest) {
 
 		var (
 			version string

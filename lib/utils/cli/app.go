@@ -115,7 +115,9 @@ func (app *App) Run(ctx context.Context, cleanup func(*cobra.Command)) error {
 	ctx, app.cancelFunc = context.WithCancel(ctx)
 	err := app.rootCmd.ExecuteContext(ctx)
 	if err != nil {
-		fmt.Println("Error Running safescale: " + err.Error())
+		app.doneCh <- struct{}{}
+		// fmt.Println("Error Running safescale: " + err.Error())
+		return err
 	}
 
 	app.doneCh <- struct{}{}

@@ -78,8 +78,6 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 	subnetRsc.ipVersion = req.IPVersion
 	subnetRsc.dnsNameServers = req.DNSServers
 
-	return nil, fail.NotImplementedError()
-
 	// // If req.IPVersion contains invalid value, force to IPv4
 	// var ipVersion gophercloud.IPVersion
 	// switch ToGophercloudIPVersion(req.IPVersion) {
@@ -195,7 +193,7 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		}
 		return out, nil
 	*/
-	return nil, nil
+	return nil, fail.NotImplementedError()
 }
 
 func (p *provider) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {

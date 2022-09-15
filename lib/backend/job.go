@@ -27,8 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	uuidpkg "github.com/gofrs/uuid"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/metadata"
 )
 
 // Job is the interface of a daemon job
@@ -75,38 +73,39 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		return nil, fail.InvalidParameterCannotBeNilError("cancel")
 	}
 
-	var (
-		md metadata.MD
-		id string
-		ok bool
-	)
+	// VPL: I don't get the point of checking if context has an uuid or not, as this uuid is not used...
+	//      and the logs are then polluted by a useless warning...
+	// var (
+	//  md metadata.MD
+	//  ok bool
+	// )
+	//
+	// md, ok = metadata.FromIncomingContext(ctx)
+	// if !ok {
+	// 	logrus.Warn("context does not contain a grpc uuid, generating one")
+	// 	uuid, err := uuidpkg.NewV4()
+	// 	if err != nil {
+	// 		return nil, fail.Wrap(err, "failed to generate uuid for job")
+	// 	}
+	//
+	// 	id = uuid.String()
+	// } else {
+	// 	u := md.Get("uuid")
+	// 	if len(u) == 0 {
+	// 		logrus.Warnf(fail.InvalidParameterError("ctx", "does not contain a grpc uuid").Error())
+	// 	} else {
+	// 		if id = u[0]; id == "" {
+	// 			logrus.Warnf(fail.InvalidParameterError("ctx", "does not contain a valid gRPC uuid").Error())
+	// 		}
+	// 	}
 
-	md, ok = metadata.FromIncomingContext(ctx)
-	if !ok {
-		logrus.Warn("context does not contain a grpc uuid, generating one")
-		uuid, err := uuidpkg.NewV4()
-		if err != nil {
-			return nil, fail.Wrap(err, "failed to generate uuid for job")
-		}
-
-		id = uuid.String()
-	} else {
-		u := md.Get("uuid")
-		if len(u) == 0 {
-			logrus.Warnf(fail.InvalidParameterError("ctx", "does not contain a grpc uuid").Error())
-		} else {
-			if id = u[0]; id == "" {
-				logrus.Warnf(fail.InvalidParameterError("ctx", "does not contain a valid gRPC uuid").Error())
-			}
-		}
-
-		uuid, err := uuidpkg.NewV4()
-		if err != nil {
-			return nil, fail.Wrap(err, "failed to generate uuid for job")
-		}
-
-		id = uuid.String()
+	uuid, err := uuidpkg.NewV4()
+	if err != nil {
+		return nil, fail.Wrap(err, "failed to generate uuid for job")
 	}
+
+	id := uuid.String()
+	// }
 
 	task, xerr := concurrency.NewTaskWithContext(ctx)
 	if xerr != nil {

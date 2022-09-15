@@ -14,7 +14,7 @@ terraform {
 	{{ end }}
 }
 
-{{ .ProviderConfiguration }}
+{{ .ProviderDeclaration }}
 
 {{ if .ConsulBackendData }}
 {{ .ConsulBackendData }}

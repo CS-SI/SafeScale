@@ -296,7 +296,7 @@ func (p *provider) GetAuthenticationOptions(ctx context.Context) (providers.Conf
 	opts := p.authOptions
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("TenantID", opts.TenantID)
-	cfg.Set("DomainName", opts.DomainName)
+	cfg.Set("DomainName", "Default")
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
 	cfg.Set("AuthURL", opts.IdentityEndpoint)

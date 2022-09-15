@@ -43,9 +43,10 @@ const networkCmdLabel = "network"
 // NetworkCommands command
 func NetworkCommands() *cobra.Command {
 	out := &cobra.Command{
-		Use:     "network",
-		Aliases: []string{"net"},
-		Short:   "network COMMAND",
+		Use:           "network",
+		Aliases:       []string{"net"},
+		Short:         "network COMMAND",
+		SilenceErrors: true,
 	}
 	out.AddCommand(
 		networkCreateCommand(),
@@ -62,9 +63,10 @@ func NetworkCommands() *cobra.Command {
 
 func networkListCommand() *cobra.Command {
 	out := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Short:   "List existing Networks (created by SafeScale)",
+		Use:           "list",
+		Aliases:       []string{"ls"},
+		Short:         "List existing Networks (created by SafeScale)",
+		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
@@ -97,6 +99,7 @@ func networkDeleteCommand() *cobra.Command {
 		Aliases: []string{"rm", "remove"},
 		Short:   "delete NETWORKREF",
 		// ArgsUsage: "NETWORKREF [NETWORKREF ...]",
+		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
@@ -133,6 +136,7 @@ func networkInspectCommand() *cobra.Command {
 		Aliases: []string{"show"},
 		Short:   "Show details of a network",
 		// ArgsUsage: "NETWORKREF",
+		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
@@ -267,6 +271,7 @@ func networkCreateCommand() *cobra.Command {
 		Aliases: []string{"new"},
 		Short:   "Create a network",
 		// ArgsUsage: "NETWORKREF",
+		SilenceErrors: true,
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Name(), strings.Join(args, ", "))
@@ -293,34 +298,36 @@ func networkCreateCommand() *cobra.Command {
 				}
 			}
 
-			gatewaySSHPort, err := c.Flags().GetUint32("gwport")
+			gatewaySSHPort, err := c.Flags().GetUint16("gwport")
 			if err != nil {
-				return cli.FailureResponse(err)
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
 
-			cidr, err := c.Flags().GetString("cidr")
+			var cidr string
+			ipNet, err := c.Flags().GetIPNet("cidr")
 			if err != nil {
-				return cli.FailureResponse(err)
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
+			cidr = ipNet.String()
 
 			gwname, err := c.Flags().GetString("gwname")
 			if err != nil {
-				return cli.FailureResponse(err)
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
 
 			os, err := c.Flags().GetString("os")
 			if err != nil {
-				return cli.FailureResponse(err)
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
 
 			keep_on_failure, err := c.Flags().GetBool("keep-on-failure")
 			if err != nil {
-				return cli.FailureResponse(err)
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
 
 			network, err := ClientSession.Network.Create(
 				args[0], cidr, empty,
-				gwname, gatewaySSHPort, os, sizing,
+				gwname, uint32(gatewaySSHPort), os, sizing,
 				keep_on_failure,
 				temporal.ExecutionTimeout(),
 			)
@@ -334,13 +341,13 @@ func networkCreateCommand() *cobra.Command {
 	}
 
 	flags := out.Flags()
-	flags.IPNetP("cidr", "N", net.IPNet{}, "CIDR of the Network (default: 192.168.0.0/23)")
-	flags.Bool("empty", false, "Do not create a default Subnet with the same name than the Network")
+	flags.IPNetP("cidr", "N", net.IPNet{net.IPv4(192, 168, 0, 0), net.CIDRMask(23, 32)}, "CIDR of the Network (default: 192.168.0.0/23)")
+	flags.Bool("empty", false, "Do not create a default Subnet with the same name as the Network")
 	flags.Bool("no-default-subnet", false, "alias of --empty")
 	flags.BoolP("keep-on-failure", "k", false, "If used, the resource(s) is(are) not deleted on failure (default: not set)")
 	flags.String("os", "", "Image name for the gateway")
 	flags.String("gwname", "", "Name for the gateway. Default to 'gw-<network_name>'")
-	flags.Int("gwport", 22, `Define the port to use for SSH (default: 22) in default subnet;
+	flags.Uint16("gwport", 22, `Define the port to use for SSH (default: 22) in default subnet;
 			Meaningful only if --empty is not used`)
 	flags.Int("default-ssh-port", 22, "alias to --gwport")
 	flags.Bool("failover", false, `creates 2 gateways for the network with a VIP used as internal default route;

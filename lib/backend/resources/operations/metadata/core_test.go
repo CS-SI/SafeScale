@@ -1,3 +1,8 @@
+//go:build disabled
+// +build disabled
+
+//FIXME: need to move NewServiceTest() and skip() inside a package
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -55,7 +60,7 @@ func (e *SomeClonable) GetID() (string, error) {
 
 func Test_NewCore(t *testing.T) {
 
-	_, err := NewCore(nil, "kind", "path", nil)
+	_, err := NewCore(nil, MethodObjectStorage, "kind", "path", nil)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
 	require.Contains(t, err.Error(), "invalid parameter: svc")
 

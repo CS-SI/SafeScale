@@ -78,6 +78,7 @@ func (r *response) Failure(err error) error {
 			r.Display()
 			return r.GetError()
 		}
+
 		logrus.Error("err is not an ExitError")
 		return err
 	}

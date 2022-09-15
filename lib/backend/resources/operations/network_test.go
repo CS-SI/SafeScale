@@ -1,3 +1,8 @@
+//go:build disabled
+// +build disabled
+
+//FIXME: need to move NewServiceTest inside a package
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *

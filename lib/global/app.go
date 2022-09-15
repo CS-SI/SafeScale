@@ -57,6 +57,7 @@ func InitApp() (ferr error) {
 			Version:          VersionString(),
 			TraverseChildren: true,
 			SilenceUsage:     true,
+			SilenceErrors:    true,
 		}
 
 		// app.Authors = []cli.Author{

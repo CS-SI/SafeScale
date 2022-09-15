@@ -19,7 +19,6 @@ package tenant
 import (
 	"sync/atomic"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
@@ -51,7 +50,7 @@ func GetCurrentTenant() *Tenant {
 				logrus.Warnf("tenant name MUST be a string, it's not: %v", tenant["name"])
 				continue
 			}
-			service, err := iaas.UseService(name, operations.MinimumMetadataVersion)
+			service, err := iaas.UseService(name /*, operations.MinimumMetadataVersion*/)
 			if err != nil {
 				return nil
 			}
@@ -71,7 +70,7 @@ func SetCurrentTenant(tenantName string) error {
 		return nil
 	}
 
-	service, err := iaas.UseService(tenantName, operations.MinimumMetadataVersion)
+	service, err := iaas.UseService(tenantName /*, operations.MinimumMetadataVersion*/)
 	if err != nil {
 		return err
 	}

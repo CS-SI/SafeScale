@@ -1,3 +1,8 @@
+//go:build disabled
+// +build disabled
+
+//FIXME: need to move NewServiceTest inside a package
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -2869,12 +2874,12 @@ func (e *ServiceTest) GetName() (string, fail.Error) {
 	}
 	return e.options.name, nil
 }
-func (e *ServiceTest) GetStack() (api.Stack, fail.Error) {
+func (e *ServiceTest) GetStack() (stacks.Stack, fail.Error) {
 	if e.options.stacknameErr != nil {
 		e._warnf("ServiceTest::GetStack forced error \"%s\"\n", e.options.stacknameErr.Error())
-		return api.StackProxy{}, e.options.stacknameErr
+		return stacks.Remediator{}, e.options.stacknameErr
 	}
-	return api.StackProxy{Name: e.options.stackname}, nil
+	return stacks.Remediator{Name: e.options.stackname}, nil
 }
 func (e *ServiceTest) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	e._survey("ServiceTest::GetRegexpsOfTemplatesWithGPU (not implemented)")

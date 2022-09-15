@@ -80,8 +80,13 @@ func main() {
 
 	err = global.RunApp(ctx, cleanup)
 	if err != nil {
-		logrus.Error("Error running cli: " + err.Error())
-		os.Exit(1)
+		switch cerr := err.(type) {
+		case cli.ExitError:
+			os.Exit(cerr.Code())
+		default:
+			logrus.Error("Error running cli: " + err.Error())
+			os.Exit(1)
+		}
 	}
 	os.Exit(0)
 }

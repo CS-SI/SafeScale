@@ -35,6 +35,9 @@ type summoner struct {
 	mu           *sync.Mutex
 }
 
+// go:embed snippets
+var layoutFiles embed.FS
+
 // NewSummoner instantiates a terraform file builder that will put file in 'workDir'
 func NewSummoner(provider ProviderInternals, conf Configuration) (Summoner, fail.Error) {
 	if valid.IsNull(provider) {
@@ -100,7 +103,7 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 	variables["Resources"] = resourceContent
 
 	// render provider configuration
-	variables["ProviderConfiguration"], xerr = instance.realizeTemplate(instance.provider.EmbeddedFS(), instance.provider.Snippet(), variables)
+	variables["ProviderDeclaration"], xerr = instance.realizeTemplate(instance.provider.EmbeddedFS(), instance.provider.Snippet(), variables)
 	if xerr != nil {
 		return xerr
 	}
@@ -109,7 +112,7 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 	if instance.config.ConsulBackend.Use {
 		lvars := variables.Clone()
 		lvars["ConsulBackend"] = instance.config.ConsulBackend
-		content, xerr := instance.realizeTemplate(instance.provider.EmbeddedFS(), "snippets/consul-backend.tf.template", variables)
+		content, xerr := instance.realizeTemplate(layoutFiles, "snippets/consul-backend.tf.template", variables)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -117,7 +120,7 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 
 		variables["ConsulBackend"] = content
 
-		content, xerr = instance.realizeTemplate(instance.provider.EmbeddedFS(), "snippets/consul-backend-data.tf.template", variables)
+		content, xerr = instance.realizeTemplate(layoutFiles, "snippets/consul-backend-data.tf.template", variables)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -127,7 +130,7 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 	}
 
 	// finally, render the layout
-	content, xerr := instance.realizeTemplate(instance.provider.EmbeddedFS(), "snippets/layout.tf.template", variables)
+	content, xerr := instance.realizeTemplate(layoutFiles, "snippets/layout.tf.template", variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
