@@ -105,7 +105,7 @@ export -f sfDetectFacts
 sfDetectFacts
 
 function drop_user() {
-  userdel -r {{.Username}}
+  userdel -r {{.Username}} || echo "User {{.Username}} not exists"
 }
 
 function create_user() {
@@ -304,7 +304,10 @@ unsafe_sshd
 secure_sshd
 {{- end }}
 
+{{- if .Debug }}
 drop_user
+{{- end }}
+
 create_user
 
 no_daily_update
