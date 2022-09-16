@@ -722,20 +722,14 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			}
 		}
 
-		// FIXME: OPP After Stein, no failover
+		// After Stein, no failover
 		{
-			st, xerr := svc.GetStack()
+			st, xerr := svc.GetProviderName()
 			if xerr != nil {
-				chRes <- result{nil, nil, xerr}
 				return xerr
 			}
-			stn, xerr := st.GetStackName()
-			if xerr != nil {
-				chRes <- result{nil, nil, xerr}
-				return xerr
-			}
-
-			if stn == "openstack" {
+			if st == "ovh" {
+				logrus.WithContext(ctx).Warnf("Disabling failover for OVH due to SG issues")
 				gwFailoverDisabled = true
 			}
 		}

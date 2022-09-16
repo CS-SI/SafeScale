@@ -793,14 +793,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		func() error {
 			var innerXErr fail.Error
 
-			// FIXME: OPP The way to pass this info is truly sad
-			copts, innerXErr := s.GetRawConfigurationOptions(ctx)
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			// FIXME: OPP More Stein fixes...
-			hostNets, hostPorts, createdPorts, innerXErr = s.identifyOpenstackSubnetsAndPorts(ctx, request, defaultSubnet, !copts.Safe)
+			hostNets, hostPorts, createdPorts, innerXErr = s.identifyOpenstackSubnetsAndPorts(ctx, request, defaultSubnet)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrDuplicate, *fail.ErrNotFound: // This kind of error means actually there is no more Ip address available
@@ -1086,7 +1079,7 @@ func (s stack) GetMetadataOfInstance(ctx context.Context, id string) (map[string
 }
 
 // identifyOpenstackSubnetsAndPorts ...
-func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abstract.HostRequest, defaultSubnet *abstract.Subnet, disaster bool) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) { // nolint
+func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) { // nolint
 	nets = []servers.Network{}
 	netPorts = []ports.Port{}
 	createdPorts = []string{}
@@ -1123,12 +1116,15 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 			)
 		}
 
-		/*port, xerr = s.rpcChangePortSecurity(ctx, port.ID)
-		if xerr != nil {
-			return nets, netPorts, createdPorts, fail.Wrap(
-				xerr, "failed to disable port on external network '%s'", s.cfgOpts.ProviderNetwork,
-			)
-		}*/
+		// FIXME: OPP Use this only for Stein disaster, so it HAS to be OVH
+		if !s.cfgOpts.Safe && s.cfgOpts.ProviderName == "ovh" {
+			port, xerr = s.rpcChangePortSecurity(ctx, port.ID, false)
+			if xerr != nil {
+				return nets, netPorts, createdPorts, fail.Wrap(
+					xerr, "failed to disable port on external network '%s'", s.cfgOpts.ProviderNetwork,
+				)
+			}
+		}
 
 		createdPorts = append(createdPorts, port.ID)
 
@@ -1138,42 +1134,12 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 
 	// private networks
 	for _, n := range request.Subnets {
-		var whatIWant []ports.AddressPair
-		whatIWant = append(whatIWant, ports.AddressPair{
-			IPAddress: "192.168.70.3",
-		})
-		whatIWant = append(whatIWant, ports.AddressPair{
-			IPAddress: "192.168.70.4",
-		})
-		whatIWant = append(whatIWant, ports.AddressPair{
-			IPAddress: "192.168.70.5",
-		})
-		whatIWant = append(whatIWant, ports.AddressPair{
-			IPAddress: "192.168.70.6",
-		})
-		whatIWant = append(whatIWant, ports.AddressPair{
-			IPAddress: "192.168.70.7",
-		})
-		whatIWant = append(whatIWant, ports.AddressPair{
-			IPAddress: "192.168.70.8",
-		})
-		whatIWant = append(whatIWant, ports.AddressPair{
-			IPAddress: "192.168.70.9",
-		})
-		whatIWant = append(whatIWant, ports.AddressPair{
-			IPAddress: "192.168.70.10",
-		})
-		whatIWant = append(whatIWant, ports.AddressPair{
-			IPAddress: "192.168.70.11",
-		})
-
 		req := ports.CreateOpts{
 			NetworkID:      n.Network,
 			Name:           fmt.Sprintf("nic_%s_subnet_%s", request.ResourceName, n.Name),
 			Description:    fmt.Sprintf("nic of host '%s' on subnet '%s'", request.ResourceName, n.Name),
 			FixedIPs:       []ports.IP{{SubnetID: n.ID}},
 			SecurityGroups: &[]string{},
-			// AllowedAddressPairs: whatIWant, // FIXME: OPP CRITICAL This is the last hope
 		}
 		port, xerr := s.rpcCreatePort(ctx, req)
 		if xerr != nil {
@@ -1182,8 +1148,8 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 			)
 		}
 
-		// FIXME: OPP Use this only for Stein disaster
-		if disaster {
+		// Fix for Stein
+		if !s.cfgOpts.Safe && s.cfgOpts.ProviderName == "ovh" {
 			port, xerr = s.rpcRemoveSGFromPort(ctx, port.ID)
 			if xerr != nil {
 				return nets, netPorts, createdPorts, fail.Wrap(

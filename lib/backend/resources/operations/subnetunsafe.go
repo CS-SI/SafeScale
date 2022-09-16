@@ -1215,11 +1215,9 @@ func (instance *Subnet) unsafeCreateGateways(
 					}
 				}()
 
-				// FIXME: OPP Enable the SG AGAIN
-
 				safe := false
 
-				// FIXME: OPP After Stein, no failover
+				// Fix for Stein
 				{
 					st, xerr := svc.GetProviderName()
 					if xerr != nil {
@@ -1303,7 +1301,7 @@ func (instance *Subnet) unsafeCreateGateways(
 			{
 				safe := false
 
-				// FIXME: OPP After Stein, no failover
+				// Fix for Stein
 				{
 					st, xerr := svc.GetProviderName()
 					if xerr != nil {
