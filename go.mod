@@ -34,7 +34,7 @@ require (
 	github.com/pkg/sftp v1.13.5
 	github.com/quasilyte/go-ruleguard/dsl v0.3.21
 	github.com/sanity-io/litter v1.5.5
-	github.com/schollz/progressbar/v3 v3.10.1
+	github.com/schollz/progressbar/v3 v3.11.0
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/viper v1.11.0
