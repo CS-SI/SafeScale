@@ -1794,6 +1794,11 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 				}
 			}
 
+			// Fix for Stein
+			if s.cfgOpts.ProviderName == "ovh" {
+				return nil
+			}
+
 			return secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,
@@ -1816,6 +1821,11 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.S
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
+			// Fix for Stein
+			if s.cfgOpts.ProviderName == "ovh" {
+				return nil
+			}
+
 			return secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,
