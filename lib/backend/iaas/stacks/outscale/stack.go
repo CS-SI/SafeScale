@@ -50,6 +50,7 @@ type ComputeConfiguration struct {
 	DefaultTenancy     string
 	DNSList            []string
 	OperatorUsername   string
+	Safe               bool
 }
 
 // NetworkConfiguration Outscale network configuration

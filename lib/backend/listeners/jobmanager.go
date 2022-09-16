@@ -140,7 +140,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 }
 
 // List running process
-func (s *JobManagerListener) List(inctx context.Context, in *googleprotobuf.Empty) (jl *protocol.JobList, err error) {
+func (s *JobManagerListener) List(inctx context.Context, _ *googleprotobuf.Empty) (jl *protocol.JobList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot list jobs")
 	defer fail.OnPanic(&err)

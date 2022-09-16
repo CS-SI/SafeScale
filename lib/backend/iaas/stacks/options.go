@@ -149,5 +149,7 @@ type ConfigurationOptions struct {
 
 	MaxLifeTime int
 
+	Safe bool
+
 	Timings *temporal.MutableTimings
 }

@@ -727,10 +727,16 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			var xerr fail.Error
 			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(ctx, outputs.COLLECT, 60*time.Second) // FIXME: Remove hardcoded timeout
 			if xerr != nil {
+				if phase == "init" {
+					logrus.Debugf("SSH still not ready for %s", sconf.Hostname)
+				}
 				return xerr
 			}
 
 			if retcode != 0 {
+				if phase == "init" {
+					logrus.Debugf("SSH still not ready for %s", sconf.Hostname)
+				}
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
 				fe.Annotate("retcode", retcode)
 				fe.Annotate("stdout", stdout)

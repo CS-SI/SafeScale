@@ -279,6 +279,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 	extendedTimeout := connectionTimeout + 2*executionTimeout
 	if executionTimeout == 0 {
 		extendedTimeout = connectionTimeout + 2*temporal.HostOperationTimeout()
+		executionTimeout = extendedTimeout / 2
 	}
 
 	retcode := -1

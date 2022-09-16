@@ -271,25 +271,25 @@ func normalizeError(err error) fail.Error {
 			if cause := lvl1.Cause(); cause != nil {
 				switch lvl2 := cause.(type) { // nolint
 				case gophercloud.ErrDefault400:
-					return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+					return openstack.OldNormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
 				case gophercloud.ErrDefault401:
-					return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+					return openstack.OldNormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
 				case gophercloud.ErrDefault403:
-					return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+					return openstack.OldNormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
 				case gophercloud.ErrDefault404:
-					return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+					return openstack.OldNormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
 				case gophercloud.ErrDefault405:
-					return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+					return openstack.OldNormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
 				case gophercloud.ErrDefault429:
-					return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+					return openstack.OldNormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
 				case gophercloud.ErrDefault500:
-					return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+					return openstack.OldNormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
 				case gophercloud.ErrDefault503:
-					return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+					return openstack.OldNormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
 				}
 			}
 		}
-		return openstack.NormalizeError(err)
+		return openstack.OldNormalizeError(err)
 	}
 	return nil
 }

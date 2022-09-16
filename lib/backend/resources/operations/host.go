@@ -1254,7 +1254,7 @@ func (instance *Host) implCreate(
 
 		safe := false
 
-		// FIXME: OPP After Stein, no failover
+		// Fix for Stein
 		{
 			st, xerr := svc.GetProviderName()
 			if xerr != nil {
@@ -1265,13 +1265,14 @@ func (instance *Host) implCreate(
 			}
 		}
 
-		if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
-			if val, ok := tpar["Safe"].(bool); ok {
-				safe = val
+		if cfg, xerr := svc.GetConfigurationOptions(ctx); xerr == nil {
+			if aval, ok := cfg.Get("Safe"); ok {
+				if val, ok := aval.(bool); ok {
+					safe = val
+				}
 			}
 		}
 
-		// FIXME: OPP Now trying to disable ports before it's too late
 		if !safe {
 			xerr = svc.ChangeSecurityGroupSecurity(ctx, true, false, hostReq.Subnets[0].Network, "")
 			if xerr != nil {
@@ -1687,12 +1688,9 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					return innerXErr
 				}
 
-				_ = otherAbstractSubnet
-				// FIXME: OPP This is the last fragment that needs fixing
-
 				safe := false
 
-				// FIXME: OPP After Stein, no failover
+				// Fix for Stein
 				{
 					st, xerr := svc.GetProviderName()
 					if xerr != nil {
@@ -1703,9 +1701,11 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					}
 				}
 
-				if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
-					if val, ok := tpar["Safe"].(bool); ok {
-						safe = val
+				if cfg, xerr := svc.GetConfigurationOptions(ctx); xerr == nil {
+					if aval, ok := cfg.Get("Safe"); ok {
+						if val, ok := aval.(bool); ok {
+							safe = val
+						}
 					}
 				}
 

@@ -52,12 +52,14 @@ func (s stack) GetRawConfigurationOptions(context.Context) (stacks.Configuration
 		WhitelistImageRegexp:     nil,
 		BlacklistImageRegexp:     nil,
 		MaxLifeTime:              0,
-		Timings:                  nil,
+		Timings:                  s.Options.Timings,
+		Safe:                     s.Options.Compute.Safe,
 	}, nil
 }
 
 // GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.AuthenticationOptions, fail.Error) {
+	// FIXME: Wrong
 	return stacks.AuthenticationOptions{
 		IdentityEndpoint: s.Options.Compute.URL,
 		Username:         "",

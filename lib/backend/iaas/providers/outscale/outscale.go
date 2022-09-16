@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -150,6 +151,13 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, ferr
 		}
 	}
 
+	isSafe, ok := compute["Safe"].(bool) // nolint
+	if !ok {
+		isSafe = true
+	}
+
+	logrus.Warningf("Setting safety to: %t", isSafe)
+
 	var timings *temporal.MutableTimings
 	s := &temporal.MutableTimings{}
 	err := mapstructure.Decode(tc, &s)
@@ -174,6 +182,7 @@ next:
 			DefaultImage:       getNotEmpty(compute, "DefaultImage", outscaleDefaultImage),
 			DefaultVolumeSpeed: volumeSpeed(get(compute, "DefaultVolumeSpeed", "Hdd")),
 			OperatorUsername:   get(compute, "OperatorUsername", "safescale"),
+			Safe:               isSafe,
 		},
 		Network: outscale.NetworkConfiguration{
 			DefaultNetworkCIDR: get(network, "DefaultNetworkCIDR", get(network, "VPCCIDR")),
@@ -268,6 +277,7 @@ func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config
 	cfg.Set("BuildSubnets", opts.BuildSubnets)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
+	cfg.Set("Safe", opts.Safe)
 
 	return cfg, nil
 }

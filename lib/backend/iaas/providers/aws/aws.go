@@ -177,6 +177,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		operatorUsername = abstract.DefaultUser
 	}
 
+	isSafe, ok := computeCfg["Safe"].(bool) // nolint
+	if !ok {
+		isSafe = true
+	}
+	params["Safe"] = isSafe
+
+	logrus.Warningf("Setting safety to: %t", isSafe)
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -246,6 +254,7 @@ next:
 		DefaultSecurityGroupName: "default",
 		MaxLifeTime:              maxLifeTime,
 		Timings:                  timings,
+		Safe:                     isSafe,
 	}
 
 	awsStack, err := aws.New(authOptions, awsConf, cfgOptions)
@@ -319,6 +328,7 @@ func (p *provider) GetConfigurationOptions(ctx context.Context) (providers.Confi
 	cfg.Set("BuildSubnets", opts.BuildSubnets)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
+	cfg.Set("Safe", opts.Safe)
 
 	return cfg, nil
 }

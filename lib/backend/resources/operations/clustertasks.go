@@ -722,20 +722,14 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			}
 		}
 
-		// FIXME: OPP After Stein, no failover
+		// After Stein, no failover
 		{
-			st, xerr := svc.GetStack()
+			st, xerr := svc.GetProviderName()
 			if xerr != nil {
-				chRes <- result{nil, nil, xerr}
 				return xerr
 			}
-			stn, xerr := st.GetStackName()
-			if xerr != nil {
-				chRes <- result{nil, nil, xerr}
-				return xerr
-			}
-
-			if stn == "openstack" {
+			if st == "ovh" {
+				logrus.WithContext(ctx).Warnf("Disabling failover for OVH due to SG issues")
 				gwFailoverDisabled = true
 			}
 		}
@@ -3413,51 +3407,6 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	case <-inctx.Done():
 		return nil, fail.ConvertError(inctx.Err())
 	}
-}
-
-type taskDeleteHostOnFailureParameters struct {
-	host resources.Host
-}
-
-// taskDeleteHostOnFailure deletes a host
-func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
-	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-
-	inctx := task.Context()
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  concurrency.TaskResult
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		// Convert and validate params
-		casted, ok := params.(taskDeleteHostOnFailureParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskDeleteHostOnFailureParameters'")}
-			return
-		}
-
-		chRes <- result{nil, deleteHostOnFailure(ctx, casted.host)}
-
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
-
 }
 
 // deleteHostOnFailure deletes a Host with appropriate logs
