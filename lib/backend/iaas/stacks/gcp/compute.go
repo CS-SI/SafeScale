@@ -224,7 +224,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 		return nil, nil, fail.InvalidRequestError("the host '%s' must have a gateway or be public", resourceName)
 	}
 
-	// --- prepares data structures for provider usage ---
+	// --- prepares data structures for Provider usage ---
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -818,7 +818,7 @@ func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter)
 	return host.CurrentState, nil
 }
 
-// -------------provider Infos-------------------------------------------------------------------------------------------
+// -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {

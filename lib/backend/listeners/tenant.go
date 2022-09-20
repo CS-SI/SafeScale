@@ -141,7 +141,7 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("tenant/%s/metadata/delete", name))
+	job, xerr := PrepareJob(inctx, "", "", in.GetName(), fmt.Sprintf("tenant/%s/metadata/delete", name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -157,8 +157,7 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 		return empty, nil
 	}
 
-	// no need to set metadataVersion in UseService, we will remove content...
-	service, xerr := iaas.UseService(in.GetName() /*, ""*/)
+	service, xerr := iaas.UseService(iaas.WithTenant(in.GetName()) /*, ""*/)
 	if xerr != nil {
 		return empty, xerr
 	}

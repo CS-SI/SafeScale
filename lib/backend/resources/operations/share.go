@@ -24,10 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
-	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/eko/gocache/v2/store"
 	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
@@ -35,6 +31,9 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/system/nfs"
@@ -43,6 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 const (
@@ -271,7 +271,7 @@ func onShareCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.I
 
 // IsNull tells if the instance should be considered as a null value
 func (instance *Share) IsNull() bool {
-	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
+	return instance == nil || valid.IsNil(instance.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)

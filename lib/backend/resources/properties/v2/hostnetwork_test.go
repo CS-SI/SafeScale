@@ -27,6 +27,13 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 )
 
+/*
+	TODO
+
+func TestNewHostNetworkingFromProperty(t *testing.T) {
+
+}
+*/
 func TestHostNetworking_IsNull(t *testing.T) {
 
 	var hnw *HostNetworking = nil

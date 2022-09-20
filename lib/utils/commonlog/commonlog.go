@@ -19,7 +19,6 @@ package commonlog
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"strconv"
@@ -106,7 +105,7 @@ func (f *MyFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 func init() {
 	switch runtime.GOOS {
 	case "linux":
-		data, err := ioutil.ReadFile("/proc/sys/kernel/pid_max")
+		data, err := os.ReadFile("/proc/sys/kernel/pid_max")
 		if err != nil {
 			return
 		}

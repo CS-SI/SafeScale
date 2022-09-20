@@ -58,12 +58,12 @@ type Router struct {
 }
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s stack) HasDefaultNetwork(context.Context) (bool, fail.Error) {
+func (s *stack) HasDefaultNetwork() (bool, fail.Error) {
 	return false, nil
 }
 
-// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (s stack) GetDefaultNetwork(context.Context) (*abstract.Network, fail.Error) {
+// DefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s *stack) DefaultNetwork(context.Context) (*abstract.Network, fail.Error) {
 	// FIXME: support default network
 	return nil, fail.NotFoundError("no default network in stack")
 }
@@ -696,7 +696,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 
 // createRouter creates a router satisfying req
 func (s stack) createRouter(ctx context.Context, req RouterRequest) (*Router, fail.Error) {
-	// Create a router to connect external provider network
+	// Create a router to connect external Provider network
 	gi := routers.GatewayInfo{
 		NetworkID: req.NetworkID,
 	}
@@ -817,13 +817,18 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 		NetworkID:      networkID,
 		AdminStateUp:   &asu,
 		Name:           name,
-		SecurityGroups: &securityGroups,
+		SecurityGroups: &[]string{},
 		FixedIPs:       []ports.IP{{SubnetID: subnetID}},
 	}
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			port, innerErr = ports.Create(s.NetworkClient, options).Extract()
-			return innerErr
+			var aport *ports.Port
+			aport, innerErr = ports.Create(s.NetworkClient, options).Extract()
+			if innerErr != nil {
+				return innerErr
+			}
+			port = aport
+			return nil
 		},
 		NormalizeError,
 	)

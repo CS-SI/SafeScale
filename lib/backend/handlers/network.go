@@ -238,7 +238,7 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 				}
 			}
 
-			cfg, cerr := handler.job.Service().GetConfigurationOptions(handler.job.Context())
+			cfg, cerr := handler.job.Service().ConfigurationOptions(handler.job.Context())
 			if cerr != nil {
 				return cerr
 			}

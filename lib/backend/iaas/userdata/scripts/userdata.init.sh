@@ -104,6 +104,10 @@ export -f sfDetectFacts
 # Detect facts
 sfDetectFacts
 
+function drop_user() {
+  userdel -r {{.Username}} || echo "User {{.Username}} not exists"
+}
+
 function create_user() {
   echo "Creating user {{.Username}}..."
   if getent passwd {{.Username}}; then
@@ -170,6 +174,22 @@ function disable_cloudinit_network_autoconf() {
 }
 
 # For testing purposes
+function failover_sshd() {
+  cp /etc/ssh/sshd_config /etc/ssh/sshd_config.old
+  cat > /etc/ssh/sshd_config <<- EOF
+  Port 22
+  PubkeyAuthentication yes
+  PasswordAuthentication yes
+  ChallengeResponseAuthentication no
+  UsePAM yes
+  AllowTcpForwarding yes
+  X11Forwarding yes
+  PrintMotd no
+  AcceptEnv LANG LC_*
+  Subsystem	sftp	/usr/lib/openssh/sftp-server
+EOF
+}
+
 function unsafe_sshd() {
   {{- if .IsGateway }}
   sed -i -E 's/(#|)Port\ ([0-9]+)/Port\ {{ .SSHPort }}/g' /etc/ssh/sshd_config || fail 208 "failure changing ssh service port"
@@ -274,10 +294,18 @@ disable_cloudinit_network_autoconf
 disable_services
 disable_upgrades
 
+{{- if .Debug}}
+failover_sshd
+{{- end}}
+
 {{- if .Debug }}
 unsafe_sshd
 {{- else }}
 secure_sshd
+{{- end }}
+
+{{- if .Debug }}
+drop_user
 {{- end }}
 
 create_user

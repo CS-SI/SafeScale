@@ -64,17 +64,13 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 		return xerr
 	}
 
-	svcConf, xerr := svc.GetConfigurationOptions(ctx)
+	svcConf, xerr := svc.ConfigurationOptions()
 	if xerr != nil {
 		return xerr
 	}
 
-	if anon, ok := svcConf.Get("OperatorUsername"); ok {
-		desc.OperatorUsername, ok = anon.(string)
-		if !ok {
-			return fail.NewError("OperatorUsername must be a string, it's not: %v", anon)
-		}
-	} else {
+	desc.OperatorUsername = svcConf.OperatorUsername
+	if desc.OperatorUsername == "" {
 		desc.OperatorUsername = abstract.DefaultUser
 	}
 	owner := desc.OperatorUsername + ":" + desc.OperatorUsername
@@ -83,6 +79,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to upload rclone configuration file")
 	}
+
 	if retcode != 0 {
 		xerr = fail.ExecutionError(xerr, "failed to copy rclone configuration file: %s, %s", stdout, stderr)
 		xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)

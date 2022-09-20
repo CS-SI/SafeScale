@@ -50,7 +50,7 @@ func GetCurrentTenant() *Tenant {
 				logrus.Warnf("tenant name MUST be a string, it's not: %v", tenant["name"])
 				continue
 			}
-			service, err := iaas.UseService(name /*, operations.MinimumMetadataVersion*/)
+			service, err := iaas.UseService(iaas.WithTenant(name) /*, operations.MinimumMetadataVersion*/)
 			if err != nil {
 				return nil
 			}
@@ -70,7 +70,7 @@ func SetCurrentTenant(tenantName string) error {
 		return nil
 	}
 
-	service, err := iaas.UseService(tenantName /*, operations.MinimumMetadataVersion*/)
+	service, err := iaas.UseService(iaas.WithTenant(tenantName) /*, operations.MinimumMetadataVersion*/)
 	if err != nil {
 		return err
 	}

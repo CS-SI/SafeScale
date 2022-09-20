@@ -21,17 +21,17 @@ import (
 	"fmt"
 	"time"
 
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // Credentials outscale credentials
@@ -51,6 +51,7 @@ type ComputeConfiguration struct {
 	DefaultTenancy     string
 	DNSList            []string
 	OperatorUsername   string
+	Safe               bool
 }
 
 // NetworkConfiguration Outscale network configuration
@@ -94,7 +95,7 @@ type stack struct {
 	auth                 context.Context
 	CPUPerformanceMap    map[int]float32
 	VolumeSpeedsMap      map[string]volumespeed.Enum
-	configurationOptions *stackoptions.ConfigurationOptions
+	configurationOptions *stackoptions.Configuration
 	deviceNames          []string
 	templates            []*abstract.HostTemplate
 	vpc                  *abstract.Network
@@ -144,9 +145,9 @@ func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 			3: 2.0,
 		},
 		deviceNames: deviceNames(),
-		configurationOptions: &stackoptions.ConfigurationOptions{
+		configurationOptions: &stackoptions.Configuration{
 			ProviderNetwork:           "",
-			DNSList:                   options.Compute.DNSList,
+			DNSServers:                options.Compute.DNSList,
 			UseFloatingIP:             true,
 			UseLayer3Networking:       false,
 			UseNATService:             false,
@@ -155,7 +156,7 @@ func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 			AutoHostNetworkInterfaces: false,
 			VolumeSpeeds:              volumeSpeeds,
 			DefaultImage:              options.Compute.DefaultImage,
-			MetadataBucket:            options.Metadata.Bucket,
+			MetadataBucketName:        options.Metadata.Bucket,
 			OperatorUsername:          options.Compute.OperatorUsername,
 			// BlacklistImageRegexp:      options.Compute.BlacklistImageRegexp,
 			// BlacklistTemplateRegexp:   options.Compute.BlacklistTemplateRegexp,
@@ -280,4 +281,35 @@ func (s *stack) Timings() (temporal.Timings, fail.Error) {
 		s.MutableTimings = temporal.NewTimings()
 	}
 	return s.MutableTimings, nil
+}
+
+func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+	if s == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	_, xerr := s.rpcCreateTags(ctx, id, lmap)
+	return xerr
+}
+
+func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+	if s == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	report := make(map[string]string)
+	for _, k := range keys {
+		report[k] = ""
+	}
+
+	xerr := s.rpcDeleteTags(ctx, id, report)
+	return xerr
 }

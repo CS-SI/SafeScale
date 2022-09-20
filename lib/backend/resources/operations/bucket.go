@@ -76,7 +76,7 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 	return instance, nil
 }
 
-// LoadBucket instantiates a bucket struct and fill it with provider metadata of Object Storage ObjectStorageBucket
+// LoadBucket instantiates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
 func LoadBucket(inctx context.Context, svc iaas.Service, name string) (resources.Bucket, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -203,7 +203,7 @@ func onBucketCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.
 
 // IsNull tells if the instance corresponds to null value
 func (instance *bucket) IsNull() bool {
-	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
+	return instance == nil || valid.IsNil(instance.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -555,7 +555,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 		return xerr
 	}
 
-	authOpts, xerr := svc.GetAuthenticationOptions(ctx)
+	authOpts, xerr := svc.AuthenticationOptions()
 	if xerr != nil {
 		return xerr
 	}
@@ -582,38 +582,24 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 
 	desc := bucketfs.Description{
+		AuthURL:    osConfig.AuthURL,
+		Endpoint:   osConfig.Endpoint,
 		BucketName: bun,
 		Protocol:   fsProtocol,
 		MountPoint: mountPoint,
-	}
-	if anon, ok := authOpts.Config("AuthURL"); ok {
-		if aurl, ok := anon.(string); ok {
-			desc.AuthURL = aurl
-		}
-	}
-	desc.Endpoint = osConfig.Endpoint
-
-	// needed value for Description.ProjectName may come from various config entries depending on the Cloud provider
-	if anon, ok := authOpts.Config("ProjectName"); ok {
-		desc.ProjectName, ok = anon.(string)
-		if !ok {
-			return fail.InconsistentError("anon should be a string")
-		}
-	} else if anon, ok := authOpts.Config("ProjectID"); ok {
-		desc.ProjectName, ok = anon.(string)
-		if !ok {
-			return fail.InconsistentError("anon should be a string")
-		}
-	} else if anon, ok := authOpts.Config("TenantName"); ok {
-		desc.ProjectName, ok = anon.(string)
-		if !ok {
-			return fail.InconsistentError("anon should be a string")
-		}
+		Username:   osConfig.User,
+		Password:   osConfig.SecretKey,
+		Region:     osConfig.Region,
 	}
 
-	desc.Username = osConfig.User
-	desc.Password = osConfig.SecretKey
-	desc.Region = osConfig.Region
+	// needed value for Description.ProjectName may come from various config entries depending on the Cloud Provider
+	desc.ProjectName = authOpts.ProjectName
+	if desc.ProjectName == "" {
+		desc.ProjectName = authOpts.ProjectID
+	}
+	if desc.ProjectName == "" {
+		desc.ProjectName = authOpts.TenantName
+	}
 
 	// -- execute the mount
 	xerr = bucketFSClient.Mount(ctx, desc)

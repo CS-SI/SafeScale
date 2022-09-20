@@ -229,7 +229,7 @@ func (s stack) rpcCreateVpc(ctx context.Context, name, cidr *string) (_ *ec2.Vpc
 		},
 		{
 			Key:   aws.String("DeclaredInBucket"),
-			Value: aws.String(s.Config.MetadataBucket),
+			Value: aws.String(s.Config.MetadataBucketName),
 		},
 		{
 			Key:   aws.String("CreationDate"),
@@ -259,6 +259,27 @@ func (s stack) rpcCreateTags(ctx context.Context, resources []*string, tags []*e
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, err := s.EC2Service.CreateTags(&req)
+			return err
+		},
+		normalizeError,
+	)
+}
+
+func (s stack) rpcDeleteTags(ctx context.Context, resources []*string, tags []*ec2.Tag) fail.Error {
+	if len(resources) == 0 {
+		return fail.InvalidParameterError("resources", "cannot be an empty slice")
+	}
+	if len(tags) == 0 {
+		return nil
+	}
+
+	req := ec2.DeleteTagsInput{
+		Resources: resources,
+		Tags:      tags,
+	}
+	return stacks.RetryableRemoteCall(ctx,
+		func() error {
+			_, err := s.EC2Service.DeleteTags(&req)
 			return err
 		},
 		normalizeError,
@@ -463,7 +484,7 @@ func (s stack) rpcCreateSubnet(ctx context.Context, name, vpcID, azID, cidr *str
 		},
 		{
 			Key:   aws.String("DeclaredInBucket"),
-			Value: aws.String(s.Config.MetadataBucket),
+			Value: aws.String(s.Config.MetadataBucketName),
 		},
 		{
 			Key:   aws.String("CreationDate"),
@@ -809,7 +830,7 @@ func (s stack) rpcAllocateAddress(ctx context.Context, description string) (allo
 		return nil, nil, xerr
 	}
 	if resp == nil {
-		return nil, nil, fail.InconsistentError("nil response received from Cloud provider")
+		return nil, nil, fail.InconsistentError("nil response received from Cloud Provider")
 	}
 
 	defer func() {
@@ -833,7 +854,7 @@ func (s stack) rpcAllocateAddress(ctx context.Context, description string) (allo
 		},
 		{
 			Key:   aws.String("DeclaredInBucket"),
-			Value: aws.String(s.Config.MetadataBucket),
+			Value: aws.String(s.Config.MetadataBucketName),
 		},
 		{
 			Key:   aws.String("CreationDate"),
@@ -888,7 +909,7 @@ func (s stack) rpcAssociateAddress(ctx context.Context, nicID, addressID *string
 		return nil, xerr
 	}
 	if resp == nil || resp.AssociationId == nil || aws.StringValue(resp.AssociationId) == "" {
-		return nil, fail.InconsistentError("invalid empty response from Cloud provider")
+		return nil, fail.InconsistentError("invalid empty response from Cloud Provider")
 	}
 	return resp.AssociationId, nil
 }
@@ -937,7 +958,7 @@ func (s stack) rpcDescribeAddressByIP(ctx context.Context, ip *string) (*ec2.Add
 		return nil, fail.NotFoundError("failed to find Elastic IP '%s'", aws.StringValue(ip))
 	}
 	if len(resp.Addresses) > 1 {
-		return nil, fail.InconsistentError("more than one Elastic IP '%s' returned by the Cloud provider", aws.StringValue(ip))
+		return nil, fail.InconsistentError("more than one Elastic IP '%s' returned by the Cloud Provider", aws.StringValue(ip))
 	}
 	return resp.Addresses[0], nil
 }
@@ -1619,7 +1640,7 @@ func (s stack) rpcRequestSpotInstance(ctx context.Context, price, zone, subnetID
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcRunInstance(ctx context.Context, name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
+func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return nil, xerr
 	}
@@ -1736,7 +1757,7 @@ func (s stack) rpcRunInstance(ctx context.Context, name, zone, subnetID, templat
 					},
 					{
 						Key:   aws.String("DeclaredInBucket"),
-						Value: aws.String(s.Config.MetadataBucket),
+						Value: aws.String(s.Config.MetadataBucketName),
 					},
 					{
 						Key:   aws.String("Image"),
@@ -1778,7 +1799,7 @@ func (s stack) rpcRunInstance(ctx context.Context, name, zone, subnetID, templat
 		return nil, xerr
 	}
 	if len(resp.Instances) == 0 {
-		return nil, fail.InconsistentError("invalid empty response from Cloud provider")
+		return nil, fail.InconsistentError("invalid empty response from Cloud Provider")
 	}
 
 	defer func() {
@@ -1787,18 +1808,14 @@ func (s stack) rpcRunInstance(ctx context.Context, name, zone, subnetID, templat
 			for _, v := range resp.Instances {
 				derr := s.rpcTerminateInstance(context.Background(), v)
 				if derr != nil {
-					_ = ferr.AddConsequence(
-						fail.Wrap(
-							derr, "cleaning up on failure, failed to delete instance %s", v.InstanceId,
-						),
-					)
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete instance %s", v.InstanceId))
 				}
 			}
 		}
 	}()
 
 	if len(resp.Instances) > 1 {
-		return nil, fail.InconsistentError("more than one instance has been created by Cloud provider")
+		return nil, fail.InconsistentError("more than one instance has been created by Cloud Provider")
 	}
 
 	instance := resp.Instances[0]
@@ -2116,7 +2133,7 @@ func (s stack) rpcCreateNetworkInterface(ctx context.Context, subnetID *string, 
 		return nil, xerr
 	}
 	if resp == nil {
-		return nil, fail.InconsistentError("nil response received from Cloud provider")
+		return nil, fail.InconsistentError("nil response received from Cloud Provider")
 	}
 	return resp.NetworkInterface, nil
 }
@@ -2162,7 +2179,7 @@ func (s stack) rpcAttachNetworkInterface(ctx context.Context, instanceID, nicID 
 		return nil, xerr
 	}
 	if resp == nil || resp.AttachmentId == nil || aws.StringValue(resp.AttachmentId) == "" {
-		return nil, fail.NewError("inconsistent response from Cloud provider")
+		return nil, fail.NewError("inconsistent response from Cloud Provider")
 	}
 	return resp.AttachmentId, nil
 }
@@ -2338,7 +2355,7 @@ func (s stack) rpcCreateVolume(ctx context.Context, name *string, size int64, sp
 		},
 		{
 			Key:   aws.String("DeclaredInBucket"),
-			Value: aws.String(s.Config.MetadataBucket),
+			Value: aws.String(s.Config.MetadataBucketName),
 		},
 		{
 			Key:   aws.String("CreationDate"),

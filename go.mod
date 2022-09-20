@@ -5,14 +5,14 @@ go 1.18
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go v1.44.88
+	github.com/aws/aws-sdk-go v1.44.94
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/dgraph-io/ristretto v0.1.0
 	github.com/eko/gocache/v2 v2.3.1
 	github.com/farmergreg/rfsnotify v0.0.0-20200716145600-b37be6e4177f
-	github.com/felixge/fgprof v0.9.2
+	github.com/felixge/fgprof v0.9.3
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/gojuno/minimock/v3 v3.0.10
@@ -23,7 +23,7 @@ require (
 	github.com/hashicorp/hc-install v0.4.0
 	github.com/hashicorp/terraform-exec v0.17.2
 	github.com/improbable-eng/grpc-web v0.15.0
-	github.com/itchyny/gojq v0.12.8
+	github.com/itchyny/gojq v0.12.9
 	github.com/json-iterator/go v1.1.12
 	github.com/magiconair/properties v1.8.6
 	github.com/mitchellh/mapstructure v1.5.0
@@ -40,7 +40,7 @@ require (
 	github.com/prometheus/client_golang v1.12.2
 	github.com/quasilyte/go-ruleguard/dsl v0.3.21
 	github.com/sanity-io/litter v1.5.5
-	github.com/schollz/progressbar/v3 v3.9.0
+	github.com/schollz/progressbar/v3 v3.10.1
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.5.0
@@ -51,10 +51,11 @@ require (
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
 	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
 	golang.org/x/oauth2 v0.0.0-20220822191816-0ebed06d0094
-	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
+	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261
+	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035
+	golang.org/x/text v0.3.7
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.94.0
+	google.golang.org/api v0.95.0
 	google.golang.org/grpc v1.49.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/fsnotify.v1 v1.4.7
@@ -91,7 +92,7 @@ require (
 	github.com/huandu/xstrings v1.3.1 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/itchyny/timefmt-go v0.1.3 // indirect
+	github.com/itchyny/timefmt-go v0.1.4 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/keybase/go-ps v0.0.0-20190827175125-91aafc93ba19 // indirect
@@ -124,7 +125,6 @@ require (
 	github.com/zclconf/go-cty v1.10.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
-	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220624142145-8cd45d7dbd1f // indirect
 	gopkg.in/ini.v1 v1.66.4 // indirect

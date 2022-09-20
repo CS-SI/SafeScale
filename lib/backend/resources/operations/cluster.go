@@ -119,6 +119,9 @@ func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Er
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Cluster) Exists(ctx context.Context) (bool, fail.Error) {
 	// FIXME: Requires iteration of quite a few members...
+	if instance == nil || instance.Core == nil {
+		return false, fail.InvalidInstanceError()
+	}
 
 	// begin by inspecting all hosts...
 	svc := instance.Service()
@@ -478,7 +481,7 @@ func (instance *Cluster) updateCachedInformation(inctx context.Context) fail.Err
 
 // IsNull tells if the instance should be considered as a null value
 func (instance *Cluster) IsNull() bool {
-	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
+	return instance == nil || valid.IsNil(instance.Core)
 }
 
 // carry ...

@@ -21,7 +21,6 @@ package concurrency
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	_ "runtime/race"
 	"strings"
@@ -47,7 +46,7 @@ func TestRace(t *testing.T) {
 	}
 
 	// Remove previous race checks
-	files, _ := ioutil.ReadDir("./")
+	files, _ := io.ReadDir("./")
 	for _, f := range files {
 		if strings.Contains(f.Name(), "races") {
 			_ = os.Remove(f.Name())
@@ -57,7 +56,7 @@ func TestRace(t *testing.T) {
 	races()
 
 	there := false
-	files, _ = ioutil.ReadDir("./")
+	files, _ = io.ReadDir("./")
 	for _, f := range files {
 		if strings.Contains(f.Name(), "races") {
 			fmt.Println(f.Name())

@@ -18,14 +18,10 @@ package providers
 
 // Capabilities represents key/value configuration.
 type Capabilities struct {
-	// PublicVirtualIP indicates if the Provider has the capability to provide a Virtual IP with public IP address
-	PublicVirtualIP bool
-	// PrivateVirtualIP indicates if the Provider has the capability to provide a Virtual IP with private IP address
-	PrivateVirtualIP bool
-	// Layer3Networking indicates if the Provider uses Layer3 networking
-	Layer3Networking bool
-	// CanDisableSecurityGroup indicates if the Provider supports to disable a Security Group
-	CanDisableSecurityGroup bool
-	// // SubnetSecurityGroup indicates if the Provider supports to bind security group to subnet
-	// SubnetSecurityGroup bool
+	UseTerraformer          bool // tells if the provider is usiung terraformer or native driver
+	PublicVirtualIP         bool // indicates if the Provider has the capability to provide a Virtual IP with public IP address
+	PrivateVirtualIP        bool // indicates if the Provider has the capability to provide a Virtual IP with private IP address
+	Layer3Networking        bool // indicates if the Provider uses Layer3 networking
+	CanDisableSecurityGroup bool // indicates if the Provider supports to disable a Security Group
+	// SubnetSecurityGroup bool // indicates if the Provider supports to bind security group to subnet
 }

@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
@@ -157,25 +156,22 @@ type Stack interface {
 	// DeleteVolumeAttachment deletes the volume attachment identified by id
 	DeleteVolumeAttachment(ctx context.Context, serverID, id string) fail.Error
 
-	// Migrate runs custom code without breaking Interfaces
-	Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error
+	// // Migrate runs custom code without breaking Interfaces
+	// Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error
 
 	// Timings ...
 	Timings() (temporal.Timings, fail.Error)
+
+	// UpdateTags updates provider's tags
+	UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error
+
+	// DeleteTags removes provider's tags
+	DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error
 }
 
-// ReservedForProviderUse is an interface about the methods only available to providers internally
-type ReservedForProviderUse interface {
-	ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error)                    // list available OS images
-	ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error)          // list available host templates
-	GetRawConfigurationOptions(ctx context.Context) (options.ConfigurationOptions, fail.Error)   // Return a read-only struct containing configuration options
-	GetRawAuthenticationOptions(ctx context.Context) (options.AuthenticationOptions, fail.Error) // Return a read-only struct containing authentication options
-	HasDefaultNetwork(ctx context.Context) (bool, fail.Error)                                    // return true if the stack as a default network set (coming from tenants file)
-	GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error)                       // return the *abstract.Network corresponding to the default network
-}
-
-// FullStack is the interface that MUST actually implement all the providers; don't do it, and we can encounter runtime panics
-type FullStack interface {
-	Stack
-	ReservedForProviderUse
-}
+//
+// // Stack is the interface that MUST actually implement all the providers; don't do it, and we can encounter runtime panics
+// type Stack interface {
+// 	Stack
+// 	ReservedForProviderUse
+// }

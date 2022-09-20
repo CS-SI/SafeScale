@@ -61,7 +61,7 @@ func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Hos
 	return nil, fail.NotImplementedError()
 
 	/*
-		allTemplates, xerr := p.Stack.(stacks.ReservedForProviderUse).ListTemplates(ctx, false)
+		allTemplates, xerr := p.Stack.(providers.StackReservedForProviderUse).ListTemplates(ctx, false)
 		if xerr != nil {
 			return nil, xerr
 		}

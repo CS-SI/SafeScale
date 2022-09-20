@@ -28,12 +28,14 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/gcp"
 	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -41,6 +43,9 @@ const (
 )
 
 var (
+	capabilities = providers.Capabilities{
+		CanDisableSecurityGroup: true,
+	}
 	dnsServers = []string{"8.8.8.8", "1.1.1.1"}
 )
 
@@ -137,7 +142,15 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
-	authOptions := stackoptions.AuthenticationOptions{
+	isSafe, ok := computeCfg["Safe"].(bool) // nolint
+	if !ok {
+		isSafe = true
+	}
+	params["Safe"] = isSafe
+
+	logrus.Warningf("Setting safety to: %t", isSafe)
+
+	authOptions := stackoptions.Authentication{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
 		Password:         password,
@@ -186,21 +199,22 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 next:
 
-	cfgOptions := stackoptions.ConfigurationOptions{
-		DNSList:                   dnsServers,
+	cfgOptions := stackoptions.Configuration{
+		DNSServers:                dnsServers,
 		UseFloatingIP:             true,
 		AutoHostNetworkInterfaces: false,
 		VolumeSpeeds: map[string]volumespeed.Enum{
 			"standard":   volumespeed.Cold,
 			"performant": volumespeed.Hdd,
 		},
-		MetadataBucket:   metadataBucketName,
-		DefaultImage:     defaultImage,
-		OperatorUsername: operatorUsername,
-		UseNATService:    true,
-		ProviderName:     providerName,
-		MaxLifeTime:      maxLifeTime,
-		Timings:          timings,
+		MetadataBucketName: metadataBucketName,
+		DefaultImage:       defaultImage,
+		OperatorUsername:   operatorUsername,
+		UseNATService:      true,
+		ProviderName:       providerName,
+		MaxLifeTime:        maxLifeTime,
+		Timings:            timings,
+		Safe:               isSafe,
 	}
 
 	gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)
@@ -211,8 +225,8 @@ next:
 	// Note: if timings have to be tuned, update gcpStack.MutableTimings
 
 	wrapped := stacks.Remediator{
-		FullStack: gcpStack,
-		Name:      "google",
+		Stack: gcpStack,
+		Name:  "google",
 	}
 
 	newP := &provider{
@@ -228,50 +242,47 @@ next:
 	return wp, nil
 }
 
-// GetAuthenticationOptions returns the auth options
-func (p provider) GetAuthenticationOptions(ctx context.Context) (providers.Config, fail.Error) {
-	cfg := providers.ConfigMap{}
-
-	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
-	if err != nil {
-		return nil, err
-	}
-	cfg.Set("TenantName", opts.TenantName)
-	cfg.Set("Login", opts.Username)
-	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthURL", opts.IdentityEndpoint)
-	cfg.Set("Region", opts.Region)
-	return cfg, nil
+// BuildWithTerraformer needs to be called when terraformer is used
+func (p *provider) BuildWithTerraformer(params map[string]any, config terraformer.Configuration) (providers.Provider, fail.Error) {
+	return nil, fail.NotImplementedError()
 }
 
-// GetConfigurationOptions return configuration parameters
-func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config, fail.Error) {
-	cfg := providers.ConfigMap{}
-
-	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
-	if err != nil {
-		return nil, err
+// AuthenticationOptions returns the auth options
+func (p provider) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
+	if valid.IsNull(p) {
+		return stackoptions.Authentication{}, fail.InvalidInstanceError()
+	}
+	if valid.IsNull(p.Stack) {
+		return stackoptions.Authentication{}, fail.InvalidInstanceContentError("p.Stack", "must be a valid 'Stack'")
 	}
 
-	provName, xerr := p.GetName()
+	return p.Stack.(providers.StackReservedForProviderUse).AuthenticationOptions()
+}
+
+// ConfigurationOptions return configuration parameters
+func (p provider) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+	if valid.IsNull(p) {
+		return stackoptions.Configuration{}, fail.InvalidInstanceError()
+	}
+	if valid.IsNull(p.Stack) {
+		return stackoptions.Configuration{}, fail.InvalidInstanceContentError("p.Stack", "must be a valid 'Stack'")
+	}
+
+	opts, xerr := p.Stack.(providers.StackReservedForProviderUse).ConfigurationOptions()
 	if xerr != nil {
-		return nil, xerr
+		return stackoptions.Configuration{}, xerr
 	}
 
-	cfg.Set("DNSList", opts.DNSList)
-	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
-	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
-	cfg.Set("DefaultImage", opts.DefaultImage)
-	cfg.Set("MetadataBucketName", opts.MetadataBucket)
-	cfg.Set("OperatorUsername", opts.OperatorUsername)
-	cfg.Set("UseNATService", opts.UseNATService)
-	cfg.Set("ProviderName", provName)
-	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
-	return cfg, nil
+	opts.ProviderName, xerr = p.GetName()
+	if xerr != nil {
+		return stackoptions.Configuration{}, xerr
+	}
+
+	return opts, nil
 }
 
 // GetName returns the providerName
-func (p provider) GetName() (string, fail.Error) {
+func (p *provider) GetName() (string, fail.Error) {
 	return "gcp", nil
 }
 
@@ -282,35 +293,49 @@ func (p provider) GetStack() (stacks.Stack, fail.Error) {
 }
 
 // ListImages ...
-func (p provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
+func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	return p.Stack.(stacks.ReservedForProviderUse).ListImages(ctx, all)
+	if p.Stack == nil {
+		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
+	}
+
+	return p.Stack.(providers.StackReservedForProviderUse).ListImages(ctx, all)
 }
 
 // ListTemplates ...
-func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
+func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	return p.Stack.(stacks.ReservedForProviderUse).ListTemplates(ctx, all)
+	if p.Stack == nil {
+		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
+	}
+
+	return p.Stack.(providers.StackReservedForProviderUse).ListTemplates(ctx, all)
 }
 
-// GetTenantParameters returns the tenant parameters as-is
-func (p *provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
+// TenantParameters returns the tenant parameters as-is
+func (p *provider) TenantParameters() (map[string]interface{}, fail.Error) {
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	return p.tenantParameters, nil
 }
 
-// GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities(context.Context) (providers.Capabilities, fail.Error) {
-	return providers.Capabilities{
-		CanDisableSecurityGroup: true,
-	}, nil
+// Capabilities returns the capabilities of the provider
+func (p *provider) Capabilities() providers.Capabilities {
+	return capabilities
 }
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
-func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
+func (p *provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	var emptySlice []*regexp.Regexp
 	if valid.IsNil(p) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -331,23 +356,20 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 }
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (p provider) HasDefaultNetwork(_ context.Context) (bool, fail.Error) {
-	if valid.IsNil(p) {
-		return false, fail.InvalidInstanceError()
-	}
-
+func (p *provider) HasDefaultNetwork() (bool, fail.Error) {
 	return false, nil
 }
 
-// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (p provider) GetDefaultNetwork(_ context.Context) (*abstract.Network, fail.Error) {
-	if valid.IsNil(p) {
-		return nil, fail.InvalidInstanceError()
-	}
-
+// DefaultNetwork returns the *abstract.Network corresponding to the default network
+func (p *provider) DefaultNetwork(_ context.Context) (*abstract.Network, fail.Error) {
 	return nil, fail.NotFoundError("this provider has no default network")
 }
 
 func init() {
-	iaas.Register("gcp", &provider{})
+	profile := providers.NewProfile(
+		capabilities,
+		func() providers.Provider { return &provider{} },
+		nil,
+	)
+	iaas.Register("gcp", profile)
 }

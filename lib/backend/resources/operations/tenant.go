@@ -100,7 +100,7 @@ func SetCurrentTenant(ctx context.Context, tenantName string) error {
 }
 
 func loadTenant(ctx context.Context, tenantName string) (iaas.Service, fail.Error) {
-	service, xerr := iaas.UseService(tenantName /*, metadata.MinimumMetadataVersion*/)
+	service, xerr := iaas.UseService(iaas.WithTenant(tenantName))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

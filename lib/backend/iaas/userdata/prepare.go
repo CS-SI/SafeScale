@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -28,9 +27,9 @@ import (
 	"sync/atomic"
 	txttmpl "text/template"
 
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/sirupsen/logrus"
 
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
@@ -114,7 +113,7 @@ func (ud Content) OK() bool {
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
 func (ud *Content) Prepare(
-	options stackoptions.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string,
+	options stackoptions.Configuration, request abstract.HostRequest, cidr string, defaultNetworkCIDR string,
 	timings temporal.Timings,
 ) fail.Error {
 	if ud == nil {
@@ -147,7 +146,7 @@ func (ud *Content) Prepare(
 	useLayer3Networking = options.UseLayer3Networking
 	useNATService = options.UseNATService
 	operatorUsername = options.OperatorUsername
-	dnsList = options.DNSList
+	dnsList = options.DNSServers
 	if len(dnsList) == 0 {
 		dnsList = []string{"1.1.1.1"}
 	}
@@ -288,7 +287,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", ud.HostName)), 0777)
 		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata.%s.sh", ud.HostName, phase))
-		err = ioutil.WriteFile(dumpName, result, 0644)
+		err = os.WriteFile(dumpName, result, 0644)
 		if err != nil { // No need to act on err
 			logrus.Warnf("[TRACE] Failure writing step info into %s", dumpName)
 		}

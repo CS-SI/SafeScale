@@ -21,13 +21,6 @@ import (
 	"strings"
 	"time"
 
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	volumesv2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
@@ -45,8 +38,15 @@ import (
 	gcos "github.com/gophercloud/gophercloud/openstack"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // stack is the implementation for huaweicloud cloud stack
@@ -57,8 +57,8 @@ type stack struct {
 	VolumeClient   *gophercloud.ServiceClient
 	Driver         *gophercloud.ProviderClient
 	// Opts contains authentication options
-	authOpts stackoptions.AuthenticationOptions
-	cfgOpts  stackoptions.ConfigurationOptions
+	authOpts stackoptions.Authentication
+	cfgOpts  stackoptions.Configuration
 	// Instance of the default Network/VPC
 	vpc *abstract.Network
 
@@ -87,7 +87,7 @@ func NullStack() *stack { // nolint
 // New authenticates and return interface stack
 //
 //goland:noinspection GoExportedFuncWithUnexportedType
-func New(auth stackoptions.AuthenticationOptions, cfg stackoptions.ConfigurationOptions) (*stack, fail.Error) { // nolint
+func New(auth stackoptions.Authentication, cfg stackoptions.Configuration) (*stack, fail.Error) { // nolint
 	ctx := context.Background()
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
@@ -1144,4 +1144,27 @@ func (s *stack) Timings() (temporal.Timings, fail.Error) {
 		s.MutableTimings = temporal.NewTimings()
 	}
 	return s.MutableTimings, nil
+}
+
+func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	xerr := s.rpcSetMetadataOfInstance(ctx, id, lmap)
+	return xerr
+}
+
+func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	report := make(map[string]string)
+	for _, k := range keys {
+		report[k] = ""
+	}
+
+	xerr := s.rpcDeleteMetadataOfInstance(ctx, id, report)
+	return xerr
 }

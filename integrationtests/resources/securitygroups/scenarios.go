@@ -22,7 +22,6 @@ package securitygroups
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
@@ -86,7 +85,7 @@ func GwFirewallWorks(t *testing.T) {
 		}(resp.Body)
 
 		// make sure it works reading the content
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		require.Nil(t, err)
 		if strings.Contains(string(body), "miniserve") {
 			fmt.Println("We don't have a working firewall")
@@ -150,7 +149,7 @@ func OpenPortClosedByDefaultInGateway(t *testing.T) {
 		}(resp.Body)
 
 		// make sure it works reading the content
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		require.Nil(t, err)
 		if strings.Contains(string(body), "miniserve") {
 			fmt.Println("We don't have a working firewall")
@@ -196,7 +195,7 @@ func OpenPortClosedByDefaultInGateway(t *testing.T) {
 	}(resp.Body)
 
 	// make sure it works reading the content
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	require.Nil(t, err)
 	require.Contains(t, string(body), "miniserve")
 }

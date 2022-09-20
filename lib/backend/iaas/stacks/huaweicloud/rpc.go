@@ -21,10 +21,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -51,14 +49,6 @@ func (s stack) rpcGetHostByID(ctx context.Context, id string) (*servers.Server, 
 		return nil, xerr
 	}
 	return server, nil
-}
-
-func closer(hr *http.Response) {
-	if hr != nil {
-		if hr.Body != nil {
-			_ = hr.Body.Close()
-		}
-	}
 }
 
 func (s stack) rpcGetHostByName(ctx context.Context, name string) (*servers.Server, fail.Error) {
@@ -122,149 +112,6 @@ func (s stack) rpcGetHostByName(ctx context.Context, name string) (*servers.Serv
 	return nil, fail.InconsistentError("found more than one Host named '%s'", name)
 }
 
-// rpcGetMetadataOfInstance returns the metadata associated with the instance
-func (s stack) rpcGetMetadataOfInstance(ctx context.Context, id string) (map[string]string, fail.Error) {
-	emptyMap := map[string]string{}
-	if id = strings.TrimSpace(id); id == "" {
-		return emptyMap, fail.InvalidParameterError("id", "cannpt be empty string")
-	}
-
-	var out map[string]string
-	xerr := stacks.RetryableRemoteCall(ctx,
-		func() (innerErr error) {
-			res := servers.Metadata(s.ComputeClient, id)
-			out, innerErr = res.Extract()
-			return innerErr
-		},
-		NormalizeError,
-	)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrTimeout:
-			return emptyMap, fail.Wrap(fail.Cause(xerr), "timeout")
-		case *retry.ErrStopRetry:
-			return emptyMap, fail.Wrap(fail.Cause(xerr), "stopping retries")
-		default:
-			return emptyMap, xerr
-		}
-	}
-
-	return out, nil
-}
-
-// rpcListServers lists servers
-func (s stack) rpcListServers(ctx context.Context) ([]*servers.Server, fail.Error) {
-	var resp []*servers.Server
-	xerr := stacks.RetryableRemoteCall(ctx,
-		func() (innerErr error) {
-			allPages, innerErr := servers.List(s.ComputeClient, nil).AllPages()
-			if innerErr != nil {
-				return innerErr
-			}
-			if innerErr := servers.ExtractServersInto(allPages, &resp); innerErr != nil {
-				return innerErr
-			}
-			return nil
-		},
-		NormalizeError,
-	)
-	if xerr != nil {
-		return []*servers.Server{}, xerr
-	}
-
-	return resp, nil
-}
-
-// rpcCreateServer calls openstack to create a server
-func (s stack) rpcCreateServer(ctx context.Context, name string, networks []servers.Network, templateID, imageID string, userdata []byte, az string) (*servers.Server, fail.Error) {
-	if name = strings.TrimSpace(name); name == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
-	}
-	if templateID = strings.TrimSpace(templateID); templateID == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("templateID")
-	}
-	if imageID = strings.TrimSpace(imageID); imageID == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("imageID")
-	}
-	if az == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("az")
-	}
-
-	metadata := make(map[string]string)
-	metadata["ManagedBy"] = "safescale"
-	metadata["DeclaredInBucket"] = s.cfgOpts.MetadataBucket
-	metadata["Image"] = imageID
-	metadata["Template"] = templateID
-	metadata["CreationDate"] = time.Now().Format(time.RFC3339)
-
-	srvOpts := servers.CreateOpts{
-		Name:             name,
-		Networks:         networks,
-		FlavorRef:        templateID,
-		ImageRef:         imageID,
-		UserData:         userdata,
-		AvailabilityZone: az,
-		Metadata:         metadata,
-	}
-
-	var server *servers.Server
-	xerr := stacks.RetryableRemoteCall(ctx,
-		func() (innerErr error) {
-			server, innerErr = servers.Create(s.ComputeClient, srvOpts).Extract()
-			return innerErr
-		},
-		NormalizeError,
-	)
-	if xerr != nil {
-		return &servers.Server{}, xerr
-	}
-	return server, nil
-}
-
-// rpcDeleteServer calls openstack to delete a server
-func (s stack) rpcDeleteServer(ctx context.Context, id string) fail.Error {
-	if id == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("id")
-	}
-
-	return stacks.RetryableRemoteCall(ctx,
-		func() error {
-			return servers.Delete(s.ComputeClient, id).ExtractErr()
-		},
-		NormalizeError,
-	)
-}
-
-// rpcCreatePort creates a port
-func (s stack) rpcCreatePort(ctx context.Context, req ports.CreateOpts) (port *ports.Port, ferr fail.Error) {
-	xerr := stacks.RetryableRemoteCall(ctx,
-		func() (innerErr error) {
-			port, innerErr = ports.Create(s.NetworkClient, req).Extract()
-			return innerErr
-		},
-		NormalizeError,
-	)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return port, nil
-}
-
-// rpcDeletePort deletes a port
-func (s stack) rpcDeletePort(ctx context.Context, id string) fail.Error {
-	if id = strings.TrimSpace(id); id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
-	}
-
-	return stacks.RetryableRemoteCall(ctx,
-		func() (innerErr error) {
-			return ports.Delete(s.NetworkClient, id).ExtractErr()
-		},
-		NormalizeError,
-	)
-}
-
 // rpcListPorts lists all ports available
 func (s stack) rpcListPorts(ctx context.Context, options ports.ListOpts) ([]ports.Port, fail.Error) {
 	var (
@@ -289,72 +136,90 @@ func (s stack) rpcListPorts(ctx context.Context, options ports.ListOpts) ([]port
 	return r, nil
 }
 
-// rpcUpdatePort updates the settings of a port
-func (s stack) rpcUpdatePort(ctx context.Context, id string, options ports.UpdateOpts) fail.Error {
-	if id == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("id")
+// rpcSetMetadataOfInstance changes the metadata associated with the instance
+func (s stack) rpcSetMetadataOfInstance(ctx context.Context, id string, tags map[string]string) fail.Error {
+	if id = strings.TrimSpace(id); id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	return stacks.RetryableRemoteCall(ctx,
-		func() error {
-			resp, innerErr := ports.Update(s.NetworkClient, id, options).Extract()
-			_ = resp
-			return innerErr
-		},
-		NormalizeError,
-	)
-}
-
-// rpcGetPort returns port information from its ID
-func (s stack) rpcGetPort(ctx context.Context, id string) (port *ports.Port, ferr fail.Error) {
-	if id == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
-	}
-
+	var out map[string]string
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			port, innerErr = ports.Get(s.NetworkClient, id).Extract()
+			res := servers.Metadata(s.ComputeClient, id)
+			out, innerErr = res.Extract()
 			return innerErr
 		},
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		case *retry.ErrStopRetry:
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		default:
+			return xerr
+		}
 	}
 
-	return port, nil
-}
+	for k, v := range tags {
+		out[k] = v
+	}
 
-// rpcCreateFloatingIP creates a floating IP
-func (s stack) rpcCreateFloatingIP(ctx context.Context) (*floatingips.FloatingIP, fail.Error) {
-	var resp *floatingips.FloatingIP
-	xerr := stacks.RetryableRemoteCall(ctx,
+	mop := make(servers.MetadataOpts)
+	for k, v := range out {
+		mop[k] = v
+	}
+
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			resp, innerErr = floatingips.Create(
-				s.ComputeClient, floatingips.CreateOpts{
-					Pool: s.authOpts.FloatingIPPool,
-				},
-			).Extract()
+			res := servers.UpdateMetadata(s.ComputeClient, id, mop)
+			_, innerErr = res.Extract()
 			return innerErr
 		},
 		NormalizeError,
 	)
 	if xerr != nil {
-		return &floatingips.FloatingIP{}, xerr
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		case *retry.ErrStopRetry:
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		default:
+			return xerr
+		}
 	}
-	return resp, nil
+
+	return nil
 }
 
-// rpcDeleteFloatingIP deletes a floating IP
-func (s stack) rpcDeleteFloatingIP(ctx context.Context, id string) fail.Error {
-	if id == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("id")
+// rpcDeleteMetadataOfInstance changes the metadata associated with the instance
+func (s stack) rpcDeleteMetadataOfInstance(ctx context.Context, id string, tags map[string]string) fail.Error {
+	if id = strings.TrimSpace(id); id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	return stacks.RetryableRemoteCall(ctx,
-		func() error {
-			return floatingips.Delete(s.ComputeClient, id).ExtractErr()
+	xerr := stacks.RetryableRemoteCall(ctx,
+		func() (innerErr error) {
+			for k := range tags {
+				res := servers.DeleteMetadatum(s.ComputeClient, id, k)
+				innerErr = res.ExtractErr()
+				return innerErr
+			}
+			return nil
 		},
 		NormalizeError,
 	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		case *retry.ErrStopRetry:
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		default:
+			return xerr
+		}
+	}
+
+	return nil
 }

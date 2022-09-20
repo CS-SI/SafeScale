@@ -32,8 +32,8 @@ type stack struct {
 	// IdentityClient *gophercloud.ServiceClient
 	// Driver         *gophercloud.ProviderClient
 
-	authOpts stackoptions.AuthenticationOptions
-	cfgOpts  stackoptions.ConfigurationOptions
+	authOpts stackoptions.Authentication
+	cfgOpts  stackoptions.Configuration
 
 	// DefaultSecurityGroupName is the name of the default security groups
 	DefaultSecurityGroupName string
@@ -58,7 +58,7 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and returns a stack pointer
-func New(auth stackoptions.AuthenticationOptions, cfg stackoptions.ConfigurationOptions) (*stack, fail.Error) { // nolint
+func New(auth stackoptions.Authentication, cfg stackoptions.Configuration) (*stack, fail.Error) { // nolint
 	ctx := context.Background()
 	_ = ctx
 

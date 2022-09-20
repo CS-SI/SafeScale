@@ -29,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/huaweicloud"
 	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	imagefilters "github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract/filters/images"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
@@ -47,6 +48,9 @@ const (
 )
 
 var (
+	capabilities = providers.Capabilities{
+		PrivateVirtualIP: true,
+	}
 	dnsServers = []string{"100.125.0.41", "100.126.0.41"}
 )
 
@@ -129,12 +133,20 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		defaultImage = flexibleEngineDefaultImage
 	}
 
+	isSafe, ok := compute["Safe"].(bool) // nolint
+	if !ok {
+		isSafe = true
+	}
+	params["Safe"] = isSafe
+
+	logrus.Warningf("Setting safety to: %t", isSafe)
+
 	maxLifeTime := 0
 	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string)) // nolint
 	}
 
-	authOptions := stackoptions.AuthenticationOptions{
+	authOptions := stackoptions.Authentication{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
 		Password:         password,
@@ -190,15 +202,15 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 next:
 
-	cfgOptions := stackoptions.ConfigurationOptions{
-		DNSList:             dnsServers,
+	cfgOptions := stackoptions.Configuration{
+		DNSServers:          dnsServers,
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,
 		VolumeSpeeds: map[string]volumespeed.Enum{
 			"SATA": volumespeed.Cold,
 			"Ssd":  volumespeed.Ssd,
 		},
-		MetadataBucket:           metadataBucketName,
+		MetadataBucketName:       metadataBucketName,
 		OperatorUsername:         operatorUsername,
 		ProviderName:             providerName,
 		DefaultSecurityGroupName: "default",
@@ -211,6 +223,7 @@ next:
 		// BlacklistImageRegexp:    blacklistImagePattern,
 		MaxLifeTime: maxLifeTime,
 		Timings:     timings,
+		Safe:        isSafe,
 	}
 
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
@@ -221,8 +234,8 @@ next:
 	// Note: if timings have to be tuned, update stack.MutableTimings
 
 	wrapped := stacks.Remediator{
-		FullStack: stack,
-		Name:      "flexibleengine",
+		Stack: stack,
+		Name:  "flexibleengine",
 	}
 
 	newP := &provider{
@@ -245,6 +258,11 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 	}
 }
 
+// BuildWithTerraformer needs to be called when terraformer is used
+func (p *provider) BuildWithTerraformer(params map[string]any, config terraformer.Configuration) (providers.Provider, fail.Error) {
+	return nil, fail.NotImplementedError()
+}
+
 // InspectTemplate returns the Template referenced by id; overloads stack.InspectTemplate to inject templates with GPU
 func (p *provider) InspectTemplate(ctx context.Context, id string) (*abstract.HostTemplate, fail.Error) {
 	tpl, xerr := p.Stack.InspectTemplate(ctx, id)
@@ -259,7 +277,7 @@ func (p *provider) InspectTemplate(ctx context.Context, id string) (*abstract.Ho
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
-	allTemplates, xerr := p.Stack.(stacks.ReservedForProviderUse).ListTemplates(ctx, all)
+	allTemplates, xerr := p.Stack.(providers.StackReservedForProviderUse).ListTemplates(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -293,7 +311,7 @@ func isBMSImage(image *abstract.Image) bool {
 
 // ListImages lists available OS images
 func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
-	images, xerr := p.Stack.(stacks.ReservedForProviderUse).ListImages(ctx, all)
+	images, xerr := p.Stack.(providers.StackReservedForProviderUse).ListImages(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -305,50 +323,38 @@ func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image,
 	return images, nil
 }
 
-// GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions(ctx context.Context) (providers.Config, fail.Error) {
-	cfg := providers.ConfigMap{}
-
-	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
-	if err != nil {
-		return nil, err
+// AuthenticationOptions returns the auth options
+func (p *provider) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
+	if valid.IsNull(p) {
+		return stackoptions.Authentication{}, fail.InvalidInstanceError()
 	}
-	cfg.Set("DomainName", opts.DomainName)
-	cfg.Set("Login", opts.Username)
-	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthURL", opts.IdentityEndpoint)
-	cfg.Set("Region", opts.Region)
+	if valid.IsNull(p.Stack) {
+		return stackoptions.Authentication{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
+	}
 
-	return cfg, nil
+	return p.Stack.(providers.StackReservedForProviderUse).AuthenticationOptions()
 }
 
-// GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions(ctx context.Context) (providers.Config, fail.Error) {
-	cfg := providers.ConfigMap{}
-
-	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
-	if err != nil {
-		return nil, err
+// ConfigurationOptions return configuration parameters
+func (p *provider) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+	if valid.IsNull(p) {
+		return stackoptions.Configuration{}, fail.InvalidInstanceError()
+	}
+	if valid.IsNull(p.Stack) {
+		return stackoptions.Configuration{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
-	provName, xerr := p.GetName()
+	opts, xerr := p.Stack.(providers.StackReservedForProviderUse).ConfigurationOptions()
 	if xerr != nil {
-		return nil, xerr
+		return stackoptions.Configuration{}, xerr
 	}
 
-	cfg.Set("DNSList", opts.DNSList)
-	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
-	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
-	cfg.Set("DefaultImage", opts.DefaultImage)
-	cfg.Set("MetadataBucketName", opts.MetadataBucket)
-	cfg.Set("OperatorUsername", opts.OperatorUsername)
-	cfg.Set("ProviderName", provName)
-	cfg.Set("DefaultNetworkName", opts.DefaultNetworkName)
-	cfg.Set("DefaultNetworkCIDR", opts.DefaultNetworkCIDR)
-	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
-	// cfg.Set("Customizations", opts.Customizations)
+	opts.ProviderName, xerr = p.GetName()
+	if xerr != nil {
+		return stackoptions.Configuration{}, xerr
+	}
 
-	return cfg, nil
+	return opts, nil
 }
 
 // GetName returns the providerName
@@ -358,24 +364,37 @@ func (p *provider) GetName() (string, fail.Error) {
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() (stacks.Stack, fail.Error) {
+func (p *provider) GetStack() (stacks.Stack, fail.Error) {
+	if valid.IsNull(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if valid.IsNull(p.Stack) {
+		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
+	}
+
 	return p.Stack, nil
 }
 
-// GetTenantParameters returns the tenant parameters as-is
-func (p *provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
+// TenantParameters returns the tenant parameters as-is
+func (p *provider) TenantParameters() (map[string]interface{}, fail.Error) {
+	if valid.IsNull(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	return p.tenantParameters, nil
 }
 
-// GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities(context.Context) (providers.Capabilities, fail.Error) {
-	return providers.Capabilities{
-		PrivateVirtualIP: true,
-	}, nil
+// Capabilities returns the capabilities of the provider
+func (p *provider) Capabilities() providers.Capabilities {
+	return capabilities
 }
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
-func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
+func (p *provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
+	if valid.IsNull(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	var emptySlice []*regexp.Regexp
 	if valid.IsNil(p) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -399,12 +418,12 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 }
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (p provider) HasDefaultNetwork(ctx context.Context) (bool, fail.Error) {
-	if valid.IsNil(p) {
+func (p provider) HasDefaultNetwork() (bool, fail.Error) {
+	if valid.IsNull(p) {
 		return false, fail.InvalidInstanceError()
 	}
 
-	options, xerr := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
+	options, xerr := p.ConfigurationOptions()
 	if xerr != nil {
 		return false, xerr
 	}
@@ -412,13 +431,13 @@ func (p provider) HasDefaultNetwork(ctx context.Context) (bool, fail.Error) {
 	return options.DefaultNetworkName != "", nil
 }
 
-// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (p provider) GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
-	if valid.IsNil(p) {
+// DefaultNetwork returns the *abstract.Network corresponding to the default network
+func (p provider) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
+	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	options, xerr := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
+	options, xerr := p.ConfigurationOptions()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -436,5 +455,10 @@ func (p provider) GetDefaultNetwork(ctx context.Context) (*abstract.Network, fai
 }
 
 func init() {
-	iaas.Register("flexibleengine", &provider{})
+	profile := providers.NewProfile(
+		capabilities,
+		func() providers.Provider { return &provider{} },
+		nil,
+	)
+	iaas.Register("flexibleengine", profile)
 }

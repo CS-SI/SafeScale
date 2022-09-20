@@ -57,7 +57,10 @@ func (c ConfigMap) Get(name string) (interface{}, bool) {
 func (c ConfigMap) GetString(name string) string {
 	val, ok := c.Get(name)
 	if ok {
-		return val.(string)
+		casted, ok := val.(string)
+		if ok {
+			return casted
+		}
 	}
 	return ""
 }
@@ -66,7 +69,10 @@ func (c ConfigMap) GetString(name string) string {
 func (c ConfigMap) GetSliceOfStrings(name string) []string {
 	val, ok := c.Get(name)
 	if ok {
-		return val.([]string)
+		casted, ok := val.([]string)
+		if ok {
+			return casted
+		}
 	}
 	return []string{}
 }
@@ -75,7 +81,10 @@ func (c ConfigMap) GetSliceOfStrings(name string) []string {
 func (c ConfigMap) GetMapOfStrings(name string) map[string]string {
 	val, ok := c.Get(name)
 	if ok {
-		return val.(map[string]string)
+		casted, ok := val.(map[string]string)
+		if ok {
+			return casted
+		}
 	}
 	return map[string]string{}
 }
@@ -84,7 +93,10 @@ func (c ConfigMap) GetMapOfStrings(name string) map[string]string {
 func (c ConfigMap) GetInteger(name string) int {
 	val, ok := c.Get(name)
 	if ok {
-		return val.(int)
+		casted, ok := val.(int)
+		if ok {
+			return casted
+		}
 	}
 	return 0
 }

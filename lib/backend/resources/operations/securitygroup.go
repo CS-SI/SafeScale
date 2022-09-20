@@ -209,7 +209,7 @@ func onSGCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Iden
 
 // IsNull tests if instance is nil or empty
 func (instance *SecurityGroup) IsNull() bool {
-	return valid.IsNil(instance.Core)
+	return instance == nil || valid.IsNil(instance.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -284,7 +284,7 @@ func (instance *SecurityGroup) Browse(
 }
 
 // Create creates a new SecurityGroup and its metadata.
-// If needed by Cloud provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
+// If needed by Cloud Provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
 // If the metadata is already carrying a SecurityGroup, returns fail.ErrNotAvailable
 func (instance *SecurityGroup) Create(
 	inctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules,
@@ -499,7 +499,7 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (ferr fai
 	return instance.unsafeDelete(ctx, force)
 }
 
-// deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on provider side
+// deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on Provider side
 func deleteProviderSecurityGroup(ctx context.Context, svc iaas.Service, abstractSG *abstract.SecurityGroup) fail.Error {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
@@ -619,9 +619,7 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 // unbindFromSubnets unbinds security group from all the subnets bound to it and update the Subnet metadata accordingly
 //
 //goland:noinspection GoDeferInLoop
-func (instance *SecurityGroup) unbindFromSubnets(
-	ctx context.Context, in *propertiesv1.SecurityGroupSubnets,
-) fail.Error {
+func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *propertiesv1.SecurityGroupSubnets) fail.Error {
 	if len(in.ByID) > 0 {
 		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/unbind"))
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1416,9 +1414,7 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 	})
 }
 
-func FilterBondsByKind(
-	bonds map[string]*propertiesv1.SecurityGroupBond, state securitygroupstate.Enum,
-) []*propertiesv1.SecurityGroupBond {
+func FilterBondsByKind(bonds map[string]*propertiesv1.SecurityGroupBond, state securitygroupstate.Enum) []*propertiesv1.SecurityGroupBond {
 	list := make([]*propertiesv1.SecurityGroupBond, 0, len(bonds))
 	switch state {
 	case securitygroupstate.All:

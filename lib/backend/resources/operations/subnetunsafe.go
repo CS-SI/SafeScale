@@ -679,11 +679,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 			}
 		}()
 
-		caps, xerr := svc.GetCapabilities(ctx)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
+		caps := svc.Capabilities()
 		failover := req.HA
 		if failover {
 			if caps.PrivateVirtualIP {
@@ -937,10 +933,7 @@ func (instance *Subnet) unsafeFinalizeSubnetCreation(inctx context.Context) fail
 	}
 }
 
-func (instance *Subnet) unsafeCreateGateways(
-	inctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements,
-	sgs map[string]struct{},
-) (_ fail.Error) {
+func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]struct{}) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -969,15 +962,14 @@ func (instance *Subnet) unsafeCreateGateways(
 		if imageQuery == "" {
 			imageQuery = req.ImageRef
 			if imageQuery == "" {
-				cfg, xerr := svc.GetConfigurationOptions(ctx)
+				cfg, xerr := svc.ConfigurationOptions()
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					chRes <- result{xerr}
 					return xerr
 				}
 
-				imageQuery = cfg.GetString("DefaultImage")
-
+				imageQuery = cfg.DefaultImage
 				if imageQuery == "" {
 					imageQuery = consts.DEFAULTOS
 				}
@@ -1215,25 +1207,22 @@ func (instance *Subnet) unsafeCreateGateways(
 					}
 				}()
 
-				// FIXME: OPP Enable the SG AGAIN
-
 				safe := false
 
-				// FIXME: OPP After Stein, no failover
+				// Fix for Stein
 				{
 					st, xerr := svc.GetProviderName()
 					if xerr != nil {
 						return xerr
 					}
+
 					if st != "ovh" {
 						safe = true
 					}
 				}
 
-				if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
-					if val, ok := tpar["Safe"].(bool); ok {
-						safe = val
-					}
+				if cfg, xerr := svc.ConfigurationOptions(); xerr == nil {
+					safe = cfg.Safe
 				}
 
 				if !safe {
@@ -1301,7 +1290,7 @@ func (instance *Subnet) unsafeCreateGateways(
 			{
 				safe := false
 
-				// FIXME: OPP After Stein, no failover
+				// Fix for Stein
 				{
 					st, xerr := svc.GetProviderName()
 					if xerr != nil {
@@ -1312,10 +1301,8 @@ func (instance *Subnet) unsafeCreateGateways(
 					}
 				}
 
-				if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
-					if val, ok := tpar["Safe"].(bool); ok {
-						safe = val
-					}
+				if cfg, xerr := svc.ConfigurationOptions(); xerr == nil {
+					safe = cfg.Safe
 				}
 
 				var ok bool
@@ -1327,7 +1314,7 @@ func (instance *Subnet) unsafeCreateGateways(
 				}
 				secondaryUserdata, ok = aresult["userdata"].(*userdata.Content)
 				if !ok {
-					xerr := fail.InvalidParameterError("result[userdata] shoulde be a *userdate.Content")
+					xerr := fail.InconsistentError("result['userdata'] should be a *userdate.Content")
 					chRes <- result{xerr}
 					return xerr
 				}
@@ -1522,9 +1509,7 @@ func (instance *Subnet) unsafeCreateGateways(
 }
 
 // unsafeUnbindSecurityGroup unbinds a security group from the host
-func (instance *Subnet) unsafeUnbindSecurityGroup(
-	ctx context.Context, sgInstance resources.SecurityGroup,
-) (ferr fail.Error) {
+func (instance *Subnet) unsafeUnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (ferr fail.Error) {
 	snid, err := instance.GetID()
 	if err != nil {
 		return fail.ConvertError(err)

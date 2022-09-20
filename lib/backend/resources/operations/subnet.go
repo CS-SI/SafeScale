@@ -63,7 +63,7 @@ const (
 	subnetPublicIPSecurityGroupNamePattern        = "safescale-sg_subnet_publicip.%s.%s"
 	subnetPublicIPSecurityGroupDescriptionPattern = "SG for hosts with public IP in Subnet %s of Network %s"
 
-	virtualIPNamePattern = "safescale-vip_gateways_subnet.%s.%s" // FIXME: OPP The ports of this thing also need disabling
+	virtualIPNamePattern = "safescale-vip_gateways_subnet.%s.%s"
 )
 
 // Subnet links Object Storage MetadataFolder and Subnet
@@ -199,7 +199,7 @@ func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef s
 					}
 				}
 
-				withDefaultSubnetwork, err := svc.HasDefaultNetwork(ctx)
+				withDefaultSubnetwork, err := svc.HasDefaultNetwork()
 				if err != nil {
 					return nil, err
 				}
@@ -233,7 +233,7 @@ func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef s
 					}
 				} else if withDefaultSubnetwork {
 					// No Network Metadata, try to use the default Network if there is one
-					an, xerr := svc.GetDefaultNetwork(ctx)
+					an, xerr := svc.DefaultNetwork(ctx)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						return nil, xerr
@@ -353,7 +353,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 	defer instance.localCache.Unlock()
 
 	var primaryGatewayID, secondaryGatewayID string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -417,7 +417,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 
 // IsNull tells if the instance is a null value
 func (instance *Subnet) IsNull() bool {
-	return instance == nil || (instance != nil && ((instance.Core == nil) || (instance.Core != nil && valid.IsNil(instance.Core))))
+	return instance == nil || valid.IsNil(instance.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -742,7 +742,7 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 	if xerr != nil {
 		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
-			withDefaultSubnetwork, err := svc.HasDefaultNetwork(ctx)
+			withDefaultSubnetwork, err := svc.HasDefaultNetwork()
 			if err != nil {
 				return nil, nil, err
 			}
@@ -751,7 +751,7 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 				return nil, nil, xerr
 			}
 
-			an, xerr = svc.GetDefaultNetwork(ctx)
+			an, xerr = svc.DefaultNetwork(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, nil, xerr
@@ -1926,10 +1926,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 			}
 
 			// Do security group stuff to enable it
-			caps, xerr := svc.GetCapabilities(ctx)
-			if xerr != nil {
-				return xerr
-			}
+			caps := svc.Capabilities()
 			if caps.CanDisableSecurityGroup {
 				if innerXErr = svc.EnableSecurityGroup(ctx, asg); innerXErr != nil {
 					return innerXErr
@@ -2021,10 +2018,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 				return fail.NotFoundError("security group '%s' is not bound to Subnet '%s'", sgInstance.GetName(), snid)
 			}
 
-			caps, xerr := svc.GetCapabilities(ctx)
-			if xerr != nil {
-				return xerr
-			}
+			caps := svc.Capabilities()
 			if caps.CanDisableSecurityGroup {
 				if innerXErr = svc.DisableSecurityGroup(ctx, abstractSG); innerXErr != nil {
 					return innerXErr

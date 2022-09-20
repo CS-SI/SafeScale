@@ -23,13 +23,13 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
-// ConfigurationOptions are the stack configuration options
-type ConfigurationOptions struct {
+// Configuration are the stack configuration options
+type Configuration struct {
 	// Name of the provider (external) network
 	ProviderNetwork string
 
-	// DNSList list of DNS
-	DNSList []string
+	// DNSServers list of DNS
+	DNSServers []string
 
 	// UseFloatingIP indicates if floating IP are used (optional)
 	UseFloatingIP bool
@@ -52,8 +52,8 @@ type ConfigurationOptions struct {
 	// DefaultImage names the image to use when not specified by the user
 	DefaultImage string
 
-	// MetadataBucket contains the name of the Object Storage bucket that will store metadata
-	MetadataBucket string
+	// MetadataBucketName contains the name of the Object Storage bucket that will store metadata
+	MetadataBucketName string
 
 	// OperatorUsername contain the name of the safescale created user
 	OperatorUsername string
@@ -76,6 +76,8 @@ type ConfigurationOptions struct {
 	BlacklistImageRegexp *regexp.Regexp
 
 	MaxLifeTime int
+
+	Safe bool
 
 	Timings *temporal.MutableTimings
 }

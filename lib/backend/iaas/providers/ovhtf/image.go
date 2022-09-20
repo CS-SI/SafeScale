@@ -19,7 +19,7 @@ package ovhtf
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -54,7 +54,7 @@ func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image,
 	}
 
 	return nil, fail.NotImplementedError()
-	// return p.Stack.(stacks.ReservedForProviderUse).ListImages(ctx, all)
+	// return p.Stack.(providers.StackReservedForProviderUse).ListImages(ctx, all)
 }
 
 func (p *provider) InspectImage(ctx context.Context, id string) (*abstract.Image, fail.Error) {

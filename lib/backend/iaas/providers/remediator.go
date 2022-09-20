@@ -27,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 // Remediator encapsulates Provider interface to catch panic, to prevent panic from halting the app
@@ -37,68 +36,25 @@ type Remediator struct {
 }
 
 // HasDefaultNetwork tells if the stack has a default network (defined in tenant settings)
-func (s Remediator) HasDefaultNetwork(ctx context.Context) (_ bool, ferr fail.Error) {
+func (s Remediator) HasDefaultNetwork() (_ bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	has, xerr := s.Provider.HasDefaultNetwork(ctx)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return has, xerr
-
+	return s.Provider.HasDefaultNetwork()
 }
 
-// GetDefaultNetwork returns the abstract.Network used as default Network
-func (s Remediator) GetDefaultNetwork(ctx context.Context) (_ *abstract.Network, ferr fail.Error) {
+// DefaultNetwork returns the abstract.Network used as default Network
+func (s Remediator) DefaultNetwork(ctx context.Context) (_ *abstract.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	network, xerr := s.Provider.GetDefaultNetwork(ctx)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return network, xerr
+	return s.Provider.DefaultNetwork(ctx)
 }
 
-func (s Remediator) GetAuthenticationOptions(ctx context.Context) (_ Config, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	config, xerr := s.Provider.GetAuthenticationOptions(ctx)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return config, xerr
+func (s Remediator) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
+	return s.Provider.AuthenticationOptions()
 }
 
-func (s Remediator) GetConfigurationOptions(ctx context.Context) (_ Config, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	config, xerr := s.Provider.GetConfigurationOptions(ctx)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return config, xerr
-}
-
-func (s Remediator) GetRawConfigurationOptions(ctx context.Context) (_ stackoptions.ConfigurationOptions, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	asta, xerr := s.Provider.GetStack()
-	if xerr != nil {
-		xerr.WithContext(ctx)
-		return stackoptions.ConfigurationOptions{}, xerr
-	}
-	return asta.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
-}
-
-func (s Remediator) GetRawAuthenticationOptions(ctx context.Context) (_ stackoptions.AuthenticationOptions, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	asta, xerr := s.Provider.GetStack()
-	if xerr != nil {
-		xerr.WithContext(ctx)
-		return stackoptions.AuthenticationOptions{}, xerr
-	}
-	return asta.(stacks.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
+func (s Remediator) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+	return s.Provider.ConfigurationOptions()
 }
 
 func (s Remediator) Build(m map[string]interface{}) (_ Provider, ferr fail.Error) {
@@ -132,20 +88,14 @@ func (s Remediator) GetRegexpsOfTemplatesWithGPU() (_ []*regexp.Regexp, ferr fai
 	return regexps, xerr
 }
 
-func (s Remediator) GetCapabilities(ctx context.Context) (_ Capabilities, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	capabilities, xerr := s.Provider.GetCapabilities(ctx)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return capabilities, xerr
+func (s Remediator) Capabilities() (_ Capabilities) {
+	return s.Provider.Capabilities()
 }
 
-func (s Remediator) GetTenantParameters() (_ map[string]interface{}, ferr fail.Error) {
+func (s Remediator) TenantParameters() (_ map[string]interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	tenantParameters, xerr := s.Provider.GetTenantParameters()
+	tenantParameters, xerr := s.Provider.TenantParameters()
 	return tenantParameters, xerr
 }
 
@@ -405,26 +355,6 @@ func (s Remediator) DeleteNetwork(ctx context.Context, id string) (ferr fail.Err
 	}
 	return xerr
 }
-
-// func (s Remediator) HasDefaultNetwork(ctx context.Context) (_ bool, ferr fail.Error) {
-// 	defer fail.OnPanic(&ferr)
-//
-// 	cfg, xerr := s.Provider.HasDefaultNetwork(ctx)
-// 	if xerr != nil {
-// 		xerr.WithContext(ctx)
-// 	}
-// 	return cfg, xerr
-// }
-
-// func (s Remediator) GetDefaultNetwork(ctx context.Context) (_ *abstract.Network, ferr fail.Error) {
-// 	defer fail.OnPanic(&ferr)
-//
-// 	network, xerr := s.Provider.GetDefaultNetwork(ctx)
-// 	if xerr != nil {
-// 		xerr.WithContext(ctx)
-// 	}
-// 	return network, xerr
-// }
 
 func (s Remediator) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (_ *abstract.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -742,20 +672,4 @@ func (s Remediator) DeleteVolumeAttachment(ctx context.Context, serverID, id str
 		xerr.WithContext(ctx)
 	}
 	return xerr
-}
-
-func (s Remediator) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.Provider.Migrate(ctx, operation, params)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}
-
-func (s Remediator) Timings() (_ temporal.Timings, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	return s.Provider.Timings()
 }

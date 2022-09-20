@@ -30,7 +30,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
@@ -52,6 +51,7 @@ import (
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/consts"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -323,7 +323,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 	instance.localCache.Lock()
 	defer instance.localCache.Unlock()
 
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -487,22 +487,15 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 }
 
 func getOperatorUsernameFromCfg(ctx context.Context, svc iaas.Service) (string, fail.Error) {
-	cfg, xerr := svc.GetConfigurationOptions(ctx)
+	cfg, xerr := svc.ConfigurationOptions()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
 
-	var userName string
-	if anon, ok := cfg.Get("OperatorUsername"); ok {
-		userName, ok = anon.(string)
-		if ok {
-			if userName == "" {
-				logrus.WithContext(ctx).Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
-			}
-		}
-	}
+	userName := cfg.OperatorUsername
 	if userName == "" {
+		logrus.WithContext(ctx).Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
 		userName = abstract.DefaultUser
 	}
 
@@ -511,7 +504,7 @@ func getOperatorUsernameFromCfg(ctx context.Context, svc iaas.Service) (string, 
 
 // IsNull ...
 func (instance *Host) IsNull() bool {
-	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
+	return instance == nil || valid.IsNil(instance.Core)
 }
 
 // carry ...
@@ -519,10 +512,8 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		if instance.Core.IsTaken() {
-			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
-		}
+	if !valid.IsNil(instance) && instance.Core.IsTaken() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -538,7 +529,7 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 	return nil
 }
 
-// Browse walks through Host folder and executes a callback for each entry
+// Browse walks through Host Metadata Folder and executes a callback for each entry
 func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -1025,16 +1016,14 @@ func (instance *Host) implCreate(
 					hostReq.SecurityGroupIDs[v.InternalSecurityGroupID] = struct{}{}
 				}
 
-				opts, xerr := svc.GetConfigurationOptions(ctx)
+				opts, xerr := svc.ConfigurationOptions()
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					chRes <- result{nil, xerr}
 					return xerr
 				}
 
-				anon, ok := opts.Get("UseNATService")
-				useNATService := ok && anon.(bool)
-				if hostReq.PublicIP || useNATService {
+				if hostReq.PublicIP || opts.UseNATService {
 					xerr = defaultSubnet.Review(ctx,
 						func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 							as, ok := clonable.(*abstract.Subnet)
@@ -1077,7 +1066,7 @@ func (instance *Host) implCreate(
 			}
 		}()
 
-		// instruct Cloud provider to create host
+		// instruct Cloud Provider to create host
 		defaultSubnetID, err := defaultSubnet.GetID()
 		if err != nil {
 			return fail.ConvertError(err)
@@ -1118,10 +1107,7 @@ func (instance *Host) implCreate(
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !hostReq.KeepOnFailure {
 				if derr := instance.Core.Delete(context.Background()); derr != nil {
-					logrus.WithContext(ctx).Errorf(
-						"cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name,
-						derr,
-					)
+					logrus.WithContext(ctx).Errorf("cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name, derr)
 					_ = ferr.AddConsequence(derr)
 				}
 			}
@@ -1136,9 +1122,7 @@ func (instance *Host) implCreate(
 						derr := instance.Alter(context.Background(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 							ahc, ok := clonable.(*abstract.HostCore)
 							if !ok {
-								return fail.InconsistentError(
-									"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
-								)
+								return fail.InconsistentError("'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String())
 							}
 
 							ahc.LastState = hoststate.Failed
@@ -1255,7 +1239,7 @@ func (instance *Host) implCreate(
 
 		safe := false
 
-		// FIXME: OPP After Stein, no failover
+		// Fix for Stein
 		{
 			st, xerr := svc.GetProviderName()
 			if xerr != nil {
@@ -1266,13 +1250,10 @@ func (instance *Host) implCreate(
 			}
 		}
 
-		if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
-			if val, ok := tpar["Safe"].(bool); ok {
-				safe = val
-			}
+		if cfg, xerr := svc.ConfigurationOptions(); xerr == nil {
+			safe = cfg.Safe
 		}
 
-		// FIXME: OPP Now trying to disable ports before it's too late
 		if !safe {
 			xerr = svc.ChangeSecurityGroupSecurity(ctx, true, false, hostReq.Subnets[0].Network, "")
 			if xerr != nil {
@@ -1377,9 +1358,7 @@ func (instance *Host) implCreate(
 				rerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 					ahc, ok := clonable.(*abstract.HostCore)
 					if !ok {
-						return fail.InconsistentError(
-							"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
-						)
+						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String())
 					}
 
 					ahc.LastState = hoststate.Started
@@ -1408,13 +1387,13 @@ func (instance *Host) implCreate(
 
 func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (string, string, fail.Error) {
 	if imageRef == "" {
-		cfg, xerr := svc.GetConfigurationOptions(ctx)
+		cfg, xerr := svc.ConfigurationOptions()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return "", "", xerr
 		}
 
-		imageRef = cfg.GetString("DefaultImage")
+		imageRef = cfg.DefaultImage
 		if imageRef == "" {
 			return "", "", fail.InconsistentError("DefaultImage cannot be empty")
 		}
@@ -1494,7 +1473,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 		}
 		for k := range req.SecurityGroupIDs {
 			if k != "" {
-				logrus.Warningf("Binding security group with id %s to host %s", k, hostID)
+				logrus.WithContext(ctx).Warningf("Binding security group with id %s to host %s", k, hostID)
 				xerr := svc.BindSecurityGroupToHost(ctx, k, hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -1544,7 +1523,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 				innerXErr = gwsg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental)
 				if innerXErr != nil {
-					return fail.Wrap(innerXErr, "failed to apply Subnet's Security Group for gateway '%s' on Host '%s'", gwsg.GetName(), req.ResourceName)
+					return fail.Wrap(innerXErr, "failed to apply Subnet's GW Security Group for gateway '%s' on Host '%s'", gwsg.GetName(), req.ResourceName)
 				}
 
 				defer func() {
@@ -1680,6 +1659,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					if !ok {
 						return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
+					_ = otherAbstractSubnet
 
 					return nil
 				})
@@ -1687,26 +1667,22 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					return innerXErr
 				}
 
-				_ = otherAbstractSubnet
-				// FIXME: OPP This is the last fragment that needs fixing
-
 				safe := false
 
-				// FIXME: OPP After Stein, no failover
+				// Fix for Stein
 				{
 					st, xerr := svc.GetProviderName()
 					if xerr != nil {
 						return xerr
 					}
+
 					if st != "ovh" {
 						safe = true
 					}
 				}
 
-				if tpar, xerr := svc.GetTenantParameters(); xerr == nil {
-					if val, ok := tpar["Safe"].(bool); ok {
-						safe = val
-					}
+				if cfg, xerr := svc.ConfigurationOptions(); xerr == nil {
+					safe = cfg.Safe
 				}
 
 				if otherAbstractSubnet.InternalSecurityGroupID != "" {
@@ -1808,11 +1784,7 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 			)
 		})
 		if derr != nil {
-			_ = (*errorPtr).AddConsequence(
-				fail.Wrap(
-					derr, "cleaning up on %s, failed to cleanup Security Groups", ActionFromError(*errorPtr),
-				),
-			)
+			_ = (*errorPtr).AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to cleanup Security Groups", ActionFromError(*errorPtr)))
 		}
 	}
 	return nil
@@ -2002,10 +1974,7 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 				}
 
 				if len(lastMsg) > 0 {
-					problem = fail.NewError(
-						"failed to execute install phase '%s' on Host '%s': %s", phase, instance.GetName(),
-						lastMsg[8:len(lastMsg)-1],
-					)
+					problem = fail.NewError("failed to execute install phase '%s' on Host '%s': %s", phase, instance.GetName(), lastMsg[8:len(lastMsg)-1])
 				}
 			}
 		}
@@ -2199,7 +2168,7 @@ func (instance *Host) updateSubnets(ctx context.Context, req abstract.HostReques
 func (instance *Host) undoUpdateSubnets(inctx context.Context, req abstract.HostRequest, errorPtr *fail.Error) {
 	ctx := inctx
 	if ctx != context.Background() {
-		logrus.Warningf("This should NOT happen")
+		logrus.WithContext(ctx).Warningf("This should NOT happen")
 	}
 
 	if errorPtr != nil && *errorPtr != nil && !req.IsGateway && !req.Single && !req.KeepOnFailure {
@@ -2276,7 +2245,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	}
 	incrementExpVar("host.cache.hit")
 
-	// Reset userdata script for Host from Cloud provider metadata service (if stack is able to do so)
+	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
 	svc := instance.Service()
 
 	hostID, err := instance.GetID()
@@ -2445,12 +2414,12 @@ func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 // createSingleHostNetwork creates Single-Host Network and Subnet
 func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHostRequest abstract.HostRequest) (_ resources.Subnet, _ func() fail.Error, ferr fail.Error) {
 	// Build network name
-	cfg, xerr := svc.GetConfigurationOptions(ctx)
+	cfg, xerr := svc.ConfigurationOptions()
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 
-	bucketName := cfg.GetString("MetadataBucketName")
+	bucketName := cfg.MetadataBucketName
 	if bucketName == "" {
 		return nil, nil, fail.InconsistentError("missing service configuration option 'MetadataBucketName'")
 	}
@@ -2534,7 +2503,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			}
 
 			var dnsServers []string
-			opts, xerr := svc.GetConfigurationOptions(ctx)
+			opts, xerr := svc.ConfigurationOptions()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -2542,8 +2511,8 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 				default:
 					return nil, nil, xerr
 				}
-			} else if servers := strings.TrimSpace(opts.GetString("DNSServers")); servers != "" {
-				dnsServers = strings.Split(servers, ",")
+			} else {
+				dnsServers = opts.DNSServers
 			}
 
 			subnetRequest.Name = singleHostRequest.ResourceName
@@ -2551,6 +2520,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			if err != nil {
 				return nil, nil, fail.ConvertError(err)
 			}
+
 			subnetRequest.IPVersion = ipversion.IPv4
 			subnetRequest.CIDR = subnetCIDR
 			subnetRequest.DNSServers = dnsServers
@@ -2567,12 +2537,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 				if ferr != nil && !singleHostRequest.KeepOnFailure {
 					derr := subnetInstance.Delete(context.Background())
 					if derr != nil {
-						_ = ferr.AddConsequence(
-							fail.Wrap(
-								derr, "cleaning up on failure, failed to delete Subnet '%s'",
-								singleHostRequest.ResourceName,
-							),
-						)
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", singleHostRequest.ResourceName))
 					}
 				}
 			}()
@@ -2581,9 +2546,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			xerr = subnetInstance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				as, ok := clonable.(*abstract.Subnet)
 				if !ok {
-					return fail.InconsistentError(
-						"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-					)
+					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
 				as.SingleHostCIDRIndex = cidrIndex
@@ -4318,10 +4281,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, hid)
 			}
 
-			caps, xerr := svc.GetCapabilities(ctx)
-			if xerr != nil {
-				return xerr
-			}
+			caps := svc.Capabilities()
 			if caps.CanDisableSecurityGroup {
 				xerr = svc.EnableSecurityGroup(ctx, asg)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -4416,10 +4376,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgID)
 			}
 
-			caps, xerr := svc.GetCapabilities(ctx)
-			if xerr != nil {
-				return xerr
-			}
+			caps := svc.Capabilities()
 			if caps.CanDisableSecurityGroup {
 				xerr = svc.DisableSecurityGroup(ctx, asg)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -4592,13 +4549,19 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 	}
 
 	labelName := labelInstance.GetName()
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	labelID, err := labelInstance.GetID()
 	if err != nil {
 		return fail.ConvertError(err)
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
-	defer tracer.Exiting()
+	instanceID, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
 
 	// Inform Label we want it bound to Host (updates its metadata)
 	xerr := labelInstance.BindToHost(ctx, instance, value)
@@ -4644,7 +4607,30 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 		return xerr
 	}
 
+	lmap, err := labelToMap(labelInstance)
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	svc := instance.Service()
+	xerr = svc.UpdateTags(ctx, abstract.HostResource, instanceID, lmap)
+	if xerr != nil {
+		return xerr
+	}
+
 	return nil
+}
+
+func labelToMap(labelInstance resources.Label) (map[string]string, error) {
+	sad := make(map[string]string)
+	k := labelInstance.GetName()
+	v, err := labelInstance.DefaultValue(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	sad[k] = v
+
+	return sad, nil
 }
 
 // UnbindLabel removes a Label from Host
@@ -4665,6 +4651,11 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance resources.L
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
 	defer tracer.Exiting()
+
+	instanceID, err := instance.GetID()
+	if err != nil {
+		return fail.ConvertError(err)
+	}
 
 	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
@@ -4693,6 +4684,12 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance resources.L
 
 	xerr = labelInstance.UnbindFromHost(ctx, instance)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	svc := instance.Service()
+	xerr = svc.DeleteTags(ctx, abstract.HostResource, instanceID, []string{labelInstance.GetName()})
 	if xerr != nil {
 		return xerr
 	}

@@ -201,7 +201,7 @@ func onLabelCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.I
 
 // IsNull tells if the instance is a null value
 func (instance *label) IsNull() bool {
-	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
+	return instance == nil || valid.IsNil(instance.Core)
 }
 
 // carry overloads rv.core.Carry() to add Label to service cache

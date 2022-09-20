@@ -62,7 +62,7 @@ func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCrea
 		return nil, fail.InvalidRequestError("network name cannot be empty string")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/network/%s/create", networkName))
+	job, xerr := PrepareJob(inctx, "default", "default", in.GetTenantId(), fmt.Sprintf("/network/%s/create", networkName))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -143,7 +143,7 @@ func (s *NetworkListener) List(inctx context.Context, in *protocol.NetworkListRe
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), "/networks/list")
+	job, xerr := PrepareJob(inctx, "default", "default", in.GetTenantId(), "/networks/list")
 	if xerr != nil {
 		return nil, xerr
 	}

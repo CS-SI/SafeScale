@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/terraformer"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
@@ -33,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -41,8 +41,9 @@ import (
 )
 
 const (
-	providerName    = "ovhtf"
-	ovhDefaultImage = "Ubuntu 20.04"
+	providerName      = "ovhtf"
+	ovhDefaultImage   = "Ubuntu 20.04"
+	configSnippetPath = "snippets/provider_ovh.tf.template"
 )
 
 type gpuCfg struct {
@@ -70,39 +71,46 @@ var gpuMap = map[string]gpuCfg{
 }
 
 var (
+	capabilities = providers.Capabilities{
+		UseTerraformer:   true,
+		PrivateVirtualIP: true,
+	}
+
+	terraformProviders = []terraformer.RequiredProvider{
+		{
+			Source:  "",
+			Version: "",
+		},
+		{
+			Source:  "",
+			Version: "",
+		},
+	}
+
 	identityEndpoint = "https://auth.cloud.ovh.net/v3"
 	externalNetwork  = "Ext-Net"
 	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
+
+	//go:embed snippets
+	snippets embed.FS // contains embedded files used by the provider for any purpose
 )
 
 // provider is the provider implementation of the OVH provider
 type provider struct {
 	// stacks.Stack
+	summoner          terraformer.Summoner
 	ExternalNetworkID string
 
-	// FIXME: move these fields in a provider Core (TBD)
-	// go:embed snippets
-	efs               embed.FS // contains embedded files used by the provider for any purpose
-	authOptions       stackoptions.AuthenticationOptions
-	configOptions     stackoptions.ConfigurationOptions
-	configSnippetPath string // contains the path of the provider configuration configSnippetPath in efs
-	terraformerConfig terraformer.Configuration
+	// FIXME: move these fields in a provider Core?
+	authOptions   stackoptions.Authentication
+	configOptions stackoptions.Configuration
 
 	tenantParameters map[string]interface{}
+	*temporal.MutableTimings
 }
 
 func (p provider) GetStackName() (string, fail.Error) {
-	return "terraform", nil
-}
-
-func (p *provider) Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error {
-	// TODO implement me
-	panic("implement me")
-}
-
-func (p *provider) Timings() (temporal.Timings, fail.Error) {
-	// TODO implement me
-	panic("implement me")
+	return "terraformer", nil
 }
 
 // IsNull returns true if the instance is considered as a null value
@@ -110,15 +118,50 @@ func (p *provider) IsNull() bool {
 	return p == nil // || p.Stack == nil
 }
 
+// BuildWithTerraformer needs to be called when terraformer is used
+func (p *provider) BuildWithTerraformer(params map[string]any, config terraformer.Configuration) (providers.Provider, fail.Error) {
+	out, xerr := (&provider{}).build(params)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// Initialize a terraformer Summoner to handle resources
+	out.summoner, xerr = terraformer.NewSummoner(out, config)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return remediatize(out), nil
+}
+
 // Build builds a new instance of Ovh using configuration parameters
 // Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
+	root, xerr := p.build(params)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return remediatize(root), nil
+}
+
+// remediatize wraps a provider inside a providers.Remediator to filter potential panics
+func remediatize(provider *provider) providers.Provider {
+	out := providers.Remediator{
+		Provider: provider,
+		Name:     provider.Name(),
+	}
+	return out
+}
+
+// build constructs a new instance of provider accordingly parameterized
+func (p *provider) build(params map[string]any) (*provider, fail.Error) {
 	var validInput bool
 
-	identityParams, _ := params["identity"].(map[string]interface{}) // nolint
-	compute, _ := params["compute"].(map[string]interface{})         // nolint
-	// networkParams, _ := params["network"].(map[string]interface{}) // nolint
-
+	identityParams, _ := params["identity"].(map[string]any) // nolint
+	compute, _ := params["compute"].(map[string]any)         // nolint
+	// networkParams, _ := params["network"].(map[string]any) // nolint
+	specificParams, _ := params["specific"].(map[string]any)
 	applicationKey, _ := identityParams["ApplicationKey"].(string)       // nolint
 	openstackID, _ := identityParams["OpenstackID"].(string)             // nolint
 	openstackPassword, _ := identityParams["OpenstackPassword"].(string) // nolint
@@ -151,12 +194,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, fail.NewError("Invalid input for 'ProjectName'")
 	}
 
-	var alternateAPIApplicationKey string
-	var alternateAPIApplicationSecret string
-	var alternateAPIConsumerKey string
-	val1, ok1 := identityParams["AlternateApiApplicationKey"]
-	val2, ok2 := identityParams["AlternateApiApplicationSecret"]
-	val3, ok3 := identityParams["AlternateApiConsumerKey"]
+	var (
+		alternateAPIApplicationKey    string
+		alternateAPIApplicationSecret string
+		alternateAPIConsumerKey       string
+	)
+	val1, ok1 := specificParams["AlternateApiApplicationKey"]
+	val2, ok2 := specificParams["AlternateApiApplicationSecret"]
+	val3, ok3 := specificParams["AlternateApiConsumerKey"]
 	if ok1 && ok2 && ok3 {
 		alternateAPIApplicationKey, validInput = val1.(string)
 		if !validInput {
@@ -194,7 +239,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 
-	authOptions := stackoptions.AuthenticationOptions{
+	authOptions := stackoptions.Authentication{
 		IdentityEndpoint: identityEndpoint,
 		Username:         openstackID,
 		Password:         openstackPassword,
@@ -203,9 +248,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:           region,
 		AvailabilityZone: zone,
 		AllowReauth:      true,
-		AK:               alternateAPIApplicationKey,
-		AS:               alternateAPIApplicationSecret,
-		CK:               alternateAPIConsumerKey,
+		// AK:               alternateAPIApplicationKey,
+		// AS:               alternateAPIApplicationSecret,
+		// CK:               alternateAPIConsumerKey,
+		Specific: OVHAPI{
+			ApplicationKey:    alternateAPIApplicationKey,
+			ApplicationSecret: alternateAPIApplicationSecret,
+			ConsumerKey:       alternateAPIConsumerKey,
+		},
 	}
 
 	err := validation.ValidateStruct(&authOptions,
@@ -232,19 +282,19 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			timings = s
 		}
 	}
-next:
 
-	cfgOptions := stackoptions.ConfigurationOptions{
+next:
+	cfgOptions := stackoptions.Configuration{
 		ProviderNetwork:           externalNetwork,
 		UseFloatingIP:             false,
 		UseLayer3Networking:       false,
 		AutoHostNetworkInterfaces: false,
-		DNSList:                   dnsServers,
+		DNSServers:                dnsServers,
 		VolumeSpeeds: map[string]volumespeed.Enum{
 			"classic":    volumespeed.Cold,
 			"high-speed": volumespeed.Hdd,
 		},
-		MetadataBucket:           metadataBucketName,
+		MetadataBucketName:       metadataBucketName,
 		OperatorUsername:         operatorUsername,
 		ProviderName:             providerName,
 		DefaultSecurityGroupName: "default",
@@ -263,73 +313,17 @@ next:
 	// Note: if timings have to be tuned, update stack.MutableTimings
 	//
 	// wrapped := stacks.Remediator{
-	// 	FullStack: stack,
+	// 	Stack: stack,
 	// 	Name:      providerName,
 	// }
 
-	newP := &provider{
+	out := &provider{
 		// Stack:            wrapped,
 		tenantParameters: params,
 		authOptions:      authOptions,
 		configOptions:    cfgOptions,
 	}
-
-	wp := providers.Remediator{
-		Provider: newP,
-		Name:     providerName,
-	}
-
-	return wp, nil
-}
-
-// GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions(ctx context.Context) (providers.Config, fail.Error) {
-	cfg := providers.ConfigMap{}
-	if valid.IsNull(p) {
-		return cfg, fail.InvalidInstanceError()
-	}
-
-	// opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	opts := p.authOptions
-	cfg.Set("TenantName", opts.TenantName)
-	cfg.Set("TenantID", opts.TenantID)
-	cfg.Set("DomainName", "Default")
-	cfg.Set("Login", opts.Username)
-	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthURL", opts.IdentityEndpoint)
-	cfg.Set("Region", opts.Region)
-	cfg.Set("AlternateApiApplicationKey", opts.AK)
-	cfg.Set("AlternateApiApplicationSecret", opts.AS)
-	cfg.Set("AlternateApiConsumerKey", opts.CK)
-	return cfg, nil
-}
-
-// GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions(ctx context.Context) (providers.Config, fail.Error) {
-	cfg := providers.ConfigMap{}
-	if valid.IsNull(p) {
-		return cfg, fail.InvalidInstanceError()
-	}
-
-	// opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	opts := p.configOptions
-	cfg.Set("DNSList", opts.DNSList)
-	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
-	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
-	cfg.Set("DefaultImage", opts.DefaultImage)
-	cfg.Set("MetadataBucketName", opts.MetadataBucket)
-	cfg.Set("OperatorUsername", opts.OperatorUsername)
-	cfg.Set("ProviderName", providerName)
-	cfg.Set("UseNATService", opts.UseNATService)
-	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
-
-	return cfg, nil
+	return out, nil
 }
 
 // Name returns the name of the driver
@@ -348,45 +342,80 @@ func (p provider) GetStack() (stacks.Stack, fail.Error) {
 	return nil, nil //p.Stack, nil
 }
 
-func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
+func (p provider) TenantParameters() (map[string]interface{}, fail.Error) {
 	if valid.IsNil(p) {
 		return map[string]interface{}{}, fail.InvalidInstanceError()
 	}
 	return p.tenantParameters, nil
 }
 
-// GetCapabilities returns the capabilities of the provider
-func (p provider) GetCapabilities(context.Context) (providers.Capabilities, fail.Error) {
-	return providers.Capabilities{
-		PrivateVirtualIP: true,
-	}, nil
+// Capabilities returns the capabilities of the provider
+func (p provider) Capabilities() providers.Capabilities {
+	return capabilities
 }
 
 func (p provider) EmbeddedFS() embed.FS {
-	return p.efs
+	return snippets
 }
 
 func (p provider) Snippet() string {
-	return p.configSnippetPath
+	return configSnippetPath
 }
 
-func (p provider) Terraformer() (terraformer.Summoner, fail.Error) {
-	out, xerr := terraformer.NewSummoner(p, p.terraformerConfig)
-	if xerr != nil {
-		return nil, xerr
+func (p provider) Terraformer() terraformer.Summoner {
+	return p.summoner
+}
+
+func (p *provider) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
+	if valid.IsNull(p) {
+		return stackoptions.Authentication{}, fail.InvalidInstanceError()
 	}
 
-	return out, nil
+	return p.authOptions, nil
 }
 
-func (p provider) AuthenticationOptions() stackoptions.AuthenticationOptions {
-	return p.authOptions
+func (p *provider) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+	if valid.IsNull(p) {
+		return stackoptions.Configuration{}, fail.InvalidInstanceError()
+	}
+
+	p.configOptions.ProviderName = providerName
+	return p.configOptions, nil
 }
 
-func (p provider) ConfigurationOptions() stackoptions.ConfigurationOptions {
-	return p.configOptions
+// Timings returns the instance containing current timeout settings
+func (p *provider) Timings() (temporal.Timings, fail.Error) {
+	if valid.IsNull(p) {
+		return temporal.NewTimings(), fail.InvalidInstanceError()
+	}
+
+	if p.MutableTimings == nil {
+		p.MutableTimings = temporal.NewTimings()
+	}
+	return p.MutableTimings, nil
+}
+
+func (p *provider) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	return fail.NotImplementedError()
+}
+
+func (p *provider) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	return fail.NotImplementedError()
 }
 
 func init() {
-	iaas.Register(providerName, &provider{})
+	profile := providers.NewProfile(
+		capabilities,
+		func() providers.Provider { return &provider{} },
+		terraformProviders,
+	)
+	iaas.Register(providerName, profile)
 }

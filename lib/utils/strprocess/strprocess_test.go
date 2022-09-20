@@ -38,16 +38,43 @@ func Test_Plural(t *testing.T) {
 }
 
 func Test_Capitalize(t *testing.T) {
-	val := "a small story"
-	res := Capitalize(val)
-	require.EqualValues(t, res, "A small story")
 
-	val = "A small Story"
-	res = Capitalize(val)
-	require.EqualValues(t, res, "A small Story")
+	tests := []struct {
+		input  string
+		output string
+	}{
+		{input: "a small story", output: "A small story"},
+		{input: "A small Story", output: "A small Story"},
+		{input: "it can't be", output: "It can't be"},
+		{input: "We\nare numerous,      somewhere\t\na Legion                            .", output: "We are numerous, somewhere a Legion ."},
+		{input: "'strings' could be quoted", output: "'strings' could be quoted"},
+	}
+
+	for i := range tests {
+		require.EqualValues(t, Capitalize(tests[i].input), tests[i].output)
+	}
+
 }
 
 func Test_FormatString(t *testing.T) {
-	res := FormatStrings("%s %s %s", "toto", "tata", "titi")
-	require.EqualValues(t, res, "toto tata titi")
+
+	tests := []struct {
+		input  []interface{}
+		output string
+	}{
+		{input: []interface{}{}, output: ""},
+		{input: []interface{}{nil, "oh", "my"}, output: ""},
+		{input: []interface{}{""}, output: ""},
+		{input: []interface{}{42}, output: ""},
+		{input: []interface{}{"some"}, output: "some"},
+		{input: []interface{}{false}, output: ""},
+		{input: []interface{}{nil}, output: ""},
+		{input: []interface{}{[]string{}}, output: ""},
+		{input: []interface{}{"%s %s %s", "toto", "tata", "titi"}, output: "toto tata titi"},
+	}
+	for i := range tests {
+		require.EqualValues(t, FormatStrings(tests[i].input...), tests[i].output)
+	}
+	require.EqualValues(t, FormatStrings(nil), "")
+
 }

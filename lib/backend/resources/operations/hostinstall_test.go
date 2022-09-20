@@ -83,7 +83,7 @@ func TestHost_AddFeature(t *testing.T) {
 		xerr = host.Start(ctx)
 		require.Nil(t, xerr)
 
-		svc._setLogLevel(2)
+		svc._setLogLevel(1)
 		_, xerr = ohost.AddFeature(ctx, "ansible", data.Map{}, resources.FeatureSettings{})
 		require.Nil(t, xerr)
 
@@ -141,7 +141,7 @@ func TestHost_CheckFeature(t *testing.T) {
 		xerr = host.Start(ctx)
 		require.Nil(t, xerr)
 
-		svc._setLogLevel(2)
+		svc._setLogLevel(1)
 		_, xerr = ohost.CheckFeature(ctx, "ansible", data.Map{}, resources.FeatureSettings{})
 		require.Nil(t, xerr)
 
@@ -199,7 +199,7 @@ func TestHost_DeleteFeature(t *testing.T) {
 		xerr = host.Start(ctx)
 		require.Nil(t, xerr)
 
-		svc._setLogLevel(2)
+		svc._setLogLevel(1)
 
 		_, xerr = ohost.DeleteFeature(ctx, "ansible", data.Map{}, resources.FeatureSettings{})
 		require.Nil(t, xerr)
@@ -402,9 +402,7 @@ func TestHost_ListEligibleFeatures(t *testing.T) {
 }
 
 func TestHost_ListInstalledFeatures(t *testing.T) {
-	if true {
-		t.Skip("BROKEN TEST") // publicIP breaks the tests
-	}
+
 	var ohost *Host = nil
 
 	ctx := context.Background()

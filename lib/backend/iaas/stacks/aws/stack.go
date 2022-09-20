@@ -21,8 +21,6 @@ import (
 	"context"
 	"fmt"
 
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
@@ -33,13 +31,16 @@ import (
 	"github.com/aws/aws-sdk-go/service/ssm"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 type stack struct {
-	Config      *stackoptions.ConfigurationOptions
-	AuthOptions *stackoptions.AuthenticationOptions
+	Config      *stackoptions.Configuration
+	AuthOptions *stackoptions.Authentication
 	AwsConfig   *stacks.AWSConfiguration
 
 	S3Service      *s3.S3
@@ -65,24 +66,26 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "aws", nil
 }
 
-// GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.ConfigurationOptions, fail.Error) {
+// ConfigurationOptions ...
+func (s *stack) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
 	if valid.IsNil(s) {
-		return stackoptions.ConfigurationOptions{}, fail.InvalidInstanceError()
+		return stackoptions.Configuration{}, fail.InvalidInstanceError()
 	}
+
 	return *s.Config, nil
 }
 
-// GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions(context.Context) (stackoptions.AuthenticationOptions, fail.Error) {
+// AuthenticationOptions ...
+func (s *stack) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
 	if valid.IsNil(s) {
-		return stackoptions.AuthenticationOptions{}, fail.InvalidInstanceError()
+		return stackoptions.Authentication{}, fail.InvalidInstanceError()
 	}
+
 	return *s.AuthOptions, nil
 }
 
 // New creates and initializes an AWS stack
-func New(auth stackoptions.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stackoptions.ConfigurationOptions) (*stack, error) { // nolint
+func New(auth stackoptions.Authentication, localCfg stacks.AWSConfiguration, cfg stackoptions.Configuration) (*stack, error) { // nolint
 	if localCfg.Ec2Endpoint == "" {
 		localCfg.Ec2Endpoint = fmt.Sprintf("https://ec2.%s.amazonaws.com", localCfg.Region)
 	}
@@ -150,4 +153,38 @@ func (s *stack) Timings() (temporal.Timings, fail.Error) {
 		s.MutableTimings = temporal.NewTimings()
 	}
 	return s.MutableTimings, nil
+}
+
+func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	tags := []*ec2.Tag{}
+	for k, v := range lmap {
+		tags = append(tags, &ec2.Tag{
+			Key:   aws.String(k),
+			Value: aws.String(v),
+		})
+	}
+
+	xerr := s.rpcCreateTags(ctx, []*string{&id}, tags)
+	return xerr
+}
+
+func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	tags := []*ec2.Tag{}
+	for _, k := range keys {
+		tags = append(tags, &ec2.Tag{
+			Key:   aws.String(k),
+			Value: nil,
+		})
+	}
+
+	xerr := s.rpcDeleteTags(ctx, []*string{&id}, tags)
+	return xerr
 }

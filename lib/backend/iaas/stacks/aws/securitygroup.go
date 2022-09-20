@@ -483,12 +483,16 @@ func (s stack) deleteRules(ctx context.Context, asg *abstract.SecurityGroup, ing
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to Hosts by provider
 func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
-	cfg, err := s.GetRawConfigurationOptions(ctx)
+	if valid.IsNull(s) {
+		return "", fail.InvalidInstanceError()
+	}
+
+	opts, err := s.ConfigurationOptions()
 	if err != nil {
 		return "", err
 	}
 
-	return cfg.DefaultSecurityGroupName, nil
+	return opts.DefaultSecurityGroupName, nil
 }
 
 // EnableSecurityGroup enables a Security Group

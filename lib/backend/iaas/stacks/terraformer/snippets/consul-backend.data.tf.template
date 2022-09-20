@@ -1,6 +1,6 @@
 data "terraform_remote_state" "consul-state" {
 	backend = "consul"
 	config = {
-		path = "{{ .Consul.Path }}"
+		path = "{{ .ConsulBackend.Path }}"
 	}
 }

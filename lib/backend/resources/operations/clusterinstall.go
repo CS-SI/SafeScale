@@ -133,11 +133,12 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	v["ClusterAdminUsername"] = "cladm"
 	v["ClusterAdminPassword"] = identity.AdminPassword
 	if _, ok := v["Username"]; !ok {
-		config, xerr := instance.Service().GetConfigurationOptions(ctx)
+		config, xerr := instance.Service().ConfigurationOptions()
 		if xerr != nil {
 			return xerr
 		}
-		if v["Username"], ok = config.Get("OperatorUsername"); !ok {
+		v["Username"] = config.OperatorUsername
+		if v["username"] == "" {
 			v["Username"] = abstract.DefaultUser
 		}
 	}
@@ -169,6 +170,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterControlplane' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			return nil
 		})
 	})
@@ -625,9 +627,7 @@ func (instance *Cluster) ExecuteScript(
 }
 
 // installNodeRequirements ...
-func (instance *Cluster) installNodeRequirements(
-	inctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string,
-) (ferr fail.Error) {
+func (instance *Cluster) installNodeRequirements(inctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -660,7 +660,7 @@ func (instance *Cluster) installNodeRequirements(
 
 		params := data.NewMap()
 		if nodeType == clusternodetype.Master {
-			tp, xerr := instance.Service().GetTenantParameters()
+			tp, xerr := instance.Service().TenantParameters()
 			if xerr != nil {
 				chRes <- result{xerr}
 				return
@@ -766,14 +766,14 @@ func (instance *Cluster) installNodeRequirements(
 
 		// FIXME: reuse ComplementFeatureParameters?
 		var dnsServers []string
-		cfg, xerr := instance.Service().GetConfigurationOptions(ctx)
+		cfg, xerr := instance.Service().ConfigurationOptions()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
 		}
 
-		dnsServers = cfg.GetSliceOfStrings("DNSList")
+		dnsServers = cfg.DNSServers
 		identity, xerr := instance.unsafeGetIdentity(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -813,7 +813,6 @@ func (instance *Cluster) installNodeRequirements(
 
 		logrus.WithContext(ctx).Debugf("[%s] system dependencies installation successful.", hostLabel)
 		chRes <- result{nil}
-
 	}()
 	select {
 	case res := <-chRes:

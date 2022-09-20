@@ -20,6 +20,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 )
 
+const defaultOrganization = "default"
+
 // OrganizationListener server is used to implement SafeScale.safescale.
 type OrganizationListener struct {
 	protocol.UnimplementedTenantServiceServer

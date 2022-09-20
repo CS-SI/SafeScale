@@ -25,12 +25,12 @@ import (
 )
 
 type (
-	ProviderInternals interface {
+	ProviderUseTerraformer interface {
 		Name() string
 		EmbeddedFS() embed.FS
 		Snippet() string
-		AuthenticationOptions() stackoptions.AuthenticationOptions
-		ConfigurationOptions() stackoptions.ConfigurationOptions
+		AuthenticationOptions() (stackoptions.Authentication, fail.Error)
+		ConfigurationOptions() (stackoptions.Configuration, fail.Error)
 	}
 
 	Resource interface {

@@ -157,7 +157,7 @@ func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // n
 			}
 			return retry.StopRetryError(realErr)
 		case net.Error:
-			if realErr.Temporary() {
+			if realErr.Temporary() || realErr.Timeout() { // nolint
 				return realErr
 			}
 			return retry.StopRetryError(realErr)
@@ -178,7 +178,7 @@ func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // n
 				}
 				return realErr
 			case net.Error:
-				if thecause.Temporary() {
+				if thecause.Temporary() || thecause.Timeout() { // nolint
 					return realErr
 				}
 				if strict {

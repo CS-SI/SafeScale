@@ -17,18 +17,16 @@
 package openstack
 
 import (
-	"context"
-
 	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.ConfigurationOptions, fail.Error) {
+// ConfigurationOptions ...
+func (s stack) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
 	return s.cfgOpts, nil
 }
 
-// GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions(context.Context) (stackoptions.AuthenticationOptions, fail.Error) {
+// AuthenticationOptions ...
+func (s stack) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
 	return s.authOpts, nil
 }

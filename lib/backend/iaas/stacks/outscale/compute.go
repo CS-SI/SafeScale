@@ -634,50 +634,6 @@ func (s stack) addGPUs(ctx context.Context, request *abstract.HostRequest, tpl a
 	return createErr
 }
 
-// FIMXE Unused
-func (s stack) addVolume(ctx context.Context, request *abstract.HostRequest, vmID string) (ferr fail.Error) {
-	if request.DiskSize == 0 {
-		return nil
-	}
-
-	v, xerr := s.CreateVolume(ctx, abstract.VolumeRequest{
-		Name:  fmt.Sprintf("vol-%s", request.HostName),
-		Size:  request.DiskSize,
-		Speed: s.Options.Compute.DefaultVolumeSpeed,
-	})
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			derr := s.DeleteVolume(context.Background(), v.ID)
-			if derr != nil {
-				_ = ferr.AddConsequence(derr)
-			}
-		}
-	}()
-
-	_, xerr = s.rpcCreateTags(ctx,
-		v.ID, map[string]string{
-			"DeleteWithVM":     "true",
-			"name":             fmt.Sprintf("vol-%s", request.HostName),
-			"ManagedBy":        "safescale",
-			"DeclaredInBucket": s.configurationOptions.MetadataBucket,
-			"CreationDate":     time.Now().Format(time.RFC3339),
-		},
-	)
-	if xerr != nil {
-		return xerr
-	}
-
-	_, xerr = s.CreateVolumeAttachment(ctx, abstract.VolumeAttachmentRequest{
-		HostID:   vmID,
-		VolumeID: v.ID,
-	})
-	return xerr
-}
-
 func (s stack) addPublicIP(ctx context.Context, nic osc.Nic) (_ osc.PublicIp, ferr fail.Error) {
 	// Allocate public IP
 	resp, xerr := s.rpcCreatePublicIP(ctx)
@@ -1042,7 +998,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 		vm.VmId, map[string]string{
 			"name":             request.ResourceName,
 			"ManagedBy":        "safescale",
-			"DeclaredInBucket": s.configurationOptions.MetadataBucket,
+			"DeclaredInBucket": s.configurationOptions.MetadataBucketName,
 			"CreationDate":     time.Now().Format(time.RFC3339),
 			"Template":         vm.VmType,
 			"Image":            vm.ImageId,

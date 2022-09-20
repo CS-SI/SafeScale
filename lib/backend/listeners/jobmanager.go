@@ -22,43 +22,23 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// PrepareJob creates a new job
-func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ backend.Job, ferr fail.Error) {
+// PrepareJob creates a new job and associated service
+// FIXME: include job and svc in context?
+func PrepareJob(ctx context.Context, organization, project, tenantID string, jobDescription string) (_ backend.Job, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	var tenant *operations.Tenant
-	if tenantID != "" {
-		service, xerr := iaas.UseService(tenantID /*, ""*/)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		bucket, ierr := service.GetMetadataBucket(ctx)
-		if ierr != nil {
-			return nil, ierr
-		}
-
-		tenant = &operations.Tenant{Name: tenantID, BucketName: bucket.GetName(), Service: service}
-	} else {
-		tenant = operations.CurrentTenant(ctx)
-		if tenant == nil {
-			return nil, fail.NotFoundError("no tenant set")
-		}
-	}
 	newctx, cancel := context.WithCancel(ctx)
-	job, xerr := backend.NewJob(newctx, cancel, tenant.Service, jobDescription)
+	job, xerr := backend.NewJob(newctx, cancel, organization, project, tenantID, jobDescription)
 	if xerr != nil {
 		return nil, xerr
 	}

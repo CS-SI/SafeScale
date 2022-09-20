@@ -30,19 +30,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/stretchr/testify/require"
 )
 
 func createClusterRequest() abstract.ClusterRequest {
@@ -122,10 +126,42 @@ func Test_NewCluster(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestCluster_Exists(t *testing.T) {
+
+	ctx := context.Background()
+	task, xerr := concurrency.NewTaskWithContext(ctx)
+	ctx = context.WithValue(ctx, "task", task)
+	require.Nil(t, xerr)
+
+	var ocluster *Cluster = nil
+	exists, xerr := ocluster.Exists(ctx)
+	require.False(t, exists)
+	require.Contains(t, xerr.Error(), "invalid instance: in")
+
+	err := NewServiceTest(t, func(svc *ServiceTest) {
+
+		svc._setLogLevel(0)
+
+		_, xerr := svc._CreateCluster(ctx, createClusterRequest(), true)
+		require.Nil(t, xerr)
+
+		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
+		require.Nil(t, xerr)
+
+		svc._setLogLevel(0)
+		// FIXME: can't work without cache
+		svc._updateOption("enablecache", true)
+
+		exists, xerr := cluster.Exists(ctx)
+		require.True(t, exists)
+		require.Nil(t, xerr)
+
+	})
+	require.Nil(t, err)
+
+}
+
 func Test_LoadCluster(t *testing.T) {
-	if true {
-		t.Skip("BROKEN TEST") // publicIP breaks the tests
-	}
 
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
@@ -135,10 +171,12 @@ func Test_LoadCluster(t *testing.T) {
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
 		svc._setLogLevel(0)
+		svc._updateOption("enablecache", true)
 
 		_, xerr := svc._CreateCluster(ctx, createClusterRequest(), false)
 		require.Nil(t, xerr)
 
+		svc._setLogLevel(2)
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(cluster).String(), "*operations.Cluster")
@@ -180,9 +218,13 @@ func TestCluster_IsNull(t *testing.T) {
 }
 
 func TestCluster_Create(t *testing.T) {
-	if true {
-		t.Skip("BROKEN TEST") // publicIP breaks the tests
-	}
+
+	//if true {
+	//t.Skip("BROKEN TEST")
+	// Race detected
+	//- (fixed) service_test.go
+	//- (partial fixed) installworker.go
+	//}
 
 	if runtime.GOOS == "windows" {
 		t.Skip()
@@ -199,13 +241,15 @@ func TestCluster_Create(t *testing.T) {
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
-		// svc._setLogLevel(0)
+		svc._setLogLevel(0)
+		// FIXME: Make it works with disables cache (failed to find Public IP of Host 'gw-clustername')
+		svc._updateOption("enablecache", true)
 
 		ocluster, xerr = NewCluster(ctx, svc)
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(ocluster).String(), "*operations.Cluster")
 
-		// svc._setLogLevel(2)
+		svc._setLogLevel(0)
 
 		request := createClusterRequest()
 
@@ -335,12 +379,13 @@ func TestCluster_Create(t *testing.T) {
 		})
 		require.Nil(t, xerr)
 
+		svc._setLogLevel(2)
+
 		xerr = ocluster.Create(ctx, request)
 		require.Nil(t, xerr)
 
 	})
 	require.Nil(t, err)
-
 }
 
 func TestCluster_Sdump(t *testing.T) {
@@ -498,6 +543,8 @@ func TestCluster_GetIdentity(t *testing.T) {
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, xerr := svc._CreateCluster(ctx, createClusterRequest(), true)
 		require.Nil(t, xerr)
 
@@ -509,6 +556,8 @@ func TestCluster_GetIdentity(t *testing.T) {
 			t.Error("ressources.Cluster not castable to operation.Cluster")
 			t.FailNow()
 		}
+
+		svc._setLogLevel(2)
 
 		aci, err := ocluster.GetIdentity(ctx)
 		require.Nil(t, err)
@@ -534,6 +583,8 @@ func TestCluster_GetFlavor(t *testing.T) {
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, xerr := svc._CreateCluster(ctx, createClusterRequest(), true)
 		require.Nil(t, xerr)
 
@@ -545,6 +596,8 @@ func TestCluster_GetFlavor(t *testing.T) {
 			t.Error("ressources.Cluster not castable to operation.Cluster")
 			t.FailNow()
 		}
+
+		svc._setLogLevel(2)
 
 		flavor, err := ocluster.GetFlavor(ctx)
 		require.Nil(t, err)
@@ -708,7 +761,7 @@ func TestCluster_GetNetworkConfig(t *testing.T) {
 
 }
 
-func TestCluster_Start(t *testing.T) {
+func TestCluster_StartStop(t *testing.T) {
 
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
@@ -742,6 +795,58 @@ func TestCluster_Start(t *testing.T) {
 
 		err = ocluster.Stop(ctx)
 		require.Nil(t, xerr)
+
+		tests := []struct {
+			state   clusterstate.Enum
+			xerrMsg string
+		}{
+			{
+				state:   clusterstate.Removed,
+				xerrMsg: "Cluster is being removed",
+			},
+			{
+				state:   clusterstate.Stopping,
+				xerrMsg: "",
+			},
+			{
+				state:   clusterstate.Starting,
+				xerrMsg: "",
+			},
+			{
+				state:   clusterstate.Stopped,
+				xerrMsg: "",
+			},
+			{
+				state:   clusterstate.Degraded,
+				xerrMsg: "",
+			},
+			{
+				state:   88,
+				xerrMsg: "failed to start Cluster because of it's current state",
+			},
+		}
+		for i := range tests {
+			t.Run(fmt.Sprintf("Start from state %s", tests[i].state.String()), func(t *testing.T) {
+				_ = cluster.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+						stateV1, ok := clonable.(*propertiesv1.ClusterState)
+						if !ok {
+							return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						}
+						stateV1.State = tests[i].state
+						return nil
+					})
+				})
+				err := ocluster.Start(ctx)
+				if err != nil {
+					require.Contains(t, err.Error(), tests[i].xerrMsg)
+				} else {
+					if tests[i].xerrMsg != "" {
+						t.Errorf("Expect an error containing \"%s\"", tests[i].xerrMsg)
+					}
+				}
+			})
+		}
 
 	})
 	require.Nil(t, err)
@@ -809,28 +914,38 @@ func TestCluster_AddNodes(t *testing.T) {
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
-		// Still have race troubles, check for io concurrency
 		svc._setLogLevel(0)
+		svc._updateOption("enablecache", true)
 
-		_, xerr := svc._CreateCluster(ctx, createClusterRequest(), true)
+		_, xerr := svc._CreateCluster(ctx, createClusterRequest(), false)
 		require.Nil(t, xerr)
 
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		// ocluster, ok := cluster.(*Cluster)
 		_, ok := cluster.(*Cluster)
 		if !ok {
 			t.Error("ressources.Cluster not castable to operation.Cluster")
 			t.FailNow()
 		}
 
-		// _, xerr = ocluster.AddNodes(ctx, 1, hsizing, make(data.Map), false)
-		// require.Nil(t, xerr)
+		_, xerr = cluster.AddNodes(nil, 1, hsizing, make(data.Map), false)
+		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
 
-		// ListNodes
+		_, xerr = cluster.AddNodes(ctx, 0, hsizing, make(data.Map), false)
+		require.Contains(t, xerr.Error(), "must be an int > 0")
+
+		svc._setLogLevel(2)
+		hosts, xerr := cluster.AddNodes(ctx, 1, hsizing, make(data.Map), false)
+		require.Nil(t, xerr)
+		require.EqualValues(t, len(hosts), 1)
+		id, _ := hosts[0].GetID()
+		require.EqualValues(t, id, "ClusterName-node-2")
 
 	})
+	if err != nil {
+		t.Error(err.Error())
+	}
 	require.Nil(t, err)
 
 }
@@ -970,9 +1085,6 @@ func TestCluster_ListMasterIPs(t *testing.T) {
 }
 
 func TestCluster_FindAvailableMaster(t *testing.T) {
-	if true {
-		t.Skip("BROKEN TEST") // publicIP breaks the tests
-	}
 
 	ctx := context.Background()
 	task, xerr := concurrency.NewTaskWithContext(ctx)
@@ -994,6 +1106,10 @@ func TestCluster_FindAvailableMaster(t *testing.T) {
 			t.Error("ressources.Cluster not castable to operation.Cluster")
 			t.FailNow()
 		}
+
+		svc._setLogLevel(2)
+		// FIXME: can't work without cache
+		svc._updateOption("enablecache", true)
 
 		master, xerr := ocluster.FindAvailableMaster(ctx)
 		require.Nil(t, xerr)

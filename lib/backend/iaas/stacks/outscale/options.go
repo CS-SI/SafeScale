@@ -17,19 +17,16 @@
 package outscale
 
 import (
-	"context"
-
 	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.ConfigurationOptions, fail.Error) {
-	// FIXME: Wrong
-	return stackoptions.ConfigurationOptions{
+// ConfigurationOptions ...
+func (s stack) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+	out := stackoptions.Configuration{
 		ProviderNetwork:           "",
-		DNSList:                   s.Options.Compute.DNSList,
+		DNSServers:                s.Options.Compute.DNSList,
 		UseFloatingIP:             false,
 		UseLayer3Networking:       false,
 		UseNATService:             false,
@@ -42,7 +39,7 @@ func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.Configu
 			"io1":      volumespeed.Ssd,
 		},
 		DefaultImage:             s.Options.Compute.DefaultImage,
-		MetadataBucket:           s.Options.Metadata.Bucket,
+		MetadataBucketName:       s.Options.Metadata.Bucket,
 		OperatorUsername:         s.Options.Compute.OperatorUsername,
 		DefaultSecurityGroupName: "",
 		DefaultNetworkName:       "",
@@ -52,13 +49,15 @@ func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.Configu
 		WhitelistImageRegexp:     nil,
 		BlacklistImageRegexp:     nil,
 		MaxLifeTime:              0,
-		Timings:                  nil,
-	}, nil
+		Timings:                  s.Options.Timings,
+		Safe:                     s.Options.Compute.Safe,
+	}
+	return out, nil
 }
 
-// GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions(context.Context) (stackoptions.AuthenticationOptions, fail.Error) {
-	return stackoptions.AuthenticationOptions{
+// AuthenticationOptions ...
+func (s stack) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
+	return stackoptions.Authentication{
 		IdentityEndpoint: s.Options.Compute.URL,
 		Username:         "",
 		UserID:           "",

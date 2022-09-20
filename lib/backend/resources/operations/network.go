@@ -88,7 +88,7 @@ func LoadNetwork(inctx context.Context, svc iaas.Service, ref string, options ..
 				return nil, fail.InvalidParameterError("svc", "cannot be null value")
 			}
 			if ref = strings.TrimSpace(ref); ref == "" {
-				return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+				return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 			}
 
 			// trick to avoid collisions
@@ -197,7 +197,7 @@ func onNetworkCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data
 
 // IsNull tells if the instance corresponds to subnet Null Value
 func (instance *Network) IsNull() bool {
-	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
+	return instance == nil || valid.IsNil(instance.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -224,7 +224,7 @@ func (instance *Network) Exists(ctx context.Context) (bool, fail.Error) {
 //   - *fail.ErrInvalidParameter: one parameter is invalid
 //   - *failErrInvalidInstance: Create() is called from bad instance (nil or null value)
 //   - *fail.ErrNotAvailable: a Network with the same name is currently created
-//   - *fail.ErrDuplicate: a Network with the same name already exist on provider Side (managed or not by SafeScale)
+//   - *fail.ErrDuplicate: a Network with the same name already exist on Provider Side (managed or not by SafeScale)
 //   - *fail.ErrAborted: abort signal has been received
 func (instance *Network) Create(inctx context.Context, req abstract.NetworkRequest) (_ fail.Error) {
 	if valid.IsNil(instance) {

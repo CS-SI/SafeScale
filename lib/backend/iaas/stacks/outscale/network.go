@@ -36,21 +36,23 @@ import (
 const tagNameLabel = "name"
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s stack) HasDefaultNetwork(ctx context.Context) (bool, fail.Error) {
+func (s stack) HasDefaultNetwork() (bool, fail.Error) {
 	if valid.IsNil(s) {
 		return false, fail.InvalidInstanceError()
 	}
+
 	return s.vpc != nil, nil
 }
 
-// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (s stack) GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
+// DefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s stack) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if s.vpc == nil {
 		return nil, fail.NotFoundError("no default Network in stack")
 	}
+
 	return s.vpc, nil
 }
 

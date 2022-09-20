@@ -22,9 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
@@ -34,12 +32,18 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 var (
+	capabilities = providers.Capabilities{
+		PrivateVirtualIP: true,
+	}
 	cloudferroIdentityEndpoint = "https://cf2.cloudferro.com:5000/v3"
 	cloudferroDefaultImage     = "Ubuntu 20.04"
 	cloudferroDNSServers       = []string{"185.48.234.234", "185.48.234.238"}
@@ -81,6 +85,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		defaultImage = cloudferroDefaultImage
 	}
 
+	isSafe, ok := compute["Safe"].(bool) // nolint
+	if !ok {
+		isSafe = true
+	}
+	params["Safe"] = isSafe
+
+	logrus.Warningf("Setting safety to: %t", isSafe)
+
 	maxLifeTime := 0
 	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
@@ -106,7 +118,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		floatingIPPool = providerNetwork
 	}
 
-	authOptions := stackoptions.AuthenticationOptions{
+	authOptions := stackoptions.Authentication{
 		IdentityEndpoint: cloudferroIdentityEndpoint,
 		Username:         username,
 		Password:         password,
@@ -163,7 +175,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 next:
 
-	cfgOptions := stackoptions.ConfigurationOptions{
+	cfgOptions := stackoptions.Configuration{
 		ProviderNetwork:           providerNetwork,
 		UseFloatingIP:             true,
 		UseLayer3Networking:       true,
@@ -172,14 +184,15 @@ next:
 			"Hdd": volumespeed.Hdd,
 			"Ssd": volumespeed.Ssd,
 		},
-		MetadataBucket:           metadataBucketName,
-		DNSList:                  cloudferroDNSServers,
+		MetadataBucketName:       metadataBucketName,
+		DNSServers:               cloudferroDNSServers,
 		DefaultImage:             defaultImage,
 		OperatorUsername:         operatorUsername,
 		ProviderName:             providerName,
 		DefaultSecurityGroupName: "default",
 		MaxLifeTime:              maxLifeTime,
 		Timings:                  timings,
+		Safe:                     isSafe,
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -190,8 +203,8 @@ next:
 	// Note: if timings have to be tuned, update stack.MutableTimings
 
 	wrapped := stacks.Remediator{
-		FullStack: stack,
-		Name:      "cloudferro",
+		Stack: stack,
+		Name:  "cloudferro",
 	}
 
 	newP := &provider{
@@ -207,53 +220,43 @@ next:
 	return wp, nil
 }
 
-// GetAuthenticationOptions returns the auth options
-func (p provider) GetAuthenticationOptions(ctx context.Context) (providers.Config, fail.Error) {
-	cfg := providers.ConfigMap{}
-	if valid.IsNil(p) {
-		return cfg, fail.InvalidInstanceError()
-	}
-
-	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawAuthenticationOptions(ctx)
-	if err != nil {
-		return nil, err
-	}
-	cfg.Set("TenantName", opts.TenantName)
-	cfg.Set("Login", opts.Username)
-	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthURL", opts.IdentityEndpoint)
-	cfg.Set("Region", opts.Region)
-	return cfg, nil
+// BuildWithTerraformer needs to be called when terraformer is used
+func (p *provider) BuildWithTerraformer(params map[string]any, config terraformer.Configuration) (providers.Provider, fail.Error) {
+	return nil, fail.NotImplementedError()
 }
 
-// GetConfigurationOptions return configuration parameters
-func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config, fail.Error) {
-	cfg := providers.ConfigMap{}
+// AuthenticationOptions returns the auth options
+func (p *provider) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
 	if valid.IsNil(p) {
-		return cfg, fail.InvalidInstanceError()
+		return stackoptions.Authentication{}, fail.InvalidInstanceError()
+	}
+	if valid.IsNull(p.Stack) {
+		return stackoptions.Authentication{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
-	opts, err := p.Stack.(stacks.ReservedForProviderUse).GetRawConfigurationOptions(ctx)
-	if err != nil {
-		return nil, err
+	return p.Stack.(providers.StackReservedForProviderUse).AuthenticationOptions()
+}
+
+// ConfigurationOptions return configuration parameters
+func (p provider) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+	if valid.IsNil(p) {
+		return stackoptions.Configuration{}, fail.InvalidInstanceError()
+	}
+	if valid.IsNull(p.Stack) {
+		return stackoptions.Configuration{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
-	provName, xerr := p.GetName()
+	opts, xerr := p.Stack.(providers.StackReservedForProviderUse).ConfigurationOptions()
 	if xerr != nil {
-		return nil, xerr
+		return stackoptions.Configuration{}, xerr
 	}
 
-	cfg.Set("DNSList", opts.DNSList)
-	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
-	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
-	cfg.Set("DefaultImage", opts.DefaultImage)
-	cfg.Set("MetadataBucketName", opts.MetadataBucket)
-	cfg.Set("OperatorUsername", opts.OperatorUsername)
-	cfg.Set("ProviderName", provName)
-	cfg.Set("UseNATService", opts.UseNATService)
-	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
+	opts.ProviderName, xerr = p.GetName()
+	if xerr != nil {
+		return stackoptions.Configuration{}, xerr
+	}
 
-	return cfg, nil
+	return opts, nil
 }
 
 // ListTemplates ...
@@ -262,8 +265,11 @@ func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Host
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
+	if valid.IsNull(p.Stack) {
+		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
+	}
 
-	allTemplates, xerr := p.Stack.(stacks.ReservedForProviderUse).ListTemplates(ctx, all)
+	allTemplates, xerr := p.Stack.(providers.StackReservedForProviderUse).ListTemplates(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -276,8 +282,11 @@ func (p provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, 
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
+	if valid.IsNull(p.Stack) {
+		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
+	}
 
-	allImages, xerr := p.Stack.(stacks.ReservedForProviderUse).ListImages(ctx, all)
+	allImages, xerr := p.Stack.(providers.StackReservedForProviderUse).ListImages(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -285,18 +294,25 @@ func (p provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, 
 }
 
 // GetName returns the providerName
-func (p provider) GetName() (string, fail.Error) {
+func (p *provider) GetName() (string, fail.Error) {
 	return "cloudferro", nil
 }
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() (stacks.Stack, fail.Error) {
+func (p *provider) GetStack() (stacks.Stack, fail.Error) {
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if valid.IsNull(p.Stack) {
+		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
+	}
+
 	return p.Stack, nil
 }
 
-// GetTenantParameters returns the tenant parameters as-is
-func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
+// TenantParameters returns the tenant parameters as-is
+func (p *provider) TenantParameters() (map[string]interface{}, fail.Error) {
 	if valid.IsNil(p) {
 		return map[string]interface{}{}, fail.InvalidInstanceError()
 	}
@@ -304,19 +320,13 @@ func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 	return p.tenantParameters, nil
 }
 
-// GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities(context.Context) (providers.Capabilities, fail.Error) {
-	if valid.IsNil(p) {
-		return providers.Capabilities{}, fail.InvalidInstanceError()
-	}
-
-	return providers.Capabilities{
-		PrivateVirtualIP: true,
-	}, nil
+// Capabilities returns the capabilities of the provider
+func (p *provider) Capabilities() providers.Capabilities {
+	return capabilities
 }
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
-func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
+func (p *provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
 	if valid.IsNil(p) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -337,23 +347,20 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 }
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (p provider) HasDefaultNetwork(ctx context.Context) (bool, fail.Error) {
-	if valid.IsNil(p) {
-		return false, fail.InvalidInstanceError()
-	}
-
+func (p *provider) HasDefaultNetwork() (bool, fail.Error) {
 	return false, nil
 }
 
-// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (p provider) GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
-	if valid.IsNil(p) {
-		return nil, fail.InvalidInstanceError()
-	}
-
+// DefaultNetwork returns the *abstract.Network corresponding to the default network
+func (p *provider) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
 	return nil, fail.NotFoundError("this provider has no default network")
 }
 
 func init() {
-	iaas.Register("cloudferro", &provider{})
+	profile := providers.NewProfile(
+		capabilities,
+		func() providers.Provider { return &provider{} },
+		nil,
+	)
+	iaas.Register("cloudferro", profile)
 }

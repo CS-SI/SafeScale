@@ -378,7 +378,7 @@ func (s *ClusterListener) Shrink(inctx context.Context, in *protocol.ClusterResi
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/shrink", clusterName))
+	job, xerr := PrepareJob(inctx, defaultOrganization, defaultProject, in.GetTenantId(), fmt.Sprintf("/cluster/%s/shrink", clusterName))
 	if xerr != nil {
 		return nil, xerr
 	}

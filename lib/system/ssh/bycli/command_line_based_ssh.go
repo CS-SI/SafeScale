@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -807,11 +806,11 @@ func (scmd *CliCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 	}
 
 	if params.collectOutputs {
-		if msgOut, err = ioutil.ReadAll(stdoutPipe); err != nil {
+		if msgOut, err = io.ReadAll(stdoutPipe); err != nil {
 			return result, fail.ConvertError(err)
 		}
 
-		if msgErr, err = ioutil.ReadAll(stderrPipe); err != nil {
+		if msgErr, err = io.ReadAll(stderrPipe); err != nil {
 			return result, fail.ConvertError(err)
 		}
 	}
@@ -1257,6 +1256,9 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			// -- Try to see if 'phase' file exists... --
 			sshCmd, innerXErr = sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
 			if innerXErr != nil {
+				if phase == "init" {
+					logrus.Debugf("SSH still not ready for %s", sconf.Hostname)
+				}
 				return innerXErr
 			}
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
@@ -1264,6 +1266,9 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 				return innerXErr
 			}
 			if retcode != 0 { // nolint
+				if phase == "init" {
+					logrus.Debugf("SSH still not ready for %s", sconf.Hostname)
+				}
 				switch phase {
 				case "final":
 					var sshCmd sshapi.Command

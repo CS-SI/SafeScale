@@ -24,7 +24,7 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
@@ -57,18 +57,18 @@ func (nr *networkResource) ToMap() map[string]any {
 }
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (p provider) HasDefaultNetwork(context.Context) (bool, fail.Error) {
+func (p *provider) HasDefaultNetwork() (bool, fail.Error) {
 	return false, nil
 }
 
-// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (p provider) GetDefaultNetwork(context.Context) (*abstract.Network, fail.Error) {
+// DefaultNetwork returns the *abstract.Network corresponding to the default network
+func (p *provider) DefaultNetwork(context.Context) (*abstract.Network, fail.Error) {
 	// FIXME: support default network
 	return nil, fail.NotFoundError("no default network for this provider")
 }
 
 // CreateNetwork creates a network named name
-func (p provider) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (newNet *abstract.Network, ferr fail.Error) {
+func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (newNet *abstract.Network, ferr fail.Error) {
 	var xerr fail.Error
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
@@ -169,7 +169,8 @@ func (p *provider) InspectNetworkByName(ctx context.Context, name string) (*abst
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
-	return nil, fail.NotImplementedError()
+	// FIXME: need to code this method
+	return nil, fail.NotFoundError()
 
 	/*
 		// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...

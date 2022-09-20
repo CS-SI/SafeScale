@@ -35,6 +35,20 @@ import (
 )
 
 func main() {
+	var err error
+	defer func() {
+		if err != nil {
+			switch cerr := err.(type) {
+			case cli.ExitError:
+				os.Exit(cerr.Code())
+			default:
+				logrus.Error("Error running cli: " + err.Error())
+				os.Exit(1)
+			}
+		}
+		os.Exit(0)
+	}()
+
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	// app.Flags = append(app.Flags, []cli.Flag{
@@ -50,7 +64,7 @@ func main() {
 	// }...)
 
 	// Finally, try the remaining possibilities
-	err := global.InitApp()
+	err = global.InitApp()
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -79,16 +93,6 @@ func main() {
 	defer cancel()
 
 	err = global.RunApp(ctx, cleanup)
-	if err != nil {
-		switch cerr := err.(type) {
-		case cli.ExitError:
-			os.Exit(cerr.Code())
-		default:
-			logrus.Error("Error running cli: " + err.Error())
-			os.Exit(1)
-		}
-	}
-	os.Exit(0)
 }
 
 func cleanup(cmd *cobra.Command) {

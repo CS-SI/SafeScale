@@ -1,3 +1,19 @@
+/*
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package terraformer
 
 import (
@@ -18,28 +34,35 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
+type RequiredProvider struct {
+	Source  string
+	Version string
+}
+
 type Configuration struct {
+	Release       string // contains the release of terraform wanted for the hcl file produced
 	WorkDir       string
 	ExecPath      string
 	ConsulBackend struct {
-		Path string // "safescale/terraformstate/{{ or .CurrentOrganization "default" }}/{{ or .CurrentProject "default" }}"<
+		Path string // "safescale/terraformstate/{{ or .CurrentOrganization "default" }}/{{ or .CurrentProject "default" }}"
 		Use  bool
 	}
+	RequiredProviders []RequiredProvider
 }
 
 // summoner is an implementation of Summoner interface
 type summoner struct {
-	provider     ProviderInternals
+	provider     ProviderUseTerraformer
 	config       Configuration
 	lastFilePath string
 	mu           *sync.Mutex
 }
 
-// go:embed snippets
+//go:embed snippets
 var layoutFiles embed.FS
 
 // NewSummoner instantiates a terraform file builder that will put file in 'workDir'
-func NewSummoner(provider ProviderInternals, conf Configuration) (Summoner, fail.Error) {
+func NewSummoner(provider ProviderUseTerraformer, conf Configuration) (Summoner, fail.Error) {
 	if valid.IsNull(provider) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -78,21 +101,28 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 		return fail.InvalidRequestError("trying to create a new main.tf file without having cleaned up the Summoner")
 	}
 
+	authOpts, xerr := instance.provider.AuthenticationOptions()
+	if xerr != nil {
+		return xerr
+	}
+
+	configOpts, xerr := instance.provider.ConfigurationOptions()
+	if xerr != nil {
+		return xerr
+	}
+
 	variables := data.NewMap()
 	variables["Provider"] = map[string]any{
 		"Name":           instance.provider.Name(),
-		"Authentication": instance.provider.AuthenticationOptions(),
-		"Configuration":  instance.provider.ConfigurationOptions(),
+		"Authentication": authOpts,
+		"Configuration":  configOpts,
 	}
 
 	// render the resources
-	var (
-		xerr fail.Error
-	)
-	resourceContent := make([][]byte, len(resources), 0)
+	resourceContent := make([][]byte, len(resources))
 	for _, r := range resources {
 		lvars := variables.Clone()
-		lvars.Merge(r.ToMap())
+		lvars.Merge(map[string]any{"Resource": r.ToMap()})
 		content, xerr := instance.realizeTemplate(instance.provider.EmbeddedFS(), r.Snippet(), lvars)
 		if xerr != nil {
 			return xerr
@@ -166,8 +196,8 @@ func (instance summoner) realizeTemplate(efs embed.FS, filename string, vars map
 		return nil, fail.Wrap(err, "failed to execute  template")
 	}
 
-	cmd := dataBuffer.Bytes()
-	return cmd, nil
+	out := dataBuffer.Bytes()
+	return out, nil
 }
 
 const mainFilename = "main.tf"

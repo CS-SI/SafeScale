@@ -52,7 +52,7 @@ func (s *SecurityGroupListener) List(inctx context.Context, in *protocol.Securit
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	job, err := PrepareJob(inctx, "", "/securitygroups/list")
+	job, err := PrepareJob(inctx, defaultOrganization, defaultProject, "", "/securitygroups/list")
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (s *SecurityGroupListener) Create(inctx context.Context, in *protocol.Secur
 
 	name := in.GetName()
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
-	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/securitygroup/%s/create", networkRef, name))
+	job, xerr := PrepareJob(inctx, defaultOrganization, defaultProject, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/securitygroup/%s/create", networkRef, name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -143,7 +143,7 @@ func (s *SecurityGroupListener) Clear(inctx context.Context, in *protocol.Refere
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/clear", ref))
+	job, xerr := PrepareJob(inctx, defaultOrganization, defaultProject, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/clear", ref))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -185,7 +185,7 @@ func (s *SecurityGroupListener) Reset(inctx context.Context, in *protocol.Refere
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/reset", ref))
+	job, xerr := PrepareJob(inctx, defaultOrganization, defaultProject, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/reset", ref))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -227,7 +227,7 @@ func (s *SecurityGroupListener) Inspect(inctx context.Context, in *protocol.Refe
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/inspect", ref))
+	job, err := PrepareJob(inctx, defaultOrganization, defaultProject, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/inspect", ref))
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func (s *SecurityGroupListener) Delete(inctx context.Context, in *protocol.Secur
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/delete", sgRef))
+	job, xerr := PrepareJob(inctx, defaultOrganization, defaultProject, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/delete", sgRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -315,7 +315,7 @@ func (s *SecurityGroupListener) AddRule(inctx context.Context, in *protocol.Secu
 		return nil, xerr
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/rule/add", sgRef))
+	job, xerr := PrepareJob(inctx, defaultOrganization, defaultProject, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/rule/add", sgRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -361,7 +361,7 @@ func (s *SecurityGroupListener) DeleteRule(inctx context.Context, in *protocol.S
 		return nil, xerr
 	}
 
-	job, err := PrepareJob(inctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/rule/delete", ref))
+	job, err := PrepareJob(inctx, defaultOrganizatio, defaultProject, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/rule/delete", ref))
 	if err != nil {
 		return nil, err
 	}
@@ -403,7 +403,7 @@ func (s *SecurityGroupListener) Sanitize(inctx context.Context, in *protocol.Ref
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/sanitize", ref))
+	job, err := PrepareJob(inctx, defaultOrganization(), defaultProject(), in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/sanitize", ref))
 	if err != nil {
 		return nil, err
 	}

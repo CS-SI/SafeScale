@@ -19,10 +19,14 @@ package backend
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -33,9 +37,11 @@ import (
 type Job interface {
 	ID() string
 	Name() string
+	Organization() string
+	Project() string
+	Tenant() string
 	Context() context.Context
 	Task() concurrency.Task
-	Tenant() string
 	Service() iaas.Service
 	Duration() time.Duration
 	String() string
@@ -47,15 +53,21 @@ type Job interface {
 
 // job contains the information needed by safescaled to execute a request
 type job struct {
-	description string
-	uuid        string
-	tenant      string
-	ctx         context.Context
-	task        concurrency.Task
-	cancel      context.CancelFunc
-	service     iaas.Service
-	startTime   time.Time
+	organization string
+	project      string
+	tenant       string
+	description  string
+	uuid         string
+	ctx          context.Context
+	task         concurrency.Task
+	cancel       context.CancelFunc
+	service      iaas.Service
+	startTime    time.Time
 }
+
+const (
+	KeyForJobInContext = "job"
+)
 
 var (
 	jobMap          = map[string]Job{}
@@ -63,7 +75,7 @@ var (
 )
 
 // NewJob creates a new instance of struct Job
-func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (_ *job, ferr fail.Error) { // nolint
+func NewJob(ctx context.Context, cancel context.CancelFunc, organization, project, tenant, description string) (_ *job, ferr fail.Error) { // nolint
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -116,34 +128,89 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		return nil, xerr
 	}
 
-	// attach task instance to the context
-	ctx = context.WithValue(ctx, concurrency.KeyForTaskInContext, task) // nolint
-	ctx = context.WithValue(ctx, concurrency.KeyForID, id)              // nolint
+	nj := &job{
+		organization: organization,
+		project:      project,
+		tenant:       tenant,
+		description:  description,
+		uuid:         id,
+		task:         task,
+		cancel:       cancel,
+		startTime:    time.Now(),
+	}
 
-	nj := job{
-		description: description,
-		uuid:        id,
-		ctx:         ctx,
-		task:        task,
-		cancel:      cancel,
-		service:     svc,
-		startTime:   time.Now(),
-	}
-	if svc != nil {
-		nj.tenant, xerr = svc.GetName()
-		if xerr != nil {
-			return nil, xerr
-		}
-	}
-	if xerr = register(&nj); xerr != nil {
+	// attach task instance to the context
+	// ctx = context.WithValue(ctx, concurrency.KeyForTaskInContext, task) // nolint
+	// ctx = context.WithValue(ctx, concurrency.KeyForID, id)              // nolint
+	// attach job instance to the context
+	ctx = context.WithValue(ctx, KeyForJobInContext, nj) // nolint
+	nj.ctx = ctx
+
+	providerProfile, xerr := iaas.FindProfile(tenant)
+	if xerr != nil {
 		return nil, xerr
 	}
 
-	return &nj, nil
+	svcOptions := []iaas.OptionsMutator{
+		iaas.WithTenant(tenant),
+	}
+	if providerProfile.Capabilities().UseTerraformer {
+		config, xerr := prepareTerraformerConfiguration(providerProfile, organization, project, tenant)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		svcOptions = append(svcOptions, iaas.WithTerraformer(config))
+	}
+
+	service, xerr := iaas.UseService(svcOptions...)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// bucket, ierr := service.GetMetadataBucket(ctx)
+	// if ierr != nil {
+	// 	return nil, ierr
+	// }
+	//
+	// tenant = &operations.Tenant{Name: providerProfile.Name(), BucketName: bucket.GetName(), Service: service}
+
+	nj.service = service
+	xerr = register(nj)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return nj, nil
 }
 
-// isNull tells if the instance represents a null value
-func (instance *job) isNull() bool {
+func prepareTerraformerConfiguration(providerProfile *providers.Profile, organization, project, tenant string) (terraformer.Configuration, fail.Error) {
+	if valid.IsNull(providerProfile) {
+		return terraformer.Configuration{}, fail.InvalidParameterCannotBeNilError("providerProfile")
+	}
+	if tenant == "" {
+		return terraformer.Configuration{}, fail.InvalidParameterCannotBeEmptyStringError("tenant")
+	}
+
+	if organization == "" {
+		organization = "default"
+	}
+	if project == "" {
+		project = "default"
+	}
+
+	workDir := filepath.Join(global.Settings.Folders.TmpDir, "terraform", organization, project, tenant)
+	out := terraformer.Configuration{
+		WorkDir:           workDir,
+		ExecPath:          path_of_terraform,
+		RequiredProviders: providerProfile.TerraformProviders(),
+	}
+
+	return out, nil
+}
+
+// IsNull tells if the instance represents a null value
+func (instance *job) IsNull() bool {
 	return instance == nil || instance.uuid == ""
 }
 
@@ -157,7 +224,17 @@ func (instance job) Name() string {
 	return instance.uuid
 }
 
-// Tenant returns the tenant to use
+// Organization returns the organization of the job
+func (instance job) Organization() string {
+	return instance.organization
+}
+
+// Project returns the project of the job
+func (instance job) Project() string {
+	return instance.project
+}
+
+// Tenant returns the tenant of the job
 func (instance job) Tenant() string {
 	return instance.tenant
 }
@@ -207,7 +284,7 @@ func (instance job) Aborted() (bool, fail.Error) {
 	return status == concurrency.ABORTED, nil
 }
 
-// Close tells the job to wait for end of operation; this ensure everything is cleaned up correctly
+// Close tells the job to wait for end of operation; this ensures everything is cleaned up correctly
 func (instance *job) Close() {
 	_ = deregister(instance)
 	if instance.cancel != nil {

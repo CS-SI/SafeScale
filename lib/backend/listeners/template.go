@@ -166,7 +166,7 @@ func (s *TemplateListener) Inspect(inctx context.Context, in *protocol.TemplateI
 }
 
 func complementWithScan(ctx context.Context, svc iaas.Service, scanOnly bool, templates ...*abstract.HostTemplate) ([]*protocol.HostTemplate, fail.Error) {
-	authOpts, xerr := svc.GetAuthenticationOptions(ctx)
+	authOpts, xerr := svc.AuthenticationOptions(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

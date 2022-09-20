@@ -18,7 +18,7 @@ package outscale
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 
@@ -49,7 +49,7 @@ func normalizeFromHTTPReturnCode(resp *http.Response) (fail.Error, fail.Error) {
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	messageBytes, err := ioutil.ReadAll(resp.Body)
+	messageBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fail.Wrap(err, "unreadable body")
 	}

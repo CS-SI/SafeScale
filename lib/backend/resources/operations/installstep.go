@@ -423,7 +423,7 @@ func (is *step) collectOutcomes(subtasks map[string]concurrency.Task, results co
 
 // initLoopTurnForHost inits the coming loop turn for a specific Host
 func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v data.Map) (clonedV data.Map, ferr fail.Error) {
-	is.Worker.startTime = time.Now()
+	is.Worker.SetStartTime(time.Now())
 
 	var xerr fail.Error
 	var cerr error

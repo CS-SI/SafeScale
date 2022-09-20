@@ -17,6 +17,7 @@
 package openstack // Package openstack contains the implemenation of a stack for OpenStack providers
 
 import (
+	context2 "context"
 	"strings"
 
 	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
@@ -39,8 +40,8 @@ type stack struct {
 	IdentityClient *gophercloud.ServiceClient
 	Driver         *gophercloud.ProviderClient
 
-	authOpts stackoptions.AuthenticationOptions
-	cfgOpts  stackoptions.ConfigurationOptions
+	authOpts stackoptions.Authentication
+	cfgOpts  stackoptions.Configuration
 
 	// DefaultSecurityGroupName is the name of the default security groups
 	DefaultSecurityGroupName string
@@ -65,7 +66,7 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and returns a stack pointer
-func New(auth stackoptions.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stackoptions.ConfigurationOptions, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
+func New(auth stackoptions.Authentication, authScope *gophercloud.AuthScope, cfg stackoptions.Configuration, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
 	ctx := context.Background()
 
 	if auth.DomainName == "" && auth.DomainID == "" {
@@ -273,4 +274,27 @@ func (s *stack) Timings() (temporal.Timings, fail.Error) {
 		s.MutableTimings = temporal.NewTimings()
 	}
 	return s.MutableTimings, nil
+}
+
+func (s *stack) UpdateTags(ctx context2.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	xerr := s.rpcSetMetadataOfInstance(ctx, id, lmap)
+	return xerr
+}
+
+func (s *stack) DeleteTags(ctx context2.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	report := make(map[string]string)
+	for _, k := range keys {
+		report[k] = ""
+	}
+
+	xerr := s.rpcDeleteMetadataOfInstance(ctx, id, report)
+	return xerr
 }

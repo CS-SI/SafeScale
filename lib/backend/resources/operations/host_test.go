@@ -24,7 +24,6 @@ package operations
 import (
 	"context" // nolint
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -210,6 +209,8 @@ func TestHost_Browse(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, abstract.HostRequest{
 			ResourceName: "localhost",
 			HostName:     "localhost",
@@ -233,6 +234,8 @@ func TestHost_Browse(t *testing.T) {
 			return nil
 		})
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
+
+		svc._setLogLevel(2)
 
 		xerr = host.Browse(ctx, callback)
 		require.Contains(t, xerr.Error(), "invalid parameter: callback")
@@ -351,6 +354,8 @@ func TestHost_Unsafereload(t *testing.T) {
 		var nullAhc *Host = nil
 		var err error
 
+		svc._setLogLevel(0)
+
 		xerr := nullAhc.Reload(ctx)
 		require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
@@ -402,6 +407,8 @@ func TestHost_Unsafereload(t *testing.T) {
 			t.FailNow()
 		}
 		require.Nil(t, xerr)
+
+		svc._setLogLevel(2)
 
 		xerr = ohost.unsafeReload(ctx)
 		require.Nil(t, xerr)
@@ -649,6 +656,8 @@ func TestHost_setSecurityGroups(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, xerr := svc.CreateNetwork(ctx, abstract.NetworkRequest{
 			Name:          "MyHostTest",
 			CIDR:          "192.168.16.4/32",
@@ -722,6 +731,8 @@ func TestHost_setSecurityGroups(t *testing.T) {
 
 		ohost := host.(*Host)
 
+		svc._setLogLevel(2)
+
 		xerr = ohost.setSecurityGroups(ctx, hostReq, subnet)
 		require.Nil(t, xerr)
 
@@ -788,6 +799,8 @@ func TestHost_thePhaseDoesSomething(t *testing.T) {
 	}
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
@@ -796,6 +809,8 @@ func TestHost_thePhaseDoesSomething(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 
 		ohost := host.(*Host)
+
+		svc._setLogLevel(2)
 
 		v := ohost.thePhaseDoesSomething(ctx, userdata.PHASE1_INIT, ua)
 		require.True(t, v)
@@ -828,12 +843,16 @@ func TestHost_WaitSSHReady(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
+
+		svc._setLogLevel(2)
 
 		_, xerr = host.WaitSSHReady(ctx, time.Second)
 		require.Nil(t, xerr)
@@ -909,6 +928,8 @@ func TestHost_Run(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
@@ -932,11 +953,21 @@ func TestHost_Run(t *testing.T) {
 		})
 		require.Nil(t, xerr)
 
-		retcode, stdout, stderr, xerr = host.Run(ctx, "echo 1", outputs.COLLECT, time.Second, time.Second)
+		svc._setLogLevel(2)
 
-		fmt.Println(retcode, stdout, stderr, xerr)
+		svc._updateOption("onsshcommand", func(in string) string {
+			output := ""
+			switch in {
+			case "emulated command --run":
+				output = "> is emulated here"
+			}
+			return output
+		})
+
+		retcode, stdout, stderr, xerr = host.Run(ctx, "emulated command --run", outputs.COLLECT, time.Second, time.Second)
+
 		require.EqualValues(t, retcode, 0)
-		require.EqualValues(t, stdout, "")
+		require.EqualValues(t, stdout, "> is emulated here")
 		require.Contains(t, stderr, "")
 		require.Nil(t, xerr)
 
@@ -968,6 +999,8 @@ func TestHost_Push(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
@@ -993,11 +1026,15 @@ func TestHost_Push(t *testing.T) {
 		owner := "safescale"
 		mode := "rwx"
 
+		svc._setLogLevel(2)
+
 		retcode, stdout, stderr, xerr := host.Push(ctx, src, target, owner, mode, time.Second)
 		require.EqualValues(t, retcode, 0)
 		require.EqualValues(t, stdout, "")
 		require.EqualValues(t, stderr, "")
 		require.Nil(t, xerr)
+
+		svc._setLogLevel(0)
 
 		content, xerr := svc._getFsCache(src)
 		require.Nil(t, xerr)
@@ -1010,7 +1047,7 @@ func TestHost_Push(t *testing.T) {
 		require.EqualValues(t, stderr, "")
 		require.Nil(t, xerr)
 
-		b, err := ioutil.ReadFile(src)
+		b, err := os.ReadFile(src)
 		if err != nil {
 			t.Error(err)
 		}
@@ -1045,6 +1082,8 @@ func TestHost_StartStop(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
@@ -1052,15 +1091,23 @@ func TestHost_StartStop(t *testing.T) {
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 
+		svc._setLogLevel(2)
+
 		xerr = host.Start(ctx)
 		require.Nil(t, xerr)
+
+		svc._setLogLevel(0)
 
 		state, xerr := host.GetState(ctx)
 		require.Nil(t, xerr)
 		require.EqualValues(t, state, hoststate.Started)
 
+		svc._setLogLevel(2)
+
 		xerr = host.Stop(ctx)
 		require.Nil(t, xerr)
+
+		svc._setLogLevel(0)
 
 		state, xerr = host.GetState(ctx)
 		require.Nil(t, xerr)
@@ -1094,6 +1141,11 @@ func TestHost_Reboot(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
+		// FIXME: can't work without cache
+		svc._updateOption("enablecache", true)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
@@ -1101,15 +1153,23 @@ func TestHost_Reboot(t *testing.T) {
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 
+		svc._setLogLevel(2)
+
 		xerr = host.Reboot(ctx, true)
 		require.Nil(t, xerr)
+
+		svc._setLogLevel(0)
 
 		state, xerr := host.GetState(ctx)
 		require.EqualValues(t, state, hoststate.Stopped)
 		require.Nil(t, xerr)
 
+		svc._setLogLevel(2)
+
 		xerr = host.Reboot(ctx, false)
 		require.Nil(t, xerr)
+
+		svc._setLogLevel(0)
 
 		state, xerr = host.GetState(ctx)
 		require.EqualValues(t, state, hoststate.Started)
@@ -1142,12 +1202,16 @@ func TestHost_Resize(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
+
+		svc._setLogLevel(2)
 
 		xerr = host.Resize(ctx, abstract.HostSizingRequirements{
 			MinCores:    3,
@@ -1191,12 +1255,16 @@ func TestHost_GetPublicIP(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
+
+		svc._setLogLevel(1)
 
 		ip, xerr := host.GetPublicIP(ctx)
 		require.Nil(t, xerr)
@@ -1242,7 +1310,7 @@ func TestHost_GetPrivateIP(t *testing.T) {
 		/*ip*/
 		ip, xerr := host.GetPrivateIP(ctx)
 		require.Nil(t, xerr)
-		require.EqualValues(t, ip, "0:0:0:0:0:ffff:7f00:0001")
+		require.EqualValues(t, ip, "127.0.0.1") // 0:0:0:0:0:ffff:7f00:0001
 
 	})
 	require.EqualValues(t, xerr, nil)
@@ -1258,6 +1326,9 @@ func TestHost_GetPrivateIPOnSubnet(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+		svc._updateOption("enablecache", true)
+
 		var nullAhc *Host = nil
 		var err error
 
@@ -1265,13 +1336,13 @@ func TestHost_GetPrivateIPOnSubnet(t *testing.T) {
 		require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
 		req := abstract.HostRequest{
-			ResourceName: "localhost",
-			HostName:     "localhost",
-			ImageID:      "ImageID",
-			PublicIP:     true,
-			Subnets:      []*abstract.Subnet{},
-			IsGateway:    true,
-			// DefaultRouteIP: request.DefaultRouteIP,
+			ResourceName:   "localhost",
+			HostName:       "localhost",
+			ImageID:        "ImageID",
+			PublicIP:       true,
+			Subnets:        []*abstract.Subnet{},
+			IsGateway:      true,
+			DefaultRouteIP: "127.0.0.1",
 			// DiskSize:       request.DiskSize,
 			TemplateID: "TemplateID",
 		}
@@ -1310,9 +1381,11 @@ func TestHost_GetPrivateIPOnSubnet(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 		require.EqualValues(t, skip(host.GetID()), "localhost")
 
+		svc._setLogLevel(2)
+
 		ip, xerr := host.GetPrivateIPOnSubnet(ctx, "localhost")
 		require.Nil(t, xerr)
-		require.EqualValues(t, ip, "0:0:0:0:0:ffff:0000:0000")
+		require.EqualValues(t, ip, "127.0.0.1")
 
 	})
 	require.Nil(t, xerr)
@@ -1341,12 +1414,16 @@ func TestHost_GetAccessIP(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
+
+		svc._setLogLevel(2)
 
 		ip, xerr := host.GetAccessIP(ctx)
 		require.Nil(t, xerr)
@@ -1378,12 +1455,16 @@ func TestHost_GetShares(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
+
+		svc._setLogLevel(1)
 
 		shares, xerr := host.GetShares(ctx)
 		require.Nil(t, xerr)
@@ -1415,6 +1496,8 @@ func TestHost_GetMounts(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
@@ -1422,6 +1505,7 @@ func TestHost_GetMounts(t *testing.T) {
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 
+		svc._setLogLevel(1)
 		mounts, xerr := host.GetMounts(ctx)
 		require.Nil(t, xerr)
 		require.True(t, mounts.IsNull())
@@ -1477,6 +1561,8 @@ func TestHost_IsGateway(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		svc._setLogLevel(0)
+
 		hostReq := abstract.HostRequest{
 			ResourceName:   "MyHostTest",
 			HostName:       "MyHostTest",
@@ -1495,6 +1581,8 @@ func TestHost_IsGateway(t *testing.T) {
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
+
+		svc._setLogLevel(1)
 
 		yes, xerr := host.IsGateway(ctx)
 		require.Nil(t, xerr)
@@ -1618,9 +1706,6 @@ func TestHost_IsSingle(t *testing.T) {
 }
 
 func TestHost_PushStringToFile(t *testing.T) {
-	if true {
-		t.Skip("BROKEN TEST") // publicIP breaks the tests
-	}
 
 	ctx := context.Background()
 
@@ -1642,6 +1727,10 @@ func TestHost_PushStringToFile(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
+		// FIXME: can't work without cache
+		svc._updateOption("enablecache", true)
+		svc._setLogLevel(0)
+
 		_, _, xerr := svc.CreateHost(ctx, hostReq)
 		require.Nil(t, xerr)
 
@@ -1654,6 +1743,8 @@ func TestHost_PushStringToFile(t *testing.T) {
 
 		xerr = host.Start(ctx)
 		require.Nil(t, xerr)
+
+		svc._setLogLevel(2)
 
 		xerr = host.PushStringToFile(ctx, "data content", "/tmp/pushtest")
 		require.Nil(t, xerr)
@@ -1671,6 +1762,8 @@ func TestHost_GetDefaultSubnet(t *testing.T) {
 	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
+
+		svc._setLogLevel(0)
 
 		_, _, xerr := svc.CreateHost(ctx, abstract.HostRequest{
 			ResourceName: "MyHostTest",
@@ -1715,6 +1808,8 @@ func TestHost_GetDefaultSubnet(t *testing.T) {
 		})
 		require.Nil(t, xerr)
 
+		svc._setLogLevel(1)
+
 		subnet, xerr := host.GetDefaultSubnet(ctx)
 		require.Nil(t, xerr)
 		require.EqualValues(t, subnet.GetName(), "MyHostTest")
@@ -1732,6 +1827,8 @@ func TestHost_ToProtocol(t *testing.T) {
 	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
+
+		svc._setLogLevel(0)
 
 		req := abstract.HostRequest{
 			ResourceName: "localhost",
@@ -1779,6 +1876,8 @@ func TestHost_ToProtocol(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 		require.EqualValues(t, skip(host.GetID()), "localhost")
 
+		svc._setLogLevel(2)
+
 		protocol, xerr := host.ToProtocol(ctx)
 		require.Nil(t, xerr)
 		require.EqualValues(t, protocol.Id, "localhost")
@@ -1798,6 +1897,8 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
+
+		svc._setLogLevel(0)
 
 		req := abstract.HostRequest{
 			ResourceName: "localhost",
@@ -1876,6 +1977,8 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 		xerr = host.BindSecurityGroup(ctx, sgs, enable)
 		require.Nil(t, xerr)
 
+		svc._setLogLevel(0)
+
 		xerr = host.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 				hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
@@ -1921,8 +2024,12 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 		xerr = host.DisableSecurityGroup(ctx, sgs)
 		require.Nil(t, xerr)
 
+		svc._setLogLevel(1)
+
 		xerr = host.UnbindSecurityGroup(ctx, sgs)
 		require.Nil(t, xerr)
+
+		svc._setLogLevel(0)
 
 		xerr = host.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {

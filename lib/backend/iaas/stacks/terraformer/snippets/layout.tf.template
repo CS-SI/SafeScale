@@ -1,7 +1,7 @@
 terraform {
-	required_version = "{{ .TerraformRelease }}"
+	required_version = "{{ .Terraformer.Config.Release }}"
 	required_providers {
-		{{ range $i := .RequiredProviders }}
+		{{ range $i := .Terraformer.Config.RequiredProviders }}
 		{{ $i.Name }} = {
 			source  = "{{ $i.Source }}"
 			version = "{{ $i.Version }}"

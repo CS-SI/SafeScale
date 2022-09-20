@@ -433,11 +433,13 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 	}
 
 	if _, ok := v["Username"]; !ok {
-		config, xerr := instance.Service().GetConfigurationOptions(ctx)
+		config, xerr := instance.Service().ConfigurationOptions()
 		if xerr != nil {
 			return xerr
 		}
-		if v["Username"], ok = config.Get("OperatorUsername"); !ok {
+
+		v["Username"] = config.OperatorUsername
+		if v["username"] == "" {
 			v["Username"] = abstract.DefaultUser
 		}
 	}

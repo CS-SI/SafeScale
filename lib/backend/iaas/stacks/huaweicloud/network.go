@@ -92,26 +92,25 @@ type vpcCreateResult struct {
 type vpcGetResult struct {
 	vpcCommonResult
 }
-type vpcDeleteResult struct { // nolint
-	gophercloud.ErrResult
-}
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s stack) HasDefaultNetwork(context.Context) (bool, fail.Error) {
+func (s stack) HasDefaultNetwork() (bool, fail.Error) {
 	if valid.IsNil(s) {
 		return false, fail.InvalidInstanceError()
 	}
+
 	return s.vpc != nil, nil
 }
 
-// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (s stack) GetDefaultNetwork(context.Context) (*abstract.Network, fail.Error) {
+// DefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s stack) DefaultNetwork(context.Context) (*abstract.Network, fail.Error) {
 	if valid.IsNil(s) {
 		return abstract.NewNetwork(), fail.InvalidInstanceError()
 	}
 	if s.vpc == nil {
 		return abstract.NewNetwork(), fail.NotFoundError("no default Network in stack")
 	}
+
 	return s.vpc, nil
 }
 
@@ -746,9 +745,6 @@ type subnetCreateResult struct {
 type subnetGetResult struct {
 	subnetCommonResult
 }
-type subnetDeleteResult struct { // nolint
-	gophercloud.ErrResult
-}
 
 // createSubnet creates a subnet using native FlexibleEngine API
 func (s stack) createSubnet(ctx context.Context, req abstract.SubnetRequest) (*subnets.Subnet, fail.Error) {
@@ -758,7 +754,7 @@ func (s stack) createSubnet(ctx context.Context, req abstract.SubnetRequest) (*s
 	n := netretry.IPv4ToUInt32(network)
 	gw := netretry.UInt32ToIPv4(n + 1)
 
-	dnsList := s.cfgOpts.DNSList
+	dnsList := s.cfgOpts.DNSServers
 	if len(dnsList) == 0 {
 		dnsList = []string{"1.1.1.1"}
 	}
@@ -905,7 +901,7 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 		NetworkID:      openstackAS.Network,
 		AdminStateUp:   &asu,
 		Name:           name,
-		SecurityGroups: &sgs,
+		SecurityGroups: &[]string{},
 		FixedIPs:       []ports.IP{{SubnetID: openstackAS.ID}},
 	}
 	port, err := ports.Create(s.NetworkClient, options).Extract()

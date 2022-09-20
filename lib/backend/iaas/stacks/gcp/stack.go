@@ -20,22 +20,23 @@ import (
 	"context"
 	"encoding/json"
 
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // stack ...
 type stack struct {
-	Config      *stackoptions.ConfigurationOptions
-	AuthOptions *stackoptions.AuthenticationOptions
+	Config      *stackoptions.Configuration
+	AuthOptions *stackoptions.Authentication
 	GcpConfig   *stacks.GCPConfiguration
 
 	ComputeService *compute.Service
@@ -60,23 +61,23 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.ConfigurationOptions, fail.Error) {
+func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.Configuration, fail.Error) {
 	if valid.IsNil(s) || s.Config == nil {
-		return stackoptions.ConfigurationOptions{}, fail.InvalidInstanceError()
+		return stackoptions.Configuration{}, fail.InvalidInstanceError()
 	}
 	return *s.Config, nil
 }
 
 // GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions(context.Context) (stackoptions.AuthenticationOptions, fail.Error) {
+func (s stack) GetRawAuthenticationOptions(context.Context) (stackoptions.Authentication, fail.Error) {
 	if valid.IsNil(s) || s.AuthOptions == nil {
-		return stackoptions.AuthenticationOptions{}, fail.InvalidInstanceError()
+		return stackoptions.Authentication{}, fail.InvalidInstanceError()
 	}
 	return *s.AuthOptions, nil
 }
 
 // New Create and initialize a ClientAPI
-func New(auth stackoptions.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stackoptions.ConfigurationOptions) (*stack, fail.Error) { // nolint
+func New(auth stackoptions.Authentication, localCfg stacks.GCPConfiguration, cfg stackoptions.Configuration) (*stack, fail.Error) { // nolint
 	gcpStack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,
@@ -121,4 +122,36 @@ func (s *stack) Timings() (temporal.Timings, fail.Error) {
 		s.MutableTimings = temporal.NewTimings()
 	}
 	return s.MutableTimings, nil
+}
+
+func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	xerr := s.rpcCreateTags(ctx, id, lmap)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = s.rpcCreateLabels(ctx, id, lmap)
+	return xerr
+}
+
+func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+	if kind != abstract.HostResource {
+		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
+	}
+
+	xerr := s.rpcRemoveTagsFromInstance(ctx, id, keys)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = s.rpcRemoveLabels(ctx, id, keys)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }

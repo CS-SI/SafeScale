@@ -17,12 +17,39 @@
 package abstract
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
+
+type BrokenLabel struct {
+	ID           string
+	Name         string
+	HasDefault   bool
+	DefaultValue string
+}
+
+func NewBrokenLabel() *BrokenLabel                                    { return &BrokenLabel{HasDefault: true} }
+func (t *BrokenLabel) IsNull() bool                                   { return false }
+func (t *BrokenLabel) Clone() (data.Clonable, error)                  { return t, nil }
+func (t *BrokenLabel) Replace(p data.Clonable) (data.Clonable, error) { return p, nil }
+func (t *BrokenLabel) Valid() bool                                    { return false }
+func (t BrokenLabel) OK() bool                                        { return true }
+func (t *BrokenLabel) Serialize() ([]byte, fail.Error) {
+	return nil, fail.ConvertError(fmt.Errorf("I'm broken!"))
+}
+func (t *BrokenLabel) Deserialize(buf []byte) (ferr fail.Error) {
+	return fail.ConvertError(fmt.Errorf("I'm broken!"))
+}
+func (t *BrokenLabel) GetName() string        { return "broken!" }
+func (t *BrokenLabel) GetID() (string, error) { return "broken", nil }
+func (t *BrokenLabel) IsTag() bool            { return false }
 
 func TestLabel_NewLabel(t *testing.T) {
 
@@ -97,6 +124,15 @@ func TestLabel_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, replaced)
+
+	s = NewLabel()
+	replaced, err = s.Replace(nil)
+	require.Nil(t, replaced)
+	require.Contains(t, err.Error(), "invalid parameter: p")
+
+	replaced, err = s.Replace(NewBrokenLabel())
+	require.Nil(t, replaced)
+	require.Contains(t, err.Error(), "p is not a *Label")
 
 }
 
@@ -182,11 +218,34 @@ func TestLabel_GetName(t *testing.T) {
 }
 
 func TestLabel_GetID(t *testing.T) {
-	s := NewLabel()
+
+	var s *Label = nil
+	id, err := s.GetID()
+	require.EqualValues(t, id, "")
+	require.Contains(t, err.Error(), "invalid instance")
+
+	s = NewLabel()
 	s.ID = "Label ID"
-	id, _ := s.GetID()
+	id, _ = s.GetID()
 	if id != s.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()
 	}
+}
+
+func TestLabel_IsTag(t *testing.T) {
+
+	var s *Label = nil
+	b := s.IsTag()
+	require.False(t, b)
+
+	s = NewLabel()
+	s.HasDefault = true
+	b = s.IsTag()
+	require.True(t, b)
+
+	s.HasDefault = false
+	b = s.IsTag()
+	require.False(t, b)
+
 }

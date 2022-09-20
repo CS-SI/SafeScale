@@ -16,9 +16,15 @@
 
 package options
 
-// AuthenticationOptions fields are the union of those recognized by each identity implementation and provider
+// AlphanumericWithDashesAndUnderscores is the regexp pattern to identify bucket names
+const (
+	DefaultNetworkCIDR                          = "192.168.0.0/16" // Contains the CIDR to use when none is provided
+	AlphanumericWithDashesAndUnderscores string = "^[-a-zA-Z0-9-_]+$"
+)
+
+// Authentication fields are the union of those recognized by each identity implementation and provider
 // to be able to carry different but necessary information to stack implementations
-type AuthenticationOptions struct {
+type Authentication struct {
 	// IdentityEndpoint specifies the HTTP endpoint that is required to work with
 	// the Identity API of the appropriate version. While it's ultimately needed by
 	// all the identity services, it will often be populated by a provider-level
@@ -80,4 +86,7 @@ type AuthenticationOptions struct {
 	// DefaultNetworkName string
 	// // CIDR of the VPC
 	// DefaultNetworkCIDR string
+
+	// FUTURE:
+	Specific any // may contain anything useful for the provider/stack, but that cannot be generalized; provider/stack has to provide the necessary to exploit this field
 }

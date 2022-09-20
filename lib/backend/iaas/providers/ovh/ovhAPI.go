@@ -19,29 +19,41 @@ package ovh
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/ovh/go-ovh/ovh"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
+// OVHAPI contains specific authentication options for OVH native API
+type OVHAPI struct {
+	ApplicationKey    string
+	ApplicationSecret string
+	ConsumerKey       string
+}
+
 func (p *provider) requestOVHAPI(ctx context.Context, url string, httpCode string) (interface{}, fail.Error) {
-	authOpts, xerr := p.GetAuthenticationOptions(ctx)
+	authOpts, xerr := p.AuthenticationOptions()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	alternateAPIApplicationKey := authOpts.GetString("AlternateApiApplicationKey")
+	ovhAPI, ok := authOpts.Specific.(OVHAPI)
+	if !ok {
+		return nil, fail.InvalidRequestError("missing 'OVHAPI' in 'AuthenticationOptions.Specific' field (found '%s' instead)", reflect.TypeOf(authOpts.Specific).String())
+	}
+	alternateAPIApplicationKey := ovhAPI.ApplicationKey
 	if alternateAPIApplicationKey == "" {
-		return nil, fail.SyntaxError("AlternateApiApplicationKey is not set (mandatory to access native OVH API)")
+		return nil, fail.SyntaxError("Specific.ApplicationKey is not set (mandatory to access native OVH API)")
 	}
-	alternateAPIApplicationSecret := authOpts.GetString("AlternateApiApplicationSecret")
+	alternateAPIApplicationSecret := ovhAPI.ApplicationSecret
 	if alternateAPIApplicationSecret == "" {
-		return nil, fail.SyntaxError("AlternateApiApplicationSecret is not set (mandatory to access native OVH API)")
+		return nil, fail.SyntaxError("Specific.ApplicationSecret is not set (mandatory to access native OVH API)")
 	}
-	alternateAPIConsumerKey := authOpts.GetString("AlternateApiConsumerKey")
+	alternateAPIConsumerKey := ovhAPI.ConsumerKey
 	if alternateAPIConsumerKey == "" {
-		return nil, fail.SyntaxError("AlternateApiConsumerKey is not set (mandatory to access native OVH API)")
+		return nil, fail.SyntaxError("Specific.ConsumerKey is not set (mandatory to access native OVH API)")
 	}
 
 	client, err := ovh.NewClient(

@@ -21,6 +21,8 @@ import (
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -33,7 +35,8 @@ type Provider interface {
 	stacks.Stack
 
 	// Build builds a new Client from configuration parameter and can be called from nil
-	Build(map[string]interface{}) (Provider, fail.Error)
+	Build(params map[string]interface{}) (Provider, fail.Error)
+	BuildWithTerraformer(params map[string]any, config terraformer.Configuration) (Provider, fail.Error)
 
 	// ListImages lists available OS images, all bool is unused here but used at upper levels to filter using whitelists and blacklists
 	ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error)
@@ -41,25 +44,35 @@ type Provider interface {
 	// ListTemplates lists available host templates, all bool is unused here but used at upper levels to filter using whitelists and blacklists, Host templates are sorted using Dominant Resource Fairness Algorithm
 	ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error)
 
-	// GetAuthenticationOptions returns authentication options as a Config
-	GetAuthenticationOptions(ctx context.Context) (Config, fail.Error)
+	// AuthenticationOptions returns authentication options
+	AuthenticationOptions() (options.Authentication, fail.Error)
 
-	// GetConfigurationOptions returns configuration options as a Config
-	GetConfigurationOptions(ctx context.Context) (Config, fail.Error)
+	// ConfigurationOptions returns configuration options
+	ConfigurationOptions() (options.Configuration, fail.Error)
 
 	GetName() (string, fail.Error)        // GetName returns the tenant name
 	GetStack() (stacks.Stack, fail.Error) // Returns the stack object used by the Provider. Use with caution
 
 	GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error)
 
-	// GetCapabilities returns the capabilities of the Provider
-	GetCapabilities(ctx context.Context) (Capabilities, fail.Error)
+	// Capabilities returns the capabilities of the Provider
+	Capabilities() Capabilities
 
-	// GetTenantParameters returns the tenant parameters as read
-	GetTenantParameters() (map[string]interface{}, fail.Error)
+	// TenantParameters returns the tenant parameters as read
+	TenantParameters() (map[string]interface{}, fail.Error)
 
 	// HasDefaultNetwork tells if the stack has a default network (defined in tenant settings)
-	HasDefaultNetwork(ctx context.Context) (bool, fail.Error)
-	// GetDefaultNetwork returns the abstract.Network used as default Network
-	GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error)
+	HasDefaultNetwork() (bool, fail.Error)
+	// DefaultNetwork returns the abstract.Network used as default Network
+	DefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error)
+}
+
+// StackReservedForProviderUse is an interface about the methods only available to providers internally
+type StackReservedForProviderUse interface {
+	ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error)           // list available OS images
+	ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) // list available host templates
+	ConfigurationOptions() (options.Configuration, fail.Error)                          // Return a read-only struct containing configuration options
+	AuthenticationOptions() (options.Authentication, fail.Error)                        // Return a read-only struct containing authentication options
+	HasDefaultNetwork() (bool, fail.Error)                                              // return true if the stack as a default network set (coming from tenants file)
+	DefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error)                 // return the *abstract.Network corresponding to the default network
 }

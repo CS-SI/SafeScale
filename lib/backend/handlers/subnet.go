@@ -136,14 +136,15 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var networkID string
+	svc := handler.job.Service()
 	if networkRef == "" {
-		withDefaultNetwork, xerr := handler.job.Service().HasDefaultNetwork(handler.job.Context())
+		withDefaultNetwork, xerr := svc.HasDefaultNetwork(handler.job.Context())
 		if xerr != nil {
 			return nil, xerr
 		}
 
 		if withDefaultNetwork {
-			an, xerr := handler.job.Service().GetDefaultNetwork(handler.job.Context())
+			an, xerr := svc.DefaultNetwork(handler.job.Context())
 			if xerr != nil {
 				return nil, xerr
 			}

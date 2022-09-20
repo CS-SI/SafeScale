@@ -279,7 +279,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 						_ = ferr.AddConsequence(tgerr)
 					}
 				} else {
-					logrus.Warningf("relying on metadata here was a mistake...")
+					logrus.WithContext(ctx).Warningf("relying on metadata here was a mistake...")
 				}
 			}
 		}()
@@ -524,18 +524,12 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 		// Determine default image
 		imageQuery = req.NodesDef.Image
 		if imageQuery == "" {
-			cfg, xerr := instance.Service().GetConfigurationOptions(ctx)
+			cfg, xerr := instance.Service().ConfigurationOptions()
 			if xerr != nil {
 				chRes <- result{nil, nil, nil, fail.Wrap(xerr, "failed to get configuration options")}
 				return
 			}
-			if anon, ok := cfg.Get("DefaultImage"); ok {
-				imageQuery, ok = anon.(string)
-				if !ok {
-					chRes <- result{nil, nil, nil, fail.InconsistentError("failed to convert anon to 'string'")}
-					return
-				}
-			}
+			imageQuery = cfg.DefaultImage
 		}
 		makers := instance.localCache.makers
 		if imageQuery == "" && makers.DefaultImage != nil {
@@ -709,11 +703,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 
 		// Determine if getGateway Failover must be set
 		svc := instance.Service()
-		caps, xerr := svc.GetCapabilities(ctx)
-		if xerr != nil {
-			chRes <- result{nil, nil, xerr}
-			return xerr
-		}
+		caps := svc.Capabilities()
 		gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
 		for k := range req.DisabledDefaultFeatures {
 			if k == "gateway-failover" {
@@ -722,20 +712,16 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			}
 		}
 
-		// FIXME: OPP After Stein, no failover
-		{
-			st, xerr := svc.GetStack()
-			if xerr != nil {
-				chRes <- result{nil, nil, xerr}
-				return xerr
-			}
-			stn, xerr := st.GetStackName()
-			if xerr != nil {
-				chRes <- result{nil, nil, xerr}
-				return xerr
-			}
+		var xerr fail.Error
 
-			if stn == "openstack" {
+		// After Stein, no failover
+		{
+			st, xerr := svc.GetProviderName()
+			if xerr != nil {
+				return xerr
+			}
+			if st == "ovh" {
+				logrus.WithContext(ctx).Warnf("Disabling failover for OVH due to SG issues")
 				gwFailoverDisabled = true
 			}
 		}
@@ -866,7 +852,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			switch xerr.(type) {
 			case *fail.ErrInvalidRequest:
 				// Some cloud providers do not allow to create a Subnet with the same CIDR than the Network; try with a sub-CIDR once
-				logrus.WithContext(ctx).Warnf("Cloud provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
+				logrus.WithContext(ctx).Warnf("Cloud Provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
 				_, ipNet, err := net.ParseCIDR(subnetReq.CIDR)
 				err = debug.InjectPlannedError(err)
 				if err != nil {
@@ -2072,10 +2058,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 						clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 							nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 							if !ok {
-								return fail.InconsistentError(
-									"'*propertiesv3.ClusterNodes' expected, '%s' provided",
-									reflect.TypeOf(clonable).String(),
-								)
+								return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 							}
 
 							delete(nodesV3.ByNumericalID, nodeIdx)
@@ -2176,9 +2159,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 				clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 
 					node := nodesV3.ByNumericalID[nodeIdx]
@@ -2626,7 +2607,6 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 	case <-inctx.Done():
 		return nil, fail.ConvertError(inctx.Err())
 	}
-
 }
 
 type taskCreateNodeParameters struct {
@@ -2698,9 +2678,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 
 					nodesV3.GlobalLastIndex++
@@ -2809,11 +2787,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 						debug.IgnoreError(derr)
 					default:
 						_ = ferr.AddConsequence(
-							fail.Wrap(
-								derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr),
-								hostInstance.GetName(),
-							),
-						)
+							fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), hostInstance.GetName()))
 					}
 				}
 			}
@@ -2836,9 +2810,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 				clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 
 					node = nodesV3.ByNumericalID[nodeIdx]
@@ -2887,18 +2859,13 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 						clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 							nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 							if !ok {
-								return fail.InconsistentError(
-									"'*propertiesv3.ClusterNodes' expected, '%s' provided",
-									reflect.TypeOf(clonable).String(),
-								)
+								return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 							}
 
 							if found, indexInSlice := containsClusterNode(nodesV3.PrivateNodes, nodeIdx); found {
 								length := len(nodesV3.PrivateNodes)
 								if indexInSlice < length-1 {
-									nodesV3.PrivateNodes = append(
-										nodesV3.PrivateNodes[:indexInSlice], nodesV3.PrivateNodes[indexInSlice+1:]...,
-									)
+									nodesV3.PrivateNodes = append(nodesV3.PrivateNodes[:indexInSlice], nodesV3.PrivateNodes[indexInSlice+1:]...)
 								} else {
 									nodesV3.PrivateNodes = nodesV3.PrivateNodes[:indexInSlice]
 								}
@@ -2981,15 +2948,9 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			logrus.WithContext(ctx).Debugf(
-				"[Cluster %s] Nodes configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr),
-				temporal.FormatDuration(time.Since(started)),
-			)
+			logrus.WithContext(ctx).Debugf("[Cluster %s] Nodes configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr), temporal.FormatDuration(time.Since(started)))
 		} else {
-			logrus.WithContext(ctx).Debugf(
-				"[Cluster %s] Nodes configuration successful in [%s].", instance.GetName(),
-				temporal.FormatDuration(time.Since(started)),
-			)
+			logrus.WithContext(ctx).Debugf("[Cluster %s] Nodes configuration successful in [%s].", instance.GetName(), temporal.FormatDuration(time.Since(started)))
 		}
 	}()
 
@@ -3415,51 +3376,6 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	}
 }
 
-type taskDeleteHostOnFailureParameters struct {
-	host resources.Host
-}
-
-// taskDeleteHostOnFailure deletes a host
-func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
-	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-
-	inctx := task.Context()
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  concurrency.TaskResult
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		// Convert and validate params
-		casted, ok := params.(taskDeleteHostOnFailureParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskDeleteHostOnFailureParameters'")}
-			return
-		}
-
-		chRes <- result{nil, deleteHostOnFailure(ctx, casted.host)}
-
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
-
-}
-
 // deleteHostOnFailure deletes a Host with appropriate logs
 func deleteHostOnFailure(ctx context.Context, instance resources.Host) fail.Error {
 	prefix := "Cleaning up on failure, "
@@ -3619,7 +3535,6 @@ func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, mas
 		}
 
 		chRes <- result{nil}
-
 	}()
 	select {
 	case res := <-chRes:

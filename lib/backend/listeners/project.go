@@ -20,6 +20,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 )
 
+const defaultProject = "default"
+
 // ProjectListener listens for safescale Project commands
 type ProjectListener struct {
 	protocol.UnimplementedTenantServiceServer

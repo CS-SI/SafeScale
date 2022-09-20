@@ -686,7 +686,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		return nil, nil, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
-	// --- prepares data structures for provider usage ---
+	// --- prepares data structures for Provider usage ---
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
@@ -893,6 +893,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 					return innerXErr
 				}
 			}
+
 			return nil
 		},
 		timings.NormalDelay(),
@@ -1115,12 +1116,15 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 			)
 		}
 
-		/*port, xerr = s.rpcChangePortSecurity(ctx, port.ID)
-		if xerr != nil {
-			return nets, netPorts, createdPorts, fail.Wrap(
-				xerr, "failed to disable port on external network '%s'", s.cfgOpts.ProviderNetwork,
-			)
-		}*/
+		// FIXME: OPP Use this only for Stein disaster, so it HAS to be OVH
+		if !s.cfgOpts.Safe && s.cfgOpts.ProviderName == "ovh" {
+			port, xerr = s.rpcChangePortSecurity(ctx, port.ID, false)
+			if xerr != nil {
+				return nets, netPorts, createdPorts, fail.Wrap(
+					xerr, "failed to disable port on external network '%s'", s.cfgOpts.ProviderNetwork,
+				)
+			}
+		}
 
 		createdPorts = append(createdPorts, port.ID)
 
@@ -1144,11 +1148,14 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 			)
 		}
 
-		port, xerr = s.rpcRemoveSGFromPort(ctx, port.ID)
-		if xerr != nil {
-			return nets, netPorts, createdPorts, fail.Wrap(
-				xerr, "failed to disable port on subnet '%s'", n.Name,
-			)
+		// Fix for Stein
+		if !s.cfgOpts.Safe && s.cfgOpts.ProviderName == "ovh" {
+			port, xerr = s.rpcRemoveSGFromPort(ctx, port.ID)
+			if xerr != nil {
+				return nets, netPorts, createdPorts, fail.Wrap(
+					xerr, "failed to disable port on subnet '%s'", n.Name,
+				)
+			}
 		}
 
 		createdPorts = append(createdPorts, port.ID)
@@ -1209,7 +1216,7 @@ func (s stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error
 	}
 
 	if s.selectedAvailabilityZone == "" {
-		opts, err := s.GetRawAuthenticationOptions(ctx)
+		opts, err := s.AuthenticationOptions()
 		if err != nil {
 			return "", err
 		}
@@ -1729,7 +1736,7 @@ func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, r
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	// TODO: RESIZE Resize IPAddress HERE
-	logrus.Warn("Trying to resize a Host...")
+	logrus.Warn("Trying to resize a Host...") // FIXME: OPP This should trigger a build failure
 
 	// TODO: RESIZE Call this
 	// servers.Resize()
@@ -1759,8 +1766,6 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			// FIXME: OPP Make sure SG are enabled before trying to attach SG
-
 			// list ports to be able to remove them
 			req := ports.ListOpts{
 				DeviceID: ahf.Core.ID,
@@ -1776,6 +1781,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 				}
 			}
 
+			// In order to add a SG, port security has to be activated
 			for _, p := range portList {
 				_, xerr = s.rpcChangePortSecurity(ctx, p.ID, true)
 				if xerr != nil {
@@ -1785,6 +1791,11 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 						return xerr
 					}
 				}
+			}
+
+			// Fix for Stein
+			if s.cfgOpts.ProviderName == "ovh" {
+				return nil
 			}
 
 			return secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
@@ -1809,6 +1820,11 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.S
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
+			// Fix for Stein
+			if s.cfgOpts.ProviderName == "ovh" {
+				return nil
+			}
+
 			return secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,

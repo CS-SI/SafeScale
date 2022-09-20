@@ -24,6 +24,9 @@ import (
 	"regexp"
 	"time"
 
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
@@ -41,19 +44,32 @@ import (
 )
 
 var (
-	allProviders = map[string]Service{}
+	// allProviders = map[string]Service{}
+	allProviderProfiles = map[string]*providers.Profile{}
 )
 
-// Register a Client referenced by the provider name. Ex: "ovh", ovh.New()
+// // Register a service referenced by the provider name. Ex: "ovh", ovh.New()
+// // This function should be called by the init function of each provider to be registered in SafeScale
+// func Register(name string, provider providers.Provider) {
+// 	// if already registered, leave
+// 	if _, ok := allProviders[name]; ok {
+// 		return
+// 	}
+// 	allProviders[name] = &service{
+// 		Provider: provider,
+// 	}
+// 	allProviderProfiles[name] = providers.NewProfile(provider.Capabilities())
+// }
+
+// Register a service referenced by the provider name. Ex: "ovh", ovh.New()
 // This function should be called by the init function of each provider to be registered in SafeScale
-func Register(name string, provider providers.Provider) {
+func Register(name string, profile *providers.Profile) {
 	// if already registered, leave
-	if _, ok := allProviders[name]; ok {
+	if _, ok := allProviderProfiles[name]; ok {
 		return
 	}
-	allProviders[name] = &service{
-		Provider: provider,
-	}
+
+	allProviderProfiles[name] = profile
 }
 
 // GetTenantNames returns all known tenants names
@@ -71,13 +87,66 @@ func GetTenants() ([]map[string]interface{}, fail.Error) {
 	return tenants, err
 }
 
+// FindProfile returns a Profile corresponding to provider name passed as parameter
+func FindProfile(providerName string) (*providers.Profile, fail.Error) {
+	if providerName == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("providerName")
+	}
+
+	p, ok := allProviderProfiles[providerName]
+	if !ok {
+		return nil, fail.NotFoundError("failed to find a Profile for Provider '%s'", providerName)
+	}
+
+	return p, nil
+}
+
+type (
+	Options struct {
+		tenantName               string
+		terraformerConfiguration terraformer.Configuration
+	}
+
+	OptionsMutator func(o *Options) fail.Error
+)
+
+func WithTenant(name string) OptionsMutator {
+	return func(o *Options) fail.Error {
+		if name == "" {
+			return fail.InvalidParameterCannotBeEmptyStringError("name")
+		}
+
+		o.tenantName = name
+		return nil
+	}
+}
+
+// WithTerraformer allows to indicate what terraformer.Configuration has to be used
+func WithTerraformer(config terraformer.Configuration) OptionsMutator {
+	return func(o *Options) fail.Error {
+		if valid.IsNull(config) {
+			return fail.InvalidParameterError("config", "must be a valid 'terraformer.Configuration' in WithTerraformer()")
+		}
+
+		o.terraformerConfiguration = config
+		return nil
+	}
+}
+
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(tenantName /*, metadataVersion*/ string) (newService Service, ferr fail.Error) {
+func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 	ctx := context.Background() // FIXME: Check context
-
 	defer fail.OnExitLogError(ctx, &ferr)
 	defer fail.OnPanic(&ferr)
+
+	var settings Options
+	for k, v := range opts {
+		xerr := v(&settings)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to apply option #%d", k)
+		}
+	}
 
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
@@ -88,66 +157,62 @@ func UseService(tenantName /*, metadataVersion*/ string) (newService Service, fe
 		tenantInCfg    bool
 		found          bool
 		name, provider string
-		svc            Service
 		svcProvider    = "__not_found__"
 	)
 
-	for _, tenant := range tenants {
-		name, found = tenant["name"].(string)
+	for _, currentTenant := range tenants {
+		name, found = currentTenant["name"].(string)
 		if !found {
-			name, found = tenant["Name"].(string)
-			if !found {
-				logrus.WithContext(ctx).Error("tenant found without 'name'")
-				continue
-			}
+			logrus.WithContext(ctx).Error("found tenant without 'name' parameter")
+			continue
 		}
-		if name != tenantName {
+		if name != settings.tenantName {
 			continue
 		}
 
 		tenantInCfg = true
-		provider, found = tenant["provider"].(string)
+		provider, found = currentTenant["provider"].(string)
 		if !found {
-			provider, found = tenant["provider"].(string)
+			provider, found = currentTenant["client"].(string)
 			if !found {
-				provider, found = tenant["client"].(string)
-				if !found {
-					provider, found = tenant["Client"].(string)
-					if !found {
-						logrus.WithContext(ctx).Error("Missing field 'provider' or 'client' in tenant")
-						continue
-					}
-				}
+				logrus.WithContext(ctx).Error("Missing field 'provider' or 'client' in currentTenant")
+				continue
 			}
 		}
 
 		svcProvider = provider
-		svc, found = allProviders[provider]
-		if !found {
-			logrus.WithContext(ctx).Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
+		svcProviderProfile, xerr := FindProfile(provider)
+		if xerr != nil {
+			logrus.WithContext(ctx).Errorf(xerr.Error())
 			continue
 		}
 
-		_, found = tenant["identity"].(map[string]interface{})
+		_, found = currentTenant["identity"].(map[string]interface{})
 		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'identity' found in tenant '%s', continuing.", name)
+			logrus.WithContext(ctx).Debugf("No section 'identity' found in currentTenant '%s', continuing.", name)
 		}
-		_, found = tenant["compute"].(map[string]interface{})
+		_, found = currentTenant["compute"].(map[string]interface{})
 		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'compute' found in tenant '%s', continuing.", name)
+			logrus.WithContext(ctx).Debugf("No section 'compute' found in currentTenant '%s', continuing.", name)
 		}
-		_, found = tenant["network"].(map[string]interface{})
+		_, found = currentTenant["network"].(map[string]interface{})
 		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'network' found in tenant '%s', continuing.", name)
+			logrus.WithContext(ctx).Debugf("No section 'network' found in currentTenant '%s', continuing.", name)
 		}
 
-		_, tenantObjectStorageFound := tenant["objectstorage"]
-		_, tenantMetadataFound := tenant["metadata"]
+		_, tenantObjectStorageFound := currentTenant["objectstorage"]
+		_, tenantMetadataFound := currentTenant["metadata"]
 
 		// Initializes provider
-		providerInstance, xerr := svc.Build(tenant)
+		var providerInstance providers.Provider
+		referenceProviderInstance := svcProviderProfile.ReferenceInstance()
+		if svcProviderProfile.Capabilities().UseTerraformer {
+			providerInstance, xerr = referenceProviderInstance.BuildWithTerraformer(currentTenant, settings.terraformerConfiguration)
+		} else {
+			providerInstance, xerr = referenceProviderInstance.Build(currentTenant)
+		}
 		if xerr != nil {
-			return NullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
+			return NullService(), fail.Wrap(xerr, "error initializing currentTenant '%s' on provider '%s'", settings.tenantName, provider)
 		}
 
 		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
@@ -161,7 +226,7 @@ func UseService(tenantName /*, metadataVersion*/ string) (newService Service, fe
 
 		newS := &service{
 			Provider:     providerInstance,
-			tenantName:   tenantName,
+			tenantName:   settings.tenantName,
 			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 1 * time.Minute}))),
 		}
 
@@ -179,7 +244,7 @@ func UseService(tenantName /*, metadataVersion*/ string) (newService Service, fe
 		// 	}
 		// }
 
-		authOpts, xerr := providerInstance.GetAuthenticationOptions(ctx)
+		authOpts, xerr := providerInstance.AuthenticationOptions()
 		if xerr != nil {
 			return NullService(), xerr
 		}
@@ -195,7 +260,7 @@ func UseService(tenantName /*, metadataVersion*/ string) (newService Service, fe
 		// Initializes Object Storage
 		var objectStorageLocation objectstorage.Location
 		if tenantObjectStorageFound {
-			objectStorageConfig, xerr := initObjectStorageLocationConfig(authOpts, tenant)
+			objectStorageConfig, xerr := initObjectStorageLocationConfig(authOpts, currentTenant)
 			if xerr != nil {
 				return NullService(), xerr
 			}
@@ -211,7 +276,7 @@ func UseService(tenantName /*, metadataVersion*/ string) (newService Service, fe
 				return NullService(), fail.Wrap(xerr, "error connecting to Object Storage location")
 			}
 		} else {
-			logrus.WithContext(ctx).Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
+			logrus.WithContext(ctx).Warnf("missing section 'objectstorage' in configuration file for currentTenant '%s'", settings.tenantName)
 		}
 
 		// Initializes Metadata Object Storage (maybe different from the Object Storage)
@@ -220,7 +285,7 @@ func UseService(tenantName /*, metadataVersion*/ string) (newService Service, fe
 			metadataCryptKey *crypt.Key
 		)
 		if tenantMetadataFound || tenantObjectStorageFound {
-			metadataLocationConfig, err := initMetadataLocationConfig(authOpts, tenant)
+			metadataLocationConfig, err := initMetadataLocationConfig(authOpts, currentTenant)
 			if err != nil {
 				return NullService(), err
 			}
@@ -237,21 +302,12 @@ func UseService(tenantName /*, metadataVersion*/ string) (newService Service, fe
 			}
 
 			if metadataLocationConfig.BucketName == "" {
-				serviceCfg, xerr := providerInstance.GetConfigurationOptions(ctx)
+				serviceCfg, xerr := providerInstance.ConfigurationOptions()
 				if xerr != nil {
 					return NullService(), xerr
 				}
 
-				anon, there := serviceCfg.Get("MetadataBucketName")
-				if !there {
-					return NullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
-				}
-
-				var ok bool
-				metadataLocationConfig.BucketName, ok = anon.(string)
-				if !ok {
-					return NullService(), fail.InvalidRequestError("invalid bucket name, it's not a string")
-				}
+				metadataLocationConfig.BucketName = serviceCfg.MetadataBucketName
 			}
 			found, err = metadataLocation.FindBucket(ctx, metadataLocationConfig.BucketName)
 			if err != nil {
@@ -279,7 +335,7 @@ func UseService(tenantName /*, metadataVersion*/ string) (newService Service, fe
 				// 	}
 				// }
 			}
-			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {
+			if metadataConfig, ok := currentTenant["metadata"].(map[string]interface{}); ok {
 				if key, ok := metadataConfig["CryptKey"].(string); ok {
 					ek, err := crypt.NewEncryptionKey([]byte(key))
 					if err != nil {
@@ -288,9 +344,9 @@ func UseService(tenantName /*, metadataVersion*/ string) (newService Service, fe
 					metadataCryptKey = ek
 				}
 			}
-			logrus.WithContext(ctx).Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", tenantName, metadataBucket.GetName())
+			logrus.WithContext(ctx).Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", settings.tenantName, metadataBucket.GetName())
 		} else {
-			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
+			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for currentTenant '%s'", settings.tenantName)
 		}
 
 		// service is ready
@@ -298,12 +354,12 @@ func UseService(tenantName /*, metadataVersion*/ string) (newService Service, fe
 		newS.metadataBucket = metadataBucket
 		newS.metadataKey = metadataCryptKey
 
-		if xerr := validateRegexps(newS, tenant); xerr != nil {
+		if xerr := validateRegexps(newS, currentTenant); xerr != nil {
 			return NullService(), xerr
 		}
 
-		// increase tenant counter
-		ts := expvar.Get("tenant.setted")
+		// increase currentTenant counter
+		ts := expvar.Get("currentTenant.setted")
 		if ts != nil {
 			tsi, ok := ts.(*expvar.Int)
 			if ok {
@@ -315,7 +371,7 @@ func UseService(tenantName /*, metadataVersion*/ string) (newService Service, fe
 	}
 
 	if !tenantInCfg {
-		return NullService(), fail.NotFoundError("tenant '%s' not found in configuration", tenantName)
+		return NullService(), fail.NotFoundError("currentTenant '%s' not found in configuration", settings.tenantName)
 	}
 
 	return NullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
@@ -401,7 +457,7 @@ func validateRegexpsOfKeyword(keyword string, content interface{}) (out []*regex
 }
 
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map
-func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (
+func initObjectStorageLocationConfig(authOpts stackoptions.Authentication, tenant map[string]interface{}) (
 	objectstorage.Config, fail.Error,
 ) {
 	var (
@@ -423,7 +479,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 				if config.Domain, ok = compute["DomainName"].(string); !ok {
 					if config.Domain, ok = identity["Domain"].(string); !ok {
 						if config.Domain, ok = identity["DomainName"].(string); !ok {
-							config.Domain = authOpts.GetString("DomainName")
+							config.Domain = authOpts.DomainName
 						}
 					}
 				}
@@ -437,7 +493,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 			if config.Tenant, ok = ostorage["ProjectID"].(string); !ok {
 				if config.Tenant, ok = compute["ProjectName"].(string); !ok {
 					if config.Tenant, ok = compute["ProjectID"].(string); !ok {
-						config.Tenant = authOpts.GetString("ProjectName")
+						config.Tenant = authOpts.ProjectName
 					}
 				}
 			}
@@ -497,7 +553,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 			if _, ok = v.(bool); ok {
 				continue
 			}
-			if k == "DNSList" {
+			if k == "DNSServers" {
 				continue
 			}
 			return config, fail.InconsistentError("'compute' it's a map[string]string, and the key %s is not a string: %v", k, v)
@@ -560,9 +616,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 // }
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
-func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (
-	objectstorage.Config, fail.Error,
-) {
+func initMetadataLocationConfig(authOpts stackoptions.Authentication, tenant map[string]interface{}) (objectstorage.Config, fail.Error) {
 	var (
 		config objectstorage.Config
 		ok     bool
@@ -589,7 +643,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 						if config.Domain, ok = compute["DomainName"].(string); !ok {
 							if config.Domain, ok = identity["Domain"].(string); !ok {
 								if config.Domain, ok = identity["DomainName"].(string); !ok {
-									config.Domain = authOpts.GetString("DomainName") // nolint
+									config.Domain = authOpts.DomainName
 								}
 							}
 						}

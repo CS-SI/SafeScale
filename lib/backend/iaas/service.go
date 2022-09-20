@@ -512,9 +512,7 @@ func (instance service) FindTemplateBySizing(inctx context.Context, sizing abstr
 }
 
 // reduceTemplates filters from template slice the entries satisfying whitelist and blacklist regexps
-func (instance service) reduceTemplates(
-	tpls []*abstract.HostTemplate, whitelistREs, blacklistREs []*regexp.Regexp,
-) []*abstract.HostTemplate {
+func (instance service) reduceTemplates(tpls []*abstract.HostTemplate, whitelistREs, blacklistREs []*regexp.Regexp) []*abstract.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if len(whitelistREs) > 0 {
 		// finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(instance.whitelistTemplateREs))
@@ -548,9 +546,7 @@ func filterTemplatesByRegexSlice(res []*regexp.Regexp) templatefilters.Predicate
 
 // ListTemplatesBySizing select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (instance service) ListTemplatesBySizing(
-	inctx context.Context, sizing abstract.HostSizingRequirements, force bool,
-) (selectedTpls []*abstract.HostTemplate, rerr fail.Error) {
+func (instance service) ListTemplatesBySizing(inctx context.Context, sizing abstract.HostSizingRequirements, force bool) (selectedTpls []*abstract.HostTemplate, rerr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -594,18 +590,13 @@ func (instance service) ListTemplatesBySizing(
 					return
 				}
 			} else {
-				authOpts, rerr := instance.GetAuthenticationOptions(ctx)
-				if rerr != nil {
-					chRes <- result{nil, rerr}
+				authOpts, xerr := instance.AuthenticationOptions()
+				if xerr != nil {
+					chRes <- result{nil, xerr}
 					return
 				}
 
-				region, ok := authOpts.Get("Region")
-				if !ok {
-					chRes <- result{nil, fail.SyntaxError("region value unset")}
-					return
-				}
-
+				region := authOpts.Region
 				svcName, xerr := instance.GetName()
 				if xerr != nil {
 					chRes <- result{nil, xerr}
@@ -1145,7 +1136,6 @@ func (instance service) ListHostsByName(inctx context.Context, details bool) (ma
 	case <-inctx.Done():
 		return nil, fail.ConvertError(inctx.Err())
 	}
-
 }
 
 // TenantCleanup removes everything related to SafeScale from tenant (mainly metadata)
@@ -1160,9 +1150,7 @@ func (instance service) TenantCleanup(ctx context.Context, force bool) fail.Erro
 }
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
-func (instance service) LookupRuleInSecurityGroup(
-	inctx context.Context, asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule,
-) (bool, fail.Error) {
+func (instance service) LookupRuleInSecurityGroup(inctx context.Context, asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule) (bool, fail.Error) {
 	if valid.IsNil(asg) {
 		return false, fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
@@ -1295,7 +1283,6 @@ func (instance service) ObjectStorageConfiguration(inctx context.Context) (objec
 
 		oc, xerr := instance.Location.Configuration()
 		chRes <- result{oc, xerr}
-
 	}()
 	select {
 	case res := <-chRes:

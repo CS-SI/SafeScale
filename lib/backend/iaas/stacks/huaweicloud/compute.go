@@ -350,7 +350,7 @@ func (s stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error
 	}
 
 	if s.selectedAvailabilityZone == "" {
-		cfg, err := s.GetRawAuthenticationOptions(ctx)
+		cfg, err := s.AuthenticationOptions()
 		if err != nil {
 			return "", err
 		}
@@ -463,7 +463,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		return nil, nil, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}
 
-	// --- prepares data structures for provider usage ---
+	// --- prepares data structures for Provider usage ---
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -540,7 +540,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	metadata := make(map[string]string)
 	metadata["ManagedBy"] = "safescale"
-	metadata["DeclaredInBucket"] = s.cfgOpts.MetadataBucket
+	metadata["DeclaredInBucket"] = s.cfgOpts.MetadataBucketName
 	metadata["Image"] = request.ImageRef
 	metadata["Template"] = request.TemplateID
 	metadata["CreationDate"] = time.Now().Format(time.RFC3339)
@@ -779,8 +779,7 @@ func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 	return true, nil
 }
 
-// FIXME: Remove this function later when searchInStruct is ready
-func extractImageTheLongWay(in *images.Image) (_ abstract.Image, ferr fail.Error) { // nolint
+func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	properties := in.Properties
@@ -821,28 +820,6 @@ func extractImageTheLongWay(in *images.Image) (_ abstract.Image, ferr fail.Error
 	if !ok {
 		return abstract.Image{}, fail.NewError("invalid new format")
 	}
-
-	out := abstract.Image{
-		ID:       id,
-		Name:     name,
-		DiskSize: int64(d),
-	}
-
-	return out, nil
-}
-
-func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	// following code will eventually break or panic
-	// FIXME: Write function that can search external structs without panicking, like jq for json
-	// so we can write something like searchInStruct(in.Properties, ".Properties.image.minDisk")
-
-	properties := in.Properties
-	image := properties["image"].(map[string]interface{}) // nolint
-	d := image["minDisk"].(float64)                       // nolint
-	id := image["id"].(string)                            // nolint
-	name := image["name"].(string)                        // nolint
 
 	out := abstract.Image{
 		ID:       id,
@@ -1517,32 +1494,6 @@ func (s stack) enableHostRouterMode(ctx context.Context, host *abstract.HostFull
 				},
 			}
 			opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
-			_, innerErr := ports.Update(s.NetworkClient, *portID, opts).Extract()
-			return normalizeError(innerErr)
-		},
-		normalizeError,
-	)
-	if commRetryErr != nil {
-		return commRetryErr
-	}
-	return nil
-}
-
-// DisableHostRouterMode disables the host to act as a router/gateway.
-func (s stack) disableHostRouterMode(ctx context.Context, host *abstract.HostFull) fail.Error {
-	portID, xerr := s.getOpenstackPortID(ctx, host)
-	if xerr != nil {
-		return fail.NewErrorWithCause(xerr, "failed to disable Router Mode on host '%s'", host.Core.Name)
-	}
-	if portID == nil {
-		return fail.NewError(
-			"failed to disable Router Mode on host '%s': failed to find OpenStack port", host.Core.Name,
-		)
-	}
-
-	commRetryErr := stacks.RetryableRemoteCall(ctx,
-		func() error {
-			opts := ports.UpdateOpts{AllowedAddressPairs: nil}
 			_, innerErr := ports.Update(s.NetworkClient, *portID, opts).Extract()
 			return normalizeError(innerErr)
 		},

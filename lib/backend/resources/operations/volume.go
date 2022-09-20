@@ -207,7 +207,7 @@ func onVolumeCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.
 
 // IsNull tells if the instance is a null value
 func (instance *volume) IsNull() bool {
-	return instance == nil || instance.Core == nil || valid.IsNil(instance.Core)
+	return instance == nil || valid.IsNil(instance.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
