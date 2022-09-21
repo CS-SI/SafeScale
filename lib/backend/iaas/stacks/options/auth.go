@@ -72,6 +72,8 @@ type Authentication struct {
 
 	// Openstack region (data center) where the infrastructure will be created
 	Region string `valid:"alphanumwithdashesandunderscores,required"`
+	// FIXME: is it really used? Isn't it a synonym of AvailabilityZone?
+	SubRegion string `valid:"alphanumwithdashesandunderscores"`
 
 	AvailabilityZone string `valid:"alphanumwithdashesandunderscores,required"`
 
@@ -79,14 +81,13 @@ type Authentication struct {
 	// Necessary only if UseFloatingIP is true
 	FloatingIPPool string
 
-	AK string
-	AS string
-	CK string
+	// AK string
+	// AS string
+	// CK string
 	// // Name of the VPC (Virtual Private Cloud)
 	// DefaultNetworkName string
 	// // CIDR of the VPC
 	// DefaultNetworkCIDR string
 
-	// FUTURE:
 	Specific any // may contain anything useful for the provider/stack, but that cannot be generalized; provider/stack has to provide the necessary to exploit this field
 }

@@ -112,7 +112,7 @@ func shareCreateCommand() *cobra.Command {
 			}
 
 			shareName := args[0]
-			def := protocol.ShareDefinition{
+			def := protocol.ShareCreateRequest{
 				Name: shareName,
 				Host: &protocol.Reference{Name: args[1]},
 				Path: path,
@@ -224,7 +224,7 @@ func shareMountCommand() *cobra.Command {
 				return cli.FailureResponse(err)
 			}
 
-			def := protocol.ShareMountDefinition{
+			def := protocol.ShareMountRequest{
 				Host:      &protocol.Reference{Name: hostName},
 				Share:     &protocol.Reference{Name: shareName},
 				Path:      path,
@@ -263,7 +263,7 @@ func shareUnmountCommand() *cobra.Command {
 
 			shareName := args[0]
 			hostName := args[1]
-			def := protocol.ShareMountDefinition{
+			def := protocol.ShareMountRequest{
 				Host:  &protocol.Reference{Name: hostName},
 				Share: &protocol.Reference{Name: shareName},
 			}

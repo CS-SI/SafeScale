@@ -34,7 +34,7 @@ type shareConsumer struct {
 }
 
 // Create ...
-func (n shareConsumer) Create(def *protocol.ShareDefinition, timeout time.Duration) error {
+func (n shareConsumer) Create(def *protocol.ShareCreateRequest, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
@@ -110,7 +110,7 @@ func (n shareConsumer) Delete(names []string, timeout time.Duration) error {
 }
 
 // List ...
-func (n shareConsumer) List(timeout time.Duration) (*protocol.ShareList, error) {
+func (n shareConsumer) List(timeout time.Duration) (*protocol.ShareListResponse, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
@@ -135,7 +135,7 @@ func (n shareConsumer) List(timeout time.Duration) (*protocol.ShareList, error) 
 }
 
 // Mount ...
-func (n shareConsumer) Mount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
+func (n shareConsumer) Mount(def *protocol.ShareMountRequest, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
@@ -160,7 +160,7 @@ func (n shareConsumer) Mount(def *protocol.ShareMountDefinition, timeout time.Du
 }
 
 // Unmount ...
-func (n shareConsumer) Unmount(def *protocol.ShareMountDefinition, timeout time.Duration) error {
+func (n shareConsumer) Unmount(def *protocol.ShareMountRequest, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
@@ -185,7 +185,7 @@ func (n shareConsumer) Unmount(def *protocol.ShareMountDefinition, timeout time.
 }
 
 // Inspect ...
-func (n shareConsumer) Inspect(name string, timeout time.Duration) (*protocol.ShareMountList, error) {
+func (n shareConsumer) Inspect(name string, timeout time.Duration) (*protocol.ShareMountListResponse, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)

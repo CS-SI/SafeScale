@@ -240,9 +240,14 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return in
 	}
 
-	opts, err := svc.ConfigurationOptions(ctx)
-	if err != nil {
-		return nil, fail.Wrap(err, "unable to recover driver configuration")
+	authOpts, xerr := svc.AuthenticationOptions()
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "unable to recover driver authentication options")
+	}
+
+	configOpts, xerr := svc.ConfigurationOptions()
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "unable to recover driver configuration options")
 	}
 
 	params, err := svc.TenantParameters()
@@ -281,17 +286,17 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		},
 		Compute: &protocol.TenantCompute{
 			Region:                 fromParams(params, "compute", "Region"),
-			SubRegion:              opts.GetString("SubRegion"),
+			SubRegion:              authOpts.SubRegion,
 			AvailabilityZone:       fromParams(params, "compute", "Zone"),
 			Context:                nil,
 			ApiKey:                 nil, // secret
-			WhitelistTemplateRegex: opts.GetString("WhitelistTemplateRegex"),
-			BlacklistTemplateRegex: opts.GetString("BlacklistTemplateRegex"),
-			DefaultImage:           opts.GetString("DefaultImage"),
-			DnsList:                opts.GetSliceOfStrings("DnsList"),
+			WhitelistTemplateRegex: configOpts.WhitelistTemplateRegexp.String(),
+			BlacklistTemplateRegex: configOpts.BlacklistTemplateRegexp.String(),
+			DefaultImage:           configOpts.DefaultImage,
+			DnsList:                configOpts.DNSServers,
 			OperatorUsername:       fromParams(params, "compute", "OperatorUsername"),
-			WhitelistImageRegex:    opts.GetString("WhitelistImageRegex"),
-			BlacklistImageRegex:    opts.GetString("BlacklistImageRegex"),
+			WhitelistImageRegex:    configOpts.WhitelistImageRegexp.String(),
+			BlacklistImageRegex:    configOpts.BlacklistImageRegexp.String(),
 		},
 		ObjectStorage: &protocol.TenantObjectStorage{
 			Type:           fromParams(params, "objectstorage", "Type"),
@@ -842,15 +847,12 @@ func createCPUInfo(output string) (_ *CPUInfo, ferr fail.Error) {
 func (handler *tenantHandler) collect(ctx context.Context) (ferr fail.Error) {
 	svc := handler.job.Service()
 
-	authOpts, xerr := svc.AuthenticationOptions(ctx)
+	authOpts, xerr := svc.AuthenticationOptions()
 	if xerr != nil {
 		return xerr
 	}
-	region, ok := authOpts.Get("Region")
-	if !ok {
-		return fail.InvalidRequestError("'Region' not set in tenant 'compute' section")
-	}
 
+	region := authOpts.Region
 	svcName, xerr := svc.GetName()
 	if xerr != nil {
 		return xerr

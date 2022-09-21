@@ -53,8 +53,8 @@ func VolumeAttachmentFromAbstractToProtocol(in *abstract.VolumeAttachment) *prot
 }
 
 // HostEffectiveSizingFromAbstractToProtocol ...
-func HostEffectiveSizingFromAbstractToProtocol(in *abstract.HostEffectiveSizing) *protocol.HostDefinition {
-	return &protocol.HostDefinition{
+func HostEffectiveSizingFromAbstractToProtocol(in *abstract.HostEffectiveSizing) *protocol.HostCreateRequest {
+	return &protocol.HostCreateRequest{
 		ImageId: in.ImageID,
 		Sizing: &protocol.HostSizing{
 			MinCpuCount: int32(in.Cores),

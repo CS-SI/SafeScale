@@ -37,7 +37,7 @@ type SSHListener struct {
 }
 
 // Run executes an ssh command on a host
-func (s *SSHListener) Run(inctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, ferr error) {
+func (s *SSHListener) Run(inctx context.Context, in *protocol.SshCommandRequest) (sr *protocol.SshResponse, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
 	defer fail.OnExitWrapError(inctx, &ferr, "cannot run by ssh")
 	defer fail.OnPanic(&ferr)
@@ -60,14 +60,14 @@ func (s *SSHListener) Run(inctx context.Context, in *protocol.SshCommand) (sr *p
 		}
 	}
 
-	command := in.GetCommand()
-
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/ssh/run/host/%s", hostRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/ssh/run/host/%s", hostRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
+	command := in.GetCommand()
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
@@ -89,7 +89,7 @@ func (s *SSHListener) Run(inctx context.Context, in *protocol.SshCommand) (sr *p
 }
 
 // Copy copies file from/to a host
-func (s *SSHListener) Copy(inctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
+func (s *SSHListener) Copy(inctx context.Context, in *protocol.SshCopyCommandRequest) (sr *protocol.SshResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot copy by ssh")
 
@@ -108,7 +108,8 @@ func (s *SSHListener) Copy(inctx context.Context, in *protocol.SshCopyCommand) (
 	source := in.Source
 	dest := in.Destination
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/ssh/%s", hostRef))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/ssh/%s", hostRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}

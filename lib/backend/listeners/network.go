@@ -62,7 +62,8 @@ func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCrea
 		return nil, fail.InvalidRequestError("network name cannot be empty string")
 	}
 
-	job, xerr := PrepareJob(inctx, "default", "default", in.GetTenantId(), fmt.Sprintf("/network/%s/create", networkName))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/network/%s/create", networkName))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -143,7 +144,8 @@ func (s *NetworkListener) List(inctx context.Context, in *protocol.NetworkListRe
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	job, xerr := PrepareJob(inctx, "default", "default", in.GetTenantId(), "/networks/list")
+	scope := extractScopeFromProtocol(in, "/networks/list")
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -189,7 +191,8 @@ func (s *NetworkListener) Inspect(inctx context.Context, in *protocol.Reference)
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/network/%s/inspect", networkRef))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/network/%s/inspect", networkRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -235,7 +238,8 @@ func (s *NetworkListener) Delete(inctx context.Context, in *protocol.NetworkDele
 		logrus.Tracef("forcing network deletion")
 	}
 
-	job, xerr := PrepareJob(inctx, in.Network.GetTenantId(), fmt.Sprintf("/network/%s/delete", networkRef))
+	scope := extractScopeFromProtocol(in.GetNetwork(), fmt.Sprintf("/network/%s/delete", networkRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -39,5 +39,5 @@ type Share interface {
 	GetServer(ctx context.Context) (Host, fail.Error)                                                              // returns the *Host acting as share server, with error handling
 	Mount(ctx context.Context, host Host, path string, withCache bool) (*propertiesv1.HostRemoteMount, fail.Error) // mounts a share on a local directory of a host
 	Unmount(ctx context.Context, host Host) fail.Error                                                             // unmounts a share from local directory of a host
-	ToProtocol(ctx context.Context) (*protocol.ShareMountList, fail.Error)
+	ToProtocol(ctx context.Context) (*protocol.ShareMountListResponse, fail.Error)
 }

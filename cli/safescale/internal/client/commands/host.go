@@ -259,7 +259,7 @@ func hostCreateCommand() *cobra.Command {
 				return err
 			}
 
-			req := protocol.HostDefinition{
+			req := protocol.HostCreateRequest{
 				Name:           args[0],
 				SizingAsString: sizing,
 			}
@@ -339,7 +339,7 @@ func hostResizeCommand() *cobra.Command {
 			default:
 			}
 
-			def := protocol.HostDefinition{
+			def := protocol.HostCreateRequest{
 				Name: args[0],
 			}
 

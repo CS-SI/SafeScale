@@ -28,8 +28,8 @@ import (
 )
 
 // ShareFromPropertyToProtocol convert a share from host to protocol message
-func ShareFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare) *protocol.ShareDefinition {
-	return &protocol.ShareDefinition{
+func ShareFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare) *protocol.ShareCreateRequest {
+	return &protocol.ShareCreateRequest{
 		Id:              share.ID,
 		Name:            share.Name,
 		Host:            &protocol.Reference{Name: hostName},
@@ -40,8 +40,8 @@ func ShareFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare)
 }
 
 // ShareMountFromPropertyToProtocol convert share mount on host to protocol message
-func ShareMountFromPropertyToProtocol(shareName string, hostName string, mount *propertiesv1.HostRemoteMount) *protocol.ShareMountDefinition {
-	return &protocol.ShareMountDefinition{
+func ShareMountFromPropertyToProtocol(shareName string, hostName string, mount *propertiesv1.HostRemoteMount) *protocol.ShareMountRequest {
+	return &protocol.ShareMountRequest{
 		Share: &protocol.Reference{Name: shareName},
 		Host:  &protocol.Reference{Name: hostName},
 		Path:  mount.Path,
@@ -50,17 +50,17 @@ func ShareMountFromPropertyToProtocol(shareName string, hostName string, mount *
 }
 
 // ShareMountListFromPropertyToProtocol converts share mounts from host to protocol message
-func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare, mounts map[string]*propertiesv1.HostRemoteMount) *protocol.ShareMountList {
-	var pbMounts []*protocol.ShareMountDefinition
+func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.HostShare, mounts map[string]*propertiesv1.HostRemoteMount) *protocol.ShareMountListResponse {
+	var pbMounts []*protocol.ShareMountRequest
 	for k, v := range mounts {
-		pbMounts = append(pbMounts, &protocol.ShareMountDefinition{
+		pbMounts = append(pbMounts, &protocol.ShareMountRequest{
 			Host:  &protocol.Reference{Name: k},
 			Share: &protocol.Reference{Name: share.Name},
 			Path:  v.Path,
 			Type:  "nfs",
 		})
 	}
-	return &protocol.ShareMountList{
+	return &protocol.ShareMountListResponse{
 		Share:     ShareFromPropertyToProtocol(hostName, share),
 		MountList: pbMounts,
 	}

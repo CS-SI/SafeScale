@@ -87,7 +87,8 @@ func (s *HostListener) Start(inctx context.Context, in *protocol.Reference) (emp
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/host/%s/start", ref))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/host/%s/start", ref))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -122,7 +123,8 @@ func (s *HostListener) Stop(inctx context.Context, in *protocol.Reference) (empt
 		return empty, fail.InvalidRequestError("neither name nor id of host has been provided")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/host/%s/stop", ref))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/host/%s/stop", ref))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -155,7 +157,8 @@ func (s *HostListener) Reboot(inctx context.Context, in *protocol.Reference) (em
 		return empty, fail.InvalidRequestError("neither name nor id of host has been provided")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/host%s/reboot", ref))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/host%s/reboot", ref))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -183,7 +186,8 @@ func (s *HostListener) List(inctx context.Context, in *protocol.HostListRequest)
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), "/hosts/list")
+	scope := extractScopeFromProtocol(in, "/hosts/list")
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -212,7 +216,7 @@ func (s *HostListener) List(inctx context.Context, in *protocol.HostListRequest)
 }
 
 // Create creates a new host
-func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, err error) {
+func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequest) (_ *protocol.Host, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot create host")
 	defer fail.OnPanic(&err)
@@ -228,7 +232,8 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/host/%s/create", name))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/host/%s/create", name))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -337,7 +342,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 }
 
 // Resize a host
-func (s *HostListener) Resize(inctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, err error) {
+func (s *HostListener) Resize(inctx context.Context, in *protocol.HostCreateRequest) (_ *protocol.Host, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot resize host")
 	defer fail.OnPanic(&err)
@@ -353,7 +358,8 @@ func (s *HostListener) Resize(inctx context.Context, in *protocol.HostDefinition
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/host/%s/resize", name))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/host/%s/resize", name))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -402,7 +408,8 @@ func (s *HostListener) Status(inctx context.Context, in *protocol.Reference) (ht
 		return nil, fail.InvalidRequestError("neither name nor id given as reference").ToGRPCStatus()
 	}
 
-	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/host/%s/state", ref))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/host/%s/state", ref))
+	job, err := prepareJob(inctx, scope)
 	if err != nil {
 		return nil, err
 	}
@@ -440,7 +447,8 @@ func (s *HostListener) Inspect(inctx context.Context, in *protocol.Reference) (h
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/host/%s/inspect", ref))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/host/%s/inspect", ref))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -488,7 +496,8 @@ func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (em
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/host/%s/delete", ref))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/host/%s/delete", ref))
+	job, err := prepareJob(inctx, scope)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +534,8 @@ func (s *HostListener) SSH(inctx context.Context, in *protocol.Reference) (_ *pr
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/host/%s/sshconfig", ref))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/host/%s/sshconfig", ref))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -577,9 +587,8 @@ func (s *HostListener) BindSecurityGroup(inctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(
-		inctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/bind", hostRef, sgRef),
-	)
+	scope := extractScopeFromProtocol(in.GetGroup(), fmt.Sprintf("/host/%s/securitygroup/%s/bind", hostRef, sgRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -629,9 +638,8 @@ func (s *HostListener) UnbindSecurityGroup(inctx context.Context, in *protocol.S
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(
-		inctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/unbind", hostRef, sgRef),
-	)
+	scope := extractScopeFromProtocol(in.GetGroup(), fmt.Sprintf("/host/%s/securitygroup/%s/unbind", hostRef, sgRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -673,7 +681,8 @@ func (s *HostListener) EnableSecurityGroup(inctx context.Context, in *protocol.S
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/enable", hostRef, sgRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/host/%s/securitygroup/%s/enable", hostRef, sgRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -715,7 +724,8 @@ func (s *HostListener) DisableSecurityGroup(inctx context.Context, in *protocol.
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/disable", hostRef, sgRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/host/%s/securitygroup/%s/disable", hostRef, sgRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -751,7 +761,8 @@ func (s *HostListener) ListSecurityGroups(inctx context.Context, in *protocol.Se
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroups/list", hostRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/host/%s/securitygroups/list", hostRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -793,7 +804,8 @@ func (s *HostListener) ListLabels(inctx context.Context, in *protocol.LabelBound
 	}
 
 	kind := strings.ToLower(kindToString(in.GetTags()))
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/%s/list", hostRef, kind))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/host/%s/%s/list", hostRef, kind))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -849,7 +861,8 @@ func (s *HostListener) InspectLabel(inctx context.Context, in *protocol.HostLabe
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/label/%s/bind", hostRef, labelRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/host/%s/label/%s/bind", hostRef, labelRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -907,7 +920,8 @@ func (s *HostListener) BindLabel(inctx context.Context, in *protocol.LabelBindRe
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/label/%s/bind", hostRef, labelRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/host/%s/label/%s/bind", hostRef, labelRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -954,7 +968,8 @@ func (s *HostListener) UnbindLabel(inctx context.Context, in *protocol.LabelBind
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/label/%s/unbind", hostRef, labelRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/host/%s/label/%s/unbind", hostRef, labelRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1001,7 +1016,8 @@ func (s *HostListener) UpdateLabel(inctx context.Context, in *protocol.LabelBind
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/label/%s/update", hostRef, labelRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/host/%s/label/%s/update", hostRef, labelRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1048,7 +1064,8 @@ func (s *HostListener) ResetLabel(inctx context.Context, in *protocol.LabelBindR
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/label/%s/reset", hostRef, labelRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/host/%s/label/%s/reset", hostRef, labelRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}

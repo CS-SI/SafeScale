@@ -68,7 +68,7 @@ func (s *TenantListener) List(inctx context.Context, in *googleprotobuf.Empty) (
 }
 
 // Get returns the name of the current tenant used
-func (s *TenantListener) Get(inctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantName, err error) {
+func (s *TenantListener) Get(inctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantNameResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 
 	if s == nil {
@@ -90,7 +90,7 @@ func (s *TenantListener) Get(inctx context.Context, in *googleprotobuf.Empty) (_
 		return nil, xerr
 	}
 
-	return &protocol.TenantName{
+	return &protocol.TenantNameResponse{
 		Name:       currentTenant.Name,
 		BucketName: currentTenant.BucketName,
 		Provider:   prvName,
@@ -98,7 +98,7 @@ func (s *TenantListener) Get(inctx context.Context, in *googleprotobuf.Empty) (_
 }
 
 // Set sets the tenant to use for each command
-func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantName) (empty *googleprotobuf.Empty, err error) {
+func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantInspectRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot set tenant")
 	defer fail.OnPanic(&err)
@@ -141,7 +141,12 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(inctx, "", "", in.GetName(), fmt.Sprintf("tenant/%s/metadata/delete", name))
+	fakeReference := &protocol.Reference{
+		Organization: in.GetOrganization(),
+		Project:      in.GetProject(),
+	}
+	scope := extractScopeFromProtocol(fakeReference, fmt.Sprintf("tenant/%s/metadata/delete", name))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -179,7 +184,12 @@ func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequ
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/tenant/%s/scan", name))
+	fakeReference := &protocol.Reference{
+		Organization: in.GetOrganization(),
+		Project:      in.GetProject(),
+	}
+	scope := extractScopeFromProtocol(fakeReference, fmt.Sprintf("/tenant/%s/scan", name))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -198,7 +208,7 @@ func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequ
 }
 
 // Inspect returns information about a tenant
-func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName) (_ *protocol.TenantInspectResponse, ferr error) {
+func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantInspectRequest) (_ *protocol.TenantInspectResponse, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
 	defer fail.OnExitWrapError(inctx, &ferr, "cannot inspect tenant")
 
@@ -213,7 +223,12 @@ func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName)
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/tenant/%s/inspect", name))
+	fakeReference := &protocol.Reference{
+		Organization: in.GetOrganization(),
+		Project:      in.GetProject(),
+	}
+	scope := extractScopeFromProtocol(fakeReference, fmt.Sprintf("/tenant/%s/inspect", name))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -233,33 +248,33 @@ func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName)
 	return tenantInfo, nil
 }
 
-// Upgrade upgrades metadata of a tenant if needed
-func (s *TenantListener) Upgrade(inctx context.Context, in *protocol.TenantUpgradeRequest) (_ *protocol.TenantUpgradeResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot upgrade tenant")
-
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
-	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	name := in.GetName()
-	job, xerr := PrepareJobWithoutService(inctx, fmt.Sprintf("/tenant/%s/metadata/upgrade", name))
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
-	return nil, fail.NewError("metadata upgrade no longer supported")
-}
+// // Upgrade upgrades metadata of a tenant if needed
+// func (s *TenantListener) Upgrade(inctx context.Context, in *protocol.TenantUpgradeRequest) (_ *protocol.TenantUpgradeResponse, err error) {
+// 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+// 	defer fail.OnExitWrapError(inctx, &err, "cannot upgrade tenant")
+//
+// 	if s == nil {
+// 		return nil, fail.InvalidInstanceError()
+// 	}
+// 	if inctx == nil {
+// 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+// 	}
+// 	if in == nil {
+// 		return nil, fail.InvalidParameterError("in", "cannot be nil")
+// 	}
+//
+// 	name := in.GetName()
+// 	job, xerr := PrepareJobWithoutService(inctx, fmt.Sprintf("/tenant/%s/metadata/upgrade", name))
+// 	xerr = debug.InjectPlannedFail(xerr)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+// 	defer job.Close()
+//
+// 	ctx := job.Context()
+// 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+// 	defer tracer.Exiting()
+// 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
+//
+// 	return nil, fail.NewError("metadata upgrade no longer supported")
+// }

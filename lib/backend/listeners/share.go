@@ -43,7 +43,7 @@ type ShareListener struct {
 }
 
 // Create calls share service creation
-func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareDefinition) (_ *protocol.ShareDefinition, err error) {
+func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareCreateRequest) (_ *protocol.ShareCreateRequest, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot create share")
 	defer fail.OnPanic(&err)
@@ -59,7 +59,8 @@ func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareDefiniti
 	}
 
 	shareName := in.GetName()
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/create", shareName))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/share/%s/create", shareName))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -110,7 +111,8 @@ func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (e
 	}
 
 	shareName := in.GetName()
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/share/%s/delete", shareName))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/share/%s/delete", shareName))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -126,7 +128,7 @@ func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (e
 }
 
 // List return the list of all available shares
-func (s *ShareListener) List(inctx context.Context, in *protocol.Reference) (_ *protocol.ShareList, err error) {
+func (s *ShareListener) List(inctx context.Context, in *protocol.Reference) (_ *protocol.ShareListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot list shares")
 	defer fail.OnPanic(&err)
@@ -138,7 +140,8 @@ func (s *ShareListener) List(inctx context.Context, in *protocol.Reference) (_ *
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), "/shares/list")
+	scope := extractScopeFromProtocol(in, "/shares/list")
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -155,18 +158,18 @@ func (s *ShareListener) List(inctx context.Context, in *protocol.Reference) (_ *
 		return nil, xerr
 	}
 
-	var pbshares []*protocol.ShareDefinition
+	var pbshares []*protocol.ShareCreateRequest
 	for k, item := range shares {
 		for _, share := range item {
 			pbshares = append(pbshares, converters.ShareFromPropertyToProtocol(k, share))
 		}
 	}
-	list := &protocol.ShareList{ShareList: pbshares}
+	list := &protocol.ShareListResponse{ShareList: pbshares}
 	return list, nil
 }
 
 // Mount mounts share on a local directory of the given host
-func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountDefinition) (smd *protocol.ShareMountDefinition, err error) {
+func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountRequest) (smd *protocol.ShareMountRequest, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot mount share")
 	defer fail.OnPanic(&err)
@@ -183,7 +186,8 @@ func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountDefi
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/mount", shareRef, hostRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/share/%s/host/%s/mount", shareRef, hostRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -206,7 +210,7 @@ func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountDefi
 }
 
 // Unmount unmounts share from the given host
-func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountDefinition) (empty *googleprotobuf.Empty, err error) {
+func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot unmount share")
 
@@ -223,7 +227,8 @@ func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountDe
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
-	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/unmount", shareRef, hostRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/share/%s/host/%s/unmount", shareRef, hostRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -244,7 +249,7 @@ func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountDe
 }
 
 // Inspect shows the detail of a share and all connected clients
-func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (sml *protocol.ShareMountList, err error) {
+func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (sml *protocol.ShareMountListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot inspect share")
 	defer fail.OnPanic(&err)
@@ -260,7 +265,8 @@ func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (
 	}
 
 	shareRef, _ := srvutils.GetReference(in)
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/share/%s/inspect", shareRef))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/share/%s/inspect", shareRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}

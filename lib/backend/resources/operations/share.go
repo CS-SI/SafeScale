@@ -1223,7 +1223,7 @@ func sanitize(in string) (string, fail.Error) {
 }
 
 // ToProtocol transforms a Share into its protobuf representation
-func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountList, ferr fail.Error) {
+func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountListResponse, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1247,8 +1247,8 @@ func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountLi
 		return nil, xerr
 	}
 
-	psml := &protocol.ShareMountList{
-		Share: &protocol.ShareDefinition{
+	psml := &protocol.ShareMountListResponse{
+		Share: &protocol.ShareCreateRequest{
 			Id:              shareID,
 			Name:            shareName,
 			Host:            &protocol.Reference{Name: server.GetName()},
@@ -1283,7 +1283,7 @@ func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountLi
 			logrus.WithContext(ctx).Error(fail.InconsistentError("failed to find a mount associated to Share path '%s' for host '%s'", sharePath, h.GetName()).Error())
 			continue
 		}
-		psmd := &protocol.ShareMountDefinition{
+		psmd := &protocol.ShareMountRequest{
 			Host:    &protocol.Reference{Name: k},
 			Share:   &protocol.Reference{Name: shareName, Id: shareID},
 			Path:    mount.Path,

@@ -172,7 +172,7 @@ func (h hostConsumer) Stop(name string, timeout time.Duration) error {
 }
 
 // Create creates a new host
-func (h hostConsumer) Create(req *protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
+func (h hostConsumer) Create(req *protocol.HostCreateRequest, timeout time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -266,7 +266,7 @@ func (h hostConsumer) SSHConfig(name string) (sshapi.Config, error) {
 }
 
 // Resize ...
-func (h hostConsumer) Resize(def *protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
+func (h hostConsumer) Resize(def *protocol.HostCreateRequest, timeout time.Duration) (*protocol.Host, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 

@@ -42,8 +42,8 @@ func Test_ShareFromPropertyToProtocol(t *testing.T) {
 		ClientsByName: map[string]string{},
 	}
 	psd := ShareFromPropertyToProtocol("HostDefinition", hs)
-	if reflect.TypeOf(psd).String() != "*protocol.ShareDefinition" {
-		t.Error("Expect type *protocol.ShareDefinition")
+	if reflect.TypeOf(psd).String() != "*protocol.ShareCreateRequest" {
+		t.Error("Expect type *protocol.ShareCreateRequest")
 		t.Fail()
 	}
 	require.EqualValues(t, hs.ID, psd.Id)
@@ -65,8 +65,8 @@ func Test_ShareMountFromPropertyToProtocol(t *testing.T) {
 	}
 	smp := ShareMountFromPropertyToProtocol("ShareName", "HostName", hrm)
 
-	if reflect.TypeOf(smp).String() != "*protocol.ShareMountDefinition" {
-		t.Error("Expect type *protocol.ShareMountDefinition")
+	if reflect.TypeOf(smp).String() != "*protocol.ShareMountRequest" {
+		t.Error("Expect type *protocol.ShareMountRequest")
 		t.Fail()
 	}
 
@@ -102,8 +102,8 @@ func Test_ShareMountListFromPropertyToProtocol(t *testing.T) {
 
 	smp := ShareMountListFromPropertyToProtocol("HostName", hs, mounts)
 
-	if reflect.TypeOf(smp).String() != "*protocol.ShareMountList" {
-		t.Error("Expect type *protocol.ShareMountList")
+	if reflect.TypeOf(smp).String() != "*protocol.ShareMountListRequest" {
+		t.Error("Expect type *protocol.ShareMountListRequest")
 		t.Fail()
 	}
 

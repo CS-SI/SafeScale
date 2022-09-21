@@ -68,7 +68,8 @@ func (s *SubnetListener) Create(inctx context.Context, in *protocol.SubnetCreate
 		return nil, fail.InvalidParameterError("in.Network", "must contain an ID or a Name")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/subnet/%s/create", networkRef))
+	scope := extractScopeFromProtocol(in.GetNetwork(), fmt.Sprintf("/subnet/%s/create", networkRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -134,7 +135,8 @@ func (s *SubnetListener) List(inctx context.Context, in *protocol.SubnetListRequ
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Network")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), "/subnets/list")
+	scope := extractScopeFromProtocol(in.GetNetwork(), "/subnets/list")
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -183,7 +185,8 @@ func (s *SubnetListener) Inspect(inctx context.Context, in *protocol.SubnetInspe
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnetInstance/%s/inspect", networkRef, subnetRef))
+	scope := extractScopeFromProtocol(in.GetNetwork(), fmt.Sprintf("/network/%s/subnetInstance/%s/inspect", networkRef, subnetRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -226,7 +229,8 @@ func (s *SubnetListener) Delete(inctx context.Context, in *protocol.SubnetDelete
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/delete", networkRef, subnetRef))
+	scope := extractScopeFromProtocol(in.GetNetwork(), fmt.Sprintf("/network/%s/subnet/%s/delete", networkRef, subnetRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -275,7 +279,8 @@ func (s *SubnetListener) BindSecurityGroup(inctx context.Context, in *protocol.S
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/bind", networkRef, subnetRef, sgRef))
+	scope := extractScopeFromProtocol(in.GetNetwork(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/bind", networkRef, subnetRef, sgRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -326,7 +331,8 @@ func (s *SubnetListener) UnbindSecurityGroup(inctx context.Context, in *protocol
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/unbind", networkRef, subnetRef, sgRef))
+	scope := extractScopeFromProtocol(in.GetNetwork(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/unbind", networkRef, subnetRef, sgRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -369,7 +375,8 @@ func (s *SubnetListener) EnableSecurityGroup(inctx context.Context, in *protocol
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/enable", networkRef, subnetRef, sgRef))
+	scope := extractScopeFromProtocol(in.GetNetwork(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/enable", networkRef, subnetRef, sgRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -412,7 +419,8 @@ func (s *SubnetListener) DisableSecurityGroup(inctx context.Context, in *protoco
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/disable", networkRef, subnetRef, sgRef))
+	scope := extractScopeFromProtocol(in.GetNetwork(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/disable", networkRef, subnetRef, sgRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -449,7 +457,8 @@ func (s *SubnetListener) ListSecurityGroups(inctx context.Context, in *protocol.
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("network/%s/subnet/%s/securitygroups/list", networkRef, subnetRef))
+	scope := extractScopeFromProtocol(in.GetNetwork(), fmt.Sprintf("network/%s/subnet/%s/securitygroups/list", networkRef, subnetRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}

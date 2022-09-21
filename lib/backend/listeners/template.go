@@ -53,7 +53,8 @@ func (s *TemplateListener) List(inctx context.Context, in *protocol.TemplateList
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), "/templates/list")
+	scope := extractScopeFromProtocol(in, "/templates/list")
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -93,7 +94,8 @@ func (s *TemplateListener) Match(inctx context.Context, in *protocol.TemplateMat
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), "/template/match")
+	scope := extractScopeFromProtocol(in, "/template/match")
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -140,7 +142,8 @@ func (s *TemplateListener) Inspect(inctx context.Context, in *protocol.TemplateI
 	}
 
 	ref, _ := srvutils.GetReference(in.GetTemplate())
-	job, xerr := PrepareJob(inctx, in.GetTemplate().GetTenantId(), fmt.Sprintf("template/%s/inspect", ref))
+	scope := extractScopeFromProtocol(in.GetTemplate(), fmt.Sprintf("template/%s/inspect", ref))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -166,16 +169,12 @@ func (s *TemplateListener) Inspect(inctx context.Context, in *protocol.TemplateI
 }
 
 func complementWithScan(ctx context.Context, svc iaas.Service, scanOnly bool, templates ...*abstract.HostTemplate) ([]*protocol.HostTemplate, fail.Error) {
-	authOpts, xerr := svc.AuthenticationOptions(ctx)
+	authOpts, xerr := svc.AuthenticationOptions()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	region, ok := authOpts.Get("Region")
-	if !ok {
-		return nil, fail.InvalidRequestError("'Region' not set in tenant 'compute' section")
-	}
-
+	region := authOpts.Region
 	svcName, xerr := svc.GetName()
 	if xerr != nil {
 		return nil, xerr

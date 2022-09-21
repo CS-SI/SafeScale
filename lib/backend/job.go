@@ -51,22 +51,29 @@ type Job interface {
 	Close()
 }
 
+type JobScope struct {
+	Organization string
+	Project      string
+	Tenant       string
+	Description  string
+}
+
 // job contains the information needed by safescaled to execute a request
 type job struct {
-	organization string
-	project      string
-	tenant       string
-	description  string
-	uuid         string
-	ctx          context.Context
-	task         concurrency.Task
-	cancel       context.CancelFunc
-	service      iaas.Service
-	startTime    time.Time
+	scope     JobScope
+	uuid      string
+	ctx       context.Context
+	task      concurrency.Task
+	cancel    context.CancelFunc
+	service   iaas.Service
+	startTime time.Time
 }
 
 const (
 	KeyForJobInContext = "job"
+
+	defaultOrganization = "default"
+	defaultProject      = "default"
 )
 
 var (
@@ -75,7 +82,7 @@ var (
 )
 
 // NewJob creates a new instance of struct Job
-func NewJob(ctx context.Context, cancel context.CancelFunc, organization, project, tenant, description string) (_ *job, ferr fail.Error) { // nolint
+func NewJob(ctx context.Context, cancel context.CancelFunc, scope JobScope) (_ *job, ferr fail.Error) { // nolint
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -83,6 +90,15 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, organization, projec
 	}
 	if cancel == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("cancel")
+	}
+	if scope.Tenant == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("scope.Tenant")
+	}
+	if scope.Organization == "" {
+		scope.Organization = defaultOrganization
+	}
+	if scope.Project == "" {
+		scope.Project = defaultProject
 	}
 
 	// VPL: I don't get the point of checking if context has an uuid or not, as this uuid is not used...
@@ -124,19 +140,16 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, organization, projec
 		return nil, xerr
 	}
 
-	if xerr = task.SetID(id + description); xerr != nil {
+	if xerr = task.SetID(id + scope.Description); xerr != nil {
 		return nil, xerr
 	}
 
 	nj := &job{
-		organization: organization,
-		project:      project,
-		tenant:       tenant,
-		description:  description,
-		uuid:         id,
-		task:         task,
-		cancel:       cancel,
-		startTime:    time.Now(),
+		scope:     scope,
+		uuid:      id,
+		task:      task,
+		cancel:    cancel,
+		startTime: time.Now(),
 	}
 
 	// attach task instance to the context
@@ -146,16 +159,16 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, organization, projec
 	ctx = context.WithValue(ctx, KeyForJobInContext, nj) // nolint
 	nj.ctx = ctx
 
-	providerProfile, xerr := iaas.FindProfile(tenant)
+	providerProfile, xerr := iaas.FindProfile(scope.Tenant)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	svcOptions := []iaas.OptionsMutator{
-		iaas.WithTenant(tenant),
+		iaas.WithTenant(scope.Tenant),
 	}
 	if providerProfile.Capabilities().UseTerraformer {
-		config, xerr := prepareTerraformerConfiguration(providerProfile, organization, project, tenant)
+		config, xerr := prepareTerraformerConfiguration(providerProfile, scope)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -184,25 +197,15 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, organization, projec
 	return nj, nil
 }
 
-func prepareTerraformerConfiguration(providerProfile *providers.Profile, organization, project, tenant string) (terraformer.Configuration, fail.Error) {
+func prepareTerraformerConfiguration(providerProfile *providers.Profile, scope JobScope) (terraformer.Configuration, fail.Error) {
 	if valid.IsNull(providerProfile) {
 		return terraformer.Configuration{}, fail.InvalidParameterCannotBeNilError("providerProfile")
 	}
-	if tenant == "" {
-		return terraformer.Configuration{}, fail.InvalidParameterCannotBeEmptyStringError("tenant")
-	}
 
-	if organization == "" {
-		organization = "default"
-	}
-	if project == "" {
-		project = "default"
-	}
-
-	workDir := filepath.Join(global.Settings.Folders.TmpDir, "terraform", organization, project, tenant)
+	workDir := filepath.Join(global.Settings.Folders.TmpDir, "terraform", scope.Organization, scope.Project, scope.Tenant)
 	out := terraformer.Configuration{
 		WorkDir:           workDir,
-		ExecPath:          path_of_terraform,
+		ExecPath:          global.Settings.Backend.Terraform.ExecPath,
 		RequiredProviders: providerProfile.TerraformProviders(),
 	}
 
@@ -226,17 +229,17 @@ func (instance job) Name() string {
 
 // Organization returns the organization of the job
 func (instance job) Organization() string {
-	return instance.organization
+	return instance.scope.Organization
 }
 
 // Project returns the project of the job
 func (instance job) Project() string {
-	return instance.project
+	return instance.scope.Project
 }
 
 // Tenant returns the tenant of the job
 func (instance job) Tenant() string {
-	return instance.tenant
+	return instance.scope.Tenant
 }
 
 // Context returns the context of the job (should be the same as the one of the task)
@@ -294,7 +297,7 @@ func (instance *job) Close() {
 
 // String returns a string representation of job information
 func (instance job) String() string {
-	return fmt.Sprintf("Job: %s (started at %s)", instance.description, instance.startTime.String())
+	return fmt.Sprintf("Job: %s (started at %s)", instance.scope.Description, instance.startTime.String())
 }
 
 // register ...

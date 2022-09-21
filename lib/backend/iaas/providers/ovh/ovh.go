@@ -194,9 +194,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:           region,
 		AvailabilityZone: zone,
 		AllowReauth:      true,
-		AK:               alternateAPIApplicationKey,
-		AS:               alternateAPIApplicationSecret,
-		CK:               alternateAPIConsumerKey,
+		Specific: OVHAPI{
+			ApplicationKey:    alternateAPIApplicationKey,
+			ApplicationSecret: alternateAPIApplicationSecret,
+			ConsumerKey:       alternateAPIConsumerKey,
+		},
 	}
 
 	err := validation.ValidateStruct(&authOptions,

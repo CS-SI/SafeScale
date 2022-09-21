@@ -42,13 +42,14 @@ func (s *ImageListener) List(inctx context.Context, in *protocol.ImageListReques
 		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	job, err := PrepareJob(inctx, in.GetTenantId(), "/images/list")
+	scope := extractScopeFromProtocol(in, "/images/list")
+	job, err := prepareJob(inctx, scope)
 	if err != nil {
 		return nil, err
 	}

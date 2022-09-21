@@ -43,9 +43,7 @@ type BucketListener struct {
 }
 
 // List available buckets
-func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequest) (
-	bl *protocol.BucketListResponse, err error,
-) {
+func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequest) (bl *protocol.BucketListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot list Buckets")
 
@@ -56,7 +54,8 @@ func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequ
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	job, xerr := PrepareJob(inctx, "", "/buckets/list")
+	scope := extractScopeFromProtocol(in, "/buckets/list")
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -77,25 +76,24 @@ func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequ
 }
 
 // Create a new bucket
-func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketRequest) (
-	empty *googleprotobuf.Empty, err error,
-) {
+func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot create bucket")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceError().ToGRPCStatus()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("in", "can't be nil")
 	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	bucketName := in.GetName()
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/create", bucketName))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/bucket/%s/create", bucketName))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -115,25 +113,24 @@ func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketReques
 }
 
 // Delete a bucket
-func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketRequest) (
-	empty *googleprotobuf.Empty, err error,
-) {
+func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete bucket")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceError().ToGRPCStatus()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("in", "can't be nil")
 	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	bucketName := in.GetName()
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/delete", bucketName))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/bucket/%s/delete", bucketName))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -148,9 +145,7 @@ func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketReques
 }
 
 // Download a bucket
-func (s *BucketListener) Download(
-	inctx context.Context, in *protocol.BucketRequest,
-) (_ *protocol.BucketDownloadResponse, err error) {
+func (s *BucketListener) Download(inctx context.Context, in *protocol.BucketRequest) (_ *protocol.BucketDownloadResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot download bucket")
 
@@ -171,7 +166,8 @@ func (s *BucketListener) Download(
 		return empty, fail.InvalidParameterError("bucket name", "cannot be empty")
 	}
 
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/download", bucketName))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/bucket/%s/download", bucketName))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -192,9 +188,7 @@ func (s *BucketListener) Download(
 }
 
 // Download a bucket
-func (s *BucketListener) Clear(inctx context.Context, in *protocol.BucketRequest) (
-	empty *googleprotobuf.Empty, err error,
-) {
+func (s *BucketListener) Clear(inctx context.Context, in *protocol.BucketRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot download bucket")
 
@@ -215,7 +209,8 @@ func (s *BucketListener) Clear(inctx context.Context, in *protocol.BucketRequest
 		return empty, fail.InvalidParameterError("bucket name", "cannot be empty")
 	}
 
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/upload", bucketName))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/bucket/%s/upload", bucketName))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -236,9 +231,7 @@ func (s *BucketListener) Clear(inctx context.Context, in *protocol.BucketRequest
 }
 
 // Inspect a bucket
-func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketRequest) (
-	_ *protocol.BucketResponse, err error,
-) {
+func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketRequest) (_ *protocol.BucketResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot inspect bucket")
 
@@ -253,7 +246,8 @@ func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketReque
 	}
 
 	bucketName := in.GetName()
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/inspect", bucketName))
+	scope := extractScopeFromProtocol(in, fmt.Sprintf("/bucket/%s/inspect", bucketName))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -279,26 +273,25 @@ func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketReque
 }
 
 // Mount a bucket on the filesystem of the host
-func (s *BucketListener) Mount(inctx context.Context, in *protocol.BucketMountRequest) (
-	empty *googleprotobuf.Empty, err error,
-) {
+func (s *BucketListener) Mount(inctx context.Context, in *protocol.BucketMountRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot mount bucket")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
-		return empty, fail.InvalidInstanceError().ToGRPCStatus()
+		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "can't be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("in", "can't be nil")
 	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil").ToGRPCStatus()
+		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
 	bucketName := in.GetBucket()
 	hostRef, _ := srvutils.GetReference(in.GetHost())
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/host/%s/mount", bucketName, hostRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/bucket/%s/host/%s/mount", bucketName, hostRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -313,9 +306,7 @@ func (s *BucketListener) Mount(inctx context.Context, in *protocol.BucketMountRe
 }
 
 // Unmount a bucket from the filesystem of the host
-func (s *BucketListener) Unmount(inctx context.Context, in *protocol.BucketMountRequest) (
-	empty *googleprotobuf.Empty, err error,
-) {
+func (s *BucketListener) Unmount(inctx context.Context, in *protocol.BucketMountRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot unmount bucket")
 
@@ -332,7 +323,8 @@ func (s *BucketListener) Unmount(inctx context.Context, in *protocol.BucketMount
 
 	bucketName := in.GetBucket()
 	hostRef, _ := srvutils.GetReference(in.GetHost())
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/bucket/%s/host/%s/unmount", bucketName, hostRef))
+	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/bucket/%s/host/%s/unmount", bucketName, hostRef))
+	job, xerr := prepareJob(inctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}

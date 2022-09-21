@@ -238,13 +238,12 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 				}
 			}
 
-			cfg, cerr := handler.job.Service().ConfigurationOptions(handler.job.Context())
+			cfg, cerr := handler.job.Service().ConfigurationOptions()
 			if cerr != nil {
 				return cerr
 			}
 
-			name, found := cfg.Get("DefaultNetworkName")
-			if found && name.(string) == abstractNetwork.Name {
+			if cfg.DefaultNetworkName == abstractNetwork.Name {
 				return fail.InvalidRequestError("cannot delete default Network '%s' because its existence is not controlled by SafeScale", networkRef)
 			}
 

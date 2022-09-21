@@ -193,7 +193,7 @@ func tenantMetadataCommands() *cobra.Command {
 		// ArgsUsage: "COMMAND",
 	}
 	out.AddCommand(
-		tenantMetadataUpgradeCommand(),
+		// tenantMetadataUpgradeCommand(),
 		// tenantMetadataBackupCommand(),
 		// tenantMetadataRestoreCommand(),
 		tenantMetadataDeleteCommand(),
@@ -201,40 +201,40 @@ func tenantMetadataCommands() *cobra.Command {
 	return out
 }
 
-const tenantMetadataUpgradeLabel = "upgrade"
-
-func tenantMetadataUpgradeCommand() *cobra.Command {
-	out := &cobra.Command{
-		Use:   tenantMetadataUpgradeLabel,
-		Short: "Upgrade tenant metadata if needed",
-		RunE: func(c *cobra.Command, args []string) (ferr error) {
-			defer fail.OnPanic(&ferr)
-			if len(args) != 1 {
-				_ = c.Usage()
-				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-			}
-
-			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", tenantCmdLabel, tenantMetadataCmdLabel, c.Name(), strings.Join(args, ", "))
-
-			// dryRun := c.Flags().GetBool("dry-run")
-			results, err := ClientSession.Tenant.Upgrade(args[0], false /*dryRun*/, 0)
-			if err != nil {
-				err = fail.FromGRPCStatus(err)
-				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "metadata upgrade", false).Error())))
-			}
-			return cli.SuccessResponse(results)
-		},
-	}
-
-	// Flags: []cli.Flag{
-	// 	&cli.BoolFlag{
-	// 		Name: "dry-run",
-	// 		Aliases: []string{"n"},
-	// 	},
-	// },
-
-	return out
-}
+// const tenantMetadataUpgradeLabel = "upgrade"
+//
+// func tenantMetadataUpgradeCommand() *cobra.Command {
+// 	out := &cobra.Command{
+// 		Use:   tenantMetadataUpgradeLabel,
+// 		Short: "Upgrade tenant metadata if needed",
+// 		RunE: func(c *cobra.Command, args []string) (ferr error) {
+// 			defer fail.OnPanic(&ferr)
+// 			if len(args) != 1 {
+// 				_ = c.Usage()
+// 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+// 			}
+//
+// 			logrus.Tracef("SafeScale command: %s %s %s with args '%s'", tenantCmdLabel, tenantMetadataCmdLabel, c.Name(), strings.Join(args, ", "))
+//
+// 			// dryRun := c.Flags().GetBool("dry-run")
+// 			results, err := ClientSession.Tenant.Upgrade(args[0], false /*dryRun*/, 0)
+// 			if err != nil {
+// 				err = fail.FromGRPCStatus(err)
+// 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "metadata upgrade", false).Error())))
+// 			}
+// 			return cli.SuccessResponse(results)
+// 		},
+// 	}
+//
+// 	// Flags: []cli.Flag{
+// 	// 	&cli.BoolFlag{
+// 	// 		Name: "dry-run",
+// 	// 		Aliases: []string{"n"},
+// 	// 	},
+// 	// },
+//
+// 	return out
+// }
 
 const tenantMetadataDeleteCmdLabel = "delete"
 

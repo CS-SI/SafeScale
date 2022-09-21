@@ -26,6 +26,8 @@ message Reference {
 	string tenant_id = 1;
 	string id = 2;
 	string name = 3;
+	string organization = 4;
+	string project = 5;
 }
 
 // Client Requests
@@ -53,7 +55,7 @@ message TenantList {
 	repeated Tenant tenants = 1;
 }
 
-message TenantName {
+message TenantNameResponse {
 	string name = 1;
 	string bucket_name = 2;
 	string provider = 3;
@@ -62,18 +64,22 @@ message TenantName {
 message TenantCleanupRequest {
 	string name = 1;
 	bool force = 2;
+	string organization = 3;
+	string project = 4;
 }
 
-message TenantUpgradeRequest {
-	string name = 1;
-	bool force = 2;
-	bool dry_run = 3;
-}
+//message TenantUpgradeRequest {
+//	string name = 1;
+//	bool force = 2;
+//	bool dry_run = 3;
+//}
 
 message TenantScanRequest {
 	string name = 1;
 	bool dry_run = 2;
 	repeated string templates = 3;
+	string organization = 4;
+	string project = 5;
 }
 
 message ScanResult {
@@ -89,6 +95,8 @@ message TenantInspectRequest {
 	string name = 1;
 	string user_id = 2;
 	string group_id = 3;
+	string organization = 4;
+	string project = 5;
 }
 
 message KeyValue {
@@ -150,18 +158,18 @@ message TenantInspectResponse {
 	TenantMetadata metadata = 6;
 }
 
-message TenantUpgradeResponse {
-	repeated string actions = 1;
-}
+//message TenantUpgradeResponse {
+//	repeated string actions = 1;
+//}
 
 service TenantService{
 	rpc Cleanup (TenantCleanupRequest) returns (google.protobuf.Empty){}
-	rpc Get (google.protobuf.Empty) returns (TenantName){}
-	rpc Inspect (TenantName) returns (TenantInspectResponse){}
+	rpc Get (google.protobuf.Empty) returns (TenantNameResponse){}
+	rpc Inspect (TenantInspectRequest) returns (TenantInspectResponse){}
 	rpc List (google.protobuf.Empty) returns (TenantList){}
 	rpc Scan (TenantScanRequest) returns (ScanResultList){}
-	rpc Set (TenantName) returns (google.protobuf.Empty){}
-	rpc Upgrade (TenantUpgradeRequest) returns (TenantUpgradeResponse){}
+	rpc Set (TenantInspectRequest) returns (google.protobuf.Empty){}
+	// rpc Upgrade (TenantUpgradeRequest) returns (TenantUpgradeResponse){}
 }
 
 // Image
@@ -178,6 +186,8 @@ message ImageList{
 message ImageListRequest{
 	bool all = 1;
 	string tenant_id = 2;
+	string organization = 3;
+	string project = 4;
 }
 
 service ImageService{
@@ -202,6 +212,8 @@ message NetworkCreateRequest{
 	string tenant_id = 8;
 	repeated string dns_servers = 9;
 	bool no_subnet = 10;            // tells not to create Subnet if set to true
+	string organization = 11;
+	string project = 12;
 }
 
 enum NetworkState {
@@ -232,11 +244,13 @@ message NetworkList {
 message NetworkListRequest {
 	bool all = 1;
 	string tenant_id = 2;
+	string organization = 3;
+	string project = 4;
 }
 
 message NetworkDeleteRequest {
-	Reference network = 1;
-    bool force = 2;
+	Reference network = 1;	// using Reference's organization, project and tenant_id to transmit these informations
+	bool force = 2;
 }
 
 service NetworkService {
@@ -261,7 +275,7 @@ message VirtualIp {
 }
 
 message SubnetCreateRequest {
-	Reference network = 1;
+	Reference network = 1;	// Using Reference's organization, project and tenant_id to transmit these informations
 	string name = 2;
 	string cidr = 3;
 	GatewayDefinition gateway = 4;
@@ -293,12 +307,12 @@ enum SubnetState {
 }
 
 message SubnetInspectRequest {
-	Reference network = 1;
+	Reference network = 1;	// Using network Reference's organization, project and tenant_id to transmit these informations
 	Reference subnet = 2;
 }
 
 message SubnetDeleteRequest {
-	Reference network = 1;
+	Reference network = 1;	// Using network Reference's organization, project and tenant_id to transmit these informations
 	Reference subnet = 2;
 	bool force = 3;
 }
@@ -319,12 +333,12 @@ message SubnetList {
 }
 
 message SubnetListRequest {
-	Reference network = 1;
+	Reference network = 1;	// Using network Reference's organization, project and tenant_id to transmit these informations
 	bool all = 2;
 }
 
 message SubnetSecurityGroupBondsRequest {
-	Reference network = 1;
+	Reference network = 1;	// Using network Reference's organization, project and tenant_id to transmit these informations
 	Reference subnet = 2;
 	string kind = 3;
 }
@@ -357,7 +371,7 @@ message HostSizing {
 	int32 max_disk_size = 8;
 }
 
-message HostDefinition {
+message HostCreateRequest {
 	string name = 2;
 	string network = 3;
 	int32 cpu_count = 4;    // Deprecated: replaced by 'sizing_as_string' field
@@ -376,6 +390,8 @@ message HostDefinition {
 	repeated string subnets = 19;
 	int32 ssh_port = 20;
 	bool single = 21;     // when an Host must be created in a dedicated Subnet without metadata in net-safescale Subnet
+	string organization = 22;
+	string project = 23;
 }
 
 enum HostState {
@@ -435,10 +451,12 @@ message SshConfig {
 message HostListRequest {
 	bool all = 1;
 	string tenant_id = 2;
+	string organization = 3;
+	string project = 4;
 }
 
 service HostService {
-	rpc Create(HostDefinition) returns (Host){}
+	rpc Create(HostCreateRequest) returns (Host){}
 	rpc Inspect(Reference) returns (Host){}
 	rpc Status(Reference) returns (HostStatus){}
 	rpc List(HostListRequest) returns (HostList){}
@@ -446,7 +464,7 @@ service HostService {
 	rpc Start(Reference) returns (google.protobuf.Empty){}
 	rpc Stop(Reference) returns (google.protobuf.Empty){}
 	rpc Reboot(Reference) returns (google.protobuf.Empty){}
-	rpc Resize(HostDefinition) returns (Host){}
+	rpc Resize(HostCreateRequest) returns (Host){}
 	rpc SSH(Reference) returns (SshConfig){}
 	rpc BindSecurityGroup(SecurityGroupHostBindRequest) returns (google.protobuf.Empty){}
 	rpc UnbindSecurityGroup(SecurityGroupHostBindRequest) returns (google.protobuf.Empty){}
@@ -464,8 +482,8 @@ service HostService {
 }
 
 message HostLabelRequest {
-	Reference Host = 1;
-	Reference Label = 2;
+	Reference host = 1;		// Using host Reference's organization, project and tenant_id to transmit these informations
+	Reference label = 2;
 }
 
 message HostLabelResponse {
@@ -532,15 +550,19 @@ message TemplateListRequest {
 	bool all = 1;
 	string tenant_id = 2;
 	bool scanned_only = 3;
+	string organization = 4;
+	string project = 5;
 }
 
 message TemplateMatchRequest {
 	string tenant_id = 1;
 	string sizing = 2;
+	string organization = 3;
+	string project = 4;
 }
 
 message TemplateInspectRequest {
-	Reference template = 1;
+	Reference template = 1;		// Using template Reference's organization, project and tenant_id to transmit these informations
 }
 
 service TemplateService {
@@ -567,6 +589,8 @@ message VolumeCreateRequest {
 	VolumeSpeed speed = 3;
 	int32 size = 4;
 	string tenant_id = 5;
+	string organization = 6;
+	string project = 7;
 }
 
 // message VolumeCreateResponse {
@@ -577,7 +601,7 @@ message VolumeCreateRequest {
 // }
 
 message VolumeDetachmentRequest {
-	Reference volume = 1;
+	Reference volume = 1; 	// Using volume Reference's organization, project and tenant_id to transmit these informations
 	Reference host = 2;
 }
 
@@ -594,7 +618,7 @@ message VolumeInspectResponse {
 }
 
 message VolumeAttachmentRequest {
-	Reference volume = 2;
+	Reference volume = 2;		// Using volume Reference's organization, project and tenant_id to transmit these informations
 	Reference host = 3;
 	string mount_path = 4;
 	string format = 5;
@@ -616,6 +640,8 @@ message VolumeAttachmentResponse {
 message VolumeListRequest {
 	bool all = 1;
 	string tenant_id = 2;
+	string organization = 3;
+	string project = 4;
 }
 
 message VolumeListResponse {
@@ -645,6 +671,9 @@ message BucketMount {
 
 message BucketRequest {
 	string name = 1;
+	string organization = 2;
+	string project = 3;
+	string tenant_id = 4;
 }
 
 message BucketResponse {
@@ -654,6 +683,9 @@ message BucketResponse {
 
 message BucketListRequest {
 	bool all = 1;
+	string organization = 2;
+	string project = 3;
+	string tenant_id = 4;
 }
 
 message BucketListResponse {
@@ -666,7 +698,7 @@ message BucketDownloadResponse {
 
 message BucketMountRequest {
 	string bucket = 1;
-	Reference host = 2;
+	Reference host = 2;	// using host Reference's organization, project and tenant_id to transmit these informations
 	string path = 3;
 }
 
@@ -689,18 +721,20 @@ service BucketService {
 
 // SSH requests
 
-message SshCommand {
-	Reference host = 1;
+message SshCommandRequest {
+	Reference host = 1; // using host Reference's organization, project and tenant_id to transmit these informations
 	string command = 2;
-	string tenant_id = 3;
+	string tenant_id = 3;	// Deprecated
 }
 
-message SshCopyCommand {
+message SshCopyCommandRequest {
 	string source = 1;
 	string destination = 2;
 	string owner = 3;
 	string mode = 4;
 	string tenant_id = 5;
+	string organization = 6;
+	string project = 7;
 }
 
 message SshResponse {
@@ -710,8 +744,8 @@ message SshResponse {
 }
 
 service SshService {
-	rpc Run(SshCommand) returns (SshResponse){}
-	rpc Copy(SshCopyCommand) returns (SshResponse){}
+	rpc Run(SshCommandRequest) returns (SshResponse){}
+	rpc Copy(SshCopyCommandRequest) returns (SshResponse){}
 }
 
 // safescale nas|share create share1 host1 --path="/shared/data"
@@ -731,10 +765,10 @@ message NFSExportOptions {
 	bool subtree_check = 7;
 }
 
-message ShareDefinition {
+message ShareCreateRequest {
 	string id = 1;
 	string name = 2;
-	Reference host = 3;
+	Reference host = 3;	// using host Reference's organization, project and tenant_id to transmit these informations
 	string path = 4;
 	string type = 5;
 	NFSExportOptions options = 6;  // Deprecated: replaced by field options_as_string to be Network FileSystem agnostic
@@ -742,12 +776,12 @@ message ShareDefinition {
 	string options_as_string = 8;
 }
 
-message ShareList {
-	repeated ShareDefinition share_list = 1;
+message ShareListResponse {
+	repeated ShareCreateRequest share_list = 1;
 }
 
-message ShareMountDefinition {
-	Reference host = 1;
+message ShareMountRequest {
+	Reference host = 1; 	// using host Reference's organization, project and tenant_id to transmit these informations
 	Reference share = 2;
 	string path = 3;
 	string type = 4;
@@ -755,18 +789,18 @@ message ShareMountDefinition {
 	bool with_cache = 6;
 }
 
-message ShareMountList {
-	ShareDefinition share = 1;
-	repeated ShareMountDefinition mount_list = 2;
+message ShareMountListResponse {
+	ShareCreateRequest share = 1;
+	repeated ShareMountRequest mount_list = 2;
 }
 
 service ShareService {
-	rpc Create(ShareDefinition) returns (ShareDefinition){}
+	rpc Create(ShareCreateRequest) returns (ShareCreateRequest){}
 	rpc Delete(Reference) returns (google.protobuf.Empty){}
-	rpc List(Reference) returns (ShareList){}     // Here, Reference is used to carry tenant
-	rpc Mount(ShareMountDefinition) returns (ShareMountDefinition){}
-	rpc Unmount(ShareMountDefinition) returns (google.protobuf.Empty){}
-	rpc Inspect(Reference) returns (ShareMountList){}
+	rpc List(Reference) returns (ShareListResponse){}     // Here, Reference is used to carry tenant
+	rpc Mount(ShareMountRequest) returns (ShareMountRequest){}
+	rpc Unmount(ShareMountRequest) returns (google.protobuf.Empty){}
+	rpc Inspect(Reference) returns (ShareMountListResponse){}
 }
 
 // Job Management
@@ -842,6 +876,8 @@ message ClusterCreateRequest {
 	bool force = 17;                 // ignore cluster sizing recommendations
 	repeated string parameters = 18; // contains optional parameters for automatically installed Features
 	uint32 default_ssh_port = 19;    // contains the default ssh port for cluster gateways
+	string organization = 20;
+	string project = 21;
 }
 
 message ClusterResizeRequest {
@@ -853,12 +889,16 @@ message ClusterResizeRequest {
 	string tenant_id = 6;
 	bool keep_on_failure = 7;
 	repeated string parameters = 8;
+	string organization = 9;
+	string project = 10;
 }
 
 message ClusterDeleteRequest  {
 	string name = 1;
 	bool force = 2;     // if true, force cluster deletion no matter what
 	string tenant_id = 3;
+	string organization = 4;
+	string project = 5;
 }
 
 message ClusterIdentity {
@@ -931,7 +971,7 @@ message ClusterNodeListResponse {
 
 message ClusterNodeRequest {
 	string name = 1;
-	Reference host = 2;     // on deletion, if not set, requests to delete last added node
+	Reference host = 2;	// using host Reference's organization, project and tenant_id to transmit these informations
 }
 
 service ClusterService {
@@ -975,7 +1015,7 @@ message FeatureResponse {
 
 message FeatureListRequest {
 	FeatureTargetType target_type = 1;
-	Reference target_ref = 2;
+	Reference target_ref = 2;	// using target_ref Reference's organization, project and tenant_id to transmit these informations
 	bool installed_only = 3;
 }
 
@@ -985,7 +1025,7 @@ message FeatureListResponse {
 
 message FeatureDetailRequest {
 	FeatureTargetType target_type = 1;
-	Reference target_ref = 2;
+	Reference target_ref = 2; 	// using target_ref Reference's organization, project and tenant_id to transmit these informations
 	string name = 3;
 	bool embedded = 4;
 }
@@ -1013,7 +1053,7 @@ message FeatureActionRequest {
 	string tenant_id = 1;	// Deprecated; use target_ref.tenant_id
 	string name = 2;
 	FeatureTargetType target_type = 3;
-	Reference target_ref = 4;
+	Reference target_ref = 4;		// using target_ref Reference's organization, project and tenant_id to transmit these informations
 	map<string, string> variables = 5;
 	FeatureSettings settings = 6;
 }
@@ -1059,17 +1099,17 @@ message SecurityGroupRule {
 }
 
 message SecurityGroupRuleRequest {
-	Reference group = 1;
+	Reference group = 1; 	// using group Reference's organization, project and tenant_id to transmit these informations
 	SecurityGroupRule rule = 2;
 }
 
 message SecurityGroupRuleDeleteRequest {
-	Reference group = 1;
+	Reference group = 1;	// using group Reference's organization, project and tenant_id to transmit these informations
 	SecurityGroupRule rule = 2;
 }
 
 message SecurityGroupCreateRequest {
-	Reference network = 1;
+	Reference network = 1; 	// using network Reference's organization, project and tenant_id to transmit these informations
 	string name = 2;
 	string description = 3;
 	repeated SecurityGroupRule rules = 4;
@@ -1084,6 +1124,9 @@ message SecurityGroupResponse {
 
 message SecurityGroupListRequest{
 	bool all = 1;
+	string organization = 2;
+	string project = 3;
+	string tenant_id = 4;
 }
 
 message SecurityGroupListResponse {
@@ -1091,20 +1134,20 @@ message SecurityGroupListResponse {
 }
 
 message SecurityGroupHostBindRequest {
-	Reference group = 1;
+	Reference group = 1; 	// using group Reference's organization, project and tenant_id to transmit these informations
 	Reference host = 2;
 	SecurityGroupState state = 3;
 }
 
 message SecurityGroupSubnetBindRequest {
-	Reference group = 1;
+	Reference group = 1; 	// using group Reference's organization, project and tenant_id to transmit these informations
 	Reference network = 2;
 	Reference subnet = 3;
 	SecurityGroupState state = 4;
 }
 
 message SecurityGroupBondsRequest {
-	Reference target = 1;   // can be used to describe a host, a subnet or a group
+	Reference target = 1;   	// using target Reference's organization, project and tenant_id to transmit these informations
 	string kind = 2;
 }
 
@@ -1120,7 +1163,7 @@ message SecurityGroupBondsResponse {
 }
 
 message SecurityGroupDeleteRequest {
-	Reference group = 1;
+	Reference group = 1; 	// using group Reference's organization, project and tenant_id to transmit these informations
 	bool force = 2;
 }
 
@@ -1144,6 +1187,8 @@ message PublicIPCreateRequest {
 	string name = 2;
 	string type = 3;
 	string description = 4;
+	string organization = 5;
+	string project = 6;
 }
 
 message PublicIPResponse {
@@ -1158,6 +1203,8 @@ message PublicIPResponse {
 message PublicIPListRequest {
 	bool all = 1;
 	string tenant_id = 2;
+	string organization = 3;
+	string project = 4;
 }
 
 message PublicIPListResponse {
@@ -1165,12 +1212,12 @@ message PublicIPListResponse {
 }
 
 message PublicIPDeleteRequest {
-	Reference ip = 1;
+	Reference ip = 1;		// using ip Reference's organization, project and tenant_id to transmit these informations
 	bool force = 2;
 }
 
 message PublicIPBindRequest {
-	Reference ip = 1;
+	Reference ip = 1; 	// using ip Reference's organization, project and tenant_id to transmit these informations
 	Reference host = 2;
 }
 
@@ -1188,10 +1235,12 @@ message LabelCreateRequest {
 	string tenant_id = 2;
 	bool has_default = 3;
 	string default_value = 4;
+	string organization = 5;
+	string project = 6;
 }
 
 message LabelInspectRequest {
-	Reference Label = 1;
+	Reference label = 1; 	// using label Reference's organization, project and tenant_id to transmit these informations
 	bool is_tag = 2;
 }
 
@@ -1206,6 +1255,8 @@ message LabelInspectResponse {
 message LabelListRequest {
 	bool tags = 1;	// if set, returns list of tags, otherwise list of labels
 	string tenant_id = 2;
+	string organization = 3;
+	string project = 4;
 }
 
 message LabelListResponse {
@@ -1218,7 +1269,7 @@ message LabelHostResponse {
 }
 
 message LabelBindRequest {
-	Reference label = 1;
+	Reference label = 1; 	// using label Reference's organization, project and tenant_id to transmit these informations
 	Reference host = 2;
 	string value = 3;
 }

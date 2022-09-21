@@ -121,20 +121,14 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 		return nil, xerr
 	}
 
-	cfg, xerr := svc.ConfigurationOptions(ctx)
+	cfg, xerr := svc.ConfigurationOptions()
 	if xerr != nil {
 		return nil, xerr
 	}
-	var user string
-	if anon, ok := cfg.Get("OperatorUsername"); ok {
-		user, ok = anon.(string)
-		if !ok {
-			logrus.Warnf("OperatorUsername is not a string, check your tenants.toml file. Using 'safescale' user instead.")
-		} else if user == "" {
-			logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
-		}
-	}
+
+	user := cfg.OperatorUsername
 	if user == "" {
+		logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using default 'safescale' user instead.")
 		user = abstract.DefaultUser
 	}
 

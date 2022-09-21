@@ -28,9 +28,25 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// PrepareJob creates a new job and associated service
+type scopeFromProtocol interface {
+	GetOrganization() string
+	GetProject() string
+	GetTenantId() string
+}
+
+func extractScopeFromProtocol(in scopeFromProtocol, description string) backend.JobScope {
+	out := backend.JobScope{
+		Organization: in.GetOrganization(),
+		Project:      in.GetProject(),
+		Tenant:       in.GetTenantId(),
+		Description:  description,
+	}
+	return out
+}
+
+// prepareJob creates a new job and associated service
 // FIXME: include job and svc in context?
-func PrepareJob(ctx context.Context, organization, project, tenantID string, jobDescription string) (_ backend.Job, ferr fail.Error) {
+func prepareJob(ctx context.Context, scope backend.JobScope) (_ backend.Job, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -38,7 +54,7 @@ func PrepareJob(ctx context.Context, organization, project, tenantID string, job
 	}
 
 	newctx, cancel := context.WithCancel(ctx)
-	job, xerr := backend.NewJob(newctx, cancel, organization, project, tenantID, jobDescription)
+	job, xerr := backend.NewJob(newctx, cancel, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -46,23 +62,23 @@ func PrepareJob(ctx context.Context, organization, project, tenantID string, job
 	return job, nil
 }
 
-// PrepareJobWithoutService creates a new job without service instanciation (for example to be used with metadata upgrade)
-func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ backend.Job, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	newctx, cancel := context.WithCancel(ctx)
-
-	job, xerr := backend.NewJob(newctx, cancel, nil, jobDescription)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return job, nil
-}
+// // PrepareJobWithoutService creates a new job without service instanciation (for example to be used with metadata upgrade)
+// func PrepareJobWithoutService(ctx context.Context, scope backend.JobScope) (_ backend.Job, ferr fail.Error) {
+// 	defer fail.OnPanic(&ferr)
+//
+// 	if ctx == nil {
+// 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+// 	}
+//
+// 	newctx, cancel := context.WithCancel(ctx)
+//
+// 	job, xerr := backend.NewJob(newctx, cancel, scope)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	return job, nil
+// }
 
 // JobManagerListener service server gRPC
 type JobManagerListener struct {

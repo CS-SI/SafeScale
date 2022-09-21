@@ -138,7 +138,7 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 	var networkID string
 	svc := handler.job.Service()
 	if networkRef == "" {
-		withDefaultNetwork, xerr := svc.HasDefaultNetwork(handler.job.Context())
+		withDefaultNetwork, xerr := svc.HasDefaultNetwork()
 		if xerr != nil {
 			return nil, xerr
 		}

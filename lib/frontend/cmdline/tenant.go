@@ -56,7 +56,7 @@ func (t tenantConsumer) List(timeout time.Duration) (*protocol.TenantList, error
 }
 
 // Get ...
-func (t tenantConsumer) Get(timeout time.Duration) (*protocol.TenantName, error) {
+func (t tenantConsumer) Get(timeout time.Duration) (*protocol.TenantNameResponse, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -96,7 +96,7 @@ func (t tenantConsumer) Set(name string, timeout time.Duration) error {
 	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	_, err := service.Set(newCtx, &protocol.TenantName{Name: name})
+	_, err := service.Set(newCtx, &protocol.TenantInspectRequest{Name: name})
 	return err
 }
 
@@ -119,7 +119,7 @@ func (t tenantConsumer) Inspect(name string, timeout time.Duration) (*protocol.T
 	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	return service.Inspect(newCtx, &protocol.TenantName{Name: name})
+	return service.Inspect(newCtx, &protocol.TenantInspectRequest{Name: name})
 }
 
 // Cleanup ...
@@ -168,28 +168,29 @@ func (t tenantConsumer) Scan(name string, dryRun bool, templates []string, timeo
 	return results, err
 }
 
-// Upgrade ...
-func (t tenantConsumer) Upgrade(name string, dryRun bool, timeout time.Duration) ([]string, error) {
-	t.session.Connect()
-	defer t.session.Disconnect()
-
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// finally, using context
-	newCtx := ctx
-	if timeout != 0 {
-		aCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		newCtx = aCtx
-	}
-
-	service := protocol.NewTenantServiceClient(t.session.connection)
-	results, err := service.Upgrade(newCtx, &protocol.TenantUpgradeRequest{Name: name, DryRun: dryRun, Force: false})
-	if results != nil && len(results.Actions) > 0 {
-		return results.Actions, err
-	}
-	return nil, err
-}
+//
+// // Upgrade ...
+// func (t tenantConsumer) Upgrade(name string, dryRun bool, timeout time.Duration) ([]string, error) {
+// 	t.session.Connect()
+// 	defer t.session.Disconnect()
+//
+// 	ctx, xerr := utils.GetContext(true)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	// finally, using context
+// 	newCtx := ctx
+// 	if timeout != 0 {
+// 		aCtx, cancel := context.WithTimeout(ctx, timeout)
+// 		defer cancel()
+// 		newCtx = aCtx
+// 	}
+//
+// 	service := protocol.NewTenantServiceClient(t.session.connection)
+// 	results, err := service.Upgrade(newCtx, &protocol.TenantUpgradeRequest{Name: name, DryRun: dryRun, Force: false})
+// 	if results != nil && len(results.Actions) > 0 {
+// 		return results.Actions, err
+// 	}
+// 	return nil, err
+// }

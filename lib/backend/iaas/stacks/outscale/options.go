@@ -76,8 +76,8 @@ func (s stack) AuthenticationOptions() (stackoptions.Authentication, fail.Error)
 		Region:           s.Options.Compute.Region,
 		AvailabilityZone: s.Options.Compute.Subregion,
 		FloatingIPPool:   "",
-		AK:               "",
-		AS:               "",
-		CK:               "",
+		// AK:               "",
+		// AS:               "",
+		// CK:               "",
 	}, nil
 }
