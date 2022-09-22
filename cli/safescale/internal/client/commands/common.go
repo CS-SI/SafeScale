@@ -38,7 +38,10 @@ const (
 	DoInstanciate    = true
 )
 
-var ClientSession *cmdline.Session
+var (
+	ClientSession    *cmdline.Session
+	CurrentUserState common.State
+)
 
 // extractFeatureArgument returns the name of the feature from the command arguments
 func extractFeatureArgument(c *cobra.Command, args []string) (string, error) {
@@ -132,12 +135,58 @@ func addPersistentPreRunE(in *cobra.Command) {
 			return err
 		}
 
-		tenant, err := c.Flags().GetString("tenant")
+		CurrentUserState, err = common.NewState()
+		if err != nil {
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+
+		err = CurrentUserState.Read()
+		if err != nil {
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+
+		organization := CurrentUserState.Current.Organization
+		organizationFlag, err := c.Flags().GetString("organization")
 		if err != nil {
 			return err
 		}
 
-		ClientSession, err = cmdline.New(server, tenant)
+		if organizationFlag != "" {
+			organization = organizationFlag
+		}
+		if organization == "" {
+			// FUTURE: error will rise when organization is fully implemented
+			// return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, "no organization set"))
+		}
+
+		project := CurrentUserState.Current.Project
+		projectByFlag, err := c.Flags().GetString("project")
+		if err != nil {
+			return err
+		}
+
+		if projectByFlag != "" {
+			project = projectByFlag
+		}
+		if project == "" {
+			// FUTURE: error will rise when project is fully implemented
+			// return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, "no project set"))
+		}
+
+		tenant := CurrentUserState.Current.Tenant
+		tenantFlag, err := c.Flags().GetString("tenant")
+		if err != nil {
+			return err
+		}
+
+		if tenantFlag != "" {
+			tenant = tenantFlag
+		}
+		if tenant == "" {
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, "no tenant set"))
+		}
+
+		ClientSession, err = cmdline.NewSession(server /*organization, project*/, tenant)
 		if err != nil {
 			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}

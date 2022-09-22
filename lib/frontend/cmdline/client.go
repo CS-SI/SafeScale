@@ -73,14 +73,14 @@ const (
 	defaultServerPort string = "50051"
 )
 
-// New returns an instance of safescale Client
-func New(server, tenantID string) (_ *Session, ferr fail.Error) {
+// NewSession returns an instance of safescale Client
+func NewSession(server, tenantID string) (_ *Session, ferr fail.Error) {
 	var xerr fail.Error
 	// Validate currentServer parameter (can be empty string...)
 	if server != "" {
 		server, xerr = validateServerString(server)
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "currentServer is invalid")
+			return nil, fail.Wrap(xerr, "server is invalid")
 		}
 	}
 

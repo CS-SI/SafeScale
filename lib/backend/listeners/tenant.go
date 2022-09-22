@@ -226,6 +226,7 @@ func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantInspe
 	fakeReference := &protocol.Reference{
 		Organization: in.GetOrganization(),
 		Project:      in.GetProject(),
+		TenantId:     name,
 	}
 	scope := extractScopeFromProtocol(fakeReference, fmt.Sprintf("/tenant/%s/inspect", name))
 	job, xerr := prepareJob(inctx, scope)

@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
@@ -33,25 +34,33 @@ type Remediator struct {
 	Name string
 }
 
-// func (s Remediator) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, ferr fail.Error) {
-// 	defer fail.OnPanic(&ferr)
-//
-// 	images, xerr := s.Stack.ListImages(ctx, all)
-// 	if xerr != nil {
-// 		xerr.WithContext(ctx)
-// 	}
-// 	return images, xerr
-// }
-//
-// func (s Remediator) ListTemplates(ctx context.Context, all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
-// 	defer fail.OnPanic(&ferr)
-//
-// 	templates, xerr := s.Stack.ListTemplates(ctx, all)
-// 	if xerr != nil {
-// 		xerr.WithContext(ctx)
-// 	}
-// 	return templates, xerr
-// }
+func (s Remediator) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	images, xerr := s.Stack.ListImages(ctx, all)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
+	return images, xerr
+}
+
+func (s Remediator) ListTemplates(ctx context.Context, all bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	templates, xerr := s.Stack.ListTemplates(ctx, all)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
+	return templates, xerr
+}
+
+func (s Remediator) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
+	return s.Stack.AuthenticationOptions()
+}
+
+func (s Remediator) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+	return s.Stack.ConfigurationOptions()
+}
 
 func (s Remediator) GetStackName() (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -622,4 +631,15 @@ func (s Remediator) Timings() (_ temporal.Timings, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	return s.Stack.Timings()
+}
+
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+// No default network settings supported by GCP
+func (s Remediator) HasDefaultNetwork() (bool, fail.Error) {
+	return s.Stack.HasDefaultNetwork()
+}
+
+// DefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s Remediator) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
+	return s.Stack.DefaultNetwork(ctx)
 }

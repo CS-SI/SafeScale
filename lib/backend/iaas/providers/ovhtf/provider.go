@@ -161,7 +161,7 @@ func (p *provider) build(params map[string]any) (*provider, fail.Error) {
 	identityParams, _ := params["identity"].(map[string]any) // nolint
 	compute, _ := params["compute"].(map[string]any)         // nolint
 	// networkParams, _ := params["network"].(map[string]any) // nolint
-	specificParams, _ := params["specific"].(map[string]any)
+	specificParams, _ := params["specific"].(map[string]any)             // nolint
 	applicationKey, _ := identityParams["ApplicationKey"].(string)       // nolint
 	openstackID, _ := identityParams["OpenstackID"].(string)             // nolint
 	openstackPassword, _ := identityParams["OpenstackPassword"].(string) // nolint

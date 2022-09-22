@@ -51,7 +51,13 @@ func (c bucketConsumer) List(all bool, timeout time.Duration) (*protocol.BucketL
 		newCtx = aCtx
 	}
 
-	r, err := service.List(newCtx, &protocol.BucketListRequest{All: all})
+	req := &protocol.BucketListRequest{
+		Organization: c.session.currentOrganization,
+		Project:      c.session.currentProject,
+		TenantId:     c.session.currentTenant,
+		All:          all,
+	}
+	r, err := service.List(newCtx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +83,13 @@ func (c bucketConsumer) Create(name string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
-	_, err := service.Create(newCtx, &protocol.BucketRequest{Name: name})
+	req := &protocol.BucketRequest{
+		Organization: c.session.currentOrganization,
+		Project:      c.session.currentProject,
+		TenantId:     c.session.currentTenant,
+		Name:         name,
+	}
+	_, err := service.Create(newCtx, req)
 	return err
 }
 
@@ -100,7 +112,13 @@ func (c bucketConsumer) Download(name string, timeout time.Duration) (*protocol.
 		newCtx = aCtx
 	}
 
-	dr, err := service.Download(newCtx, &protocol.BucketRequest{Name: name})
+	req := &protocol.BucketRequest{
+		Organization: c.session.currentOrganization,
+		Project:      c.session.currentProject,
+		TenantId:     c.session.currentTenant,
+		Name:         name,
+	}
+	dr, err := service.Download(newCtx, req)
 	return dr, err
 }
 
@@ -123,11 +141,17 @@ func (c bucketConsumer) Clear(name string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
-	_, err := service.Clear(newCtx, &protocol.BucketRequest{Name: name})
+	req := &protocol.BucketRequest{
+		Organization: c.session.currentOrganization,
+		Project:      c.session.currentProject,
+		TenantId:     c.session.currentTenant,
+		Name:         name,
+	}
+	_, err := service.Clear(newCtx, req)
 	return err
 }
 
-// Download ...
+// Upload ...
 func (c bucketConsumer) Upload(name string, dirct string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
@@ -146,10 +170,14 @@ func (c bucketConsumer) Upload(name string, dirct string, timeout time.Duration)
 		newCtx = aCtx
 	}
 
-	_, err := service.Upload(newCtx, &protocol.BucketUploadRequest{
-		Bucket: name,
-		Path:   dirct,
-	})
+	req := &protocol.BucketUploadRequest{
+		Organization: c.session.currentOrganization,
+		Project:      c.session.currentProject,
+		TenantId:     c.session.currentTenant,
+		Bucket:       name,
+		Path:         dirct,
+	}
+	_, err := service.Upload(newCtx, req)
 	return err
 }
 
@@ -182,7 +210,13 @@ func (c bucketConsumer) Delete(names []string, timeout time.Duration) error {
 		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
-		_, err := service.Delete(newCtx, &protocol.BucketRequest{Name: aname})
+		req := &protocol.BucketRequest{
+			Organization: c.session.currentOrganization,
+			Project:      c.session.currentProject,
+			TenantId:     c.session.currentTenant,
+			Name:         aname,
+		}
+		_, err := service.Delete(newCtx, req)
 		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
@@ -220,7 +254,13 @@ func (c bucketConsumer) Inspect(name string, timeout time.Duration) (*protocol.B
 		newCtx = aCtx
 	}
 
-	return service.Inspect(newCtx, &protocol.BucketRequest{Name: name})
+	req := &protocol.BucketRequest{
+		Organization: c.session.currentOrganization,
+		Project:      c.session.currentProject,
+		TenantId:     c.session.currentTenant,
+		Name:         name,
+	}
+	return service.Inspect(newCtx, req)
 }
 
 // Mount ...
@@ -241,11 +281,17 @@ func (c bucketConsumer) Mount(bucketName, hostName, mountPoint string, timeout t
 		newCtx = aCtx
 	}
 
-	_, err := service.Mount(newCtx, &protocol.BucketMountRequest{
+	req := &protocol.BucketMountRequest{
 		Bucket: bucketName,
-		Host:   &protocol.Reference{Name: hostName},
-		Path:   mountPoint,
-	})
+		Host: &protocol.Reference{
+			Organization: c.session.currentOrganization,
+			Project:      c.session.currentProject,
+			TenantId:     c.session.currentTenant,
+			Name:         hostName,
+		},
+		Path: mountPoint,
+	}
+	_, err := service.Mount(newCtx, req)
 	return err
 }
 
@@ -267,9 +313,15 @@ func (c bucketConsumer) Unmount(bucketName, hostName string, timeout time.Durati
 		newCtx = aCtx
 	}
 
-	_, err := service.Unmount(newCtx, &protocol.BucketMountRequest{
+	req := &protocol.BucketMountRequest{
 		Bucket: bucketName,
-		Host:   &protocol.Reference{Name: hostName},
-	})
+		Host: &protocol.Reference{
+			Organization: c.session.currentOrganization,
+			Project:      c.session.currentProject,
+			TenantId:     c.session.currentTenant,
+			Name:         hostName,
+		},
+	}
+	_, err := service.Unmount(newCtx, req)
 	return err
 }

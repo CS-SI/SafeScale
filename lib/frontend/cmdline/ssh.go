@@ -456,8 +456,14 @@ func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (sshapi.
 		return nil, xerr
 	}
 
+	req := &protocol.Reference{
+		Organization: s.session.currentOrganization,
+		Project:      s.session.currentProject,
+		TenantId:     s.session.currentTenant,
+		Name:         name,
+	}
 	service := protocol.NewHostServiceClient(s.session.connection)
-	sshConfig, err := service.SSH(ctx, &protocol.Reference{Name: name})
+	sshConfig, err := service.SSH(ctx, req)
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}

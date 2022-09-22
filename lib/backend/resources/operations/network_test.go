@@ -1,5 +1,6 @@
-//go:build disabled
-// +build disabled
+///go:build fixme
+//go:build fixme
+// +build fixme
 
 //FIXME: need to move NewServiceTest inside a package
 

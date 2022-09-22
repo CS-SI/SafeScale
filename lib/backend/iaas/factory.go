@@ -21,6 +21,8 @@ import (
 	"expvar"
 	"fmt"
 	"os"
+	"os/user"
+	"path/filepath"
 	"regexp"
 	"time"
 
@@ -37,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -87,8 +88,26 @@ func GetTenants() ([]map[string]interface{}, fail.Error) {
 	return tenants, err
 }
 
-// FindProfile returns a Profile corresponding to provider name passed as parameter
-func FindProfile(providerName string) (*providers.Profile, fail.Error) {
+// FindProviderProfileForTenant returns a Profile corresponding to provider name passed as parameter
+func FindProviderProfileForTenant(tenantName string) (*providers.Profile, fail.Error) {
+	if tenantName == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("providerName")
+	}
+
+	tenantInCfg, tenantParameters := findParametersOfTenant(tenantName)
+	if tenantInCfg {
+	}
+
+	provider := findProviderFromTenantParameters(tenantParameters)
+	if provider == "" {
+		return nil, fail.NotFoundError("failed to find the Provider used by Tenant '%s'", tenantName)
+	}
+
+	return findProfile(provider)
+}
+
+// findProfile returns a Profile corresponding to provider name passed as parameter
+func findProfile(providerName string) (*providers.Profile, fail.Error) {
 	if providerName == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("providerName")
 	}
@@ -148,43 +167,19 @@ func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 		}
 	}
 
-	tenants, _, err := getTenantsFromCfg()
-	if err != nil {
-		return NullService(), err
-	}
-
 	var (
 		tenantInCfg    bool
 		found          bool
 		name, provider string
-		svcProvider    = "__not_found__"
 	)
 
-	for _, currentTenant := range tenants {
-		name, found = currentTenant["name"].(string)
-		if !found {
-			logrus.WithContext(ctx).Error("found tenant without 'name' parameter")
-			continue
-		}
-		if name != settings.tenantName {
-			continue
-		}
-
-		tenantInCfg = true
-		provider, found = currentTenant["provider"].(string)
-		if !found {
-			provider, found = currentTenant["client"].(string)
-			if !found {
-				logrus.WithContext(ctx).Error("Missing field 'provider' or 'client' in currentTenant")
-				continue
-			}
-		}
-
-		svcProvider = provider
-		svcProviderProfile, xerr := FindProfile(provider)
+	tenantInCfg, currentTenant := findParametersOfTenant(settings.tenantName)
+	if tenantInCfg {
+		provider = findProviderFromTenantParameters(currentTenant)
+		svcProviderProfile, xerr := findProfile(provider)
 		if xerr != nil {
-			logrus.WithContext(ctx).Errorf(xerr.Error())
-			continue
+			return NullService(), fail.Wrap(xerr, "error initializing Tenant '%s' with Provider '%s'", settings.tenantName, provider)
+
 		}
 
 		_, found = currentTenant["identity"].(map[string]interface{})
@@ -358,8 +353,8 @@ func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 			return NullService(), xerr
 		}
 
-		// increase currentTenant counter
-		ts := expvar.Get("currentTenant.setted")
+		// increase Tenant counter
+		ts := expvar.Get("tenant.setted")
 		if ts != nil {
 			tsi, ok := ts.(*expvar.Int)
 			if ok {
@@ -370,11 +365,52 @@ func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 		return newS, nil
 	}
 
-	if !tenantInCfg {
-		return NullService(), fail.NotFoundError("currentTenant '%s' not found in configuration", settings.tenantName)
+	return NullService(), fail.NotFoundError("no valid Tenant '%s' found in configuration", settings.tenantName)
+}
+
+func findParametersOfTenant(tenant string) (bool, map[string]any) {
+	tenants, _, err := getTenantsFromCfg()
+	if err != nil {
+		return false, nil
 	}
 
-	return NullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
+	for _, currentTenant := range tenants {
+		name, found := currentTenant["name"].(string)
+		if !found {
+			continue
+		}
+
+		if name != tenant {
+			continue
+		}
+
+		_, found = currentTenant["provider"].(string)
+		if !found {
+			_, found = currentTenant["client"].(string)
+			if !found {
+				logrus.Errorf("Missing field 'provider' or 'client' in tenant '%s'", name)
+				continue
+			}
+		}
+
+		return true, currentTenant
+	}
+
+	return false, nil
+}
+
+func findProviderFromTenantParameters(params map[string]any) string {
+	provider, found := params["provider"].(string)
+	if found {
+		return provider
+	}
+
+	provider, found = params["client"].(string)
+	if found {
+		return provider
+	}
+
+	panic("should not reach this point!")
 }
 
 // validateRegionName validates the availability of the region passed as parameter
@@ -814,12 +850,19 @@ func loadConfig() (map[string]string, fail.Error) {
 }
 
 func getTenantsFromCfg() ([]map[string]interface{}, *viper.Viper, fail.Error) {
+	currentUser, err := user.Current()
+	if err != nil {
+		return nil, nil, fail.Wrap(err, "failed to get current user information")
+	}
+
 	v := viper.New()
 	v.AddConfigPath(".")
-	v.AddConfigPath("$HOME/.safescale")
-	v.AddConfigPath(utils.AbsPathify("$HOME/.safescale"))
-	v.AddConfigPath("$HOME/.config/safescale")
-	v.AddConfigPath(utils.AbsPathify("$HOME/.config/safescale"))
+	v.AddConfigPath(filepath.Join(currentUser.HomeDir, ".safescale"))
+	// FIXME: is it needed with user.Homedir?
+	// v.AddConfigPath(utils.AbsPathify(filepath.Join(currentUser.HomeDir, ".safescale")))
+	v.AddConfigPath(filepath.Join(currentUser.HomeDir, ".config", "safescale"))
+	// FIXME: is it needed with user.Homedir?
+	// v.AddConfigPath(utils.AbsPathify(filepath.Join(currentUser.HomeDir, ".config", "safescale")))
 	v.AddConfigPath("/etc/safescale")
 	v.SetConfigName("tenants")
 	return getTenantsFromViperCfg(v)

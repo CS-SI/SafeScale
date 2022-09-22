@@ -60,19 +60,21 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "gcp", nil
 }
 
-// GetRawConfigurationOptions ...
-func (s stack) GetRawConfigurationOptions(context.Context) (stackoptions.Configuration, fail.Error) {
+// ConfigurationOptions ...
+func (s stack) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
 	if valid.IsNil(s) || s.Config == nil {
 		return stackoptions.Configuration{}, fail.InvalidInstanceError()
 	}
+
 	return *s.Config, nil
 }
 
-// GetRawAuthenticationOptions ...
-func (s stack) GetRawAuthenticationOptions(context.Context) (stackoptions.Authentication, fail.Error) {
+// AuthenticationOptions ...
+func (s stack) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
 	if valid.IsNil(s) || s.AuthOptions == nil {
 		return stackoptions.Authentication{}, fail.InvalidInstanceError()
 	}
+
 	return *s.AuthOptions, nil
 }
 

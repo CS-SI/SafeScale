@@ -47,8 +47,15 @@ func (t templateConsumer) List(all, scannedOnly bool, timeout time.Duration) (*p
 		newCtx = aCtx
 	}
 
+	req := &protocol.TemplateListRequest{
+		Organization: t.session.currentOrganization,
+		Project:      t.session.currentProject,
+		TenantId:     t.session.currentTenant,
+		All:          all,
+		ScannedOnly:  scannedOnly,
+	}
 	service := protocol.NewTemplateServiceClient(t.session.connection)
-	return service.List(newCtx, &protocol.TemplateListRequest{All: all, ScannedOnly: scannedOnly})
+	return service.List(newCtx, req)
 }
 
 // Match returns the list of templates that match the sizing
@@ -69,8 +76,14 @@ func (t templateConsumer) Match(sizing string, timeout time.Duration) (*protocol
 		newCtx = aCtx
 	}
 
+	req := &protocol.TemplateMatchRequest{
+		Organization: t.session.currentOrganization,
+		Project:      t.session.currentProject,
+		TenantId:     t.session.currentTenant,
+		Sizing:       sizing,
+	}
 	service := protocol.NewTemplateServiceClient(t.session.connection)
-	return service.Match(newCtx, &protocol.TemplateMatchRequest{Sizing: sizing})
+	return service.Match(newCtx, req)
 }
 
 // Inspect returns details of a template identified by name of ID
@@ -91,7 +104,14 @@ func (t templateConsumer) Inspect(name string, timeout time.Duration) (*protocol
 		newCtx = aCtx
 	}
 
+	req := &protocol.TemplateInspectRequest{
+		Template: &protocol.Reference{
+			Organization: t.session.currentOrganization,
+			Project:      t.session.currentProject,
+			TenantId:     t.session.currentTenant,
+			Name:         name,
+		},
+	}
 	service := protocol.NewTemplateServiceClient(t.session.connection)
-
-	return service.Inspect(newCtx, &protocol.TemplateInspectRequest{Template: &protocol.Reference{Name: name}})
+	return service.Inspect(newCtx, req)
 }

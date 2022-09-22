@@ -120,6 +120,7 @@ func LoadSettings(cmd *cobra.Command, args []string) (ferr error) {
 			ferr = err
 			return
 		}
+
 		if configFile != "" {
 			dirname, basename = filepath.Split(configFile)
 			reader.AddConfigPath(dirname)

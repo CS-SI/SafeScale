@@ -118,8 +118,13 @@ func (t tenantConsumer) Inspect(name string, timeout time.Duration) (*protocol.T
 		newCtx = aCtx
 	}
 
+	req := &protocol.TenantInspectRequest{
+		Organization: t.session.currentOrganization,
+		Project:      t.session.currentProject,
+		Name:         name,
+	}
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	return service.Inspect(newCtx, &protocol.TenantInspectRequest{Name: name})
+	return service.Inspect(newCtx, req)
 }
 
 // Cleanup ...
@@ -140,8 +145,14 @@ func (t tenantConsumer) Cleanup(name string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
+	req := &protocol.TenantCleanupRequest{
+		Organization: t.session.currentOrganization,
+		Project:      t.session.currentProject,
+		Name:         name,
+		Force:        false,
+	}
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	_, err := service.Cleanup(newCtx, &protocol.TenantCleanupRequest{Name: name, Force: false})
+	_, err := service.Cleanup(newCtx, req)
 	return err
 }
 
@@ -163,8 +174,15 @@ func (t tenantConsumer) Scan(name string, dryRun bool, templates []string, timeo
 		newCtx = aCtx
 	}
 
+	req := &protocol.TenantScanRequest{
+		Organization: t.session.currentOrganization,
+		Project:      t.session.currentProject,
+		Name:         name,
+		DryRun:       dryRun,
+		Templates:    templates,
+	}
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	results, err := service.Scan(newCtx, &protocol.TenantScanRequest{Name: name, DryRun: dryRun, Templates: templates})
+	results, err := service.Scan(newCtx, req)
 	return results, err
 }
 

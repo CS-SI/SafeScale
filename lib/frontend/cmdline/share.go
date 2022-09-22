@@ -37,7 +37,7 @@ type shareConsumer struct {
 func (n shareConsumer) Create(def *protocol.ShareCreateRequest, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := protocol.NewShareServiceClient(n.session.connection)
+
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
@@ -51,10 +51,15 @@ func (n shareConsumer) Create(def *protocol.ShareCreateRequest, timeout time.Dur
 		newCtx = aCtx
 	}
 
+	def.Host.Organization = n.session.currentOrganization
+	def.Host.Project = n.session.currentProject
+	def.Host.TenantId = n.session.currentTenant
+	service := protocol.NewShareServiceClient(n.session.connection)
 	_, err := service.Create(newCtx, def)
 	if err != nil {
 		return DecorateTimeoutError(err, "creation of share", true)
 	}
+
 	return nil
 }
 
@@ -63,7 +68,6 @@ func (n shareConsumer) Delete(names []string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 
-	service := protocol.NewShareServiceClient(n.session.connection)
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
@@ -82,14 +86,20 @@ func (n shareConsumer) Delete(names []string, timeout time.Duration) error {
 		wg    sync.WaitGroup
 		errs  []string
 	)
-
+	service := protocol.NewShareServiceClient(n.session.connection)
 	shareDeleter := func(aname string) {
 		var crash error
 		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
 
-		if _, xerr := service.Delete(newCtx, &protocol.Reference{Name: aname}); xerr != nil {
+		req := &protocol.Reference{
+			Organization: n.session.currentOrganization,
+			Project:      n.session.currentProject,
+			TenantId:     n.session.currentTenant,
+			Name:         aname,
+		}
+		if _, xerr := service.Delete(newCtx, req); xerr != nil {
 			mutex.Lock()
 			errs = append(errs, xerr.Error())
 			mutex.Unlock() // nolint
@@ -113,7 +123,7 @@ func (n shareConsumer) Delete(names []string, timeout time.Duration) error {
 func (n shareConsumer) List(timeout time.Duration) (*protocol.ShareListResponse, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := protocol.NewShareServiceClient(n.session.connection)
+
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return nil, xerr
@@ -127,7 +137,13 @@ func (n shareConsumer) List(timeout time.Duration) (*protocol.ShareListResponse,
 		newCtx = aCtx
 	}
 
-	list, err := service.List(newCtx, &protocol.Reference{})
+	req := &protocol.Reference{
+		Organization: n.session.currentOrganization,
+		Project:      n.session.currentProject,
+		TenantId:     n.session.currentTenant,
+	}
+	service := protocol.NewShareServiceClient(n.session.connection)
+	list, err := service.List(newCtx, req)
 	if err != nil {
 		return nil, DecorateTimeoutError(err, "list of shares", true)
 	}
@@ -138,7 +154,7 @@ func (n shareConsumer) List(timeout time.Duration) (*protocol.ShareListResponse,
 func (n shareConsumer) Mount(def *protocol.ShareMountRequest, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := protocol.NewShareServiceClient(n.session.connection)
+
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
@@ -152,6 +168,10 @@ func (n shareConsumer) Mount(def *protocol.ShareMountRequest, timeout time.Durat
 		newCtx = aCtx
 	}
 
+	def.Host.Organization = n.session.currentOrganization
+	def.Host.Project = n.session.currentProject
+	def.Host.TenantId = n.session.currentTenant
+	service := protocol.NewShareServiceClient(n.session.connection)
 	_, err := service.Mount(newCtx, def)
 	if err != nil {
 		return DecorateTimeoutError(err, "mount of share", true)
@@ -163,7 +183,7 @@ func (n shareConsumer) Mount(def *protocol.ShareMountRequest, timeout time.Durat
 func (n shareConsumer) Unmount(def *protocol.ShareMountRequest, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := protocol.NewShareServiceClient(n.session.connection)
+
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
@@ -177,6 +197,10 @@ func (n shareConsumer) Unmount(def *protocol.ShareMountRequest, timeout time.Dur
 		newCtx = aCtx
 	}
 
+	def.Host.Organization = n.session.currentOrganization
+	def.Host.Project = n.session.currentProject
+	def.Host.TenantId = n.session.currentTenant
+	service := protocol.NewShareServiceClient(n.session.connection)
 	_, err := service.Unmount(newCtx, def)
 	if err != nil {
 		return DecorateTimeoutError(err, "unmount of share", true)
@@ -202,7 +226,13 @@ func (n shareConsumer) Inspect(name string, timeout time.Duration) (*protocol.Sh
 		newCtx = aCtx
 	}
 
-	list, err := service.Inspect(newCtx, &protocol.Reference{Name: name})
+	req := &protocol.Reference{
+		Organization: n.session.currentOrganization,
+		Project:      n.session.currentProject,
+		TenantId:     n.session.currentTenant,
+		Name:         name,
+	}
+	list, err := service.Inspect(newCtx, req)
 	if err != nil {
 		return nil, DecorateTimeoutError(err, "inspection of share", true)
 	}

@@ -36,7 +36,6 @@ func (c jobConsumer) List(timeout time.Duration) (*protocol.JobList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	service := protocol.NewJobServiceClient(c.session.connection)
 	ctx, xerr := utils.GetContext(false)
 	if xerr != nil {
 		return nil, xerr
@@ -50,6 +49,7 @@ func (c jobConsumer) List(timeout time.Duration) (*protocol.JobList, error) {
 		newCtx = aCtx
 	}
 
+	service := protocol.NewJobServiceClient(c.session.connection)
 	return service.List(newCtx, &emptypb.Empty{})
 }
 
@@ -58,7 +58,6 @@ func (c jobConsumer) Stop(uuid string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	service := protocol.NewJobServiceClient(c.session.connection)
 	ctx, xerr := utils.GetContext(false)
 	if xerr != nil {
 		return xerr
@@ -72,6 +71,8 @@ func (c jobConsumer) Stop(uuid string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
-	_, err := service.Stop(newCtx, &protocol.JobDefinition{Uuid: uuid})
+	req := &protocol.JobDefinition{Uuid: uuid}
+	service := protocol.NewJobServiceClient(c.session.connection)
+	_, err := service.Stop(newCtx, req)
 	return err
 }

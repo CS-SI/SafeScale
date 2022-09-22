@@ -596,9 +596,9 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	desc.ProjectName = authOpts.ProjectName
 	if desc.ProjectName == "" {
 		desc.ProjectName = authOpts.ProjectID
-	}
-	if desc.ProjectName == "" {
-		desc.ProjectName = authOpts.TenantName
+		if desc.ProjectName == "" {
+			desc.ProjectName = authOpts.TenantName
+		}
 	}
 
 	// -- execute the mount

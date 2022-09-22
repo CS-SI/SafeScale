@@ -49,13 +49,40 @@ var (
 )
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s stack) HasDefaultNetwork(context.Context) (bool, fail.Error) {
-	return false, nil
+func (s stack) HasDefaultNetwork() (bool, fail.Error) {
+	if valid.IsNil(s) {
+		return false, fail.InvalidInstanceError()
+	}
+
+	options, xerr := s.ConfigurationOptions()
+	if xerr != nil {
+		return false, xerr
+	}
+
+	return options.DefaultNetworkName != "", nil
 }
 
-// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (s stack) GetDefaultNetwork(context.Context) (*abstract.Network, fail.Error) {
-	return nil, fail.NotFoundError("no default network in stack")
+// DefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s stack) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
+	if valid.IsNil(s) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	options, xerr := s.ConfigurationOptions()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if options.DefaultNetworkName != "" {
+		networkAbstract, xerr := s.InspectNetwork(ctx, options.DefaultNetworkCIDR)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		return networkAbstract, nil
+	}
+
+	return nil, fail.NotFoundError("this provider has no default network")
 }
 
 // CreateNetwork creates a Network, ie a VPC in AWS terminology

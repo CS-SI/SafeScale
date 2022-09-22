@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
@@ -31,6 +32,9 @@ import (
 
 // Stack is the interface to cloud stack
 type Stack interface {
+	AuthenticationOptions() (stackoptions.Authentication, fail.Error)
+	ConfigurationOptions() (stackoptions.Configuration, fail.Error)
+
 	GetStackName() (string, fail.Error)
 
 	// ListAvailabilityZones lists the usable Availability Zones
@@ -39,9 +43,12 @@ type Stack interface {
 	// ListRegions returns a list with the regions available
 	ListRegions(ctx context.Context) ([]string, fail.Error)
 
+	// ListImages lists available images
+	ListImages(ctx context.Context, all bool) (_ []*abstract.Image, ferr fail.Error)
 	// InspectImage returns the Image referenced by id
 	InspectImage(ctx context.Context, id string) (*abstract.Image, fail.Error)
 
+	ListTemplates(ctx context.Context, _ bool) (templates []*abstract.HostTemplate, ferr fail.Error)
 	// InspectTemplate returns the Template referenced by id
 	InspectTemplate(ctx context.Context, id string) (*abstract.HostTemplate, fail.Error)
 
@@ -75,6 +82,8 @@ type Stack interface {
 	// DisableSecurityGroup disables a Security Group
 	DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error
 
+	HasDefaultNetwork() (bool, fail.Error)
+	DefaultNetwork(context.Context) (*abstract.Network, fail.Error)
 	// CreateNetwork creates a network named name
 	CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (*abstract.Network, fail.Error)
 	// InspectNetwork returns the network identified by id

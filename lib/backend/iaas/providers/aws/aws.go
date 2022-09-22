@@ -400,43 +400,6 @@ func (p *provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error)
 	return out, nil
 }
 
-// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (p provider) HasDefaultNetwork() (bool, fail.Error) {
-	if valid.IsNil(p) {
-		return false, fail.InvalidInstanceError()
-	}
-
-	options, xerr := p.ConfigurationOptions()
-	if xerr != nil {
-		return false, xerr
-	}
-
-	return options.DefaultNetworkName != "", nil
-}
-
-// DefaultNetwork returns the *abstract.Network corresponding to the default network
-func (p *provider) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
-	if valid.IsNil(p) {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	options, xerr := p.ConfigurationOptions()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if options.DefaultNetworkName != "" {
-		networkAbstract, xerr := p.InspectNetwork(ctx, options.DefaultNetworkCIDR)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		return networkAbstract, nil
-	}
-
-	return nil, fail.NotFoundError("this provider has no default network")
-}
-
 func init() {
 	profile := providers.NewProfile(
 		capabilities,

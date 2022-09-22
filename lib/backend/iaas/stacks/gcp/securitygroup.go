@@ -404,7 +404,7 @@ func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Er
 		return "", fail.InvalidInstanceError()
 	}
 
-	cfg, err := s.GetRawConfigurationOptions(ctx)
+	cfg, err := s.ConfigurationOptions()
 	if err != nil {
 		return "", err
 	}

@@ -38,7 +38,6 @@ type subnetConsumer struct {
 func (s subnetConsumer) List(networkRef string, all bool, timeout time.Duration) (*protocol.SubnetList, error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
-	service := protocol.NewSubnetServiceClient(s.session.connection)
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return nil, xerr
@@ -52,17 +51,24 @@ func (s subnetConsumer) List(networkRef string, all bool, timeout time.Duration)
 		newCtx = aCtx
 	}
 
-	return service.List(newCtx, &protocol.SubnetListRequest{
-		Network: &protocol.Reference{Name: networkRef},
-		All:     all,
-	})
+	req := &protocol.SubnetListRequest{
+		Network: &protocol.Reference{
+			Organization: s.session.currentOrganization,
+			Project:      s.session.currentProject,
+			TenantId:     s.session.currentTenant,
+			Name:         networkRef,
+		},
+		All: all,
+	}
+	service := protocol.NewSubnetServiceClient(s.session.connection)
+	return service.List(newCtx, req)
 }
 
 // Delete deletes several networks at the same time in goroutines
 func (s subnetConsumer) Delete(networkRef string, names []string, timeout time.Duration, force bool) error {
 	s.session.Connect()
 	defer s.session.Disconnect()
-	service := protocol.NewSubnetServiceClient(s.session.connection)
+
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return xerr
@@ -78,14 +84,23 @@ func (s subnetConsumer) Delete(networkRef string, names []string, timeout time.D
 		wg    sync.WaitGroup
 		errs  []string
 	)
-
+	service := protocol.NewSubnetServiceClient(s.session.connection)
 	subnetDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(newCtx, &protocol.SubnetDeleteRequest{
-			Network: &protocol.Reference{Name: networkRef},
-			Subnet:  &protocol.Reference{Name: aname},
-			Force:   true,
-		})
+
+		req := &protocol.SubnetDeleteRequest{
+			Network: &protocol.Reference{
+				Organization: s.session.currentOrganization,
+				Project:      s.session.currentProject,
+				TenantId:     s.session.currentTenant,
+				Name:         networkRef,
+			},
+			Subnet: &protocol.Reference{
+				Name: aname,
+			},
+			Force: true,
+		}
+		_, err := service.Delete(newCtx, req)
 
 		if err != nil {
 			mutex.Lock()
@@ -111,7 +126,7 @@ func (s subnetConsumer) Delete(networkRef string, names []string, timeout time.D
 func (s subnetConsumer) Inspect(networkRef, name string, timeout time.Duration) (*protocol.Subnet, error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
-	service := protocol.NewSubnetServiceClient(s.session.connection)
+
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return nil, xerr
@@ -126,9 +141,17 @@ func (s subnetConsumer) Inspect(networkRef, name string, timeout time.Duration) 
 	}
 
 	req := &protocol.SubnetInspectRequest{
-		Network: &protocol.Reference{Name: networkRef},
-		Subnet:  &protocol.Reference{Name: name},
+		Network: &protocol.Reference{
+			Organization: s.session.currentOrganization,
+			Project:      s.session.currentProject,
+			TenantId:     s.session.currentTenant,
+			Name:         networkRef,
+		},
+		Subnet: &protocol.Reference{
+			Name: name,
+		},
 	}
+	service := protocol.NewSubnetServiceClient(s.session.connection)
 	return service.Inspect(newCtx, req)
 
 }
@@ -144,7 +167,7 @@ func (s subnetConsumer) Create(
 
 	s.session.Connect()
 	defer s.session.Disconnect()
-	service := protocol.NewSubnetServiceClient(s.session.connection)
+
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return nil, xerr
@@ -158,10 +181,15 @@ func (s subnetConsumer) Create(
 		newCtx = aCtx
 	}
 
-	def := &protocol.SubnetCreateRequest{
-		Name:     name,
-		Cidr:     cidr,
-		Network:  &protocol.Reference{Name: networkRef},
+	req := &protocol.SubnetCreateRequest{
+		Name: name,
+		Cidr: cidr,
+		Network: &protocol.Reference{
+			Organization: s.session.currentOrganization,
+			Project:      s.session.currentProject,
+			TenantId:     s.session.currentTenant,
+			Name:         networkRef,
+		},
 		FailOver: failover,
 		Gateway: &protocol.GatewayDefinition{
 			ImageId:        os,
@@ -171,7 +199,8 @@ func (s subnetConsumer) Create(
 		},
 		KeepOnFailure: keepOnFailure,
 	}
-	return service.Create(newCtx, def)
+	service := protocol.NewSubnetServiceClient(s.session.connection)
+	return service.Create(newCtx, req)
 }
 
 // BindSecurityGroup calls the gRPC currentServer to bind a security group to a subnet
@@ -200,10 +229,19 @@ func (s subnetConsumer) BindSecurityGroup(networkRef, subnetRef, sgRef string, e
 		state = protocol.SecurityGroupState_SGS_ENABLED
 	}
 	req := &protocol.SecurityGroupSubnetBindRequest{
-		Group:   &protocol.Reference{Name: sgRef},
-		Network: &protocol.Reference{Name: networkRef},
-		Subnet:  &protocol.Reference{Name: subnetRef},
-		State:   state,
+		Group: &protocol.Reference{
+			Organization: s.session.currentOrganization,
+			Project:      s.session.currentProject,
+			TenantId:     s.session.currentTenant,
+			Name:         sgRef,
+		},
+		Network: &protocol.Reference{
+			Name: networkRef,
+		},
+		Subnet: &protocol.Reference{
+			Name: subnetRef,
+		},
+		State: state,
 	}
 	service := protocol.NewSubnetServiceClient(s.session.connection)
 	_, err := service.BindSecurityGroup(newCtx, req)
@@ -229,9 +267,18 @@ func (s subnetConsumer) UnbindSecurityGroup(networkRef, subnetRef, sgRef string,
 	}
 
 	req := &protocol.SecurityGroupSubnetBindRequest{
-		Group:   &protocol.Reference{Name: sgRef},
-		Network: &protocol.Reference{Name: networkRef},
-		Subnet:  &protocol.Reference{Name: subnetRef},
+		Group: &protocol.Reference{
+			Organization: s.session.currentOrganization,
+			Project:      s.session.currentProject,
+			TenantId:     s.session.currentTenant,
+			Name:         sgRef,
+		},
+		Network: &protocol.Reference{
+			Name: networkRef,
+		},
+		Subnet: &protocol.Reference{
+			Name: subnetRef,
+		},
 	}
 	service := protocol.NewSubnetServiceClient(s.session.connection)
 	_, err := service.UnbindSecurityGroup(newCtx, req)
@@ -257,9 +304,18 @@ func (s subnetConsumer) EnableSecurityGroup(networkRef, subnetRef, sgRef string,
 	}
 
 	req := &protocol.SecurityGroupSubnetBindRequest{
-		Group:   &protocol.Reference{Name: sgRef},
-		Network: &protocol.Reference{Name: networkRef},
-		Subnet:  &protocol.Reference{Name: subnetRef},
+		Group: &protocol.Reference{
+			Organization: s.session.currentOrganization,
+			Project:      s.session.currentProject,
+			TenantId:     s.session.currentTenant,
+			Name:         sgRef,
+		},
+		Network: &protocol.Reference{
+			Name: networkRef,
+		},
+		Subnet: &protocol.Reference{
+			Name: subnetRef,
+		},
 	}
 	service := protocol.NewSubnetServiceClient(s.session.connection)
 	_, err := service.EnableSecurityGroup(newCtx, req)
@@ -287,9 +343,18 @@ func (s subnetConsumer) DisableSecurityGroup(networkRef, subnetRef, sgRef string
 	service := protocol.NewSubnetServiceClient(s.session.connection)
 
 	req := &protocol.SecurityGroupSubnetBindRequest{
-		Group:   &protocol.Reference{Name: sgRef},
-		Network: &protocol.Reference{Name: networkRef},
-		Subnet:  &protocol.Reference{Name: subnetRef},
+		Group: &protocol.Reference{
+			Organization: s.session.currentOrganization,
+			Project:      s.session.currentProject,
+			TenantId:     s.session.currentTenant,
+			Name:         sgRef,
+		},
+		Network: &protocol.Reference{
+			Name: networkRef,
+		},
+		Subnet: &protocol.Reference{
+			Name: subnetRef,
+		},
 	}
 	_, err := service.DisableSecurityGroup(newCtx, req)
 	return err
@@ -314,11 +379,16 @@ func (s subnetConsumer) ListSecurityGroups(networkRef, subnetRef, state string, 
 		newCtx = aCtx
 	}
 
-	service := protocol.NewSubnetServiceClient(s.session.connection)
-
 	req := &protocol.SecurityGroupSubnetBindRequest{
-		Network: &protocol.Reference{Name: networkRef},
-		Subnet:  &protocol.Reference{Name: subnetRef},
+		Network: &protocol.Reference{
+			Organization: s.session.currentOrganization,
+			Project:      s.session.currentProject,
+			TenantId:     s.session.currentTenant,
+			Name:         networkRef,
+		},
+		Subnet: &protocol.Reference{
+			Name: subnetRef,
+		},
 	}
 	switch strings.ToLower(strings.TrimSpace(state)) {
 	case "all":
@@ -330,6 +400,6 @@ func (s subnetConsumer) ListSecurityGroups(networkRef, subnetRef, state string, 
 	default:
 		return nil, fail.SyntaxError("invalid value '%s' for 'state' field", state)
 	}
-
+	service := protocol.NewSubnetServiceClient(s.session.connection)
 	return service.ListSecurityGroups(newCtx, req)
 }

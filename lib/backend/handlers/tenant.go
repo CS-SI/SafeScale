@@ -270,6 +270,25 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return nil, err
 	}
 
+	var (
+		whitelistTemplateRegexp string
+		blacklistTemplateRegexp string
+		whitelistImageRegexp    string
+		blacklistImageRegexp    string
+	)
+	if configOpts.WhitelistTemplateRegexp != nil {
+		whitelistTemplateRegexp = configOpts.WhitelistTemplateRegexp.String()
+	}
+	if configOpts.BlacklistTemplateRegexp != nil {
+		blacklistTemplateRegexp = configOpts.BlacklistTemplateRegexp.String()
+	}
+	if configOpts.WhitelistImageRegexp != nil {
+		whitelistImageRegexp = configOpts.WhitelistImageRegexp.String()
+	}
+	if configOpts.BlacklistImageRegexp != nil {
+		blacklistImageRegexp = configOpts.BlacklistImageRegexp.String()
+	}
+
 	return &protocol.TenantInspectResponse{
 		Name:     svcName,
 		Provider: provName,
@@ -290,13 +309,13 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 			AvailabilityZone:       fromParams(params, "compute", "Zone"),
 			Context:                nil,
 			ApiKey:                 nil, // secret
-			WhitelistTemplateRegex: configOpts.WhitelistTemplateRegexp.String(),
-			BlacklistTemplateRegex: configOpts.BlacklistTemplateRegexp.String(),
+			WhitelistTemplateRegex: whitelistTemplateRegexp,
+			BlacklistTemplateRegex: blacklistTemplateRegexp,
 			DefaultImage:           configOpts.DefaultImage,
 			DnsList:                configOpts.DNSServers,
 			OperatorUsername:       fromParams(params, "compute", "OperatorUsername"),
-			WhitelistImageRegex:    configOpts.WhitelistImageRegexp.String(),
-			BlacklistImageRegex:    configOpts.BlacklistImageRegexp.String(),
+			WhitelistImageRegex:    whitelistImageRegexp,
+			BlacklistImageRegex:    blacklistImageRegexp,
 		},
 		ObjectStorage: &protocol.TenantObjectStorage{
 			Type:           fromParams(params, "objectstorage", "Type"),

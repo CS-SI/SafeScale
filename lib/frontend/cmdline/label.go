@@ -50,8 +50,14 @@ func (t labelConsumer) List(selectTags bool, timeout time.Duration) (*protocol.L
 		newCtx = aCtx
 	}
 
+	req := &protocol.LabelListRequest{
+		Organization: t.session.currentOrganization,
+		Project:      t.session.currentProject,
+		TenantId:     t.session.currentTenant,
+		Tags:         selectTags,
+	}
 	service := protocol.NewLabelServiceClient(t.session.connection)
-	return service.List(newCtx, &protocol.LabelListRequest{TenantId: t.session.currentTenant, Tags: selectTags})
+	return service.List(newCtx, req)
 }
 
 // Inspect ...
@@ -71,14 +77,16 @@ func (t labelConsumer) Inspect(name string, selectTag bool, timeout time.Duratio
 		newCtx = aCtx
 	}
 
-	service := protocol.NewLabelServiceClient(t.session.connection)
 	req := &protocol.LabelInspectRequest{
 		Label: &protocol.Reference{
-			TenantId: t.session.currentTenant,
-			Name:     name,
+			Organization: t.session.currentOrganization,
+			Project:      t.session.currentProject,
+			TenantId:     t.session.currentTenant,
+			Name:         name,
 		},
 		IsTag: selectTag,
 	}
+	service := protocol.NewLabelServiceClient(t.session.connection)
 	return service.Inspect(newCtx, req)
 }
 
@@ -114,7 +122,12 @@ func (t labelConsumer) Delete(names []string, selectTags bool, timeout time.Dura
 		defer wg.Done()
 
 		req := &protocol.LabelInspectRequest{
-			Label: &protocol.Reference{TenantId: t.session.currentTenant, Name: aname},
+			Label: &protocol.Reference{
+				Organization: t.session.currentOrganization,
+				Project:      t.session.currentProject,
+				TenantId:     t.session.currentTenant,
+				Name:         aname,
+			},
 			IsTag: selectTags,
 		}
 		_, err := service.Delete(newCtx, req)
@@ -156,11 +169,14 @@ func (t labelConsumer) Create(name string, hasDefault bool, defaultValue string,
 		newCtx = aCtx
 	}
 
-	def := &protocol.LabelCreateRequest{
+	req := &protocol.LabelCreateRequest{
 		Name:         name,
 		HasDefault:   hasDefault,
 		DefaultValue: defaultValue,
+		Organization: t.session.currentOrganization,
+		Project:      t.session.currentProject,
+		TenantId:     t.session.currentTenant,
 	}
 	service := protocol.NewLabelServiceClient(t.session.connection)
-	return service.Create(newCtx, def)
+	return service.Create(newCtx, req)
 }

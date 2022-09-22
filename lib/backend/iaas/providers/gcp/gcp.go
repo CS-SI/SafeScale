@@ -355,16 +355,6 @@ func (p *provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error)
 	return out, nil
 }
 
-// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (p *provider) HasDefaultNetwork() (bool, fail.Error) {
-	return false, nil
-}
-
-// DefaultNetwork returns the *abstract.Network corresponding to the default network
-func (p *provider) DefaultNetwork(_ context.Context) (*abstract.Network, fail.Error) {
-	return nil, fail.NotFoundError("this provider has no default network")
-}
-
 func init() {
 	profile := providers.NewProfile(
 		capabilities,

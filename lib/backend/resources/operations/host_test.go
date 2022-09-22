@@ -1,5 +1,5 @@
-//go:build disabled
-// +build disabled
+//go:build fixme
+// +build fixme
 
 //FIXME: need to move NewServiceTest() and skip() inside a package
 

@@ -159,7 +159,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, scope JobScope) (_ *
 	ctx = context.WithValue(ctx, KeyForJobInContext, nj) // nolint
 	nj.ctx = ctx
 
-	providerProfile, xerr := iaas.FindProfile(scope.Tenant)
+	providerProfile, xerr := iaas.FindProviderProfileForTenant(scope.Tenant)
 	if xerr != nil {
 		return nil, xerr
 	}
