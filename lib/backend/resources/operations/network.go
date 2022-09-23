@@ -311,7 +311,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && !req.KeepOnFailure {
+			if ferr != nil && !req.KeepOnFailure && !valid.IsNull(abstractNetwork) {
 				derr := svc.DeleteNetwork(context.Background(), abstractNetwork.ID)
 				derr = debug.InjectPlannedFail(derr)
 				if derr != nil {

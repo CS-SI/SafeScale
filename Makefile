@@ -135,6 +135,10 @@ sharetests:
 	@echo "settings go build tags for sharetests"
 	@$(eval BUILD_TAGS = "sharetests,$(BUILD_TAGS)")
 
+labeltests:
+	@echo "settings go build tags for labeltests"
+	@$(eval BUILD_TAGS = "labeltests,$(BUILD_TAGS)")
+
 ifeq ($(OS),Windows_NT)
 releasearchive:
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Creating release archive $(NO_COLOR)\n";

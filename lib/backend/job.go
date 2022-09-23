@@ -71,9 +71,6 @@ type job struct {
 
 const (
 	KeyForJobInContext = "job"
-
-	defaultOrganization = "default"
-	defaultProject      = "default"
 )
 
 var (
@@ -95,10 +92,10 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, scope JobScope) (_ *
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("scope.Tenant")
 	}
 	if scope.Organization == "" {
-		scope.Organization = defaultOrganization
+		scope.Organization = global.DefaultOrganization
 	}
 	if scope.Project == "" {
-		scope.Project = defaultProject
+		scope.Project = global.DefaultProject
 	}
 
 	// VPL: I don't get the point of checking if context has an uuid or not, as this uuid is not used...

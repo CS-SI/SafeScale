@@ -14,13 +14,9 @@
  * limitations under the License.
  */
 
-package listeners
+package global
 
-import (
-	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+const (
+	DefaultOrganization = "default"
+	DefaultProject      = "default"
 )
-
-// OrganizationListener server is used to implement SafeScale.safescale.
-type OrganizationListener struct {
-	protocol.UnimplementedTenantServiceServer
-}

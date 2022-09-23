@@ -24,11 +24,10 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	filelock "github.com/MichaelS11/go-file-lock"
 	"github.com/spf13/viper"
 
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -70,6 +69,8 @@ func NewState() (State, error) {
 		homedir:      currentUser.HomeDir,
 		configFolder: configFolder,
 	}
+	out.Current.Organization = global.DefaultOrganization
+	out.Current.Project = global.DefaultProject
 	return out, nil
 }
 
@@ -98,14 +99,23 @@ func (s *State) Read() error {
 		}
 	}
 
-	s.Current.Organization = viperInstance.GetString("organization.current")
-	s.Current.Project = viperInstance.GetString("organization.project")
-	s.Current.Tenant = viperInstance.GetString("organization.tenant")
+	content := viperInstance.GetString("organization.current")
+	if content != "" {
+		s.Current.Organization = content
+	}
+	content = viperInstance.GetString("project.current")
+	if content != "" {
+		s.Current.Project = content
+	}
+	content = viperInstance.GetString("tenant.current")
+	if content != "" {
+		s.Current.Tenant = content
+	}
 	return nil
 }
 
-// Update writes state changes to state config file
-func (s State) Update() error {
+// Write writes state changes to state config file
+func (s State) Write() error {
 	viperInstance := viper.New()
 	viperInstance.AddConfigPath(s.configFolder)
 	viperInstance.SetConfigName("state")
@@ -122,10 +132,11 @@ func (s State) Update() error {
 			}
 			file.Close()
 
+			// FIXME: as soon as go1.19 becomes the oldest go release supported, replace github.com/MichaelS11/go-file-lock with implementation brought by go1.19 std lib
 			// lock config file to prevent simultaneous update
-			fl, err = filelock.New(viperInstance.ConfigFileUsed())
+			fl, err = filelock.New(stateFile)
 			if err != nil {
-				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, fail.Wrap(err, "failed to lock file '%s'", viperInstance.ConfigFileUsed()).Error()))
+				return fail.Wrap(err, "failed to lock file '%s'", stateFile)
 			}
 
 			// Prepares viper instance for update to come
@@ -140,7 +151,7 @@ func (s State) Update() error {
 		// lock config file to prevent simultaneous update
 		fl, err = filelock.New(viperInstance.ConfigFileUsed())
 		if err != nil {
-			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, fail.Wrap(err, "failed to lock file '%s'", viperInstance.ConfigFileUsed()).Error()))
+			return fail.Wrap(err, "failed to lock file '%s'", viperInstance.ConfigFileUsed())
 		}
 	}
 	defer func() { _ = fl.Unlock() }()
@@ -151,7 +162,7 @@ func (s State) Update() error {
 
 	err = viperInstance.WriteConfig()
 	if err != nil {
-		return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, fail.Wrap(err, "failed to update '%s/%s' file", s.configFolder, viperInstance.ConfigFileUsed()).Error()))
+		return fail.Wrap(err, "failed to update '%s/%s' file", s.configFolder, viperInstance.ConfigFileUsed())
 	}
 
 	return nil

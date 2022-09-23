@@ -96,14 +96,15 @@ func FindProviderProfileForTenant(tenantName string) (*providers.Profile, fail.E
 
 	tenantInCfg, tenantParameters := findParametersOfTenant(tenantName)
 	if tenantInCfg {
+		provider := findProviderFromTenantParameters(tenantParameters)
+		if provider == "" {
+			return nil, fail.NotFoundError("failed to find the profile of Provider used by Tenant '%s'", tenantName)
+		}
+
+		return findProfile(provider)
 	}
 
-	provider := findProviderFromTenantParameters(tenantParameters)
-	if provider == "" {
-		return nil, fail.NotFoundError("failed to find the Provider used by Tenant '%s'", tenantName)
-	}
-
-	return findProfile(provider)
+	return nil, fail.NotFoundError("failed to find Tenant '%s'", tenantName)
 }
 
 // findProfile returns a Profile corresponding to provider name passed as parameter
@@ -176,10 +177,13 @@ func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 	tenantInCfg, currentTenant := findParametersOfTenant(settings.tenantName)
 	if tenantInCfg {
 		provider = findProviderFromTenantParameters(currentTenant)
+		if provider == "" {
+			return NullService(), fail.NotFoundError("failed to find Provider used by Tenant '%s'; check its parameters", settings.tenantName)
+
+		}
 		svcProviderProfile, xerr := findProfile(provider)
 		if xerr != nil {
 			return NullService(), fail.Wrap(xerr, "error initializing Tenant '%s' with Provider '%s'", settings.tenantName, provider)
-
 		}
 
 		_, found = currentTenant["identity"].(map[string]interface{})
@@ -339,7 +343,7 @@ func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 					metadataCryptKey = ek
 				}
 			}
-			logrus.WithContext(ctx).Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", settings.tenantName, metadataBucket.GetName())
+			// logrus.WithContext(ctx).Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", settings.tenantName, metadataBucket.GetName())
 		} else {
 			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for currentTenant '%s'", settings.tenantName)
 		}
@@ -410,7 +414,7 @@ func findProviderFromTenantParameters(params map[string]any) string {
 		return provider
 	}
 
-	panic("should not reach this point!")
+	return ""
 }
 
 // validateRegionName validates the availability of the region passed as parameter

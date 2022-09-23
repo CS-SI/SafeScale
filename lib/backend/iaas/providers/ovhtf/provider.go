@@ -76,12 +76,12 @@ var (
 		PrivateVirtualIP: true,
 	}
 
-	terraformProviders = []terraformer.RequiredProvider{
-		{
+	terraformProviders = terraformer.RequiredProviders{
+		"required1": {
 			Source:  "",
 			Version: "",
 		},
-		{
+		"required2": {
 			Source:  "",
 			Version: "",
 		},
@@ -245,6 +245,7 @@ func (p *provider) build(params map[string]any) (*provider, fail.Error) {
 		Password:         openstackPassword,
 		TenantID:         applicationKey,
 		TenantName:       projectName,
+		DomainName:       "Default",
 		Region:           region,
 		AvailabilityZone: zone,
 		AllowReauth:      true,

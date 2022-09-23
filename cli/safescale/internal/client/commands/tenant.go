@@ -76,7 +76,7 @@ func tenantGetCommand() *cobra.Command {
 	out := &cobra.Command{
 		Use:     "get",
 		Aliases: []string{"current"},
-		Short:   "Get current tenant",
+		Short:   "Get current tenant for user",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
@@ -134,7 +134,7 @@ func tenantSetCommand() *cobra.Command {
 			}
 
 			state.Current.Tenant = args[0]
-			err = state.Update()
+			err = state.Write()
 			if err != nil {
 				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}

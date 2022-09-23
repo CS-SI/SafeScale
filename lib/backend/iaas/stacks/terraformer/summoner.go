@@ -39,15 +39,19 @@ type RequiredProvider struct {
 	Version string
 }
 
+type RequiredProviders map[string]RequiredProvider
+
 type Configuration struct {
 	Release       string // contains the release of terraform wanted for the hcl file produced
 	WorkDir       string
 	ExecPath      string
 	ConsulBackend struct {
-		Path string // "safescale/terraformstate/{{ or .CurrentOrganization "default" }}/{{ or .CurrentProject "default" }}"
+		Path string // "/safescale/terraformstate/{{ or .CurrentOrganization "default" }}/{{ or .CurrentProject "default" }}"
 		Use  bool
 	}
-	RequiredProviders []RequiredProvider
+
+	RequiredProviders
+	Performer string // contains the name of the acting provider (must be listed in RequiredProviders as key)
 }
 
 // summoner is an implementation of Summoner interface
@@ -117,9 +121,12 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 		"Authentication": authOpts,
 		"Configuration":  configOpts,
 	}
+	variables["Terraformer"] = map[string]any{
+		"Config": instance.config,
+	}
 
 	// render the resources
-	resourceContent := make([][]byte, len(resources))
+	resourceContent := make([]string, len(resources))
 	for _, r := range resources {
 		lvars := variables.Clone()
 		lvars.Merge(map[string]any{"Resource": r.ToMap()})
@@ -156,7 +163,7 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 			return xerr
 		}
 
-		variables["ConsulBackendData"] = content
+		variables["ConsulBackendData"] = string(content)
 	}
 
 	// finally, render the layout
@@ -176,40 +183,40 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 }
 
 // realizeTemplate generates a file from box template with variables updated
-func (instance summoner) realizeTemplate(efs embed.FS, filename string, vars map[string]interface{}) ([]byte, fail.Error) {
+func (instance summoner) realizeTemplate(efs embed.FS, filename string, vars map[string]interface{}) (string, fail.Error) {
 	tmplString, err := efs.ReadFile(filename)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return nil, fail.Wrap(err, "failed to load template")
+		return "", fail.Wrap(err, "failed to load template")
 	}
 
 	tmplCmd, err := template.Parse(filename, string(tmplString))
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return nil, fail.Wrap(err, "failed to parse template")
+		return "", fail.Wrap(err, "failed to parse template")
 	}
 
 	dataBuffer := bytes.NewBufferString("")
 	err = tmplCmd.Option("missingkey=error").Execute(dataBuffer, vars)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return nil, fail.Wrap(err, "failed to execute  template")
+		return "", fail.Wrap(err, "failed to execute  template")
 	}
 
-	out := dataBuffer.Bytes()
+	out := dataBuffer.String()
 	return out, nil
 }
 
 const mainFilename = "main.tf"
 
 // createFile creates the file in the appropriate path for terraform to execute it
-func (instance summoner) createMainFile(content []byte) fail.Error {
+func (instance summoner) createMainFile(content string) fail.Error {
 	if instance.lastFilePath != "" {
 		return fail.InvalidRequestError("trying to create a new main.tf file without having cleaned up the Summoner")
 	}
 
 	instance.lastFilePath = filepath.Join(instance.config.WorkDir, mainFilename)
-	err := ioutil.WriteFile(instance.lastFilePath, content, 0)
+	err := ioutil.WriteFile(instance.lastFilePath, []byte(content), 0)
 	if err != nil {
 		return fail.Wrap(err, "failed to create terraform file '%s'", instance.lastFilePath)
 	}

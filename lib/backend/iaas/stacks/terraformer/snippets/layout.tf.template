@@ -1,23 +1,29 @@
 terraform {
 	required_version = "{{ .Terraformer.Config.Release }}"
+{{- if .Terraformer.Config.RequiredProviders }}
 	required_providers {
-		{{ range $i := .Terraformer.Config.RequiredProviders }}
-		{{ $i.Name }} = {
+{{   range $k, $i := .Terraformer.Config.RequiredProviders }}
+		{{ $k }} = {
 			source  = "{{ $i.Source }}"
 			version = "{{ $i.Version }}"
 		}
-		{{ end }}
+{{   end }}
 	}
+{{- end }}
 
-	{{ if .ConsulBackend }}
-	{{ .ConsulBackend }}
-	{{ end }}
+	{{- if .Terraformer.Config.ConsulBackend.Use }}
+	{{   or .ConsulBackendConfig "" }}
+	{{- end }}
 }
 
 {{ .ProviderDeclaration }}
 
-{{ if .ConsulBackendData }}
-{{ .ConsulBackendData }}
-{{ end }}
+{{- if .Terraformer.Config.ConsulBackend.Use }}
+{{   or "" .ConsulBackendData }}
+{{- end }}
 
-{{ .Resources }}
+{{- if .Resources }}
+{{   range $i := .Resources }}
+{{     $i }}
+{{   end }}
+{{- end }}

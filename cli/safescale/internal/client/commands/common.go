@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -146,13 +147,13 @@ func addPersistentPreRunE(in *cobra.Command) {
 		}
 
 		organization := CurrentUserState.Current.Organization
-		organizationFlag, err := c.Flags().GetString("organization")
+		organizationByFlag, err := c.Flags().GetString("organization")
 		if err != nil {
 			return err
 		}
 
-		if organizationFlag != "" {
-			organization = organizationFlag
+		if organizationByFlag != "" {
+			organization = organizationByFlag
 		}
 		if organization == "" {
 			// FUTURE: error will rise when organization is fully implemented
@@ -174,19 +175,16 @@ func addPersistentPreRunE(in *cobra.Command) {
 		}
 
 		tenant := CurrentUserState.Current.Tenant
-		tenantFlag, err := c.Flags().GetString("tenant")
+		tenantByFlag, err := c.Flags().GetString("tenant")
 		if err != nil {
 			return err
 		}
 
-		if tenantFlag != "" {
-			tenant = tenantFlag
-		}
-		if tenant == "" {
-			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, "no tenant set"))
+		if tenantByFlag != "" {
+			tenant = tenantByFlag
 		}
 
-		ClientSession, err = cmdline.NewSession(server /*organization, project*/, tenant)
+		ClientSession, err = cmdline.NewSession(server, organization, project, tenant)
 		if err != nil {
 			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -204,6 +202,12 @@ func addPersistentPreRunE(in *cobra.Command) {
 
 func addCommonFlags(cmd *cobra.Command) {
 	flags := cmd.PersistentFlags()
-	flags.StringP("server", "L", "localhost:50051", "Connect to daemon on server SERVER (default: localhost:50051)")
+	flags.StringP("server", "L", "localhost:50051", "Connect to backend on server SERVER (default: localhost:50051)")
+	flags.StringP("organization", "O", "", "Use organization ORG (default: 'default')")
+	flags.StringP("project", "P", "", "Use project PROJECT (default: 'default')")
 	flags.StringP("tenant", "T", "", "Use tenant TENANT (default: none)")
+	flags.StringP("config", "c", "", "Provides the configuration file to use (if needed) (default: <root-dir>/etc/settings.yml)")
+	flags.SetAnnotation("config", cobra.BashCompFilenameExt, global.ValidConfigFilenameExts)
+	flags.StringP("root-dir", "R", "", "Defines the root folder of safescale work tree; will overload content of configuration file (default: /opt/safescale)")
+	flags.StringP("etc-dir", "E", "", "Defines the config folder of safescale work tree; will overload content of configuration file (default: <root-dir>/etc)")
 }

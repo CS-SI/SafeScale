@@ -74,7 +74,7 @@ const (
 )
 
 // NewSession returns an instance of safescale Client
-func NewSession(server, tenantID string) (_ *Session, ferr fail.Error) {
+func NewSession(server, organization, project, tenantID string) (_ *Session, ferr fail.Error) {
 	var xerr fail.Error
 	// Validate currentServer parameter (can be empty string...)
 	if server != "" {
@@ -113,7 +113,12 @@ func NewSession(server, tenantID string) (_ *Session, ferr fail.Error) {
 		}
 	}
 
-	s := &Session{currentServer: server, currentTenant: tenantID}
+	s := &Session{
+		currentServer:       server,
+		currentOrganization: organization,
+		currentProject:      project,
+		currentTenant:       tenantID,
+	}
 	s.task, xerr = concurrency.VoidTask()
 	if xerr != nil {
 		return nil, xerr

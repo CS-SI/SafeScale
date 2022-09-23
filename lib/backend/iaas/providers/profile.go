@@ -22,13 +22,13 @@ import (
 
 // Profile contains Provider profile
 type Profile struct {
-	capabilities       Capabilities                   // contains capabilities of the provider
-	metrics            *Metrics                       // contains the metric of the provider, all instances combined
-	referenceInstance  func() Provider                // contains a reference provider from which we can call Build
-	terraformProviders []terraformer.RequiredProvider // contains the provider(s) to require in terraform HCL
+	capabilities       Capabilities                  // contains capabilities of the provider
+	metrics            *Metrics                      // contains the metric of the provider, all instances combined
+	referenceInstance  func() Provider               // contains a reference provider from which we can call Build
+	terraformProviders terraformer.RequiredProviders // contains the provider(s) to require in terraform HCL
 }
 
-func NewProfile(caps Capabilities, referenceInstance func() Provider, terraformProviders []terraformer.RequiredProvider) *Profile {
+func NewProfile(caps Capabilities, referenceInstance func() Provider, terraformProviders map[string]terraformer.RequiredProvider) *Profile {
 	out := &Profile{
 		capabilities:       caps,
 		metrics:            NewMetrics(),
@@ -53,7 +53,7 @@ func (p Profile) Metrics() Metrics {
 	return *p.metrics
 }
 
-func (p Profile) TerraformProviders() []terraformer.RequiredProvider {
+func (p Profile) TerraformProviders() terraformer.RequiredProviders {
 	return p.terraformProviders
 }
 
