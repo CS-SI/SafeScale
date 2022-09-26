@@ -260,7 +260,7 @@ func (s *ClusterListener) Stop(inctx context.Context, in *protocol.Reference) (e
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewClusterHandler(job)
-	return empty, handler.Start(ref)
+	return empty, handler.Stop(ref)
 }
 
 // Delete a cluster
