@@ -17,9 +17,9 @@
 package handlers
 
 import (
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	labelfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/label"
@@ -38,11 +38,11 @@ type LabelHandler interface {
 
 // labelHandler Label service
 type labelHandler struct {
-	job backend.Job
+	job job.Job
 }
 
 // NewTagHandler creates a Label service
-func NewTagHandler(job backend.Job) LabelHandler {
+func NewTagHandler(job job.Job) LabelHandler {
 	return &labelHandler{job: job}
 }
 

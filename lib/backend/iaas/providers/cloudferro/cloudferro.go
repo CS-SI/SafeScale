@@ -22,17 +22,18 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -41,7 +42,7 @@ import (
 )
 
 var (
-	capabilities = providers.Capabilities{
+	capabilities = iaasapi.Capabilities{
 		PrivateVirtualIP: true,
 	}
 	cloudferroIdentityEndpoint = "https://cf2.cloudferro.com:5000/v3"
@@ -51,7 +52,7 @@ var (
 
 // provider is the implementation of the CloudFerro provider
 type provider struct {
-	stacks.Stack
+	iaasapi.Stack
 
 	tenantParameters map[string]interface{}
 	templatesWithGPU []string
@@ -63,7 +64,7 @@ func (p *provider) IsNull() bool {
 }
 
 // Build builds a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
+func (p *provider) Build(params map[string]interface{}, _ ...options.Mutator) (iaasapi.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
 	identity, _ := params["identity"].(map[string]interface{}) // nolint
@@ -118,7 +119,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		floatingIPPool = providerNetwork
 	}
 
-	authOptions := stackoptions.Authentication{
+	authOptions := iaasoptions.Authentication{
 		IdentityEndpoint: cloudferroIdentityEndpoint,
 		Username:         username,
 		Password:         password,
@@ -175,7 +176,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 next:
 
-	cfgOptions := stackoptions.Configuration{
+	cfgOptions := iaasoptions.Configuration{
 		ProviderNetwork:           providerNetwork,
 		UseFloatingIP:             true,
 		UseLayer3Networking:       true,
@@ -220,40 +221,35 @@ next:
 	return wp, nil
 }
 
-// BuildWithTerraformer needs to be called when terraformer is used
-func (p *provider) BuildWithTerraformer(params map[string]any, config terraformer.Configuration) (providers.Provider, fail.Error) {
-	return nil, fail.NotImplementedError()
-}
-
 // AuthenticationOptions returns the auth options
-func (p *provider) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
+func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
 	if valid.IsNil(p) {
-		return stackoptions.Authentication{}, fail.InvalidInstanceError()
+		return iaasoptions.Authentication{}, fail.InvalidInstanceError()
 	}
 	if valid.IsNull(p.Stack) {
-		return stackoptions.Authentication{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
+		return iaasoptions.Authentication{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).AuthenticationOptions()
 }
 
 // ConfigurationOptions return configuration parameters
-func (p provider) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+func (p provider) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 	if valid.IsNil(p) {
-		return stackoptions.Configuration{}, fail.InvalidInstanceError()
+		return iaasoptions.Configuration{}, fail.InvalidInstanceError()
 	}
 	if valid.IsNull(p.Stack) {
-		return stackoptions.Configuration{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
+		return iaasoptions.Configuration{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	opts, xerr := p.Stack.(providers.StackReservedForProviderUse).ConfigurationOptions()
 	if xerr != nil {
-		return stackoptions.Configuration{}, xerr
+		return iaasoptions.Configuration{}, xerr
 	}
 
 	opts.ProviderName, xerr = p.GetName()
 	if xerr != nil {
-		return stackoptions.Configuration{}, xerr
+		return iaasoptions.Configuration{}, xerr
 	}
 
 	return opts, nil
@@ -300,7 +296,7 @@ func (p *provider) GetName() (string, fail.Error) {
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p *provider) GetStack() (stacks.Stack, fail.Error) {
+func (p *provider) GetStack() (iaasapi.Stack, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -321,7 +317,7 @@ func (p *provider) TenantParameters() (map[string]interface{}, fail.Error) {
 }
 
 // Capabilities returns the capabilities of the provider
-func (p *provider) Capabilities() providers.Capabilities {
+func (p *provider) Capabilities() iaasapi.Capabilities {
 	return capabilities
 }
 
@@ -359,8 +355,8 @@ func (p *provider) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.
 func init() {
 	profile := providers.NewProfile(
 		capabilities,
-		func() providers.Provider { return &provider{} },
+		func() iaasapi.Provider { return &provider{} },
 		nil,
 	)
-	iaas.Register("cloudferro", profile)
+	factory.Register("cloudferro", profile)
 }

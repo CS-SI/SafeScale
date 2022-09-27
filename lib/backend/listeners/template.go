@@ -22,11 +22,11 @@ import (
 
 	"github.com/oscarpicas/scribble"
 
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -168,7 +168,7 @@ func (s *TemplateListener) Inspect(inctx context.Context, in *protocol.TemplateI
 	return out[0], nil
 }
 
-func complementWithScan(ctx context.Context, svc iaas.Service, scanOnly bool, templates ...*abstract.HostTemplate) ([]*protocol.HostTemplate, fail.Error) {
+func complementWithScan(ctx context.Context, svc iaasapi.Service, scanOnly bool, templates ...*abstract.HostTemplate) ([]*protocol.HostTemplate, fail.Error) {
 	authOpts, xerr := svc.AuthenticationOptions()
 	if xerr != nil {
 		return nil, xerr

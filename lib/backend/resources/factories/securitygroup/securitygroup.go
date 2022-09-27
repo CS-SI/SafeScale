@@ -19,7 +19,7 @@ package securitygroup
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
@@ -27,7 +27,7 @@ import (
 )
 
 // List returns a list of available security groups
-func List(ctx context.Context, svc iaas.Service, all bool) ([]*abstract.SecurityGroup, fail.Error) {
+func List(ctx context.Context, svc iaasapi.Service, all bool) ([]*abstract.SecurityGroup, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -53,7 +53,7 @@ func List(ctx context.Context, svc iaas.Service, all bool) ([]*abstract.Security
 }
 
 // New creates an instance of resources.SecurityGroup
-func New(svc iaas.Service) (_ resources.SecurityGroup, ferr fail.Error) {
+func New(svc iaasapi.Service) (_ resources.SecurityGroup, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -67,6 +67,6 @@ func New(svc iaas.Service) (_ resources.SecurityGroup, ferr fail.Error) {
 }
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
-func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
+func Load(ctx context.Context, svc iaasapi.Service, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
 	return operations.LoadSecurityGroup(ctx, svc, ref)
 }

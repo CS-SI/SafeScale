@@ -19,7 +19,7 @@ package bucket
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
@@ -27,7 +27,7 @@ import (
 )
 
 // List retrieves all available buckets
-func List(ctx context.Context, svc iaas.Service) ([]string, fail.Error) {
+func List(ctx context.Context, svc iaasapi.Service) ([]string, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -36,11 +36,11 @@ func List(ctx context.Context, svc iaas.Service) ([]string, fail.Error) {
 }
 
 // New creates a bucket instance
-func New(svc iaas.Service) (resources.Bucket, fail.Error) { // nolint
+func New(svc iaasapi.Service) (resources.Bucket, fail.Error) { // nolint
 	return operations.NewBucket(svc)
 }
 
 // Load initializes the bucket with metadata from provider
-func Load(ctx context.Context, svc iaas.Service, name string) (resources.Bucket, fail.Error) { // nolint
+func Load(ctx context.Context, svc iaasapi.Service, name string) (resources.Bucket, fail.Error) { // nolint
 	return operations.LoadBucket(ctx, svc, name)
 }

@@ -23,19 +23,21 @@ import (
 	"strconv"
 	"strings"
 
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -71,19 +73,19 @@ var gpuMap = map[string]gpuCfg{
 }
 
 var (
-	capabilities = providers.Capabilities{
+	capabilities = iaasapi.Capabilities{
 		UseTerraformer:   true,
 		PrivateVirtualIP: true,
 	}
 
-	terraformProviders = terraformer.RequiredProviders{
-		"required1": {
-			Source:  "",
-			Version: "",
+	terraformProviders = terraformerapi.RequiredProviders{
+		"openstack": {
+			Source:  "terraform-provider-openstack/openstack",
+			Version: "~> 1.42.0",
 		},
-		"required2": {
-			Source:  "",
-			Version: "",
+		"ovh": {
+			Source:  "ovh/ovh",
+			Version: ">= 0.13.0",
 		},
 	}
 
@@ -98,12 +100,12 @@ var (
 // provider is the provider implementation of the OVH provider
 type provider struct {
 	// stacks.Stack
-	summoner          terraformer.Summoner
+	summonerConfig    terraformerapi.Configuration
 	ExternalNetworkID string
 
 	// FIXME: move these fields in a provider Core?
-	authOptions   stackoptions.Authentication
-	configOptions stackoptions.Configuration
+	authOptions   iaasoptions.Authentication
+	configOptions iaasoptions.Configuration
 
 	tenantParameters map[string]interface{}
 	*temporal.MutableTimings
@@ -118,25 +120,9 @@ func (p *provider) IsNull() bool {
 	return p == nil // || p.Stack == nil
 }
 
-// BuildWithTerraformer needs to be called when terraformer is used
-func (p *provider) BuildWithTerraformer(params map[string]any, config terraformer.Configuration) (providers.Provider, fail.Error) {
-	out, xerr := (&provider{}).build(params)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// Initialize a terraformer Summoner to handle resources
-	out.summoner, xerr = terraformer.NewSummoner(out, config)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return remediatize(out), nil
-}
-
 // Build builds a new instance of Ovh using configuration parameters
 // Can be called from nil
-func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
+func (p *provider) Build(params map[string]interface{}, opts ...options.Mutator) (iaasapi.Provider, fail.Error) {
 	root, xerr := p.build(params)
 	if xerr != nil {
 		return nil, xerr
@@ -146,7 +132,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 }
 
 // remediatize wraps a provider inside a providers.Remediator to filter potential panics
-func remediatize(provider *provider) providers.Provider {
+func remediatize(provider *provider) iaasapi.Provider {
 	out := providers.Remediator{
 		Provider: provider,
 		Name:     provider.Name(),
@@ -155,7 +141,7 @@ func remediatize(provider *provider) providers.Provider {
 }
 
 // build constructs a new instance of provider accordingly parameterized
-func (p *provider) build(params map[string]any) (*provider, fail.Error) {
+func (p *provider) build(params map[string]any, opts ...options.Mutator) (*provider, fail.Error) {
 	var validInput bool
 
 	identityParams, _ := params["identity"].(map[string]any) // nolint
@@ -239,7 +225,7 @@ func (p *provider) build(params map[string]any) (*provider, fail.Error) {
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 
-	authOptions := stackoptions.Authentication{
+	authOptions := iaasoptions.Authentication{
 		IdentityEndpoint: identityEndpoint,
 		Username:         openstackID,
 		Password:         openstackPassword,
@@ -285,7 +271,7 @@ func (p *provider) build(params map[string]any) (*provider, fail.Error) {
 	}
 
 next:
-	cfgOptions := stackoptions.Configuration{
+	cfgOptions := iaasoptions.Configuration{
 		ProviderNetwork:           externalNetwork,
 		UseFloatingIP:             false,
 		UseLayer3Networking:       false,
@@ -339,7 +325,7 @@ func (p provider) GetName() (string, fail.Error) {
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() (stacks.Stack, fail.Error) {
+func (p provider) GetStack() (iaasapi.Stack, fail.Error) {
 	return nil, nil //p.Stack, nil
 }
 
@@ -351,7 +337,7 @@ func (p provider) TenantParameters() (map[string]interface{}, fail.Error) {
 }
 
 // Capabilities returns the capabilities of the provider
-func (p provider) Capabilities() providers.Capabilities {
+func (p provider) Capabilities() iaasapi.Capabilities {
 	return capabilities
 }
 
@@ -363,21 +349,25 @@ func (p provider) Snippet() string {
 	return configSnippetPath
 }
 
-func (p provider) Terraformer() terraformer.Summoner {
-	return p.summoner
+func (p provider) Terraformer() (terraformerapi.Summoner, fail.Error) {
+	summoner, xerr := terraformer.NewSummoner(&p, p.summonerConfig)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return summoner, nil
 }
 
-func (p *provider) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
+func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
 	if valid.IsNull(p) {
-		return stackoptions.Authentication{}, fail.InvalidInstanceError()
+		return iaasoptions.Authentication{}, fail.InvalidInstanceError()
 	}
 
 	return p.authOptions, nil
 }
 
-func (p *provider) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+func (p *provider) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 	if valid.IsNull(p) {
-		return stackoptions.Configuration{}, fail.InvalidInstanceError()
+		return iaasoptions.Configuration{}, fail.InvalidInstanceError()
 	}
 
 	p.configOptions.ProviderName = providerName
@@ -415,8 +405,8 @@ func (p *provider) DeleteTags(ctx context.Context, kind abstract.Enum, id string
 func init() {
 	profile := providers.NewProfile(
 		capabilities,
-		func() providers.Provider { return &provider{} },
+		func() iaasapi.Provider { return &provider{} },
 		terraformProviders,
 	)
-	iaas.Register(providerName, profile)
+	factory.Register(providerName, profile)
 }

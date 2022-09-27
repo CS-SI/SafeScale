@@ -19,18 +19,18 @@ package label
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // New creates an instance of resources.Label
-func New(svc iaas.Service) (_ resources.Label, ferr fail.Error) {
+func New(svc iaasapi.Service) (_ resources.Label, ferr fail.Error) {
 	return operations.NewLabel(svc)
 }
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.Label
-func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.Label, ferr fail.Error) {
+func Load(ctx context.Context, svc iaasapi.Service, ref string) (_ resources.Label, ferr fail.Error) {
 	return operations.LoadLabel(ctx, svc, ref)
 }

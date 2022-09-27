@@ -20,11 +20,11 @@ import (
 	context2 "context"
 	"strings"
 
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"golang.org/x/net/context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -40,8 +40,8 @@ type stack struct {
 	IdentityClient *gophercloud.ServiceClient
 	Driver         *gophercloud.ProviderClient
 
-	authOpts stackoptions.Authentication
-	cfgOpts  stackoptions.Configuration
+	authOpts iaasoptions.Authentication
+	cfgOpts  iaasoptions.Configuration
 
 	// DefaultSecurityGroupName is the name of the default security groups
 	DefaultSecurityGroupName string
@@ -66,7 +66,7 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and returns a stack pointer
-func New(auth stackoptions.Authentication, authScope *gophercloud.AuthScope, cfg stackoptions.Configuration, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
+func New(auth iaasoptions.Authentication, authScope *gophercloud.AuthScope, cfg iaasoptions.Configuration, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
 	ctx := context.Background()
 
 	if auth.DomainName == "" && auth.DomainID == "" {

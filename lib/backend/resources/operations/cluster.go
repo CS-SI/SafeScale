@@ -29,13 +29,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
@@ -48,6 +47,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/clusterflavors/boh"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/clusterflavors/k8s"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v3"
@@ -86,7 +86,7 @@ type Cluster struct {
 }
 
 // NewCluster is the constructor of resources.Cluster struct
-func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Error) {
+func NewCluster(ctx context.Context, svc iaasapi.Service) (_ *Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -254,7 +254,7 @@ func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max
 }
 
 // LoadCluster loads cluster information from metadata
-func LoadCluster(inctx context.Context, svc iaas.Service, name string, options ...data.ImmutableKeyValue) (_ resources.Cluster, ferr fail.Error) {
+func LoadCluster(inctx context.Context, svc iaasapi.Service, name string, options ...data.ImmutableKeyValue) (_ resources.Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -376,7 +376,7 @@ func LoadCluster(inctx context.Context, svc iaas.Service, name string, options .
 }
 
 // onClusterCacheMiss is called when cluster cache does not contain an instance of cluster 'name'
-func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (data.Identifiable, fail.Error) {
+func onClusterCacheMiss(inctx context.Context, svc iaasapi.Service, name string) (data.Identifiable, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 

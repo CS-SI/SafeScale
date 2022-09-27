@@ -20,7 +20,7 @@ package subnet
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
@@ -28,16 +28,16 @@ import (
 )
 
 // List returns a list of available subnets
-func List(ctx context.Context, svc iaas.Service, networkID string, all bool) ([]*abstract.Subnet, fail.Error) {
+func List(ctx context.Context, svc iaasapi.Service, networkID string, all bool) ([]*abstract.Subnet, fail.Error) {
 	return operations.ListSubnets(ctx, svc, networkID, all)
 }
 
 // New creates an instance of resources.Subnet
-func New(svc iaas.Service) (resources.Subnet, fail.Error) {
+func New(svc iaasapi.Service) (resources.Subnet, fail.Error) {
 	return operations.NewSubnet(svc)
 }
 
 // Load loads the metadata of a subnet and returns an instance of resources.Subnet
-func Load(ctx context.Context, svc iaas.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
+func Load(ctx context.Context, svc iaasapi.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
 	return operations.LoadSubnet(ctx, svc, networkRef, subnetRef)
 }

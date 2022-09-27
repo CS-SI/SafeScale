@@ -28,11 +28,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -153,13 +153,13 @@ type TenantHandler interface {
 
 // tenantHandler service
 type tenantHandler struct {
-	job              backend.Job
+	job              job.Job
 	abstractSubnet   *abstract.Subnet
 	scannedHostImage *abstract.Image
 }
 
 // NewTenantHandler creates a scanner service
-func NewTenantHandler(job backend.Job) TenantHandler {
+func NewTenantHandler(job job.Job) TenantHandler {
 	return &tenantHandler{job: job}
 }
 

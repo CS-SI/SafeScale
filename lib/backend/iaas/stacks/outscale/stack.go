@@ -23,8 +23,8 @@ import (
 
 	"github.com/outscale/osc-sdk-go/osc"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -95,7 +95,7 @@ type stack struct {
 	auth                 context.Context
 	CPUPerformanceMap    map[int]float32
 	VolumeSpeedsMap      map[string]volumespeed.Enum
-	configurationOptions *stackoptions.Configuration
+	configurationOptions *iaasoptions.Configuration
 	deviceNames          []string
 	templates            []*abstract.HostTemplate
 	vpc                  *abstract.Network
@@ -145,7 +145,7 @@ func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 			3: 2.0,
 		},
 		deviceNames: deviceNames(),
-		configurationOptions: &stackoptions.Configuration{
+		configurationOptions: &iaasoptions.Configuration{
 			ProviderNetwork:           "",
 			DNSServers:                options.Compute.DNSList,
 			UseFloatingIP:             true,

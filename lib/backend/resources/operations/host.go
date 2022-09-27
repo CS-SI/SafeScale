@@ -34,7 +34,7 @@ import (
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -93,7 +93,7 @@ type Host struct {
 }
 
 // NewHost ...
-func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
+func NewHost(svc iaasapi.Service) (_ *Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -113,7 +113,7 @@ func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
 }
 
 // LoadHost ...
-func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Host, fail.Error) {
+func LoadHost(inctx context.Context, svc iaasapi.Service, ref string, options ...data.ImmutableKeyValue) (resources.Host, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -232,7 +232,7 @@ func Stack() []byte {
 }
 
 // onHostCacheMiss is called when host 'ref' is not found in cache
-func onHostCacheMiss(inctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onHostCacheMiss(inctx context.Context, svc iaasapi.Service, ref string) (data.Identifiable, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -486,7 +486,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 	return nil
 }
 
-func getOperatorUsernameFromCfg(ctx context.Context, svc iaas.Service) (string, fail.Error) {
+func getOperatorUsernameFromCfg(ctx context.Context, svc iaasapi.Service) (string, fail.Error) {
 	cfg, xerr := svc.ConfigurationOptions()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1385,7 +1385,7 @@ func (instance *Host) implCreate(
 	}
 }
 
-func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (string, string, fail.Error) {
+func determineImageID(ctx context.Context, svc iaasapi.Service, imageRef string) (string, string, fail.Error) {
 	if imageRef == "" {
 		cfg, xerr := svc.ConfigurationOptions()
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2412,7 +2412,7 @@ func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 }
 
 // createSingleHostNetwork creates Single-Host Network and Subnet
-func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHostRequest abstract.HostRequest) (_ resources.Subnet, _ func() fail.Error, ferr fail.Error) {
+func createSingleHostNetworking(ctx context.Context, svc iaasapi.Service, singleHostRequest abstract.HostRequest) (_ resources.Subnet, _ func() fail.Error, ferr fail.Error) {
 	// Build network name
 	cfg, xerr := svc.ConfigurationOptions()
 	if xerr != nil {

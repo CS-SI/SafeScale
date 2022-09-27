@@ -24,10 +24,10 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -44,7 +44,7 @@ type (
 	}
 )
 
-func newNetworkResource(name string) terraformer.Resource {
+func newNetworkResource(name string) terraformerapi.Resource {
 	out := &networkResource{terraformer.NewResourceCore(name, networkResourceSnippetPath)}
 	return out
 }
@@ -96,12 +96,7 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 	}
 
 	netRsc := newNetworkResource(req.Name)
-
-	summonerConfig := terraformer.Configuration{
-		WorkDir:  "???", //p.tfWorkDir,
-		ExecPath: global.Settings.Backend.Terraform.ExecPath,
-	}
-	summoner, xerr := terraformer.NewSummoner(p, summonerConfig)
+	summoner, xerr := p.Terraformer()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -110,6 +105,7 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 	if xerr != nil {
 		return nil, xerr
 	}
+	// defer p.Terraformer().Clean()
 
 	// // We specify a name and that it should forward packets
 	// state := true

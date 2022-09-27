@@ -20,7 +20,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -36,7 +37,7 @@ const (
 	vipResourceSnippetPath = "snippets/resource_vip.tf.template"
 )
 
-func newVIPResource(name string) terraformer.Resource {
+func newVIPResource(name string) terraformerapi.Resource {
 	out := &vipResource{terraformer.NewResourceCore(name, vipResourceSnippetPath)}
 	return out
 }

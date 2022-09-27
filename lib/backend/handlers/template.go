@@ -17,7 +17,7 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -35,11 +35,11 @@ type TemplateHandler interface {
 
 // templateHandler image service
 type templateHandler struct {
-	job backend.Job
+	job job.Job
 }
 
 // NewTemplateHandler creates a host service
-func NewTemplateHandler(job backend.Job) TemplateHandler {
+func NewTemplateHandler(job job.Job) TemplateHandler {
 	return &templateHandler{job: job}
 }
 

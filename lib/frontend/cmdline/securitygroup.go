@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -42,7 +42,7 @@ func (sg securityGroupConsumer) List(all bool, timeout time.Duration) (*protocol
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -74,7 +74,7 @@ func (sg securityGroupConsumer) Inspect(ref string, timeout time.Duration) (*pro
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -106,7 +106,7 @@ func (sg securityGroupConsumer) Create(networkRef string, req abstract.SecurityG
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -148,7 +148,7 @@ func (sg securityGroupConsumer) Delete(names []string, force bool, timeout time.
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -208,7 +208,7 @@ func (sg securityGroupConsumer) Clear(ref string, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -241,7 +241,7 @@ func (sg securityGroupConsumer) Reset(ref string, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -273,7 +273,7 @@ func (sg securityGroupConsumer) AddRule(group string, rule *abstract.SecurityGro
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -308,7 +308,7 @@ func (sg securityGroupConsumer) DeleteRule(group string, rule *abstract.Security
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -343,7 +343,7 @@ func (sg securityGroupConsumer) Bonds(group, kind string, timeout time.Duration)
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}

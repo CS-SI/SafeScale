@@ -19,7 +19,7 @@ package host
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
@@ -28,7 +28,7 @@ import (
 )
 
 // List returns a list of available hosts
-func List(ctx context.Context, svc iaas.Service, all bool) (abstract.HostList, fail.Error) {
+func List(ctx context.Context, svc iaasapi.Service, all bool) (abstract.HostList, fail.Error) {
 	var nullList abstract.HostList
 	if ctx == nil {
 		return nullList, fail.InvalidParameterCannotBeNilError("ctx")
@@ -56,11 +56,11 @@ func List(ctx context.Context, svc iaas.Service, all bool) (abstract.HostList, f
 }
 
 // New creates an instance of resources.Host
-func New(svc iaas.Service) (_ resources.Host, err fail.Error) {
+func New(svc iaasapi.Service) (_ resources.Host, err fail.Error) {
 	return operations.NewHost(svc)
 }
 
 // Load loads the metadata of host and returns an instance of resources.Host
-func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.Host, err fail.Error) {
+func Load(ctx context.Context, svc iaasapi.Service, ref string) (_ resources.Host, err fail.Error) {
 	return operations.LoadHost(ctx, svc, ref)
 }

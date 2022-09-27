@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
@@ -53,7 +53,7 @@ type Network struct {
 }
 
 // NewNetwork creates an instance of Networking
-func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
+func NewNetwork(svc iaasapi.Service) (resources.Network, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -71,7 +71,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 }
 
 // LoadNetwork loads the metadata of a subnet
-func LoadNetwork(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Network, fail.Error) {
+func LoadNetwork(inctx context.Context, svc iaasapi.Service, ref string, options ...data.ImmutableKeyValue) (resources.Network, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -173,7 +173,7 @@ func LoadNetwork(inctx context.Context, svc iaas.Service, ref string, options ..
 }
 
 // onNetworkCacheMiss is called when there is no instance in cache of Network 'ref'
-func onNetworkCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onNetworkCacheMiss(ctx context.Context, svc iaasapi.Service, ref string) (data.Identifiable, fail.Error) {
 	networkInstance, innerXErr := NewNetwork(svc)
 	if innerXErr != nil {
 		return nil, innerXErr

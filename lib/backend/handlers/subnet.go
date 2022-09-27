@@ -19,7 +19,7 @@ package handlers
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupstate"
@@ -50,10 +50,10 @@ type SubnetHandler interface {
 
 // SubnetHandler ...
 type subnetHandler struct {
-	job backend.Job
+	job job.Job
 }
 
-func NewSubnetHandler(job backend.Job) SubnetHandler {
+func NewSubnetHandler(job job.Job) SubnetHandler {
 	return &subnetHandler{job}
 }
 

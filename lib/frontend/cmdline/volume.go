@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -38,7 +38,7 @@ func (v volumeConsumer) List(all bool, timeout time.Duration) (*protocol.VolumeL
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -66,7 +66,7 @@ func (v volumeConsumer) Inspect(name string, timeout time.Duration) (*protocol.V
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -94,7 +94,7 @@ func (v volumeConsumer) Delete(names []string, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -154,7 +154,7 @@ func (v volumeConsumer) Create(def *protocol.VolumeCreateRequest, timeout time.D
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -179,7 +179,7 @@ func (v volumeConsumer) Attach(def *protocol.VolumeAttachmentRequest, timeout ti
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -205,7 +205,7 @@ func (v volumeConsumer) Detach(volumeName string, hostName string, timeout time.
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}

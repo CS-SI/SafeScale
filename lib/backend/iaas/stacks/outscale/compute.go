@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
@@ -495,7 +496,7 @@ func (s stack) hostState(ctx context.Context, id string) (hoststate.Enum, fail.E
 
 // WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	if valid.IsNil(s) {
 		return abstract.NewHostCore(), fail.InvalidInstanceError()
 	}
@@ -508,7 +509,7 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter
 // - *retry.ErrTimeout: when the timeout is reached
 // - *retry.ErrStopRetry: when a breaking error arises; fail.Cause(xerr) contains the real error encountered
 // - fail.Error: any other errors
-func (s stack) WaitHostState(ctx context.Context, hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
+func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1058,7 +1059,7 @@ func (s stack) deleteHost(ctx context.Context, id string) fail.Error {
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
-func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
+func (s stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
 	return nil
 }
 
@@ -1067,7 +1068,7 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool,
 }
 
 // DeleteHost deletes the host identified by id
-func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1124,7 +1125,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 }
 
 // InspectHost returns the host identified by id or updates content of a *abstract.Host
-func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (ahf *abstract.HostFull, ferr fail.Error) {
+func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (ahf *abstract.HostFull, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1182,7 +1183,7 @@ func (s stack) complementHost(ctx context.Context, ahf *abstract.HostFull, vm os
 }
 
 // GetHostState returns the current state of the host identified by id
-func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
+func (s stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
@@ -1242,7 +1243,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList
 }
 
 // StopHost stops the host identified by id
-func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, gracefully bool) (ferr fail.Error) {
+func (s stack) StopHost(ctx context.Context, host iaasapi.HostParameter, gracefully bool) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1258,7 +1259,7 @@ func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, graceful
 }
 
 // StartHost starts the host identified by id
-func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1274,7 +1275,7 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (f
 }
 
 // RebootHost Reboot host
-func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1304,7 +1305,7 @@ func (s stack) perfFromFreq(freq float32) int {
 }
 
 // ResizeHost Resize host
-func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, sizing abstract.HostSizingRequirements) (ahf *abstract.HostFull, ferr fail.Error) {
+func (s stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, sizing abstract.HostSizingRequirements) (ahf *abstract.HostFull, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1329,7 +1330,7 @@ func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, s
 }
 
 // BindSecurityGroupToHost ...
-func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1374,7 +1375,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

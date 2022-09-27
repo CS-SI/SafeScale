@@ -19,7 +19,7 @@ package handlers
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	networkfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/network"
@@ -47,11 +47,11 @@ type SecurityGroupHandler interface {
 }
 
 type securityGroupHandler struct {
-	job backend.Job
+	job job.Job
 }
 
 // NewSecurityGroupHandler returns an instance of SecurityGroupHandler
-func NewSecurityGroupHandler(job backend.Job) SecurityGroupHandler {
+func NewSecurityGroupHandler(job job.Job) SecurityGroupHandler {
 	return &securityGroupHandler{job}
 }
 

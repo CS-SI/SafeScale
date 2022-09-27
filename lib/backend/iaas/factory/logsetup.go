@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package iaas
+package factory
 
 import (
 	"fmt"

@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -78,7 +78,7 @@ type Subnet struct {
 }
 
 // ListSubnets returns a list of available subnets
-func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bool) (_ []*abstract.Subnet, ferr fail.Error) {
+func ListSubnets(ctx context.Context, svc iaasapi.Service, networkID string, all bool) (_ []*abstract.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -114,7 +114,7 @@ func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bo
 }
 
 // NewSubnet creates an instance of Subnet used as resources.Subnet
-func NewSubnet(svc iaas.Service) (_ *Subnet, ferr fail.Error) {
+func NewSubnet(svc iaasapi.Service) (_ *Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -134,7 +134,7 @@ func NewSubnet(svc iaas.Service) (_ *Subnet, ferr fail.Error) {
 }
 
 // LoadSubnet loads the metadata of a Subnet
-func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef string, options ...data.ImmutableKeyValue) (*Subnet, fail.Error) {
+func LoadSubnet(inctx context.Context, svc iaasapi.Service, networkRef, subnetRef string, options ...data.ImmutableKeyValue) (*Subnet, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -329,7 +329,7 @@ func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef s
 }
 
 // onSubnetCacheMiss is called when there is no instance in cache of Subnet 'subnetID'
-func onSubnetCacheMiss(ctx context.Context, svc iaas.Service, subnetID string) (data.Identifiable, fail.Error) {
+func onSubnetCacheMiss(ctx context.Context, svc iaasapi.Service, subnetID string) (data.Identifiable, fail.Error) {
 	subnetInstance, innerXErr := NewSubnet(svc)
 	if innerXErr != nil {
 		return nil, innerXErr

@@ -20,7 +20,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	networkfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/network"
@@ -48,11 +48,11 @@ type NetworkHandler interface {
 
 // networkHandler is one implementation of NetworkHandler interface
 type networkHandler struct {
-	job backend.Job
+	job job.Job
 }
 
 // NewNetworkHandler returns an instance of *networkHandler that satisfies interface NetworkHandler
-func NewNetworkHandler(job backend.Job) NetworkHandler {
+func NewNetworkHandler(job job.Job) NetworkHandler {
 	return &networkHandler{job}
 }
 

@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -38,7 +38,7 @@ func (c bucketConsumer) List(all bool, timeout time.Duration) (*protocol.BucketL
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -70,7 +70,7 @@ func (c bucketConsumer) Create(name string, timeout time.Duration) error {
 	defer c.session.Disconnect()
 
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -99,7 +99,7 @@ func (c bucketConsumer) Download(name string, timeout time.Duration) (*protocol.
 	defer c.session.Disconnect()
 
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -128,7 +128,7 @@ func (c bucketConsumer) Clear(name string, timeout time.Duration) error {
 	defer c.session.Disconnect()
 
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -157,7 +157,7 @@ func (c bucketConsumer) Upload(name string, dirct string, timeout time.Duration)
 	defer c.session.Disconnect()
 
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -186,7 +186,7 @@ func (c bucketConsumer) Delete(names []string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -241,7 +241,7 @@ func (c bucketConsumer) Inspect(name string, timeout time.Duration) (*protocol.B
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := common.ContextForGRPC(true)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +268,7 @@ func (c bucketConsumer) Mount(bucketName, hostName, mountPoint string, timeout t
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -300,7 +300,7 @@ func (c bucketConsumer) Unmount(bucketName, hostName string, timeout time.Durati
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}

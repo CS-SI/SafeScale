@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package stacks
+package iaasapi
 
 import (
 	"context"
 	"time"
 
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
@@ -28,12 +28,12 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
-//go:generate minimock -o ../mocks/mock_stack.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api.Stack
+//go:generate minimock -o ../mocks/mock_stack.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api.Stack
 
 // Stack is the interface to cloud stack
 type Stack interface {
-	AuthenticationOptions() (stackoptions.Authentication, fail.Error)
-	ConfigurationOptions() (stackoptions.Configuration, fail.Error)
+	AuthenticationOptions() (iaasoptions.Authentication, fail.Error)
+	ConfigurationOptions() (iaasoptions.Configuration, fail.Error)
 
 	GetStackName() (string, fail.Error)
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package providers
+package iaasapi
 
 // Capabilities represents key/value configuration.
 type Capabilities struct {

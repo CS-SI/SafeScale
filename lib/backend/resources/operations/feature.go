@@ -25,7 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -47,7 +47,7 @@ import (
 type Feature struct {
 	file       *FeatureFile
 	installers map[installmethod.Enum]Installer // defines the installers available for the Feature
-	svc        iaas.Service                     // is the iaas.Service to use to interact with Cloud Provider
+	svc        iaasapi.Service                  // is the iaas.Service to use to interact with Cloud Provider
 
 	machines map[string]resources.Host
 
@@ -59,7 +59,7 @@ type Feature struct {
 // error contains :
 //   - fail.ErrNotFound if no Feature is found by its name
 //   - fail.ErrSyntax if Feature found contains syntax error
-func NewFeature(ctx context.Context, svc iaas.Service, name string) (_ resources.Feature, ferr fail.Error) {
+func NewFeature(ctx context.Context, svc iaasapi.Service, name string) (_ resources.Feature, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -89,7 +89,7 @@ func NewFeature(ctx context.Context, svc iaas.Service, name string) (_ resources
 
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
-func NewEmbeddedFeature(ctx context.Context, svc iaas.Service, name string) (_ resources.Feature, ferr fail.Error) {
+func NewEmbeddedFeature(ctx context.Context, svc iaasapi.Service, name string) (_ resources.Feature, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -689,7 +689,7 @@ func (instance *Feature) installRequirements(ctx context.Context, t resources.Ta
 	return nil
 }
 
-func registerOnSuccessfulHostsInCluster(ctx context.Context, svc iaas.Service, target resources.Targetable, installed resources.Feature, requiredBy resources.Feature, results resources.Results) fail.Error {
+func registerOnSuccessfulHostsInCluster(ctx context.Context, svc iaasapi.Service, target resources.Targetable, installed resources.Feature, requiredBy resources.Feature, results resources.Results) fail.Error {
 	if target.TargetType() == featuretargettype.Cluster {
 		// Walk through results and register Feature in successful hosts
 		successfulHosts := map[string]struct{}{}
@@ -721,7 +721,7 @@ func registerOnSuccessfulHostsInCluster(ctx context.Context, svc iaas.Service, t
 	return nil
 }
 
-func unregisterOnSuccessfulHostsInCluster(ctx context.Context, svc iaas.Service, target resources.Targetable, installed resources.Feature, results resources.Results) fail.Error {
+func unregisterOnSuccessfulHostsInCluster(ctx context.Context, svc iaasapi.Service, target resources.Targetable, installed resources.Feature, results resources.Results) fail.Error {
 	if target.TargetType() == featuretargettype.Cluster {
 		// Walk through results and register Feature in successful hosts
 		successfulHosts := map[string]struct{}{}

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package iaas
+package factory
 
 import (
 	"context"
@@ -26,22 +26,22 @@ import (
 	"regexp"
 	"time"
 
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 )
 
 var (
@@ -80,7 +80,7 @@ func GetTenantNames() (map[string]string, fail.Error) {
 }
 
 // GetTenants returns all known tenants
-func GetTenants() ([]map[string]interface{}, fail.Error) {
+func GetTenants() ([]map[string]any, fail.Error) {
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
@@ -121,48 +121,16 @@ func findProfile(providerName string) (*providers.Profile, fail.Error) {
 	return p, nil
 }
 
-type (
-	Options struct {
-		tenantName               string
-		terraformerConfiguration terraformer.Configuration
-	}
-
-	OptionsMutator func(o *Options) fail.Error
-)
-
-func WithTenant(name string) OptionsMutator {
-	return func(o *Options) fail.Error {
-		if name == "" {
-			return fail.InvalidParameterCannotBeEmptyStringError("name")
-		}
-
-		o.tenantName = name
-		return nil
-	}
-}
-
-// WithTerraformer allows to indicate what terraformer.Configuration has to be used
-func WithTerraformer(config terraformer.Configuration) OptionsMutator {
-	return func(o *Options) fail.Error {
-		if valid.IsNull(config) {
-			return fail.InvalidParameterError("config", "must be a valid 'terraformer.Configuration' in WithTerraformer()")
-		}
-
-		o.terraformerConfiguration = config
-		return nil
-	}
-}
-
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
+func UseService(mutators ...options.Mutator) (newService iaasapi.Service, ferr fail.Error) {
 	ctx := context.Background() // FIXME: Check context
 	defer fail.OnExitLogError(ctx, &ferr)
 	defer fail.OnPanic(&ferr)
 
-	var settings Options
-	for k, v := range opts {
-		xerr := v(&settings)
+	var opts iaasoptions.Build
+	for k, v := range mutators {
+		xerr := v(&opts)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to apply option #%d", k)
 		}
@@ -174,16 +142,16 @@ func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 		name, provider string
 	)
 
-	tenantInCfg, currentTenant := findParametersOfTenant(settings.tenantName)
+	tenantInCfg, currentTenant := findParametersOfTenant(opts.TenantName)
 	if tenantInCfg {
 		provider = findProviderFromTenantParameters(currentTenant)
 		if provider == "" {
-			return NullService(), fail.NotFoundError("failed to find Provider used by Tenant '%s'; check its parameters", settings.tenantName)
+			return NullService(), fail.NotFoundError("failed to find Provider used by Tenant '%s'; check its parameters", opts.TenantName)
 
 		}
 		svcProviderProfile, xerr := findProfile(provider)
 		if xerr != nil {
-			return NullService(), fail.Wrap(xerr, "error initializing Tenant '%s' with Provider '%s'", settings.tenantName, provider)
+			return NullService(), fail.Wrap(xerr, "error initializing Tenant '%s' with Provider '%s'", opts.TenantName, provider)
 		}
 
 		_, found = currentTenant["identity"].(map[string]interface{})
@@ -203,15 +171,15 @@ func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 		_, tenantMetadataFound := currentTenant["metadata"]
 
 		// Initializes provider
-		var providerInstance providers.Provider
+		var providerInstance iaasapi.Provider
 		referenceProviderInstance := svcProviderProfile.ReferenceInstance()
 		if svcProviderProfile.Capabilities().UseTerraformer {
-			providerInstance, xerr = referenceProviderInstance.BuildWithTerraformer(currentTenant, settings.terraformerConfiguration)
+			providerInstance, xerr = referenceProviderInstance.Build(currentTenant, iaasoptions.BuildWithTerraformer(opts.TerraformerConfiguration))
 		} else {
 			providerInstance, xerr = referenceProviderInstance.Build(currentTenant)
 		}
 		if xerr != nil {
-			return NullService(), fail.Wrap(xerr, "error initializing currentTenant '%s' on provider '%s'", settings.tenantName, provider)
+			return NullService(), fail.Wrap(xerr, "error initializing currentTenant '%s' on provider '%s'", opts.TenantName, provider)
 		}
 
 		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
@@ -225,7 +193,7 @@ func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 
 		newS := &service{
 			Provider:     providerInstance,
-			tenantName:   settings.tenantName,
+			tenantName:   opts.TenantName,
 			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 1 * time.Minute}))),
 		}
 
@@ -275,7 +243,7 @@ func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 				return NullService(), fail.Wrap(xerr, "error connecting to Object Storage location")
 			}
 		} else {
-			logrus.WithContext(ctx).Warnf("missing section 'objectstorage' in configuration file for currentTenant '%s'", settings.tenantName)
+			logrus.WithContext(ctx).Warnf("missing section 'objectstorage' in configuration file for currentTenant '%s'", opts.TenantName)
 		}
 
 		// Initializes Metadata Object Storage (maybe different from the Object Storage)
@@ -343,9 +311,9 @@ func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 					metadataCryptKey = ek
 				}
 			}
-			// logrus.WithContext(ctx).Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", settings.tenantName, metadataBucket.GetName())
+			// logrus.WithContext(ctx).Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", iaasoptions.tenantName, metadataBucket.GetName())
 		} else {
-			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for currentTenant '%s'", settings.tenantName)
+			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for currentTenant '%s'", opts.TenantName)
 		}
 
 		// service is ready
@@ -369,7 +337,7 @@ func UseService(opts ...OptionsMutator) (newService Service, ferr fail.Error) {
 		return newS, nil
 	}
 
-	return NullService(), fail.NotFoundError("no valid Tenant '%s' found in configuration", settings.tenantName)
+	return NullService(), fail.NotFoundError("no valid Tenant '%s' found in configuration", opts.TenantName)
 }
 
 func findParametersOfTenant(tenant string) (bool, map[string]any) {
@@ -497,7 +465,7 @@ func validateRegexpsOfKeyword(keyword string, content interface{}) (out []*regex
 }
 
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map
-func initObjectStorageLocationConfig(authOpts stackoptions.Authentication, tenant map[string]interface{}) (
+func initObjectStorageLocationConfig(authOpts iaasoptions.Authentication, tenant map[string]interface{}) (
 	objectstorage.Config, fail.Error,
 ) {
 	var (
@@ -656,7 +624,7 @@ func initObjectStorageLocationConfig(authOpts stackoptions.Authentication, tenan
 // }
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
-func initMetadataLocationConfig(authOpts stackoptions.Authentication, tenant map[string]interface{}) (objectstorage.Config, fail.Error) {
+func initMetadataLocationConfig(authOpts iaasoptions.Authentication, tenant map[string]interface{}) (objectstorage.Config, fail.Error) {
 	var (
 		config objectstorage.Config
 		ok     bool

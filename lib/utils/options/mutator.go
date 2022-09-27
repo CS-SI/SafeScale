@@ -14,34 +14,10 @@
  * limitations under the License.
  */
 
-package terraformer
+package options
 
 import (
-	"context"
-	"embed"
-
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-type (
-	ProviderUseTerraformer interface {
-		Name() string
-		EmbeddedFS() embed.FS
-		Snippet() string
-		AuthenticationOptions() (stackoptions.Authentication, fail.Error)
-		ConfigurationOptions() (stackoptions.Configuration, fail.Error)
-	}
-
-	Resource interface {
-		Snippet() string
-		ToMap() map[string]any
-	}
-
-	Summoner interface {
-		Build(resources ...Resource) fail.Error
-		Apply(ctx context.Context) (any, fail.Error)
-		Destroy(ctx context.Context) fail.Error
-		Plan(ctx context.Context) (bool, fail.Error)
-	}
-)
+type Mutator func(o Options) fail.Error

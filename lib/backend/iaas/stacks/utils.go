@@ -21,18 +21,18 @@ import (
 	"fmt"
 	"os"
 
+	uuid "github.com/gofrs/uuid"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	uuid "github.com/gofrs/uuid"
 )
 
-// HostParameter can represent a host by a string (containing name or id), an *abstract.HostCore or an *abstract.HostFull
-type HostParameter interface{}
-
+//FIXME: useless ctx parameter
 // ValidateHostParameter validates host parameter that can be a string as ID or an *abstract.HostCore
-func ValidateHostParameter(ctx context.Context, hostParam HostParameter) (ahf *abstract.HostFull, hostLabel string, ferr fail.Error) {
+func ValidateHostParameter(_ context.Context, hostParam iaasapi.HostParameter) (ahf *abstract.HostFull, hostLabel string, ferr fail.Error) {
 	ahf = abstract.NewHostFull()
 	switch hostParam := hostParam.(type) {
 	case string:

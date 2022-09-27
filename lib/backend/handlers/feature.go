@@ -17,7 +17,7 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	clusterfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/cluster"
@@ -45,10 +45,10 @@ type FeatureHandler interface {
 
 // featureHandler is an implementation of FeatureHandler
 type featureHandler struct {
-	job backend.Job
+	job job.Job
 }
 
-func NewFeatureHandler(job backend.Job) FeatureHandler {
+func NewFeatureHandler(job job.Job) FeatureHandler {
 	return &featureHandler{job: job}
 }
 

@@ -28,7 +28,7 @@ import (
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/labelproperty"
@@ -56,7 +56,7 @@ type label struct {
 var _ resources.Label = (*label)(nil)
 
 // NewLabel creates an instance of Label
-func NewLabel(svc iaas.Service) (_ resources.Label, ferr fail.Error) {
+func NewLabel(svc iaasapi.Service) (_ resources.Label, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -74,7 +74,7 @@ func NewLabel(svc iaas.Service) (_ resources.Label, ferr fail.Error) {
 }
 
 // LoadLabel loads the metadata of a Label
-func LoadLabel(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Label, fail.Error) {
+func LoadLabel(inctx context.Context, svc iaasapi.Service, ref string, options ...data.ImmutableKeyValue) (resources.Label, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -176,7 +176,7 @@ func LoadLabel(inctx context.Context, svc iaas.Service, ref string, options ...d
 }
 
 // onLabelCacheMiss is called when there is no instance in cache of Label 'ref'
-func onLabelCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onLabelCacheMiss(ctx context.Context, svc iaasapi.Service, ref string) (data.Identifiable, fail.Error) {
 	labelInstance, innerXErr := NewLabel(svc)
 	if innerXErr != nil {
 		return nil, innerXErr

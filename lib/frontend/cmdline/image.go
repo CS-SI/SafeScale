@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 )
 
@@ -34,7 +34,7 @@ func (img imageConsumer) List(all bool, timeout time.Duration) (*protocol.ImageL
 	img.session.Connect()
 	defer img.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}

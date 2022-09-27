@@ -25,48 +25,38 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	uuidpkg "github.com/gofrs/uuid"
 	"github.com/hashicorp/terraform-exec/tfexec"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-type RequiredProvider struct {
-	Source  string
-	Version string
-}
-
-type RequiredProviders map[string]RequiredProvider
-
-type Configuration struct {
-	Release       string // contains the release of terraform wanted for the hcl file produced
-	WorkDir       string
-	ExecPath      string
-	ConsulBackend struct {
-		Path string // "/safescale/terraformstate/{{ or .CurrentOrganization "default" }}/{{ or .CurrentProject "default" }}"
-		Use  bool
-	}
-
-	RequiredProviders
-	Performer string // contains the name of the acting provider (must be listed in RequiredProviders as key)
+// ProviderUseTerraformer ...
+type providerUseTerraformer interface {
+	Name() string
+	EmbeddedFS() embed.FS
+	Snippet() string
 }
 
 // summoner is an implementation of Summoner interface
 type summoner struct {
-	provider     ProviderUseTerraformer
-	config       Configuration
-	lastFilePath string
-	mu           *sync.Mutex
+	provider      iaasapi.Provider
+	config        terraformerapi.Configuration
+	lastBuildPath string
+	mu            *sync.Mutex
 }
 
 //go:embed snippets
 var layoutFiles embed.FS
 
 // NewSummoner instantiates a terraform file builder that will put file in 'workDir'
-func NewSummoner(provider ProviderUseTerraformer, conf Configuration) (Summoner, fail.Error) {
+func NewSummoner(provider iaasapi.Provider, conf terraformerapi.Configuration) (terraformerapi.Summoner, fail.Error) {
 	if valid.IsNull(provider) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -75,6 +65,9 @@ func NewSummoner(provider ProviderUseTerraformer, conf Configuration) (Summoner,
 	}
 	if conf.ExecPath == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("execPath")
+	}
+	if _, ok := provider.(providerUseTerraformer); !ok {
+		return nil, fail.InconsistentError("missing methods in 'provider' to be used by Summoner")
 	}
 
 	out := &summoner{provider: provider, config: conf, mu: &sync.Mutex{}}
@@ -87,7 +80,7 @@ func (instance *summoner) IsNull() bool {
 }
 
 // Build creates a main.tf file in the appropriate folder
-func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
+func (instance *summoner) Build(resources ...terraformerapi.Resource) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNull(instance) {
@@ -101,7 +94,7 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 	defer instance.mu.Unlock()
 
 	// If previous built file is still referenced in summoner, Cleanup wasn't called as expected
-	if instance.lastFilePath != "" {
+	if instance.lastBuildPath != "" {
 		return fail.InvalidRequestError("trying to create a new main.tf file without having cleaned up the Summoner")
 	}
 
@@ -117,7 +110,7 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 
 	variables := data.NewMap()
 	variables["Provider"] = map[string]any{
-		"Name":           instance.provider.Name(),
+		"Name":           instance.provider.(providerUseTerraformer).Name(),
 		"Authentication": authOpts,
 		"Configuration":  configOpts,
 	}
@@ -130,7 +123,7 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 	for _, r := range resources {
 		lvars := variables.Clone()
 		lvars.Merge(map[string]any{"Resource": r.ToMap()})
-		content, xerr := instance.realizeTemplate(instance.provider.EmbeddedFS(), r.Snippet(), lvars)
+		content, xerr := instance.realizeTemplate(instance.provider.(providerUseTerraformer).EmbeddedFS(), r.Snippet(), lvars)
 		if xerr != nil {
 			return xerr
 		}
@@ -140,7 +133,7 @@ func (instance *summoner) Build(resources ...Resource) (ferr fail.Error) {
 	variables["Resources"] = resourceContent
 
 	// render provider configuration
-	variables["ProviderDeclaration"], xerr = instance.realizeTemplate(instance.provider.EmbeddedFS(), instance.provider.Snippet(), variables)
+	variables["ProviderDeclaration"], xerr = instance.realizeTemplate(instance.provider.(providerUseTerraformer).EmbeddedFS(), instance.provider.(providerUseTerraformer).Snippet(), variables)
 	if xerr != nil {
 		return xerr
 	}
@@ -211,14 +204,19 @@ const mainFilename = "main.tf"
 
 // createFile creates the file in the appropriate path for terraform to execute it
 func (instance summoner) createMainFile(content string) fail.Error {
-	if instance.lastFilePath != "" {
-		return fail.InvalidRequestError("trying to create a new main.tf file without having cleaned up the Summoner")
+	if instance.lastBuildPath != "" {
+		return fail.InvalidRequestError("trying to create a new main.tf file without having cleaned up the Summoner environment")
 	}
 
-	instance.lastFilePath = filepath.Join(instance.config.WorkDir, mainFilename)
-	err := ioutil.WriteFile(instance.lastFilePath, []byte(content), 0)
+	uuid, err := uuidpkg.NewV4()
 	if err != nil {
-		return fail.Wrap(err, "failed to create terraform file '%s'", instance.lastFilePath)
+		return fail.Wrap(err, "failed to generate uuid")
+	}
+
+	instance.lastBuildPath = filepath.Join(instance.config.WorkDir, uuid.String(), mainFilename)
+	err = ioutil.WriteFile(instance.lastBuildPath, []byte(content), 0)
+	if err != nil {
+		return fail.Wrap(err, "failed to create terraform file '%s'", instance.lastBuildPath)
 	}
 
 	return nil
@@ -322,13 +320,13 @@ func (instance *summoner) Cleanup(ctx context.Context) fail.Error {
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
-	if instance.lastFilePath != "" {
-		err := os.Remove(instance.lastFilePath)
+	if instance.lastBuildPath != "" {
+		err := os.Remove(instance.lastBuildPath)
 		if err != nil {
 			return fail.Wrap(err)
 		}
 
-		instance.lastFilePath = ""
+		instance.lastBuildPath = ""
 	}
 
 	return nil

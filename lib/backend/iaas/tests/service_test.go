@@ -183,7 +183,7 @@ func Test_service_SearchImage(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	api.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
@@ -228,7 +228,7 @@ func Test_service_SearchImage_AWS_Ubu20(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	api.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
@@ -273,7 +273,7 @@ func Test_service_SearchImage_AWS_Centos7(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	api.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
@@ -313,7 +313,7 @@ func Test_service_SearchImage_OVH_Centos7(t *testing.T) {
 
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	api.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	res, err := SearchImageOriginal(common, "CentOS 7.4")
 	if err != nil {
@@ -345,7 +345,7 @@ func Test_service_SearchImage_FE_Centos7(t *testing.T) {
 
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	api.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	res, err := SearchImageOriginal(common, "CentOS 7.4")
 	if err != nil {
@@ -388,7 +388,7 @@ func Test_service_SearchImageNew(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	api.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
@@ -433,7 +433,7 @@ func Test_service_SearchImageNew_AWS_Ubu20(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	api.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
@@ -478,7 +478,7 @@ func Test_service_SearchImageNew_AWS_Centos7(t *testing.T) {
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
 	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	api.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...

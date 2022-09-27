@@ -29,7 +29,8 @@ import (
 	"github.com/hashicorp/hc-install/src"
 	"github.com/hashicorp/terraform-exec/tfexec"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/versions"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/env"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -39,7 +40,7 @@ import (
 // logrus.Fatal is called if not to stop the program
 func Check(cmd *cobra.Command) (suffix string, ferr error) {
 	logrus.Infoln("Checking configuration")
-	_, xerr := iaas.GetTenantNames()
+	_, xerr := factory.GetTenantNames()
 	if xerr != nil {
 		return "", xerr
 	}
@@ -83,7 +84,7 @@ func checkTerraform() error {
 	if err != nil {
 		execPath, err = installTerraform()
 		if err != nil {
-			logrus.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
+			logrus.Fatalf("error installing terraform release '%s': %s", versions.Terraformv1_2_6, err)
 		}
 	} else {
 		tf, err := tfexec.NewTerraform(global.Settings.Folders.TmpDir, execPath)
@@ -92,12 +93,12 @@ func checkTerraform() error {
 		}
 		version, _, err := tf.Version(context.Background(), true)
 		if err != nil {
-			logrus.Fatalf("error checking terraform release '%s': %s", terraformv1_2_6, err)
+			logrus.Fatalf("error checking terraform release '%s': %s", versions.Terraformv1_2_6, err)
 		}
-		if !version.Equal(terraformv1_2_6) {
+		if !version.Equal(versions.Terraformv1_2_6) {
 			execPath, err = installTerraform()
 			if err != nil {
-				logrus.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
+				logrus.Fatalf("error installing terraform release '%s': %s", versions.Terraformv1_2_6, err)
 			}
 		}
 	}
@@ -133,7 +134,7 @@ func checkConsul() error {
 	if err != nil {
 		execPath, err = installConsul()
 		if err != nil {
-			logrus.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
+			logrus.Fatalf("error installing terraform release '%s': %s", versions.Terraformv1_2_6, err)
 		}
 	} else {
 		tf, err := tfexec.NewTerraform(global.Settings.Folders.TmpDir, execPath)
@@ -142,12 +143,12 @@ func checkConsul() error {
 		}
 		version, _, err := tf.Version(context.Background(), true)
 		if err != nil {
-			logrus.Fatalf("error checking terraform release '%s': %s", terraformv1_2_6, err)
+			logrus.Fatalf("error checking terraform release '%s': %s", versions.Terraformv1_2_6, err)
 		}
-		if !version.Equal(terraformv1_2_6) {
+		if !version.Equal(versions.Terraformv1_2_6) {
 			execPath, err = installTerraform()
 			if err != nil {
-				logrus.Fatalf("error installing terraform release '%s': %s", terraformv1_2_6, err)
+				logrus.Fatalf("error installing terraform release '%s': %s", versions.Terraformv1_2_6, err)
 			}
 		}
 	}

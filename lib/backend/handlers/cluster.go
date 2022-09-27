@@ -17,7 +17,7 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
@@ -60,11 +60,11 @@ type ClusterHandler interface {
 
 // clusterHandler bucket service
 type clusterHandler struct {
-	job backend.Job
+	job job.Job
 }
 
 // NewClusterHandler creates a ClusterHandler
-func NewClusterHandler(job backend.Job) ClusterHandler {
+func NewClusterHandler(job job.Job) ClusterHandler {
 	return &clusterHandler{job: job}
 }
 

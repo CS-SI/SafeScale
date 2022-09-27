@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/davecgh/go-spew/spew"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
@@ -885,7 +886,7 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 // InspectHost updates the data inside host with the data from provider
 // Returns:
 // - *abstract.HostFull, nil if no error occurs
-func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
+func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -1240,7 +1241,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 }
 
 // DeleteHost deletes the host identified by id
-func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
+func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

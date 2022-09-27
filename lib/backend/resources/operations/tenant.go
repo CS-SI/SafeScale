@@ -20,9 +20,11 @@ import (
 	"context"
 	"sync/atomic"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -31,7 +33,7 @@ import (
 type Tenant struct {
 	Name       string
 	BucketName string
-	Service    iaas.Service
+	Service    iaasapi.Service
 }
 
 // currentTenant contains the current tenant
@@ -41,7 +43,7 @@ var currentTenant atomic.Value
 func CurrentTenant(ctx context.Context) *Tenant {
 	anon := currentTenant.Load()
 	if anon == nil {
-		tenants, err := iaas.GetTenants()
+		tenants, err := factory.GetTenants()
 		if err != nil || len(tenants) != 1 {
 			return nil
 		}
@@ -99,8 +101,8 @@ func SetCurrentTenant(ctx context.Context, tenantName string) error {
 	return nil
 }
 
-func loadTenant(ctx context.Context, tenantName string) (iaas.Service, fail.Error) {
-	service, xerr := iaas.UseService(iaas.WithTenant(tenantName))
+func loadTenant(ctx context.Context, tenantName string) (iaasapi.Service, fail.Error) {
+	service, xerr := factory.UseService(iaasoptions.BuildWithTenant(tenantName))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

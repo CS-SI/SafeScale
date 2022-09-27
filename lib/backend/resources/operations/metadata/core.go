@@ -23,9 +23,9 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -64,7 +64,7 @@ type Core struct {
 }
 
 // NewCore creates an instance of Core
-func NewCore(svc iaas.Service, method string, kind string, path string, instance data.Clonable) (_ *Core, ferr fail.Error) {
+func NewCore(svc iaasapi.Service, method string, kind string, path string, instance data.Clonable) (_ *Core, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -117,7 +117,7 @@ func (myself *Core) IsNull() bool {
 }
 
 // Service returns the iaas.Service used to create/load the persistent object
-func (myself *Core) Service() iaas.Service {
+func (myself *Core) Service() iaasapi.Service {
 	return myself.folder.Service()
 }
 

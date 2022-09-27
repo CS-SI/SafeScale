@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 )
 
@@ -34,7 +34,7 @@ func (t templateConsumer) List(all, scannedOnly bool, timeout time.Duration) (*p
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -63,7 +63,7 @@ func (t templateConsumer) Match(sizing string, timeout time.Duration) (*protocol
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -91,7 +91,7 @@ func (t templateConsumer) Inspect(name string, timeout time.Duration) (*protocol
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -25,8 +25,8 @@ import (
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -35,8 +35,8 @@ import (
 
 // stack ...
 type stack struct {
-	Config      *stackoptions.Configuration
-	AuthOptions *stackoptions.Authentication
+	Config      *iaasoptions.Configuration
+	AuthOptions *iaasoptions.Authentication
 	GcpConfig   *stacks.GCPConfiguration
 
 	ComputeService *compute.Service
@@ -61,25 +61,25 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // ConfigurationOptions ...
-func (s stack) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+func (s stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 	if valid.IsNil(s) || s.Config == nil {
-		return stackoptions.Configuration{}, fail.InvalidInstanceError()
+		return iaasoptions.Configuration{}, fail.InvalidInstanceError()
 	}
 
 	return *s.Config, nil
 }
 
 // AuthenticationOptions ...
-func (s stack) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
+func (s stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
 	if valid.IsNil(s) || s.AuthOptions == nil {
-		return stackoptions.Authentication{}, fail.InvalidInstanceError()
+		return iaasoptions.Authentication{}, fail.InvalidInstanceError()
 	}
 
 	return *s.AuthOptions, nil
 }
 
 // New Create and initialize a ClientAPI
-func New(auth stackoptions.Authentication, localCfg stacks.GCPConfiguration, cfg stackoptions.Configuration) (*stack, fail.Error) { // nolint
+func New(auth iaasoptions.Authentication, localCfg stacks.GCPConfiguration, cfg iaasoptions.Configuration) (*stack, fail.Error) { // nolint
 	gcpStack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,

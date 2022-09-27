@@ -25,7 +25,7 @@ import (
 	"sync"
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/client/commands"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -48,7 +48,7 @@ func Cleanup() {
 	}
 	if strings.TrimRight(text, "\n") == "y" {
 		cleanupOnce.Do(func() {
-			err = commands.ClientSession.JobManager.Stop(utils.GetUUID(), temporal.ExecutionTimeout())
+			err = commands.ClientSession.JobManager.Stop(common.GetUUID(), temporal.ExecutionTimeout())
 			if err != nil {
 				fmt.Printf("failed to stop the process %v\n", err)
 			}

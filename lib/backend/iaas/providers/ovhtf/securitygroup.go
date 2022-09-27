@@ -19,7 +19,7 @@ package ovhtf
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -34,12 +34,12 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 	panic("implement me")
 }
 
-func (p *provider) InspectSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (p *provider) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (p *provider) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	// TODO implement me
 	panic("implement me")
 }
@@ -49,12 +49,12 @@ func (p *provider) DeleteSecurityGroup(ctx context.Context, group *abstract.Secu
 	panic("implement me")
 }
 
-func (p *provider) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (p *provider) AddRuleToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (p *provider) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	// TODO implement me
 	panic("implement me")
 }

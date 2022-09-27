@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package utils
+package common
 
 import (
 	"context"
@@ -27,31 +27,34 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-var clientRPCUUID uuid.UUID
-var uuidSet bool
-var mutexContextManager sync.Mutex
+var (
+	clientRPCUUID       uuid.UUID
+	uuidSet             bool
+	mutexContextManager sync.Mutex
+)
 
 // --------------------- CLIENT ---------------------------------
 
-// GetContext ...
-func GetContext(storeUUID bool) (context.Context, fail.Error) {
+// ContextForGRPC ...
+func ContextForGRPC(storeUUID bool) (context.Context, fail.Error) {
 	clientContext := context.Background()
 	aUUID, xerr := generateUUID(storeUUID)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	clientContext = metadata.AppendToOutgoingContext(clientContext, "UUID", aUUID)
 	return clientContext, nil
 }
 
-// GetTimeoutContext return a context for gRPC commands
-func GetTimeoutContext(parentCtx context.Context, timeout time.Duration) (context.Context, context.CancelFunc, fail.Error) {
+// ContextForGRPCWithTimeout return a context for gRPC commands
+func ContextForGRPCWithTimeout(parentCtx context.Context, timeout time.Duration) (context.Context, context.CancelFunc, fail.Error) {
 	if parentCtx != context.TODO() { // nolint
 		ctx, cancel := context.WithTimeout(parentCtx, timeout)
 		return ctx, cancel, nil
 	}
 
-	aContext, xerr := GetContext(true)
+	aContext, xerr := ContextForGRPC(true)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -64,6 +67,7 @@ func GetTimeoutContext(parentCtx context.Context, timeout time.Duration) (contex
 func GetUUID() string {
 	mutexContextManager.Lock()
 	defer mutexContextManager.Unlock()
+
 	return clientRPCUUID.String()
 }
 
@@ -71,10 +75,12 @@ func GetUUID() string {
 func generateUUID(store bool) (string, fail.Error) {
 	mutexContextManager.Lock()
 	defer mutexContextManager.Unlock()
+
 	newUUID, err := uuid.NewV4()
 	if err != nil {
 		return "", fail.ConvertError(err)
 	}
+
 	if store {
 		uuidSet = true
 		clientRPCUUID = newUUID

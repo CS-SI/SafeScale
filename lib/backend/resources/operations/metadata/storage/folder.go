@@ -19,7 +19,7 @@ package storage
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -34,7 +34,7 @@ type (
 		Lookup(ctx context.Context, path string, name string) fail.Error                                                           // tells if the object named 'name' is inside the metadata Folder
 		Delete(ctx context.Context, path string, name string) fail.Error                                                           // removes metadata passed as parameter
 		Read(ctx context.Context, path string, name string, callback FolderCallback, options ...data.ImmutableKeyValue) fail.Error // loads the content of the object stored in metadata folder
-		Service() iaas.Service                                                                                                     // returns the current provider driver to use
+		Service() iaasapi.Service                                                                                                  // returns the current provider driver to use
 		Write(ctx context.Context, path string, name string, content []byte, options ...data.ImmutableKeyValue) fail.Error         // writes the content in storage, and check the write operation is committed
 	}
 )

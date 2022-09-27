@@ -20,7 +20,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -41,7 +41,7 @@ const (
 )
 
 // CheckVersion checks if the content of /version in metadata bucket is equal to MetadataVersion
-func CheckVersion(ctx context.Context, svc iaas.Service, method string) (string, fail.Error) {
+func CheckVersion(ctx context.Context, svc iaasapi.Service, method string) (string, fail.Error) {
 	// Read file /version in metadata
 	var currentMetadataVersion string
 	folder, xerr := NewFolder(method, svc, "")

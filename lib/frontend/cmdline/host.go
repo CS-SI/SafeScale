@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
@@ -42,7 +42,7 @@ func (h hostConsumer) List(all bool, timeout time.Duration) (*protocol.HostList,
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -70,7 +70,7 @@ func (h hostConsumer) Inspect(name string, timeout time.Duration) (*protocol.Hos
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -98,7 +98,7 @@ func (h hostConsumer) GetStatus(name string, timeout time.Duration) (*protocol.H
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -126,7 +126,7 @@ func (h hostConsumer) Reboot(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -155,7 +155,7 @@ func (h hostConsumer) Start(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -184,7 +184,7 @@ func (h hostConsumer) Stop(name string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 	service := protocol.NewHostServiceClient(h.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -212,7 +212,7 @@ func (h hostConsumer) Create(req *protocol.HostCreateRequest, timeout time.Durat
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -237,7 +237,7 @@ func (h hostConsumer) Delete(names []string, timeout time.Duration) error {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -294,7 +294,7 @@ func (h hostConsumer) SSHConfig(name string) (sshapi.Config, error) {
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -321,7 +321,7 @@ func (h hostConsumer) Resize(def *protocol.HostCreateRequest, timeout time.Durat
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -346,7 +346,7 @@ func (h hostConsumer) ListFeatures(hostRef string, all bool, timeout time.Durati
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -382,7 +382,7 @@ func (h hostConsumer) InspectFeature(hostRef, featureName string, embedded bool,
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -415,7 +415,7 @@ func (h hostConsumer) ExportFeature(hostRef, featureName string, embedded bool, 
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -448,7 +448,7 @@ func (h hostConsumer) CheckFeature(hostRef, featureName string, params map[strin
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -483,7 +483,7 @@ func (h hostConsumer) AddFeature(hostRef, featureName string, params map[string]
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -518,7 +518,7 @@ func (h hostConsumer) RemoveFeature(hostRef, featureName string, params map[stri
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -553,7 +553,7 @@ func (h hostConsumer) BindSecurityGroup(hostRef, sgRef string, enable bool, time
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -595,7 +595,7 @@ func (h hostConsumer) UnbindSecurityGroup(hostRef, sgRef string, timeout time.Du
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -629,7 +629,7 @@ func (h hostConsumer) EnableSecurityGroup(hostRef, sgRef string, timeout time.Du
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -663,7 +663,7 @@ func (h hostConsumer) DisableSecurityGroup(hostRef, sgRef string, timeout time.D
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -697,7 +697,7 @@ func (h hostConsumer) ListSecurityGroups(hostRef, state string, timeout time.Dur
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -738,7 +738,7 @@ func (h hostConsumer) ListLabels(hostName string, selectTags bool, timeout time.
 	defer h.session.Disconnect()
 
 	service := protocol.NewHostServiceClient(h.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -769,7 +769,7 @@ func (h hostConsumer) InspectLabel(hostName string, labelName string, timeout ti
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -803,7 +803,7 @@ func (h hostConsumer) BindLabel(hostName string, labelName string, value string,
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -839,7 +839,7 @@ func (h hostConsumer) UnbindLabel(hostName string, labelName string, timeout tim
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -873,7 +873,7 @@ func (h hostConsumer) UpdateLabel(hostName string, labelName string, value strin
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -909,7 +909,7 @@ func (h hostConsumer) ResetLabel(hostName string, labelName string, timeout time
 	h.session.Connect()
 	defer h.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}

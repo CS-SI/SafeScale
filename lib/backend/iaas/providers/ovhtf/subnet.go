@@ -20,7 +20,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -110,8 +110,12 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		// opts.GatewayIP = &noGateway
 	}
 
-	summoner := p.Terraformer()
-	xerr := summoner.Build()
+	summoner, xerr := p.Terraformer()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = summoner.Build(subnetRsc)
 	if xerr != nil {
 		return nil, xerr
 	}

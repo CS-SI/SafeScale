@@ -32,7 +32,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
@@ -105,7 +105,7 @@ type alterCommandCB func(string) string
 
 type worker struct {
 	mu        *sync.RWMutex
-	service   iaas.Service
+	service   iaasapi.Service
 	feature   *Feature
 	target    resources.Targetable
 	method    installmethod.Enum

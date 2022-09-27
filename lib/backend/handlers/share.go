@@ -20,7 +20,7 @@ import (
 	"path"
 	"reflect"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
@@ -49,11 +49,11 @@ type ShareHandler interface {
 
 // shareHandler nas service
 type shareHandler struct {
-	job backend.Job
+	job job.Job
 }
 
 // NewShareHandler creates a ShareHandler
-func NewShareHandler(job backend.Job) ShareHandler {
+func NewShareHandler(job job.Job) ShareHandler {
 	return &shareHandler{job: job}
 }
 

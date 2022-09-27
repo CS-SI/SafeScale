@@ -24,7 +24,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -43,7 +43,7 @@ func (c clusterConsumer) List(timeout time.Duration) (*protocol.ClusterListRespo
 	defer c.session.Disconnect()
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -78,7 +78,7 @@ func (c clusterConsumer) Inspect(clusterName string, timeout time.Duration) (*pr
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -113,7 +113,7 @@ func (c clusterConsumer) GetState(clusteName string, timeout time.Duration) (*pr
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, err := utils.GetContext(true)
+	ctx, err := common.ContextForGRPC(true)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (c clusterConsumer) Start(clusterName string, timeout time.Duration) error 
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -168,7 +168,7 @@ func (c clusterConsumer) Stop(clusterName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -201,7 +201,7 @@ func (c clusterConsumer) Create(def *protocol.ClusterCreateRequest, timeout time
 	defer c.session.Disconnect()
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -233,7 +233,7 @@ func (c clusterConsumer) Delete(clusterName string, force bool, timeout time.Dur
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -267,7 +267,7 @@ func (c clusterConsumer) Expand(req *protocol.ClusterResizeRequest, timeout time
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -296,7 +296,7 @@ func (c clusterConsumer) Shrink(req *protocol.ClusterResizeRequest, timeout time
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -328,7 +328,7 @@ func (c clusterConsumer) CheckFeature(clusterName, featureName string, params ma
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -370,7 +370,7 @@ func (c clusterConsumer) AddFeature(clusterName, featureName string, params map[
 
 	c.session.Connect()
 	defer c.session.Disconnect()
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -413,7 +413,7 @@ func (c clusterConsumer) RemoveFeature(clusterName, featureName string, params m
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -453,7 +453,7 @@ func (c clusterConsumer) ListFeatures(clusterName string, all bool, timeout time
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -495,7 +495,7 @@ func (c clusterConsumer) InspectFeature(clusterName, featureName string, embedde
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -538,7 +538,7 @@ func (c clusterConsumer) ExportFeature(clusterName, featureName string, embedded
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -581,7 +581,7 @@ func (c clusterConsumer) FindAvailableMaster(clusterName string, timeout time.Du
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -617,7 +617,7 @@ func (c clusterConsumer) ListNodes(clusterName string, timeout time.Duration) (*
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -656,7 +656,7 @@ func (c clusterConsumer) InspectNode(clusterName string, nodeRef string, timeout
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -694,7 +694,7 @@ func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, timeout 
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -771,7 +771,7 @@ func (c clusterConsumer) StartNode(clusterName string, nodeRef string, timeout t
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -810,7 +810,7 @@ func (c clusterConsumer) StopNode(clusterName string, nodeRef string, timeout ti
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -849,7 +849,7 @@ func (c clusterConsumer) StateNode(clusterName string, nodeRef string, timeout t
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -884,7 +884,7 @@ func (c clusterConsumer) ListMasters(clusterName string, timeout time.Duration) 
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -924,7 +924,7 @@ func (c clusterConsumer) InspectMaster(clusterName string, masterRef string, tim
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -962,7 +962,7 @@ func (c clusterConsumer) StartMaster(clusterName string, masterRef string, timeo
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -1001,7 +1001,7 @@ func (c clusterConsumer) StopMaster(clusterName string, masterRef string, timeou
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -1040,7 +1040,7 @@ func (c clusterConsumer) StateMaster(clusterName string, masterRef string, timeo
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}

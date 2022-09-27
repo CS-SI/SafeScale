@@ -19,7 +19,7 @@ package nfs
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -28,12 +28,12 @@ import (
 
 // Server getServer structure
 type Server struct {
-	svc       iaas.Service
+	svc       iaasapi.Service
 	SSHConfig sshapi.Connector
 }
 
 // NewServer instantiates a new nfs.getServer struct
-func NewServer(svc iaas.Service, sshconfig sshapi.Connector) (srv *Server, err fail.Error) {
+func NewServer(svc iaasapi.Service, sshconfig sshapi.Connector) (srv *Server, err fail.Error) {
 	if sshconfig == nil {
 		return nil, fail.InvalidParameterError("sshconfig", "cannot be nil")
 	}

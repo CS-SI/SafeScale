@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package backend
+package job
 
 import (
 	"context"
@@ -23,14 +23,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
+	uuidpkg "github.com/gofrs/uuid"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/versions"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
+	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	uuidpkg "github.com/gofrs/uuid"
 )
 
 // Job is the interface of a daemon job
@@ -42,7 +47,7 @@ type Job interface {
 	Tenant() string
 	Context() context.Context
 	Task() concurrency.Task
-	Service() iaas.Service
+	Service() iaasapi.Service
 	Duration() time.Duration
 	String() string
 
@@ -51,35 +56,24 @@ type Job interface {
 	Close()
 }
 
-type JobScope struct {
-	Organization string
-	Project      string
-	Tenant       string
-	Description  string
-}
-
 // job contains the information needed by safescaled to execute a request
 type job struct {
-	scope     JobScope
+	scope     Scope
 	uuid      string
 	ctx       context.Context
 	task      concurrency.Task
 	cancel    context.CancelFunc
-	service   iaas.Service
+	service   iaasapi.Service
 	startTime time.Time
 }
-
-const (
-	KeyForJobInContext = "job"
-)
 
 var (
 	jobMap          = map[string]Job{}
 	mutexJobManager sync.Mutex
 )
 
-// NewJob creates a new instance of struct Job
-func NewJob(ctx context.Context, cancel context.CancelFunc, scope JobScope) (_ *job, ferr fail.Error) { // nolint
+// New creates a new instance of struct Job
+func New(ctx context.Context, cancel context.CancelFunc, scope Scope) (_ *job, ferr fail.Error) { // nolint
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -137,7 +131,8 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, scope JobScope) (_ *
 		return nil, xerr
 	}
 
-	if xerr = task.SetID(id + scope.Description); xerr != nil {
+	xerr = task.SetID(id + scope.Description)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -156,13 +151,13 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, scope JobScope) (_ *
 	ctx = context.WithValue(ctx, KeyForJobInContext, nj) // nolint
 	nj.ctx = ctx
 
-	providerProfile, xerr := iaas.FindProviderProfileForTenant(scope.Tenant)
+	providerProfile, xerr := factory.FindProviderProfileForTenant(scope.Tenant)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	svcOptions := []iaas.OptionsMutator{
-		iaas.WithTenant(scope.Tenant),
+	svcOptions := []options.Mutator{
+		iaasoptions.BuildWithTenant(scope.Tenant),
 	}
 	if providerProfile.Capabilities().UseTerraformer {
 		config, xerr := prepareTerraformerConfiguration(providerProfile, scope)
@@ -170,10 +165,10 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, scope JobScope) (_ *
 			return nil, xerr
 		}
 
-		svcOptions = append(svcOptions, iaas.WithTerraformer(config))
+		svcOptions = append(svcOptions, iaasoptions.BuildWithTerraformer(config))
 	}
 
-	service, xerr := iaas.UseService(svcOptions...)
+	service, xerr := factory.UseService(svcOptions...)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -194,13 +189,14 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, scope JobScope) (_ *
 	return nj, nil
 }
 
-func prepareTerraformerConfiguration(providerProfile *providers.Profile, scope JobScope) (terraformer.Configuration, fail.Error) {
+func prepareTerraformerConfiguration(providerProfile *providers.Profile, scope Scope) (terraformerapi.Configuration, fail.Error) {
 	if valid.IsNull(providerProfile) {
-		return terraformer.Configuration{}, fail.InvalidParameterCannotBeNilError("providerProfile")
+		return terraformerapi.Configuration{}, fail.InvalidParameterCannotBeNilError("providerProfile")
 	}
 
 	workDir := filepath.Join(global.Settings.Folders.TmpDir, "terraform", scope.Organization, scope.Project, scope.Tenant)
-	out := terraformer.Configuration{
+	out := terraformerapi.Configuration{
+		Release:           "= " + versions.Terraformv1_2_6.String(),
 		WorkDir:           workDir,
 		ExecPath:          global.Settings.Backend.Terraform.ExecPath,
 		RequiredProviders: providerProfile.TerraformProviders(),
@@ -250,7 +246,7 @@ func (instance job) Task() concurrency.Task {
 }
 
 // Service returns the service instance
-func (instance job) Service() iaas.Service {
+func (instance job) Service() iaasapi.Service {
 	return instance.service
 }
 
@@ -325,30 +321,4 @@ func deregister(job Job) fail.Error {
 	}
 
 	return fail.InvalidParameterError("job", "job id cannot be empty string")
-}
-
-// AbortJobByID asks the job identified by 'id' to abort
-func AbortJobByID(id string) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if id == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("id")
-	}
-
-	if job, ok := jobMap[id]; ok {
-		if xerr := job.Abort(); xerr != nil {
-			return fail.Wrap(xerr, "failed to stop job '%s'", id)
-		}
-		return nil
-	}
-	return fail.NotFoundError("no job identified by '%s' found", id)
-}
-
-// ListJobs ...
-func ListJobs() map[string]string {
-	listMap := map[string]string{}
-	for uuid, job := range jobMap {
-		listMap[uuid] = job.Name()
-	}
-	return listMap
 }

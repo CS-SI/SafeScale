@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package iaas
+package factory
 
 import (
 	"context"
@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/gofrs/uuid"
 	"github.com/oscarpicas/scribble"
@@ -33,7 +34,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	imagefilters "github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract/filters/images"
@@ -48,39 +48,9 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-//go:generate minimock -o mocks/mock_service.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas.Service
-
-// Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
-// completed with higher-level methods
-type Service interface {
-	FilterImages(context.Context, string) ([]*abstract.Image, fail.Error)
-	FindTemplateBySizing(context.Context, abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error)
-	FindTemplateByName(context.Context, string) (*abstract.HostTemplate, fail.Error)
-	FindTemplateByID(context.Context, string) (*abstract.HostTemplate, fail.Error)
-	GetProviderName() (string, fail.Error)
-	GetMetadataBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error)
-	GetMetadataKey() (*crypt.Key, fail.Error)
-	GetCache(context.Context) (cache.CacheInterface, fail.Error)
-	InspectSecurityGroupByName(ctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error)
-	ListHostsByName(context.Context, bool) (map[string]*abstract.HostFull, fail.Error)
-	ListTemplatesBySizing(context.Context, abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
-	ObjectStorageConfiguration(ctx context.Context) (objectstorage.Config, fail.Error)
-	SearchImage(context.Context, string) (*abstract.Image, fail.Error)
-	TenantCleanup(context.Context, bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
-	WaitHostState(context.Context, string, hoststate.Enum, time.Duration) fail.Error
-	WaitVolumeState(context.Context, string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
-
-	LookupRuleInSecurityGroup(context.Context, *abstract.SecurityGroup, *abstract.SecurityGroupRule) (bool, fail.Error)
-
-	providers.Provider
-
-	// Location --- from interface objectstorage.Location ---
-	objectstorage.Location
-}
-
 // service is the implementation struct of interface Service
 type service struct {
-	providers.Provider
+	iaasapi.Provider
 	objectstorage.Location
 
 	tenantName string
@@ -138,7 +108,7 @@ func (a ByRankDRF) Less(i, j int) bool {
 }
 
 // NullService creates a service instance corresponding to null value
-func NullService() *service { // nolint
+func NullService() iaasapi.Service { // nolint
 	return &service{}
 }
 
@@ -189,13 +159,14 @@ func (instance service) GetMetadataKey() (*crypt.Key, fail.Error) {
 }
 
 // ChangeProvider allows changing provider interface of service object (mainly for test purposes)
-func (instance *service) ChangeProvider(provider providers.Provider) fail.Error {
+func (instance *service) ChangeProvider(provider iaasapi.Provider) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if provider == nil {
 		return fail.InvalidParameterCannotBeNilError("provider")
 	}
+
 	instance.Provider = provider
 	return nil
 }
@@ -590,7 +561,7 @@ func (instance service) ListTemplatesBySizing(inctx context.Context, sizing abst
 					return
 				}
 			} else {
-				authOpts, xerr := instance.AuthenticationOptions()
+				authOpts, xerr := instance.Provider.AuthenticationOptions()
 				if xerr != nil {
 					chRes <- result{nil, xerr}
 					return

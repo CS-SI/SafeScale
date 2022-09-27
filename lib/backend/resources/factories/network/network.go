@@ -20,7 +20,7 @@ package network
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
@@ -28,7 +28,7 @@ import (
 )
 
 // List returns a slice of *abstract.Network corresponding to managed networks
-func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Error) {
+func List(ctx context.Context, svc iaasapi.Service) ([]*abstract.Network, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -72,11 +72,11 @@ func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Erro
 }
 
 // New creates an instance of resources.Network
-func New(svc iaas.Service) (resources.Network, fail.Error) {
+func New(svc iaasapi.Service) (resources.Network, fail.Error) {
 	return operations.NewNetwork(svc)
 }
 
 // Load loads the metadata of a network and returns an instance of resources.Network
-func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Network, fail.Error) {
+func Load(ctx context.Context, svc iaasapi.Service, ref string) (resources.Network, fail.Error) {
 	return operations.LoadNetwork(ctx, svc, ref)
 }

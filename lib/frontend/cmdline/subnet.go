@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -38,7 +38,7 @@ type subnetConsumer struct {
 func (s subnetConsumer) List(networkRef string, all bool, timeout time.Duration) (*protocol.SubnetList, error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -69,7 +69,7 @@ func (s subnetConsumer) Delete(networkRef string, names []string, timeout time.D
 	s.session.Connect()
 	defer s.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -127,7 +127,7 @@ func (s subnetConsumer) Inspect(networkRef, name string, timeout time.Duration) 
 	s.session.Connect()
 	defer s.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -168,7 +168,7 @@ func (s subnetConsumer) Create(
 	s.session.Connect()
 	defer s.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -208,7 +208,7 @@ func (s subnetConsumer) BindSecurityGroup(networkRef, subnetRef, sgRef string, e
 	s.session.Connect()
 	defer s.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -253,7 +253,7 @@ func (s subnetConsumer) UnbindSecurityGroup(networkRef, subnetRef, sgRef string,
 	s.session.Connect()
 	defer s.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -290,7 +290,7 @@ func (s subnetConsumer) EnableSecurityGroup(networkRef, subnetRef, sgRef string,
 	s.session.Connect()
 	defer s.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -327,7 +327,7 @@ func (s subnetConsumer) DisableSecurityGroup(networkRef, subnetRef, sgRef string
 	s.session.Connect()
 	defer s.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -366,7 +366,7 @@ func (s subnetConsumer) ListSecurityGroups(networkRef, subnetRef, state string, 
 	s.session.Connect()
 	defer s.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}

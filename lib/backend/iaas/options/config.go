@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package options
+package iaasoptions
 
 import (
 	"regexp"

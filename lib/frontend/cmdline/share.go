@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -38,7 +38,7 @@ func (n shareConsumer) Create(def *protocol.ShareCreateRequest, timeout time.Dur
 	n.session.Connect()
 	defer n.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -68,7 +68,7 @@ func (n shareConsumer) Delete(names []string, timeout time.Duration) error {
 	n.session.Connect()
 	defer n.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -124,7 +124,7 @@ func (n shareConsumer) List(timeout time.Duration) (*protocol.ShareListResponse,
 	n.session.Connect()
 	defer n.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -155,7 +155,7 @@ func (n shareConsumer) Mount(def *protocol.ShareMountRequest, timeout time.Durat
 	n.session.Connect()
 	defer n.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -184,7 +184,7 @@ func (n shareConsumer) Unmount(def *protocol.ShareMountRequest, timeout time.Dur
 	n.session.Connect()
 	defer n.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -213,7 +213,7 @@ func (n shareConsumer) Inspect(name string, timeout time.Duration) (*protocol.Sh
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewShareServiceClient(n.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}

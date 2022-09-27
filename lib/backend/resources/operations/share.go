@@ -28,7 +28,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
@@ -121,7 +121,7 @@ type Share struct {
 }
 
 // NewShare creates an instance of Share
-func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
+func NewShare(svc iaasapi.Service) (resources.Share, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -144,7 +144,7 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //	If error is fail.ErrNotFound return this error
 //	In case of any other error, abort the retry to propagate the error
 //	If retry times out, return fail.ErrTimeout
-func LoadShare(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Share, fail.Error) {
+func LoadShare(inctx context.Context, svc iaasapi.Service, ref string, options ...data.ImmutableKeyValue) (resources.Share, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -247,7 +247,7 @@ func LoadShare(inctx context.Context, svc iaas.Service, ref string, options ...d
 }
 
 // onShareCacheMiss is called when there is no instance in cache of Share 'ref'
-func onShareCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onShareCacheMiss(ctx context.Context, svc iaasapi.Service, ref string) (data.Identifiable, fail.Error) {
 	shareInstance, innerXErr := NewShare(svc)
 	if innerXErr != nil {
 		return nil, innerXErr

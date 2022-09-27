@@ -28,11 +28,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/sirupsen/logrus"
 
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
@@ -68,7 +68,7 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 		connectionTimeout = DefaultConnectionTimeout
 	}
 
-	ctx, xerr := srvutils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -451,7 +451,7 @@ func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (sshapi.
 	s.session.Connect()
 	defer s.session.Disconnect()
 
-	ctx, xerr := srvutils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}

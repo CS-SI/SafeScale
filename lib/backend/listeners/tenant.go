@@ -21,7 +21,8 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -51,7 +52,7 @@ func (s *TenantListener) List(inctx context.Context, in *googleprotobuf.Empty) (
 
 	defer fail.OnExitLogError(inctx, &err)
 
-	tenants, xerr := iaas.GetTenantNames()
+	tenants, xerr := factory.GetTenantNames()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -162,7 +163,7 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 		return empty, nil
 	}
 
-	service, xerr := iaas.UseService(iaas.WithTenant(in.GetName()) /*, ""*/)
+	service, xerr := factory.UseService(iaasoptions.BuildWithTenant(in.GetName()) /*, ""*/)
 	if xerr != nil {
 		return empty, xerr
 	}

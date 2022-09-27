@@ -17,7 +17,7 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -45,11 +45,11 @@ type BucketHandler interface {
 
 // bucketHandler bucket service
 type bucketHandler struct {
-	job backend.Job
+	job job.Job
 }
 
 // NewBucketHandler creates a BucketHandler
-func NewBucketHandler(job backend.Job) BucketHandler {
+func NewBucketHandler(job job.Job) BucketHandler {
 	return &bucketHandler{job: job}
 }
 

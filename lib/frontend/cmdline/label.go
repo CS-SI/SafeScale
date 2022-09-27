@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -38,7 +38,7 @@ func (t labelConsumer) List(selectTags bool, timeout time.Duration) (*protocol.L
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -65,7 +65,7 @@ func (t labelConsumer) Inspect(name string, selectTag bool, timeout time.Duratio
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -95,7 +95,7 @@ func (t labelConsumer) Delete(names []string, selectTags bool, timeout time.Dura
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -157,7 +157,7 @@ func (t labelConsumer) Create(name string, hasDefault bool, defaultValue string,
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package options
+package iaasoptions
 
 // AlphanumericWithDashesAndUnderscores is the regexp pattern to identify bucket names
 const (

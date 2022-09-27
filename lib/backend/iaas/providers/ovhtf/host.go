@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
@@ -32,17 +32,17 @@ func (p *provider) CreateHost(ctx context.Context, request abstract.HostRequest)
 	panic("implement me")
 }
 
-func (p *provider) ClearHostStartupScript(ctx context.Context, parameter stacks.HostParameter) fail.Error {
+func (p *provider) ClearHostStartupScript(ctx context.Context, parameter iaasapi.HostParameter) fail.Error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) InspectHost(ctx context.Context, parameter stacks.HostParameter) (*abstract.HostFull, fail.Error) {
+func (p *provider) InspectHost(ctx context.Context, parameter iaasapi.HostParameter) (*abstract.HostFull, fail.Error) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) GetHostState(ctx context.Context, parameter stacks.HostParameter) (hoststate.Enum, fail.Error) {
+func (p *provider) GetHostState(ctx context.Context, parameter iaasapi.HostParameter) (hoststate.Enum, fail.Error) {
 	// TODO implement me
 	panic("implement me")
 }
@@ -52,42 +52,42 @@ func (p *provider) ListHosts(ctx context.Context, b bool) (abstract.HostList, fa
 	panic("implement me")
 }
 
-func (p *provider) DeleteHost(ctx context.Context, parameter stacks.HostParameter) fail.Error {
+func (p *provider) DeleteHost(ctx context.Context, parameter iaasapi.HostParameter) fail.Error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) StopHost(ctx context.Context, host stacks.HostParameter, gracefully bool) fail.Error {
+func (p *provider) StopHost(ctx context.Context, host iaasapi.HostParameter, gracefully bool) fail.Error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) StartHost(ctx context.Context, parameter stacks.HostParameter) fail.Error {
+func (p *provider) StartHost(ctx context.Context, parameter iaasapi.HostParameter) fail.Error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) RebootHost(ctx context.Context, parameter stacks.HostParameter) fail.Error {
+func (p *provider) RebootHost(ctx context.Context, parameter iaasapi.HostParameter) fail.Error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) ResizeHost(ctx context.Context, parameter stacks.HostParameter, requirements abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (p *provider) ResizeHost(ctx context.Context, parameter iaasapi.HostParameter, requirements abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+func (p *provider) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (p *provider) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
 	// TODO implement me
 	panic("implement me")
 }
