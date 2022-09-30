@@ -58,7 +58,7 @@ require (
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.95.0
 	google.golang.org/grpc v1.49.0
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/protobuf v1.28.1
 	gopkg.in/fsnotify.v1 v1.4.7
 )
 

@@ -1,12 +1,13 @@
 resource "openstack_networking_network_v2" "{{ .Resource.Name }}" {
-    # count                   = length(var.request.networks)
-    provider                = {{ .Provider.Name }} 						# openstack.ovh
+    provider                = openstack.ovh
     name                    = "{{ .Resource.Name }}"					# var.request.networks[count.index].Name
     admin_state_up          = true
     port_security_enabled   = true
     shared                  = false
     tenant_id               = "{{ .Provider.Authentication.TenantID }}"	# "${var.tenant.identity.ApplicationKey}"
-	region                  = "{{ .Provider.Authentication.Region }}"	# "${var.tenant.compute.Region}"
+    region                  = "{{ .Provider.Authentication.Region }}"	# "${var.tenant.compute.Region}"
 }
 
-# FIXME: outputs for network id
+output "network_id" {
+    value = "${openstack_networking_network_v2.{{ .Resource.Name }}.id}"
+}

@@ -379,6 +379,7 @@ func (instance folder) Write(ctx context.Context, path string, name string, cont
 					switch v { // nolint
 					case verdict.Retry:
 						logrus.WithContext(ctx).Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying check...", bucketName, absolutePath, t.Err.Error())
+					default:
 					}
 				},
 			)
@@ -402,6 +403,7 @@ func (instance folder) Write(ctx context.Context, path string, name string, cont
 			switch v { // nolint
 			case verdict.Retry:
 				logrus.WithContext(ctx).Warnf("metadata '%s:%s' write not acknowledged after %s; considering write lost, retrying...", bucketName, absolutePath, temporal.FormatDuration(time.Since(readAfterWrite)))
+			default:
 			}
 		},
 	)

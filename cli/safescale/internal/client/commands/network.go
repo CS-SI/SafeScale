@@ -108,6 +108,7 @@ func networkDeleteCommand() *cobra.Command {
 			case 0:
 				_ = c.Usage()
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			default:
 			}
 
 			force, err := c.Flags().GetBool("force")
@@ -280,6 +281,7 @@ func networkCreateCommand() *cobra.Command {
 			case 0:
 				_ = c.Usage()
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			default:
 			}
 
 			var (
@@ -970,6 +972,7 @@ func subnetListCommand() *cobra.Command {
 			case 0:
 				_ = c.Usage()
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
+			default:
 			}
 			networkRef := args[0]
 			if networkRef == "-" {

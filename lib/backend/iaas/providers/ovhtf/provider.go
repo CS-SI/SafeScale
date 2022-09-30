@@ -122,8 +122,8 @@ func (p *provider) IsNull() bool {
 
 // Build builds a new instance of Ovh using configuration parameters
 // Can be called from nil
-func (p *provider) Build(params map[string]interface{}, opts ...options.Mutator) (iaasapi.Provider, fail.Error) {
-	root, xerr := p.build(params)
+func (p *provider) Build(params map[string]interface{}, opts options.Options) (iaasapi.Provider, fail.Error) {
+	root, xerr := p.build(params, opts)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -141,7 +141,7 @@ func remediatize(provider *provider) iaasapi.Provider {
 }
 
 // build constructs a new instance of provider accordingly parameterized
-func (p *provider) build(params map[string]any, opts ...options.Mutator) (*provider, fail.Error) {
+func (p *provider) build(params map[string]any, opts options.Options) (*provider, fail.Error) {
 	var validInput bool
 
 	identityParams, _ := params["identity"].(map[string]any) // nolint
@@ -310,6 +310,23 @@ next:
 		authOptions:      authOptions,
 		configOptions:    cfgOptions,
 	}
+
+	out.summonerConfig, _ = options.ValueOrDefault(opts, "TerraformerConfiguration", terraformerapi.Configuration{})
+	out.summonerConfig.Scope.Organization, xerr = options.Value[string](opts, "Organization")
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out.summonerConfig.Scope.Project, xerr = options.Value[string](opts, "Project")
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out.summonerConfig.Scope.Tenant, xerr = options.Value[string](opts, "Tenant")
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	return out, nil
 }
 

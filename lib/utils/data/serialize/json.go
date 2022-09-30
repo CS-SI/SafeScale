@@ -119,7 +119,11 @@ func (x *JSONProperties) Clone() (*JSONProperties, error) {
 		for k, v := range x.Properties {
 			b, err := v.Clone()
 			if err == nil {
-				newP.Properties[k], _ = b.(*jsonProperty) // nolint
+				var ok bool
+				newP.Properties[k], ok = b.(*jsonProperty) // nolint
+				if !ok {
+					return nil, fail.InconsistentError("failed to cast to '*jsonProperty'")
+				}
 			}
 		}
 	}

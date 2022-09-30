@@ -37,9 +37,9 @@ gensrc:
 	@(cd system && $(MAKE) $(@))
 
 generate: gensrc sdk
+	@(cd backend && $(MAKE) $@)
 	@(cd protocol && $(MAKE) $@)
 	@(cd utils && $(MAKE) $@)
-	@(cd backend && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
 
 sdk: gensrc

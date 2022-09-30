@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/hashicorp/terraform-exec/tfexec"
 )
 
 type (
@@ -30,9 +31,9 @@ type (
 
 	Summoner interface {
 		Build(resources ...Resource) fail.Error
-		Apply(ctx context.Context) (any, fail.Error)
+		Apply(ctx context.Context) (map[string]tfexec.OutputMeta, fail.Error)
 		Destroy(ctx context.Context) fail.Error
-		Plan(ctx context.Context) (bool, fail.Error)
+		Plan(ctx context.Context) (map[string]tfexec.OutputMeta, bool, fail.Error)
 	}
 
 	RequiredProvider struct {
@@ -49,6 +50,11 @@ type (
 		ConsulBackend struct {
 			Path string // "/safescale/terraformstate/{{ or .CurrentOrganization "default" }}/{{ or .CurrentProject "default" }}"
 			Use  bool
+		}
+		Scope struct { // Note: don't use job.Scope, to prevent import cycle, and avoid "outside" dependencies for iaas backend
+			Organization string
+			Project      string
+			Tenant       string
 		}
 		RequiredProviders
 	}

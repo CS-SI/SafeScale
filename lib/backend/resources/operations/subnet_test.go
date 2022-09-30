@@ -24,7 +24,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/stretchr/testify/require"
@@ -47,7 +46,7 @@ func subnetRequest() abstract.SubnetRequest {
 
 func Test_NewSubnet(t *testing.T) {
 
-	var svc iaas.Service
+	var svc iaasapi.Service
 
 	subnet, err := NewSubnet(svc)
 	require.Nil(t, subnet)
@@ -69,7 +68,7 @@ func Test_NewSubnet(t *testing.T) {
 
 func Test_LoadSubnet(t *testing.T) {
 
-	var svc iaas.Service
+	var svc iaasapi.Service
 	ctx := context.Background()
 
 	// Wrong service

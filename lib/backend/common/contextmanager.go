@@ -19,7 +19,6 @@ package common
 import (
 	"context"
 	"sync"
-	"time"
 
 	uuid "github.com/gofrs/uuid"
 	"google.golang.org/grpc/metadata"
@@ -47,21 +46,22 @@ func ContextForGRPC(storeUUID bool) (context.Context, fail.Error) {
 	return clientContext, nil
 }
 
+// VPL: not used
 // ContextForGRPCWithTimeout return a context for gRPC commands
-func ContextForGRPCWithTimeout(parentCtx context.Context, timeout time.Duration) (context.Context, context.CancelFunc, fail.Error) {
-	if parentCtx != context.TODO() { // nolint
-		ctx, cancel := context.WithTimeout(parentCtx, timeout)
-		return ctx, cancel, nil
-	}
-
-	aContext, xerr := ContextForGRPC(true)
-	if xerr != nil {
-		return nil, nil, xerr
-	}
-
-	ctx, cancel := context.WithTimeout(aContext, timeout)
-	return ctx, cancel, nil
-}
+// func ContextForGRPCWithTimeout(parentCtx context.Context, timeout time.Duration) (context.Context, context.CancelFunc, fail.Error) {
+// 	if parentCtx != nil { // nolint
+// 		ctx, cancel := context.WithTimeout(parentCtx, timeout)
+// 		return ctx, cancel, nil
+// 	}
+//
+// 	aContext, xerr := ContextForGRPC(true)
+// 	if xerr != nil {
+// 		return nil, nil, xerr
+// 	}
+//
+// 	ctx, cancel := context.WithTimeout(aContext, timeout)
+// 	return ctx, cancel, nil
+// }
 
 // GetUUID ...
 func GetUUID() string {

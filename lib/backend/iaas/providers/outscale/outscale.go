@@ -117,7 +117,7 @@ func (p *provider) IsNull() bool {
 }
 
 // Build builds a new Client from configuration parameter
-func (p *provider) Build(opt map[string]interface{}, _ ...options.Mutator) (_ iaasapi.Provider, ferr fail.Error) {
+func (p *provider) Build(opt map[string]interface{}, _ options.Options) (_ iaasapi.Provider, ferr fail.Error) {
 	identity := remap(opt["identity"])
 	compute := remap(opt["compute"])
 	metadata := remap(opt["metadata"])

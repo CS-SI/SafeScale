@@ -96,7 +96,7 @@ func (p *provider) IsNull() bool {
 }
 
 // Build initializes a new FlexibleEngine instance from parameters
-func (p *provider) Build(params map[string]interface{}, _ ...options.Mutator) (iaasapi.Provider, fail.Error) {
+func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaasapi.Provider, fail.Error) {
 	identity, _ := params["identity"].(map[string]interface{}) // nolint
 	compute, _ := params["compute"].(map[string]interface{})   // nolint
 	network, _ := params["network"].(map[string]interface{})   // nolint

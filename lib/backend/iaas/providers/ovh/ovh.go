@@ -96,7 +96,7 @@ func (p *provider) IsNull() bool {
 
 // Build builds a new instance of Ovh using configuration parameters
 // Can be called from nil
-func (p *provider) Build(params map[string]interface{}, _ ...options.Mutator) (iaasapi.Provider, fail.Error) {
+func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaasapi.Provider, fail.Error) {
 	var validInput bool
 
 	identityParams, _ := params["identity"].(map[string]interface{}) // nolint

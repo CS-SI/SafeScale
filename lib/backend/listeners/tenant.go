@@ -23,7 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -68,62 +67,62 @@ func (s *TenantListener) List(inctx context.Context, in *googleprotobuf.Empty) (
 	return &protocol.TenantList{Tenants: list}, nil
 }
 
-// Get returns the name of the current tenant used
-func (s *TenantListener) Get(inctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantNameResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
-	}
-
-	defer fail.OnExitLogError(inctx, &err)
-
-	currentTenant := operations.CurrentTenant(inctx)
-	if currentTenant == nil {
-		return nil, fail.NotFoundError("no tenant set")
-	}
-
-	prvName, xerr := currentTenant.Service.GetProviderName()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return &protocol.TenantNameResponse{
-		Name:       currentTenant.Name,
-		BucketName: currentTenant.BucketName,
-		Provider:   prvName,
-	}, nil
-}
-
-// Set sets the tenant to use for each command
-func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantInspectRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot set tenant")
-	defer fail.OnPanic(&err)
-
-	empty = &googleprotobuf.Empty{}
-	if s == nil {
-		return empty, fail.InvalidInstanceError()
-	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
-	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	defer fail.OnExitLogError(inctx, &err)
-
-	xerr := operations.SetCurrentTenant(inctx, in.GetName())
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	return empty, nil
-}
+// // Get returns the name of the current tenant used
+// func (s *TenantListener) Get(inctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantNameResponse, err error) {
+// 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+//
+// 	if s == nil {
+// 		return nil, fail.InvalidInstanceError()
+// 	}
+// 	if inctx == nil {
+// 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+// 	}
+//
+// 	defer fail.OnExitLogError(inctx, &err)
+//
+// 	currentTenant := operations.CurrentTenant(inctx)
+// 	if currentTenant == nil {
+// 		return nil, fail.NotFoundError("no tenant set")
+// 	}
+//
+// 	prvName, xerr := currentTenant.Service.GetProviderName()
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	return &protocol.TenantNameResponse{
+// 		Name:       currentTenant.Name,
+// 		BucketName: currentTenant.BucketName,
+// 		Provider:   prvName,
+// 	}, nil
+// }
+//
+// // Set sets the tenant to use for each command
+// func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantInspectRequest) (empty *googleprotobuf.Empty, err error) {
+// 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
+// 	defer fail.OnExitWrapError(inctx, &err, "cannot set tenant")
+// 	defer fail.OnPanic(&err)
+//
+// 	empty = &googleprotobuf.Empty{}
+// 	if s == nil {
+// 		return empty, fail.InvalidInstanceError()
+// 	}
+// 	if inctx == nil {
+// 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+// 	}
+// 	if in == nil {
+// 		return empty, fail.InvalidParameterError("in", "cannot be nil")
+// 	}
+//
+// 	defer fail.OnExitLogError(inctx, &err)
+//
+// 	xerr := operations.SetCurrentTenant(inctx, in.GetName())
+// 	if xerr != nil {
+// 		return empty, xerr
+// 	}
+//
+// 	return empty, nil
+// }
 
 // Cleanup removes everything corresponding to SafeScale from tenant (metadata in particular)
 func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantCleanupRequest) (empty *googleprotobuf.Empty, err error) {
@@ -145,6 +144,7 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 	fakeReference := &protocol.Reference{
 		Organization: in.GetOrganization(),
 		Project:      in.GetProject(),
+		TenantId:     in.GetName(),
 	}
 	scope := extractScopeFromProtocol(fakeReference, fmt.Sprintf("tenant/%s/metadata/delete", name))
 	job, xerr := prepareJob(inctx, scope)
@@ -158,12 +158,12 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
-	currentTenant := operations.CurrentTenant(ctx)
-	if currentTenant != nil && currentTenant.Name == in.GetName() {
-		return empty, nil
-	}
+	// currentTenant := operations.CurrentTenant(ctx)
+	// if currentTenant != nil && currentTenant.Name == in.GetName() {
+	// 	return empty, nil
+	// }
 
-	service, xerr := factory.UseService(iaasoptions.BuildWithTenant(in.GetName()) /*, ""*/)
+	service, xerr := factory.UseService(iaasoptions.BuildWithScope(scope.Organization, scope.Project, scope.Tenant))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -188,6 +188,7 @@ func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequ
 	fakeReference := &protocol.Reference{
 		Organization: in.GetOrganization(),
 		Project:      in.GetProject(),
+		TenantId:     name,
 	}
 	scope := extractScopeFromProtocol(fakeReference, fmt.Sprintf("/tenant/%s/scan", name))
 	job, xerr := prepareJob(inctx, scope)

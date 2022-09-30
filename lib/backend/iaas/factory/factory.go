@@ -128,43 +128,52 @@ func UseService(mutators ...options.Mutator) (newService iaasapi.Service, ferr f
 	defer fail.OnExitLogError(ctx, &ferr)
 	defer fail.OnPanic(&ferr)
 
-	var opts iaasoptions.Build
+	opts := options.New()
 	for k, v := range mutators {
-		xerr := v(&opts)
+		xerr := v(opts)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to apply option #%d", k)
 		}
 	}
 
 	var (
-		tenantInCfg    bool
-		found          bool
-		name, provider string
+		tenantInCfg bool
+		found       bool
+		provider    string
 	)
 
-	tenantInCfg, currentTenant := findParametersOfTenant(opts.TenantName)
+	tenantName, xerr := options.Value[string](opts, "Tenant")
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if tenantName == "" {
+		return nil, fail.InconsistentError("scope.Tenant cannot be an empty string")
+	}
+
+	tenantInCfg, currentTenant := findParametersOfTenant(tenantName)
 	if tenantInCfg {
 		provider = findProviderFromTenantParameters(currentTenant)
 		if provider == "" {
-			return NullService(), fail.NotFoundError("failed to find Provider used by Tenant '%s'; check its parameters", opts.TenantName)
-
+			return NullService(), fail.NotFoundError("failed to find Provider used by Tenant '%s'; check its parameters", tenantName)
 		}
+
 		svcProviderProfile, xerr := findProfile(provider)
 		if xerr != nil {
-			return NullService(), fail.Wrap(xerr, "error initializing Tenant '%s' with Provider '%s'", opts.TenantName, provider)
+			return NullService(), fail.Wrap(xerr, "error initializing Tenant '%s' with Provider '%s'", tenantName, provider)
 		}
 
 		_, found = currentTenant["identity"].(map[string]interface{})
 		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'identity' found in currentTenant '%s', continuing.", name)
+			logrus.WithContext(ctx).Debugf("No section 'identity' found in Tenant '%s', continuing.", tenantName)
 		}
 		_, found = currentTenant["compute"].(map[string]interface{})
 		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'compute' found in currentTenant '%s', continuing.", name)
+			logrus.WithContext(ctx).Debugf("No section 'compute' found in Tenant '%s', continuing.", tenantName)
 		}
 		_, found = currentTenant["network"].(map[string]interface{})
 		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'network' found in currentTenant '%s', continuing.", name)
+			logrus.WithContext(ctx).Debugf("No section 'network' found in Tenant '%s', continuing.", tenantName)
 		}
 
 		_, tenantObjectStorageFound := currentTenant["objectstorage"]
@@ -172,14 +181,9 @@ func UseService(mutators ...options.Mutator) (newService iaasapi.Service, ferr f
 
 		// Initializes provider
 		var providerInstance iaasapi.Provider
-		referenceProviderInstance := svcProviderProfile.ReferenceInstance()
-		if svcProviderProfile.Capabilities().UseTerraformer {
-			providerInstance, xerr = referenceProviderInstance.Build(currentTenant, iaasoptions.BuildWithTerraformer(opts.TerraformerConfiguration))
-		} else {
-			providerInstance, xerr = referenceProviderInstance.Build(currentTenant)
-		}
+		providerInstance, xerr = svcProviderProfile.ReferenceInstance().Build(currentTenant, opts)
 		if xerr != nil {
-			return NullService(), fail.Wrap(xerr, "error initializing currentTenant '%s' on provider '%s'", opts.TenantName, provider)
+			return NullService(), fail.Wrap(xerr, "error initializing currentTenant '%s' on provider '%s'", tenantName, provider)
 		}
 
 		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
@@ -193,7 +197,7 @@ func UseService(mutators ...options.Mutator) (newService iaasapi.Service, ferr f
 
 		newS := &service{
 			Provider:     providerInstance,
-			tenantName:   opts.TenantName,
+			tenantName:   tenantName,
 			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 1 * time.Minute}))),
 		}
 
@@ -243,7 +247,7 @@ func UseService(mutators ...options.Mutator) (newService iaasapi.Service, ferr f
 				return NullService(), fail.Wrap(xerr, "error connecting to Object Storage location")
 			}
 		} else {
-			logrus.WithContext(ctx).Warnf("missing section 'objectstorage' in configuration file for currentTenant '%s'", opts.TenantName)
+			logrus.WithContext(ctx).Warnf("missing section 'objectstorage' in configuration file for Tenant '%s'", tenantName)
 		}
 
 		// Initializes Metadata Object Storage (maybe different from the Object Storage)
@@ -313,7 +317,7 @@ func UseService(mutators ...options.Mutator) (newService iaasapi.Service, ferr f
 			}
 			// logrus.WithContext(ctx).Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", iaasoptions.tenantName, metadataBucket.GetName())
 		} else {
-			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for currentTenant '%s'", opts.TenantName)
+			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for currentTenant '%s'", tenantName)
 		}
 
 		// service is ready
@@ -337,7 +341,7 @@ func UseService(mutators ...options.Mutator) (newService iaasapi.Service, ferr f
 		return newS, nil
 	}
 
-	return NullService(), fail.NotFoundError("no valid Tenant '%s' found in configuration", opts.TenantName)
+	return NullService(), fail.NotFoundError("no valid Tenant '%s' found in configuration", tenantName)
 }
 
 func findParametersOfTenant(tenant string) (bool, map[string]any) {

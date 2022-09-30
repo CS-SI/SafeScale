@@ -93,7 +93,7 @@ func New() iaasapi.Provider {
 }
 
 // Build builds a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}, _ ...options.Mutator) (iaasapi.Provider, fail.Error) {
+func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaasapi.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
 	identityCfg, ok := params["identity"].(map[string]interface{})
@@ -109,7 +109,10 @@ func (p *provider) Build(params map[string]interface{}, _ ...options.Mutator) (i
 	var networkName string
 	networkCfg, ok := params["network"].(map[string]interface{})
 	if ok {
-		networkName, _ = networkCfg["ProviderNetwork"].(string) // nolint
+		networkName, ok = networkCfg["ProviderNetwork"].(string) // nolint
+		if !ok {
+			return &provider{}, fail.InconsistentError("failed to cast 'networkCfg[\"ProviderNetwork\"]' to 'string'")
+		}
 	}
 	if networkName == "" {
 		networkName = "safescale"
@@ -147,28 +150,25 @@ func (p *provider) Build(params map[string]interface{}, _ ...options.Mutator) (i
 		Owners:      owners,
 	}
 
-	username, ok := identityCfg["Username"].(string) // nolint
-	if !ok || username == "" {
-		username, _ = identityCfg["Username"].(string) // nolint
+	username, _ := identityCfg["Username"].(string) // nolint
+	if username == "" {
+		return &provider{}, fail.SyntaxError("field 'Username' is missing or invalid")
 	}
 	password, _ := identityCfg["Password"].(string) // nolint
 
-	accessKeyID, ok := identityCfg["AccessKeyID"].(string)
-	if !ok || accessKeyID == "" {
+	accessKeyID, _ := identityCfg["AccessKeyID"].(string)
+	if accessKeyID == "" {
 		return &provider{}, fail.SyntaxError("field 'AccessKeyID' in section 'identity' not found in tenants.toml")
 	}
 
-	secretAccessKey, ok := identityCfg["SecretAccessKey"].(string) // nolint
-	if !ok || secretAccessKey == "" {
+	secretAccessKey, _ := identityCfg["SecretAccessKey"].(string) // nolint
+	if secretAccessKey == "" {
 		return &provider{}, fail.SyntaxError("no secret access key provided in tenants.toml")
 	}
 
 	identityEndpoint, _ := identityCfg["IdentityEndpoint"].(string) // nolint
 	if identityEndpoint == "" {
-		identityEndpoint, ok = identityCfg["auth_uri"].(string) // DEPRECATED: deprecated, kept until next release
-		if !ok || identityEndpoint == "" {
-			identityEndpoint = "https://iam.amazonaws.com"
-		}
+		identityEndpoint = "https://iam.amazonaws.com"
 	}
 
 	projectName, _ := computeCfg["ProjectName"].(string)   // nolint
@@ -180,8 +180,8 @@ func (p *provider) Build(params map[string]interface{}, _ ...options.Mutator) (i
 		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
 	}
 
-	operatorUsername, _ := computeCfg["OperatorUsername"].(string) // nolint
-	if operatorUsername == "" {
+	operatorUsername, ok := computeCfg["OperatorUsername"].(string) // nolint
+	if !ok || operatorUsername == "" {
 		operatorUsername = abstract.DefaultUser
 	}
 
@@ -214,8 +214,8 @@ func (p *provider) Build(params map[string]interface{}, _ ...options.Mutator) (i
 
 	metadataBucketName = strings.ReplaceAll(metadataBucketName, ".", "-")
 
-	customDNS, _ := computeCfg["DNS"].(string) // nolint
-	if customDNS != "" {
+	customDNS, ok := computeCfg["DNS"].(string) // nolint
+	if ok && customDNS != "" {
 		if strings.Contains(customDNS, ",") {
 			fragments := strings.Split(customDNS, ",")
 			for _, fragment := range fragments {

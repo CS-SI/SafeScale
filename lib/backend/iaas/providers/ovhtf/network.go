@@ -19,12 +19,14 @@ package ovhtf
 import (
 	"context"
 	"net"
+	"reflect"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
 
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -35,17 +37,21 @@ import (
 )
 
 const (
-	networkResourceSnippetPath = "snippets/resource_network.tf.template"
+	networkCreateResourceSnippetPath  = "snippets/resource_network_create.tf"
+	networkInspectResourceSnippetPath = "snippets/resource_network_inspect.tf"
 )
 
 type (
 	networkResource struct {
 		terraformer.ResourceCore
+		id string
 	}
 )
 
-func newNetworkResource(name string) terraformerapi.Resource {
-	out := &networkResource{terraformer.NewResourceCore(name, networkResourceSnippetPath)}
+func newNetworkResource(name string) *networkResource {
+	out := &networkResource{
+		ResourceCore: terraformer.NewResourceCore(name, networkCreateResourceSnippetPath),
+	}
 	return out
 }
 
@@ -53,6 +59,7 @@ func newNetworkResource(name string) terraformerapi.Resource {
 func (nr *networkResource) ToMap() map[string]any {
 	return map[string]any{
 		"Name": nr.Name(),
+		"ID":   nr.id,
 	}
 }
 
@@ -77,62 +84,26 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
-	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
-	if len(req.DNSServers) == 0 {
-		req.DNSServers = []string{"0.0.0.0"}
-	}
-
-	// Checks if CIDR is valid...
-	if req.CIDR != "" {
-		_, _, err := net.ParseCIDR(req.CIDR)
-		if err != nil {
-			return nil, fail.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
-		}
-	} else { // CIDR is empty, choose the first Class C one possible
-		tracer.Trace("CIDR is empty, choosing one...")
-		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
-	}
-
-	netRsc := newNetworkResource(req.Name)
-	summoner, xerr := p.Terraformer()
+	netRsc, xerr := defineNetworkResource(tracer, req)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = summoner.Build(netRsc)
+	summoner, xerr := p.Terraformer()
 	if xerr != nil {
 		return nil, xerr
 	}
 	// defer p.Terraformer().Clean()
 
-	// // We specify a name and that it should forward packets
-	// state := true
-	// basicOpts := networks.CreateOpts{
-	// 	Name:         req.Name,
-	// 	AdminStateUp: &state,
-	// }
-	//
-	// opts := portsecurity.NetworkCreateOptsExt{
-	// 	CreateOptsBuilder:   basicOpts,
-	// 	PortSecurityEnabled: gophercloud.Enabled,
-	// }
-	//
-	// // Creates the network
-	// var network *networks.Network
-	// xerr = stacks.RetryableRemoteCall(ctx,
-	// 	func() (innerErr error) {
-	// 		network, innerErr = networks.Create(s.NetworkClient, opts).Extract()
-	// 		return innerErr
-	// 	},
-	// 	NormalizeError,
-	// )
+	xerr = summoner.Build(netRsc)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	outputs, xerr := summoner.Apply(ctx)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to create network '%s'", req.Name)
 	}
-	_ = outputs
 
 	// Starting from here, delete network if exit with error
 	defer func() {
@@ -147,11 +118,37 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 	}()
 
 	newNet = abstract.NewNetwork()
-	// FIXME: how to recover outputs from terraform apply?
-	// newNet.ID = outputs.ID
-	// newNet.Name = outputs.Name
+	newNet.ID, xerr = unmarshalOutput[string](outputs["network_id"])
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "failed to recover network id")
+	}
+
+	newNet.Name = req.Name
 	newNet.CIDR = req.CIDR
 	return newNet, nil
+}
+
+func defineNetworkResource(tracer debug.Tracer, req abstract.NetworkRequest) (*networkResource, fail.Error) {
+	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
+	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
+	if len(req.DNSServers) == 0 {
+		req.DNSServers = []string{"0.0.0.0"}
+	}
+
+	// Checks if CIDR is valid...
+	if req.CIDR != "" {
+		_, _, err := net.ParseCIDR(req.CIDR)
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
+	} else { // CIDR is empty, choose the first Class C one possible
+		tracer.Trace("CIDR is empty, choosing one...")
+		req.CIDR = "192.168.1.0/24"
+		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
+	}
+
+	netRsc := newNetworkResource(req.Name)
+	return netRsc, nil
 }
 
 // InspectNetworkByName ...
@@ -165,44 +162,50 @@ func (p *provider) InspectNetworkByName(ctx context.Context, name string) (*abst
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
-	// FIXME: need to code this method
-	return nil, fail.NotFoundError()
+	netRsc := newNetworkResource(name)
+	summoner, xerr := p.Terraformer()
+	if xerr != nil {
+		return nil, xerr
+	}
 
-	/*
-		// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
-		r := networks.GetResult{}
-		xerr := stacks.RetryableRemoteCall(ctx,
-			func() error {
-				_, r.Err = s.ComputeClient.Get(s.NetworkClient.ServiceURL("networks?name="+name), &r.Body, &gophercloud.RequestOpts{
-					OkCodes: []int{200, 203},
-				})
-				return r.Err
-			},
-			NormalizeError,
-		)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrForbidden:
-				return nil, abstract.ResourceForbiddenError("network", name)
-			default:
-				return nil, fail.NewError("query for network '%s' failed: %v", name, r.Err)
-			}
-		}
+	xerr = summoner.Build(netRsc)
+	if xerr != nil {
+		return nil, xerr
+	}
 
-		nets, found := r.Body.(map[string]interface{})["networks"].([]interface{})
-		if found && len(nets) > 0 {
-			entry, ok := nets[0].(map[string]interface{})
-			if !ok {
-				return nil, fail.InvalidParameterError("Body['networks']", "is not a map[string]")
-			}
-			id, ok := entry["id"].(string)
-			if !ok {
-				return nil, fail.InvalidParameterError("entry['id']", "is not a string")
-			}
-			return s.InspectNetwork(ctx, id)
-		}
-		return nil, abstract.ResourceNotFoundError("network", name)
-	*/
+	outputs, success, xerr := summoner.Plan(ctx)
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "failed to inspect network '%s'", name)
+	}
+	if !success {
+		return nil, fail.NewError("failed to inspect network '%s'", name)
+	}
+
+	out := abstract.NewNetwork()
+	out.ID, xerr = unmarshalOutput[string](outputs["id"])
+	if xerr != nil {
+		return nil, xerr
+	}
+	out.Name, xerr = unmarshalOutput[string](outputs["name"])
+	if xerr != nil {
+		return nil, xerr
+	}
+	out.Tags, xerr = unmarshalOutput[map[string]string](outputs["tags"])
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return out, nil
+}
+
+func unmarshalOutput[T any](in tfexec.OutputMeta) (T, fail.Error) {
+	var out T
+	err := json.Unmarshal(in.Value, &out)
+	if err != nil {
+		return out, fail.Wrap(err, "failed to unmarshal '%s' value in '%s'", in.Type, reflect.TypeOf(out).String())
+	}
+
+	return out, nil
 }
 
 // InspectNetwork returns the network identified by id
@@ -216,40 +219,42 @@ func (p *provider) InspectNetwork(ctx context.Context, id string) (*abstract.Net
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-	return nil, fail.NotImplementedError()
+	netRsc := newNetworkResource("")
+	netRsc.id = id
 
-	/*
-		// If not found, we look for any network from provider
-		// 1st try with id
-		var network *networks.Network
-		xerr := stacks.RetryableRemoteCall(ctx,
-			func() (innerErr error) {
-				network, innerErr = networks.Get(s.NetworkClient, id).Extract()
-				return innerErr
-			},
-			NormalizeError,
-		)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// continue
-				debug.IgnoreError(xerr)
-			default:
-				return nil, xerr
-			}
-		}
-		if network != nil && network.ID != "" {
-			newNet := abstract.NewNetwork()
-			newNet.ID = network.ID
-			newNet.Name = network.Name
-			return newNet, nil
-		}
+	summoner, xerr := p.Terraformer()
+	if xerr != nil {
+		return nil, xerr
+	}
 
-		// At this point, no network has been found with given reference
-		errNotFound := abstract.ResourceNotFoundError("network", id)
-		// logrus.Debug(errNotFound)
-		return nil, errNotFound
-	*/
+	xerr = summoner.Build(netRsc)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	outputs, success, xerr := summoner.Plan(ctx)
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "failed to inspect network %s", id)
+	}
+	if !success {
+		return nil, fail.NewError("failed to inspect network '%s'", id)
+	}
+
+	out := abstract.NewNetwork()
+	out.ID, xerr = unmarshalOutput[string](outputs["id"])
+	if xerr != nil {
+		return nil, xerr
+	}
+	out.Name, xerr = unmarshalOutput[string](outputs["name"])
+	if xerr != nil {
+		return nil, xerr
+	}
+	out.Tags, xerr = unmarshalOutput[map[string]string](outputs["tags"])
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return out, nil
 }
 
 // ListNetworks lists available networks

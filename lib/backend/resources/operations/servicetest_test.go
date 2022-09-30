@@ -39,7 +39,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
@@ -101,7 +100,7 @@ var SHORTEN_TIMINGS = &temporal.MutableTimings{
 }
 
 type ServiceTest struct {
-	iaas.Service
+	iaasapi.Service
 	Name      string
 	internals ServiceTestInternals
 	memory    ServiceTestMemory

@@ -5,7 +5,7 @@ GO?=go
 all: generate
 
 generate: clean
-	@mkdir -p mocks || true
+	@(cd api && $(MAKE) $(@))
 	@(cd objectstorage && $(MAKE) $(@))
 	@(cd providers && $(MAKE) $(@))
 	@(cd userdata && $(MAKE) $(@))
@@ -15,8 +15,8 @@ vet:
 	@$(GO) vet ./...
 
 clean:
+	@(cd api && $(MAKE) $(@))
 	@(cd objectstorage && $(MAKE) $(@))
 	@(cd providers && $(MAKE) $(@))
 	@(cd userdata && $(MAKE) $(@))
 	@(cd stacks && $(MAKE) $(@))
-	@$(RM) ./mocks/mock_*.go || true

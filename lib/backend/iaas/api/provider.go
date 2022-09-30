@@ -34,7 +34,7 @@ type Provider interface {
 	Stack
 
 	// Build builds a new Client from configuration parameter and can be called from nil
-	Build(params map[string]interface{}, options ...options.Mutator) (Provider, fail.Error)
+	Build(params map[string]interface{}, opts options.Options) (Provider, fail.Error)
 
 	// ListImages lists available OS images, all bool is unused here but used at upper levels to filter using whitelists and blacklists
 	ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error)

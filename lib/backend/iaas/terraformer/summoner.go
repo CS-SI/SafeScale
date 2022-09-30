@@ -176,7 +176,7 @@ func (instance *summoner) Build(resources ...terraformerapi.Resource) (ferr fail
 }
 
 // realizeTemplate generates a file from box template with variables updated
-func (instance summoner) realizeTemplate(efs embed.FS, filename string, vars map[string]interface{}) (string, fail.Error) {
+func (instance summoner) realizeTemplate(efs embed.FS, filename string, vars map[string]any) (string, fail.Error) {
 	tmplString, err := efs.ReadFile(filename)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
@@ -203,7 +203,7 @@ func (instance summoner) realizeTemplate(efs embed.FS, filename string, vars map
 const mainFilename = "main.tf"
 
 // createFile creates the file in the appropriate path for terraform to execute it
-func (instance summoner) createMainFile(content string) fail.Error {
+func (instance *summoner) createMainFile(content string) fail.Error {
 	if instance.lastBuildPath != "" {
 		return fail.InvalidRequestError("trying to create a new main.tf file without having cleaned up the Summoner environment")
 	}
@@ -214,7 +214,12 @@ func (instance summoner) createMainFile(content string) fail.Error {
 	}
 
 	instance.lastBuildPath = filepath.Join(instance.config.WorkDir, uuid.String(), mainFilename)
-	err = ioutil.WriteFile(instance.lastBuildPath, []byte(content), 0)
+	err = os.MkdirAll(filepath.Dir(instance.lastBuildPath), 0700)
+	if err != nil {
+		return fail.Wrap(err, "failed to create temporary folder")
+	}
+
+	err = ioutil.WriteFile(instance.lastBuildPath, []byte(content), 0600)
 	if err != nil {
 		return fail.Wrap(err, "failed to create terraform file '%s'", instance.lastBuildPath)
 	}
@@ -227,9 +232,9 @@ func (instance summoner) createMainFile(content string) fail.Error {
 //   - false, fail.Error if an error occurred
 //   - false, nil if no error occurred and no change would be made
 //   - true, nil if no error occurred and changes would be made
-func (instance *summoner) Plan(ctx context.Context) (bool, fail.Error) {
+func (instance *summoner) Plan(ctx context.Context) (map[string]tfexec.OutputMeta, bool, fail.Error) {
 	if valid.IsNull(instance) {
-		return false, fail.InvalidInstanceError()
+		return nil, false, fail.InvalidInstanceError()
 	}
 
 	instance.mu.Lock()
@@ -237,24 +242,29 @@ func (instance *summoner) Plan(ctx context.Context) (bool, fail.Error) {
 
 	tf, err := tfexec.NewTerraform(instance.config.WorkDir, instance.config.ExecPath)
 	if err != nil {
-		return false, fail.Wrap(err, "failed to instantiate terraform executor")
+		return nil, false, fail.Wrap(err, "failed to instantiate terraform executor")
 	}
 
 	err = tf.Init(ctx, tfexec.Upgrade(true))
 	if err != nil {
-		return false, fail.Wrap(err, "failed to init terraform executor")
+		return nil, false, fail.Wrap(err, "failed to init terraform executor")
 	}
 
-	out, err := tf.Plan(ctx)
+	success, err := tf.Plan(ctx)
 	if err != nil {
-		return false, fail.Wrap(err, "failed to apply terraform")
+		return nil, false, fail.Wrap(err, "failed to apply terraform")
 	}
 
-	return out, nil
+	outputs, err := tf.Output(ctx)
+	if err != nil {
+		return nil, false, fail.Wrap(err, "failed to gather terraform outputs")
+	}
+
+	return outputs, success, nil
 }
 
 // Apply calls the terraform Apply command to operate changes
-func (instance *summoner) Apply(ctx context.Context) (any, fail.Error) {
+func (instance *summoner) Apply(ctx context.Context) (map[string]tfexec.OutputMeta, fail.Error) {
 	if valid.IsNull(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -262,7 +272,7 @@ func (instance *summoner) Apply(ctx context.Context) (any, fail.Error) {
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
-	tf, err := tfexec.NewTerraform(instance.config.WorkDir, instance.config.ExecPath)
+	tf, err := tfexec.NewTerraform(filepath.Dir(instance.lastBuildPath), instance.config.ExecPath)
 	if err != nil {
 		return nil, fail.Wrap(err, "failed to instanciate terraform executor")
 	}

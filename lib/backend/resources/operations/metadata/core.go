@@ -116,7 +116,7 @@ func (myself *Core) IsNull() bool {
 	return myself == nil || myself.kind == ""
 }
 
-// Service returns the iaas.Service used to create/load the persistent object
+// Service returns the iaasapi.Service used to create/load the persistent object
 func (myself *Core) Service() iaasapi.Service {
 	return myself.folder.Service()
 }

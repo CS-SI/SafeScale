@@ -58,10 +58,10 @@ func (s Remediator) ConfigurationOptions() (iaasoptions.Configuration, fail.Erro
 	return s.Provider.ConfigurationOptions()
 }
 
-func (s Remediator) Build(m map[string]interface{}, opts ...options.Mutator) (_ iaasapi.Provider, ferr fail.Error) {
+func (s Remediator) Build(m map[string]interface{}, opts options.Options) (_ iaasapi.Provider, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	build, xerr := s.Provider.Build(m, opts...)
+	build, xerr := s.Provider.Build(m, opts)
 	return build, xerr
 }
 

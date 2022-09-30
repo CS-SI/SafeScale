@@ -164,6 +164,7 @@ func NewTenantHandler(job job.Job) TenantHandler {
 }
 
 // Inspect displays tenant configuration
+// FIXME: job now knows the tenant to inspect, not more needed to pass tenantName as parameter...
 func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInspectResponse, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -171,6 +172,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		}
 	}()
 	defer fail.OnPanic(&ferr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -186,13 +188,13 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
-	currentName, err := svc.GetName()
-	if err != nil {
-		return nil, err
-	}
-	if tenantName != currentName {
-		return nil, fail.NewError("we only inspect current tenant right now")
-	}
+	// currentName, err := svc.GetName()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if tenantName != currentName {
+	// 	return nil, fail.NewError("we only inspect current tenant right now")
+	// }
 
 	ctx := handler.job.Context()
 
@@ -289,7 +291,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		blacklistImageRegexp = configOpts.BlacklistImageRegexp.String()
 	}
 
-	return &protocol.TenantInspectResponse{
+	out := &protocol.TenantInspectResponse{
 		Name:     svcName,
 		Provider: provName,
 		Identity: &protocol.TenantIdentity{
@@ -332,10 +334,12 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 			BucketName: bucket.GetName(),
 			Crypt:      fromParams(params, "metadata", "CryptKey") != "",
 		},
-	}, nil
+	}
+	return out, nil
 }
 
 // Scan scans the tenant and updates the database
+// FIXME: job now knows the tenant to scan, no need to pass it as parameter
 func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -365,7 +369,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		return nil, err
 	}
 	if !isScannable {
-		return nil, fail.ForbiddenError("tenant is not scannable")
+		return nil, fail.ForbiddenError("tenant is not defined as scannable")
 	}
 
 	if isDryRun {
@@ -517,7 +521,6 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 }
 
 func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (ferr fail.Error) {
-
 	svc := handler.job.Service()
 	task := handler.job.Task()
 	tenantName, xerr := svc.GetName()

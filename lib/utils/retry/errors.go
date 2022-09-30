@@ -43,6 +43,7 @@ func TimeoutError(err error, limit time.Duration, actual time.Duration, options 
 			case "callstack":
 				// no panics if value is not a bool
 				decorate, _ = v.Value().(bool) // nolint
+			default:
 			}
 		}
 	}

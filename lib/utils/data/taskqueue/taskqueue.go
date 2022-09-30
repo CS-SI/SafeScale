@@ -91,23 +91,25 @@ func (e *TaskQueue) Push(f func() (interface{}, fail.Error), timeout time.Durati
 
 }
 
-// Return max size of task queue
+// Size returns max size of task queue
 func (e *TaskQueue) Size() uint {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
 	return e.size
 }
 
-// Return current size of task queue
+// Length returns current size of task queue
 func (e *TaskQueue) Length() uint {
 	// queue updated by slice trunk, Rlock does not lock slice read,
 	// but queue replace => makes late update with deprecated data
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
 	return uint(len(e.queue))
 }
 
-// Return when taskqueue is empty
+// Drain returns when taskqueue is empty
 func (e *TaskQueue) Drain() {
 	length := e.Length()
 	if length > 0 {
@@ -125,7 +127,7 @@ func (e *TaskQueue) Drain() {
 	}
 }
 
-// Called when queue is empty
+// unsafeDrain called when queue is empty
 func (e *TaskQueue) unsafeDrain() {
 	// Drain
 	_, ok := e.handlers["drain"]

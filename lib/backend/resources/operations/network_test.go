@@ -30,19 +30,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/stretchr/testify/require"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	serializer "github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_NewNetwork(t *testing.T) {
 
-	var svc iaas.Service
+	var svc iaasapi.Service
 	_, err := NewNetwork(svc)
 	require.Contains(t, err.Error(), "invalid parameter: svc")
 
@@ -68,7 +68,7 @@ func Test_NewNetwork(t *testing.T) {
 
 func Test_LoadNetwork(t *testing.T) {
 
-	var svc iaas.Service
+	var svc iaasapi.Service
 	ctx := context.Background()
 
 	network, err := LoadNetwork(ctx, svc, "mynetwork")

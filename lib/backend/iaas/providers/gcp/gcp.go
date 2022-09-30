@@ -70,7 +70,7 @@ func (p *provider) IsNull() bool {
 }
 
 // Build builds a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}, _ ...options.Mutator) (iaasapi.Provider, fail.Error) {
+func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaasapi.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string) // nolint
 
 	identityCfg, ok := params["identity"].(map[string]interface{})

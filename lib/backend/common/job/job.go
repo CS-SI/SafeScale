@@ -157,7 +157,7 @@ func New(ctx context.Context, cancel context.CancelFunc, scope Scope) (_ *job, f
 	}
 
 	svcOptions := []options.Mutator{
-		iaasoptions.BuildWithTenant(scope.Tenant),
+		iaasoptions.BuildWithScope(scope.Organization, scope.Project, scope.Tenant),
 	}
 	if providerProfile.Capabilities().UseTerraformer {
 		config, xerr := prepareTerraformerConfiguration(providerProfile, scope)

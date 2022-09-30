@@ -19,15 +19,17 @@ package tenant
 import (
 	"sync/atomic"
 
+	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 )
 
 // Tenant structure to handle name and Service for a tenant
 type Tenant struct {
 	Name    string
-	Service iaas.Service
+	Service iaasapi.Service
 }
 
 // currentTenant contains the current tenant
@@ -37,7 +39,7 @@ var currentTenant atomic.Value
 func GetCurrentTenant() *Tenant {
 	anon := currentTenant.Load()
 	if anon == nil {
-		tenants, err := iaas.GetTenants()
+		tenants, err := factory.GetTenants()
 		if err != nil || len(tenants) != 1 {
 			return nil
 		}
@@ -50,7 +52,7 @@ func GetCurrentTenant() *Tenant {
 				logrus.Warnf("tenant name MUST be a string, it's not: %v", tenant["name"])
 				continue
 			}
-			service, err := iaas.UseService(iaas.WithTenant(name) /*, operations.MinimumMetadataVersion*/)
+			service, err := factory.UseService(iaasoptions.BuildWithScope(name) /*, operations.MinimumMetadataVersion*/)
 			if err != nil {
 				return nil
 			}
@@ -70,7 +72,7 @@ func SetCurrentTenant(tenantName string) error {
 		return nil
 	}
 
-	service, err := iaas.UseService(iaas.WithTenant(tenantName) /*, operations.MinimumMetadataVersion*/)
+	service, err := factory.UseService(iaasoptions.BuildWithScope(tenantName) /*, operations.MinimumMetadataVersion*/)
 	if err != nil {
 		return err
 	}
