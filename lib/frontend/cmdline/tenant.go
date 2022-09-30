@@ -20,9 +20,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -37,7 +37,7 @@ func (t tenantConsumer) List(timeout time.Duration) (*protocol.TenantList, error
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -60,7 +60,7 @@ func (t tenantConsumer) Get(timeout time.Duration) (*protocol.TenantNameResponse
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -82,7 +82,7 @@ func (t tenantConsumer) Set(name string, timeout time.Duration) error {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -105,7 +105,7 @@ func (t tenantConsumer) Inspect(name string, timeout time.Duration) (*protocol.T
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failure retrieving context")
 	}
@@ -118,8 +118,13 @@ func (t tenantConsumer) Inspect(name string, timeout time.Duration) (*protocol.T
 		newCtx = aCtx
 	}
 
+	req := &protocol.TenantInspectRequest{
+		Organization: t.session.currentOrganization,
+		Project:      t.session.currentProject,
+		Name:         name,
+	}
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	return service.Inspect(newCtx, &protocol.TenantInspectRequest{Name: name})
+	return service.Inspect(newCtx, req)
 }
 
 // Cleanup ...
@@ -127,7 +132,7 @@ func (t tenantConsumer) Cleanup(name string, timeout time.Duration) error {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -140,8 +145,14 @@ func (t tenantConsumer) Cleanup(name string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
+	req := &protocol.TenantCleanupRequest{
+		Organization: t.session.currentOrganization,
+		Project:      t.session.currentProject,
+		Name:         name,
+		Force:        false,
+	}
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	_, err := service.Cleanup(newCtx, &protocol.TenantCleanupRequest{Name: name, Force: false})
+	_, err := service.Cleanup(newCtx, req)
 	return err
 }
 
@@ -150,7 +161,7 @@ func (t tenantConsumer) Scan(name string, dryRun bool, templates []string, timeo
 	t.session.Connect()
 	defer t.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -163,8 +174,15 @@ func (t tenantConsumer) Scan(name string, dryRun bool, templates []string, timeo
 		newCtx = aCtx
 	}
 
+	req := &protocol.TenantScanRequest{
+		Organization: t.session.currentOrganization,
+		Project:      t.session.currentProject,
+		Name:         name,
+		DryRun:       dryRun,
+		Templates:    templates,
+	}
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	results, err := service.Scan(newCtx, &protocol.TenantScanRequest{Name: name, DryRun: dryRun, Templates: templates})
+	results, err := service.Scan(newCtx, req)
 	return results, err
 }
 
@@ -174,7 +192,7 @@ func (t tenantConsumer) Scan(name string, dryRun bool, templates []string, timeo
 // 	t.session.Connect()
 // 	defer t.session.Disconnect()
 //
-// 	ctx, xerr := utils.GetContext(true)
+// 	ctx, xerr := common.ContextForGRPC(true)
 // 	if xerr != nil {
 // 		return nil, xerr
 // 	}

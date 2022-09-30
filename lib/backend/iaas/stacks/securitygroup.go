@@ -17,6 +17,7 @@
 package stacks
 
 import (
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupruledirection"
@@ -29,11 +30,8 @@ import (
 //	DefaultSecurityGroupDescription string = "Default Security Group for SafeScale resources"
 // )
 
-// SecurityGroupParameter can represent a Security Group by a string as ID or an *abstract.SecurityGroup
-type SecurityGroupParameter interface{}
-
 // ValidateSecurityGroupParameter validates securitygroup parameter that can be a string as ID or an *abstract.SecurityGroup
-func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstract.SecurityGroup, sgLabel string, _ fail.Error) {
+func ValidateSecurityGroupParameter(sgParam iaasapi.SecurityGroupParameter) (asg *abstract.SecurityGroup, sgLabel string, _ fail.Error) {
 	asg = abstract.NewSecurityGroup()
 	switch sgParam := sgParam.(type) {
 	case string:

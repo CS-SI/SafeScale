@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -42,7 +42,7 @@ func (sg securityGroupConsumer) List(all bool, timeout time.Duration) (*protocol
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -55,8 +55,14 @@ func (sg securityGroupConsumer) List(all bool, timeout time.Duration) (*protocol
 		newCtx = aCtx
 	}
 
+	req := &protocol.SecurityGroupListRequest{
+		Organization: sg.session.currentOrganization,
+		Project:      sg.session.currentProject,
+		TenantId:     sg.session.currentTenant,
+		All:          all,
+	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	rv, err := service.List(newCtx, &protocol.SecurityGroupListRequest{All: all})
+	rv, err := service.List(newCtx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +74,7 @@ func (sg securityGroupConsumer) Inspect(ref string, timeout time.Duration) (*pro
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -81,8 +87,14 @@ func (sg securityGroupConsumer) Inspect(ref string, timeout time.Duration) (*pro
 		newCtx = aCtx
 	}
 
+	req := &protocol.Reference{
+		Organization: sg.session.currentOrganization,
+		Project:      sg.session.currentProject,
+		TenantId:     sg.session.currentTenant,
+		Name:         ref,
+	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	rv, err := service.Inspect(newCtx, &protocol.Reference{Name: ref})
+	rv, err := service.Inspect(newCtx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +106,7 @@ func (sg securityGroupConsumer) Create(networkRef string, req abstract.SecurityG
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -108,7 +120,12 @@ func (sg securityGroupConsumer) Create(networkRef string, req abstract.SecurityG
 	}
 
 	protoRequest := &protocol.SecurityGroupCreateRequest{
-		Network:     &protocol.Reference{Name: networkRef},
+		Network: &protocol.Reference{
+			Organization: sg.session.currentOrganization,
+			Project:      sg.session.currentProject,
+			TenantId:     sg.session.currentTenant,
+			Name:         networkRef,
+		},
 		Name:        req.Name,
 		Description: req.Description,
 		Rules:       converters.SecurityGroupRulesFromAbstractToProtocol(req.Rules),
@@ -119,11 +136,11 @@ func (sg securityGroupConsumer) Create(networkRef string, req abstract.SecurityG
 		return nil, err
 	}
 
-	rv, err := converters.SecurityGroupFromProtocolToAbstract(resp)
+	abstractNetwork, err := converters.SecurityGroupFromProtocolToAbstract(resp)
 	if err != nil {
 		return nil, err
 	}
-	return rv, nil
+	return abstractNetwork, nil
 }
 
 // Delete deletes several hosts at the same time in goroutines
@@ -131,7 +148,7 @@ func (sg securityGroupConsumer) Delete(names []string, force bool, timeout time.
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -156,8 +173,14 @@ func (sg securityGroupConsumer) Delete(names []string, force bool, timeout time.
 		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
+
 		req := &protocol.SecurityGroupDeleteRequest{
-			Group: &protocol.Reference{Name: aname},
+			Group: &protocol.Reference{
+				Organization: sg.session.currentOrganization,
+				Project:      sg.session.currentProject,
+				TenantId:     sg.session.currentTenant,
+				Name:         aname,
+			},
 			Force: force,
 		}
 		_, err := service.Delete(newCtx, req)
@@ -185,7 +208,7 @@ func (sg securityGroupConsumer) Clear(ref string, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -198,11 +221,18 @@ func (sg securityGroupConsumer) Clear(ref string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
+	req := &protocol.Reference{
+		Organization: sg.session.currentOrganization,
+		Project:      sg.session.currentProject,
+		TenantId:     sg.session.currentTenant,
+		Name:         ref,
+	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	_, err := service.Clear(newCtx, &protocol.Reference{Name: ref})
+	_, err := service.Clear(newCtx, req)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -211,7 +241,7 @@ func (sg securityGroupConsumer) Reset(ref string, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -224,8 +254,14 @@ func (sg securityGroupConsumer) Reset(ref string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
+	req := &protocol.Reference{
+		Organization: sg.session.currentOrganization,
+		Project:      sg.session.currentProject,
+		TenantId:     sg.session.currentTenant,
+		Name:         ref,
+	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	_, err := service.Reset(newCtx, &protocol.Reference{Name: ref})
+	_, err := service.Reset(newCtx, req)
 	if err != nil {
 		return err
 	}
@@ -237,7 +273,7 @@ func (sg securityGroupConsumer) AddRule(group string, rule *abstract.SecurityGro
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -250,11 +286,16 @@ func (sg securityGroupConsumer) AddRule(group string, rule *abstract.SecurityGro
 		newCtx = aCtx
 	}
 
-	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	req := &protocol.SecurityGroupRuleRequest{
-		Group: &protocol.Reference{Name: group},
-		Rule:  converters.SecurityGroupRuleFromAbstractToProtocol(rule),
+		Group: &protocol.Reference{
+			Organization: sg.session.currentOrganization,
+			Project:      sg.session.currentProject,
+			TenantId:     sg.session.currentTenant,
+			Name:         group,
+		},
+		Rule: converters.SecurityGroupRuleFromAbstractToProtocol(rule),
 	}
+	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	_, err := service.AddRule(newCtx, req)
 	if err != nil {
 		return err
@@ -267,7 +308,7 @@ func (sg securityGroupConsumer) DeleteRule(group string, rule *abstract.Security
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -280,12 +321,17 @@ func (sg securityGroupConsumer) DeleteRule(group string, rule *abstract.Security
 		newCtx = aCtx
 	}
 
-	def := &protocol.SecurityGroupRuleDeleteRequest{
-		Group: &protocol.Reference{Name: group},
-		Rule:  converters.SecurityGroupRuleFromAbstractToProtocol(rule),
+	req := &protocol.SecurityGroupRuleDeleteRequest{
+		Group: &protocol.Reference{
+			Organization: sg.session.currentOrganization,
+			Project:      sg.session.currentProject,
+			TenantId:     sg.session.currentTenant,
+			Name:         group,
+		},
+		Rule: converters.SecurityGroupRuleFromAbstractToProtocol(rule),
 	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	_, err := service.DeleteRule(newCtx, def)
+	_, err := service.DeleteRule(newCtx, req)
 	if err != nil {
 		return err
 	}
@@ -297,7 +343,7 @@ func (sg securityGroupConsumer) Bonds(group, kind string, timeout time.Duration)
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -311,13 +357,19 @@ func (sg securityGroupConsumer) Bonds(group, kind string, timeout time.Duration)
 	}
 
 	req := &protocol.SecurityGroupBondsRequest{
-		Target: &protocol.Reference{Name: group},
-		Kind:   strings.ToLower(kind),
+		Target: &protocol.Reference{
+			Organization: sg.session.currentOrganization,
+			Project:      sg.session.currentProject,
+			TenantId:     sg.session.currentTenant,
+			Name:         group,
+		},
+		Kind: strings.ToLower(kind),
 	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	rv, err := service.Bonds(newCtx, req)
+	resp, err := service.Bonds(newCtx, req)
 	if err != nil {
 		return nil, err
 	}
-	return rv, nil
+
+	return resp, nil
 }

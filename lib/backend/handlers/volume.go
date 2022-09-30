@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumeproperty"
@@ -57,11 +57,11 @@ type VolumeHandler interface {
 
 // volumeHandler volume service
 type volumeHandler struct {
-	job backend.Job
+	job job.Job
 }
 
 // NewVolumeHandler creates a Volume service
-func NewVolumeHandler(job backend.Job) VolumeHandler {
+func NewVolumeHandler(job job.Job) VolumeHandler {
 	return &volumeHandler{job: job}
 }
 

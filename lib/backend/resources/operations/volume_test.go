@@ -1,3 +1,6 @@
+//go:build fixme
+// +build fixme
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -21,7 +24,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
@@ -39,7 +41,7 @@ func volumeRequest() abstract.VolumeRequest {
 
 func Test_NewVolume(t *testing.T) {
 
-	var svc iaas.Service
+	var svc iaasapi.Service
 	_, err := NewVolume(svc)
 	require.Contains(t, err.Error(), "invalid parameter: svc")
 
@@ -65,7 +67,7 @@ func Test_NewVolume(t *testing.T) {
 
 func Test_LoadVolume(t *testing.T) {
 
-	var svc iaas.Service
+	var svc iaasapi.Service
 	ctx := context.Background()
 
 	volume, err := LoadVolume(ctx, svc, "MyVolume")

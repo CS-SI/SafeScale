@@ -30,8 +30,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/ssm"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -39,8 +39,8 @@ import (
 )
 
 type stack struct {
-	Config      *stackoptions.Configuration
-	AuthOptions *stackoptions.Authentication
+	Config      *iaasoptions.Configuration
+	AuthOptions *iaasoptions.Authentication
 	AwsConfig   *stacks.AWSConfiguration
 
 	S3Service      *s3.S3
@@ -67,25 +67,25 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // ConfigurationOptions ...
-func (s *stack) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+func (s *stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 	if valid.IsNil(s) {
-		return stackoptions.Configuration{}, fail.InvalidInstanceError()
+		return iaasoptions.Configuration{}, fail.InvalidInstanceError()
 	}
 
 	return *s.Config, nil
 }
 
 // AuthenticationOptions ...
-func (s *stack) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
+func (s *stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
 	if valid.IsNil(s) {
-		return stackoptions.Authentication{}, fail.InvalidInstanceError()
+		return iaasoptions.Authentication{}, fail.InvalidInstanceError()
 	}
 
 	return *s.AuthOptions, nil
 }
 
 // New creates and initializes an AWS stack
-func New(auth stackoptions.Authentication, localCfg stacks.AWSConfiguration, cfg stackoptions.Configuration) (*stack, error) { // nolint
+func New(auth iaasoptions.Authentication, localCfg stacks.AWSConfiguration, cfg iaasoptions.Configuration) (*stack, error) { // nolint
 	if localCfg.Ec2Endpoint == "" {
 		localCfg.Ec2Endpoint = fmt.Sprintf("https://ec2.%s.amazonaws.com", localCfg.Region)
 	}

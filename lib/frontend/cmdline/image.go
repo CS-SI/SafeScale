@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 )
 
@@ -33,8 +33,8 @@ type imageConsumer struct {
 func (img imageConsumer) List(all bool, timeout time.Duration) (*protocol.ImageList, error) {
 	img.session.Connect()
 	defer img.session.Disconnect()
-	service := protocol.NewImageServiceClient(img.session.connection)
-	ctx, xerr := utils.GetContext(true)
+
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -47,5 +47,12 @@ func (img imageConsumer) List(all bool, timeout time.Duration) (*protocol.ImageL
 		newCtx = aCtx
 	}
 
-	return service.List(newCtx, &protocol.ImageListRequest{All: all})
+	req := &protocol.ImageListRequest{
+		Organization: img.session.currentOrganization,
+		Project:      img.session.currentProject,
+		TenantId:     img.session.currentTenant,
+		All:          all,
+	}
+	service := protocol.NewImageServiceClient(img.session.connection)
+	return service.List(newCtx, req)
 }

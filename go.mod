@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
+	github.com/MichaelS11/go-file-lock v0.1.0
 	github.com/antihax/optional v1.0.0
 	github.com/aws/aws-sdk-go v1.44.94
 	github.com/davecgh/go-spew v1.1.1
@@ -57,7 +58,7 @@ require (
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.95.0
 	google.golang.org/grpc v1.49.0
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/protobuf v1.28.1
 	gopkg.in/fsnotify.v1 v1.4.7
 )
 

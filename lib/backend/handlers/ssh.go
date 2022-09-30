@@ -25,10 +25,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -39,7 +39,7 @@ import (
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/subnet"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -48,6 +48,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 const protocolSeparator = ":"
@@ -60,23 +61,23 @@ const protocolSeparator = ":"
 type SSHHandler interface {
 	Run(hostname, cmd string) (int, string, string, fail.Error)
 	Copy(from string, to string) (int, string, string, fail.Error)
-	GetConfig(stacks.HostParameter) (api.Connector, fail.Error)
+	GetConfig(iaasapi.HostParameter) (sshapi.Connector, fail.Error)
 }
 
 // FIXME: ROBUSTNESS All functions MUST propagate context
 
 // sshHandler SSH service
 type sshHandler struct {
-	job backend.Job
+	job job.Job
 }
 
 // NewSSHHandler ...
-func NewSSHHandler(job backend.Job) SSHHandler {
+func NewSSHHandler(job job.Job) SSHHandler {
 	return &sshHandler{job: job}
 }
 
 // GetConfig creates Profile to connect to a host
-func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Connector, ferr fail.Error) {
+func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.Connector, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -300,7 +301,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 }
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
-func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeout time.Duration) (ferr fail.Error) {
+func (handler *sshHandler) WaitServerReady(hostParam iaasapi.HostParameter, timeout time.Duration) (ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -424,10 +425,10 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 }
 
 // run executes command on the host
-func (handler *sshHandler) runWithTimeout(ssh api.Connector, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+func (handler *sshHandler) runWithTimeout(ssh sshapi.Connector, cmd string, duration time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
 	const invalid = -1
 
-	var sshCmd api.Command
+	var sshCmd sshapi.Command
 	var xerr fail.Error
 	defer func() {
 		if sshCmd != nil {
@@ -642,7 +643,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 				crcCtx := handler.job.Task().Context()
 
-				var crcCmd api.Command
+				var crcCmd sshapi.Command
 				var finnerXerr fail.Error
 				defer func() {
 					if crcCmd != nil {

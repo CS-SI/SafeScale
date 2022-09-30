@@ -17,18 +17,19 @@
 package providers
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 )
 
 // Profile contains Provider profile
 type Profile struct {
-	capabilities       Capabilities                   // contains capabilities of the provider
-	metrics            *Metrics                       // contains the metric of the provider, all instances combined
-	referenceInstance  func() Provider                // contains a reference provider from which we can call Build
-	terraformProviders []terraformer.RequiredProvider // contains the provider(s) to require in terraform HCL
+	capabilities       iaasapi.Capabilities             // contains capabilities of the provider
+	metrics            *Metrics                         // contains the metric of the provider, all instances combined
+	referenceInstance  func() iaasapi.Provider          // contains a reference provider from which we can call Build
+	terraformProviders terraformerapi.RequiredProviders // contains the provider(s) to require in terraform HCL
 }
 
-func NewProfile(caps Capabilities, referenceInstance func() Provider, terraformProviders []terraformer.RequiredProvider) *Profile {
+func NewProfile(caps iaasapi.Capabilities, referenceInstance func() iaasapi.Provider, terraformProviders map[string]terraformerapi.RequiredProvider) *Profile {
 	out := &Profile{
 		capabilities:       caps,
 		metrics:            NewMetrics(),
@@ -44,7 +45,7 @@ func (p Profile) IsNull() bool {
 }
 
 // Capabilities returns the capabilities of the provider
-func (p Profile) Capabilities() Capabilities {
+func (p Profile) Capabilities() iaasapi.Capabilities {
 	return p.capabilities
 }
 
@@ -53,10 +54,10 @@ func (p Profile) Metrics() Metrics {
 	return *p.metrics
 }
 
-func (p Profile) TerraformProviders() []terraformer.RequiredProvider {
+func (p Profile) TerraformProviders() terraformerapi.RequiredProviders {
 	return p.terraformProviders
 }
 
-func (p Profile) ReferenceInstance() Provider {
+func (p Profile) ReferenceInstance() iaasapi.Provider {
 	return p.referenceInstance()
 }

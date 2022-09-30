@@ -32,7 +32,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
@@ -105,7 +105,7 @@ type alterCommandCB func(string) string
 
 type worker struct {
 	mu        *sync.RWMutex
-	service   iaas.Service
+	service   iaasapi.Service
 	feature   *Feature
 	target    resources.Targetable
 	method    installmethod.Enum
@@ -1805,7 +1805,11 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 				sgRule := abstract.NewSecurityGroupRule()
 				sgRule.Direction = securitygroupruledirection.Ingress // Implicit for gateways
 				sgRule.EtherType = ipversion.IPv4
-				sgRule.Protocol, _ = r["protocol"].(string) // nolint
+				sgRule.Protocol, ok = r["protocol"].(string) // nolint
+				if !ok {
+					chRes <- result{fail.InconsistentError("failed to cast 'r[\"protocol\"]' to 'string'")}
+				}
+
 				sgRule.Sources = []string{"0.0.0.0/0"}
 				sgRule.Targets = []string{gwID}
 

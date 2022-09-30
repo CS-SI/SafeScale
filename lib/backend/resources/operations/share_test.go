@@ -1,3 +1,6 @@
+//go:build fixme
+// +build fixme
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -22,7 +25,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/require"
@@ -125,7 +127,7 @@ func TestShareIdentity_Replace(t *testing.T) {
 
 func Test_NewShare(t *testing.T) {
 
-	var svc iaas.Service
+	var svc iaasapi.Service
 
 	share, err := NewShare(svc)
 	require.Nil(t, share)

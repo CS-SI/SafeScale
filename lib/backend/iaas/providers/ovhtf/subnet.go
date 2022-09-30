@@ -20,13 +20,18 @@ import (
 	"context"
 	"net"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+)
+
+const (
+	createSubnetResourceSnippetPath = "snippets/resource_subnet_create.tf"
+	createRouterResourceSnippetPath = "snippets/resource_router_create.tf"
 )
 
 type subnetResource struct {
@@ -39,12 +44,8 @@ type subnetResource struct {
 	dnsNameServers []string
 }
 
-const (
-	subnetResourceSnippetPath = "snippets/resource_subnet.tf.template"
-)
-
 func newSubnetResource(name string) *subnetResource {
-	out := &subnetResource{ResourceCore: terraformer.NewResourceCore(name, subnetResourceSnippetPath)}
+	out := &subnetResource{ResourceCore: terraformer.NewResourceCore(name, createSubnetResourceSnippetPath)}
 	return out
 }
 
@@ -56,6 +57,25 @@ func (nr *subnetResource) ToMap() map[string]any {
 		"CIDR":       nr.cidr,
 		"IPVersion":  nr.ipVersion,
 		"DNSServers": nr.dnsNameServers,
+	}
+}
+
+type routerResource struct {
+	terraformer.ResourceCore
+
+	id string
+}
+
+func newRouterResource(name string) *routerResource {
+	out := &routerResource{ResourceCore: terraformer.NewResourceCore(name, createRouterResourceSnippetPath)}
+	return out
+}
+
+// ToMap returns a map of networkResource field to be used where needed
+func (rr *routerResource) ToMap() map[string]any {
+	return map[string]any{
+		"Name": rr.Name(),
+		"ID":   rr.id,
 	}
 }
 
@@ -104,14 +124,18 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		subnetRsc.dnsNameServers = req.DNSServers
 	}
 
-	if !p.configOptions.UseLayer3Networking {
-		// FIXME:
-		// noGateway := ""
-		// opts.GatewayIP = &noGateway
+	// FIXME: is it necessary?
+	// if !p.configOptions.UseLayer3Networking {
+	// 	// noGateway := ""
+	// 	// opts.GatewayIP = &noGateway
+	// }
+
+	summoner, xerr := p.Terraformer()
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	summoner := p.Terraformer()
-	xerr := summoner.Build()
+	xerr = summoner.Build(subnetRsc)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -121,75 +145,29 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		return nil, xerr
 	}
 
-	// FIXME:
-	_ = outputs
-	// subnetRsc.id = outputs.ID
+	// FIXME: think about it: not deleting may allow to rerun to finalize creation...
+	// defer func() {
+	// 	if ferr != nil {
+	// 		derr := summoner.Destroy(ctx)
+	// 		if derr != nil {
+	// 			_ = ferr.AddConsequence(derr)
+	// 		}
+	// 	}
+	// }()
 
-	// var subnet *subnets.Subnet
-	// // Execute the operation and get back a subnets.Subnet struct
-	// xerr := stacks.RetryableRemoteCall(ctx,
-	// 	func() (innerErr error) {
-	// 		subnet, innerErr = subnets.Create(s.NetworkClient, opts).Extract()
-	// 		return innerErr
-	// 	},
-	// 	NormalizeError,
-	// )
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	/*
-		// Starting from here, delete subnet if exit with error
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil {
-				derr := s.DeleteSubnet(context.Background(), subnet.ID)
-				if derr != nil {
-					wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", subnet.Name)
-					logrus.Error(wrapErr.Error())
-					_ = ferr.AddConsequence(wrapErr)
-				}
-			}
-		}()
+	out := &abstract.Subnet{
+		Name:      req.Name,
+		Network:   req.NetworkID,
+		IPVersion: req.IPVersion,
+		Domain:    req.Domain,
+		CIDR:      req.CIDR,
+	}
+	out.ID, xerr = unmarshalOutput[string](outputs["subnet_id"])
+	if xerr != nil {
+		return nil, xerr
+	}
 
-		if s.cfgOpts.UseLayer3Networking {
-			router, xerr := s.createRouter(ctx, RouterRequest{
-				Name:      subnet.ID,
-				NetworkID: s.ProviderNetworkID,
-			})
-			if xerr != nil {
-				return nil, fail.Wrap(xerr, "failed to create router '%s'", subnet.ID)
-			}
-
-			// Starting from here, delete router if exit with error
-			defer func() {
-				ferr = debug.InjectPlannedFail(ferr)
-				if ferr != nil {
-					derr := s.deleteRouter(context.Background(), router.ID)
-					if derr != nil {
-						wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", router.Name)
-						_ = ferr.AddConsequence(wrapErr)
-						logrus.Error(wrapErr.Error())
-					}
-				}
-			}()
-
-			xerr = s.addSubnetToRouter(ctx, router.ID, subnet.ID)
-			if xerr != nil {
-				return nil, fail.Wrap(xerr, "failed to add subnet '%s' to router '%s'", subnet.Name, router.Name)
-			}
-		}
-
-		out := &abstract.Subnet{
-			ID:        subnet.ID,
-			Name:      subnet.Name,
-			IPVersion: ToAbstractIPVersion(subnet.IPVersion),
-			CIDR:      subnet.CIDR,
-			Network:   subnet.NetworkID,
-			Domain:    req.Domain,
-		}
-		return out, nil
-	*/
-	return nil, fail.NotImplementedError()
+	return out, nil
 }
 
 func (p *provider) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {

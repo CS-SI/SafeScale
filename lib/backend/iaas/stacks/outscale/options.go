@@ -17,14 +17,14 @@
 package outscale
 
 import (
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // ConfigurationOptions ...
-func (s stack) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
-	out := stackoptions.Configuration{
+func (s stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
+	out := iaasoptions.Configuration{
 		ProviderNetwork:           "",
 		DNSServers:                s.Options.Compute.DNSList,
 		UseFloatingIP:             false,
@@ -56,8 +56,8 @@ func (s stack) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
 }
 
 // AuthenticationOptions ...
-func (s stack) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
-	return stackoptions.Authentication{
+func (s stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
+	return iaasoptions.Authentication{
 		IdentityEndpoint: s.Options.Compute.URL,
 		Username:         "",
 		UserID:           "",

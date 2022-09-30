@@ -1,5 +1,5 @@
-//go:build disabled
-// +build disabled
+//go:build fixme
+// +build fixme
 
 //FIXME: need to move NewServiceTest inside a package
 
@@ -27,7 +27,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
@@ -41,7 +40,7 @@ Solve it or give up for cover.
 */
 func Test_NewBucket(t *testing.T) {
 
-	var svc iaas.Service
+	var svc iaasapi.Service
 
 	bucket, err := NewBucket(svc)
 	require.Nil(t, bucket)
@@ -69,7 +68,7 @@ func Test_NewBucket(t *testing.T) {
 
 func Test_LoadBucket(t *testing.T) {
 
-	var svc iaas.Service
+	var svc iaasapi.Service
 	ctx := context.Background()
 
 	// Wrong service

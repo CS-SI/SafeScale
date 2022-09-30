@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
@@ -43,13 +43,13 @@ import (
 type folder struct {
 	// path contains the base path where to read/write record in Object Storage
 	path     string
-	service  iaas.Service
+	service  iaasapi.Service
 	crypt    bool
 	cryptKey *crypt.Key
 }
 
 // NewFolder creates a new Metadata folder object, ready to help access the metadata inside it
-func NewFolder(svc iaas.Service, path string) (*folder, fail.Error) {
+func NewFolder(svc iaasapi.Service, path string) (*folder, fail.Error) {
 	if svc == nil {
 		return &folder{}, fail.InvalidInstanceError()
 	}
@@ -80,7 +80,7 @@ func (instance *folder) IsNull() bool {
 }
 
 // Service returns the service used by the folder
-func (instance folder) Service() iaas.Service {
+func (instance folder) Service() iaasapi.Service {
 	return instance.service
 }
 

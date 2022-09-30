@@ -49,4 +49,4 @@ sdk_js: sdk
 force_sdk_js: sdk_js
 
 clean:
-	@($(RM) safescale.pb.go safescale_pb2.py ./python3/safescale_pb2.py ./python3/safescale_pb2_grpc.py ./javascript/* || true)
+	@($(RM) safescale.pb.go safescale_grpc.pb.go safescale_pb2.py ./python3/safescale_pb2.py ./python3/safescale_pb2_grpc.py ./javascript/* || true)

@@ -19,7 +19,7 @@ package feature
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -27,7 +27,7 @@ import (
 
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func New(ctx context.Context, svc iaas.Service, name string) (resources.Feature, fail.Error) {
+func New(ctx context.Context, svc iaasapi.Service, name string) (resources.Feature, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -54,6 +54,6 @@ func New(ctx context.Context, svc iaas.Service, name string) (resources.Feature,
 
 // NewEmbedded searches for an embedded feature called 'name' and initializes a new Feature object
 // with its content
-func NewEmbedded(ctx context.Context, svc iaas.Service, name string) (resources.Feature, fail.Error) {
+func NewEmbedded(ctx context.Context, svc iaasapi.Service, name string) (resources.Feature, fail.Error) {
 	return operations.NewEmbeddedFeature(ctx, svc, name)
 }

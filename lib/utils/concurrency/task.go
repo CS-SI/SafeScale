@@ -235,6 +235,21 @@ func TaskFromContextOrVoid(ctx context.Context) (Task, fail.Error) {
 	return nctx, nil
 }
 
+// TaskIDFromContext returns the task ID from the context
+func TaskIDFromContext(ctx context.Context) (string, fail.Error) {
+	task, xerr := TaskFromContext(ctx)
+	if xerr != nil {
+		return "", xerr
+	}
+
+	taskID, xerr := task.ID()
+	if xerr != nil {
+		return "", xerr
+	}
+
+	return taskID, nil
+}
+
 // NewTask creates a new instance of Task
 func NewTask() (Task, fail.Error) {
 	return newTask(context.Background(), nil)

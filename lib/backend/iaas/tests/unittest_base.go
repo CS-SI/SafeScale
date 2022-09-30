@@ -26,8 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/aws"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/huaweicloud"
@@ -53,12 +52,12 @@ import (
 
 // ServiceTester helper class to test clients
 type ServiceTester struct {
-	Service iaas.Service
+	Service iaasapi.Service
 }
 
 // VerifyStacks checks at compile that initialized tenants are valid stacks
 func (tester *ServiceTester) VerifyStacks(t *testing.T) {
-	var stack stacks.Stack
+	var stack iaasapi.Stack
 
 	stack = aws.NullStack()         // nolint
 	stack = gcp.NullStack()         // nolint

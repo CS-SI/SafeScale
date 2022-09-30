@@ -17,7 +17,7 @@
 package metadata
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage/bucket"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage/consul"
@@ -30,7 +30,7 @@ const (
 )
 
 // NewFolder creates a Folder corresponding to the method wanted
-func NewFolder(method string, svc iaas.Service, path string) (storage.Folder, fail.Error) {
+func NewFolder(method string, svc iaasapi.Service, path string) (storage.Folder, fail.Error) {
 	switch method {
 	case MethodObjectStorage:
 		return bucket.NewFolder(svc, path)

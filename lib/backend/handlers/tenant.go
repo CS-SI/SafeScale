@@ -28,11 +28,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -153,17 +153,18 @@ type TenantHandler interface {
 
 // tenantHandler service
 type tenantHandler struct {
-	job              backend.Job
+	job              job.Job
 	abstractSubnet   *abstract.Subnet
 	scannedHostImage *abstract.Image
 }
 
 // NewTenantHandler creates a scanner service
-func NewTenantHandler(job backend.Job) TenantHandler {
+func NewTenantHandler(job job.Job) TenantHandler {
 	return &tenantHandler{job: job}
 }
 
 // Inspect displays tenant configuration
+// FIXME: job now knows the tenant to inspect, not more needed to pass tenantName as parameter...
 func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInspectResponse, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -171,6 +172,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		}
 	}()
 	defer fail.OnPanic(&ferr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -186,13 +188,13 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
-	currentName, err := svc.GetName()
-	if err != nil {
-		return nil, err
-	}
-	if tenantName != currentName {
-		return nil, fail.NewError("we only inspect current tenant right now")
-	}
+	// currentName, err := svc.GetName()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if tenantName != currentName {
+	// 	return nil, fail.NewError("we only inspect current tenant right now")
+	// }
 
 	ctx := handler.job.Context()
 
@@ -270,7 +272,26 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return nil, err
 	}
 
-	return &protocol.TenantInspectResponse{
+	var (
+		whitelistTemplateRegexp string
+		blacklistTemplateRegexp string
+		whitelistImageRegexp    string
+		blacklistImageRegexp    string
+	)
+	if configOpts.WhitelistTemplateRegexp != nil {
+		whitelistTemplateRegexp = configOpts.WhitelistTemplateRegexp.String()
+	}
+	if configOpts.BlacklistTemplateRegexp != nil {
+		blacklistTemplateRegexp = configOpts.BlacklistTemplateRegexp.String()
+	}
+	if configOpts.WhitelistImageRegexp != nil {
+		whitelistImageRegexp = configOpts.WhitelistImageRegexp.String()
+	}
+	if configOpts.BlacklistImageRegexp != nil {
+		blacklistImageRegexp = configOpts.BlacklistImageRegexp.String()
+	}
+
+	out := &protocol.TenantInspectResponse{
 		Name:     svcName,
 		Provider: provName,
 		Identity: &protocol.TenantIdentity{
@@ -290,13 +311,13 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 			AvailabilityZone:       fromParams(params, "compute", "Zone"),
 			Context:                nil,
 			ApiKey:                 nil, // secret
-			WhitelistTemplateRegex: configOpts.WhitelistTemplateRegexp.String(),
-			BlacklistTemplateRegex: configOpts.BlacklistTemplateRegexp.String(),
+			WhitelistTemplateRegex: whitelistTemplateRegexp,
+			BlacklistTemplateRegex: blacklistTemplateRegexp,
 			DefaultImage:           configOpts.DefaultImage,
 			DnsList:                configOpts.DNSServers,
 			OperatorUsername:       fromParams(params, "compute", "OperatorUsername"),
-			WhitelistImageRegex:    configOpts.WhitelistImageRegexp.String(),
-			BlacklistImageRegex:    configOpts.BlacklistImageRegexp.String(),
+			WhitelistImageRegex:    whitelistImageRegexp,
+			BlacklistImageRegex:    blacklistImageRegexp,
 		},
 		ObjectStorage: &protocol.TenantObjectStorage{
 			Type:           fromParams(params, "objectstorage", "Type"),
@@ -313,10 +334,12 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 			BucketName: bucket.GetName(),
 			Crypt:      fromParams(params, "metadata", "CryptKey") != "",
 		},
-	}, nil
+	}
+	return out, nil
 }
 
 // Scan scans the tenant and updates the database
+// FIXME: job now knows the tenant to scan, no need to pass it as parameter
 func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -346,7 +369,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		return nil, err
 	}
 	if !isScannable {
-		return nil, fail.ForbiddenError("tenant is not scannable")
+		return nil, fail.ForbiddenError("tenant is not defined as scannable")
 	}
 
 	if isDryRun {
@@ -498,7 +521,6 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 }
 
 func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (ferr fail.Error) {
-
 	svc := handler.job.Service()
 	task := handler.job.Task()
 	tenantName, xerr := svc.GetName()

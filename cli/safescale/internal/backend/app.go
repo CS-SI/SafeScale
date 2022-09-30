@@ -73,7 +73,7 @@ func addPreRunE(cmd *cobra.Command) {
 				logrus.Infof("For consistency, you should move '%s' file in folder '%s'", global.Settings.ReadConfigFile+"."+global.Settings.ReadConfigFileExt, global.Settings.Folders.EtcDir)
 			}
 		} else {
-			_, err := os.Stat(global.Settings.Folders.EtcDir + "/settings.yml")
+			_, err := os.Stat(global.Settings.Folders.EtcDir + "/settings.yaml")
 			if err != nil {
 				// create settings files from current Settings
 

@@ -19,7 +19,7 @@ package nfs
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -40,7 +40,7 @@ func NewNFSClient(sshconfig sshapi.Connector) (*Client, fail.Error) {
 }
 
 // Install installs NFS client on remote host
-func (c *Client) Install(ctx context.Context, svc iaas.Service) fail.Error {
+func (c *Client) Install(ctx context.Context, svc iaasapi.Service) fail.Error {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
@@ -55,7 +55,7 @@ func (c *Client) Install(ctx context.Context, svc iaas.Service) fail.Error {
 }
 
 // Mount defines a mount of a remote share and mount it
-func (c *Client) Mount(ctx context.Context, svc iaas.Service, export string, mountPoint string, withCache bool) fail.Error {
+func (c *Client) Mount(ctx context.Context, svc iaasapi.Service, export string, mountPoint string, withCache bool) fail.Error {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
@@ -75,7 +75,7 @@ func (c *Client) Mount(ctx context.Context, svc iaas.Service, export string, mou
 }
 
 // Unmount a nfs share from NFS server
-func (c *Client) Unmount(ctx context.Context, svc iaas.Service, export string) fail.Error {
+func (c *Client) Unmount(ctx context.Context, svc iaasapi.Service, export string) fail.Error {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr

@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -38,7 +38,7 @@ func (n networkConsumer) List(all bool, timeout time.Duration) (*protocol.Networ
 	n.session.Connect()
 	defer n.session.Disconnect()
 	service := protocol.NewNetworkServiceClient(n.session.connection)
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -51,9 +51,13 @@ func (n networkConsumer) List(all bool, timeout time.Duration) (*protocol.Networ
 		newCtx = aCtx
 	}
 
-	return service.List(newCtx, &protocol.NetworkListRequest{
-		All: all,
-	})
+	req := &protocol.NetworkListRequest{
+		Organization: n.session.currentOrganization,
+		Project:      n.session.currentProject,
+		TenantId:     n.session.currentTenant,
+		All:          all,
+	}
+	return service.List(newCtx, req)
 }
 
 var forceCtxKey = "force"
@@ -62,8 +66,8 @@ var forceCtxKey = "force"
 func (n networkConsumer) Delete(names []string, timeout time.Duration, force bool) error { // TODO: concurrent access if deleting multiple networks
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := protocol.NewNetworkServiceClient(n.session.connection)
-	ctx, xerr := utils.GetContext(true)
+
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -82,16 +86,23 @@ func (n networkConsumer) Delete(names []string, timeout time.Duration, force boo
 		errs  []string
 	)
 
+	service := protocol.NewNetworkServiceClient(n.session.connection)
 	networkDeleter := func(aname string) {
 		var crash error
 		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
-		_, err := service.Delete(newCtx, &protocol.NetworkDeleteRequest{
-			Network: &protocol.Reference{Name: aname},
-			Force:   force,
-		})
 
+		req := &protocol.NetworkDeleteRequest{
+			Network: &protocol.Reference{
+				Organization: n.session.currentOrganization,
+				Project:      n.session.currentProject,
+				TenantId:     n.session.currentTenant,
+				Name:         aname,
+			},
+			Force: force,
+		}
+		_, err := service.Delete(newCtx, req)
 		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
@@ -116,8 +127,8 @@ func (n networkConsumer) Delete(names []string, timeout time.Duration, force boo
 func (n networkConsumer) Inspect(name string, timeout time.Duration) (*protocol.Network, error) {
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := protocol.NewNetworkServiceClient(n.session.connection)
-	ctx, xerr := utils.GetContext(true)
+
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -130,7 +141,14 @@ func (n networkConsumer) Inspect(name string, timeout time.Duration) (*protocol.
 		newCtx = aCtx
 	}
 
-	return service.Inspect(newCtx, &protocol.Reference{Name: name})
+	req := &protocol.Reference{
+		Organization: n.session.currentOrganization,
+		Project:      n.session.currentProject,
+		TenantId:     n.session.currentTenant,
+		Name:         name,
+	}
+	service := protocol.NewNetworkServiceClient(n.session.connection)
+	return service.Inspect(newCtx, req)
 
 }
 
@@ -145,8 +163,8 @@ func (n networkConsumer) Create(
 
 	n.session.Connect()
 	defer n.session.Disconnect()
-	service := protocol.NewNetworkServiceClient(n.session.connection)
-	ctx, xerr := utils.GetContext(true)
+
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -159,7 +177,10 @@ func (n networkConsumer) Create(
 		newCtx = aCtx
 	}
 
-	def := &protocol.NetworkCreateRequest{
+	req := &protocol.NetworkCreateRequest{
+		Organization:  n.session.currentOrganization,
+		Project:       n.session.currentProject,
+		TenantId:      n.session.currentTenant,
 		Name:          name,
 		Cidr:          cidr,
 		NoSubnet:      noSubnet,
@@ -171,5 +192,6 @@ func (n networkConsumer) Create(
 			SizingAsString: sizing,
 		},
 	}
-	return service.Create(newCtx, def)
+	service := protocol.NewNetworkServiceClient(n.session.connection)
+	return service.Create(newCtx, req)
 }

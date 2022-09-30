@@ -188,7 +188,7 @@ func labelCreateCommand() *cobra.Command {
 	return out
 }
 
-// TagCommand tag command
+// TagCommands tag commands
 func TagCommands() *cobra.Command {
 	out := &cobra.Command{
 		Use:   "tag",
@@ -200,6 +200,8 @@ func TagCommands() *cobra.Command {
 		tagDeleteCommand(),
 		tagCreateCommand(),
 	)
+	addPersistentPreRunE(out)
+	addCommonFlags(out)
 	return out
 }
 

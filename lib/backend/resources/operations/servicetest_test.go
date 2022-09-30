@@ -1,5 +1,5 @@
-//go:build disabled
-// +build disabled
+//go:build fixme
+// +build fixme
 
 //FIXME: need to move NewServiceTest inside a package
 
@@ -39,7 +39,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
@@ -101,7 +100,7 @@ var SHORTEN_TIMINGS = &temporal.MutableTimings{
 }
 
 type ServiceTest struct {
-	iaas.Service
+	iaasapi.Service
 	Name      string
 	internals ServiceTestInternals
 	memory    ServiceTestMemory
@@ -1443,7 +1442,7 @@ func (e *ServiceTest) DisableSecurityGroup(ctx context.Context, asg *abstract.Se
 	})
 }
 
-func (e *ServiceTest) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (e *ServiceTest) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam common.HostParameter) (ferr fail.Error) {
 
 	defer fail.OnPanic(&ferr)
 
@@ -1498,7 +1497,7 @@ func (e *ServiceTest) BindSecurityGroupToHost(ctx context.Context, sgParam stack
 	//})
 }
 
-func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam common.HostParameter) (ferr fail.Error) {
 
 	defer fail.OnPanic(&ferr)
 
@@ -2251,12 +2250,12 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 	return ahf, uc, nil
 }
 
-func (e *ServiceTest) ClearHostStartupScript(context.Context, stacks.HostParameter) fail.Error {
+func (e *ServiceTest) ClearHostStartupScript(context.Context, common.HostParameter) fail.Error {
 	e._survey("ServiceTest::ClearHostStartupScript (do nothing)")
 	return nil
 }
 
-func (e *ServiceTest) InspectHost(ctx context.Context, params stacks.HostParameter) (hf *abstract.HostFull, ferr fail.Error) {
+func (e *ServiceTest) InspectHost(ctx context.Context, params common.HostParameter) (hf *abstract.HostFull, ferr fail.Error) {
 
 	if valid.IsNil(e) {
 		e._error("ServiceTest::InspectHost (error)")
@@ -2380,7 +2379,7 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 	return ahf, nil
 }
 
-func (e *ServiceTest) GetHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error) {
+func (e *ServiceTest) GetHostState(context.Context, common.HostParameter) (hoststate.Enum, fail.Error) {
 	e._survey("ServiceTest::GetHostState (not implemented)")
 	return hoststate.Enum(0), nil
 }
@@ -2410,7 +2409,7 @@ func (e *ServiceTest) ListHosts(ctx context.Context, details bool) (abstract.Hos
 	return list, nil
 }
 
-func (e *ServiceTest) DeleteHost(ctx context.Context, params stacks.HostParameter) fail.Error {
+func (e *ServiceTest) DeleteHost(ctx context.Context, params common.HostParameter) fail.Error {
 
 	ahf, _, xerr := stacks.ValidateHostParameter(ctx, params)
 	if xerr != nil {
@@ -2437,7 +2436,7 @@ func (e *ServiceTest) DeleteHost(ctx context.Context, params stacks.HostParamete
 	return nil
 }
 
-func (e *ServiceTest) StopHost(ctx context.Context, params stacks.HostParameter, gracefully bool) fail.Error {
+func (e *ServiceTest) StopHost(ctx context.Context, params common.HostParameter, gracefully bool) fail.Error {
 
 	ahf, _, xerr := stacks.ValidateHostParameter(ctx, params)
 	if xerr != nil {
@@ -2474,7 +2473,7 @@ func (e *ServiceTest) StopHost(ctx context.Context, params stacks.HostParameter,
 	return nil
 }
 
-func (e *ServiceTest) StartHost(ctx context.Context, params stacks.HostParameter) fail.Error {
+func (e *ServiceTest) StartHost(ctx context.Context, params common.HostParameter) fail.Error {
 
 	ahf, _, xerr := stacks.ValidateHostParameter(ctx, params)
 	if xerr != nil {
@@ -2508,17 +2507,17 @@ func (e *ServiceTest) StartHost(ctx context.Context, params stacks.HostParameter
 
 }
 
-func (e *ServiceTest) RebootHost(context.Context, stacks.HostParameter) fail.Error {
+func (e *ServiceTest) RebootHost(context.Context, common.HostParameter) fail.Error {
 	e._survey("ServiceTest::RebootHost (not implemented)")
 	return nil
 }
 
-func (e *ServiceTest) ResizeHost(context.Context, stacks.HostParameter, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (e *ServiceTest) ResizeHost(context.Context, common.HostParameter, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	e._survey("ServiceTest::ResizeHost (not implemented)")
 	return nil, nil
 }
 
-func (e *ServiceTest) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+func (e *ServiceTest) WaitHostReady(ctx context.Context, hostParam common.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	e._survey("ServiceTest::WaitHostReady (not implemented)")
 	return nil, nil
 }

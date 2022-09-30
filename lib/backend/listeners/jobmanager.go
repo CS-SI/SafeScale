@@ -19,9 +19,9 @@ package listeners
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -34,8 +34,8 @@ type scopeFromProtocol interface {
 	GetTenantId() string
 }
 
-func extractScopeFromProtocol(in scopeFromProtocol, description string) backend.JobScope {
-	out := backend.JobScope{
+func extractScopeFromProtocol(in scopeFromProtocol, description string) job.Scope {
+	out := job.Scope{
 		Organization: in.GetOrganization(),
 		Project:      in.GetProject(),
 		Tenant:       in.GetTenantId(),
@@ -46,7 +46,7 @@ func extractScopeFromProtocol(in scopeFromProtocol, description string) backend.
 
 // prepareJob creates a new job and associated service
 // FIXME: include job and svc in context?
-func prepareJob(ctx context.Context, scope backend.JobScope) (_ backend.Job, ferr fail.Error) {
+func prepareJob(ctx context.Context, scope job.Scope) (_ job.Job, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -54,7 +54,7 @@ func prepareJob(ctx context.Context, scope backend.JobScope) (_ backend.Job, fer
 	}
 
 	newctx, cancel := context.WithCancel(ctx)
-	job, xerr := backend.NewJob(newctx, cancel, scope)
+	job, xerr := job.New(newctx, cancel, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -122,7 +122,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 
 	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 
-	xerr = backend.AbortJobByID(uuid)
+	xerr = job.AbortByID(uuid)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -158,7 +158,7 @@ func (s *JobManagerListener) List(inctx context.Context, in *emptypb.Empty) (jl 
 	defer fail.OnExitLogError(inctx, &err, tracer.TraceMessage())
 
 	// handler := JobManagerHandler(tenant.Service)
-	jobMap := backend.ListJobs()
+	jobMap := job.List()
 	var pbProcessList []*protocol.JobDefinition
 	for uuid, info := range jobMap {
 		status, _ := task.Status()

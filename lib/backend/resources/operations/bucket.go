@@ -24,16 +24,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/bucketproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/system/bucketfs"
@@ -59,7 +59,7 @@ type bucket struct {
 }
 
 // NewBucket instantiates bucket struct
-func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
+func NewBucket(svc iaasapi.Service) (resources.Bucket, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -77,7 +77,7 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 }
 
 // LoadBucket instantiates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
-func LoadBucket(inctx context.Context, svc iaas.Service, name string) (resources.Bucket, fail.Error) {
+func LoadBucket(inctx context.Context, svc iaasapi.Service, name string) (resources.Bucket, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -179,7 +179,7 @@ func LoadBucket(inctx context.Context, svc iaas.Service, name string) (resources
 	}
 }
 
-func onBucketCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onBucketCacheMiss(ctx context.Context, svc iaasapi.Service, ref string) (data.Identifiable, fail.Error) {
 	bucketInstance, innerXErr := NewBucket(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -596,9 +596,9 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	desc.ProjectName = authOpts.ProjectName
 	if desc.ProjectName == "" {
 		desc.ProjectName = authOpts.ProjectID
-	}
-	if desc.ProjectName == "" {
-		desc.ProjectName = authOpts.TenantName
+		if desc.ProjectName == "" {
+			desc.ProjectName = authOpts.TenantName
+		}
 	}
 
 	// -- execute the mount

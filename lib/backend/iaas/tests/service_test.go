@@ -1,3 +1,6 @@
+//go:build fixme
+// +build fixme
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -28,8 +31,8 @@ import (
 	"github.com/oscarpicas/smetrics"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/mocks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/mocks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 
@@ -67,7 +70,7 @@ type searcher func(context.Context, bool) ([]*abstract.Image, fail.Error)
 
 // just a copy of original code from iaas/service.go, but mockable (the 1st parameter of this function can be replaced by a mock),
 // the only thing that changes is the method signature, the code inside is the same (even the commented/unused lines)
-func SearchImageOriginal(svc iaas.Service, osname string) (*abstract.Image, fail.Error) {
+func SearchImageOriginal(svc iaasapi.Service, osname string) (*abstract.Image, fail.Error) {
 	ctx := context.Background()
 	var aSearcher searcher = svc.ListImages
 	_ = aSearcher
@@ -103,7 +106,7 @@ func SearchImageOriginal(svc iaas.Service, osname string) (*abstract.Image, fail
 	return imgs[maxi], nil
 }
 
-func SearchImageNew(svc iaas.Service, osname string) (*abstract.Image, fail.Error) {
+func SearchImageNew(svc iaasapi.Service, osname string) (*abstract.Image, fail.Error) {
 	ctx := context.Background()
 	var aSearcher searcher = svc.ListImages
 	_ = aSearcher
@@ -182,15 +185,15 @@ func Test_service_SearchImage(t *testing.T) {
 
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
-	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	svc := mocks.NewServiceMock(mc)
+	svc.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
 	// in order to do so, we created a new function, SearchImageOriginal, which is testable, this is, we can replace
 	// true implementations by our mocks without touching anything else
 	// the contents of our SearchImageOriginal are the same as in iaas/service.go:685
-	res, err := SearchImageOriginal(common, "Ubuntu 18.04")
+	res, err := SearchImageOriginal(svc, "Ubuntu 18.04")
 	if err != nil {
 		t.FailNow()
 	}
@@ -227,15 +230,15 @@ func Test_service_SearchImage_AWS_Ubu20(t *testing.T) {
 
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
-	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	svc := mocks.NewServiceMock(mc)
+	svc.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
 	// in order to do so, we created a new function, SearchImageOriginal, which is testable, this is, we can replace
 	// true implementations by our mocks without touching anything else
 	// the contents of our SearchImageOriginal are the same as in iaas/service.go:685
-	res, err := SearchImageOriginal(common, "Ubuntu 20.04")
+	res, err := SearchImageOriginal(svc, "Ubuntu 20.04")
 	if err != nil {
 		t.FailNow()
 	}
@@ -272,15 +275,15 @@ func Test_service_SearchImage_AWS_Centos7(t *testing.T) {
 
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
-	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	svc := mocks.NewServiceMock(mc)
+	svc.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
 	// in order to do so, we created a new function, SearchImageOriginal, which is testable, this is, we can replace
 	// true implementations by our mocks without touching anything else
 	// the contents of our SearchImageOriginal are the same as in iaas/service.go:685
-	res, err := SearchImageOriginal(common, "CentOS 7.4")
+	res, err := SearchImageOriginal(svc, "CentOS 7.4")
 	if err != nil {
 		t.FailNow()
 	}
@@ -312,10 +315,10 @@ func Test_service_SearchImage_OVH_Centos7(t *testing.T) {
 	}
 
 	mc := minimock.NewController(t)
-	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	svc := mocks.NewServiceMock(mc)
+	svc.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
-	res, err := SearchImageOriginal(common, "CentOS 7.4")
+	res, err := SearchImageOriginal(svc, "CentOS 7.4")
 	if err != nil {
 		t.FailNow()
 	}
@@ -344,10 +347,10 @@ func Test_service_SearchImage_FE_Centos7(t *testing.T) {
 	}
 
 	mc := minimock.NewController(t)
-	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	svc := mocks.NewServiceMock(mc)
+	svc.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
-	res, err := SearchImageOriginal(common, "CentOS 7.4")
+	res, err := SearchImageOriginal(svc, "CentOS 7.4")
 	if err != nil {
 		t.FailNow()
 	}
@@ -387,15 +390,15 @@ func Test_service_SearchImageNew(t *testing.T) {
 
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
-	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	svc := mocks.NewServiceMock(mc)
+	svc.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
 	// in order to do so, we created a new function, SearchImageOriginal, which is testable, this is, we can replace
 	// true implementations by our mocks without touching anything else
 	// the contents of our SearchImageOriginal are the same as in iaas/service.go:685
-	res, err := SearchImageNew(common, "Ubuntu 18.04")
+	res, err := SearchImageNew(svc, "Ubuntu 18.04")
 	if err != nil {
 		t.FailNow()
 	}
@@ -432,15 +435,15 @@ func Test_service_SearchImageNew_AWS_Ubu20(t *testing.T) {
 
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
-	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	svc := mocks.NewServiceMock(mc)
+	svc.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
 	// in order to do so, we created a new function, SearchImageOriginal, which is testable, this is, we can replace
 	// true implementations by our mocks without touching anything else
 	// the contents of our SearchImageOriginal are the same as in iaas/service.go:685
-	res, err := SearchImageNew(common, "Ubuntu 20.04")
+	res, err := SearchImageNew(svc, "Ubuntu 20.04")
 	if err != nil {
 		t.FailNow()
 	}
@@ -477,15 +480,15 @@ func Test_service_SearchImageNew_AWS_Centos7(t *testing.T) {
 
 	// we are mocking the output of the ListImages method -> so we are using ListImagesMock
 	mc := minimock.NewController(t)
-	common := mocks.NewServiceMock(mc)
-	common.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
+	svc := mocks.NewServiceMock(mc)
+	svc.ListImagesMock.Expect(ctx, false).Return(recovered, nil)
 
 	// now the tricky part, ideally we should use the code 'SearchImage' from the service, but we cannot
 	// this is a code smell, it means that our code is really hard to test...
 	// in order to do so, we created a new function, SearchImageOriginal, which is testable, this is, we can replace
 	// true implementations by our mocks without touching anything else
 	// the contents of our SearchImageOriginal are the same as in iaas/service.go:685
-	res, err := SearchImageNew(common, "CentOS 7.4")
+	res, err := SearchImageNew(svc, "CentOS 7.4")
 	if err != nil {
 		t.FailNow()
 	}

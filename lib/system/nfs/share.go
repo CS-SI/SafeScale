@@ -20,7 +20,7 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/system/nfs/enums/securityflavor"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -75,7 +75,7 @@ func NewShare(server *Server, path, options string) (*Share, fail.Error) {
 }
 
 // Add configures and exports the share
-func (s *Share) Add(ctx context.Context, svc iaas.Service) fail.Error {
+func (s *Share) Add(ctx context.Context, svc iaasapi.Service) fail.Error {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr

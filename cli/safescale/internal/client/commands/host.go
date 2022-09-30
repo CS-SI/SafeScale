@@ -963,7 +963,7 @@ func hostFeatureRemoveCommand() *cobra.Command {
 	return out
 }
 
-func formatSSHConfig(in api.Config) (map[string]interface{}, fail.Error) {
+func formatSSHConfig(in sshapi.Config) (map[string]interface{}, fail.Error) {
 	jsoned, err := json.Marshal(&in)
 	if err != nil {
 		return nil, fail.ConvertError(err)

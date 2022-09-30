@@ -19,14 +19,14 @@ package share
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // New creates an instance of resources.Share
-func New(svc iaas.Service) (resources.Share, fail.Error) {
+func New(svc iaasapi.Service) (resources.Share, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -34,6 +34,6 @@ func New(svc iaas.Service) (resources.Share, fail.Error) {
 }
 
 // Load loads the metadata of a share and returns an instance of resources.Share
-func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Share, fail.Error) {
+func Load(ctx context.Context, svc iaasapi.Service, ref string) (resources.Share, fail.Error) {
 	return operations.LoadShare(ctx, svc, ref)
 }

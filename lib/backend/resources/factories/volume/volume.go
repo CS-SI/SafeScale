@@ -19,18 +19,18 @@ package volume
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // New creates an instance of resources.Volume
-func New(svc iaas.Service) (resources.Volume, fail.Error) {
+func New(svc iaasapi.Service) (resources.Volume, fail.Error) {
 	return operations.NewVolume(svc)
 }
 
 // Load loads the metadata of a volume and returns an instance of resources.Volume
-func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
+func Load(ctx context.Context, svc iaasapi.Service, ref string) (resources.Volume, fail.Error) {
 	return operations.LoadVolume(ctx, svc, ref)
 }

@@ -17,7 +17,7 @@
 package huaweicloud
 
 import (
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -35,11 +35,11 @@ import (
 // }
 
 // ConfigurationOptions ...
-func (s *stack) ConfigurationOptions() (stackoptions.Configuration, fail.Error) {
+func (s *stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 	return s.cfgOpts, nil
 }
 
 // AuthenticationOptions ...
-func (s *stack) AuthenticationOptions() (stackoptions.Authentication, fail.Error) {
+func (s *stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
 	return s.authOpts, nil
 }

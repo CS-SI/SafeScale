@@ -33,7 +33,7 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/fsnotify.v1"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
@@ -172,7 +172,7 @@ func (ff *FeatureFile) Specs() *viper.Viper {
 //   - nil: everything worked as expected
 //   - fail.ErrNotFound: no FeatureFile is found with the name
 //   - fail.ErrSyntax: FeatureFile contains syntax error
-func LoadFeatureFile(inctx context.Context, svc iaas.Service, name string, embeddedOnly bool) (*FeatureFile, fail.Error) {
+func LoadFeatureFile(inctx context.Context, svc iaasapi.Service, name string, embeddedOnly bool) (*FeatureFile, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -269,7 +269,7 @@ func LoadFeatureFile(inctx context.Context, svc iaas.Service, name string, embed
 }
 
 // onFeatureFileCacheMiss is called when host 'ref' is not found in cache
-func onFeatureFileCacheMiss(_ iaas.Service, name string, embeddedOnly bool) (data.Identifiable, fail.Error) {
+func onFeatureFileCacheMiss(_ iaasapi.Service, name string, embeddedOnly bool) (data.Identifiable, fail.Error) {
 	var (
 		newInstance *FeatureFile
 		xerr        fail.Error
@@ -788,7 +788,7 @@ func addPathToWatch(ctx context.Context, w *rfsnotify.RWatcher, path string) err
 }
 
 // onFeatureFileEvent reacts to filesystem change event
-func onFeatureFileEvent(ctx context.Context, w *rfsnotify.RWatcher, e fsnotify.Event) {
+func onFeatureFileEvent(_ context.Context, w *rfsnotify.RWatcher, e fsnotify.Event) {
 	switch {
 	case e.Op&fsnotify.Chmod == fsnotify.Chmod:
 		fallthrough

@@ -22,10 +22,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/tests"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -43,7 +46,7 @@ func getTester() (*tests.ServiceTester, error) {
 	return tester, nil
 }
 
-func getService() (iaas.Service, error) {
+func getService() (iaasapi.Service, error) {
 	tenantName := ""
 	if tenantOverride := os.Getenv("TEST_OUTSCALE"); tenantOverride != "" {
 		tenantName = tenantOverride
@@ -53,7 +56,7 @@ func getService() (iaas.Service, error) {
 		return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
 	}
 
-	service, err := iaas.UseService(iaas.WithTenant(tenantName) /*, ""*/)
+	service, err := factory.UseService(iaasoptions.BuildWithScope(global.DefaultOrganization, global.DefaultProject, tenantName))
 	if err != nil || service == nil {
 		return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
 	}

@@ -29,7 +29,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	stackoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
@@ -112,10 +112,7 @@ func (ud Content) OK() bool {
 }
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
-func (ud *Content) Prepare(
-	options stackoptions.Configuration, request abstract.HostRequest, cidr string, defaultNetworkCIDR string,
-	timings temporal.Timings,
-) fail.Error {
+func (ud *Content) Prepare(options iaasoptions.Configuration, request abstract.HostRequest, cidr string, defaultNetworkCIDR string, timings temporal.Timings) fail.Error {
 	if ud == nil {
 		return fail.InvalidInstanceError()
 	}

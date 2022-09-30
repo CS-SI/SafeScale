@@ -20,9 +20,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 )
 
@@ -36,8 +36,7 @@ func (c jobConsumer) List(timeout time.Duration) (*protocol.JobList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	service := protocol.NewJobServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(false)
+	ctx, xerr := common.ContextForGRPC(false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -50,6 +49,7 @@ func (c jobConsumer) List(timeout time.Duration) (*protocol.JobList, error) {
 		newCtx = aCtx
 	}
 
+	service := protocol.NewJobServiceClient(c.session.connection)
 	return service.List(newCtx, &emptypb.Empty{})
 }
 
@@ -58,8 +58,7 @@ func (c jobConsumer) Stop(uuid string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 
-	service := protocol.NewJobServiceClient(c.session.connection)
-	ctx, xerr := utils.GetContext(false)
+	ctx, xerr := common.ContextForGRPC(false)
 	if xerr != nil {
 		return xerr
 	}
@@ -72,6 +71,8 @@ func (c jobConsumer) Stop(uuid string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
-	_, err := service.Stop(newCtx, &protocol.JobDefinition{Uuid: uuid})
+	req := &protocol.JobDefinition{Uuid: uuid}
+	service := protocol.NewJobServiceClient(c.session.connection)
+	_, err := service.Stop(newCtx, req)
 	return err
 }

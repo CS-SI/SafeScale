@@ -1,5 +1,5 @@
-//go:build disabled
-// +build disabled
+//go:build fixme
+// +build fixme
 
 //FIXME: need to move NewServiceTest() and skip() inside a package
 
@@ -31,7 +31,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -67,7 +66,7 @@ func Test_host_IsNull_Nil(t *testing.T) {
 
 func Test_NewHost(t *testing.T) {
 
-	var svc iaas.Service
+	var svc iaasapi.Service
 	_, err := NewHost(svc)
 	require.Contains(t, err.Error(), "invalid parameter: svc")
 
@@ -92,7 +91,7 @@ func Test_NewHost(t *testing.T) {
 
 func Test_LoadHost(t *testing.T) {
 
-	var svc iaas.Service
+	var svc iaasapi.Service
 	ctx := context.Background()
 
 	task, err := concurrency.NewTaskWithContext(ctx)

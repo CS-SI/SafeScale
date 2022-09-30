@@ -19,13 +19,14 @@ package commands
 import (
 	"strings"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-
+	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 var tenantCmdLabel = "tenant"
@@ -75,16 +76,26 @@ func tenantGetCommand() *cobra.Command {
 	out := &cobra.Command{
 		Use:     "get",
 		Aliases: []string{"current"},
-		Short:   "Get current tenant",
+		Short:   "Get current tenant for user",
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			tenant, err := ClientSession.Tenant.Get(0)
+			state, err := common.NewState()
 			if err != nil {
-				err = fail.FromGRPCStatus(err)
-				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "get tenant", false).Error())))
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 			}
+
+			err = state.Read()
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+			}
+
+			tenant := state.Current.Tenant
+			if tenant == "" {
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, "no tenant set"))
+			}
+
 			return cli.SuccessResponse(tenant)
 		},
 	}
@@ -105,11 +116,29 @@ func tenantSetCommand() *cobra.Command {
 
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			err := ClientSession.Tenant.Set(args[0], 0)
+			_, err := ClientSession.Tenant.Inspect(args[0], 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
-				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "set tenant", false).Error())))
+				return cli.FailureResponse(cli.ExitOnRPC(err.Error()))
 			}
+
+			// -- save tenant as default tenant for current user --
+			state, err := common.NewState()
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+			}
+
+			err = state.Read()
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+			}
+
+			state.Current.Tenant = args[0]
+			err = state.Write()
+			if err != nil {
+				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+			}
+
 			return cli.SuccessResponse(nil)
 		},
 	}

@@ -19,7 +19,8 @@ package ovhtf
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/terraformer"
+	tfapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -35,7 +36,7 @@ type (
 	}
 )
 
-func newImageResource(name string) terraformer.Resource {
+func newImageResource(name string) tfapi.Resource {
 	out := &imageResource{terraformer.NewResourceCore(name, imageResourceSnippetPath)}
 	return out
 }

@@ -705,6 +705,9 @@ message BucketMountRequest {
 message BucketUploadRequest {
 	string bucket = 1;
 	string path = 2;
+	string organization = 3;
+	string project = 4;
+	string tenant_id = 5;
 }
 
 service BucketService {

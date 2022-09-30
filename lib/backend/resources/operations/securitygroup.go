@@ -29,7 +29,7 @@ import (
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
@@ -62,7 +62,7 @@ type SecurityGroup struct {
 }
 
 // NewSecurityGroup ...
-func NewSecurityGroup(svc iaas.Service) (*SecurityGroup, fail.Error) {
+func NewSecurityGroup(svc iaasapi.Service) (*SecurityGroup, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -80,9 +80,7 @@ func NewSecurityGroup(svc iaas.Service) (*SecurityGroup, fail.Error) {
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(
-	inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue,
-) (*SecurityGroup, fail.Error) {
+func LoadSecurityGroup(inctx context.Context, svc iaasapi.Service, ref string, options ...data.ImmutableKeyValue) (*SecurityGroup, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -185,7 +183,7 @@ func LoadSecurityGroup(
 }
 
 // onSGCacheMiss is called when there is no instance in cache of Security Group 'ref'
-func onSGCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+func onSGCacheMiss(ctx context.Context, svc iaasapi.Service, ref string) (data.Identifiable, fail.Error) {
 	sgInstance, innerXErr := NewSecurityGroup(svc)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -500,7 +498,7 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (ferr fai
 }
 
 // deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on Provider side
-func deleteProviderSecurityGroup(ctx context.Context, svc iaas.Service, abstractSG *abstract.SecurityGroup) fail.Error {
+func deleteProviderSecurityGroup(ctx context.Context, svc iaasapi.Service, abstractSG *abstract.SecurityGroup) fail.Error {
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr

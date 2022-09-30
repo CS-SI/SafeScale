@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -38,7 +38,7 @@ func (v volumeConsumer) List(all bool, timeout time.Duration) (*protocol.VolumeL
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -51,8 +51,14 @@ func (v volumeConsumer) List(all bool, timeout time.Duration) (*protocol.VolumeL
 		newCtx = aCtx
 	}
 
+	req := &protocol.VolumeListRequest{
+		Organization: v.session.currentOrganization,
+		Project:      v.session.currentProject,
+		TenantId:     v.session.currentTenant,
+		All:          all,
+	}
 	service := protocol.NewVolumeServiceClient(v.session.connection)
-	return service.List(newCtx, &protocol.VolumeListRequest{All: all})
+	return service.List(newCtx, req)
 }
 
 // Inspect ...
@@ -60,7 +66,7 @@ func (v volumeConsumer) Inspect(name string, timeout time.Duration) (*protocol.V
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -73,8 +79,14 @@ func (v volumeConsumer) Inspect(name string, timeout time.Duration) (*protocol.V
 		newCtx = aCtx
 	}
 
+	req := &protocol.Reference{
+		Organization: v.session.currentOrganization,
+		Project:      v.session.currentProject,
+		TenantId:     v.session.currentTenant,
+		Name:         name,
+	}
 	service := protocol.NewVolumeServiceClient(v.session.connection)
-	return service.Inspect(newCtx, &protocol.Reference{Name: name})
+	return service.Inspect(newCtx, req)
 }
 
 // Delete ...
@@ -82,7 +94,7 @@ func (v volumeConsumer) Delete(names []string, timeout time.Duration) error {
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -108,11 +120,19 @@ func (v volumeConsumer) Delete(names []string, timeout time.Duration) error {
 		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
-		_, err := service.Delete(newCtx, &protocol.Reference{Name: aname})
+
+		req := &protocol.Reference{
+			Organization: v.session.currentOrganization,
+			Project:      v.session.currentProject,
+			TenantId:     v.session.currentTenant,
+			Name:         aname,
+		}
+		_, err := service.Delete(newCtx, req)
 
 		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
+
 			errs = append(errs, err.Error())
 		}
 	}
@@ -135,7 +155,7 @@ func (v volumeConsumer) Create(def *protocol.VolumeCreateRequest, timeout time.D
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -148,6 +168,9 @@ func (v volumeConsumer) Create(def *protocol.VolumeCreateRequest, timeout time.D
 		newCtx = aCtx
 	}
 
+	def.Organization = v.session.currentOrganization
+	def.Project = v.session.currentProject
+	def.TenantId = v.session.currentTenant
 	service := protocol.NewVolumeServiceClient(v.session.connection)
 	return service.Create(newCtx, def)
 }
@@ -157,7 +180,7 @@ func (v volumeConsumer) Attach(def *protocol.VolumeAttachmentRequest, timeout ti
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -170,10 +193,12 @@ func (v volumeConsumer) Attach(def *protocol.VolumeAttachmentRequest, timeout ti
 		newCtx = aCtx
 	}
 
+	def.Volume.Organization = v.session.currentOrganization
+	def.Volume.Project = v.session.currentProject
+	def.Volume.TenantId = v.session.currentTenant
 	service := protocol.NewVolumeServiceClient(v.session.connection)
 	_, err := service.Attach(newCtx, def)
 	return err
-
 }
 
 // Detach ...
@@ -181,7 +206,7 @@ func (v volumeConsumer) Detach(volumeName string, hostName string, timeout time.
 	v.session.Connect()
 	defer v.session.Disconnect()
 
-	ctx, xerr := utils.GetContext(true)
+	ctx, xerr := common.ContextForGRPC(true)
 	if xerr != nil {
 		return xerr
 	}
@@ -194,10 +219,18 @@ func (v volumeConsumer) Detach(volumeName string, hostName string, timeout time.
 		newCtx = aCtx
 	}
 
+	req := &protocol.VolumeDetachmentRequest{
+		Volume: &protocol.Reference{
+			Organization: v.session.currentOrganization,
+			Project:      v.session.currentProject,
+			TenantId:     v.session.currentTenant,
+			Name:         volumeName,
+		},
+		Host: &protocol.Reference{
+			Name: hostName,
+		},
+	}
 	service := protocol.NewVolumeServiceClient(v.session.connection)
-	_, err := service.Detach(newCtx, &protocol.VolumeDetachmentRequest{
-		Volume: &protocol.Reference{Name: volumeName},
-		Host:   &protocol.Reference{Name: hostName},
-	})
+	_, err := service.Detach(newCtx, req)
 	return err
 }

@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -38,7 +39,10 @@ const (
 	DoInstanciate    = true
 )
 
-var ClientSession *cmdline.Session
+var (
+	ClientSession    *cmdline.Session
+	CurrentUserState common.State
+)
 
 // extractFeatureArgument returns the name of the feature from the command arguments
 func extractFeatureArgument(c *cobra.Command, args []string) (string, error) {
@@ -132,12 +136,55 @@ func addPersistentPreRunE(in *cobra.Command) {
 			return err
 		}
 
-		tenant, err := c.Flags().GetString("tenant")
+		CurrentUserState, err = common.NewState()
+		if err != nil {
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+
+		err = CurrentUserState.Read()
+		if err != nil {
+			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		}
+
+		organization := CurrentUserState.Current.Organization
+		organizationByFlag, err := c.Flags().GetString("organization")
 		if err != nil {
 			return err
 		}
 
-		ClientSession, err = cmdline.New(server, tenant)
+		if organizationByFlag != "" {
+			organization = organizationByFlag
+		}
+		if organization == "" {
+			// FUTURE: error will rise when organization is fully implemented
+			// return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, "no organization set"))
+		}
+
+		project := CurrentUserState.Current.Project
+		projectByFlag, err := c.Flags().GetString("project")
+		if err != nil {
+			return err
+		}
+
+		if projectByFlag != "" {
+			project = projectByFlag
+		}
+		if project == "" {
+			// FUTURE: error will rise when project is fully implemented
+			// return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, "no project set"))
+		}
+
+		tenant := CurrentUserState.Current.Tenant
+		tenantByFlag, err := c.Flags().GetString("tenant")
+		if err != nil {
+			return err
+		}
+
+		if tenantByFlag != "" {
+			tenant = tenantByFlag
+		}
+
+		ClientSession, err = cmdline.NewSession(server, organization, project, tenant)
 		if err != nil {
 			return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -155,6 +202,12 @@ func addPersistentPreRunE(in *cobra.Command) {
 
 func addCommonFlags(cmd *cobra.Command) {
 	flags := cmd.PersistentFlags()
-	flags.StringP("server", "L", "localhost:50051", "Connect to daemon on server SERVER (default: localhost:50051)")
+	flags.StringP("server", "L", "localhost:50051", "Connect to backend on server SERVER (default: localhost:50051)")
+	flags.StringP("organization", "O", "", "Use organization ORG (default: 'default')")
+	flags.StringP("project", "P", "", "Use project PROJECT (default: 'default')")
 	flags.StringP("tenant", "T", "", "Use tenant TENANT (default: none)")
+	flags.StringP("config", "c", "", "Provides the configuration file to use (if needed) (default: <root-dir>/etc/settings.yml)")
+	flags.SetAnnotation("config", cobra.BashCompFilenameExt, global.ValidConfigFilenameExts)
+	flags.StringP("root-dir", "R", "", "Defines the root folder of safescale work tree; will overload content of configuration file (default: /opt/safescale)")
+	flags.StringP("etc-dir", "E", "", "Defines the config folder of safescale work tree; will overload content of configuration file (default: <root-dir>/etc)")
 }

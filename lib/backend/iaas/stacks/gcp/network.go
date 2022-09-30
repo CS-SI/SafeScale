@@ -43,14 +43,13 @@ const (
 // ------ network methods ------
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-// No default network settings supported by GCP
-func (s stack) HasDefaultNetwork(context.Context) (bool, fail.Error) {
+func (s stack) HasDefaultNetwork() (bool, fail.Error) {
 	return false, nil
 }
 
-// GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (s stack) GetDefaultNetwork(context.Context) (*abstract.Network, fail.Error) {
-	return nil, fail.NotFoundError("no default network in gcp driver")
+// DefaultNetwork returns the *abstract.Network corresponding to the default network
+func (s stack) DefaultNetwork(_ context.Context) (*abstract.Network, fail.Error) {
+	return nil, fail.NotFoundError("this provider has no default network")
 }
 
 // CreateNetwork creates a new network

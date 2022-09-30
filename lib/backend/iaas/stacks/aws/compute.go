@@ -24,6 +24,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -434,7 +435,7 @@ func toAbstractHostTemplate(in ec2.InstanceTypeInfo) *abstract.HostTemplate {
 // WaitHostReady waits until a host achieves ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
 func (s stack) WaitHostReady(
-	ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration,
+	ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration,
 ) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -813,7 +814,7 @@ func (s stack) buildAwsMachine(
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
-func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
+func (s stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
 	return nil
 }
 
@@ -822,7 +823,7 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool,
 }
 
 // InspectHost loads information of a host from AWS
-func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (
+func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (
 	ahf *abstract.HostFull, ferr fail.Error,
 ) {
 	defer fail.OnPanic(&ferr)
@@ -998,7 +999,7 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.
 }
 
 // GetHostState returns the current state of the host
-func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
+func (s stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
@@ -1058,7 +1059,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.Host
 }
 
 // DeleteHost deletes a Host
-func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1188,7 +1189,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 }
 
 // StopHost stops a running host
-func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, gracefully bool) (ferr fail.Error) {
+func (s stack) StopHost(ctx context.Context, host iaasapi.HostParameter, gracefully bool) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1244,7 +1245,7 @@ func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, graceful
 }
 
 // StartHost starts a stopped host
-func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1299,7 +1300,7 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (f
 }
 
 // RebootHost stops then starts a host
-func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1354,7 +1355,7 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (
 
 // ResizeHost changes the sizing of an existing host
 func (s stack) ResizeHost(
-	ctx context.Context, hostParam stacks.HostParameter, request abstract.HostSizingRequirements,
+	ctx context.Context, hostParam iaasapi.HostParameter, request abstract.HostSizingRequirements,
 ) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
@@ -1367,7 +1368,7 @@ func (s stack) ResizeHost(
 // Returns:
 // - *fail.ErrNotFound if the Host is not found
 func (s stack) BindSecurityGroupToHost(
-	ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
+	ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter,
 ) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
@@ -1428,7 +1429,7 @@ func (s stack) BindSecurityGroupToHost(
 // - nil means success
 // - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
 func (s stack) UnbindSecurityGroupFromHost(
-	ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
+	ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter,
 ) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()

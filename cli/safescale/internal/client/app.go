@@ -1,3 +1,20 @@
+/*
+ * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package client
 
 import (
@@ -8,7 +25,7 @@ import (
 	"sync"
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/client/commands"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -31,7 +48,7 @@ func Cleanup() {
 	}
 	if strings.TrimRight(text, "\n") == "y" {
 		cleanupOnce.Do(func() {
-			err = commands.ClientSession.JobManager.Stop(utils.GetUUID(), temporal.ExecutionTimeout())
+			err = commands.ClientSession.JobManager.Stop(common.GetUUID(), temporal.ExecutionTimeout())
 			if err != nil {
 				fmt.Printf("failed to stop the process %v\n", err)
 			}

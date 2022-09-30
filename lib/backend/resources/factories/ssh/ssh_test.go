@@ -32,14 +32,14 @@ func Test_NewConnector(t *testing.T) {
 	SetCustomConnectorFactory(nil) // Factory kept when multiple tests
 
 	// Invalid conf
-	var config api.Config = nil
+	var config sshapi.Config = nil
 	connector, xerr := NewConnector(config, ConnectorWithLib())
 	require.Nil(t, connector)
 	require.Contains(t, xerr.Error(), "invalid parameter: conf")
 	require.Contains(t, xerr.Error(), "cannot be null value")
 
 	// Invalid customFactory
-	SetCustomConnectorFactory(func(api.Config) (api.Connector, fail.Error) {
+	SetCustomConnectorFactory(func(sshapi.Config) (sshapi.Connector, fail.Error) {
 		return nil, fail.NewError("No ssh lib available")
 	})
 	config = ssh.NewConfig("HostName", "ipAdress", 22, "User", "PrivateKey", 0, "", nil, nil)
@@ -50,14 +50,14 @@ func Test_NewConnector(t *testing.T) {
 	SetCustomConnectorFactory(nil)
 
 	// Invalid default factory
-	var nilcfg api.Config
+	var nilcfg sshapi.Config
 	connector, xerr = NewConnector(nilcfg, ConnectorWithCli())
 	require.Nil(t, connector)
 	require.Contains(t, xerr.Error(), "cannot be null")
 
 	// Invalid option
 	config = ssh.NewConfig("HostName", "ipAdress", 22, "User", "PrivateKey", 0, "", nil, nil)
-	connector, xerr = NewConnector(config, ConnectorWithCli(), nil, func(connector api.Connector, conf api.Config) (api.Connector, fail.Error) {
+	connector, xerr = NewConnector(config, ConnectorWithCli(), nil, func(connector sshapi.Connector, conf sshapi.Config) (sshapi.Connector, fail.Error) {
 		return nil, fail.NewError("No ssh lib available")
 	})
 	require.Nil(t, connector)
@@ -76,10 +76,10 @@ func Test_NewConnector_Cli(t *testing.T) {
 
 	SetCustomConnectorFactory(nil) // Factory kept when multiple tests
 
-	var config api.Config = nil
+	var config sshapi.Config = nil
 
 	// Invalid customFactory
-	SetCustomConnectorFactory(func(api.Config) (api.Connector, fail.Error) {
+	SetCustomConnectorFactory(func(sshapi.Config) (sshapi.Connector, fail.Error) {
 		return nil, fail.NewError("No ssh lib available")
 	})
 	config = ssh.NewConfig("HostName", "ipAdress", 22, "User", "PrivateKey", 0, "", nil, nil)
@@ -88,7 +88,7 @@ func Test_NewConnector_Cli(t *testing.T) {
 	require.Contains(t, xerr.Error(), "No ssh lib available")
 
 	// Valid custom factory
-	SetCustomConnectorFactory(func(config api.Config) (api.Connector, fail.Error) {
+	SetCustomConnectorFactory(func(config sshapi.Config) (sshapi.Connector, fail.Error) {
 		return bycli.NewConnector(config)
 	})
 	connector, xerr = NewConnector(config, ConnectorWithCli())
@@ -120,10 +120,10 @@ func Test_NewConnector_Lib(t *testing.T) {
 
 	SetCustomConnectorFactory(nil) // Factory kept when multiple tests
 
-	var config api.Config = nil
+	var config sshapi.Config = nil
 
 	// Invalid customFactory
-	SetCustomConnectorFactory(func(api.Config) (api.Connector, fail.Error) {
+	SetCustomConnectorFactory(func(sshapi.Config) (sshapi.Connector, fail.Error) {
 		return nil, fail.NewError("No ssh lib available")
 	})
 	config = ssh.NewConfig("HostName", "ipAdress", 22, "User", "PrivateKey", 0, "", nil, nil)
@@ -132,7 +132,7 @@ func Test_NewConnector_Lib(t *testing.T) {
 	require.Contains(t, xerr.Error(), "No ssh lib available")
 
 	// Valid custom factory
-	SetCustomConnectorFactory(func(config api.Config) (api.Connector, fail.Error) {
+	SetCustomConnectorFactory(func(config sshapi.Config) (sshapi.Connector, fail.Error) {
 		return bycli.NewConnector(config)
 	})
 	connector, xerr = NewConnector(config, ConnectorWithLib())

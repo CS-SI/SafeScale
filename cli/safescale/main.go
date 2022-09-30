@@ -46,6 +46,7 @@ func main() {
 				os.Exit(1)
 			}
 		}
+
 		os.Exit(0)
 	}()
 
@@ -67,7 +68,7 @@ func main() {
 	err = global.InitApp()
 	if err != nil {
 		fmt.Println(err.Error())
-		os.Exit(1)
+		return
 	}
 
 	// 1st try to see if command is daemon
