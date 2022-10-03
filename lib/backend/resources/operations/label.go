@@ -360,7 +360,7 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return fail.Wrap(xerr, "failed to check if %s '%s' already exists", kind, name)
 		}

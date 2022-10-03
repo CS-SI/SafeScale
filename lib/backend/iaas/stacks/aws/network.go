@@ -75,7 +75,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 	if _, xerr = s.rpcDescribeVpcByName(ctx, aws.String(req.Name)); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 			// continue
 		default:
 			return nil, xerr

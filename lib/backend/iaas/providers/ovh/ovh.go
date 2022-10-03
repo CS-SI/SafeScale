@@ -169,7 +169,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 	params["Safe"] = isSafe
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	defaultImage, ok := compute["DefaultImage"].(string)
 	if !ok {
@@ -179,6 +179,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	maxLifeTime := 0
 	if _, ok = compute["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
+	machineCreationLimit := 8
+	if _, ok = compute["ConcurrentMachineCreationLimit"].(string); ok {
+		machineCreationLimit, _ = strconv.Atoi(compute["ConcurrentMachineCreationLimit"].(string))
 	}
 
 	authOptions := stacks.AuthenticationOptions{
@@ -232,14 +237,15 @@ next:
 			"classic":    volumespeed.Cold,
 			"high-speed": volumespeed.Hdd,
 		},
-		MetadataBucket:           metadataBucketName,
-		OperatorUsername:         operatorUsername,
-		ProviderName:             providerName,
-		DefaultSecurityGroupName: "default",
-		DefaultImage:             defaultImage,
-		MaxLifeTime:              maxLifeTime,
-		Timings:                  timings,
-		Safe:                     isSafe,
+		MetadataBucket:                 metadataBucketName,
+		OperatorUsername:               operatorUsername,
+		ProviderName:                   providerName,
+		DefaultSecurityGroupName:       "default",
+		DefaultImage:                   defaultImage,
+		MaxLifeTime:                    maxLifeTime,
+		Timings:                        timings,
+		Safe:                           isSafe,
+		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
 	serviceVersions := map[string]string{"volume": "v2"}
@@ -320,6 +326,7 @@ func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 	cfg.Set("Safe", opts.Safe)
+	cfg.Set("ConcurrentMachineCreationLimit", opts.ConcurrentMachineCreationLimit)
 
 	return cfg, nil
 }

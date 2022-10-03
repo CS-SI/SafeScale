@@ -156,7 +156,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, ferr
 		isSafe = true
 	}
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	var timings *temporal.MutableTimings
 	s := &temporal.MutableTimings{}

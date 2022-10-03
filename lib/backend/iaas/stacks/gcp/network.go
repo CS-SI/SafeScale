@@ -66,7 +66,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return nil, xerr
 		}
@@ -184,7 +184,7 @@ func (s stack) DeleteNetwork(ctx context.Context, ref string) (ferr fail.Error) 
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -478,7 +478,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider missing route as a successful removal
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -489,7 +489,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider a missing Subnet as a successful removal
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 			return nil
 		default:
 			return xerr
@@ -513,7 +513,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider missing network as a successful removal
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}

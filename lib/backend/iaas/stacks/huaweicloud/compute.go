@@ -1254,7 +1254,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable: // It's in ERROR state, but it's there
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}

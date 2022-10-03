@@ -363,7 +363,7 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider a missing rule as a successful deletion and continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return nil, xerr
 		}

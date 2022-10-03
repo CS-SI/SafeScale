@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -539,6 +540,9 @@ func (a action) loopWithSoftTimeout() (ferr fail.Error) {
 					case *fail.ErrAborted:
 						return
 					default:
+						if strings.Contains(ferr.Error(), "context canceled") {
+							return
+						}
 					}
 				}
 			}
@@ -649,6 +653,9 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 				case *fail.ErrAborted:
 					return
 				default:
+					if strings.Contains(ferr.Error(), "context canceled") {
+						return
+					}
 				}
 			}
 

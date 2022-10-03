@@ -20,18 +20,6 @@ import (
 	"fmt"
 )
 
-// AnonymousMap ...
-type AnonymousMap map[interface{}]interface{}
-
-func AnonymousMapToStringMap(in map[interface{}]interface{}) map[string]interface{} {
-	out := make(map[string]interface{}, len(in))
-	for k, v := range in {
-		key := fmt.Sprintf("%v", k)
-		out[key] = v
-	}
-	return out
-}
-
 // Map ...
 type Map map[string]interface{}
 

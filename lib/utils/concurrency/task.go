@@ -48,10 +48,12 @@ const (
 )
 
 // TaskParameters ...
-type TaskParameters interface{}
+type TaskParameters = interface{}
 
 // TaskResult ...
-type TaskResult interface{}
+type TaskResult = interface{}
+
+type TaskAdaptor = interface{}
 
 // TaskAction defines the type of the function that can be started by a Task.
 // NOTE: you have to check if task is aborted inside this function using method t.ErrAborted(),

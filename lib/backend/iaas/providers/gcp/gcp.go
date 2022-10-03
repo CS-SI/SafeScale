@@ -131,6 +131,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
 	}
 
+	machineCreationLimit := 8
+	if _, ok = computeCfg["ConcurrentMachineCreationLimit"].(string); ok {
+		machineCreationLimit, _ = strconv.Atoi(computeCfg["ConcurrentMachineCreationLimit"].(string))
+	}
+
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
 		if operatorUsername, ok = operatorUsernameIf.(string); !ok {
@@ -144,7 +149,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 	params["Safe"] = isSafe
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
@@ -203,14 +208,15 @@ next:
 			"standard":   volumespeed.Cold,
 			"performant": volumespeed.Hdd,
 		},
-		MetadataBucket:   metadataBucketName,
-		DefaultImage:     defaultImage,
-		OperatorUsername: operatorUsername,
-		UseNATService:    true,
-		ProviderName:     providerName,
-		MaxLifeTime:      maxLifeTime,
-		Timings:          timings,
-		Safe:             isSafe,
+		MetadataBucket:                 metadataBucketName,
+		DefaultImage:                   defaultImage,
+		OperatorUsername:               operatorUsername,
+		UseNATService:                  true,
+		ProviderName:                   providerName,
+		MaxLifeTime:                    maxLifeTime,
+		Timings:                        timings,
+		Safe:                           isSafe,
+		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
 	gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)
@@ -278,6 +284,7 @@ func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config
 	cfg.Set("ProviderName", provName)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 	cfg.Set("Safe", opts.Safe)
+	cfg.Set("ConcurrentMachineCreationLimit", opts.ConcurrentMachineCreationLimit)
 	return cfg, nil
 }
 

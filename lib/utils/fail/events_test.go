@@ -445,15 +445,6 @@ func Test_SilentOnPanic(t *testing.T) {
 	})
 	require.Contains(t, log, "intercepted panic but parameter 'err' is invalid")
 
-	log = tests.LogrusCapture(func() {
-		_ = func() (err error) {
-			err = errors.New("Any message")
-			defer SilentOnPanic(&err)
-			panic("mayday")
-		}()
-	})
-	require.Contains(t, log, "fail.SilentOnPanic")
-
 	testlist := []struct {
 		name     string
 		err      Error
@@ -485,6 +476,7 @@ func Test_SilentOnPanic(t *testing.T) {
 	}
 
 	for i := range testlist {
+		i := i
 		t.Run(testlist[i].name, func(t *testing.T) {
 			log = tests.LogrusCapture(func() {
 				_ = func() (err Error) {

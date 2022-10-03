@@ -19,10 +19,23 @@
 
 package debug
 
+import (
+	"context"
+
+	"github.com/sirupsen/logrus"
+)
+
 // IgnoreError logs an error that's considered not important by the caller
 func IgnoreError(err error) {
 	if err != nil { // nolint
-		// logrus.Debugf("ignoring error [%s]", err)
+		logrus.Debugf("ignoring error [%s]", err)
 		// logrus.Debugf("ignoring error stack: %s", string(debug.Stack()))
+	}
+}
+
+func IgnoreError2(ctx context.Context, err error) {
+	if err != nil { // nolint
+		logrus.WithContext(ctx).Debugf("ignoring error [%s]", err)
+		// logrus.WithContext(ctx).Debugf("ignoring error stack: %s", string(debug.Stack()))
 	}
 }

@@ -26,6 +26,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -241,20 +242,20 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s resources.FeatureSettings) (_ resources.UnitResults, ferr fail.Error) {
+func (is *step) Run(inctx context.Context, hosts []resources.Host, v data.Map, s resources.FeatureSettings) (_ resources.UnitResults, ferr fail.Error) {
 	outcomes := &unitResults{}
 
 	select {
-	case <-task.Context().Done():
-		return outcomes, fail.AbortedError(task.Context().Err())
+	case <-inctx.Done():
+		return outcomes, fail.AbortedError(inctx.Err())
 	default:
 	}
 
 	if is.Serial || s.Serialize {
-		return is.loopSeriallyOnHosts(task.Context(), hosts, v)
+		return is.loopSeriallyOnHosts(inctx, hosts, v)
 	}
 
-	return is.loopConcurrentlyOnHosts(task.Context(), hosts, v)
+	return is.loopConcurrentlyOnHosts(inctx, hosts, v)
 }
 
 func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
@@ -265,6 +266,8 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 	outcomes := &unitResults{}
 
 	for _, h := range hosts {
+		h := h
+
 		select {
 		case <-ctx.Done():
 			return nil, fail.AbortedError(ctx.Err())
@@ -278,13 +281,7 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 			return nil, xerr
 		}
 
-		subtask, xerr := concurrency.NewTaskWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		outcome, xerr := is.taskRunOnHost(subtask, runOnHostParameters{Host: h, Variables: clonedV})
+		outcome, xerr := is.taskRunOnHost(ctx, runOnHostParameters{Host: h, Variables: clonedV})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -326,65 +323,55 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 		ra   resources.UnitResults
 		rErr fail.Error
 	}
+
+	type partResult struct {
+		who  string
+		what concurrency.TaskResult
+		err  fail.Error
+	}
+
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
+		blue := make(chan partResult, len(hosts))
 
-		tg, xerr := concurrency.NewTaskGroupWithContext(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		var taskErr fail.Error
-		subtasks := map[string]concurrency.Task{}
+		tg := new(errgroup.Group)
 		for _, h := range hosts {
-			subtask, taskErr := tg.Start(is.taskRunOnHostWithLoop, runOnHostParameters{Host: h, Variables: v})
-			taskErr = debug.InjectPlannedFail(taskErr)
-			if taskErr != nil {
-				abErr := tg.AbortWithCause(taskErr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+			h := h
+			tg.Go(func() error {
+				tr, err := is.taskRunOnHostWithLoop(ctx, runOnHostParameters{Host: h, Variables: v})
+				hid, _ := h.GetID()
+				blue <- partResult{who: hid, what: tr, err: err}
+				if err != nil {
+					return err
 				}
-				break
-			}
-			subtasks[h.GetName()] = subtask
+				return nil
+			})
 		}
 
-		tgr, xerr := tg.WaitGroup()
+		xerr := fail.ConvertError(tg.Wait())
 		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			if len(subtasks) != len(hosts) {
-				logrus.WithContext(ctx).Warnf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
-			}
-			logrus.WithContext(ctx).Errorf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
-			if taskErr != nil {
-				_ = taskErr.AddConsequence(xerr)
-			} else {
-				taskErr = xerr
+
+		outcomes := &unitResults{}
+		close(blue)
+		for ur := range blue {
+			if ur.what != nil {
+				oko, ok := ur.what.(stepResult)
+				if !ok {
+					chRes <- result{nil, fail.InconsistentError("outcome should be a stepResult (implements resources.UnitResult)")}
+					return
+				}
+
+				outcomes.AddOne(ur.who, oko)
 			}
 		}
 
-		wrongs, outcomes, cerr := is.collectOutcomes(subtasks, tgr)
-		if cerr != nil {
-			if wrongs == 0 && len(subtasks) == len(hosts) {
-				inconsistency := fail.InconsistentError("CRITICAL problem: there is a discrepancy between WaitGroup and its individual results: %w", cerr)
-				inconsistency.Annotate("wrongs", wrongs).Annotate("outcomes", outcomes)
-				chRes <- result{nil, inconsistency}
-				return
-			}
-
-			if taskErr != nil {
-				_ = taskErr.AddConsequence(cerr)
-				chRes <- result{nil, taskErr}
-				return
-			}
-			chRes <- result{nil, cerr}
+		if xerr != nil {
+			chRes <- result{outcomes, xerr}
 			return
 		}
 
-		chRes <- result{outcomes, taskErr}
-
+		chRes <- result{outcomes, nil}
 	}()
 	select {
 	case res := <-chRes:
@@ -394,31 +381,6 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 	case <-inctx.Done():
 		return nil, fail.ConvertError(inctx.Err())
 	}
-}
-
-// collectOutcomes collects results from subtasks
-func (is *step) collectOutcomes(subtasks map[string]concurrency.Task, results concurrency.TaskGroupResult) (int, resources.UnitResults, fail.Error) {
-	outcomes := &unitResults{}
-	wrongs := 0
-	for k, s := range subtasks {
-		sid, err := s.ID()
-		if err != nil {
-			return 0, nil, err
-		}
-		outcome := results[sid]
-		if outcome != nil {
-			oko, ok := outcome.(stepResult)
-			if !ok {
-				return wrongs, nil, fail.InconsistentError("outcome should be a stepResult (implements resources.UnitResult)")
-			}
-
-			outcomes.AddOne(k, oko)
-			if oko.err != nil || !strings.Contains(oko.output, "exit 0") {
-				wrongs++
-			}
-		}
-	}
-	return wrongs, outcomes, nil
 }
 
 // initLoopTurnForHost inits the coming loop turn for a specific Host
@@ -494,7 +456,7 @@ type runOnHostParameters struct {
 	Variables data.Map
 }
 
-func (is *step) taskRunOnHostWithLoop(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (is *step) taskRunOnHostWithLoop(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var res concurrency.TaskResult
 
@@ -506,17 +468,13 @@ func (is *step) taskRunOnHostWithLoop(task concurrency.Task, params concurrency.
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	inctx := task.Context()
 	cv, xerr := is.initLoopTurnForHost(inctx, p.Host, p.Variables)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	res, xerr = is.taskRunOnHost(task, runOnHostParameters{
+	res, xerr = is.taskRunOnHost(inctx, runOnHostParameters{
 		Host:      p.Host,
 		Variables: cv,
 	})
@@ -529,7 +487,7 @@ func (is *step) taskRunOnHostWithLoop(task concurrency.Task, params concurrency.
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
-func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (is *step) taskRunOnHost(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var res concurrency.TaskResult
 
@@ -541,11 +499,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 

@@ -375,7 +375,7 @@ func (instance *Share) Create(
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -457,7 +457,7 @@ func (instance *Share) Create(
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -500,7 +500,7 @@ func (instance *Share) Create(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := nfsServer.RemoveShare(context.Background(), sharePath); derr != nil {
+			if derr := nfsServer.RemoveShare(cleanupContextFrom(ctx), sharePath); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Share '%s' from Host", sharePath))
 			}
 		}
@@ -541,7 +541,7 @@ func (instance *Share) Create(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := server.Alter(context.Background(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := server.Alter(cleanupContextFrom(ctx), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
@@ -554,7 +554,7 @@ func (instance *Share) Create(
 				})
 			})
 			if derr != nil {
-				logrus.WithContext(context.Background()).Errorf("After failure, cleanup failed to update metadata of host '%s'", server.GetName())
+				logrus.WithContext(cleanupContextFrom(ctx)).Errorf("After failure, cleanup failed to update metadata of host '%s'", server.GetName())
 				_ = ferr.AddConsequence(derr)
 			}
 		}
@@ -863,7 +863,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := serverInstance.Alter(context.Background(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := serverInstance.Alter(cleanupContextFrom(ctx), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 					if !ok {
@@ -886,7 +886,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 				return
 			}
 
-			derr = nfsClient.Unmount(context.Background(), instance.Service(), export)
+			derr = nfsClient.Unmount(cleanupContextFrom(ctx), instance.Service(), export)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount trying to delete Share"))
 				return
@@ -1192,7 +1192,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 				return xerr
 			}
 
-			xerr = nfsServer.RemoveShare(context.Background(), hostShare.Path)
+			xerr = nfsServer.RemoveShare(cleanupContextFrom(ctx), hostShare.Path)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr

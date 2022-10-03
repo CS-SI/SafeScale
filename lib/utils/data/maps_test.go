@@ -23,18 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_AnonymousMapToStringMap(t *testing.T) {
-
-	v := AnonymousMap{
-		0: "first",
-		1: "second",
-		2: "third",
-	}
-	am := AnonymousMapToStringMap(v)
-	require.EqualValues(t, reflect.TypeOf(am).String(), "map[string]interface {}")
-
-}
-
 func Test_NewMap(t *testing.T) {
 
 	m := NewMap()

@@ -1834,7 +1834,7 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// continue
-						debug.IgnoreError(xerr)
+						debug.IgnoreError2(ctx, xerr)
 					default:
 						return fail.Wrap(xerr, "failed to req information about Elastic IP '%s'", ip)
 					}
@@ -1930,7 +1930,7 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound, *fail.ErrInvalidRequest:
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				return fail.Wrap(xerr, "failed to delete network interface %s from instance", aws.StringValue(v))
 			}

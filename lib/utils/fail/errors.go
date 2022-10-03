@@ -190,9 +190,11 @@ func defaultCauseFormatter(e Error) string {
 				msgFinal += ": " + raw
 			}
 		default:
-			raw := cerr.Error()
-			if raw != "" {
-				msgFinal += ": " + raw
+			if cerr != nil {
+				raw := cerr.Error()
+				if raw != "" {
+					msgFinal += ": " + raw
+				}
 			}
 		}
 	}
@@ -370,7 +372,7 @@ func (e *errorCore) Error() string {
 	if e.context != nil {
 		id, ok := e.context.Value("ID").(string)
 		if ok {
-			msgFinal += fmt.Sprintf(".\n[ctx: %s]", id)
+			msgFinal += fmt.Sprintf(" [ctx: %s]", id)
 		}
 	}
 
@@ -378,7 +380,7 @@ func (e *errorCore) Error() string {
 		sta := string(debug.Stack())
 		num := strings.Count(sta, "(*errorCore).Error") // protection against recursive calls infinite loop
 		if num < 32 {
-			msgFinal += ".\nWith annotations: "
+			msgFinal += ". With annotations: "
 			more, fmtErr := e.annotationFormatter(e.annotations)
 			if fmtErr != nil {
 				return msgFinal
@@ -407,12 +409,12 @@ func (e *errorCore) unsafeUnformattedError() string {
 	if e.context != nil {
 		id, ok := e.context.Value("ID").(string)
 		if ok {
-			msgFinal += fmt.Sprintf(".\n[ctx: %s]", id)
+			msgFinal += fmt.Sprintf(" [ctx: %s]", id)
 		}
 	}
 
 	if len(e.annotations) > 0 {
-		msgFinal += ".\nWith annotations: "
+		msgFinal += ". With annotations: "
 		more, fmtErr := e.annotationFormatter(e.annotations)
 		if fmtErr != nil {
 			return msgFinal

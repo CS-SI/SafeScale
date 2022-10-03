@@ -45,7 +45,7 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return nil, xerr
 		}

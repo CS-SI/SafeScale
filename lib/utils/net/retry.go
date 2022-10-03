@@ -142,6 +142,10 @@ func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // n
 	}()
 
 	if in != nil {
+		if strings.Contains(in.Error(), "context canceled") {
+			return retry.StopRetryError(in)
+		}
+
 		switch realErr := in.(type) {
 		case *url.Error:
 			if realErr.Temporary() {

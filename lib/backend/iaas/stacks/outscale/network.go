@@ -323,7 +323,7 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// if no nics found, considered as a success and continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -338,7 +338,7 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// no Internet Gateway, consider the deletion successful and continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -546,7 +546,7 @@ func (s stack) listSubnetsByHost(ctx context.Context, hostID string) ([]*abstrac
 		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
 			// No nics found, considered as a success and returns empty slices
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 			return emptySubnetSlice, emptyNicSlice, nil
 		}
 		return emptySubnetSlice, emptyNicSlice, xerr
@@ -584,7 +584,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// No nics, continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -595,7 +595,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 			if nic.LinkNic.LinkNicId != "" {
 				xerr = s.rpcUnLinkNic(ctx, nic.LinkNic.LinkNicId)
 				if xerr != nil {
-					debug.IgnoreError(xerr)
+					debug.IgnoreError2(ctx, xerr)
 				}
 			}
 		}

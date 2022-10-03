@@ -107,9 +107,9 @@ func (t *tracer) buildMessage() string {
 		return "" // FIXME: Error hiding
 	}
 
-	message := t.taskSig
+	message := ""
 	if _, _, line, ok := runtime.Caller(1); ok {
-		message += " " + t.funcName + t.callerParams + " [" + t.fileName + ":" + strconv.Itoa(line) + "]"
+		message += t.funcName + t.callerParams + " [" + t.fileName + ":" + strconv.Itoa(line) + "]"
 	}
 	return message
 }

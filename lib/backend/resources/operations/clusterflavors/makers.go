@@ -36,11 +36,11 @@ type Makers struct {
 	// GetNodeInstallationScript func(c resources.Cluster, nodeType clusternodetype.Enum) (string, map[string]interface{})
 	// GetGlobalSystemRequirements func(c resources.Cluster) (string, fail.Error)
 	ConfigureGateway       func(c resources.Cluster) fail.Error
-	CreateMaster           func(c resources.Cluster, index uint) fail.Error
-	ConfigureMaster        func(c resources.Cluster, index uint, host resources.Host) fail.Error
+	CreateMaster           func(c resources.Cluster) fail.Error
+	ConfigureMaster        func(c resources.Cluster, host resources.Host) fail.Error
 	UnconfigureMaster      func(c resources.Cluster, host resources.Host) fail.Error
-	CreateNode             func(c resources.Cluster, index uint, host resources.Host) fail.Error
-	ConfigureNode          func(c resources.Cluster, index uint, host resources.Host) fail.Error
+	CreateNode             func(c resources.Cluster, host resources.Host) fail.Error
+	ConfigureNode          func(c resources.Cluster, host resources.Host) fail.Error
 	UnconfigureNode        func(c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
 	ConfigureCluster       func(ctx context.Context, c resources.Cluster, params data.Map) fail.Error
 	UnconfigureCluster     func(c resources.Cluster) fail.Error

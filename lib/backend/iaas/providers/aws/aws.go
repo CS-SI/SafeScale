@@ -172,6 +172,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
 	}
 
+	machineCreationLimit := 8
+	if _, ok = computeCfg["ConcurrentMachineCreationLimit"].(string); ok {
+		machineCreationLimit, _ = strconv.Atoi(computeCfg["ConcurrentMachineCreationLimit"].(string))
+	}
+
 	operatorUsername, _ := computeCfg["OperatorUsername"].(string) // nolint
 	if operatorUsername == "" {
 		operatorUsername = abstract.DefaultUser
@@ -183,7 +188,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 	params["Safe"] = isSafe
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
@@ -245,16 +250,17 @@ next:
 			"standard":   volumespeed.Cold,
 			"performant": volumespeed.Hdd,
 		},
-		MetadataBucket:   metadataBucketName,
-		DefaultImage:     defaultImage,
-		OperatorUsername: operatorUsername,
-		UseNATService:    false,
-		ProviderName:     providerName,
-		// BuildSubnets:     false, // FIXME: AWS by default don't build subnetworks
-		DefaultSecurityGroupName: "default",
-		MaxLifeTime:              maxLifeTime,
-		Timings:                  timings,
-		Safe:                     isSafe,
+		MetadataBucket:                 metadataBucketName,
+		DefaultImage:                   defaultImage,
+		OperatorUsername:               operatorUsername,
+		UseNATService:                  false,
+		ProviderName:                   providerName,
+		BuildSubnets:                   false, // FIXME: AWS by default don't build subnetworks
+		DefaultSecurityGroupName:       "default",
+		MaxLifeTime:                    maxLifeTime,
+		Timings:                        timings,
+		Safe:                           isSafe,
+		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
 	awsStack, err := aws.New(authOptions, awsConf, cfgOptions)
@@ -329,6 +335,7 @@ func (p *provider) GetConfigurationOptions(ctx context.Context) (providers.Confi
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 	cfg.Set("Safe", opts.Safe)
+	cfg.Set("ConcurrentMachineCreationLimit", opts.ConcurrentMachineCreationLimit)
 
 	return cfg, nil
 }

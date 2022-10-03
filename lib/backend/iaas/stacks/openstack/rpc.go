@@ -276,11 +276,11 @@ func (s stack) rpcCreateServer(ctx context.Context, name string, networks []serv
 
 	srvOpts := servers.CreateOpts{
 		Name:             name,
-		Networks:         networks,
-		FlavorRef:        templateID,
 		ImageRef:         imageID,
+		FlavorRef:        templateID,
 		UserData:         userdata,
 		AvailabilityZone: az,
+		Networks:         networks,
 		Metadata:         metadata,
 	}
 
@@ -294,12 +294,16 @@ func (s stack) rpcCreateServer(ctx context.Context, name string, networks []serv
 
 	var server *servers.Server
 	xerr := stacks.RetryableRemoteCall(ctx,
-		func() (innerErr error) {
-			server, innerErr = bootfromvolume.Create(s.ComputeClient, bootfromvolume.CreateOptsExt{
+		func() error {
+			aserver, innerErr := bootfromvolume.Create(s.ComputeClient, bootfromvolume.CreateOptsExt{
 				CreateOptsBuilder: srvOpts,
 				BlockDevice:       bd,
 			}).Extract()
-			return innerErr
+			if innerErr != nil {
+				return innerErr
+			}
+			server = aserver
+			return nil
 		},
 		NormalizeError,
 	)

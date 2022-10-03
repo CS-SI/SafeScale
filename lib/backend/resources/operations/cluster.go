@@ -22,6 +22,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"math"
 	mrand "math/rand"
 	"reflect"
 	"strconv"
@@ -30,10 +31,10 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -53,7 +54,6 @@ import (
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -80,13 +80,16 @@ type Cluster struct {
 
 	machines map[string]resources.Host
 
-	randomDelayTask concurrency.Task
+	randomDelayTask func()
 	randomDelayCh   <-chan int
 }
 
 // NewCluster is the constructor of resources.Cluster struct
-func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Error) {
+func NewCluster(inctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -215,19 +218,13 @@ func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max
 	chint := make(chan int)
 	mrand.Seed(time.Now().UnixNano())
 
-	var xerr fail.Error
-	instance.randomDelayTask, xerr = concurrency.NewTaskWithContext(ctx)
-	if xerr != nil {
-		return xerr
-	}
-
-	_, xerr = instance.randomDelayTask.Start(func(t concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+	instance.randomDelayTask = func() {
 		defer close(chint)
 		if min == max {
 			for {
 				select {
 				case <-ctx.Done():
-					return nil, nil
+					return
 				default:
 					chint <- min
 				}
@@ -237,16 +234,14 @@ func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max
 			for {
 				select {
 				case <-ctx.Done():
-					return nil, nil
+					return
 				default:
 					chint <- mrand.Intn(value) + min // nolint
 				}
 			}
 		}
-	}, nil)
-	if xerr != nil {
-		return xerr
 	}
+	go instance.randomDelayTask()
 
 	instance.randomDelayCh = chint
 	return nil
@@ -484,7 +479,7 @@ func (instance *Cluster) IsNull() bool {
 }
 
 // carry ...
-func (instance *Cluster) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
+func (instance *Cluster) carry(inctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -493,6 +488,9 @@ func (instance *Cluster) carry(ctx context.Context, clonable data.Clonable) (fer
 			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 		}
 	}
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
@@ -531,13 +529,7 @@ func (instance *Cluster) Create(inctx context.Context, req abstract.ClusterReque
 				return fail.InvalidParameterCannotBeNilError("ctx")
 			}
 
-			task, xerr := concurrency.TaskFromContext(ctx)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-
-			res, xerr := instance.taskCreateCluster(task, req)
+			res, xerr := instance.taskCreateCluster(ctx, req)
 			if xerr != nil {
 				return xerr
 			}
@@ -608,18 +600,21 @@ func (instance *Cluster) bootstrap(flavor clusterflavor.Enum) (ferr fail.Error) 
 
 // Browse walks through Cluster MetadataFolder and executes a callback for each entry
 // FIXME: adds a Cluster status check to prevent operations on removed clusters
-func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.ClusterIdentity) fail.Error) (ferr fail.Error) {
+func (instance *Cluster) Browse(inctx context.Context, callback func(*abstract.ClusterIdentity) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return fail.InvalidParameterCannotBeNilError("ctx")
+	if inctx == nil {
+		return fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		aci := abstract.NewClusterIdentity()
@@ -904,66 +899,39 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 
 	var problems []error
 
-	// Start gateway(s)
-	taskGroup, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+	runGroup := new(errgroup.Group)
 
-	_, xerr = taskGroup.Start(instance.taskStartHost, gatewayID)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		problems = append(problems, xerr)
-		abErr := taskGroup.AbortWithCause(xerr)
-		if abErr != nil {
-			logrus.WithContext(ctx).Warnf("problem aborting taskgroup: %v", abErr)
-		}
-	}
+	runGroup.Go(func() error {
+		_, err := instance.taskStartHost(ctx, gatewayID)
+		return err
+	})
 
 	if secondaryGatewayID != "" {
-		_, xerr = taskGroup.Start(instance.taskStartHost, secondaryGatewayID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			problems = append(problems, xerr)
-			abErr := taskGroup.AbortWithCause(xerr)
-			if abErr != nil {
-				logrus.WithContext(ctx).Warnf("problem aborting taskgroup: %v", abErr)
-			}
-		}
+		runGroup.Go(func() error {
+			_, err := instance.taskStartHost(ctx, secondaryGatewayID)
+			return err
+		})
 	}
 
 	// Start masters
 	for _, n := range masters {
 		n := n
-		_, xerr = taskGroup.Start(instance.taskStartHost, n)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			problems = append(problems, xerr)
-			abErr := taskGroup.AbortWithCause(xerr)
-			if abErr != nil {
-				logrus.WithContext(ctx).Warnf("problem aborting taskgroup: %v", abErr)
-			}
-			break
-		}
+		runGroup.Go(func() error {
+			_, err := instance.taskStartHost(ctx, n)
+			return err
+		})
 	}
 
 	// Start nodes
 	for _, n := range nodes {
 		n := n
-		_, xerr = taskGroup.Start(instance.taskStartHost, n)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			problems = append(problems, xerr)
-			abErr := taskGroup.AbortWithCause(xerr)
-			if abErr != nil {
-				logrus.WithContext(ctx).Warnf("problem aborting taskgroup: %v", abErr)
-			}
-			break
-		}
+		runGroup.Go(func() error {
+			_, err := instance.taskStartHost(ctx, n)
+			return err
+		})
 	}
 
-	_, xerr = taskGroup.WaitGroup()
+	xerr = fail.ConvertError(runGroup.Wait())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if len(problems) > 0 {
@@ -1152,64 +1120,39 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 		}
 
 		// Stop nodes
-		taskGroup, innerXErr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		// If there's a problem starting things don't return, note the problem, break if needed, then abort and wait.
-		var problems []error
+		egStopHosts := new(errgroup.Group)
 
 		for _, n := range nodes {
 			n := n
-			if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
-				problems = append(problems, innerXErr)
-				abErr := taskGroup.AbortWithCause(innerXErr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("problem aborting taskgroup: %v", abErr)
-				}
-				break
-			}
+			egStopHosts.Go(func() error {
+				_, err := instance.taskStopHost(ctx, n)
+				return err
+			})
 		}
 		// Stop masters
 		for _, n := range masters {
 			n := n
-			if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
-				problems = append(problems, innerXErr)
-				abErr := taskGroup.AbortWithCause(innerXErr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("problem aborting taskgroup: %v", abErr)
-				}
-				break
-			}
+			egStopHosts.Go(func() error {
+				_, err := instance.taskStopHost(ctx, n)
+				return err
+			})
 		}
 		// Stop gateway(s)
-		if _, innerXErr = taskGroup.Start(instance.taskStopHost, gatewayID); innerXErr != nil {
-			problems = append(problems, innerXErr)
-			abErr := taskGroup.AbortWithCause(innerXErr)
-			if abErr != nil {
-				logrus.WithContext(ctx).Warnf("problem aborting taskgroup: %v", abErr)
-			}
-		}
+		egStopHosts.Go(func() error {
+			_, err := instance.taskStopHost(ctx, gatewayID)
+			return err
+		})
 
 		if secondaryGatewayID != "" {
-			if _, innerXErr = taskGroup.Start(instance.taskStopHost, secondaryGatewayID); innerXErr != nil {
-				problems = append(problems, innerXErr)
-				abErr := taskGroup.AbortWithCause(innerXErr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("problem aborting taskgroup: %v", abErr)
-				}
-			}
+			egStopHosts.Go(func() error {
+				_, err := instance.taskStopHost(ctx, secondaryGatewayID)
+				return err
+			})
 		}
 
-		if _, innerXErr = taskGroup.WaitGroup(); innerXErr != nil {
-			if len(problems) > 0 {
-				_ = innerXErr.AddConsequence(fail.NewErrorList(problems))
-			}
+		innerXErr = fail.ConvertError(egStopHosts.Wait())
+		if innerXErr != nil {
 			return innerXErr
-		}
-		if len(problems) > 0 {
-			return fail.NewErrorList(problems)
 		}
 
 		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
@@ -1319,8 +1262,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	var (
-		errors []string
-		nodes  []*propertiesv3.ClusterNode
+		nodes []*propertiesv3.ClusterNode
 	)
 
 	timings, xerr := svc.Timings()
@@ -1328,82 +1270,71 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		return nil, xerr
 	}
 
-	timeout := 3 * timings.HostCreationTimeout() // More than enough
+	timeout := time.Duration(count) * timings.HostCreationTimeout() // More than enough
 
-	tg, xerr := concurrency.NewTaskGroupWithContext(
-		ctx, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)),
-	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	for i := uint(1); i <= count; i++ {
-		captured := i
-		params := taskCreateNodeParameters{
-			nodeDef:       nodeDef,
-			timeout:       timeout,
-			keepOnFailure: keepOnFailure,
-			index:         captured,
-		}
-		_, xerr := tg.Start(instance.taskCreateNode, params, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", captured)))
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			abErr := tg.AbortWithCause(xerr)
-			if abErr != nil {
-				logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+	winSize := 8
+	if cfg, xerr := svc.GetConfigurationOptions(ctx); xerr == nil {
+		if aval, ok := cfg.Get("ConcurrentMachineCreationLimit"); ok {
+			if val, ok := aval.(int); ok {
+				winSize = val
 			}
-			break
 		}
+	}
+
+	// for OVH, we have to ignore the errors and keep trying until we have 'count'
+	var listNodes []StdResult
+	nodesChan := make(chan StdResult, count)
+
+	// FIXME: OPP This is our second problem.
+	err = runWindow(ctx, count, uint(math.Min(float64(count), float64(winSize))), timeout, nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
+		nodeDef:       nodeDef,
+		timeout:       timings.HostCreationTimeout(),
+		keepOnFailure: keepOnFailure,
+	})
+	if err != nil {
+		close(nodesChan)
+		return nil, fail.ConvertError(err)
+	}
+
+	close(nodesChan)
+	for v := range nodesChan {
+		listNodes = append(listNodes, v)
+		if v.Err != nil {
+			continue
+		}
+		if v.ToBeDeleted {
+			_, xerr = instance.taskDeleteNodeWithCtx(ctx, taskDeleteNodeParameters{node: v.Content.(*propertiesv3.ClusterNode)})
+			debug.IgnoreError2(ctx, xerr)
+			continue
+		}
+		nodes = append(nodes, v.Content.(*propertiesv3.ClusterNode))
 	}
 
 	// Starting from here, if exiting with error, delete created nodes if allowed (cf. keepOnFailure)
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !keepOnFailure && len(nodes) > 0 {
-			// Note: using context.Background() disable cancellation mechanism for a workload that needs to go to the end
-			dtg, derr := concurrency.NewTaskGroupWithContext(context.Background())
-			if derr != nil {
-				_ = ferr.AddConsequence(derr)
-			}
-			derr = dtg.SetID("/onfailure")
-			if derr != nil {
-				_ = ferr.AddConsequence(derr)
-			}
+			egDeletion := new(errgroup.Group)
 
 			for _, v := range nodes {
 				v := v
-				_, derr = dtg.Start(
-					instance.taskDeleteNode, taskDeleteNodeParameters{node: v},
-				)
-				if derr != nil {
-					abErr := dtg.AbortWithCause(derr)
-					if abErr != nil {
-						logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-					}
-					break
-				}
+				egDeletion.Go(func() error {
+					_, err := instance.taskDeleteNode(cleanupContextFrom(ctx), taskDeleteNodeParameters{node: v})
+					return err
+				})
 			}
-			_, derr = dtg.WaitGroup()
+			derr := fail.ConvertError(egDeletion.Wait())
 			derr = debug.InjectPlannedFail(derr)
 			if derr != nil {
 				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()
-
-	_, res, xerr := tg.WaitGroupFor(3 * timings.HostCreationTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if len(res) > 0 {
-		for _, v := range res {
-			if item, ok := v.(*propertiesv3.ClusterNode); ok {
-				nodes = append(nodes, item)
-			}
-		}
-	}
-	if xerr != nil {
-		return nil, fail.NewErrorWithCause(xerr, "errors occurred on node%s addition", strprocess.Plural(uint(len(errors))))
-	}
 
 	// configure what has to be done Cluster-wide
 	makers := instance.localCache.makers
@@ -1999,7 +1930,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := instance.Alter(context.Background(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := instance.Alter(cleanupContextFrom(ctx), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
@@ -2029,7 +1960,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 		case *fail.ErrNotFound:
 			// master seems already deleted, so consider it as a success
 			logrus.WithContext(ctx).Tracef("master not found, deletion considered successful")
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -2093,7 +2024,7 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := instance.Alter(context.Background(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				derr := instance.Alter(cleanupContextFrom(ctx), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 						nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 						if !ok {
@@ -2112,7 +2043,7 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 					})
 				})
 				if derr != nil {
-					logrus.WithContext(context.Background()).Errorf("failed to restore node ownership in Cluster")
+					logrus.WithContext(cleanupContextFrom(ctx)).Errorf("failed to restore node ownership in Cluster")
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to restore node ownership in Cluster metadata", ActionFromError(ferr)))
 				}
 			}
@@ -2235,7 +2166,7 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := instance.Alter(context.Background(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				derr := instance.Alter(cleanupContextFrom(ctx), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Alter(
 						clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 							stateV1, ok := clonable.(*propertiesv1.ClusterState)
@@ -2307,83 +2238,35 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 
 		masterCount, nodeCount := len(masters), len(nodes)
 		if masterCount+nodeCount > 0 {
-			tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				chRes <- result{xerr}
-				return xerr
-			}
-
-			options := []data.ImmutableKeyValue{
-				concurrency.InheritParentIDOption,
-				data.NewImmutableKeyValue("normalize_error", func(err error) error {
-					err = debug.InjectPlannedError(err)
-					if err != nil {
-						switch err.(type) {
-						case *fail.ErrNotFound:
-							return nil
-						default:
-						}
-					}
-					return err
-				}),
-			}
+			egKill := new(errgroup.Group)
 
 			foundSomething := false
 			for _, v := range nodes {
+				v := v
 				if n, ok := all[v]; ok {
 					foundSomething = true
 
-					var completedOptions []data.ImmutableKeyValue
-					copy(completedOptions, options)
-
-					completedOptions = append(completedOptions, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", n.Name)))
-					_, xerr = tg.Start(
-						instance.taskDeleteNode, taskDeleteNodeParameters{node: n},
-						completedOptions...,
-					)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						abErr := tg.AbortWithCause(xerr)
-						if abErr != nil {
-							logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-						}
-						cleaningErrors = append(
-							cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name),
-						)
-						break
-					}
+					egKill.Go(func() error {
+						_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: n})
+						return err
+					})
 				}
 			}
 
 			for _, v := range masters {
+				v := v
 				if n, ok := all[v]; ok {
 					foundSomething = true
 
-					var completedOptions []data.ImmutableKeyValue
-					copy(completedOptions, options)
-
-					completedOptions = append(completedOptions, concurrency.AmendID(fmt.Sprintf("/master/%s/delete", n.Name)))
-					_, xerr := tg.Start(
-						instance.taskDeleteMaster, taskDeleteNodeParameters{node: n},
-						completedOptions...,
-					)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						cleaningErrors = append(
-							cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name),
-						)
-						abErr := tg.AbortWithCause(xerr)
-						if abErr != nil {
-							logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-						}
-						break
-					}
+					egKill.Go(func() error {
+						_, err := instance.taskDeleteMaster(ctx, taskDeleteNodeParameters{node: n})
+						return err
+					})
 				}
 			}
 
 			if foundSomething {
-				_, xerr = tg.WaitGroup()
+				xerr = fail.ConvertError(egKill.Wait())
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					cleaningErrors = append(cleaningErrors, xerr)
@@ -2418,32 +2301,17 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 
 		allCount := len(all)
 		if allCount > 0 {
-			tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				chRes <- result{xerr}
-				return xerr
-			}
+			egKill := new(errgroup.Group)
 
 			for _, v := range all {
-				_, xerr = tg.Start(
-					instance.taskDeleteNode, taskDeleteNodeParameters{node: v},
-					concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)),
-				)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					cleaningErrors = append(
-						cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", v.Name),
-					)
-					abErr := tg.AbortWithCause(xerr)
-					if abErr != nil {
-						logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-					}
-					break
-				}
+				v := v
+				egKill.Go(func() error {
+					_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: v})
+					return err
+				})
 			}
 
-			_, xerr = tg.WaitGroup()
+			xerr = fail.ConvertError(egKill.Wait())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				cleaningErrors = append(cleaningErrors, xerr)
@@ -2462,7 +2330,7 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// missing Network and Subnet is considered as a successful deletion, continue
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				chRes <- result{xerr}
 				return xerr
@@ -2505,13 +2373,13 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					debug.IgnoreError(xerr)
+					debug.IgnoreError2(ctx, xerr)
 				case *fail.ErrTimeout, *fail.ErrAborted:
 					nerr := fail.ConvertError(fail.Cause(xerr))
 					switch nerr.(type) {
 					case *fail.ErrNotFound:
 						// Subnet not found, considered as a successful deletion and continue
-						debug.IgnoreError(nerr)
+						debug.IgnoreError2(ctx, nerr)
 					default:
 						xerr = fail.Wrap(nerr, "failed to delete Subnet '%s'", subnetName)
 						chRes <- result{xerr}
@@ -2555,7 +2423,7 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// network not found, considered as a successful deletion and continue
-					debug.IgnoreError(xerr)
+					debug.IgnoreError2(ctx, xerr)
 				case *retry.ErrStopRetry:
 					xerr = fail.Wrap(xerr.Cause(), "stopping retries")
 					chRes <- result{xerr}
@@ -3003,47 +2871,22 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 		}
 
 		// --------- Upload file for each master and test it (parallelized) --------------
-		tg, xerr := concurrency.NewTaskGroup()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			ar := result{xerr}
-			chRes <- ar
-			return
-		}
-		xerr = tg.SetID(fileName)
-		if xerr != nil {
-			ar := result{xerr}
-			chRes <- ar
-			return
-		}
-
-		var errors []error
+		tg := new(errgroup.Group)
 		for master := range masters {
+			master := master
 			logrus.WithContext(ctx).Infof("%s Update master %s", prerr, masters[master].GetName())
 
-			_, xerr = tg.Start(
-				instance.taskUpdateClusterInventoryMaster,
-				taskUpdateClusterInventoryMasterParameters{
+			tg.Go(func() error {
+				_, err := instance.taskUpdateClusterInventoryMaster(ctx, taskUpdateClusterInventoryMasterParameters{
 					ctx:           ctx,
 					master:        masters[master],
 					inventoryData: dataBuffer.String(),
-				},
-				concurrency.InheritParentIDOption,
-				concurrency.AmendID(fmt.Sprintf("/cluster/%s/master/%s/update_inventory", instance.GetName(), masters[master].GetName())),
-			)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				errors = append(errors, xerr)
-				abErr := tg.AbortWithCause(xerr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("%s there was an error trying to abort TaskGroup: %s", prerr, spew.Sdump(abErr))
-				}
-				break
-			}
+				})
+				return err
+			})
 		}
 
-		var tgr concurrency.TaskGroupResult
-		tgr, xerr = tg.WaitGroup()
+		xerr = fail.ConvertError(tg.Wait())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if withTimeout(xerr) {
@@ -3054,12 +2897,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 			return
 		}
 
-		if len(errors) != 0 {
-			ar := result{fail.NewError("%s failed to update inventory: %s", prerr, fail.NewErrorList(errors))}
-			chRes <- ar
-			return
-		}
-		logrus.WithContext(ctx).Debugf("%s update inventory successful: %v", prerr, tgr)
+		logrus.WithContext(ctx).Debugf("%s update inventory successful", prerr)
 
 		ar := result{nil}
 		chRes <- ar
@@ -3082,33 +2920,19 @@ func (instance *Cluster) configureNodesFromList(ctx context.Context, nodes []*pr
 
 	length := len(nodes)
 	if length > 0 {
-		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
+		eg := new(errgroup.Group)
 		for i := 0; i < length; i++ {
 			captured := i
-			_, ierr := tg.Start(
-				instance.taskConfigureNode, taskConfigureNodeParameters{
-					index:     uint(captured + 1),
+			eg.Go(func() error {
+				_, xerr := instance.taskConfigureNode(ctx, taskConfigureNodeParameters{
 					node:      nodes[captured],
 					variables: parameters,
-				}, concurrency.InheritParentIDOption,
-				concurrency.AmendID(fmt.Sprintf("/host/%s/configure", nodes[captured].Name)),
-			)
-			ierr = debug.InjectPlannedFail(ierr)
-			if ierr != nil {
-				abErr := tg.AbortWithCause(ierr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-				}
-				break
-			}
+				})
+				return xerr
+			})
 		}
-		_, xerr = tg.WaitGroup()
-		xerr = debug.InjectPlannedFail(xerr)
+
+		xerr := fail.ConvertError(eg.Wait())
 		if xerr != nil {
 			return xerr
 		}
@@ -3409,7 +3233,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := instance.Alter(context.Background(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := instance.Alter(cleanupContextFrom(ctx), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(
 					clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 						nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -3441,13 +3265,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	}()
 
 	if len(removedNodes) > 0 {
-		tg, xerr := concurrency.NewTaskGroupWithContext(
-			ctx, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/shrink/%d", len(removedNodes))),
-		)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return emptySlice, xerr
-		}
+		tg := new(errgroup.Group)
 
 		selectedMaster, xerr := instance.unsafeFindAvailableMaster(ctx)
 		if xerr != nil {
@@ -3455,22 +3273,13 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 		}
 
 		for _, v := range removedNodes {
-			_, xerr = tg.Start(
-				instance.taskDeleteNode,
-				taskDeleteNodeParameters{node: v, master: selectedMaster.(*Host)},
-				concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)),
-			)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				errors = append(errors, xerr)
-				abErr := tg.AbortWithCause(xerr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-				}
-				break
-			}
+			v := v
+			tg.Go(func() error {
+				_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: v, master: selectedMaster.(*Host)})
+				return err
+			})
 		}
-		_, xerr = tg.WaitGroup()
+		xerr = fail.ConvertError(tg.Wait())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			errors = append(errors, xerr)

@@ -234,22 +234,25 @@ func (instance *tracer) buildMessage(extra uint) string {
 	//       badly set, and you will get a line number that does not match with the one corresponding to the call
 	skipCallers := 2 + int(extra)
 
-	message := instance.taskSig
+	message := ""
 	if _, _, line, ok := runtime.Caller(skipCallers); ok {
-		message += " " + instance.funcName + instance.callerParams + " [" + instance.fileName + ":" + strconv.Itoa(line) + "]"
+		message += instance.funcName + instance.callerParams + " [" + instance.fileName + ":" + strconv.Itoa(line) + "]"
 	}
 	return message
 }
 
 // TraceMessage returns a string containing a trace message
 func (instance *tracer) TraceMessage(msg ...interface{}) string {
-	return "--- " + instance.buildMessage(1) + ": " + strprocess.FormatStrings(msg...)
+	amsg := "--- " + instance.buildMessage(1) + ": " + strprocess.FormatStrings(msg...)
+	amsg = strings.Replace(amsg, "\n", "\t", -1)
+	return amsg
 }
 
 // Trace traces a message
 func (instance *tracer) Trace(msg ...interface{}) Tracer {
 	if !valid.IsNil(instance) && instance.enabled {
 		message := "--- " + instance.buildMessage(0) + ": " + strprocess.FormatStrings(msg...)
+		message = strings.Replace(message, "\n", "\t", -1)
 		if message != "" {
 			logrus.WithContext(instance.context).Tracef(message)
 		}
@@ -261,6 +264,7 @@ func (instance *tracer) Trace(msg ...interface{}) Tracer {
 func (instance *tracer) TraceAsError(msg ...interface{}) Tracer {
 	if !valid.IsNil(instance) && instance.enabled {
 		message := "--- " + instance.buildMessage(0) + ": " + strprocess.FormatStrings(msg...)
+		message = strings.Replace(message, "\n", "\t", -1)
 		if message != "" {
 			logrus.WithContext(instance.context).Errorf(message)
 		}
