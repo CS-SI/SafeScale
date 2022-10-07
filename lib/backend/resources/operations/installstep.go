@@ -241,7 +241,7 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s resources.FeatureSettings) (_ resources.UnitResults, ferr fail.Error) {
+func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map[string, any], s resources.FeatureSettings) (_ resources.UnitResults, ferr fail.Error) {
 	outcomes := &unitResults{}
 
 	select {
@@ -257,7 +257,7 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 	return is.loopConcurrentlyOnHosts(task.Context(), hosts, v)
 }
 
-func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
+func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host, v data.Map[string, any]) (_ resources.UnitResults, ferr fail.Error) {
 	tracer := debug.NewTracer(ctx, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
@@ -314,7 +314,7 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 	return outcomes, nil
 }
 
-func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
+func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources.Host, v data.Map[string, any]) (_ resources.UnitResults, ferr fail.Error) {
 	tracer := debug.NewTracer(inctx, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(inctx, &ferr, tracer.TraceMessage())
@@ -422,15 +422,16 @@ func (is *step) collectOutcomes(subtasks map[string]concurrency.Task, results co
 }
 
 // initLoopTurnForHost inits the coming loop turn for a specific Host
-func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v data.Map) (clonedV data.Map, ferr fail.Error) {
+func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v data.Map[string, any]) (clonedV data.Map[string, any], ferr fail.Error) {
 	is.Worker.SetStartTime(time.Now())
 
 	var xerr fail.Error
-	var cerr error
-	clonedV, cerr = data.FromMap(v)
-	if cerr != nil {
-		return nil, fail.Wrap(cerr)
-	}
+	// var cerr error
+	// clonedV, cerr = data.FromMap(v)
+	// if cerr != nil {
+	// 	return nil, fail.Wrap(cerr)
+	// }
+	clonedV = v.Clone()
 
 	clonedV["HostIP"], xerr = host.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -491,7 +492,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 
 type runOnHostParameters struct {
 	Host      resources.Host
-	Variables data.Map
+	Variables data.Map[string, any]
 }
 
 func (is *step) taskRunOnHostWithLoop(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
@@ -689,11 +690,8 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 }
 
 // realizeVariables replaces any template occurring in every variable
-func realizeVariables(variables data.Map) (data.Map, fail.Error) {
-	cloneV, cerr := data.FromMap(variables)
-	if cerr != nil {
-		return nil, fail.Wrap(cerr)
-	}
+func realizeVariables(variables data.Map[string, any]) (data.Map[string, any], fail.Error) {
+	cloneV := variables.Clone()
 
 	for k, v := range cloneV {
 		if variable, ok := v.(string); ok && variable != "" {
@@ -718,7 +716,7 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 }
 
 // replaceVariablesInString ...
-func replaceVariablesInString(text string, v data.Map) (string, fail.Error) {
+func replaceVariablesInString(text string, v data.Map[string, any]) (string, fail.Error) {
 	tmpl, xerr := template.Parse("replaceVariablesInString", text)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

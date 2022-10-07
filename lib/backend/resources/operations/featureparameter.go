@@ -118,8 +118,8 @@ func (cfp ConditionedFeatureParameter) Value() string {
 type ConditionedFeatureParameters map[string]ConditionedFeatureParameter
 
 // ToMap converts a ConditionedFeatureParameters to a data.Map (to be used in template)
-func (cfp ConditionedFeatureParameters) ToMap() data.Map {
-	out := data.NewMap()
+func (cfp ConditionedFeatureParameters) ToMap() data.Map[string, any] {
+	out := data.NewMap[string, any]()
 	for k, v := range cfp {
 		out[k] = v.Value()
 	}

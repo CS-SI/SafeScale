@@ -20,13 +20,18 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"errors"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/hashicorp/terraform-exec/tfexec"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
@@ -50,7 +55,14 @@ type summoner struct {
 	config        terraformerapi.Configuration
 	lastBuildPath string
 	mu            *sync.Mutex
+	saveLockFile  bool
 }
+
+const (
+	consulBackendSnippetPath     = "snippets/consul-backend.tf"
+	consulBackendDataSnippetPath = "snippets/consul-backend-data.tf"
+	layoutSnippetPath            = "snippets/layout.tf"
+)
 
 //go:embed snippets
 var layoutFiles embed.FS
@@ -108,7 +120,7 @@ func (instance *summoner) Build(resources ...terraformerapi.Resource) (ferr fail
 		return xerr
 	}
 
-	variables := data.NewMap()
+	variables := data.NewMap[string, any]()
 	variables["Provider"] = map[string]any{
 		"Name":           instance.provider.(providerUseTerraformer).Name(),
 		"Authentication": authOpts,
@@ -119,7 +131,7 @@ func (instance *summoner) Build(resources ...terraformerapi.Resource) (ferr fail
 	}
 
 	// render the resources
-	resourceContent := make([]string, len(resources))
+	resourceContent := data.NewSlice[string](len(resources))
 	for _, r := range resources {
 		lvars := variables.Clone()
 		lvars.Merge(map[string]any{"Resource": r.ToMap()})
@@ -142,7 +154,7 @@ func (instance *summoner) Build(resources ...terraformerapi.Resource) (ferr fail
 	if instance.config.ConsulBackend.Use {
 		lvars := variables.Clone()
 		lvars["ConsulBackend"] = instance.config.ConsulBackend
-		content, xerr := instance.realizeTemplate(layoutFiles, "snippets/consul-backend.tf.template", variables)
+		content, xerr := instance.realizeTemplate(layoutFiles, consulBackendSnippetPath, variables)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -150,7 +162,7 @@ func (instance *summoner) Build(resources ...terraformerapi.Resource) (ferr fail
 
 		variables["ConsulBackend"] = content
 
-		content, xerr = instance.realizeTemplate(layoutFiles, "snippets/consul-backend-data.tf.template", variables)
+		content, xerr = instance.realizeTemplate(layoutFiles, consulBackendDataSnippetPath, variables)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -160,7 +172,7 @@ func (instance *summoner) Build(resources ...terraformerapi.Resource) (ferr fail
 	}
 
 	// finally, render the layout
-	content, xerr := instance.realizeTemplate(layoutFiles, "snippets/layout.tf.template", variables)
+	content, xerr := instance.realizeTemplate(layoutFiles, layoutSnippetPath, variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -229,10 +241,11 @@ func (instance *summoner) createMainFile(content string) fail.Error {
 
 // Plan calls the terraform Plan command to simulate changes
 // returns:
-//   - false, fail.Error if an error occurred
+//   - false, *fail.ErrNotFound if the query returns no result
+//   - false, fail.Error if the query returns no result
 //   - false, nil if no error occurred and no change would be made
 //   - true, nil if no error occurred and changes would be made
-func (instance *summoner) Plan(ctx context.Context) (map[string]tfexec.OutputMeta, bool, fail.Error) {
+func (instance *summoner) Plan(ctx context.Context) (_ map[string]tfexec.OutputMeta, _ bool, ferr fail.Error) {
 	if valid.IsNull(instance) {
 		return nil, false, fail.InvalidInstanceError()
 	}
@@ -240,20 +253,63 @@ func (instance *summoner) Plan(ctx context.Context) (map[string]tfexec.OutputMet
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
-	tf, err := tfexec.NewTerraform(instance.config.WorkDir, instance.config.ExecPath)
+	tf, err := tfexec.NewTerraform(filepath.Dir(instance.lastBuildPath), instance.config.ExecPath)
 	if err != nil {
 		return nil, false, fail.Wrap(err, "failed to instantiate terraform executor")
 	}
 
-	err = tf.Init(ctx, tfexec.Upgrade(true))
+	env := instance.defaultEnv()
+	err = tf.SetEnv(env)
 	if err != nil {
-		return nil, false, fail.Wrap(err, "failed to init terraform executor")
+		return nil, false, fail.Wrap(err, "failed to set terraform environment")
 	}
+
+	xerr := instance.copyTerraformLockFile()
+	if xerr != nil {
+		return nil, false, xerr
+	}
+	defer func() {
+		derr := instance.saveTerraformLockFile()
+		if derr != nil {
+			if ferr != nil {
+				_ = ferr.AddConsequence(derr)
+			} else {
+				ferr = derr
+			}
+		}
+	}()
+
+	err = tf.Init(ctx, tfexec.Upgrade(false))
+	if err != nil {
+		return nil, false, fail.Wrap(err, "failed to execute terraform init")
+	}
+	logrus.Trace("terraform init ran successfully.")
+
+	output, err := tf.Validate(ctx)
+	if err != nil {
+		return nil, false, fail.Wrap(err, "failed to validate terraform file")
+	}
+	_ = output
+	logrus.Trace("terraform validate ran successfully.")
 
 	success, err := tf.Plan(ctx)
 	if err != nil {
-		return nil, false, fail.Wrap(err, "failed to apply terraform")
+		uerr := errors.Unwrap(err)
+		rerr := errors.Unwrap(uerr)
+		if rerr != nil {
+			switch rerr.(type) {
+			case *exec.ExitError:
+				if strings.Contains(err.Error(), "Your query returned no results") {
+					return nil, false, fail.NotFoundError()
+				}
+
+			default:
+			}
+		}
+
+		return nil, false, fail.Wrap(err, "failed to run terraform plan")
 	}
+	logrus.Trace("terraform plan ran successfully.")
 
 	outputs, err := tf.Output(ctx)
 	if err != nil {
@@ -263,8 +319,69 @@ func (instance *summoner) Plan(ctx context.Context) (map[string]tfexec.OutputMet
 	return outputs, success, nil
 }
 
+func (instance *summoner) defaultEnv() map[string]string {
+	if valid.IsNull(instance) {
+		return map[string]string{}
+	}
+
+	env := map[string]string{
+		"TF_DATA_DIR": instance.config.PluginDir,
+	}
+	return env
+}
+
+const terraformLockFile = ".terraform.lock.hcl"
+
+func (instance *summoner) copyTerraformLockFile() fail.Error {
+	lockPath := filepath.Join(instance.config.WorkDir, terraformLockFile)
+
+	// check if lock file exist in tenant folder
+	_, err := os.Stat(lockPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			instance.saveLockFile = true
+			return nil
+		}
+
+		return fail.Wrap(err, "failed to stat file '%s'", lockPath)
+	}
+
+	copiedLockPath := filepath.Join(filepath.Dir(instance.lastBuildPath), terraformLockFile)
+	_, xerr := utils.CopyFile(lockPath, copiedLockPath)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
+
+func (instance *summoner) saveTerraformLockFile() fail.Error {
+	if instance.saveLockFile {
+		lockPath := filepath.Join(filepath.Dir(instance.lastBuildPath), terraformLockFile)
+		copiedLockPath := filepath.Join(instance.config.WorkDir, terraformLockFile)
+
+		_, err := os.Stat(lockPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+
+			return fail.Wrap(err, "failed to stat file '%s'", lockPath)
+		}
+
+		_, xerr := utils.CopyFile(lockPath, copiedLockPath)
+		if xerr != nil {
+			return xerr
+		}
+
+		instance.saveLockFile = false
+	}
+
+	return nil
+}
+
 // Apply calls the terraform Apply command to operate changes
-func (instance *summoner) Apply(ctx context.Context) (map[string]tfexec.OutputMeta, fail.Error) {
+func (instance *summoner) Apply(ctx context.Context) (_ map[string]tfexec.OutputMeta, ferr fail.Error) {
 	if valid.IsNull(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -277,15 +394,61 @@ func (instance *summoner) Apply(ctx context.Context) (map[string]tfexec.OutputMe
 		return nil, fail.Wrap(err, "failed to instanciate terraform executor")
 	}
 
-	err = tf.Init(ctx, tfexec.Upgrade(true))
+	env := instance.defaultEnv()
+	err = tf.SetEnv(env)
+	if err != nil {
+		return nil, fail.Wrap(err, "failed to set terraform environment")
+	}
+
+	xerr := instance.copyTerraformLockFile()
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer func() {
+		derr := instance.saveTerraformLockFile()
+		if derr != nil {
+			if ferr != nil {
+				_ = ferr.AddConsequence(derr)
+			} else {
+				ferr = derr
+			}
+		}
+	}()
+
+	err = tf.Init(ctx, tfexec.Upgrade(false))
 	if err != nil {
 		return nil, fail.Wrap(err, "failed to init terraform executor")
 	}
+	logrus.Trace("terraform init ran successfully.")
+
+	output, err := tf.Validate(ctx)
+	if err != nil {
+		return nil, fail.Wrap(err, "failed to validate terraform file")
+	}
+	_ = output
+	logrus.Trace("terraform validate ran successfully.")
 
 	err = tf.Apply(ctx)
 	if err != nil {
-		return nil, fail.Wrap(err, "failed to apply terraform")
+		uerr := errors.Unwrap(err)
+		rerr := errors.Unwrap(uerr)
+		if rerr != nil {
+			switch rerr.(type) {
+			case *exec.ExitError:
+				if strings.Contains(err.Error(), "Your query returned no results") {
+					return nil, fail.NotFoundError()
+				}
+				if strings.Contains(err.Error(), "Your query returned more than one result") {
+					return nil, fail.DuplicateError()
+				}
+
+			default:
+			}
+
+			return nil, fail.Wrap(rerr, "terraform apply failed")
+		}
 	}
+	logrus.Trace("terraform apply ran successfully.")
 
 	outputs, err := tf.Output(ctx)
 	if err != nil {
@@ -296,7 +459,7 @@ func (instance *summoner) Apply(ctx context.Context) (map[string]tfexec.OutputMe
 }
 
 // Destroy calls the terraform Destroy command to operate changes
-func (instance *summoner) Destroy(ctx context.Context) fail.Error {
+func (instance *summoner) Destroy(ctx context.Context) (ferr fail.Error) {
 	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -304,20 +467,50 @@ func (instance *summoner) Destroy(ctx context.Context) fail.Error {
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
-	tf, err := tfexec.NewTerraform(instance.config.WorkDir, instance.config.ExecPath)
+	tf, err := tfexec.NewTerraform(filepath.Dir(instance.lastBuildPath), instance.config.ExecPath)
 	if err != nil {
 		return fail.Wrap(err, "failed to instanciate terraform executor")
 	}
 
-	err = tf.Init(ctx, tfexec.Upgrade(true))
+	env := instance.defaultEnv()
+	err = tf.SetEnv(env)
+	if err != nil {
+		return fail.Wrap(err, "failed to set terraform environment")
+	}
+
+	xerr := instance.copyTerraformLockFile()
+	if xerr != nil {
+		return xerr
+	}
+	defer func() {
+		derr := instance.saveTerraformLockFile()
+		if derr != nil {
+			if ferr != nil {
+				_ = ferr.AddConsequence(derr)
+			} else {
+				ferr = derr
+			}
+		}
+	}()
+
+	err = tf.Init(ctx, tfexec.Upgrade(false))
 	if err != nil {
 		return fail.Wrap(err, "failed to init terraform executor")
 	}
+	logrus.Trace("terraform init ran successfully.")
+
+	output, err := tf.Validate(ctx)
+	if err != nil {
+		return fail.Wrap(err, "failed to validate terraform file")
+	}
+	_ = output
+	logrus.Trace("terraform validate ran successfully.")
 
 	err = tf.Destroy(ctx)
 	if err != nil {
 		return fail.Wrap(err, "failed to apply terraform")
 	}
+	logrus.Trace("terraform destroy ran successfully.")
 
 	return nil
 }

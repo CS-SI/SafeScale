@@ -585,7 +585,7 @@ func TestErrorCore_SetAnnotationFormatter(t *testing.T) {
 		message:      "houston, we have a problem",
 		cause:        errors.New("math: can't divide by zero"),
 		consequences: []error{errors.New("can't resolve equation")},
-		annotations: map[string]interface{}{
+		annotations: data.Annotations{
 			"two": "second one",
 			"eggs": struct {
 				source string

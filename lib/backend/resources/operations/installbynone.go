@@ -33,7 +33,7 @@ import (
 type noneInstaller struct{}
 
 // Check checks if the Feature is installed
-func (i *noneInstaller) Check(_ context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
+func (i *noneInstaller) Check(_ context.Context, f resources.Feature, t resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&ferr)
 
@@ -58,7 +58,7 @@ func (i *noneInstaller) Check(_ context.Context, f resources.Feature, t resource
 
 // Add installs the Feature using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
-func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
+func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&ferr)
 
@@ -95,7 +95,7 @@ func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resource
 }
 
 // Remove uninstalls the Feature
-func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
+func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&ferr)
 

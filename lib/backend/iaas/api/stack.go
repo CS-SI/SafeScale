@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
-//go:generate minimock -o ../mocks/mock_stack.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api.Stack
+//go:generate minimock -o mocks/mock_stack.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api.Stack
 
 // Stack is the interface to cloud stack
 type Stack interface {

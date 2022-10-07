@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	imageResourceSnippetPath = "snippets/resource_image.tf.template"
+	imageResourceSnippetPath = "snippets/resource_image.tf"
 )
 
 type (

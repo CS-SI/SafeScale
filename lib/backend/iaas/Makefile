@@ -5,11 +5,7 @@ GO?=go
 all: generate
 
 generate: clean
-	@(cd api && $(MAKE) $(@))
-	@(cd objectstorage && $(MAKE) $(@))
-	@(cd providers && $(MAKE) $(@))
-	@(cd userdata && $(MAKE) $(@))
-	@(cd stacks && $(MAKE) $(@))
+	@$(GO) generate -run minimock ./...
 
 vet:
 	@$(GO) vet ./...

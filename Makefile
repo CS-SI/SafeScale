@@ -315,7 +315,7 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) stringer > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n"; \
-		$(GO) install $(STRINGER)@v0.1.9 &>/dev/null || true; \
+		$(GO) install $(STRINGER)@v0.1.12 &>/dev/null || true; \
 	fi
 	@sleep 2
 	@$(WHICH) go-enum > /dev/null; if [ $$? -ne 0 ]; then \

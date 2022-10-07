@@ -34,7 +34,7 @@ type (
 )
 
 const (
-	vipResourceSnippetPath = "snippets/resource_vip.tf.template"
+	vipResourceSnippetPath = "snippets/resource_vip.tf"
 )
 
 func newVIPResource(name string) terraformerapi.Resource {

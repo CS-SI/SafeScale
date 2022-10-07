@@ -44,8 +44,8 @@ type subnetResource struct {
 	dnsNameServers []string
 }
 
-func newSubnetResource(name string) *subnetResource {
-	out := &subnetResource{ResourceCore: terraformer.NewResourceCore(name, createSubnetResourceSnippetPath)}
+func newSubnetResource(name string, snippet string) *subnetResource {
+	out := &subnetResource{ResourceCore: terraformer.NewResourceCore(name, snippet)}
 	return out
 }
 
@@ -56,6 +56,7 @@ func (nr *subnetResource) ToMap() map[string]any {
 		"ID":         nr.networkID,
 		"CIDR":       nr.cidr,
 		"IPVersion":  nr.ipVersion,
+		"NetworkID":  nr.networkID,
 		"DNSServers": nr.dnsNameServers,
 	}
 }
@@ -66,8 +67,8 @@ type routerResource struct {
 	id string
 }
 
-func newRouterResource(name string) *routerResource {
-	out := &routerResource{ResourceCore: terraformer.NewResourceCore(name, createRouterResourceSnippetPath)}
+func newRouterResource(name string, snippet string) *routerResource {
+	out := &routerResource{ResourceCore: terraformer.NewResourceCore(name, snippet)}
 	return out
 }
 
@@ -93,7 +94,7 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		return nil, fail.ConvertError(err)
 	}
 
-	subnetRsc := newSubnetResource(req.Name)
+	subnetRsc := newSubnetResource(req.Name, createSubnetResourceSnippetPath)
 	subnetRsc.cidr = req.CIDR
 	subnetRsc.ipVersion = req.IPVersion
 	subnetRsc.dnsNameServers = req.DNSServers

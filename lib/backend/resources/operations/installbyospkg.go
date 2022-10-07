@@ -42,7 +42,7 @@ type genericPackager struct {
 }
 
 // Check checks if the Feature is installed
-func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
+func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -83,7 +83,7 @@ func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t reso
 }
 
 // Add installs the Feature using apt
-func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
+func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&ferr)
 
@@ -126,7 +126,7 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 }
 
 // Remove uninstalls the Feature using the RemoveScript script
-func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
+func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&ferr)
 

@@ -1,4 +1,5 @@
-data "openstack_networking_subnet_v2" "{{ .ResourceName }}" {
+data "openstack_networking_subnet_v2" "{{ or .Resource.Name .Resource.ID }}" {
+    provider = openstack.ovh
 {{- if .Resource.ID }}
     id = "{{ .Resource.ID }}"
 {{- else }}
@@ -11,17 +12,17 @@ data "openstack_networking_subnet_v2" "{{ .ResourceName }}" {
 }
 
 output "id" {
-    value = "${openstack_networking_network_v2.{{ .Resource.Name }}.id}"
+    value = "${openstack_networking_network_v2.{{ or .Resource.Name .Resource.ID }}.id}"
 }
 output "name" {
-    value = "${openstack_networking_network_v2.{{ .Resource.Name }}.name}"
+    value = "${openstack_networking_network_v2.{{ or .Resource.Name .Resource.ID }}.name}"
 }
 output "allocation_pools" {
-    value = "${openstack_networking_subnet_v2.{{ .Resource.Name }}.allocation_pools}"
+    value = "${openstack_networking_subnet_v2.{{ or .Resource.Name .Resource.ID }}.allocation_pools}"
 }
 output "host_routes" {
-    value = "${openstack_networking_subnet_v2.{{ .Resource.Name }}.hoist_routes}"
+    value = "${openstack_networking_subnet_v2.{{ or .Resource.Name .Resource.ID }}.hoist_routes}"
 }
 output "tags" {
-    value = "${openstack_networking_subnet_v2.{{ .Resource.Name }}.all_tags}"
+    value = "${openstack_networking_subnet_v2.{{ or .Resource.Name .Resource.ID }}.all_tags}"
 }

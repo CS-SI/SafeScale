@@ -61,6 +61,7 @@ func Cleanup() {
 func addPreRunE(cmd *cobra.Command) {
 	previousCB := cmd.PreRunE
 	cmd.PreRunE = func(cmd *cobra.Command, args []string) (err error) {
+		// Do not replace previous PreRunE if there is one...
 		if previousCB != nil {
 			err := previousCB(cmd, args)
 			if err != nil {

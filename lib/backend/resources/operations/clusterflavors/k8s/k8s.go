@@ -97,7 +97,7 @@ func defaultImage(_ resources.Cluster) string {
 	return consts.DEFAULTOS
 }
 
-func configureCluster(ctx context.Context, c resources.Cluster, params data.Map) fail.Error {
+func configureCluster(ctx context.Context, c resources.Cluster, params data.Map[string, any]) fail.Error {
 	clusterName := c.GetName()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 

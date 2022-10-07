@@ -65,8 +65,6 @@ type Provider interface {
 	DefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error)
 }
 
-//go:generate minimock -o mocks/mock_provider.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers.StackReservedForProviderUse
-
 // StackReservedForProviderUse is an interface about the methods only available to providers internally
 type StackReservedForProviderUse interface {
 	ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error)           // list available OS images

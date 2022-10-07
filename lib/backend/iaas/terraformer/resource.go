@@ -18,18 +18,23 @@ package terraformer
 
 type ResourceCore struct {
 	name    string // contains the name of the resource
-	snippet string // contains the snippet to use to configure the resource
+	snippet string // contains the snippet to use to handle the resource
 }
 
 // NewResourceCore creates a new instance of ResourceCore
 func NewResourceCore(name string, snippet string) ResourceCore {
-	return ResourceCore{name: name, snippet: snippet}
+	return ResourceCore{
+		name:    name,
+		snippet: snippet,
+	}
 }
 
+// Name returns the name of the resource
 func (rc ResourceCore) Name() string {
 	return rc.name
 }
 
+// Snippet returns the path of the snippet used to handle the resource
 func (rc ResourceCore) Snippet() string {
 	return rc.snippet
 }

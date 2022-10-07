@@ -23,36 +23,34 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_AnonymousMapToStringMap(t *testing.T) {
-
-	v := AnonymousMap{
-		0: "first",
-		1: "second",
-		2: "third",
-	}
-	am := AnonymousMapToStringMap(v)
-	require.EqualValues(t, reflect.TypeOf(am).String(), "map[string]interface {}")
-
-}
+// func Test_AnonymousMapToStringMap(t *testing.T) {
+//
+// 	v := AnonymousMap{
+// 		0: "first",
+// 		1: "second",
+// 		2: "third",
+// 	}
+// 	am := AnonymousMapToStringMap(v)
+// 	require.EqualValues(t, reflect.TypeOf(am).String(), "map[string]interface {}")
+//
+// }
 
 func Test_NewMap(t *testing.T) {
 
-	m := NewMap()
+	m := NewMap[string, any]()
 	require.EqualValues(t, reflect.TypeOf(m).String(), "data.Map")
 
 }
 
 func TestMap_Clone(t *testing.T) {
 
-	m := Map{
+	m := Map[string, string]{
 		"0": "first",
 		"1": "second",
 		"2": "third",
 	}
-	c, err := FromMap(m)
-	if err != nil {
-		t.Error(err)
-	}
+	c := m.Clone()
+
 	areEqual := reflect.DeepEqual(m, c)
 	if !areEqual {
 		t.Error("Clone not restitute values")
@@ -70,16 +68,16 @@ func TestMap_Clone(t *testing.T) {
 
 func TestMap_Merge(t *testing.T) {
 
-	a := Map{
+	a := Map[string, string]{
 		"0": "first",
 	}
-	b := Map{
+	b := Map[string, string]{
 		"1": "second",
 	}
-	c := Map{
+	c := Map[string, string]{
 		"2": "third",
 	}
-	m := Map{
+	m := Map[string, string]{
 		"0": "first",
 		"1": "second",
 		"2": "third",
@@ -97,15 +95,15 @@ func TestMap_Merge(t *testing.T) {
 
 func TestMap_ForceMerge(t *testing.T) {
 
-	a := Map{
+	a := Map[string, string]{
 		"0": "first",
 		"1": "second",
 	}
-	b := Map{
+	b := Map[string, string]{
 		"1": "new second",
 		"2": "third",
 	}
-	m := Map{
+	m := Map[string, string]{
 		"0": "first",
 		"1": "new second",
 		"2": "third",
@@ -122,7 +120,7 @@ func TestMap_ForceMerge(t *testing.T) {
 
 func TestMap_Contains(t *testing.T) {
 
-	a := Map{
+	a := Map[string, string]{
 		"0": "first",
 		"1": "second",
 		"2": "third",
@@ -134,7 +132,7 @@ func TestMap_Contains(t *testing.T) {
 
 func TestMap_Keys(t *testing.T) {
 
-	a := Map{
+	a := Map[string, string]{
 		"0": "first",
 		"1": "second",
 		"2": "third",
@@ -151,14 +149,14 @@ func TestMap_Keys(t *testing.T) {
 }
 func TestMap_Values(t *testing.T) {
 
-	a := Map{
+	a := Map[string, string]{
 		"0": "first",
 		"1": "second",
 		"2": "third",
 	}
 	v := a.Values()
 	for i := range v {
-		l := v[i].(string)
+		l := v[i]
 		if l != "first" && l != "second" && l != "third" {
 			t.Errorf("Unexpected value %s", l)
 			t.Fail()

@@ -47,6 +47,7 @@ type (
 		Release       string // contains the release of terraform wanted for the hcl file produced
 		WorkDir       string
 		ExecPath      string
+		PluginDir     string
 		ConsulBackend struct {
 			Path string // "/safescale/terraformstate/{{ or .CurrentOrganization "default" }}/{{ or .CurrentProject "default" }}"
 			Use  bool

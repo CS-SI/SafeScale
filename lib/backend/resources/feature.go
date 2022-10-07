@@ -34,7 +34,7 @@ import (
 type Targetable interface {
 	data.Identifiable
 
-	ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error                                // adds parameters corresponding to the Target in preparation of feature installation
+	ComplementFeatureParameters(ctx context.Context, v data.Map[string, any]) fail.Error                   // adds parameters corresponding to the Target in preparation of feature installation
 	UnregisterFeature(ctx context.Context, feat string) fail.Error                                         // unregisters a Feature from Target in metadata
 	InstalledFeatures(ctx context.Context) ([]string, fail.Error)                                          // returns a list of installed features
 	InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error)                         // returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
@@ -48,14 +48,14 @@ type Feature interface {
 	data.Clonable
 	data.Identifiable
 
-	Add(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)    // installs the feature on the target
-	Applicable(ctx context.Context, tg Targetable) (bool, fail.Error)                               // tells if the feature is installable on the target
-	Check(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // check if feature is installed on target
-	GetDisplayFilename(ctx context.Context) string                                                  // displays the filename of display (optionally adding '[embedded]' for embedded features)
-	GetFilename(ctx context.Context) (string, fail.Error)                                           // returns the filename of the feature
-	Dependencies(ctx context.Context) (map[string]struct{}, fail.Error)                             // returns the other features needed as requirements
-	ListParametersWithControl(ctx context.Context) []string                                         // returns a list of parameter containing version information
-	Remove(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error) // uninstalls the feature from the target
+	Add(ctx context.Context, t Targetable, v data.Map[string, any], fs FeatureSettings) (Results, fail.Error)    // installs the feature on the target
+	Applicable(ctx context.Context, tg Targetable) (bool, fail.Error)                                            // tells if the feature is installable on the target
+	Check(ctx context.Context, t Targetable, v data.Map[string, any], fs FeatureSettings) (Results, fail.Error)  // check if feature is installed on target
+	GetDisplayFilename(ctx context.Context) string                                                               // displays the filename of display (optionally adding '[embedded]' for embedded features)
+	GetFilename(ctx context.Context) (string, fail.Error)                                                        // returns the filename of the feature
+	Dependencies(ctx context.Context) (map[string]struct{}, fail.Error)                                          // returns the other features needed as requirements
+	ListParametersWithControl(ctx context.Context) []string                                                      // returns a list of parameter containing version information
+	Remove(ctx context.Context, t Targetable, v data.Map[string, any], fs FeatureSettings) (Results, fail.Error) // uninstalls the feature from the target
 	ToProtocol(ctx context.Context) *protocol.FeatureResponse
 }
 

@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -504,11 +505,12 @@ func BuildFolderTree() error {
 		{Settings.Folders.VarDir, 0770},
 		{Settings.Folders.TmpDir, 0770},
 		{Settings.Folders.LogDir, 0770},
-		{Settings.Folders.ShareDir + "/terraform/bin", 0700}, // used terraform binary will be stored here
+		{filepath.Join(Settings.Folders.ShareDir, "terraform", "bin"), 0700},     // used terraform binary will be stored here
+		{filepath.Join(Settings.Folders.ShareDir, "terraform", "plugins"), 0700}, // used terraform plugins will be stored here
 	}
 
 	for _, v := range dirList {
-		xerr := mkdir(v.path, v.rights, Settings.Access.UID, Settings.Access.GID)
+		xerr := utils.Mkdir(v.path, v.rights, Settings.Access.UID, Settings.Access.GID)
 		if xerr != nil {
 			return xerr
 		}
@@ -518,39 +520,9 @@ func BuildFolderTree() error {
 	if err != nil {
 		return fail.Wrap(err, "failed to get path of binary")
 	}
+
 	if Settings.Folders.BinDir != "" && path.Dir(e) != Settings.Folders.BinDir {
 		fmt.Printf("For consistency, you should move safescale binary in '%s'\n", Settings.Folders.BinDir)
-	}
-
-	return nil
-}
-
-// mkdir creates a folder with appropriate ownership
-func mkdir(path string, rights os.FileMode, uid, gid int) fail.Error {
-	state, err := os.Stat(path)
-	if err != nil {
-		switch {
-		case os.IsNotExist(err):
-			err = os.MkdirAll(path, rights)
-			if err != nil {
-				return fail.Wrap(err, "failed to create folder '%s'", path)
-			}
-
-			err := os.Chown(path, uid, gid)
-			if err != nil {
-				return fail.Wrap(err)
-			}
-			state, err = os.Stat(path)
-			if err != nil {
-				return fail.Wrap(err)
-			}
-
-		default:
-			return fail.Wrap(err)
-		}
-	}
-	if !state.IsDir() {
-		return fail.NotAvailableError("'%s' exists but is not a folder", path)
 	}
 
 	return nil

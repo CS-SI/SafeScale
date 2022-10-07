@@ -199,6 +199,7 @@ func prepareTerraformerConfiguration(providerProfile *providers.Profile, scope S
 		Release:           "= " + versions.Terraformv1_2_6.String(),
 		WorkDir:           workDir,
 		ExecPath:          global.Settings.Backend.Terraform.ExecPath,
+		PluginDir:         filepath.Join(global.Settings.Folders.ShareDir, "terraform", "plugins"),
 		RequiredProviders: providerProfile.TerraformProviders(),
 	}
 

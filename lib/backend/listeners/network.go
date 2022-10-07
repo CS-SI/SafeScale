@@ -46,7 +46,8 @@ type NetworkListener struct {
 // Create a new network
 func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCreateRequest) (_ *protocol.Network, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
-	defer fail.OnExitLogError(inctx, &ferr, "cannot create network")
+	defer fail.OnExitLogError(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot create network")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -207,7 +208,12 @@ func (s *NetworkListener) Inspect(inctx context.Context, in *protocol.Reference)
 	handler := handlers.NewNetworkHandler(job)
 	networkInstance, xerr := handler.Inspect(networkRef)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			return nil, fail.NotFoundError("%s not found", networkRefLabel)
+		default:
+			return nil, xerr
+		}
 	}
 
 	return networkInstance.ToProtocol(ctx)

@@ -26,8 +26,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"gomodules.xyz/stow"
 
 	// necessary for connect()
@@ -37,12 +35,14 @@ import (
 	_ "gomodules.xyz/stow/swift"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-//go:generate minimock -o ../mocks/mock_location.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage.Location
+//go:generate minimock -o ./mocks/mock_location.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage.Location
 
 // FIXME: Make this easy to validate, what is optional ?, what is mandatory ?
 

@@ -17,6 +17,7 @@
 package utils
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 
@@ -61,4 +62,59 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, f
 	}
 
 	return f, nil
+}
+
+// Mkdir creates a folder with appropriate ownership
+func Mkdir(path string, rights os.FileMode, uid, gid int) fail.Error {
+	state, err := os.Stat(path)
+	if err != nil {
+		switch {
+		case os.IsNotExist(err):
+			err = os.MkdirAll(path, rights)
+			if err != nil {
+				return fail.Wrap(err, "failed to create folder '%s'", path)
+			}
+
+			err := os.Chown(path, uid, gid)
+			if err != nil {
+				return fail.Wrap(err)
+			}
+
+			state, err = os.Stat(path)
+			if err != nil {
+				return fail.Wrap(err)
+			}
+
+		default:
+			return fail.Wrap(err)
+		}
+	}
+	if !state.IsDir() {
+		return fail.NotAvailableError("'%s' exists but is not a folder", path)
+	}
+
+	return nil
+}
+
+// CopyFile copies a file
+func CopyFile(source, destination string) (int64, fail.Error) {
+	// copy file in temporary run folder
+	src, err := os.Open(source)
+	if err != nil {
+		return 0, fail.Wrap(err, "failed to open file '%s'", source)
+	}
+	defer func() { _ = src.Close() }()
+
+	dest, err := os.Create(destination)
+	if err != nil {
+		return 0, fail.Wrap(err, "failed to create file '%s'", destination)
+	}
+	defer func() { _ = dest.Close() }()
+
+	n, err := io.Copy(dest, src)
+	if err != nil {
+		return 0, fail.Wrap(err, "failed to copy '%s' to '%s'", source, destination)
+	}
+
+	return n, nil
 }

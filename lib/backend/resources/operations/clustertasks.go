@@ -985,7 +985,7 @@ func (instance *Cluster) createHostResources(
 	mastersDef abstract.HostSizingRequirements,
 	nodesDef abstract.HostSizingRequirements,
 	initialNodeCount uint,
-	parameters data.Map,
+	parameters data.Map[string, any],
 	keepOnFailure bool,
 ) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
@@ -1677,7 +1677,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 
 type taskInstallGatewayParameters struct {
 	host      resources.Host
-	variables data.Map
+	variables data.Map[string, any]
 }
 
 // taskInstallGateway installs necessary components on one gateway
@@ -1710,7 +1710,8 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 			return
 		}
 
-		variables, _ := data.FromMap(p.variables)
+		// variables, _ := data.FromMap(p.variables)
+		variables := p.variables
 		hostLabel := p.host.GetName()
 
 		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
@@ -2248,7 +2249,7 @@ func withTimeout(xerr fail.Error) bool {
 }
 
 type taskConfigureMastersParameters struct {
-	variables data.Map
+	variables data.Map[string, any]
 }
 
 // taskConfigureMasters configure masters
@@ -2295,7 +2296,8 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 			chRes <- result{nil, fail.InconsistentError("failed to cast 'params' to 'taskConfiguraMastersParameters'")}
 			return
 		}
-		variables, _ := data.FromMap(p.variables)
+		// variables, _ := data.FromMap(p.variables)
+		variables := p.variables
 		tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 		defer tracer.Exiting()
 
@@ -2410,7 +2412,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 type taskConfigureMasterParameters struct {
 	Index     uint
 	Host      resources.Host
-	variables data.Map
+	variables data.Map[string, any]
 }
 
 // taskConfigureMaster configures one master
@@ -2456,7 +2458,8 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 			return
 		}
 
-		variables, _ := data.FromMap(p.variables)
+		// variables, _ := data.FromMap(p.variables)
+		variables := p.variables
 
 		started := time.Now()
 
@@ -2921,7 +2924,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 }
 
 type taskConfigureNodesParameters struct {
-	variables data.Map
+	variables data.Map[string, any]
 }
 
 // taskConfigureNodes configures nodes
@@ -2939,7 +2942,8 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 	if !ok {
 		return nil, fail.InconsistentError("failed to cast 'params' to 'taskConfigureNodesParameters'")
 	}
-	variables, _ := data.FromMap(p.variables)
+	//variables, _ := data.FromMap(p.variables)
+	variables := p.variables
 	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -3059,7 +3063,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concur
 type taskConfigureNodeParameters struct {
 	index     uint
 	node      *propertiesv3.ClusterNode
-	variables data.Map
+	variables data.Map[string, any]
 }
 
 // taskConfigureNode configure one node
@@ -3096,7 +3100,8 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 			chRes <- result{nil, fail.InvalidParameterCannotBeNilError("params.Node")}
 			return
 		}
-		variables, _ := data.FromMap(p.variables)
+		// variables, _ := data.FromMap(p.variables)
+		variables := p.variables
 
 		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.index, p.node.Name).WithStopwatch().Entering()
 		defer tracer.Exiting()

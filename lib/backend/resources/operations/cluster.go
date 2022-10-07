@@ -1236,7 +1236,7 @@ func (instance *Cluster) GetState(ctx context.Context) (state clusterstate.Enum,
 }
 
 // AddNodes adds several nodes
-func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
+func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map[string, any], keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1249,10 +1249,10 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		return nil, fail.InvalidParameterError("count", "must be an int > 0")
 	}
 
-	parameters, err := data.FromMap(parameters)
-	if err != nil {
-		return nil, fail.ConvertError(err)
-	}
+	// parameters, err := data.FromMap(parameters)
+	// if err != nil {
+	// 	return nil, fail.ConvertError(err)
+	// }
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d)", count)
 	defer tracer.Entering().Exiting()
@@ -3075,7 +3075,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 }
 
 // configureNodesFromList configures nodes from a list
-func (instance *Cluster) configureNodesFromList(ctx context.Context, nodes []*propertiesv3.ClusterNode, parameters data.Map) (ferr fail.Error) {
+func (instance *Cluster) configureNodesFromList(ctx context.Context, nodes []*propertiesv3.ClusterNode, parameters data.Map[string, any]) (ferr fail.Error) {
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 

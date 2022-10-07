@@ -1,15 +1,15 @@
 provider "openstack" {
-    auth_url    = "{{ .Provider.Authentication.IdentityEndpoint }}"	# "${var.tenant.objectstorage.AuthURL}"
+    auth_url    = "{{ .Provider.Authentication.IdentityEndpoint }}"
     domain_name = "default"
-    tenant_id   = "{{ .Provider.Authentication.TenantID }}" 		# "${var.tenant.identity.ApplicationKey}"
-    tenant_name = "{{ .Provider.Authentication.TenantName }}"		# "SAFESCALE-TEST"
-    user_name   = "{{ .Provider.Authentication.Username }}" 		# "${var.tenant.identity.OpenstackID}"
-    password    = "{{ .Provider.Authentication.Password }}"			# "${var.tenant.identity.OpenstackPassword}"
-    alias       = "ovh"												# Un alias
-    region      = "{{ .Provider.Authentication.Region }}"			# "${var.tenant.compute.Region}"
+    tenant_id   = "{{ .Provider.Authentication.TenantID }}"
+    tenant_name = "{{ .Provider.Authentication.TenantName }}"
+    user_name   = "{{ .Provider.Authentication.Username }}"
+    password    = "{{ .Provider.Authentication.Password }}"
+    region      = "{{ .Provider.Authentication.Region }}"
+    alias       = "ovh"
 }
 
 provider "ovh" {
-    alias    = "openstack"
+    alias    = "ovh"
     endpoint = "ovh-eu"
 }

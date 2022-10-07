@@ -42,7 +42,7 @@ type ClusterHandler interface {
 	Start(string) fail.Error
 	Stop(string) fail.Error
 	Delete(string, bool) fail.Error
-	Expand(string, abstract.HostSizingRequirements, uint, data.Map, bool) ([]resources.Host, fail.Error)
+	Expand(string, abstract.HostSizingRequirements, uint, data.Map[string, any], bool) ([]resources.Host, fail.Error)
 	Shrink(string, uint) ([]*propertiesv3.ClusterNode, fail.Error)
 	ListNodes(string) (resources.IndexedListOfClusterNodes, fail.Error)
 	InspectNode(string, string) (resources.Host, fail.Error)
@@ -277,7 +277,7 @@ func (handler *clusterHandler) Delete(name string, force bool) (ferr fail.Error)
 
 // Expand adds node(s) to a cluster
 // Note: returned []resources.host have to be .Released() by caller...
-func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingRequirements, count uint, parameters data.Map, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
+func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingRequirements, count uint, parameters data.Map[string, any], keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())

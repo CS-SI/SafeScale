@@ -95,7 +95,7 @@ func NewKongController(ctx context.Context, svc iaasapi.Service, subnet resource
 			return nil, xerr
 		}
 
-		results, xerr := featureInstance.Check(ctx, addressedGateway, data.NewMap(), resources.FeatureSettings{})
+		results, xerr := featureInstance.Check(ctx, addressedGateway, data.NewMap[string, any](), resources.FeatureSettings{})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4subnet' is installed on gateway '%s'", addressedGateway.GetName())
@@ -164,7 +164,7 @@ func (k *KongController) GetHostname() string {
 // Apply applies the rule to Kong proxy
 // Currently, support rule types 'service', 'route' and 'upstream'
 // Returns rule name and error
-func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interface{}, values *data.Map) (string, fail.Error) {
+func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interface{}, values *data.Map[string, any]) (string, fail.Error) {
 	ruleType, ok := rule["type"].(string)
 	if !ok {
 		return "", fail.InvalidParameterError("rule['type']", "is not a string")
@@ -283,14 +283,14 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 
 	case "upstream":
 		// Separate upstream options from target settings
-		unjsoned := data.NewMap()
+		unjsoned := data.NewMap[string, any]()
 		err := json.Unmarshal([]byte(content), &unjsoned)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
 			return ruleName, fail.SyntaxError("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
-		options := data.NewMap()
-		target := data.NewMap()
+		options := data.NewMap[string, any]()
+		target := data.NewMap[string, any]()
 		for k, v := range unjsoned {
 			if k == "target" || k == "weight" {
 				target[k] = v
@@ -330,7 +330,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 	}
 }
 
-func (k *KongController) realizeRuleData(content string, v data.Map) (string, fail.Error) {
+func (k *KongController) realizeRuleData(content string, v data.Map[string, any]) (string, fail.Error) {
 	contentTmpl, xerr := template.Parse("proxy_content", content)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -345,7 +345,7 @@ func (k *KongController) realizeRuleData(content string, v data.Map) (string, fa
 	return dataBuffer.String(), nil
 }
 
-func (k *KongController) createUpstream(ctx context.Context, name string, options data.Map, v *data.Map) fail.Error {
+func (k *KongController) createUpstream(ctx context.Context, name string, options data.Map[string, any], v *data.Map[string, any]) fail.Error {
 	jsoned, err := json.Marshal(&options)
 	if err != nil {
 		return fail.Wrap(err, "failed to marshal options")
@@ -362,12 +362,7 @@ func (k *KongController) createUpstream(ctx context.Context, name string, option
 	return nil
 }
 
-func (k *KongController) addSourceControl(ctx context.Context,
-	ruleName, url, resourceType, resourceID string,
-	sourceControl map[string]interface{},
-	v *data.Map,
-) fail.Error {
-
+func (k *KongController) addSourceControl(ctx context.Context, ruleName, url, resourceType, resourceID string, sourceControl map[string]interface{}, v *data.Map[string, any]) fail.Error {
 	if sourceControl == nil {
 		return nil
 	}
@@ -458,7 +453,7 @@ func (k *KongController) get(ctx context.Context, name, url string) (map[string]
 }
 
 // post creates a rule
-func (k *KongController) post(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
+func (k *KongController) post(ctx context.Context, name, url, data string, v *data.Map[string, any], propagate bool) (map[string]interface{}, string, fail.Error) {
 	timings, xerr := k.service.Timings()
 	if xerr != nil {
 		return nil, "", xerr
@@ -493,7 +488,7 @@ func (k *KongController) post(ctx context.Context, name, url, data string, v *da
 }
 
 // put updates or creates a rule
-func (k *KongController) put(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
+func (k *KongController) put(ctx context.Context, name, url, data string, v *data.Map[string, any], propagate bool) (map[string]interface{}, string, fail.Error) {
 	timings, xerr := k.service.Timings()
 	if xerr != nil {
 		return nil, "", xerr
@@ -528,7 +523,7 @@ func (k *KongController) put(ctx context.Context, name, url, data string, v *dat
 }
 
 // patch updates an existing rule
-func (k *KongController) patch(ctx context.Context, name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
+func (k *KongController) patch(ctx context.Context, name, url, data string, v *data.Map[string, any], propagate bool) (map[string]interface{}, string, fail.Error) {
 	timings, xerr := k.service.Timings()
 	if xerr != nil {
 		return nil, "", xerr

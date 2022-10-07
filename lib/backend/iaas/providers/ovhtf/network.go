@@ -21,6 +21,7 @@ import (
 	"net"
 	"reflect"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/sirupsen/logrus"
@@ -38,6 +39,7 @@ import (
 
 const (
 	networkCreateResourceSnippetPath  = "snippets/resource_network_create.tf"
+	networkDeleteResourceSnippetPath  = "snippets/resource_network_delete.tf"
 	networkInspectResourceSnippetPath = "snippets/resource_network_inspect.tf"
 )
 
@@ -48,9 +50,9 @@ type (
 	}
 )
 
-func newNetworkResource(name string) *networkResource {
+func newNetworkResource(name string, snippet string) *networkResource {
 	out := &networkResource{
-		ResourceCore: terraformer.NewResourceCore(name, networkCreateResourceSnippetPath),
+		ResourceCore: terraformer.NewResourceCore(name, snippet),
 	}
 	return out
 }
@@ -61,6 +63,15 @@ func (nr *networkResource) ToMap() map[string]any {
 		"Name": nr.Name(),
 		"ID":   nr.id,
 	}
+}
+
+// String returns a string that represents the network resource
+func (nr networkResource) String() string {
+	out := "'" + nr.Name() + "'"
+	if out == "''" {
+		out = nr.id
+	}
+	return out
 }
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
@@ -84,11 +95,25 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	netRsc, xerr := defineNetworkResource(tracer, req)
-	if xerr != nil {
-		return nil, xerr
+	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
+	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
+	if len(req.DNSServers) == 0 {
+		req.DNSServers = []string{"0.0.0.0"}
 	}
 
+	// Checks if CIDR is valid...
+	if req.CIDR != "" {
+		_, _, err := net.ParseCIDR(req.CIDR)
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
+	} else { // CIDR is empty, choose the first Class C one possible
+		tracer.Trace("CIDR is empty, choosing one...")
+		req.CIDR = "192.168.1.0/24"
+		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
+	}
+
+	netRsc := newNetworkResource(req.Name, networkCreateResourceSnippetPath)
 	summoner, xerr := p.Terraformer()
 	if xerr != nil {
 		return nil, xerr
@@ -128,30 +153,12 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 	return newNet, nil
 }
 
-func defineNetworkResource(tracer debug.Tracer, req abstract.NetworkRequest) (*networkResource, fail.Error) {
-	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
-	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
-	if len(req.DNSServers) == 0 {
-		req.DNSServers = []string{"0.0.0.0"}
-	}
-
-	// Checks if CIDR is valid...
-	if req.CIDR != "" {
-		_, _, err := net.ParseCIDR(req.CIDR)
-		if err != nil {
-			return nil, fail.Wrap(err)
-		}
-	} else { // CIDR is empty, choose the first Class C one possible
-		tracer.Trace("CIDR is empty, choosing one...")
-		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
-	}
-
-	netRsc := newNetworkResource(req.Name)
-	return netRsc, nil
-}
-
 // InspectNetworkByName ...
+// returns:
+//  - nil, *fail.ErrInvalidParameter: one parameter is invalid
+//  - nil, *fail.ErrNotFound: network not found
+//  - nil, *fail.ErrDuplicate: found multiple networks with that name
+//  - *abstract.Network, nil: network found and returned information
 func (p *provider) InspectNetworkByName(ctx context.Context, name string) (*abstract.Network, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
@@ -162,23 +169,45 @@ func (p *provider) InspectNetworkByName(ctx context.Context, name string) (*abst
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
-	netRsc := newNetworkResource(name)
+	netRsc := newNetworkResource(name, networkInspectResourceSnippetPath)
+	return p.inspectNetworkResource(ctx, netRsc)
+}
+
+func unmarshalOutput[T any](in tfexec.OutputMeta) (T, fail.Error) {
+	var out T
+	if len(in.Value) == 0 {
+		return out, fail.SyntaxError("failed to unmarshal empty %s value", in.Type, in.Value, reflect.TypeOf(out).String())
+	}
+
+	err := json.Unmarshal(in.Value, &out)
+	if err != nil {
+		return out, fail.Wrap(err, "failed to unmarshal '%s' value in '%s'", in.Type, reflect.TypeOf(out).String())
+	}
+
+	return out, nil
+}
+
+func (p *provider) inspectNetworkResource(ctx context.Context, rsc *networkResource) (*abstract.Network, fail.Error) {
 	summoner, xerr := p.Terraformer()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = summoner.Build(netRsc)
+	xerr = summoner.Build(rsc)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	outputs, success, xerr := summoner.Plan(ctx)
+	outputs, xerr := summoner.Apply(ctx)
 	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to inspect network '%s'", name)
-	}
-	if !success {
-		return nil, fail.NewError("failed to inspect network '%s'", name)
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			return nil, fail.NotFoundError("failed to find network %s", rsc.String())
+		case *fail.ErrDuplicate:
+			return nil, fail.DuplicateError("found multiple networks %s", rsc.String())
+		default:
+			return nil, xerr
+		}
 	}
 
 	out := abstract.NewNetwork()
@@ -190,25 +219,22 @@ func (p *provider) InspectNetworkByName(ctx context.Context, name string) (*abst
 	if xerr != nil {
 		return nil, xerr
 	}
-	out.Tags, xerr = unmarshalOutput[map[string]string](outputs["tags"])
+	tags, xerr := unmarshalOutput[data.Slice[string]](outputs["tags"])
 	if xerr != nil {
 		return nil, xerr
 	}
+	out.Tags = data.StringSliceToMap[string](tags)
 
 	return out, nil
-}
 
-func unmarshalOutput[T any](in tfexec.OutputMeta) (T, fail.Error) {
-	var out T
-	err := json.Unmarshal(in.Value, &out)
-	if err != nil {
-		return out, fail.Wrap(err, "failed to unmarshal '%s' value in '%s'", in.Type, reflect.TypeOf(out).String())
-	}
-
-	return out, nil
 }
 
 // InspectNetwork returns the network identified by id
+// returns:
+//  - nil, *fail.ErrInvalidParameter: one parameter is invalid
+//  - nil, *fail.ErrNotFound: network not found
+//  - nil, *fail.ErrDuplicate: found multiple networks with that name
+//  - *abstract.Network, nil: network found and returned information
 func (p *provider) InspectNetwork(ctx context.Context, id string) (*abstract.Network, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
@@ -219,42 +245,9 @@ func (p *provider) InspectNetwork(ctx context.Context, id string) (*abstract.Net
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-	netRsc := newNetworkResource("")
+	netRsc := newNetworkResource("", networkInspectResourceSnippetPath)
 	netRsc.id = id
-
-	summoner, xerr := p.Terraformer()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	xerr = summoner.Build(netRsc)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	outputs, success, xerr := summoner.Plan(ctx)
-	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to inspect network %s", id)
-	}
-	if !success {
-		return nil, fail.NewError("failed to inspect network '%s'", id)
-	}
-
-	out := abstract.NewNetwork()
-	out.ID, xerr = unmarshalOutput[string](outputs["id"])
-	if xerr != nil {
-		return nil, xerr
-	}
-	out.Name, xerr = unmarshalOutput[string](outputs["name"])
-	if xerr != nil {
-		return nil, xerr
-	}
-	out.Tags, xerr = unmarshalOutput[map[string]string](outputs["tags"])
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return out, nil
+	return p.inspectNetworkResource(ctx, netRsc)
 }
 
 // ListNetworks lists available networks
@@ -315,9 +308,13 @@ func (p *provider) DeleteNetwork(ctx context.Context, id string) fail.Error {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
-	return fail.NotImplementedError()
+	abstractNetwork, xerr := p.InspectNetwork(ctx, id)
+	if xerr != nil {
+		return xerr
+	}
 
 	/*
 		var network *networks.Network
@@ -357,6 +354,25 @@ func (p *provider) DeleteNetwork(ctx context.Context, id string) fail.Error {
 
 		return nil
 	*/
+
+	netRsc := newNetworkResource(abstractNetwork.Name, networkDeleteResourceSnippetPath)
+	summoner, xerr := p.Terraformer()
+	if xerr != nil {
+		return xerr
+	}
+	// defer p.Terraformer().Clean()
+
+	xerr = summoner.Build(netRsc)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = summoner.Destroy(ctx)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to delete network %s", id)
+	}
+
+	return nil
 }
 
 // ToGophercloudIPVersion converts ipversion.Enum (corresponding to SafeScale abstract) to gophercloud.IPVersion

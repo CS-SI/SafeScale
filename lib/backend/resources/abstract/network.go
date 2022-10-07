@@ -45,12 +45,12 @@ type SubNetwork struct { // DEPRECATED: deprecated
 
 // Network represents a virtual network
 type Network struct {
-	ID         string            `json:"id"`                    // ID for the network (from provider)
-	Name       string            `json:"name"`                  // name of the network
-	CIDR       string            `json:"mask"`                  // network in CIDR notation (if it has a meaning...)
-	DNSServers []string          `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
-	Imported   bool              `json:"imported,omitempty"`    // tells if the Network has been imported (making it not deletable by SafeScale)
-	Tags       map[string]string `json:"tags,omitempty"`
+	ID         string                   `json:"id"`                    // ID for the network (from provider)
+	Name       string                   `json:"name"`                  // name of the network
+	CIDR       string                   `json:"mask"`                  // network in CIDR notation (if it has a meaning...)
+	DNSServers []string                 `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
+	Imported   bool                     `json:"imported,omitempty"`    // tells if the Network has been imported (making it not deletable by SafeScale)
+	Tags       data.Map[string, string] `json:"tags,omitempty"`
 
 	Domain             string         `json:"domain,omitempty"`               // DEPRECATED: contains the domain used to define host FQDN
 	GatewayID          string         `json:"gateway_id,omitempty"`           // DEPRECATED: contains the id of the host acting as primary gateway for the network
@@ -64,7 +64,7 @@ type Network struct {
 func NewNetwork() *Network {
 	nn := &Network{
 		DNSServers: make([]string, 0),
-		Tags:       make(map[string]string),
+		Tags:       data.NewMap[string, string](),
 	}
 	nn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	nn.Tags["ManagedBy"] = "safescale"

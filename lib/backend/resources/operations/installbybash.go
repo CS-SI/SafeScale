@@ -33,7 +33,7 @@ import (
 type bashInstaller struct{}
 
 // Check checks if the Feature is installed, using the check script in Specs
-func (i *bashInstaller) Check(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
+func (i *bashInstaller) Check(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&ferr)
 
@@ -77,7 +77,7 @@ func (i *bashInstaller) Check(ctx context.Context, f resources.Feature, t resour
 
 // Add installs the Feature using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
-func (i *bashInstaller) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
+func (i *bashInstaller) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&ferr)
 
@@ -127,7 +127,7 @@ func (i *bashInstaller) Add(ctx context.Context, f resources.Feature, t resource
 }
 
 // Remove uninstalls the Feature
-func (i *bashInstaller) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
+func (i *bashInstaller) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&ferr)
 

@@ -526,7 +526,7 @@ func (ff *FeatureFile) parseParameters() fail.Error {
 				ff.parameters[name] = newParam
 
 			case map[interface{}]interface{}:
-				casted := data.ToMapStringOfString(p)
+				casted := data.ToStringMapOfString(p)
 				name, ok := casted[nameKey]
 				if !ok {
 					return fail.SyntaxError("missing 'name' field in entry #%d of keyword 'feature.parameters'", k+1)

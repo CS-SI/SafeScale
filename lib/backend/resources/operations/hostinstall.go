@@ -39,7 +39,7 @@ import (
 )
 
 // AddFeature handles 'safescale host feature add <host name or id> <feature name>'
-func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, ferr fail.Error) {
+func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings) (outcomes resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -111,7 +111,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 }
 
 // CheckFeature ...
-func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -137,7 +137,7 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
-func (instance *Host) DeleteFeature(inctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+func (instance *Host) DeleteFeature(inctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -378,7 +378,7 @@ func (instance *Host) InstalledFeatures(ctx context.Context) ([]string, fail.Err
 
 // ComplementFeatureParameters configures parameters that are appropriate for the target
 // satisfies interface install.Targetable
-func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Map) (ferr fail.Error) {
+func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Map[string, any]) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {

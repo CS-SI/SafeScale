@@ -116,7 +116,7 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.
 
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
-func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error {
+func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data.Map[string, any]) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -409,7 +409,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 
 // AddFeature installs a feature on the Cluster
 func (instance *Cluster) AddFeature(
-	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
+	ctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings,
 ) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -432,7 +432,7 @@ func (instance *Cluster) AddFeature(
 
 // CheckFeature tells if a feature is installed on the Cluster
 func (instance *Cluster) CheckFeature(
-	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
+	ctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings,
 ) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -455,7 +455,7 @@ func (instance *Cluster) CheckFeature(
 
 // RemoveFeature uninstalls a feature from the Cluster
 func (instance *Cluster) RemoveFeature(
-	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
+	ctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings,
 ) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -480,9 +480,7 @@ func (instance *Cluster) RemoveFeature(
 var clusterFlavorScripts embed.FS
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *Cluster) ExecuteScript(
-	inctx context.Context, tmplName string, variables data.Map, host resources.Host,
-) (_ int, _ string, _ string, ferr fail.Error) {
+func (instance *Cluster) ExecuteScript(inctx context.Context, tmplName string, variables data.Map[string, any], host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
@@ -542,7 +540,7 @@ func (instance *Cluster) ExecuteScript(
 		}
 
 		var fisize = uint64(len(variables) + len(bashLibraryVariables))
-		finalVariables := make(data.Map, fisize)
+		finalVariables := make(data.Map[string, any], fisize)
 		for k, v := range variables {
 			finalVariables[k] = v
 		}
@@ -658,15 +656,15 @@ func (instance *Cluster) installNodeRequirements(inctx context.Context, nodeType
 			return
 		}
 
-		params := data.NewMap()
+		params := data.NewMap[string, any]()
 		if nodeType == clusternodetype.Master {
 			tp, xerr := instance.Service().TenantParameters()
 			if xerr != nil {
 				chRes <- result{xerr}
 				return
 			}
-			content := map[string]interface{}{
-				"tenants": []map[string]interface{}{tp},
+			content := map[string]any{
+				"tenants": []map[string]any{tp},
 			}
 			jsoned, err := json.MarshalIndent(content, "", "    ")
 			err = debug.InjectPlannedError(err)
@@ -826,7 +824,7 @@ func (instance *Cluster) installNodeRequirements(inctx context.Context, nodeType
 }
 
 // installReverseProxy installs reverseproxy
-func (instance *Cluster) installReverseProxy(inctx context.Context, params data.Map) (ferr fail.Error) {
+func (instance *Cluster) installReverseProxy(inctx context.Context, params data.Map[string, any]) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -896,7 +894,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 				return
 			}
 
-			params, _ := data.FromMap(params)
+			// params, _ := data.FromMap(params)
 			results, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -929,7 +927,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 }
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the Cluster
-func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data.Map) (ferr fail.Error) {
+func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data.Map[string, any]) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -1000,7 +998,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 			}
 
 			// Adds remotedesktop feature on Cluster (ie masters)
-			params, _ := data.FromMap(params)
+			// params, _ := data.FromMap(params)
 			params["Username"] = "cladm"
 			params["Password"] = identity.AdminPassword
 
@@ -1039,7 +1037,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 }
 
 // installAnsible installs feature ansible on all masters of the Cluster
-func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) (ferr fail.Error) {
+func (instance *Cluster) installAnsible(inctx context.Context, params data.Map[string, any]) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -1089,7 +1087,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 			}
 
 			// Adds ansible feature on Cluster (ie masters)
-			params, _ := data.FromMap(params)
+			// params, _ := data.FromMap(params)
 			params["Username"] = "cladm"
 			params["Password"] = identity.AdminPassword
 			r, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
@@ -1142,9 +1140,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 }
 
 // installDocker installs docker and docker-compose
-func (instance *Cluster) installDocker(
-	inctx context.Context, host resources.Host, hostLabel string, params data.Map,
-) (ferr fail.Error) {
+func (instance *Cluster) installDocker(inctx context.Context, host resources.Host, hostLabel string, params data.Map[string, any]) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -1186,7 +1182,7 @@ func (instance *Cluster) installDocker(
 			return
 		}
 
-		params, _ := data.FromMap(params)
+		// params, _ := data.FromMap(params)
 		r, xerr := feat.Add(ctx, host, params, resources.FeatureSettings{})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {

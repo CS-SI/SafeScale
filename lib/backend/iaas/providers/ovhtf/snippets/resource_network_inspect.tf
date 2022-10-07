@@ -1,23 +1,25 @@
-data "openstack_networking_network_v2" "{{ .ResourceName }}" {
+data "openstack_networking_network_v2" "network_inspect" {
+    provider = openstack.ovh
 {{- if .Resource.ID }}
-    id = "{{ .Resource.ID }}"
+    network_id = "{{ .Resource.ID }}"
 {{- else }}
 {{-   if .Resource.Name }}
     name = "{{ .Resource.Name }}"
 {{-   end }}
 {{- end }}
     tenant_id = "{{ or .Provider.Authentication.TenantID .Provider.Authentication.TenantName }}"
+    region = "{{ .Provider.Authentication.Region }}"
 }
 
 output "id" {
-    value = "${openstack_networking_network_v2.{{ .Resource.Name }}.id}"
+    value = "${data.openstack_networking_network_v2.network_inspect.id}"
 }
 output "name" {
-    value = "${openstack_networking_network_v2.{{ .Resource.Name }}.name}"
+    value = "${data.openstack_networking_network_v2.network_inspect.name}"
 }
 output "subnets" {
-    value = "${openstack_networking_network_v2.{{ .Resource.Name }}.subnets}"
+    value = "${data.openstack_networking_network_v2.network_inspect.subnets}"
 }
 output "tags" {
-    value = "${openstack_networking_network_v2.{{ .Resource.Name }}.all_tags}"
+    value = "${data.openstack_networking_network_v2.network_inspect.all_tags}"
 }

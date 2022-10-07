@@ -91,10 +91,12 @@ func checkTerraform() error {
 		if err != nil {
 			logrus.Fatalf("error creating terraform exec instance: %s", err)
 		}
+
 		version, _, err := tf.Version(context.Background(), true)
 		if err != nil {
 			logrus.Fatalf("error checking terraform release '%s': %s", versions.Terraformv1_2_6, err)
 		}
+
 		if !version.Equal(versions.Terraformv1_2_6) {
 			execPath, err = installTerraform()
 			if err != nil {

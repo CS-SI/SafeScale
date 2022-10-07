@@ -1158,7 +1158,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 			return xerr
 		}
 
-		aresult, ok := results[id].(data.Map)
+		aresult, ok := results[id].(data.Map[string, any])
 		if !ok {
 			xerr := fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
 			chRes <- result{xerr}
@@ -1279,7 +1279,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 				return xerr
 			}
 
-			aresult, ok := results[id].(data.Map)
+			aresult, ok := results[id].(data.Map[string, any])
 			if !ok {
 				xerr := fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
 				chRes <- result{xerr}

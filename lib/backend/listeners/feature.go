@@ -269,15 +269,15 @@ func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActio
 	return empty, nil
 }
 
-func convertVariablesToDataMap(in map[string]string) (data.Map, fail.Error) {
-	var out data.Map
+func convertVariablesToDataMap(in map[string]string) (data.Map[string, any], fail.Error) {
+	var out data.Map[string, any]
 	if len(in) > 0 {
 		jsoned, err := json.Marshal(in)
 		if err != nil {
-			return data.NewMap(), fail.Wrap(err, "failed to check feature: failed to convert variables to json")
+			return out, fail.Wrap(err, "failed to check feature: failed to convert variables to json")
 		}
 		if err = json.Unmarshal(jsoned, &out); err != nil {
-			return data.NewMap(), fail.Wrap(err, "failed to check feature: failed to convert variables")
+			return data.NewMap[string, any](0), fail.Wrap(err, "failed to check feature: failed to convert variables")
 		}
 	}
 	return out, nil

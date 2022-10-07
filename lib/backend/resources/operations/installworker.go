@@ -110,7 +110,7 @@ type worker struct {
 	target    resources.Targetable
 	method    installmethod.Enum
 	action    installaction.Enum
-	variables data.Map
+	variables data.Map[string, any]
 	settings  resources.FeatureSettings
 	startTime time.Time
 
@@ -632,7 +632,7 @@ func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host,
 
 // Proceed executes the action
 func (w *worker) Proceed(
-	inctx context.Context, params data.Map, settings resources.FeatureSettings,
+	inctx context.Context, params data.Map[string, any], settings resources.FeatureSettings,
 ) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -844,7 +844,7 @@ type taskLaunchStepParameters struct {
 	stepName  string
 	stepKey   string
 	stepMap   map[string]interface{}
-	variables data.Map
+	variables data.Map[string, any]
 	hosts     []resources.Host
 }
 
@@ -961,7 +961,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			}
 		}
 
-		templateCommand, xerr := normalizeScript(timings, &p.variables, data.Map{
+		templateCommand, xerr := normalizeScript(timings, &p.variables, data.Map[string, any]{
 			"reserved_Name":    w.feature.GetName(),
 			"reserved_Content": runContent,
 			"reserved_Action":  strings.ToLower(w.action.String()),
@@ -1294,18 +1294,10 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 		}
 
 		// Now submits all the rules to reverse proxy
-		primaryGatewayVariables, cerr := data.FromMap(w.variables)
-		if cerr != nil {
-			chRes <- result{fail.Wrap(cerr)}
-			return
-		}
-		var secondaryGatewayVariables data.Map
+		primaryGatewayVariables := w.variables.Clone()
+		var secondaryGatewayVariables data.Map[string, any]
 		if secondaryKongController != nil {
-			secondaryGatewayVariables, cerr = data.FromMap(w.variables)
-			if cerr != nil {
-				chRes <- result{fail.Wrap(cerr)}
-				return
-			}
+			secondaryGatewayVariables = w.variables.Clone()
 		}
 		for _, r := range rules {
 			if r == nil {
@@ -1316,6 +1308,7 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 				chRes <- result{fail.InconsistentError("wrong r type %T, it should be a map[interface{}]interface{}", r)}
 				return
 			}
+
 			targets := w.interpretRuleTargets(rule)
 			hosts, xerr := w.identifyHosts(ctx, targets)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -1461,7 +1454,7 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 type taskApplyProxyRuleParameters struct {
 	controller *KongController
 	rule       map[interface{}]interface{}
-	variables  *data.Map
+	variables  *data.Map[string, any]
 }
 
 func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (
@@ -1640,7 +1633,7 @@ func (w *worker) identifyHosts(inctx context.Context, targets stepTargets) ([]re
 
 // normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
 // and ensures BashLibrary are there
-func normalizeScript(timings temporal.Timings, params *data.Map, reserved data.Map) (string, fail.Error) {
+func normalizeScript(timings temporal.Timings, params *data.Map[string, any], reserved data.Map[string, any]) (string, fail.Error) {
 	var (
 		err         error
 		tmplContent string

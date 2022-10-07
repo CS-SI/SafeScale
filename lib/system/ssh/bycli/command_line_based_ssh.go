@@ -709,7 +709,7 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 			return
 		}
 
-		if res, ok := r.(data.Map); ok {
+		if res, ok := r.(data.Map[string, any]); ok {
 			tracer.Trace("run succeeded, retcode=%d", res["retcode"].(int))
 			chRes <- result{res["retcode"].(int), res["stdout"].(string), res["stderr"].(string), nil}
 			return
@@ -753,7 +753,7 @@ func (scmd *CliCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 		err                        error
 	)
 
-	result := data.Map{
+	result := data.Map[string, any]{
 		"retcode": -1,
 		"stdout":  "",
 		"stderr":  "",

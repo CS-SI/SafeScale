@@ -262,7 +262,7 @@ func (instance *Feature) Applicable(ctx context.Context, tg resources.Targetable
 
 // Check if Feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
-func (instance *Feature) Check(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+func (instance *Feature) Check(ctx context.Context, target resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -377,7 +377,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 // Returned error may be:
 //   - nil: everything went well
 //   - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
-func (instance Feature) prepareParameters(ctx context.Context, externals data.Map, target resources.Targetable) (data.Map, fail.Error) {
+func (instance Feature) prepareParameters(ctx context.Context, externals data.Map[string, any], target resources.Targetable) (data.Map[string, any], fail.Error) {
 	xerr := instance.conditionParameters(ctx, externals, target)
 	if xerr != nil {
 		return nil, xerr
@@ -398,7 +398,7 @@ func (instance Feature) prepareParameters(ctx context.Context, externals data.Ma
 // Returned error may be:
 //   - nil: everything went well
 //   - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
-func (instance *Feature) conditionParameters(ctx context.Context, externals data.Map, target resources.Targetable) fail.Error {
+func (instance *Feature) conditionParameters(ctx context.Context, externals data.Map[string, any], target resources.Targetable) fail.Error {
 	if instance.conditionedParameters == nil {
 		var xerr fail.Error
 		instance.conditionedParameters = make(ConditionedFeatureParameters)
@@ -463,7 +463,7 @@ func (instance *Feature) determineInstallerForTarget(ctx context.Context, target
 
 // Add installs the Feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -537,7 +537,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 }
 
 // Remove uninstalls the Feature from the target
-func (instance *Feature) Remove(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+func (instance *Feature) Remove(ctx context.Context, target resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -635,7 +635,7 @@ func (instance *Feature) ClusterSizingRequirementsForFlavor(flavor string) (map[
 }
 
 // installRequirements walks through dependencies and installs them if needed
-func (instance *Feature) installRequirements(ctx context.Context, t resources.Targetable, v data.Map, s resources.FeatureSettings) fail.Error {
+func (instance *Feature) installRequirements(ctx context.Context, t resources.Targetable, v data.Map[string, any], s resources.FeatureSettings) fail.Error {
 	requirements := instance.file.getDependencies()
 	if len(requirements) > 0 {
 		{
@@ -804,7 +804,7 @@ func (instance Feature) controlledParameter(ctx context.Context, p string, targe
 			}
 		}
 
-		cmd, xerr := replaceVariablesInString(cc, data.Map{"ParameterValue": instance.conditionedParameters[p].currentValue})
+		cmd, xerr := replaceVariablesInString(cc, data.Map[string, any]{"ParameterValue": instance.conditionedParameters[p].currentValue})
 		if xerr != nil {
 			return "", xerr
 		}
@@ -833,8 +833,8 @@ func (instance Feature) controlledParameter(ctx context.Context, p string, targe
 }
 
 // ExtractFeatureParameters convert a slice of string in format a=b into a map index on 'a' with value 'b'
-func ExtractFeatureParameters(params []string) data.Map {
-	out := data.NewMap()
+func ExtractFeatureParameters(params []string) data.Map[string, any] {
+	out := data.NewMap[string, any]()
 	for _, v := range params {
 		splitted := strings.Split(v, "=")
 		if len(splitted) > 1 {

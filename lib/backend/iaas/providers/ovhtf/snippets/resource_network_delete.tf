@@ -1,7 +1,11 @@
-resource "openstack_networking_network_v2" "{{ .Resource.Name }}" {
+resource "openstack_networking_network_v2" "network_delete" {
     provider                = openstack.ovh
-    id                      = "{{ .Resource.ID }}"
+{{- if .Resource.ID }}
+    network_id              = "{{ .Resource.ID }}"
+{{- end }}
+{{- if .Resource.Name }}
     name                    = "{{ .Resource.Name }}"
+{{- end }}
     admin_state_up          = true
     port_security_enabled   = true
     shared                  = false

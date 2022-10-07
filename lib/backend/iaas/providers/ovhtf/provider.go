@@ -45,7 +45,7 @@ import (
 const (
 	providerName      = "ovhtf"
 	ovhDefaultImage   = "Ubuntu 20.04"
-	configSnippetPath = "snippets/provider_ovh.tf.template"
+	configSnippetPath = "snippets/provider_ovh.tf"
 )
 
 type gpuCfg struct {

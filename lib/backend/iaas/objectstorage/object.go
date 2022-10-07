@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"gomodules.xyz/stow"
 
 	// necessary for connect
@@ -36,9 +35,10 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-//go:generate minimock -o ../mocks/mock_object.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage.Object
+//go:generate minimock -o ./mocks/mock_object.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage.Object
 
 // Object interface
 type Object interface {

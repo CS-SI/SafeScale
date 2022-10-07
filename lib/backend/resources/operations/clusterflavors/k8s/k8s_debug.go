@@ -97,7 +97,7 @@ func defaultImage(_ resources.Cluster) string {
 	return consts.DEFAULTOS
 }
 
-func configureCluster(ctx context.Context, c resources.Cluster, params data.Map) fail.Error {
+func configureCluster(ctx context.Context, c resources.Cluster, params data.Map[string, any]) fail.Error {
 	clusterName := c.GetName()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
@@ -129,9 +129,7 @@ func configureCluster(ctx context.Context, c resources.Cluster, params data.Map)
 }
 
 // This function is called to remove a node from a Cluster
-func leaveNodeFromCluster(
-	ctx context.Context, clusterInstance resources.Cluster, node resources.Host, selectedMaster resources.Host,
-) (ferr fail.Error) {
+func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster, node resources.Host, selectedMaster resources.Host) (ferr fail.Error) {
 	if clusterInstance == nil {
 		return fail.InvalidParameterCannotBeNilError("clusterInstance")
 	}

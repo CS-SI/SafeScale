@@ -35,12 +35,12 @@ import (
 
 // FeatureHandler interface defines the methods available to handle Features
 type FeatureHandler interface {
-	Add(featuretargettype.Enum, string, string, data.Map, resources.FeatureSettings) fail.Error
-	Check(featuretargettype.Enum, string, string, data.Map, resources.FeatureSettings) fail.Error
+	Add(featuretargettype.Enum, string, string, data.Map[string, any], resources.FeatureSettings) fail.Error
+	Check(featuretargettype.Enum, string, string, data.Map[string, any], resources.FeatureSettings) fail.Error
 	Export(featuretargettype.Enum, string, string, bool) (*protocol.FeatureExportResponse, fail.Error)
 	Inspect(featuretargettype.Enum, string, string) (resources.Feature, fail.Error)
 	List(featuretargettype.Enum, string, bool) ([]resources.Feature, fail.Error)
-	Remove(featuretargettype.Enum, string, string, data.Map, resources.FeatureSettings) fail.Error
+	Remove(featuretargettype.Enum, string, string, data.Map[string, any], resources.FeatureSettings) fail.Error
 }
 
 // featureHandler is an implementation of FeatureHandler
@@ -231,7 +231,7 @@ func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetR
 }
 
 // Check checks if a feature installed on target
-func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map, settings resources.FeatureSettings) (ferr fail.Error) {
+func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map[string, any], settings resources.FeatureSettings) (ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -304,7 +304,7 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 	}
 }
 
-// func convertVariablesToDataMap(in map[string]string) (data.Map, fail.Error) {
+// func convertVariablesToDataMap(in map[string]string) (data.Map[string, any], fail.Error) {
 // 	var out data.Map
 // 	if len(in) > 0 {
 // 		jsoned, err := json.Marshal(in)
@@ -319,7 +319,7 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 // }
 
 // Add ...
-func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map, settings resources.FeatureSettings) (ferr fail.Error) {
+func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map[string, any], settings resources.FeatureSettings) (ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -383,7 +383,7 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 }
 
 // Remove uninstalls a Feature
-func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map, settings resources.FeatureSettings) (ferr fail.Error) {
+func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map[string, any], settings resources.FeatureSettings) (ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())

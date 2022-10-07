@@ -198,7 +198,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 			return ar.rErr
 		}
 
-		r := data.Map{
+		r := data.Map[string, any]{
 			"host":     rgw,
 			"userdata": userData,
 		}
