@@ -60,8 +60,7 @@ func (s *SSHListener) Run(inctx context.Context, in *protocol.SshCommandRequest)
 		}
 	}
 
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/ssh/run/host/%s", hostRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/ssh/run/host/%s", hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -108,8 +107,7 @@ func (s *SSHListener) Copy(inctx context.Context, in *protocol.SshCopyCommandReq
 	source := in.Source
 	dest := in.Destination
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/ssh/%s", hostRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/ssh/%s", hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}

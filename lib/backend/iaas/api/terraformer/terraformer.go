@@ -19,6 +19,8 @@ package terraformerapi
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/hashicorp/terraform-exec/tfexec"
 )
@@ -41,22 +43,18 @@ type (
 		Version string
 	}
 
-	RequiredProviders map[string]RequiredProvider
+	RequiredProviders data.Map[string, RequiredProvider]
 
 	Configuration struct {
-		Release       string // contains the release of terraform wanted for the hcl file produced
-		WorkDir       string
-		ExecPath      string
-		PluginDir     string
-		ConsulBackend struct {
-			Path string // "/safescale/terraformstate/{{ or .CurrentOrganization "default" }}/{{ or .CurrentProject "default" }}"
-			Use  bool
+		Release   string // contains the release of terraform wanted for the hcl file produced
+		WorkDir   string
+		ExecPath  string
+		PluginDir string
+		Consul    struct {
+			Server string
+			Prefix string // should contains "safescale/terraformstate/{Scope.Organization}/{Scope.Project}/{Scope.Tenant}
 		}
-		Scope struct { // Note: don't use job.Scope, to prevent import cycle, and avoid "outside" dependencies for iaas backend
-			Organization string
-			Project      string
-			Tenant       string
-		}
+		Scope common.Scope
 		RequiredProviders
 	}
 )

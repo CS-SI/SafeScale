@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -34,32 +35,27 @@ type scopeFromProtocol interface {
 	GetTenantId() string
 }
 
-func extractScopeFromProtocol(in scopeFromProtocol, description string) job.Scope {
-	out := job.Scope{
-		Organization: in.GetOrganization(),
-		Project:      in.GetProject(),
-		Tenant:       in.GetTenantId(),
-		Description:  description,
-	}
-	return out
-}
-
 // prepareJob creates a new job and associated service
 // FIXME: include job and svc in context?
-func prepareJob(ctx context.Context, scope job.Scope) (_ job.Job, ferr fail.Error) {
+func prepareJob(ctx context.Context, in scopeFromProtocol, description string) (_ job.Job, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	newctx, cancel := context.WithCancel(ctx)
-	job, xerr := job.New(newctx, cancel, scope)
+	scope, xerr := common.NewScope(in.GetOrganization(), in.GetProject(), in.GetTenantId(), description)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return job, nil
+	newctx, cancel := context.WithCancel(ctx)
+	j, xerr := job.New(newctx, cancel, scope)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return j, nil
 }
 
 // // PrepareJobWithoutService creates a new job without service instanciation (for example to be used with metadata upgrade)
@@ -136,7 +132,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 }
 
 // List running process
-func (s *JobManagerListener) List(inctx context.Context, in *emptypb.Empty) (jl *protocol.JobList, err error) {
+func (s *JobManagerListener) List(inctx context.Context, _ *emptypb.Empty) (jl *protocol.JobList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot list jobs")
 	defer fail.OnPanic(&err)

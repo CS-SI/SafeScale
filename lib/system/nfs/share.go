@@ -82,7 +82,7 @@ func (s *Share) Add(ctx context.Context, svc iaasapi.Service) fail.Error {
 	}
 
 	data := map[string]interface{}{
-		"Path": s.Path,
+		"Prefix": s.Path,
 		// "AccessRights": strings.TrimSpace(acls),
 		"Options": s.Options,
 	}

@@ -525,7 +525,7 @@ func (ff *FeatureFile) parseParameters() fail.Error {
 				}
 				ff.parameters[name] = newParam
 
-			case map[interface{}]interface{}:
+			case map[any]any:
 				casted := data.ToStringMapOfString(p)
 				name, ok := casted[nameKey]
 				if !ok {

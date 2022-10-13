@@ -1240,7 +1240,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 					}
 				}()
 
-				// Bind Internal Security Group to gateway
+				// Bind External Security Group to gateway
 				xerr = instance.bindInternalSecurityGroupToGateway(ctx, primaryGateway)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -1349,7 +1349,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 					}
 				}()
 
-				// Bind Internal Security Group to gateway
+				// Bind External Security Group to gateway
 
 				if !safe {
 					xerr = svc.ChangeSecurityGroupSecurity(ctx, false, true, req.NetworkID, "")

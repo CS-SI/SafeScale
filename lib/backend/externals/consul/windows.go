@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -10,16 +13,23 @@
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
-package job
+package consul
 
-// Scope contains information about context of the Job
-type Scope struct {
-	Organization string
-	Project      string
-	Tenant       string
-	Description  string
+import (
+	"os/exec"
+	"syscall"
+)
+
+// adaptToOS ...
+func adaptToOS(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow: true,
+		// Setpgid: true,
+		// Chroot:  filepath.Join(global.Settings.Folders.ShareDir, "consul"),
+	}
 }

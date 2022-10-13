@@ -323,7 +323,7 @@ func reduceHuaweiAPIErrors(errcode int, code string, body map[string]interface{}
 	case "APIGW.0501", "APIGW.0502":
 		return fail.ForbiddenError("Quotas exceeded")
 	case "APIGW.0601", "APIGW.0605", "APIGW.0606", "APIGW.0608", "APIGW.0609", "APIGW.0611", "APIGW.0613", "APIGW.0705":
-		return fail.UnknownError("Internal error, contact your cloud provider")
+		return fail.UnknownError("External error, contact your cloud provider")
 	case "APIGW.0610":
 		return fail.NotAvailableError("Backend service in timeout or not available")
 	case "APIGW.0602", "APIGW.0607", "APIGW.0612":

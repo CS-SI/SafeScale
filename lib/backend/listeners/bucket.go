@@ -54,8 +54,7 @@ func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequ
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	scope := extractScopeFromProtocol(in, "/buckets/list")
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, "/buckets/list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -92,8 +91,7 @@ func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketReques
 	}
 
 	bucketName := in.GetName()
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/bucket/%s/create", bucketName))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/bucket/%s/create", bucketName))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -129,8 +127,7 @@ func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketReques
 	}
 
 	bucketName := in.GetName()
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/bucket/%s/delete", bucketName))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/bucket/%s/delete", bucketName))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -166,8 +163,7 @@ func (s *BucketListener) Download(inctx context.Context, in *protocol.BucketRequ
 		return empty, fail.InvalidParameterError("bucket name", "cannot be empty")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/bucket/%s/download", bucketName))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/bucket/%s/download", bucketName))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -209,8 +205,7 @@ func (s *BucketListener) Clear(inctx context.Context, in *protocol.BucketRequest
 		return empty, fail.InvalidParameterError("bucket name", "cannot be empty")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/bucket/%s/upload", bucketName))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/bucket/%s/upload", bucketName))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -246,8 +241,7 @@ func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketReque
 	}
 
 	bucketName := in.GetName()
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/bucket/%s/inspect", bucketName))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/bucket/%s/inspect", bucketName))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -290,8 +284,7 @@ func (s *BucketListener) Mount(inctx context.Context, in *protocol.BucketMountRe
 
 	bucketName := in.GetBucket()
 	hostRef, _ := srvutils.GetReference(in.GetHost())
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/bucket/%s/host/%s/mount", bucketName, hostRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/bucket/%s/host/%s/mount", bucketName, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -323,8 +316,7 @@ func (s *BucketListener) Unmount(inctx context.Context, in *protocol.BucketMount
 
 	bucketName := in.GetBucket()
 	hostRef, _ := srvutils.GetReference(in.GetHost())
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/bucket/%s/host/%s/unmount", bucketName, hostRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/bucket/%s/host/%s/unmount", bucketName, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}

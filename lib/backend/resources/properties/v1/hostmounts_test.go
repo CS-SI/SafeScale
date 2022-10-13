@@ -100,7 +100,7 @@ func TestHostRemoteMount_Clone(t *testing.T) {
 	hrm := &HostRemoteMount{
 		ShareID:    "HostRemoteMount ShareID",
 		Export:     "HostRemoteMount Export",
-		Path:       "HostRemoteMount Path",
+		Path:       "HostRemoteMount Prefix",
 		FileSystem: "HostRemoteMount FileSystem",
 		Options:    "HostRemoteMount Options",
 	}
@@ -133,7 +133,7 @@ func TestHostRemoteMount_Replace(t *testing.T) {
 	hrm2 := &HostRemoteMount{
 		ShareID:    "HostRemoteMount ShareID",
 		Export:     "HostRemoteMount Export",
-		Path:       "HostRemoteMount Path",
+		Path:       "HostRemoteMount Prefix",
 		FileSystem: "HostRemoteMount FileSystem",
 		Options:    "HostRemoteMount Options",
 	}

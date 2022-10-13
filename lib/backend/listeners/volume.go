@@ -61,8 +61,7 @@ func (s *VolumeListener) List(inctx context.Context, in *protocol.VolumeListRequ
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	scope := extractScopeFromProtocol(in, "/volumes/list")
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in, "/volumes/list")
 	if err != nil {
 		return nil, err
 	}
@@ -110,8 +109,7 @@ func (s *VolumeListener) Create(inctx context.Context, in *protocol.VolumeCreate
 	}
 
 	name := in.GetName()
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/volume/%s/create", name))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/volume/%s/create", name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -170,8 +168,7 @@ func (s *VolumeListener) Attach(inctx context.Context, in *protocol.VolumeAttach
 		doNotFormatStr = "FORMAT"
 	}
 
-	scope := extractScopeFromProtocol(in.GetVolume(), fmt.Sprintf("/volume/%s/host/%s/attach", volumeRef, hostRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetVolume(), fmt.Sprintf("/volume/%s/host/%s/attach", volumeRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -215,8 +212,7 @@ func (s *VolumeListener) Detach(inctx context.Context, in *protocol.VolumeDetach
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for host")
 	}
 
-	scope := extractScopeFromProtocol(in.GetVolume(), fmt.Sprintf("/volume/%s/host/%s/detach", volumeRef, hostRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetVolume(), fmt.Sprintf("/volume/%s/host/%s/detach", volumeRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -256,8 +252,7 @@ func (s *VolumeListener) Delete(inctx context.Context, in *protocol.Reference) (
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/volume/%s/delete", ref))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/volume/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -296,8 +291,7 @@ func (s *VolumeListener) Inspect(inctx context.Context, in *protocol.Reference) 
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/volume/%s/inspect", ref))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/volume/%s/inspect", ref))
 	if xerr != nil {
 		return nil, xerr
 	}

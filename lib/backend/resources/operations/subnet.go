@@ -572,13 +572,13 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 
 			sg, derr := LoadSecurityGroup(ctx, instance.Service(), as.InternalSecurityGroupID)
 			if derr != nil {
-				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
+				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind External Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
 				return derr
 			}
 
 			derr = sg.UnbindFromHost(ctx, host)
 			if derr != nil {
-				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
+				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind External Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
 				return derr
 			}
 

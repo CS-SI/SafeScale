@@ -17,10 +17,10 @@
 package iaasoptions
 
 import (
-	"strings"
+	"reflect"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
-	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -44,31 +44,15 @@ func (o Build) Store(key string, value any) (any, fail.Error) {
 }
 
 // BuildWithScope allows to define the tenant to use
-func BuildWithScope(organization, project, tenant string) options.Mutator {
-	if organization = strings.TrimSpace(organization); organization == "" {
-		organization = global.DefaultOrganization
+func BuildWithScope(scope common.Scope) options.Mutator {
+	if valid.IsNull(scope) {
+		return func(o options.Options) fail.Error {
+			return fail.InvalidParameterError("scope", "cannot be null value of '%s'", reflect.TypeOf(scope).String())
+		}
 	}
-	if project = strings.TrimSpace(project); project == "" {
-		project = global.DefaultProject
-	}
-	tenant = strings.TrimSpace(tenant)
 
 	return func(o options.Options) fail.Error {
-		if tenant == "" {
-			return fail.InvalidParameterCannotBeEmptyStringError("tenant")
-		}
-
-		xerr := options.Add(o, "Organization", organization)
-		if xerr != nil {
-			return xerr
-		}
-
-		xerr = options.Add(o, "Project", project)
-		if xerr != nil {
-			return xerr
-		}
-
-		xerr = options.Add(o, "Tenant", tenant)
+		xerr := options.Add(o, "Scope", scope)
 		if xerr != nil {
 			return xerr
 		}

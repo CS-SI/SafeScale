@@ -22,6 +22,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,7 +57,12 @@ func getService() (iaasapi.Service, error) {
 		return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
 	}
 
-	service, err := factory.UseService(iaasoptions.BuildWithScope(global.DefaultOrganization, global.DefaultProject, tenantName))
+	scope, xerr := common.NewScope(global.DefaultOrganization, global.DefaultProject, tenantName, "")
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service, err := factory.UseService(iaasoptions.BuildWithScope(scope))
 	if err != nil || service == nil {
 		return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
 	}

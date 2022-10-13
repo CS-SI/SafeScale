@@ -138,7 +138,7 @@ func shareCreateCommand() *cobra.Command {
 	}
 
 	flags := out.Flags()
-	flags.String("path", abstract.DefaultShareExportedPath, "Path to be exported")
+	flags.String("path", abstract.DefaultShareExportedPath, "Prefix to be exported")
 	flags.Bool("readonly", false, "Disallow write requests on this NFS volume")
 	flags.Bool("rootsquash", false, "Map requests from uid/gid 0 to the anonymous uid/gid")
 	flags.Bool("secure", false, "Requires that requests originate on an Internet port less than IPPORT_RESERVED (1024).")
@@ -241,7 +241,7 @@ func shareMountCommand() *cobra.Command {
 	}
 
 	flags := out.Flags()
-	flags.String("path", abstract.DefaultShareMountPath, "Path to be mounted")
+	flags.String("path", abstract.DefaultShareMountPath, "Prefix to be mounted")
 	flags.Bool("ac", false, "Disable cache coherence to improve performances")
 
 	return out

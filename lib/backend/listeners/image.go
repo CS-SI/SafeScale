@@ -48,8 +48,7 @@ func (s *ImageListener) List(inctx context.Context, in *protocol.ImageListReques
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	scope := extractScopeFromProtocol(in, "/images/list")
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in, "/images/list")
 	if err != nil {
 		return nil, err
 	}

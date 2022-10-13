@@ -150,29 +150,26 @@ func (instance *summoner) Build(resources ...terraformerapi.Resource) (ferr fail
 		return xerr
 	}
 
-	// render optional consul backend configuration
-	if instance.config.ConsulBackend.Use {
-		lvars := variables.Clone()
-		lvars["ConsulBackend"] = instance.config.ConsulBackend
-		content, xerr := instance.realizeTemplate(layoutFiles, consulBackendSnippetPath, variables)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		variables["ConsulBackend"] = content
-
-		content, xerr = instance.realizeTemplate(layoutFiles, consulBackendDataSnippetPath, variables)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		variables["ConsulBackendData"] = string(content)
+	// render consul backend configuration to store state
+	lvars := variables.Clone()
+	lvars["Consul"] = instance.config.Consul
+	content, xerr := instance.realizeTemplate(layoutFiles, consulBackendSnippetPath, variables)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
 	}
 
+	variables["Consul"] = content
+	content, xerr = instance.realizeTemplate(layoutFiles, consulBackendDataSnippetPath, variables)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	variables["ConsulBackendData"] = string(content)
+
 	// finally, render the layout
-	content, xerr := instance.realizeTemplate(layoutFiles, layoutSnippetPath, variables)
+	content, xerr = instance.realizeTemplate(layoutFiles, layoutSnippetPath, variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -285,12 +282,12 @@ func (instance *summoner) Plan(ctx context.Context) (_ map[string]tfexec.OutputM
 	}
 	logrus.Trace("terraform init ran successfully.")
 
-	output, err := tf.Validate(ctx)
-	if err != nil {
-		return nil, false, fail.Wrap(err, "failed to validate terraform file")
-	}
-	_ = output
-	logrus.Trace("terraform validate ran successfully.")
+	// output, err := tf.Validate(ctx)
+	// if err != nil {
+	// 	return nil, false, fail.Wrap(err, "failed to validate terraform file")
+	// }
+	// _ = output
+	// logrus.Trace("terraform validate ran successfully.")
 
 	success, err := tf.Plan(ctx)
 	if err != nil {
@@ -421,12 +418,12 @@ func (instance *summoner) Apply(ctx context.Context) (_ map[string]tfexec.Output
 	}
 	logrus.Trace("terraform init ran successfully.")
 
-	output, err := tf.Validate(ctx)
-	if err != nil {
-		return nil, fail.Wrap(err, "failed to validate terraform file")
-	}
-	_ = output
-	logrus.Trace("terraform validate ran successfully.")
+	// output, err := tf.Validate(ctx)
+	// if err != nil {
+	// 	return nil, fail.Wrap(err, "failed to validate terraform file")
+	// }
+	// _ = output
+	// logrus.Trace("terraform validate ran successfully.")
 
 	err = tf.Apply(ctx)
 	if err != nil {
@@ -499,12 +496,12 @@ func (instance *summoner) Destroy(ctx context.Context) (ferr fail.Error) {
 	}
 	logrus.Trace("terraform init ran successfully.")
 
-	output, err := tf.Validate(ctx)
-	if err != nil {
-		return fail.Wrap(err, "failed to validate terraform file")
-	}
-	_ = output
-	logrus.Trace("terraform validate ran successfully.")
+	// output, err := tf.Validate(ctx)
+	// if err != nil {
+	// 	return fail.Wrap(err, "failed to validate terraform file")
+	// }
+	// _ = output
+	// logrus.Trace("terraform validate ran successfully.")
 
 	err = tf.Destroy(ctx)
 	if err != nil {

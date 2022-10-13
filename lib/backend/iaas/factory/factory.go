@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
@@ -123,7 +124,7 @@ func findProfile(providerName string) (*providers.Profile, fail.Error) {
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(mutators ...options.Mutator) (newService iaasapi.Service, ferr fail.Error) {
+func UseService(mutators ...options.Mutator) (_ iaasapi.Service, ferr fail.Error) {
 	ctx := context.Background() // FIXME: Check context
 	defer fail.OnExitLogError(ctx, &ferr)
 	defer fail.OnPanic(&ferr)
@@ -142,15 +143,12 @@ func UseService(mutators ...options.Mutator) (newService iaasapi.Service, ferr f
 		provider    string
 	)
 
-	tenantName, xerr := options.Value[string](opts, "Tenant")
+	scope, xerr := options.Value[common.Scope](opts, "Scope")
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	if tenantName == "" {
-		return nil, fail.InconsistentError("scope.Tenant cannot be an empty string")
-	}
-
+	tenantName := scope.Tenant()
 	tenantInCfg, currentTenant := findParametersOfTenant(tenantName)
 	if tenantInCfg {
 		provider = findProviderFromTenantParameters(currentTenant)

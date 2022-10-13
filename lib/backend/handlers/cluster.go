@@ -102,20 +102,21 @@ func (handler *clusterHandler) Create(req abstract.ClusterRequest) (_ resources.
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", req.Name).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.cluster"), "('%s')", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.New(handler.job.Context(), handler.job.Service())
+	instance, xerr := clusterfactory.New(ctx, handler.job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	if req.Tenant == "" {
-		req.Tenant = handler.job.Tenant()
-	}
+	// if req.Tenant == "" {
+	// 	req.Tenant = handler.job.Scope().Tenant()
+	// }
 
-	xerr = instance.Create(handler.job.Context(), req)
+	xerr = instance.Create(ctx, req)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -138,16 +139,18 @@ func (handler *clusterHandler) State(name string) (_ clusterstate.Enum, ferr fai
 	if name == "" {
 		return clusterstate.Unknown, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	ctx := handler.job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
+
+	instance, xerr := clusterfactory.Load(ctx, handler.job.Service(), name)
 	if xerr != nil {
 		return clusterstate.Unknown, xerr
 	}
 
-	st, xerr := instance.GetState(handler.job.Context())
+	st, xerr := instance.GetState(ctx)
 	if xerr != nil {
 		return clusterstate.Unknown, xerr
 	}

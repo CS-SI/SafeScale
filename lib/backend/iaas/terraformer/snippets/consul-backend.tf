@@ -1,9 +1,7 @@
-{{ if and .ConsulBackend .ConsulBackend.Use }}
 backend "consul" {
-	address		 = "{{ .ConsulBackend.Server }}"
+	address		 = "{{ .Terraformer.Config.Consul.Backend.Server }}"
 	scheme		 = "https"	#FIXME: do we need to parameterize this?
-	path		 = "{{ .ConsulBackend.Path }}"
+	path		 = "{{ .Terraformer.Config.Consul.Backend.Prefix }}"
 	gzip		 = false	#FIXME:  We'll see if this setting should change to true
 	# 'access_token' voluntarily not placed here to avoir security risk, will use env var to provide token
 }
-{{ end }}

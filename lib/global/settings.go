@@ -62,13 +62,16 @@ type settings struct {
 			NoVerify bool     // Whether to ignore TLS verification checks (cert validity, hostname). *DO NOT USE IN PRODUCTION*.
 		}
 		Terraform struct {
-			ExecPath      string
-			StateInConsul bool
+			ExecPath string
 		}
 		Consul struct { // Consul is used to store terraform states, and in the future SafeScale metadata
-			ExecPath string // Contains the path of the internal consul binary
-			Peers    []string
-			Internal bool
+			ExecPath    string   // Contains the path of the internal consul binary
+			Peers       []string // Contains the Consul peers (being internal or external)
+			HttpPort    string   // contains the port used by the local agent for http access
+			ServerPort  string   // contains the port used by the local agent for server
+			SerfLanPort string   // defaults to ServerPort +1
+			SerfWanPort string   // defaults to ServerPort +2
+			External    bool     // tells if we use externally started consul server
 		}
 		Metadata struct {
 			Method string // can be objectstorage or consul
@@ -90,8 +93,8 @@ type settings struct {
 		Tls     struct {
 			CertFile              string
 			KeyFile               string
-			BackendClientCertFile string // Path to the PEM certificate used when the backend requires client certificates for TLS.
-			BackendClientKeyFile  string // Path to the PEM key used when the backend requires client certificates for TLS.
+			BackendClientCertFile string // Prefix to the PEM certificate used when the backend requires client certificates for TLS.
+			BackendClientKeyFile  string // Prefix to the PEM key used when the backend requires client certificates for TLS.
 			CAs                   []string
 			CertVerification      string // Controls whether a client certificate is on. Allowed values: 'none', 'verify_if_given', 'require'
 		}
@@ -404,6 +407,39 @@ func loadBackendSettings(cmd *cobra.Command, reader *viper.Viper) error {
 		Settings.Backend.Tls.CAs = reader.GetStringSlice("safescale.backend.tls.ca_files")
 	}
 
+	// FIXME: miss some consul parameters: external, peers, ...
+	strValue, _, ok := env.FirstValue("SAFESCALE_DAEMON_CONSUL_HTTP_PORT", "SAFESCALE_BACKEND_CONSUL_HTTP_PORT")
+	if ok {
+		if _, err := strconv.Atoi(strValue); err != nil {
+			return fail.SyntaxError("invalid port setting for consul http: %v", err)
+		}
+
+		Settings.Backend.Consul.HttpPort = strValue
+	} else if reader.IsSet("safescale.backend.consul.http_port") {
+		strValue = reader.GetString("safescale.backend.consul.http_port")
+		if _, err := strconv.Atoi(strValue); err != nil {
+			return fail.SyntaxError("invalid port setting for consul http: %v", err)
+		}
+
+		Settings.Backend.Consul.HttpPort = strValue
+	}
+
+	strValue, _, ok = env.FirstValue("SAFESCALE_DAEMON_CONSUL_SERVER_PORT", "SAFESCALE_BACKEND_CONSUL_SERVER_PORT")
+	if ok {
+		if _, err := strconv.Atoi(strValue); err != nil {
+			return fail.SyntaxError("invalid port setting for consul server: %v", err)
+		}
+
+		Settings.Backend.Consul.ServerPort = strValue
+	} else if reader.IsSet("safescale.backend.consul.server_port") {
+		strValue = reader.GetString("safescale.backend.consul.server_port")
+		if _, err := strconv.Atoi(strValue); err != nil {
+			return fail.SyntaxError("invalid port setting for consul server: %v", err)
+		}
+
+		Settings.Backend.Consul.ServerPort = strValue
+	}
+
 	return nil
 }
 
@@ -494,12 +530,14 @@ func loadWebUISettings(cmd *cobra.Command, reader *viper.Viper) error {
 	return nil
 }
 
+type dirListEntry struct {
+	path   string
+	rights os.FileMode
+}
+
 // BuildFolderTree builds the folder tree needed by SafeScale daemon to work correctly
 func BuildFolderTree() error {
-	dirList := []struct {
-		path   string
-		rights os.FileMode
-	}{
+	dirList := []dirListEntry{
 		{Settings.Folders.RootDir, 0750},
 		// {settings.Folders.EtcDir, 0750},
 		{Settings.Folders.VarDir, 0770},
@@ -507,6 +545,10 @@ func BuildFolderTree() error {
 		{Settings.Folders.LogDir, 0770},
 		{filepath.Join(Settings.Folders.ShareDir, "terraform", "bin"), 0700},     // used terraform binary will be stored here
 		{filepath.Join(Settings.Folders.ShareDir, "terraform", "plugins"), 0700}, // used terraform plugins will be stored here
+	}
+	if !Settings.Backend.Consul.External {
+		dirList = append(dirList, dirListEntry{filepath.Join(Settings.Folders.ShareDir, "consul", "bin"), 0700}) // used consul binary will be stored here
+		dirList = append(dirList, dirListEntry{filepath.Join(Settings.Folders.ShareDir, "consul", "etc"), 0700}) // used consul binary will be stored here
 	}
 
 	for _, v := range dirList {

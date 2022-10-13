@@ -20,14 +20,15 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"sync"
 	"time"
 
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
-	uuidpkg "github.com/gofrs/uuid"
-
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/versions"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
@@ -36,15 +37,14 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	uuidpkg "github.com/gofrs/uuid"
 )
 
 // Job is the interface of a daemon job
 type Job interface {
 	ID() string
 	Name() string
-	Organization() string
-	Project() string
-	Tenant() string
+	Scope() common.Scope
 	Context() context.Context
 	Task() concurrency.Task
 	Service() iaasapi.Service
@@ -58,13 +58,14 @@ type Job interface {
 
 // job contains the information needed by safescaled to execute a request
 type job struct {
-	scope     Scope
+	scope     common.Scope
 	uuid      string
 	ctx       context.Context
 	task      concurrency.Task
 	cancel    context.CancelFunc
 	service   iaasapi.Service
 	startTime time.Time
+	kv        *common.ConsulKVClient
 }
 
 var (
@@ -73,7 +74,7 @@ var (
 )
 
 // New creates a new instance of struct Job
-func New(ctx context.Context, cancel context.CancelFunc, scope Scope) (_ *job, ferr fail.Error) { // nolint
+func New(ctx context.Context, cancel context.CancelFunc, scope common.Scope) (_ *job, ferr fail.Error) { // nolint
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -82,14 +83,8 @@ func New(ctx context.Context, cancel context.CancelFunc, scope Scope) (_ *job, f
 	if cancel == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("cancel")
 	}
-	if scope.Tenant == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("scope.Tenant")
-	}
-	if scope.Organization == "" {
-		scope.Organization = global.DefaultOrganization
-	}
-	if scope.Project == "" {
-		scope.Project = global.DefaultProject
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterError("scope", "cannot be a null value of 'common.Scope'")
 	}
 
 	// VPL: I don't get the point of checking if context has an uuid or not, as this uuid is not used...
@@ -131,7 +126,12 @@ func New(ctx context.Context, cancel context.CancelFunc, scope Scope) (_ *job, f
 		return nil, xerr
 	}
 
-	xerr = task.SetID(id + scope.Description)
+	xerr = task.SetID(id + scope.Description())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	kv, xerr := common.NewKVClient(strings.Join([]string{"safescale", "metadata", scope.KVPath()}, "/"))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -142,6 +142,7 @@ func New(ctx context.Context, cancel context.CancelFunc, scope Scope) (_ *job, f
 		task:      task,
 		cancel:    cancel,
 		startTime: time.Now(),
+		kv:        kv,
 	}
 
 	// attach task instance to the context
@@ -151,13 +152,14 @@ func New(ctx context.Context, cancel context.CancelFunc, scope Scope) (_ *job, f
 	ctx = context.WithValue(ctx, KeyForJobInContext, nj) // nolint
 	nj.ctx = ctx
 
-	providerProfile, xerr := factory.FindProviderProfileForTenant(scope.Tenant)
+	providerProfile, xerr := factory.FindProviderProfileForTenant(scope.Tenant())
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	svcOptions := []options.Mutator{
-		iaasoptions.BuildWithScope(scope.Organization, scope.Project, scope.Tenant),
+		// iaasoptions.BuildWithScope(scope.Organization(), scope.Project(), scope.Tenant()),
+		iaasoptions.BuildWithScope(scope),
 	}
 	if providerProfile.Capabilities().UseTerraformer {
 		config, xerr := prepareTerraformerConfiguration(providerProfile, scope)
@@ -189,20 +191,25 @@ func New(ctx context.Context, cancel context.CancelFunc, scope Scope) (_ *job, f
 	return nj, nil
 }
 
-func prepareTerraformerConfiguration(providerProfile *providers.Profile, scope Scope) (terraformerapi.Configuration, fail.Error) {
+// prepareTerraformerConfiguration assembles needed configuration to use terraform with the provider
+func prepareTerraformerConfiguration(providerProfile *providers.Profile, scope common.Scope) (terraformerapi.Configuration, fail.Error) {
 	if valid.IsNull(providerProfile) {
 		return terraformerapi.Configuration{}, fail.InvalidParameterCannotBeNilError("providerProfile")
 	}
+	if valid.IsNull(scope) {
+		return terraformerapi.Configuration{}, fail.InvalidParameterError("scope", "cannot be null value of '%s'", reflect.TypeOf(scope).String())
+	}
 
-	workDir := filepath.Join(global.Settings.Folders.TmpDir, "terraform", scope.Organization, scope.Project, scope.Tenant)
 	out := terraformerapi.Configuration{
 		Release:           "= " + versions.Terraformv1_2_6.String(),
-		WorkDir:           workDir,
+		WorkDir:           filepath.Join(global.Settings.Folders.TmpDir, "terraform", scope.FSPath()),
 		ExecPath:          global.Settings.Backend.Terraform.ExecPath,
 		PluginDir:         filepath.Join(global.Settings.Folders.ShareDir, "terraform", "plugins"),
 		RequiredProviders: providerProfile.TerraformProviders(),
+		Scope:             scope,
 	}
-
+	out.Consul.Prefix = "safescale/terraformstate/" + scope.KVPath()
+	out.Consul.Server = "localhost:" + global.Settings.Backend.Consul.HttpPort
 	return out, nil
 }
 
@@ -221,19 +228,9 @@ func (instance job) Name() string {
 	return instance.uuid
 }
 
-// Organization returns the organization of the job
-func (instance job) Organization() string {
-	return instance.scope.Organization
-}
-
-// Project returns the project of the job
-func (instance job) Project() string {
-	return instance.scope.Project
-}
-
-// Tenant returns the tenant of the job
-func (instance job) Tenant() string {
-	return instance.scope.Tenant
+// Scope returns the Scope of the job
+func (instance job) Scope() common.Scope {
+	return instance.scope
 }
 
 // Context returns the context of the job (should be the same as the one of the task)
@@ -291,7 +288,7 @@ func (instance *job) Close() {
 
 // String returns a string representation of job information
 func (instance job) String() string {
-	return fmt.Sprintf("Job: %s (started at %s)", instance.scope.Description, instance.startTime.String())
+	return fmt.Sprintf("Job: %s (started at %s)", instance.scope.Description(), instance.startTime.String())
 }
 
 // register ...

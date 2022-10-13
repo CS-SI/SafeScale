@@ -53,8 +53,7 @@ func (s *LabelListener) List(inctx context.Context, in *protocol.LabelListReques
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	scope := extractScopeFromProtocol(in, "/labels/list")
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in, "/labels/list")
 	if err != nil {
 		return nil, err
 	}
@@ -103,8 +102,7 @@ func (s *LabelListener) Create(inctx context.Context, in *protocol.LabelCreateRe
 	}
 
 	name := in.GetName()
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/label/%s/create", name))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/label/%s/create", name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -145,8 +143,7 @@ func (s *LabelListener) Delete(inctx context.Context, in *protocol.LabelInspectR
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	scope := extractScopeFromProtocol(in.GetLabel(), fmt.Sprintf("/label/%s/delete", ref))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetLabel(), fmt.Sprintf("/label/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -185,8 +182,7 @@ func (s *LabelListener) Inspect(inctx context.Context, in *protocol.LabelInspect
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	scope := extractScopeFromProtocol(in.GetLabel(), fmt.Sprintf("/label/%s/inspect", ref))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetLabel(), fmt.Sprintf("/label/%s/inspect", ref))
 	if xerr != nil {
 		return nil, xerr
 	}

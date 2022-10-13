@@ -143,9 +143,9 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 	}()
 
 	newNet = abstract.NewNetwork()
-	newNet.ID, xerr = unmarshalOutput[string](outputs["network_id"])
+	newNet.ID, xerr = unmarshalOutput[string](outputs["id"])
 	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to recover network id")
+		return nil, fail.Wrap(xerr, "failed to recover Network id")
 	}
 
 	newNet.Name = req.Name

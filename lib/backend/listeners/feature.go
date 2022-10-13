@@ -65,8 +65,7 @@ func (s *FeatureListener) List(inctx context.Context, in *protocol.FeatureListRe
 		return empty, fail.InvalidParameterError("in.TargetRef", "neither Name nor ID fields are provided")
 	}
 
-	scope := extractScopeFromProtocol(in.GetTargetRef(), "/features/list")
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetTargetRef(), "/features/list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -127,8 +126,7 @@ func (s *FeatureListener) Inspect(inctx context.Context, in *protocol.FeatureDet
 		return nil, fail.InvalidRequestError("feature name is missing")
 	}
 
-	scope := extractScopeFromProtocol(in.GetTargetRef(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in.GetTargetRef(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
 	if err != nil {
 		return nil, err
 	}
@@ -174,8 +172,7 @@ func (s *FeatureListener) Export(inctx context.Context, in *protocol.FeatureDeta
 	}
 	featureName := in.GetName()
 
-	scope := extractScopeFromProtocol(in.GetTargetRef(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetTargetRef(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -234,8 +231,7 @@ func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActio
 	}
 
 	featureSettings := converters.FeatureSettingsFromProtocolToResource(in.GetSettings())
-	scope := extractScopeFromProtocol(in.GetTargetRef(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in.GetTargetRef(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
 	if err != nil {
 		return nil, err
 	}
@@ -314,8 +310,7 @@ func (s *FeatureListener) Add(inctx context.Context, in *protocol.FeatureActionR
 	}
 	featureSettings := converters.FeatureSettingsFromProtocolToResource(in.GetSettings())
 
-	scope := extractScopeFromProtocol(in.GetTargetRef(), fmt.Sprintf("/feature/%s/add/%s/%s", featureName, targetType, targetRef))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in.GetTargetRef(), fmt.Sprintf("/feature/%s/add/%s/%s", featureName, targetType, targetRef))
 	if err != nil {
 		return nil, err
 	}
@@ -365,8 +360,7 @@ func (s *FeatureListener) Remove(inctx context.Context, in *protocol.FeatureActi
 	}
 	featureSettings := converters.FeatureSettingsFromProtocolToResource(in.GetSettings())
 
-	scope := extractScopeFromProtocol(in.GetTargetRef(), fmt.Sprintf("/feature/%s/remove/%s/%s", featureName, targetType, targetRef))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in.GetTargetRef(), fmt.Sprintf("/feature/%s/remove/%s/%s", featureName, targetType, targetRef))
 	if err != nil {
 		return empty, err
 	}

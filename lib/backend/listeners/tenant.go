@@ -146,8 +146,7 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 		Project:      in.GetProject(),
 		TenantId:     in.GetName(),
 	}
-	scope := extractScopeFromProtocol(fakeReference, fmt.Sprintf("tenant/%s/metadata/delete", name))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, fakeReference, fmt.Sprintf("tenant/%s/metadata/delete", name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -163,7 +162,8 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 	// 	return empty, nil
 	// }
 
-	service, xerr := factory.UseService(iaasoptions.BuildWithScope(scope.Organization, scope.Project, scope.Tenant))
+	// service, xerr := factory.UseService(iaasoptions.BuildWithScope(job.Scope().Organization(), job.Scope().Project(), job.Scope().Tenant()))
+	service, xerr := factory.UseService(iaasoptions.BuildWithScope(job.Scope()))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -190,8 +190,7 @@ func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequ
 		Project:      in.GetProject(),
 		TenantId:     name,
 	}
-	scope := extractScopeFromProtocol(fakeReference, fmt.Sprintf("/tenant/%s/scan", name))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, fakeReference, fmt.Sprintf("/tenant/%s/scan", name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -230,8 +229,7 @@ func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantInspe
 		Project:      in.GetProject(),
 		TenantId:     name,
 	}
-	scope := extractScopeFromProtocol(fakeReference, fmt.Sprintf("/tenant/%s/inspect", name))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, fakeReference, fmt.Sprintf("/tenant/%s/inspect", name))
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
@@ -312,20 +313,20 @@ next:
 	}
 
 	out.summonerConfig, _ = options.ValueOrDefault(opts, "TerraformerConfiguration", terraformerapi.Configuration{})
-	out.summonerConfig.Scope.Organization, xerr = options.Value[string](opts, "Organization")
+	out.summonerConfig.Scope, xerr = options.Value[common.Scope](opts, "Scope")
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	out.summonerConfig.Scope.Project, xerr = options.Value[string](opts, "Project")
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	out.summonerConfig.Scope.Tenant, xerr = options.Value[string](opts, "Tenant")
-	if xerr != nil {
-		return nil, xerr
-	}
+	// out.summonerConfig.Scope.Project, xerr = options.Value[string](opts, "Project")
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// out.summonerConfig.Scope.Tenant, xerr = options.Value[string](opts, "Tenant")
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	return out, nil
 }

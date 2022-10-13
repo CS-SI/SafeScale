@@ -33,7 +33,7 @@ func Test_ShareFromPropertyToProtocol(t *testing.T) {
 	hs := &propertiesv1.HostShare{
 		ID:            "Host ID",
 		Name:          "Nost Name",
-		Path:          "Host Path",
+		Path:          "Host Prefix",
 		PathAcls:      "Host PathAcls",
 		Type:          "Host Type",
 		ShareAcls:     "Host ShareAcls",
@@ -59,7 +59,7 @@ func Test_ShareMountFromPropertyToProtocol(t *testing.T) {
 	hrm := &propertiesv1.HostRemoteMount{
 		ShareID:    "HostRemoteMount ShareID",
 		Export:     "HostRemoteMount Export",
-		Path:       "HostRemoteMount Path",
+		Path:       "HostRemoteMount Prefix",
 		FileSystem: "HostRemoteMount FileSystem",
 		Options:    "HostRemoteMount Options",
 	}
@@ -82,7 +82,7 @@ func Test_ShareMountListFromPropertyToProtocol(t *testing.T) {
 	hs := &propertiesv1.HostShare{
 		ID:            "Host ID",
 		Name:          "Nost Name",
-		Path:          "Host Path",
+		Path:          "Host Prefix",
 		PathAcls:      "Host PathAcls",
 		Type:          "Host Type",
 		ShareAcls:     "Host ShareAcls",
@@ -94,7 +94,7 @@ func Test_ShareMountListFromPropertyToProtocol(t *testing.T) {
 		"remote": {
 			ShareID:    "HostRemoteMount ShareID",
 			Export:     "HostRemoteMount Export",
-			Path:       "HostRemoteMount Path",
+			Path:       "HostRemoteMount Prefix",
 			FileSystem: "HostRemoteMount FileSystem",
 			Options:    "HostRemoteMount Options",
 		},

@@ -663,7 +663,8 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 				}
 				iterations := 6
 				for {
-					if _, ierr := svc.InspectNetwork(ctx, abstractNetwork.ID); ierr != nil {
+					_, ierr := svc.InspectNetwork(ctx, abstractNetwork.ID)
+					if ierr != nil {
 						if _, ok := ierr.(*fail.ErrNotFound); ok {
 							break
 						}

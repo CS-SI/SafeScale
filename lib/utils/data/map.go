@@ -122,56 +122,25 @@ func (m Map[K, V]) KeysAndValues() (Slice[K], Slice[V]) {
 	return keys, values
 }
 
+type (
+	StringMap         = Map[string, any]
+	StringMapOfString = Map[string, string]
+)
+
+func NewStringMap(o ...int) StringMap {
+	return NewMap[string, any](o...)
+}
+
+func NewStringMapOfString(o ...int) StringMapOfString {
+	return NewMap[string, string](o...)
+}
+
 // IndexedListOfStrings contains a list of string (being ID, IP, ...) of nodes indexed by node Numerical ID.
 type IndexedListOfStrings = Map[uint, string]
 
-// // KeysAndValues returns a slice with keys and a slice with values from map[uint]string
-// func (ilos IndexedListOfStrings) KeysAndValues() ([]uint, []string) {
-// 	length := len(ilos)
-// 	if length <= 0 {
-// 		return []uint{}, []string{}
-// 	}
-//
-// 	keys := make([]uint, 0, length)
-// 	values := make([]string, 0, length)
-// 	for k, v := range ilos {
-// 		keys = append(keys, k)
-// 		values = append(values, v)
-// 	}
-// 	return keys, values
-// }
-
-// // Keys returns a slice with keys from map[uint]string
-// func (ilos IndexedListOfStrings) Keys() []uint {
-// 	length := len(ilos)
-// 	if length <= 0 {
-// 		return []uint{}
-// 	}
-//
-// 	keys := make([]uint, 0, length)
-// 	for k := range ilos {
-// 		keys = append(keys, k)
-// 	}
-// 	return keys
-// }
-
-// // Values returns a slice with values from map[uint]string
-// func (ilos IndexedListOfStrings) Values() []string {
-// 	length := len(ilos)
-// 	if length <= 0 {
-// 		return []string{}
-// 	}
-//
-// 	values := make([]string, 0, length)
-// 	for _, v := range ilos {
-// 		values = append(values, v)
-// 	}
-// 	return values
-// }
-
-// ToStringMapOfString converts a map[interface{}]interface{} (something that viper may return for example) to a map[string]string
-func ToStringMapOfString(in map[any]any) Map[string, string] {
-	out := NewMap[string, string](len(in))
+// ToStringMapOfString converts a map[any]any (something that viper may return for example) to a Stringmap[string]
+func ToStringMapOfString(in map[any]any) StringMapOfString {
+	out := NewStringMapOfString(len(in))
 	for k, v := range in {
 		out[fmt.Sprintf("%v", k)] = fmt.Sprintf("%v", v)
 	}

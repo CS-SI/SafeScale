@@ -59,8 +59,7 @@ func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareCreateRe
 	}
 
 	shareName := in.GetName()
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/share/%s/create", shareName))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/share/%s/create", shareName))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -111,8 +110,7 @@ func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (e
 	}
 
 	shareName := in.GetName()
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/share/%s/delete", shareName))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/share/%s/delete", shareName))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -140,8 +138,7 @@ func (s *ShareListener) List(inctx context.Context, in *protocol.Reference) (_ *
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	scope := extractScopeFromProtocol(in, "/shares/list")
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, "/shares/list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -186,8 +183,7 @@ func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountRequ
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/share/%s/host/%s/mount", shareRef, hostRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/share/%s/host/%s/mount", shareRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -227,8 +223,7 @@ func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountRe
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/share/%s/host/%s/unmount", shareRef, hostRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/share/%s/host/%s/unmount", shareRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -265,8 +260,7 @@ func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (
 	}
 
 	shareRef, _ := srvutils.GetReference(in)
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/share/%s/inspect", shareRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/share/%s/inspect", shareRef))
 	if xerr != nil {
 		return nil, xerr
 	}

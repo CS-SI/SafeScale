@@ -52,8 +52,7 @@ func (s *ClusterListener) List(inctx context.Context, in *protocol.Reference) (h
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	scope := extractScopeFromProtocol(in, "/clusters/list")
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, "/clusters/list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -89,8 +88,7 @@ func (s *ClusterListener) Create(inctx context.Context, in *protocol.ClusterCrea
 	}
 
 	name := in.GetName()
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/cluster/%s/create", name))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/cluster/%s/create", name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -106,9 +104,9 @@ func (s *ClusterListener) Create(inctx context.Context, in *protocol.ClusterCrea
 		return nil, xerr
 	}
 
-	if req.Tenant == "" {
-		req.Tenant = job.Tenant()
-	}
+	// if req.Tenant == "" {
+	// 	req.Tenant = job.Tenant()
+	// }
 
 	handler := handlers.NewClusterHandler(job)
 	instance, xerr := handler.Create(*req)
@@ -138,8 +136,7 @@ func (s *ClusterListener) State(inctx context.Context, in *protocol.Reference) (
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/cluster/%s/state", ref))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/cluster/%s/state", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -179,8 +176,7 @@ func (s *ClusterListener) Inspect(inctx context.Context, in *protocol.Reference)
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/cluster/%s/inspect", ref))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in, fmt.Sprintf("/cluster/%s/inspect", ref))
 	if err != nil {
 		return nil, err
 	}
@@ -217,8 +213,7 @@ func (s *ClusterListener) Start(inctx context.Context, in *protocol.Reference) (
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/cluster/%s/start", ref))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/cluster/%s/start", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -253,8 +248,7 @@ func (s *ClusterListener) Stop(inctx context.Context, in *protocol.Reference) (e
 		return empty, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/cluster/%s/stop", ref))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/cluster/%s/stop", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -290,8 +284,7 @@ func (s *ClusterListener) Delete(inctx context.Context, in *protocol.ClusterDele
 		return empty, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/cluster/%s/delete", ref))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/cluster/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -326,8 +319,7 @@ func (s *ClusterListener) Expand(inctx context.Context, in *protocol.ClusterResi
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/cluster/%s/expand", ref))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in, fmt.Sprintf("/cluster/%s/expand", ref))
 	if err != nil {
 		return nil, err
 	}
@@ -386,8 +378,7 @@ func (s *ClusterListener) Shrink(inctx context.Context, in *protocol.ClusterResi
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/cluster/%s/shrink", clusterName))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/cluster/%s/shrink", clusterName))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -442,8 +433,7 @@ func (s *ClusterListener) ListNodes(inctx context.Context, in *protocol.Referenc
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/cluster/%s/nodes/list", ref))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in, fmt.Sprintf("/cluster/%s/nodes/list", ref))
 	if err != nil {
 		return nil, err
 	}
@@ -497,8 +487,7 @@ func (s *ClusterListener) InspectNode(inctx context.Context, in *protocol.Cluste
 		return nil, fail.InvalidRequestError("neither name nor id of node is provided")
 	}
 
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/inspect", clusterName, nodeRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/inspect", clusterName, nodeRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -545,8 +534,7 @@ func (s *ClusterListener) DeleteNode(inctx context.Context, in *protocol.Cluster
 	}
 	nodeRef, nodeRefLabel := srvutils.GetReference(in.GetHost()) // If NodeRef is empty string, asks to delete the last added node
 
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/delete", clusterName, nodeRef))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/delete", clusterName, nodeRef))
 	if err != nil {
 		return empty, err
 	}
@@ -596,8 +584,7 @@ func (s *ClusterListener) StopNode(inctx context.Context, in *protocol.ClusterNo
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id of node is provided")
 	}
 
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/stop", clusterName, nodeRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/stop", clusterName, nodeRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -647,8 +634,7 @@ func (s *ClusterListener) StartNode(inctx context.Context, in *protocol.ClusterN
 		return nil, fail.InvalidRequestError("neither name nor id of node is provided")
 	}
 
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/start", clusterName, nodeRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/start", clusterName, nodeRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -697,8 +683,7 @@ func (s *ClusterListener) StateNode(inctx context.Context, in *protocol.ClusterN
 		return nil, fail.InvalidRequestError("neither name nor id of node is provided")
 	}
 
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/state", clusterName, nodeRef))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/state", clusterName, nodeRef))
 	if err != nil {
 		return nil, err
 	}
@@ -744,8 +729,7 @@ func (s *ClusterListener) ListMasters(inctx context.Context, in *protocol.Refere
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/cluster/%s/masters/list", clusterName))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in, fmt.Sprintf("/cluster/%s/masters/list", clusterName))
 	if err != nil {
 		return nil, err
 	}
@@ -790,8 +774,7 @@ func (s *ClusterListener) FindAvailableMaster(inctx context.Context, in *protoco
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	scope := extractScopeFromProtocol(in, fmt.Sprintf("/cluster/%s/master/available", clusterName))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in, fmt.Sprintf("/cluster/%s/master/available", clusterName))
 	if err != nil {
 		return nil, err
 	}
@@ -840,8 +823,7 @@ func (s *ClusterListener) InspectMaster(inctx context.Context, in *protocol.Clus
 		return nil, fail.InvalidRequestError("neither name nor id of master is provided")
 	}
 
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/cluster/%s/master/%s/inspect", clusterName, masterRef))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/cluster/%s/master/%s/inspect", clusterName, masterRef))
 	if err != nil {
 		return nil, err
 	}
@@ -896,8 +878,7 @@ func (s *ClusterListener) StopMaster(inctx context.Context, in *protocol.Cluster
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id of node is provided")
 	}
 
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/cluster/%s/master/%s/stop", clusterName, masterRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/cluster/%s/master/%s/stop", clusterName, masterRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -947,8 +928,7 @@ func (s *ClusterListener) StartMaster(inctx context.Context, in *protocol.Cluste
 		return nil, fail.InvalidRequestError("neither name nor id of node is provided")
 	}
 
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/cluster/%s/master/%s/start", clusterName, masterRef))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/cluster/%s/master/%s/start", clusterName, masterRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -997,8 +977,7 @@ func (s *ClusterListener) StateMaster(inctx context.Context, in *protocol.Cluste
 		return nil, fail.InvalidRequestError("neither name nor id of node is provided")
 	}
 
-	scope := extractScopeFromProtocol(in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/state", clusterName, masterRef))
-	job, err := prepareJob(inctx, scope)
+	job, err := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/cluster/%s/node/%s/state", clusterName, masterRef))
 	if err != nil {
 		return nil, err
 	}

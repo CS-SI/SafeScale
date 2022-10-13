@@ -53,8 +53,7 @@ func (s *TemplateListener) List(inctx context.Context, in *protocol.TemplateList
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	scope := extractScopeFromProtocol(in, "/templates/list")
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, "/templates/list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -94,8 +93,7 @@ func (s *TemplateListener) Match(inctx context.Context, in *protocol.TemplateMat
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	scope := extractScopeFromProtocol(in, "/template/match")
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in, "/template/match")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -142,8 +140,7 @@ func (s *TemplateListener) Inspect(inctx context.Context, in *protocol.TemplateI
 	}
 
 	ref, _ := srvutils.GetReference(in.GetTemplate())
-	scope := extractScopeFromProtocol(in.GetTemplate(), fmt.Sprintf("template/%s/inspect", ref))
-	job, xerr := prepareJob(inctx, scope)
+	job, xerr := prepareJob(inctx, in.GetTemplate(), fmt.Sprintf("template/%s/inspect", ref))
 	if xerr != nil {
 		return nil, xerr
 	}

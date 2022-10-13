@@ -121,7 +121,7 @@ func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
 	}
 
 	data := map[string]interface{}{
-		"Path": path,
+		"Prefix": path,
 	}
 
 	stdout, xerr := executeScript(ctx, timings, s.SSHConfig, "nfs_server_path_unexport.sh", data)
