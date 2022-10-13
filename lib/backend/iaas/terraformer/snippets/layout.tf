@@ -11,16 +11,10 @@ terraform {
     }
 {{- end }}
 
-{{- if .Terraformer.Config.ConsulBackend.Use }}
-    {{    or .ConsulBackendConfig "" }}
-{{- end }}
+    {{ .ConsulBackendConfig }}
 }
 
 {{ .ProviderDeclaration }}
-
-{{- if .Terraformer.Config.ConsulBackend.Use }}
-{{    or "" .ConsulBackendData }}
-{{- end }}
 
 {{- if .Resources }}
 {{-   range $i := .Resources }}

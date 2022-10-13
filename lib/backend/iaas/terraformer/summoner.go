@@ -153,20 +153,24 @@ func (instance *summoner) Build(resources ...terraformerapi.Resource) (ferr fail
 	// render consul backend configuration to store state
 	lvars := variables.Clone()
 	lvars["Consul"] = instance.config.Consul
-	content, xerr := instance.realizeTemplate(layoutFiles, consulBackendSnippetPath, variables)
+	content, xerr := instance.realizeTemplate(layoutFiles, consulBackendSnippetPath, lvars)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	variables["Consul"] = content
-	content, xerr = instance.realizeTemplate(layoutFiles, consulBackendDataSnippetPath, variables)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+	variables["ConsulBackendConfig"] = content
 
-	variables["ConsulBackendData"] = string(content)
+	lvars = variables.Clone()
+	lvars["Consul"] = instance.config.Consul
+	// VPL: disabled terraform_remote_state for now, troubles more than helps
+	// content, xerr = instance.realizeTemplate(layoutFiles, consulBackendDataSnippetPath, lvars)
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	//
+	// variables["ConsulBackendData"] = string(content)
 
 	// finally, render the layout
 	content, xerr = instance.realizeTemplate(layoutFiles, layoutSnippetPath, variables)
