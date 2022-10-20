@@ -38,7 +38,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -674,7 +673,7 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 			timeout = 1200 * time.Second // nothing should take more than 20 min
 		}
 
-		trch := make(chan concurrency.TaskResult, 1)
+		trch := make(chan interface{}, 1)
 		subtask.Go(func() error {
 			tctx, cat := context.WithTimeout(ctx, timeout)
 			defer cat()
@@ -735,7 +734,7 @@ type taskExecuteParameters struct {
 	collectOutputs bool
 }
 
-func (scmd *CliCommand) taskExecute(inctx context.Context, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (interface{}, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -744,13 +743,13 @@ func (scmd *CliCommand) taskExecute(inctx context.Context, p concurrency.TaskPar
 	defer cancel()
 
 	type result struct {
-		rRes concurrency.TaskResult
+		rRes interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		gres, gerr := func() (_ concurrency.TaskResult, ferr fail.Error) {
+		gres, gerr := func() (_ interface{}, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
 			params, ok := p.(taskExecuteParameters)
