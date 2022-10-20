@@ -1731,10 +1731,11 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params concurr
 				continue
 			}
 			if v.ToBeDeleted {
-				aho := v.Content.(*Host)
-				xerr = aho.Delete(cleanupContextFrom(ctx))
-				debug.IgnoreError2(ctx, xerr)
-				continue
+				if aho, ok := v.Content.(*Host); ok {
+					xerr = aho.Delete(cleanupContextFrom(ctx))
+					debug.IgnoreError2(ctx, xerr)
+					continue
+				}
 			}
 			listMasters = append(listMasters, v)
 		}
