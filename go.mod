@@ -14,7 +14,7 @@ require (
 	github.com/farmergreg/rfsnotify v0.0.0-20200716145600-b37be6e4177f
 	github.com/felixge/fgprof v0.9.3
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
-	github.com/gofrs/uuid v4.3.0+incompatible
+	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/gojuno/minimock/v3 v3.0.10
 	github.com/golang/protobuf v1.5.2
 	github.com/google/gofuzz v1.2.0
