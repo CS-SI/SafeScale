@@ -1287,7 +1287,6 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	// for OVH, we have to ignore the errors and keep trying until we have 'count'
-	var listNodes []StdResult
 	nodesChan := make(chan StdResult, count)
 
 	// FIXME: OPP This is our second problem.
@@ -1303,7 +1302,6 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	close(nodesChan)
 	for v := range nodesChan {
-		listNodes = append(listNodes, v)
 		if v.Err != nil {
 			continue
 		}

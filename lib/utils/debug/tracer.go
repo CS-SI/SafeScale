@@ -244,7 +244,7 @@ func (instance *tracer) buildMessage(extra uint) string {
 // TraceMessage returns a string containing a trace message
 func (instance *tracer) TraceMessage(msg ...interface{}) string {
 	amsg := "--- " + instance.buildMessage(1) + ": " + strprocess.FormatStrings(msg...)
-	amsg = strings.Replace(amsg, "\n", "\t", -1)
+	amsg = strings.ReplaceAll(amsg, "\n", "\t")
 	return amsg
 }
 
@@ -252,7 +252,7 @@ func (instance *tracer) TraceMessage(msg ...interface{}) string {
 func (instance *tracer) Trace(msg ...interface{}) Tracer {
 	if !valid.IsNil(instance) && instance.enabled {
 		message := "--- " + instance.buildMessage(0) + ": " + strprocess.FormatStrings(msg...)
-		message = strings.Replace(message, "\n", "\t", -1)
+		message = strings.ReplaceAll(message, "\n", "\t")
 		if message != "" {
 			logrus.WithContext(instance.context).Tracef(message)
 		}
@@ -264,7 +264,7 @@ func (instance *tracer) Trace(msg ...interface{}) Tracer {
 func (instance *tracer) TraceAsError(msg ...interface{}) Tracer {
 	if !valid.IsNil(instance) && instance.enabled {
 		message := "--- " + instance.buildMessage(0) + ": " + strprocess.FormatStrings(msg...)
-		message = strings.Replace(message, "\n", "\t", -1)
+		message = strings.ReplaceAll(message, "\n", "\t")
 		if message != "" {
 			logrus.WithContext(instance.context).Errorf(message)
 		}

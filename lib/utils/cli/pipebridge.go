@@ -186,7 +186,6 @@ func (pbc *PipeBridgeController) Start(inctx context.Context) fail.Error {
 			return nil
 		}()
 		chRes <- result{gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -284,7 +283,6 @@ func taskRead(inctx context.Context, p concurrency.TaskParameters) (_ concurrenc
 
 		}()
 		chRes <- result{gres, gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
@@ -326,7 +324,6 @@ func taskDisplay(inctx context.Context, params concurrency.TaskParameters) (_ co
 
 		}()
 		chRes <- result{gres, gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:

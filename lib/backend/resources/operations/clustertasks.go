@@ -2276,7 +2276,7 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 
 	if windowSize == count {
 		if count >= 4 {
-			windowSize = windowSize - 2
+			windowSize -= 2
 		}
 	}
 
@@ -2476,8 +2476,9 @@ type taskCreateNodeParameters struct {
 
 func cleanupContextFrom(inctx context.Context) context.Context {
 	if oldKey := inctx.Value(concurrency.KeyForID); oldKey != nil {
-		ctx := context.WithValue(context.Background(), concurrency.KeyForID, oldKey)
-		ctx = context.WithValue(ctx, "cleanup", true) // cleanup functions can look after that
+		ctx := context.WithValue(context.Background(), concurrency.KeyForID, oldKey) // nolint
+		// cleanup functions can look for "cleanup" to decide if a ctx is a cleanup context
+		ctx = context.WithValue(ctx, "cleanup", true) // nolint
 		return ctx
 	}
 	return context.Background()
@@ -2885,7 +2886,7 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params concur
 				}
 
 				resCh <- cfgRes{
-					who:  node.ID,
+					who:  capturedNode.ID,
 					what: tr,
 				}
 
