@@ -1436,13 +1436,10 @@ func taskApplyProxyRule(inctx context.Context, params concurrency.TaskParameters
 				msg += " '" + ruleName + "'"
 			}
 			msg += " for host '" + hostName
-			logrus.WithContext(ctx).Error(msg + "': " + xerr.Error())
 			chRes <- result{nil, fail.Wrap(xerr, msg)}
 			return
 		}
-		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s' for host '%s'", ruleName, hostName)
 		chRes <- result{nil, nil}
-
 	}()
 	select {
 	case res := <-chRes:
