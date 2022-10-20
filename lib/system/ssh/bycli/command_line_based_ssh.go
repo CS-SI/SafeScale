@@ -1111,7 +1111,7 @@ func createSSHCommand(
 		sshCmdString += fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
 	}
 
-	logrus.WithContext(context.Background()).Debugf("Created SSH command '%s'", strings.Replace(sshCmdString, "\n", "\t", -1))
+	// logrus.WithContext(context.Background()).Debugf("Created SSH command '%s'", strings.Replace(sshCmdString, "\n", "\t", -1))
 
 	return sshCmdString, f, nil
 }
