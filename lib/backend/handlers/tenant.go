@@ -19,7 +19,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"reflect"
@@ -866,7 +865,7 @@ func (handler *tenantHandler) collect(ctx context.Context) (ferr fail.Error) {
 		return fail.ConvertError(err)
 	}
 
-	files, err := ioutil.ReadDir(utils.AbsPathify("$HOME/.safescale/scanner"))
+	files, err := os.ReadDir(utils.AbsPathify("$HOME/.safescale/scanner"))
 	if err != nil {
 		return fail.ConvertError(err)
 	}
