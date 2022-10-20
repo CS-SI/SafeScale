@@ -304,6 +304,8 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (*abstract.KeyPai
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
+	// FIXME: OPP Look at CreateKeyPair from aws/compute.go
+
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
@@ -986,7 +988,7 @@ func (s stack) deletePortsInSlice(ctx context.Context, ports []string) fail.Erro
 			switch rerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a not found port as a successful deletion
-				debug.IgnoreError(rerr)
+				debug.IgnoreError2(ctx, rerr)
 			default:
 				errors = append(errors, fail.Wrap(rerr, "failed to delete port %s", v))
 			}
@@ -1015,7 +1017,7 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG bool, en
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -1029,7 +1031,7 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG bool, en
 			if check {
 				_, xerr = s.rpcRemoveSGFromPort(ctx, p.ID)
 				if xerr != nil {
-					debug.IgnoreError(xerr)
+					debug.IgnoreError2(ctx, xerr)
 					collected = append(collected, xerr)
 				} else {
 					goodEnough = true
@@ -1047,7 +1049,7 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG bool, en
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -1059,7 +1061,7 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG bool, en
 		if check {
 			_, xerr = s.rpcChangePortSecurity(ctx, p.ID, enabledPort)
 			if xerr != nil {
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 				collected = append(collected, xerr)
 			} else {
 				goodEnough = true
@@ -1116,7 +1118,7 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 			)
 		}
 
-		// FIXME: OPP Use this only for Stein disaster, so it HAS to be OVH
+		// FIXME: OPP workaround for Stein disaster, so we have to make sure it is OVH
 		if !s.cfgOpts.Safe && s.cfgOpts.ProviderName == "ovh" {
 			port, xerr = s.rpcChangePortSecurity(ctx, port.ID, false)
 			if xerr != nil {
@@ -1492,7 +1494,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				return fail.Wrap(xerr, "failed to find floating ip of host '%s'", hostRef)
 			}
@@ -1522,7 +1524,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -1594,21 +1596,21 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 		case *retry.ErrTimeout:
 			cause := fail.Cause(xerr)
 			if _, ok := cause.(*fail.ErrNotFound); ok {
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			} else {
 				return fail.ConvertError(cause)
 			}
 		case *retry.ErrStopRetry:
 			cause := fail.Cause(xerr)
 			if _, ok := cause.(*fail.ErrNotFound); ok {
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			} else {
 				return fail.ConvertError(cause)
 			}
 		case *fail.ErrNotFound:
 			// if host disappeared (rpcListPorts succeeded and host was still there at this moment), consider the error as a successful deletion;
 			// leave a chance to remove ports
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -1621,7 +1623,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 			switch rerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a not found port as a successful deletion
-				debug.IgnoreError(rerr)
+				debug.IgnoreError2(ctx, rerr)
 			default:
 				errors = append(errors, fail.Wrap(rerr, "failed to delete port %s (%s)", v.ID, v.Description))
 			}
@@ -1686,17 +1688,12 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) f
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
+	// Only hard reboot actually solves problems
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := servers.Reboot(
-				s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.SoftReboot},
+				s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.HardReboot},
 			).ExtractErr()
-			if innerErr != nil {
-				innerErr = servers.Reboot(
-					s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.HardReboot},
-				).ExtractErr()
-			}
 			return innerErr
 		},
 		NormalizeError,
@@ -1776,7 +1773,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// continue
-					debug.IgnoreError(xerr)
+					debug.IgnoreError2(ctx, xerr)
 				default:
 					return xerr
 				}
@@ -1787,7 +1784,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 				_, xerr = s.rpcChangePortSecurity(ctx, p.ID, true)
 				if xerr != nil {
 					if strings.Contains(xerr.Error(), "policy") {
-						debug.IgnoreError(xerr)
+						debug.IgnoreError2(ctx, xerr)
 					} else {
 						return xerr
 					}

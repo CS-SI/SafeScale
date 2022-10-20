@@ -191,7 +191,7 @@ func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef s
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
-						debug.IgnoreError(xerr)
+						debug.IgnoreError2(ctx, xerr)
 						// Network metadata can be missing if it's the default Network, so continue
 					default:
 						return nil, xerr
@@ -376,7 +376,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 				// Network metadata can be missing if it's the default Network, so continue
 			default:
 				return xerr
@@ -396,7 +396,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 				// Network metadata can be missing if it's the default Network, so continue
 			default:
 				return xerr
@@ -489,7 +489,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			if !req.KeepOnFailure {
-				if derr := instance.deleteSubnetThenWaitCompletion(context.Background(), snid); derr != nil {
+				if derr := instance.deleteSubnetThenWaitCompletion(cleanupContextFrom(ctx), snid); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 				} else {
 					logrus.WithContext(ctx).Infof("the subnet '%s' should be gone by now", snid)
@@ -504,7 +504,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			if instance != nil {
-				derr := instance.unsafeUpdateSubnetStatus(context.Background(), subnetstate.Error)
+				derr := instance.unsafeUpdateSubnetStatus(cleanupContextFrom(ctx), subnetstate.Error)
 				if derr != nil {
 					_ = ferr.AddConsequence(derr)
 				}
@@ -557,12 +557,8 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 
 // undoBindInternalSecurityGroupToGateway does what its name says
 func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host, keepOnFailure bool, xerr *fail.Error) fail.Error {
-	if ctx != context.Background() {
-		return fail.InvalidParameterError("ctx", "has to be context.Background()")
-	}
-
 	if xerr != nil && *xerr != nil && keepOnFailure {
-		_ = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		rerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -582,6 +578,9 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 
 			return nil
 		})
+		if rerr != nil {
+			return rerr
+		}
 	}
 
 	return nil
@@ -602,7 +601,7 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(ctx context.Context, id s
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If Subnet doesn't exist anymore on the provider infrastructure, do not fail
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 			return nil
 		default:
 			return xerr
@@ -622,7 +621,7 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(ctx context.Context, id s
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// Subnet not found, good
-					debug.IgnoreError(xerr)
+					debug.IgnoreError2(ctx, xerr)
 					return nil
 				default:
 					return xerr
@@ -1220,10 +1219,10 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 					for k := range shV1.ByName {
 						// Check if Host still has metadata and count it if yes
 						if hess, innerXErr := LoadHost(ctx, svc, k); innerXErr != nil {
-							debug.IgnoreError(innerXErr)
+							debug.IgnoreError2(ctx, innerXErr)
 						} else {
 							if _, innerXErr := hess.ForceGetState(ctx); innerXErr != nil {
-								debug.IgnoreError(innerXErr)
+								debug.IgnoreError2(ctx, innerXErr)
 							} else {
 								hostList = append(hostList, k)
 							}
@@ -1362,7 +1361,7 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// Security Group not found, consider this as a success
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 				continue
 			default:
 				return xerr
@@ -1380,7 +1379,7 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// Security Group not found, consider this as a success
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 				continue
 			default:
 				return xerr
@@ -1430,7 +1429,7 @@ func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Sub
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				return subnet.GatewayIDs, xerr
 			}
@@ -1448,7 +1447,7 @@ func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Sub
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				return subnet.GatewayIDs, xerr
 			}
@@ -1472,7 +1471,7 @@ func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Sub
 				case *fail.ErrNotFound:
 					// missing gateway is considered as a successful deletion, continue
 					logrus.WithContext(ctx).Tracef("host instance not found, gateway deletion considered as a success")
-					debug.IgnoreError(xerr)
+					debug.IgnoreError2(ctx, xerr)
 				default:
 					return subnet.GatewayIDs, xerr
 				}
@@ -1493,7 +1492,7 @@ func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Sub
 					case *fail.ErrNotFound:
 						// missing gateway is considered as a successful deletion, continue
 						logrus.WithContext(ctx).Tracef("host instance not found, relaxed gateway deletion considered as a success")
-						debug.IgnoreError(xerr)
+						debug.IgnoreError2(ctx, xerr)
 					default:
 						return subnet.GatewayIDs, xerr
 					}
@@ -1532,7 +1531,7 @@ func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subne
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a Security Group not found as a successful unbind
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				return xerr
 			}
@@ -1942,7 +1941,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 					switch innerXErr.(type) {
 					case *fail.ErrDuplicate:
 						// security group already bound to Subnet with the same state, considered as a success
-						debug.IgnoreError(innerXErr)
+						debug.IgnoreError2(ctx, innerXErr)
 					default:
 						return innerXErr
 					}
@@ -2038,7 +2037,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						// security group not bound to Subnet, considered as a success
-						debug.IgnoreError(innerXErr)
+						debug.IgnoreError2(ctx, innerXErr)
 					default:
 						return innerXErr
 					}

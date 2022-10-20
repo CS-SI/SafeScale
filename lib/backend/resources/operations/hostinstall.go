@@ -426,7 +426,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// Host may not have Public IP, ignore this error
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -492,7 +492,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 			case *fail.ErrNotFound:
 				v["SecondaryGatewayIP"] = ""
 				v["SecondaryPublicIP"] = ""
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				return xerr
 			}

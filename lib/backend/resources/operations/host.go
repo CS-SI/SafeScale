@@ -400,7 +400,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// continue
-						debug.IgnoreError(xerr)
+						debug.IgnoreError2(ctx, xerr)
 					default:
 						return xerr
 					}
@@ -854,7 +854,7 @@ func (instance *Host) Create(
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done(): // if not because parent context was canceled
-		return nil, fail.Wrap(inctx.Err(), "cancelled by parent")
+		return nil, fail.Wrap(inctx.Err(), "canceled by parent")
 	}
 }
 
@@ -874,20 +874,14 @@ func (instance *Host) implCreate(
 		defer close(chRes)
 		svc := instance.Service()
 
-		timings, xerr := instance.Service().Timings()
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
 		// Check if Host exists and is managed bySafeScale
-		_, xerr = LoadHost(ctx, svc, hostReq.ResourceName)
+		_, xerr := LoadHost(ctx, svc, hostReq.ResourceName)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				chRes <- result{nil, fail.Wrap(xerr, "failed to check if Host '%s' already exists", hostReq.ResourceName)}
 				return xerr
@@ -904,7 +898,7 @@ func (instance *Host) implCreate(
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				chRes <- result{nil, fail.Wrap(xerr, "failed to check if Host resource name '%s' is already used", hostReq.ResourceName)}
 				return xerr
@@ -1067,7 +1061,7 @@ func (instance *Host) implCreate(
 			if ferr != nil && !hostReq.KeepOnFailure {
 				if ahf != nil {
 					if ahf.IsConsistent() {
-						if derr := svc.DeleteHost(context.Background(), ahf.Core.ID); derr != nil {
+						if derr := svc.DeleteHost(cleanupContextFrom(ctx), ahf.Core.ID); derr != nil {
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Core.Name))
 						}
 						ahf.Core.LastState = hoststate.Deleted
@@ -1116,7 +1110,7 @@ func (instance *Host) implCreate(
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !hostReq.KeepOnFailure {
-				if derr := instance.MetadataCore.Delete(context.Background()); derr != nil {
+				if derr := instance.MetadataCore.Delete(cleanupContextFrom(ctx)); derr != nil {
 					logrus.WithContext(ctx).Errorf(
 						"cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name,
 						derr,
@@ -1131,8 +1125,8 @@ func (instance *Host) implCreate(
 			if ferr != nil {
 				if ahf.IsConsistent() {
 					if ahf.Core.LastState != hoststate.Deleted {
-						logrus.WithContext(context.Background()).Warnf("Marking instance '%s' as FAILED", ahf.GetName())
-						derr := instance.Alter(context.Background(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+						logrus.WithContext(cleanupContextFrom(ctx)).Warnf("Marking instance '%s' as failed", ahf.GetName())
+						derr := instance.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 							ahc, ok := clonable.(*abstract.HostCore)
 							if !ok {
 								return fail.InconsistentError(
@@ -1147,7 +1141,7 @@ func (instance *Host) implCreate(
 						if derr != nil {
 							_ = ferr.AddConsequence(derr)
 						} else {
-							logrus.WithContext(context.Background()).Warnf("Instance now should be in FAILED state")
+							logrus.WithContext(cleanupContextFrom(ctx)).Warnf("Instance now should be in failed state")
 						}
 					}
 				}
@@ -1177,8 +1171,7 @@ func (instance *Host) implCreate(
 					return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				var err error
-				_, err = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*ahf.Description))
+				_, err := hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*ahf.Description))
 				if err != nil {
 					return fail.Wrap(err)
 				}
@@ -1244,7 +1237,7 @@ func (instance *Host) implCreate(
 			return xerr
 		}
 		defer func() {
-			derr := instance.undoSetSecurityGroups(context.Background(), &ferr, hostReq.KeepOnFailure)
+			derr := instance.undoSetSecurityGroups(cleanupContextFrom(ctx), &ferr, hostReq.KeepOnFailure)
 			if derr != nil {
 				logrus.WithContext(ctx).Warnf(derr.Error())
 			}
@@ -1285,13 +1278,13 @@ func (instance *Host) implCreate(
 		// claiming Host is created
 		logrus.WithContext(ctx).Infof("Waiting SSH availability on Host '%s' ...", instance.GetName())
 
-		status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, timings.HostCreationTimeout())
+		maybePackerFailure := false
+		status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, 3*time.Minute) // FIXME: OPP Hardcoded timeout
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
-				chRes <- result{nil, fail.Wrap(xerr, "timeout after Host creation waiting for SSH availability")}
-				return xerr
+				maybePackerFailure = true
 			default:
 				if abstract.IsProvisioningError(xerr) {
 					chRes <- result{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", instance.GetName())}
@@ -1299,6 +1292,38 @@ func (instance *Host) implCreate(
 				}
 				chRes <- result{nil, xerr}
 				return xerr
+			}
+		}
+
+		if maybePackerFailure {
+			logrus.WithContext(ctx).Warningf("Hard Rebooting the host %s", instance.GetName())
+			hostID, err := instance.GetID()
+			if err != nil {
+				chRes <- result{nil, fail.ConvertError(err)}
+				return fail.ConvertError(err)
+			}
+
+			xerr = svc.RebootHost(ctx, hostID)
+			if xerr != nil {
+				chRes <- result{nil, xerr}
+				return xerr
+			}
+
+			status, xerr = instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, 3*time.Minute) // FIXME: OPP Hardcoded timeout
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrTimeout:
+					chRes <- result{nil, fail.Wrap(xerr, "timeout after Host creation waiting for SSH availability")}
+					return xerr
+				default:
+					if abstract.IsProvisioningError(xerr) {
+						chRes <- result{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", instance.GetName())}
+						return
+					}
+					chRes <- result{nil, xerr}
+					return xerr
+				}
 			}
 		}
 
@@ -1336,7 +1361,7 @@ func (instance *Host) implCreate(
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				instance.undoUpdateSubnets(context.Background(), hostReq, &ferr)
+				instance.undoUpdateSubnets(cleanupContextFrom(ctx), hostReq, &ferr)
 			}
 		}()
 
@@ -1402,7 +1427,7 @@ func (instance *Host) implCreate(
 		return res.ct, res.err
 	case <-ctx.Done(): // if not because parent context was canceled
 		<-chRes // wait for cleanup
-		return nil, fail.Wrap(ctx.Err(), "cancelled by parent")
+		return nil, fail.Wrap(ctx.Err(), "canceled by parent")
 	}
 }
 
@@ -1469,7 +1494,7 @@ func determineImageID(ctx context.Context, svc iaas.Service, imageRef string) (s
 				}
 			}
 		default:
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		}
 	}
 
@@ -1494,7 +1519,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 		}
 		for k := range req.SecurityGroupIDs {
 			if k != "" {
-				logrus.WithContext(ctx).Warningf("Binding security group with id %s to host %s", k, hostID)
+				logrus.WithContext(ctx).Infof("Binding security group with id %s to host %s", k, hostID)
 				xerr := svc.BindSecurityGroupToHost(ctx, k, hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -1549,7 +1574,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 				defer func() {
 					if finnerXErr != nil && !req.KeepOnFailure {
-						derr := gwsg.UnbindFromHost(context.Background(), instance)
+						derr := gwsg.UnbindFromHost(cleanupContextFrom(ctx), instance)
 						if derr != nil {
 							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), gwsg.GetName(), instance.GetName()))
 						}
@@ -1585,7 +1610,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 				defer func() {
 					if finnerXErr != nil && !req.KeepOnFailure {
-						derr := pubipsg.UnbindFromHost(context.Background(), instance)
+						derr := pubipsg.UnbindFromHost(cleanupContextFrom(ctx), instance)
 						if derr != nil {
 							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), pubipsg.GetName(), instance.GetName()))
 						}
@@ -1620,14 +1645,14 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 							continue
 						}
 
-						subnetInstance, deeperXErr := LoadSubnet(context.Background(), svc, "", v.ID)
+						subnetInstance, deeperXErr := LoadSubnet(cleanupContextFrom(ctx), svc, "", v.ID)
 						if deeperXErr != nil {
 							_ = innerXErr.AddConsequence(deeperXErr)
 							continue
 						}
 
 						sgName := sg.GetName()
-						deeperXErr = subnetInstance.Review(context.Background(), func(
+						deeperXErr = subnetInstance.Review(cleanupContextFrom(ctx), func(
 							clonable data.Clonable, _ *serialize.JSONProperties,
 						) fail.Error {
 							abstractSubnet, ok := clonable.(*abstract.Subnet)
@@ -1636,11 +1661,11 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 							}
 
 							if abstractSubnet.InternalSecurityGroupID != "" {
-								sg, derr = LoadSecurityGroup(context.Background(), svc, abstractSubnet.InternalSecurityGroupID)
+								sg, derr = LoadSecurityGroup(cleanupContextFrom(ctx), svc, abstractSubnet.InternalSecurityGroupID)
 								if derr != nil {
 									errs = append(errs, derr)
 								} else {
-									derr = sg.UnbindFromHost(context.Background(), instance)
+									derr = sg.UnbindFromHost(cleanupContextFrom(ctx), instance)
 									if derr != nil {
 										errs = append(errs, derr)
 									}
@@ -1766,9 +1791,6 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 	if errorPtr == nil {
 		return fail.NewError("trying to call a cancel function from a nil error; cancel not run")
 	}
-	if ctx != context.Background() {
-		return fail.NewError("wrong context")
-	}
 
 	if *errorPtr != nil && !keepOnFailure {
 		svc := instance.Service()
@@ -1838,7 +1860,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(ctx context.Context, ne
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// ignore this error
-				debug.IgnoreError(innerXErr)
+				debug.IgnoreError2(ctx, innerXErr)
 			default:
 				return innerXErr
 			}
@@ -1846,7 +1868,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(ctx context.Context, ne
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// Consider a security group not found as a successful unbind
-				debug.IgnoreError(innerXErr)
+				debug.IgnoreError2(ctx, innerXErr)
 			default:
 				return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
 			}
@@ -2029,28 +2051,7 @@ func (instance *Host) waitInstallPhase(inctx context.Context, phase userdata.Pha
 		defer close(chRes)
 		defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Waiting install phase %s on '%s'...", phase, instance.GetName()), fmt.Sprintf("Finish Waiting install phase %s on '%s'...", phase, instance.GetName()))()
 
-		timings, xerr := instance.Service().Timings()
-		if xerr != nil {
-			chRes <- result{"", xerr}
-			return
-		}
-
-		givenTimeout := int(timeout.Minutes())
-		sshDefaultTimeout := int(timings.HostOperationTimeout().Minutes())
-		if givenTimeout > sshDefaultTimeout {
-			sshDefaultTimeout = givenTimeout
-		}
-
-		// FIXME: rework this using instance.Service().Timings() (add new .SSHTimeout() if needed)
-		// this overrides the default timeout of max(GetHostTimeout, timeout)
-		if sshDefaultTimeoutCandidate := os.Getenv("SAFESCALE_SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
-			if num, err := strconv.Atoi(sshDefaultTimeoutCandidate); err != nil {
-				logrus.WithContext(ctx).Debugf("error parsing timeout: %v", err)
-			} else {
-				logrus.WithContext(ctx).Debugf("Using custom timeout of %d minutes", num)
-				sshDefaultTimeout = num
-			}
-		}
+		sshDefaultTimeout := int(timeout.Minutes()) + 1
 
 		duration := time.Duration(sshDefaultTimeout) * time.Minute
 		sshCfg, xerr := instance.GetSSHConfig(ctx)
@@ -2135,6 +2136,8 @@ func (instance *Host) waitInstallPhase(inctx context.Context, phase userdata.Pha
 
 	}()
 	select {
+	case <-time.After(timeout):
+		return "", fail.TimeoutError(fmt.Errorf("failed to wait for SSH on Host '%s' to be ready (phase %s)", instance.GetName(), phase), timeout)
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
@@ -2199,9 +2202,6 @@ func (instance *Host) updateSubnets(ctx context.Context, req abstract.HostReques
 // undoUpdateSubnets removes what updateSubnets have done
 func (instance *Host) undoUpdateSubnets(inctx context.Context, req abstract.HostRequest, errorPtr *fail.Error) {
 	ctx := inctx
-	if ctx != context.Background() {
-		logrus.WithContext(ctx).Warningf("This should NOT happen")
-	}
 
 	if errorPtr != nil && *errorPtr != nil && !req.IsGateway && !req.Single && !req.KeepOnFailure {
 		xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2300,7 +2300,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		if _, err := os.Stat("/tmp/tss"); !errors.Is(err, os.ErrNotExist) {
 			_, _, _, xerr = instance.unsafePush(ctx, "/tmp/tss", fmt.Sprintf("/home/%s/tss", userdataContent.Username), userdataContent.Username, "755", 10*time.Second)
 			if xerr != nil {
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			}
 		}
 	}
@@ -2376,7 +2376,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 					return xerr
 				}
 
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			}
 
 			// Reboot Host
@@ -2566,7 +2566,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !singleHostRequest.KeepOnFailure {
-					derr := subnetInstance.Delete(context.Background())
+					derr := subnetInstance.Delete(cleanupContextFrom(ctx))
 					if derr != nil {
 						_ = ferr.AddConsequence(
 							fail.Wrap(
@@ -2603,7 +2603,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 	undoFunc := func() fail.Error {
 		var errs []error
 		if !singleHostRequest.KeepOnFailure {
-			derr := subnetInstance.Delete(context.Background())
+			derr := subnetInstance.Delete(cleanupContextFrom(ctx))
 			if derr != nil {
 				errs = append(
 					errs, fail.Wrap(
@@ -2611,7 +2611,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 					),
 				)
 			}
-			derr = FreeCIDRForSingleHost(context.Background(), networkInstance, cidrIndex)
+			derr = FreeCIDRForSingleHost(cleanupContextFrom(ctx), networkInstance, cidrIndex)
 			if derr != nil {
 				errs = append(
 					errs, fail.Wrap(
@@ -2708,7 +2708,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					for _, hostID := range hostShare.ClientsByID {
 						instance, inErr := LoadHost(ctx, svc, hostID)
 						if inErr != nil {
-							debug.IgnoreError(inErr)
+							debug.IgnoreError2(ctx, inErr)
 							continue
 						}
 						return fail.NotAvailableError("Host '%s' exports %d share%s and at least one share is mounted", instance.GetName(), shareCount, strprocess.Plural(uint(shareCount)))
@@ -2788,7 +2788,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					if _, ok := loopErr.(*fail.ErrNotFound); !ok { // nolint
 						return loopErr
 					}
-					debug.IgnoreError(loopErr)
+					debug.IgnoreError2(ctx, loopErr)
 					continue
 				}
 
@@ -2821,7 +2821,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				if _, ok := loopErr.(*fail.ErrNotFound); !ok { // nolint
 					return loopErr
 				}
-				debug.IgnoreError(loopErr)
+				debug.IgnoreError2(ctx, loopErr)
 				continue
 			}
 
@@ -2838,7 +2838,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				if _, ok := loopErr.(*fail.ErrNotFound); !ok { // nolint
 					return loopErr
 				}
-				debug.IgnoreError(loopErr)
+				debug.IgnoreError2(ctx, loopErr)
 				continue
 			}
 
@@ -2908,7 +2908,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					switch rerr.(type) {
 					case *fail.ErrNotFound:
 						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreError(rerr)
+						debug.IgnoreError2(ctx, rerr)
 					default:
 						errs = append(errs, rerr)
 					}
@@ -2920,7 +2920,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					switch rerr.(type) {
 					case *fail.ErrNotFound:
 						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreError(rerr)
+						debug.IgnoreError2(ctx, rerr)
 					default:
 						errs = append(errs, rerr)
 					}
@@ -2951,7 +2951,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					switch rerr.(type) {
 					case *fail.ErrNotFound:
 						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreError(rerr)
+						debug.IgnoreError2(ctx, rerr)
 					default:
 						errs = append(errs, rerr)
 					}
@@ -2963,7 +2963,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					switch rerr.(type) {
 					case *fail.ErrNotFound:
 						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreError(rerr)
+						debug.IgnoreError2(ctx, rerr)
 					default:
 						errs = append(errs, rerr)
 					}
@@ -2994,7 +2994,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					case *fail.ErrNotFound:
 						// A Host not found is considered as a successful deletion
 						logrus.WithContext(ctx).Tracef("Host not found, deletion considered as a success")
-						debug.IgnoreError(rerr)
+						debug.IgnoreError2(ctx, rerr)
 					default:
 						return fail.Wrap(rerr, "cannot delete Host")
 					}
@@ -3031,7 +3031,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 						switch stateErr.(type) {
 						case *fail.ErrNotFound:
 							// If Host is not found anymore, consider this as a success
-							debug.IgnoreError(stateErr)
+							debug.IgnoreError2(ctx, stateErr)
 							return nil
 						default:
 							return stateErr
@@ -3052,9 +3052,9 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					if _, ok := innerXErr.(*fail.ErrNotFound); !ok || valid.IsNil(innerXErr) {
 						return innerXErr
 					}
-					debug.IgnoreError(innerXErr)
+					debug.IgnoreError2(ctx, innerXErr)
 				case *fail.ErrNotFound:
-					debug.IgnoreError(innerXErr)
+					debug.IgnoreError2(ctx, innerXErr)
 				default:
 					return innerXErr
 				}
@@ -3091,7 +3091,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
 		}
-		debug.IgnoreError(xerr)
+		debug.IgnoreError2(ctx, xerr)
 		logrus.WithContext(ctx).Tracef("core instance not found, deletion considered as a success")
 	}
 
@@ -3594,6 +3594,10 @@ func (instance *Host) Sync(ctx context.Context) (ferr fail.Error) {
 
 func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+
+	if debugFlag := os.Getenv("SAFESCALE_DEBUG"); debugFlag == "NoReboot" {
+		return nil
+	}
 
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
@@ -4336,7 +4340,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
-						debug.IgnoreError(xerr)
+						debug.IgnoreError2(ctx, xerr)
 					default:
 						return xerr
 					}
@@ -4434,7 +4438,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
-						debug.IgnoreError(xerr)
+						debug.IgnoreError2(ctx, xerr)
 						// continue
 					default:
 						return xerr
@@ -4478,7 +4482,7 @@ func ReserveCIDRForSingleHost(ctx context.Context, networkInstance resources.Net
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := FreeCIDRForSingleHost(context.Background(), networkInstance, index)
+			derr := FreeCIDRForSingleHost(cleanupContextFrom(ctx), networkInstance, index)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot '%d' in Network '%s'", index, networkInstance.GetName()))
 			}
@@ -4616,7 +4620,7 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := labelInstance.UnbindFromHost(context.Background(), instance)
+			derr := labelInstance.UnbindFromHost(cleanupContextFrom(ctx), instance)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure"))
 			}

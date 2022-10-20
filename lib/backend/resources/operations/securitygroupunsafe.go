@@ -26,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -375,15 +374,8 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 	go func() {
 		defer close(chRes)
 
-		task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
 		// Unbind Security Group from Hosts attached to Subnet
-		_, xerr = instance.taskUnbindFromHostsAttachedToSubnet(task, params)
+		_, xerr := instance.taskUnbindFromHostsAttachedToSubnet(ctx, params)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
@@ -532,7 +524,7 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 		}
 
 		hn := hostInstance.GetName()
-		logrus.WithContext(ctx).Warningf("Binding security group %s to host %s", sgid, hn)
+		logrus.WithContext(ctx).Infof("Binding security group %s to host %s", sgid, hn)
 
 		xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			if mark == resources.MarkSecurityGroupAsDefault {
@@ -586,7 +578,7 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrDuplicate:
-							debug.IgnoreError(xerr)
+							debug.IgnoreError2(ctx, xerr)
 							// continue
 						default:
 							return xerr
@@ -599,7 +591,7 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
-							debug.IgnoreError(xerr)
+							debug.IgnoreError2(ctx, xerr)
 							// continue
 						default:
 							return xerr

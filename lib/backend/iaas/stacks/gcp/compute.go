@@ -521,7 +521,7 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				return nil, xerr
 			}

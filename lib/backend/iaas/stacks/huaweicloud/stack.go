@@ -250,7 +250,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return nil, xerr
 		}
@@ -691,17 +691,12 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) f
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
+	// Only hard reboot fixes problems
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := servers.Reboot(
-				s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.SoftReboot},
+				s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.HardReboot},
 			).ExtractErr()
-			if innerErr != nil {
-				innerErr = servers.Reboot(
-					s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.HardReboot},
-				).ExtractErr()
-			}
 			return innerErr
 		},
 		NormalizeError,
@@ -1123,7 +1118,7 @@ func (s *stack) initVPC(ctx context.Context) fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// FIXME: error or automatic DefaultNetwork creation ?
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				return xerr
 			}

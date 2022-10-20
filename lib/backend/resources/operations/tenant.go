@@ -58,13 +58,13 @@ func CurrentTenant(ctx context.Context) *Tenant {
 			service, xerr := loadTenant(ctx, name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 				return nil
 			}
 
 			bucket, xerr := service.GetMetadataBucket(ctx)
 			if xerr != nil {
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 				return nil
 			}
 

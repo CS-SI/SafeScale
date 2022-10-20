@@ -1082,7 +1082,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// a host not found is considered as a successful deletion, continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 			vm = nil
 		default:
 			return xerr
@@ -1117,12 +1117,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 			cause := fail.ConvertError(xerr.Cause())
 			switch cause.(type) {
 			case *fail.ErrNotFound, *fail.ErrInvalidRequest:
-				debug.IgnoreError(cause)
+				debug.IgnoreError2(ctx, cause)
 			default:
 				return fail.Wrap(cause, "failed to stop Host '%s' with id '%s'", ahfn, ahfi)
 			}
 		case *fail.ErrNotFound, *fail.ErrInvalidRequest:
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return fail.Wrap(xerr, "failed to stop Host '%s' with id '%s'", ahfn, ahfi)
 		}
@@ -1137,12 +1137,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 				xerr = fail.ConvertError(xerr.Cause())
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					debug.IgnoreError(xerr)
+					debug.IgnoreError2(ctx, xerr)
 				default:
 					return xerr
 				}
 			case *fail.ErrNotFound:
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				return xerr
 			}
@@ -1163,7 +1163,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// A missing volume is considered as a successful deletion
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				logrus.WithContext(ctx).Warnf("failed to delete volume %s (error %s)", volume, reflect.TypeOf(xerr).String())
 			}
@@ -1177,7 +1177,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// A missing keypair is considered as a successful deletion
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				return fail.Wrap(xerr, "error deleting keypair '%s'", keyPairName)
 			}

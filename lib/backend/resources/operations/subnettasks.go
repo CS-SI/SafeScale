@@ -28,7 +28,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -41,20 +40,16 @@ type taskCreateGatewayParameters struct {
 	sizing  abstract.HostSizingRequirements
 }
 
-func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Subnet) taskCreateGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -135,17 +130,17 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 			if ferr != nil {
 				if !hostReq.KeepOnFailure {
 					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
-					derr := rgw.Delete(context.Background())
+					derr := rgw.Delete(cleanupContextFrom(ctx))
 					if derr != nil {
 						msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 						switch derr.(type) {
 						case *fail.ErrNotFound:
 							// missing Host is considered as a successful deletion, continue
-							debug.IgnoreError(derr)
+							debug.IgnoreError2(ctx, derr)
 						case *fail.ErrTimeout:
-							logrus.WithContext(context.Background()).Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
+							logrus.WithContext(cleanupContextFrom(ctx)).Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
 						default:
-							logrus.WithContext(context.Background()).Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
+							logrus.WithContext(cleanupContextFrom(ctx)).Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
 						}
 						_ = ferr.AddConsequence(derr)
 					} else {
@@ -153,7 +148,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 					}
 					_ = ferr.AddConsequence(derr)
 				} else {
-					xerr = rgw.Alter(context.Background(), func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					xerr = rgw.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 						as, ok := clonable.(*abstract.HostCore)
 						if !ok {
 							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -164,7 +159,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 					})
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
-						logrus.WithContext(ctx).Warnf("error marking host '%s' in FAILED state: %v", hostReq.ResourceName, xerr)
+						logrus.WithContext(ctx).Warnf("error marking host '%s' in failed state: %v", hostReq.ResourceName, xerr)
 					}
 				}
 			}
@@ -224,22 +219,18 @@ type taskFinalizeGatewayConfigurationParameters struct {
 	userdata *userdata.Content
 }
 
-func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, gerr fail.Error) {
+func (instance *Subnet) taskFinalizeGatewayConfiguration(inctx context.Context, params interface{}) (_ interface{}, gerr fail.Error) {
 	defer fail.OnPanic(&gerr)
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -299,7 +290,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 					return xerr
 				}
 
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			}
 
 			// intermediate gateway reboot

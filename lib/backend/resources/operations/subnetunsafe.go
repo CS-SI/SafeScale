@@ -22,8 +22,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -37,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/consts"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -228,7 +227,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(
 			return xerr
 		}
 		defer func() {
-			derr := instance.undoCreateSecurityGroup(context.Background(), &ferr, keepOnFailure, subnetGWSG)
+			derr := instance.undoCreateSecurityGroup(cleanupContextFrom(ctx), &ferr, keepOnFailure, subnetGWSG)
 			if derr != nil {
 				logrus.WithContext(ctx).Warnf(derr.Error())
 			}
@@ -241,7 +240,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(
 			return xerr
 		}
 		defer func() {
-			derr := instance.undoCreateSecurityGroup(context.Background(), &ferr, keepOnFailure, subnetPublicIPSG)
+			derr := instance.undoCreateSecurityGroup(cleanupContextFrom(ctx), &ferr, keepOnFailure, subnetPublicIPSG)
 			if derr != nil {
 				logrus.WithContext(ctx).Warnf(derr.Error())
 			}
@@ -254,7 +253,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(
 			return xerr
 		}
 		defer func() {
-			derr := instance.undoCreateSecurityGroup(context.Background(), &ferr, keepOnFailure, subnetInternalSG)
+			derr := instance.undoCreateSecurityGroup(cleanupContextFrom(ctx), &ferr, keepOnFailure, subnetInternalSG)
 			if derr != nil {
 				logrus.WithContext(ctx).Warnf(derr.Error())
 			}
@@ -269,7 +268,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !keepOnFailure {
-				if derr := subnetGWSG.UnbindFromSubnet(context.Background(), instance); derr != nil {
+				if derr := subnetGWSG.UnbindFromSubnet(cleanupContextFrom(ctx), instance); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateways from Subnet", ActionFromError(ferr)))
 				}
 			}
@@ -325,7 +324,7 @@ func (instance *Subnet) createGWSecurityGroup(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !keepOnFailure {
-			if derr := sg.Delete(context.Background(), true); derr != nil {
+			if derr := sg.Delete(cleanupContextFrom(ctx), true); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), sgName))
 			}
 		}
@@ -435,7 +434,7 @@ func (instance *Subnet) createPublicIPSecurityGroup(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !keepOnFailure {
-			if derr := sgInstance.Delete(context.Background(), true); derr != nil {
+			if derr := sgInstance.Delete(cleanupContextFrom(ctx), true); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), sgName))
 			}
 		}
@@ -472,9 +471,6 @@ func (instance *Subnet) undoCreateSecurityGroup(
 ) fail.Error {
 	if errorPtr == nil {
 		return fail.NewError("trying to undo an action based on the content of a nil fail.Error; undo cannot be run")
-	}
-	if ctx != context.Background() {
-		return fail.InvalidParameterError("ctx", "has to be context.Background()")
 	}
 	if *errorPtr != nil && !keepOnFailure {
 		sgName := sg.GetName()
@@ -518,7 +514,7 @@ func (instance *Subnet) createInternalSecurityGroup(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !keepOnFailure {
-			if derr := sg.Delete(context.Background(), true); derr != nil {
+			if derr := sg.Delete(cleanupContextFrom(ctx), true); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Security Group '%s'", ActionFromError(ferr), sgName))
 			}
 		}
@@ -623,7 +619,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && abstractSubnet != nil && !req.KeepOnFailure {
-				if derr := instance.deleteSubnetThenWaitCompletion(context.Background(), abstractSubnet.ID); derr != nil {
+				if derr := instance.deleteSubnetThenWaitCompletion(cleanupContextFrom(ctx), abstractSubnet.ID); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 				}
 			}
@@ -641,7 +637,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !req.KeepOnFailure {
-				if derr := instance.MetadataCore.Delete(context.Background()); derr != nil {
+				if derr := instance.MetadataCore.Delete(cleanupContextFrom(ctx)); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet metadata", ActionFromError(ferr)))
 				}
 			}
@@ -672,7 +668,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 				b, _ := subnetInternalSG.GetID()
 				c, _ := subnetPublicIPSG.GetID()
 
-				derr := instance.deleteSecurityGroups(context.Background(), [3]string{a, b, c})
+				derr := instance.deleteSecurityGroups(cleanupContextFrom(ctx), [3]string{a, b, c})
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Groups"))
 				}
@@ -715,7 +711,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && abstractSubnet != nil && abstractSubnet.VIP != nil && !req.KeepOnFailure {
-					if derr := svc.DeleteVIP(context.Background(), abstractSubnet.VIP); derr != nil {
+					if derr := svc.DeleteVIP(cleanupContextFrom(ctx), abstractSubnet.VIP); derr != nil {
 						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete VIP", ActionFromError(ferr)))
 					}
 				}
@@ -810,7 +806,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !req.KeepOnFailure {
-				derr := networkInstance.Alter(context.Background(), func(
+				derr := networkInstance.Alter(cleanupContextFrom(ctx), func(
 					_ data.Clonable, props *serialize.JSONProperties,
 				) fail.Error {
 					return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
@@ -1081,106 +1077,148 @@ func (instance *Subnet) unsafeCreateGateways(
 		var (
 			primaryGateway, secondaryGateway   *Host
 			primaryUserdata, secondaryUserdata *userdata.Content
-			primaryTask, secondaryTask         concurrency.Task
 		)
 
-		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/creategateways"))
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
+		type gwRes struct {
+			num uint
+			res data.Map
+			err fail.Error
 		}
+
+		gws := make(chan gwRes, 2)
+		egGwCreation := new(errgroup.Group)
 
 		// Starts primary gateway creation
 		primaryRequest := gwRequest
 		primaryRequest.ResourceName = primaryGatewayName
 		primaryRequest.HostName = primaryGatewayName + domain
-		primaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
-			request: primaryRequest,
-			sizing:  *gwSizing,
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			abErr := tg.AbortWithCause(xerr)
-			if abErr != nil {
-				logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-			}
-			chRes <- result{xerr}
-			return xerr
-		}
 
-		// Starts secondary gateway creation if asked for
-		if req.HA {
-			secondaryRequest := gwRequest
-			secondaryRequest.ResourceName = secondaryGatewayName
-			secondaryRequest.HostName = secondaryGatewayName
-			if req.Domain != "" {
-				secondaryRequest.HostName = secondaryGatewayName + domain
-			}
-			secondaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
-				request: secondaryRequest,
+		waitForFirstGw := make(chan struct{})
+		egGwCreation.Go(func() error {
+			defer func() {
+				close(waitForFirstGw)
+			}()
+			tr, err := instance.taskCreateGateway(ctx, taskCreateGatewayParameters{
+				request: primaryRequest,
 				sizing:  *gwSizing,
 			})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				abErr := tg.AbortWithCause(xerr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+			if err != nil {
+				gws <- gwRes{
+					num: 1,
+					res: nil,
+					err: err,
 				}
+				return err
 			}
-		}
+			gws <- gwRes{
+				num: 1,
+				res: tr.(data.Map),
+				err: nil,
+			}
+			return nil
+		})
+		egGwCreation.Go(func() error {
+			// Starts secondary gateway creation if asked for
+			if req.HA {
+				// workaround for Stein -> creating both gw at the same time don't work, so with Stein we have to wait until 1st gateway is finished
+				{
+					st, xerr := svc.GetProviderName()
+					if xerr != nil {
+						return xerr
+					}
+					if st == "ovh" {
+						<-waitForFirstGw
+					}
+				}
 
-		results, groupXErr := tg.WaitGroup()
-		groupXErr = debug.InjectPlannedFail(groupXErr)
-		if groupXErr != nil {
-			xerr := groupXErr
-			chRes <- result{xerr}
-			return xerr
-		}
-		if results == nil {
-			xerr := fail.InconsistentError("task results shouldn't be nil")
-			chRes <- result{xerr}
-			return xerr
-		}
+				secondaryRequest := gwRequest
+				secondaryRequest.ResourceName = secondaryGatewayName
+				secondaryRequest.HostName = secondaryGatewayName
+				if req.Domain != "" {
+					secondaryRequest.HostName = secondaryGatewayName + domain
+				}
+				tr, err := instance.taskCreateGateway(ctx, taskCreateGatewayParameters{
+					request: secondaryRequest,
+					sizing:  *gwSizing,
+				})
+				if err != nil {
+					gws <- gwRes{
+						num: 2,
+						res: nil,
+						err: err,
+					}
+					return err
+				}
+				gws <- gwRes{
+					num: 2,
+					res: tr.(data.Map),
+					err: nil,
+				}
+				return nil
+			}
+			return nil
+		})
 
-		id, xerr := primaryTask.ID()
+		xerr = fail.ConvertError(egGwCreation.Wait())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return xerr
+		}
+
+		var primaryMap data.Map
+		var secondaryMap data.Map
+
+		close(gws)
+		for v := range gws {
+			if v.num == 1 {
+				primaryMap = v.res
+			}
+			if v.num == 2 {
+				secondaryMap = v.res
+			}
 		}
 
 		// handle primary gateway
-
-		var content concurrency.TaskResult
 		var ok bool
-
-		if content, ok = results[id]; !ok {
-			xerr := fail.InconsistentError("task results does not contain %s", id)
-			chRes <- result{xerr}
-			return xerr
-		}
-		if content == nil {
-			xerr := fail.InconsistentError("task result with %s should not be nil", id)
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		aresult, ok := results[id].(data.Map)
-		if !ok {
-			xerr := fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
-			chRes <- result{xerr}
-			return xerr
-		}
-
 		{
-			primaryGateway, ok = aresult["host"].(*Host)
+			// Starting from here, deletes the primary gateway if exiting with error
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && !req.KeepOnFailure {
+					if primaryGateway != nil {
+						var derr fail.Error
+						defer func() {
+							if derr != nil {
+								_ = ferr.AddConsequence(derr)
+							}
+						}()
+						logrus.WithContext(cleanupContextFrom(ctx)).Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
+						derr = primaryGateway.RelaxedDeleteHost(cleanupContextFrom(ctx))
+						derr = debug.InjectPlannedFail(derr)
+						if derr != nil {
+							debug.IgnoreError2(cleanupContextFrom(ctx), derr)
+						}
+						if req.HA {
+							derr = instance.unbindHostFromVIP(cleanupContextFrom(ctx), as.VIP, primaryGateway)
+							if derr != nil {
+								debug.IgnoreError2(cleanupContextFrom(ctx), derr)
+							}
+						}
+						if derr != nil {
+							logrus.WithContext(cleanupContextFrom(ctx)).Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
+						}
+					}
+				}
+			}()
+
+			primaryGateway, ok = primaryMap["host"].(*Host)
 			if !ok {
 				xerr := fail.InconsistentError("result[host] should be a *Host")
 				chRes <- result{xerr}
 				return xerr
 			}
-			primaryUserdata, ok = aresult["userdata"].(*userdata.Content)
+			primaryUserdata, ok = primaryMap["userdata"].(*userdata.Content)
 			if !ok {
 				xerr := fail.InconsistentError("result[userdata] should be a *userdata.Content")
 				chRes <- result{xerr}
@@ -1190,31 +1228,6 @@ func (instance *Subnet) unsafeCreateGateways(
 
 			// apply SG to primary gateway
 			{
-				// Starting from here, deletes the primary gateway if exiting with error
-				defer func() {
-					ferr = debug.InjectPlannedFail(ferr)
-					if ferr != nil && !req.KeepOnFailure {
-						logrus.WithContext(ctx).Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
-						derr := primaryGateway.RelaxedDeleteHost(context.Background())
-						derr = debug.InjectPlannedFail(derr)
-						if derr != nil {
-							switch derr.(type) {
-							case *fail.ErrTimeout:
-								logrus.WithContext(ctx).Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
-							default:
-							}
-							_ = ferr.AddConsequence(derr)
-						} else {
-							logrus.WithContext(ctx).Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
-						}
-						if req.HA {
-							if derr := instance.unbindHostFromVIP(context.Background(), as.VIP, primaryGateway); derr != nil {
-								_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))
-							}
-						}
-					}
-				}()
-
 				safe := false
 
 				// Fix for Stein
@@ -1245,7 +1258,7 @@ func (instance *Subnet) unsafeCreateGateways(
 				}
 
 				defer func() {
-					derr := instance.undoBindInternalSecurityGroupToGateway(context.Background(), primaryGateway, req.KeepOnFailure, &ferr)
+					derr := instance.undoBindInternalSecurityGroupToGateway(cleanupContextFrom(ctx), primaryGateway, req.KeepOnFailure, &ferr)
 					if derr != nil {
 						logrus.WithContext(ctx).Warnf(derr.Error())
 					}
@@ -1270,33 +1283,6 @@ func (instance *Subnet) unsafeCreateGateways(
 		}
 
 		if req.HA {
-			id, xerr := secondaryTask.ID()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				chRes <- result{xerr}
-				return xerr
-			}
-
-			var content concurrency.TaskResult
-			var ok bool
-			if content, ok = results[id]; !ok {
-				xerr := fail.InconsistentError("task results does not contain %s", id)
-				chRes <- result{xerr}
-				return xerr
-			}
-			if content == nil {
-				xerr := fail.InconsistentError("task result with %s should not be nil", id)
-				chRes <- result{xerr}
-				return xerr
-			}
-
-			aresult, ok := results[id].(data.Map)
-			if !ok {
-				xerr := fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
-				chRes <- result{xerr}
-				return xerr
-			}
-
 			// apply SG to secondary gateway
 			{
 				safe := false
@@ -1320,14 +1306,39 @@ func (instance *Subnet) unsafeCreateGateways(
 					}
 				}
 
+				// Starting from here, deletes the secondary gateway if exiting with error
+				defer func() {
+					ferr = debug.InjectPlannedFail(ferr)
+					if ferr != nil && !req.KeepOnFailure {
+						if secondaryGateway != nil {
+							var derr fail.Error
+							defer func() {
+								if derr != nil {
+									_ = ferr.AddConsequence(derr)
+								}
+							}()
+							derr = secondaryGateway.RelaxedDeleteHost(cleanupContextFrom(ctx))
+							derr = debug.InjectPlannedFail(derr)
+							if derr != nil {
+								debug.IgnoreError2(cleanupContextFrom(ctx), derr)
+							}
+							derr = instance.unbindHostFromVIP(cleanupContextFrom(ctx), as.VIP, secondaryGateway)
+							derr = debug.InjectPlannedFail(derr)
+							if derr != nil {
+								debug.IgnoreError2(cleanupContextFrom(ctx), derr)
+							}
+						}
+					}
+				}()
+
 				var ok bool
-				secondaryGateway, ok = aresult["host"].(*Host)
+				secondaryGateway, ok = secondaryMap["host"].(*Host)
 				if !ok {
 					xerr := fail.InconsistentError("result[host] should be a *Host")
 					chRes <- result{xerr}
 					return xerr
 				}
-				secondaryUserdata, ok = aresult["userdata"].(*userdata.Content)
+				secondaryUserdata, ok = secondaryMap["userdata"].(*userdata.Content)
 				if !ok {
 					xerr := fail.InvalidParameterError("result[userdata] should be a *userdate.Content")
 					chRes <- result{xerr}
@@ -1335,30 +1346,8 @@ func (instance *Subnet) unsafeCreateGateways(
 				}
 				secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
 
-				// Starting from here, deletes the secondary gateway if exiting with error
 				defer func() {
-					ferr = debug.InjectPlannedFail(ferr)
-					if ferr != nil && !req.KeepOnFailure {
-						derr := secondaryGateway.RelaxedDeleteHost(context.Background())
-						derr = debug.InjectPlannedFail(derr)
-						if derr != nil {
-							switch derr.(type) {
-							case *fail.ErrTimeout:
-								logrus.WithContext(ctx).Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
-							default:
-							}
-							_ = ferr.AddConsequence(derr)
-						}
-						derr = instance.unbindHostFromVIP(context.Background(), as.VIP, secondaryGateway)
-						derr = debug.InjectPlannedFail(derr)
-						if derr != nil {
-							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))
-						}
-					}
-				}()
-
-				defer func() {
-					derr := instance.undoBindInternalSecurityGroupToGateway(context.Background(), secondaryGateway, req.KeepOnFailure, &ferr)
+					derr := instance.undoBindInternalSecurityGroupToGateway(cleanupContextFrom(ctx), secondaryGateway, req.KeepOnFailure, &ferr)
 					if derr != nil {
 						logrus.Warn(derr.Error())
 					}
@@ -1467,40 +1456,26 @@ func (instance *Subnet) unsafeCreateGateways(
 			return xerr
 		}
 
-		tg, xerr = concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/configuregateways"))
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
-			host:     primaryGateway,
-			userdata: primaryUserdata,
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			abErr := tg.AbortWithCause(xerr)
-			if abErr != nil {
-				logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-			}
-		}
-
-		if req.HA {
-			_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
-				host:     secondaryGateway,
-				userdata: secondaryUserdata,
+		egFinalizer := new(errgroup.Group)
+		egFinalizer.Go(func() error {
+			_, err := instance.taskFinalizeGatewayConfiguration(ctx, taskFinalizeGatewayConfigurationParameters{
+				host:     primaryGateway,
+				userdata: primaryUserdata,
 			})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				abErr := tg.AbortWithCause(xerr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-				}
+			return err
+		})
+		egFinalizer.Go(func() error {
+			if req.HA {
+				_, err := instance.taskFinalizeGatewayConfiguration(ctx, taskFinalizeGatewayConfigurationParameters{
+					host:     secondaryGateway,
+					userdata: secondaryUserdata,
+				})
+				return err
 			}
-		}
+			return nil
+		})
 
-		_, xerr = tg.WaitGroup()
+		xerr = fail.ConvertError(egFinalizer.Wait())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			xerr := fail.Wrap(xerr, "error finalizing gateway configuration")

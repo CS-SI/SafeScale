@@ -300,7 +300,7 @@ func TestBucket_GetMountPoint(t *testing.T) {
 			t.Error("ressource.Bucket not castable to *operations.bucket")
 		}
 		strmount, xerr := ob.GetMountPoint(ctx)
-		require.Contains(t, strmount, "/tmp/safescale_NewServiceTest")
+		require.Contains(t, strmount, "safescale_NewServiceTest")
 		require.Nil(t, xerr)
 	})
 	require.Nil(t, xerr)

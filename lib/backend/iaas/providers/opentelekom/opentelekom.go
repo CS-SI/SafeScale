@@ -105,7 +105,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 	params["Safe"] = isSafe
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	defaultImage, _ := compute["DefaultImage"].(string) // nolint
 	if defaultImage == "" {
@@ -115,6 +115,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	maxLifeTime := 0
 	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
+	machineCreationLimit := 8
+	if _, ok := compute["ConcurrentMachineCreationLimit"].(string); ok {
+		machineCreationLimit, _ = strconv.Atoi(compute["ConcurrentMachineCreationLimit"].(string))
 	}
 
 	authOptions := stacks.AuthenticationOptions{
@@ -182,15 +187,16 @@ next:
 			"SAS":  volumespeed.Hdd,
 			"Ssd":  volumespeed.Ssd,
 		},
-		MetadataBucket:     metadataBucketName,
-		OperatorUsername:   operatorUsername,
-		ProviderName:       providerName,
-		DefaultNetworkName: vpcName,
-		DefaultNetworkCIDR: vpcCIDR,
-		DefaultImage:       defaultImage,
-		MaxLifeTime:        maxLifeTime,
-		Timings:            timings,
-		Safe:               isSafe,
+		MetadataBucket:                 metadataBucketName,
+		OperatorUsername:               operatorUsername,
+		ProviderName:                   providerName,
+		DefaultNetworkName:             vpcName,
+		DefaultNetworkCIDR:             vpcCIDR,
+		DefaultImage:                   defaultImage,
+		MaxLifeTime:                    maxLifeTime,
+		Timings:                        timings,
+		Safe:                           isSafe,
+		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
 	if xerr != nil {
@@ -276,6 +282,7 @@ func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 	cfg.Set("Safe", opts.Safe)
+	cfg.Set("ConcurrentMachineCreationLimit", opts.ConcurrentMachineCreationLimit)
 
 	return cfg, nil
 }

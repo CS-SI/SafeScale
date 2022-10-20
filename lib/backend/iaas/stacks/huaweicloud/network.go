@@ -397,7 +397,7 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (su
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return nil, xerr
 		}
@@ -655,7 +655,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If subnet is not found, considered as a success
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 			return nil
 		default:
 			return xerr

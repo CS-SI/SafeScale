@@ -74,6 +74,8 @@ type Content struct {
 	ProviderName                string
 	BuildSubnetworks            bool
 	Debug                       bool
+	WithoutFirewall             bool
+	DefaultFirewall             bool
 	// Dashboard bool // Add kubernetes dashboard
 }
 
@@ -168,6 +170,14 @@ func (ud *Content) Prepare(
 
 	if debugFlag := os.Getenv("SAFESCALE_DEBUG"); debugFlag != "" {
 		ud.Debug = true
+	}
+
+	if debugFlag := os.Getenv("SAFESCALE_DEBUG"); debugFlag == "NoFirewall" {
+		ud.WithoutFirewall = true
+	}
+
+	if debugFlag := os.Getenv("SAFESCALE_DEBUG"); debugFlag == "DefaultFirewall" {
+		ud.DefaultFirewall = true
 	}
 
 	ud.BashLibraryDefinition = *bashLibraryDefinition

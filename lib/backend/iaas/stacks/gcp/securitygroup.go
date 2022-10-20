@@ -84,7 +84,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 						switch ferr.(type) {
 						case *fail.ErrNotFound:
 							// rule not found, considered as a removal success
-							debug.IgnoreError(ferr)
+							debug.IgnoreError2(ctx, ferr)
 							continue
 						default:
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete firewall rule %s", r))
@@ -198,7 +198,7 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGr
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// rule not found, considered as a removal success
-						debug.IgnoreError(xerr)
+						debug.IgnoreError2(ctx, xerr)
 						continue
 					default:
 						return fail.Wrap(xerr, "failed to delete rule %d", k)
@@ -249,7 +249,7 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// rule not found, considered as a removal success
-						debug.IgnoreError(xerr)
+						debug.IgnoreError2(ctx, xerr)
 						continue
 					default:
 						return asg, fail.Wrap(xerr, "failed to delete rule %d", k)

@@ -258,7 +258,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				chRes <- result{xerr}
 				return xerr
@@ -277,7 +277,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			default:
 				chRes <- result{xerr}
 				return xerr
@@ -311,7 +311,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !req.KeepOnFailure {
-				derr := svc.DeleteNetwork(context.Background(), abstractNetwork.ID)
+				derr := svc.DeleteNetwork(cleanupContextFrom(ctx), abstractNetwork.ID)
 				derr = debug.InjectPlannedFail(derr)
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
@@ -398,7 +398,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -552,7 +552,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 							switch xerr.(type) {
 							case *fail.ErrNotFound:
 								// Subnet is already deleted, considered as a success and continue
-								debug.IgnoreError(xerr)
+								debug.IgnoreError2(ctx, xerr)
 								deleted = true
 							default:
 								return xerr
@@ -589,7 +589,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 						if propsXErr != nil {
 							switch propsXErr.(type) {
 							case *fail.ErrNotFound:
-								debug.IgnoreError(propsXErr)
+								debug.IgnoreError2(ctx, propsXErr)
 								continue
 							default:
 								return propsXErr
@@ -681,7 +681,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 				// continue
 			default:
 				xerr.WithContext(ctx)

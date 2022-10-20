@@ -687,7 +687,7 @@ func walkInsideFeatureFileFolders(ctx context.Context, filter featureFilter) ([]
 						switch casted.Err {
 						case NOTFOUND:
 							// entry not found, ignore it
-							debug.IgnoreError(err)
+							debug.IgnoreError2(ctx, err)
 							return nil
 						default:
 						}
@@ -771,7 +771,7 @@ func addPathToWatch(ctx context.Context, w *rfsnotify.RWatcher, path string) err
 			switch casted.Err {
 			case NOTFOUND:
 				// folder not found, ignore it
-				debug.IgnoreError(err)
+				debug.IgnoreError2(ctx, err)
 				return nil
 			default:
 				logrus.WithContext(ctx).Error(err)

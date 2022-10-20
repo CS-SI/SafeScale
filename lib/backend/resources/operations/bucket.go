@@ -381,7 +381,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// no bucket with this name managed by SafeScale, continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -396,10 +396,10 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			if strings.Contains(xerr.Error(), objectstorage.NotFound) {
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 				break
 			}
 			return xerr
@@ -716,7 +716,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If mount is not found on remote server, consider unmount as successful
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}

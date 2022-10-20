@@ -33,11 +33,11 @@ import (
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -662,14 +662,10 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 		}
 
 		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
-		tracer.Trace("host='%s', command=\n%s\n", scmd.hostname, scmd.runCmdString)
+		tracer.Trace("host='%s', command=%s", scmd.hostname, scmd.runCmdString)
 		defer tracer.Exiting()
 
-		subtask, xerr := concurrency.NewTaskWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/ssh/run"))
-		if xerr != nil {
-			chRes <- result{invalid, "", "", xerr}
-			return
-		}
+		subtask := new(errgroup.Group)
 
 		if timeout == 0 {
 			timeout = 1200 * time.Second // upper bound of 20 min
@@ -677,13 +673,19 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 			timeout = 1200 * time.Second // nothing should take more than 20 min
 		}
 
-		if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
-			chRes <- result{invalid, "", "", xerr}
-			return
-		}
+		trch := make(chan interface{}, 1)
+		subtask.Go(func() error {
+			tctx, cat := context.WithTimeout(ctx, timeout)
+			defer cat()
+			tr, xerr := scmd.taskExecute(tctx, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY})
+			trch <- tr
+			return xerr
+		})
 
-		_, r, xerr := subtask.WaitFor(timeout)
+		xerr := fail.ConvertError(subtask.Wait())
 		if xerr != nil {
+			defer close(trch)
+
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
 				xerr = fail.Wrap(fail.Cause(xerr), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
@@ -709,13 +711,14 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 			return
 		}
 
+		close(trch)
+		r := <-trch
 		if res, ok := r.(data.Map); ok {
 			tracer.Trace("run succeeded, retcode=%d", res["retcode"].(int))
 			chRes <- result{res["retcode"].(int), res["stdout"].(string), res["stderr"].(string), nil}
 			return
 		}
 		chRes <- result{invalid, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")}
-
 	}()
 	select {
 	case res := <-chRes:
@@ -728,155 +731,169 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 }
 
 type taskExecuteParameters struct {
-	// stdout, stderr io.ReadCloser
 	collectOutputs bool
 }
 
-func (scmd *CliCommand) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (interface{}, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rRes interface{}
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		gres, gerr := func() (_ interface{}, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-	params, ok := p.(taskExecuteParameters)
-	if !ok {
-		return nil, fail.InvalidParameterError("p", "must be a 'taskExecuteParameters'")
-	}
+			params, ok := p.(taskExecuteParameters)
+			if !ok {
+				return nil, fail.InvalidParameterError("p", "must be a 'taskExecuteParameters'")
+			}
 
-	var (
-		stdoutBridge, stderrBridge cli.PipeBridge
-		pipeBridgeCtrl             *cli.PipeBridgeController
-		msgOut, msgErr             []byte
-		xerr                       fail.Error
-		err                        error
-	)
+			var (
+				stdoutBridge, stderrBridge cli.PipeBridge
+				pipeBridgeCtrl             *cli.PipeBridgeController
+				msgOut, msgErr             []byte
+				xerr                       fail.Error
+				err                        error
+			)
 
-	result := data.Map{
-		"retcode": -1,
-		"stdout":  "",
-		"stderr":  "",
-	}
+			remap := data.Map{
+				"retcode": -1,
+				"stdout":  "",
+				"stderr":  "",
+			}
 
-	ctx := task.Context()
-	select {
-	case <-ctx.Done():
-		return nil, fail.AbortedError(ctx.Err())
-	default:
-	}
+			// Prepare command
+			scmd.cmd = exec.CommandContext(ctx, "bash", "-c", scmd.runCmdString)
+			scmd.cmd.SysProcAttr = getSyscallAttrs()
 
-	// Prepare command
-	scmd.cmd = exec.CommandContext(ctx, "bash", "-c", scmd.runCmdString)
-	scmd.cmd.SysProcAttr = getSyscallAttrs()
+			// Set up the outputs (std and err)
+			stdoutPipe, xerr := scmd.getStdoutPipe()
+			if xerr != nil {
+				return remap, xerr
+			}
 
-	// Set up the outputs (std and err)
-	stdoutPipe, xerr := scmd.getStdoutPipe()
-	if xerr != nil {
-		return result, xerr
-	}
+			stderrPipe, xerr := scmd.getStderrPipe()
+			if xerr != nil {
+				return remap, xerr
+			}
 
-	stderrPipe, xerr := scmd.getStderrPipe()
-	if xerr != nil {
-		return result, xerr
-	}
-
-	if !params.collectOutputs {
-		if stdoutBridge, xerr = cli.NewStdoutBridge(stdoutPipe); xerr != nil {
-			return result, xerr
-		}
-
-		if stderrBridge, xerr = cli.NewStderrBridge(stderrPipe); xerr != nil {
-			return result, xerr
-		}
-
-		if pipeBridgeCtrl, xerr = cli.NewPipeBridgeController(stdoutBridge, stderrBridge); xerr != nil {
-			return result, xerr
-		}
-
-		// Starts pipebridge if needed
-		if xerr = pipeBridgeCtrl.Start(task); xerr != nil {
-			return result, xerr
-		}
-	}
-
-	// Launch the command and wait for its completion
-	if xerr = scmd.Start(); xerr != nil {
-		return result, xerr
-	}
-
-	if params.collectOutputs {
-		if msgOut, err = io.ReadAll(stdoutPipe); err != nil {
-			return result, fail.ConvertError(err)
-		}
-
-		if msgErr, err = io.ReadAll(stderrPipe); err != nil {
-			return result, fail.ConvertError(err)
-		}
-	}
-
-	var pbcErr error
-	runErr := scmd.Wait()
-	_ = stdoutPipe.Close()
-	_ = stderrPipe.Close()
-
-	if runErr != nil {
-		xerr = fail.ExecutionError(runErr)
-		// If error doesn't contain outputs and return code of the process, stop the pipe bridges and return error
-		var (
-			rc     int
-			note   data.Annotation
-			stderr string
-			ok     bool
-		)
-		if note, ok = xerr.Annotation("retcode"); !ok {
 			if !params.collectOutputs {
-				if derr := pipeBridgeCtrl.Stop(); derr != nil {
-					_ = xerr.AddConsequence(derr)
+				if stdoutBridge, xerr = cli.NewStdoutBridge(stdoutPipe); xerr != nil {
+					return remap, xerr
+				}
+
+				if stderrBridge, xerr = cli.NewStderrBridge(stderrPipe); xerr != nil {
+					return remap, xerr
+				}
+
+				if pipeBridgeCtrl, xerr = cli.NewPipeBridgeController(stdoutBridge, stderrBridge); xerr != nil {
+					return remap, xerr
+				}
+
+				// Starts pipebridge if needed
+				if xerr = pipeBridgeCtrl.Start(ctx); xerr != nil {
+					return remap, xerr
 				}
 			}
-			return result, xerr
-		} else if rc, ok = note.(int); ok && rc == -1 {
-			if !params.collectOutputs {
-				if derr := pipeBridgeCtrl.Stop(); derr != nil {
-					_ = xerr.AddConsequence(derr)
+
+			// Launch the command and wait for its completion
+			if xerr = scmd.Start(); xerr != nil {
+				return remap, xerr
+			}
+
+			if params.collectOutputs {
+				if msgOut, err = io.ReadAll(stdoutPipe); err != nil {
+					return remap, fail.ConvertError(err)
+				}
+
+				if msgErr, err = io.ReadAll(stderrPipe); err != nil {
+					return remap, fail.ConvertError(err)
 				}
 			}
-			return result, xerr
-		}
 
-		result["retcode"], ok = note.(int)
-		if !ok {
-			logrus.WithContext(ctx).Warnf("Unable to recover 'retcode' because 'note' is not an integer: %v", note)
-		}
+			var pbcErr error
+			runErr := scmd.Wait()
+			_ = stdoutPipe.Close()
+			_ = stderrPipe.Close()
 
-		// Make sure all outputs have been processed
-		if !params.collectOutputs {
-			if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
-				logrus.WithContext(ctx).Error(pbcErr.Error())
-			}
+			if runErr != nil {
+				xerr = fail.ExecutionError(runErr)
+				// If error doesn't contain outputs and return code of the process, stop the pipe bridges and return error
+				var (
+					rc     int
+					note   data.Annotation
+					stderr string
+					ok     bool
+				)
+				if note, ok = xerr.Annotation("retcode"); !ok {
+					if !params.collectOutputs {
+						if derr := pipeBridgeCtrl.Stop(); derr != nil {
+							_ = xerr.AddConsequence(derr)
+						}
+					}
+					return remap, xerr
+				} else if rc, ok = note.(int); ok && rc == -1 {
+					if !params.collectOutputs {
+						if derr := pipeBridgeCtrl.Stop(); derr != nil {
+							_ = xerr.AddConsequence(derr)
+						}
+					}
+					return remap, xerr
+				}
 
-			if note, ok = xerr.Annotation("stderr"); ok {
-				result["stderr"], ok = note.(string)
+				remap["retcode"], ok = note.(int)
 				if !ok {
-					logrus.WithContext(ctx).Warnf("Unable to recover 'stederr' because 'note' is not an string: %v", note)
+					logrus.WithContext(ctx).Warnf("Unable to recover 'retcode' because 'note' is not an integer: %v", note)
+				}
+
+				// Make sure all outputs have been processed
+				if !params.collectOutputs {
+					if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
+						logrus.WithContext(ctx).Error(pbcErr.Error())
+					}
+
+					if note, ok = xerr.Annotation("stderr"); ok {
+						remap["stderr"], ok = note.(string)
+						if !ok {
+							logrus.WithContext(ctx).Warnf("Unable to recover 'stederr' because 'note' is not an string: %v", note)
+						}
+					}
+				} else {
+					remap["stdout"] = string(msgOut)
+					remap["stderr"] = fmt.Sprint(string(msgErr), stderr)
+				}
+			} else {
+				remap["retcode"] = 0
+				if params.collectOutputs {
+					remap["stdout"] = string(msgOut)
+					remap["stderr"] = string(msgErr)
+				} else if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
+					logrus.WithContext(ctx).Error(pbcErr.Error())
 				}
 			}
-		} else {
-			result["stdout"] = string(msgOut)
-			result["stderr"] = fmt.Sprint(string(msgErr), stderr)
-		}
-	} else {
-		result["retcode"] = 0
-		if params.collectOutputs {
-			result["stdout"] = string(msgOut)
-			result["stderr"] = string(msgErr)
-		} else if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
-			logrus.WithContext(ctx).Error(pbcErr.Error())
-		}
-	}
 
-	return result, nil
+			return remap, nil
+
+		}()
+		chRes <- result{gres, gerr}
+	}()
+	select {
+	case res := <-chRes:
+		return res.rRes, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
+	}
 }
 
 // Close is called to clean Command (close tunnel(s), remove temporary files, ...)
@@ -887,12 +904,8 @@ func (scmd *CliCommand) Close() fail.Error {
 		err1 = scmd.tunnels.Close()
 	}
 	if err1 != nil {
-		logrus.WithContext(context.Background()).Errorf("Command.closeTunnels() failed: %s (%s)", err1.Error(), reflect.TypeOf(err1).String())
 		defer func() { // lazy removal
-			ierr := utils.LazyRemove(scmd.keyFile.Name())
-			if ierr != nil {
-				debug.IgnoreError(ierr)
-			}
+			_ = utils.LazyRemove(scmd.keyFile.Name())
 		}()
 		return fail.Wrap(err1, "failed to close SSH tunnels")
 	}
@@ -1096,7 +1109,7 @@ func createSSHCommand(
 		sshCmdString += fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
 	}
 
-	logrus.WithContext(context.Background()).Debugf("Created SSH command '%s'", sshCmdString)
+	// logrus.WithContext(context.Background()).Debugf("Created SSH command '%s'", strings.Replace(sshCmdString, "\n", "\t", -1))
 
 	return sshCmdString, f, nil
 }
@@ -1257,7 +1270,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			sshCmd, innerXErr = sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
 			if innerXErr != nil {
 				if phase == "init" {
-					logrus.Debugf("SSH still not ready for %s", sconf.Hostname)
+					logrus.WithContext(ctx).Debugf("SSH still not ready for %s, phase %s", sconf.Hostname, phase)
 				}
 				return innerXErr
 			}
@@ -1267,7 +1280,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			}
 			if retcode != 0 { // nolint
 				if phase == "init" {
-					logrus.Debugf("SSH still not ready for %s", sconf.Hostname)
+					logrus.WithContext(ctx).Debugf("SSH still not ready for %s, phase %s", sconf.Hostname, phase)
 				}
 				switch phase {
 				case "final":

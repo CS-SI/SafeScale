@@ -93,8 +93,7 @@ func (handler *shareHandler) Create(
 		return nil, fail.InvalidParameterError("path", "cannot be empty")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", shareName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", shareName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -108,7 +107,7 @@ func (handler *shareHandler) Create(
 		return nil, xerr
 	}
 
-	return shareInstance, shareInstance.Create(task.Context(), shareName, hostInstance, apath, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
+	return shareInstance, shareInstance.Create(handler.job.Context(), shareName, hostInstance, apath, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
 }
 
 // Delete a share from host
@@ -130,8 +129,7 @@ func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -140,7 +138,7 @@ func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 		return xerr
 	}
 
-	return shareInstance.Delete(task.Context())
+	return shareInstance.Delete(handler.job.Context())
 }
 
 // List return the list of all shares from all servers
@@ -159,8 +157,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -170,7 +167,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 		return nil, xerr
 	}
 	var servers []string
-	xerr = objs.Browse(task.Context(), func(hostName string, shareID string) fail.Error {
+	xerr = objs.Browse(handler.job.Context(), func(hostName string, shareID string) fail.Error {
 		servers = append(servers, hostName)
 		return nil
 	})
@@ -190,7 +187,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 			return nil, xerr
 		}
 
-		xerr = host.Inspect(task.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = host.Inspect(handler.job.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 				hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 				if !ok {
@@ -232,8 +229,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 		return nil, fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareName, hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareName, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -275,8 +271,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 		return fail.InvalidParameterError("hostRef", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareRef, hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareRef, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -315,8 +310,7 @@ func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, fe
 		return nil, fail.InvalidParameterError("shareName", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", shareRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", shareRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 

@@ -115,10 +115,13 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.
 
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
-func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error {
+func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v data.Map) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	identity, xerr := instance.unsafeGetIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -290,7 +293,7 @@ func (instance *Cluster) RegisterFeature(
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
 // satisfies interface resources.Targetable
-func (instance *Cluster) UnregisterFeature(ctx context.Context, feat string) (ferr fail.Error) {
+func (instance *Cluster) UnregisterFeature(inctx context.Context, feat string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -299,6 +302,9 @@ func (instance *Cluster) UnregisterFeature(ctx context.Context, feat string) (fe
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -800,7 +806,7 @@ func (instance *Cluster) installNodeRequirements(
 		retcode, stdout, stderr, xerr := instance.ExecuteScript(ctx, "node_install_requirements.sh", params, host)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			chRes <- result{fail.Wrap(xerr, "[%s] system dependencies installation failed", hostLabel)}
+			chRes <- result{fail.Wrap(xerr, "system dependencies installation failed")}
 			return
 		}
 		if retcode != 0 {
@@ -810,7 +816,7 @@ func (instance *Cluster) installNodeRequirements(
 			return
 		}
 
-		logrus.WithContext(ctx).Debugf("[%s] system dependencies installation successful.", hostLabel)
+		logrus.WithContext(ctx).Debugf("system dependencies installation successful.")
 		chRes <- result{nil}
 
 	}()

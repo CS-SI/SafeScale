@@ -87,8 +87,8 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		}
 	}
 	if !present {
-		// try an active check and update InstalledFeatures if found
-		// Check if 'edgeproxy4subnet' feature is installed on host
+		// try an active check and update InstalledFeatures when found
+		// Check if feature 'edgeproxy4subnet' is installed on host
 		featureInstance, xerr := NewFeature(ctx, svc, "edgeproxy4subnet")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -243,7 +243,6 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 		if xerr != nil {
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
-		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s': %v", ruleName, jsonContent)
 		return ruleName, k.addSourceControl(ctx, ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "route":
@@ -278,7 +277,6 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
 
-		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, k.addSourceControl(ctx, ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "upstream":
@@ -322,7 +320,6 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
 
-		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, nil
 
 	default:
@@ -382,7 +379,7 @@ func (k *KongController) addSourceControl(ctx context.Context,
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -465,13 +462,12 @@ func (k *KongController) post(ctx context.Context, name, url, data string, v *da
 	}
 
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, stderr, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
+	retcode, stdout, _, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr
 	}
 	if retcode != 0 {
-		logrus.WithContext(ctx).Debugf("submit of rule '%s' failed on primary gateway: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, "", fail.NewError("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 
@@ -500,13 +496,12 @@ func (k *KongController) put(ctx context.Context, name, url, data string, v *dat
 	}
 
 	cmd := fmt.Sprintf(curlPut, url, data)
-	retcode, stdout, stderr, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
+	retcode, stdout, _, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr
 	}
 	if retcode != 0 {
-		logrus.WithContext(ctx).Debugf("submit of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, "", fail.NewError("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 

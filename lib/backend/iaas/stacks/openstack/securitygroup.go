@@ -87,7 +87,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 			asg = abstract.NewSecurityGroup()
 			asg.Name = name
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		case *fail.ErrDuplicate:
 			// Special case : a duplicate error may come from OpenStack after normalization, because there are already more than 1
 			// security groups with the same name. In this situation, returns a DuplicateError with the xerr as cause
@@ -277,7 +277,7 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 				continue
 			default:
 				return asg, xerr
@@ -399,7 +399,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return asg, xerr
 		}
@@ -541,7 +541,7 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						// If rule not found on provider side, consider the deletion as successful and continue the loop
-						debug.IgnoreError(innerXErr)
+						debug.IgnoreError2(ctx, innerXErr)
 						breakIt = true
 					default:
 						return fail.Wrap(innerErr, "failed to delete provider rule #%d", k)

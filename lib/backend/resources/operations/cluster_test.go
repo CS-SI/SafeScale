@@ -1,3 +1,8 @@
+//go:build alltests
+// +build alltests
+
+// this file fails randomly on GitHub CI tests, sometimes is one test, sometimes another
+
 /*
 * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 *

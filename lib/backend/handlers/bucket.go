@@ -105,8 +105,7 @@ func (handler *bucketHandler) Create(name string) (ferr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -125,7 +124,7 @@ func (handler *bucketHandler) Create(name string) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	return rb.Create(task.Context(), name)
+	return rb.Create(handler.job.Context(), name)
 }
 
 // Delete a bucket
@@ -143,8 +142,7 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -152,7 +150,7 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	return rb.Delete(task.Context())
+	return rb.Delete(handler.job.Context())
 }
 
 // Uploads a bucket
@@ -173,13 +171,12 @@ func (handler *bucketHandler) Upload(bucketName, directoryName string) (ferr fai
 		return fail.InvalidParameterCannotBeEmptyStringError("directoryName")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+directoryName+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+directoryName+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	// -- upload bucket
-	xerr := handler.job.Service().UploadBucket(task.Context(), bucketName, directoryName)
+	xerr := handler.job.Service().UploadBucket(handler.job.Context(), bucketName, directoryName)
 	if xerr != nil {
 		return xerr
 	}
@@ -201,13 +198,12 @@ func (handler *bucketHandler) Download(name string) (bytes []byte, ferr fail.Err
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	// -- download bucket
-	ct, xerr := handler.job.Service().DownloadBucket(task.Context(), name, "")
+	ct, xerr := handler.job.Service().DownloadBucket(handler.job.Context(), name, "")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -229,13 +225,12 @@ func (handler *bucketHandler) Clear(name string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	// clear bucket
-	xerr := handler.job.Service().ClearBucket(task.Context(), name, "", "")
+	xerr := handler.job.Service().ClearBucket(handler.job.Context(), name, "", "")
 	if xerr != nil {
 		return xerr
 	}
@@ -257,8 +252,7 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, ferr fa
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -298,8 +292,7 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fai
 		return fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -316,7 +309,7 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fai
 		return xerr
 	}
 
-	return rb.Mount(task.Context(), hostName, path)
+	return rb.Mount(handler.job.Context(), hostName, path)
 }
 
 // Unmount a bucket
@@ -337,8 +330,7 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (ferr fail.Er
 		return fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -355,5 +347,5 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (ferr fail.Er
 		return xerr
 	}
 
-	return rb.Unmount(task.Context(), hostName)
+	return rb.Unmount(handler.job.Context(), hostName)
 }

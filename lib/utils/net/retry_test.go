@@ -224,6 +224,7 @@ type NetErrorTemporaryInterface interface {
 	Timeout() bool
 	Temporary() bool
 }
+
 type NetErrorTemporary struct {
 	NetErrorTemporaryInterface
 }
@@ -355,14 +356,6 @@ func Test_normalizeErrorAndCheckIfRetriable(t *testing.T) {
 				"Any error",
 			),
 			out: "*fail.ErrAborted",
-		},
-		{
-			in: fail.NotAvailableErrorWithCause(
-				NewNetErrorTemporary(), // as Net.Error with Temporary = true ? => @TODO: Should not it be consider as retrybable ?
-				nil,
-				"Any error",
-			),
-			out: "*fail.ErrNotAvailable",
 		},
 		{
 			in: fail.NotAvailableErrorWithCause(

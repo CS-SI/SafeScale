@@ -19,7 +19,12 @@
 
 package debug
 
+import "context"
+
 // IgnoreError logs an error that's considered not important by the caller
 // Does nothing in release mode
 func IgnoreError(err error) {
+}
+
+func IgnoreError2(ctx context.Context, err error) {
 }

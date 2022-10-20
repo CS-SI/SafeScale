@@ -225,7 +225,7 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider a Subnet not found as a job done
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(handler.job.Context(), xerr)
 			return nil
 		default:
 			return fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
@@ -243,7 +243,7 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider a Subnet not found as a successful deletion
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(handler.job.Context(), xerr)
 			clean = false
 		default:
 			return fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
@@ -255,7 +255,7 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a Subnet not found as a job done
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(handler.job.Context(), xerr)
 			default:
 				return fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
 			}

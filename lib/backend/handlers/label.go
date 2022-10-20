@@ -62,8 +62,7 @@ func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fa
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tag"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
@@ -72,13 +71,13 @@ func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fa
 		return nil, xerr
 	}
 
-	xerr = browseInstance.Browse(task.Context(), func(label *abstract.Label) fail.Error {
+	xerr = browseInstance.Browse(handler.job.Context(), func(label *abstract.Label) fail.Error {
 		labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Service(), label.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
 
-		isTag, innerXErr := labelInstance.IsTag(task.Context())
+		isTag, innerXErr := labelInstance.IsTag(handler.job.Context())
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -114,8 +113,7 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "(%s)", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tag"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
@@ -125,12 +123,12 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 		case *fail.ErrNotFound:
 			return abstract.ResourceNotFoundError("tag", ref)
 		default:
-			logrus.WithContext(task.Context()).Debugf("failed to delete tag: %+v", xerr)
+			logrus.WithContext(handler.job.Context()).Debugf("failed to delete tag: %+v", xerr)
 			return xerr
 		}
 	}
 
-	return instance.Delete(task.Context())
+	return instance.Delete(handler.job.Context())
 }
 
 // Inspect returns the tag identified by ref and its attachment (if any)
@@ -152,8 +150,7 @@ func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.E
 		return nil, fail.InvalidParameterError("ref", "cannot be empty!")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "('"+ref+"')").WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tag"), "('"+ref+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 

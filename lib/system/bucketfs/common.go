@@ -43,7 +43,6 @@ var bucketfsScripts embed.FS
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
-// func executeScript(task concurrency.Task, sshconfig ssh.Profile, name string, data map[string]interface{}) (int, string, string, fail.Error) {
 func executeScript(ctx context.Context, host resources.Host, name string, data map[string]interface{}) fail.Error {
 	timings, xerr := host.Service().Timings()
 	if xerr != nil {

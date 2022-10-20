@@ -31,6 +31,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -47,7 +48,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/app"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -262,7 +262,7 @@ func (w *worker) identifyAvailableMaster(ctx context.Context) (_ resources.Host,
 	return w.availableMaster, nil
 }
 
-// identifyAvailableNode finds a node available and will use this one during all the install session
+// identifyAvailableNode finds a node available and will use this one during all the installation session
 func (w *worker) identifyAvailableNode(ctx context.Context) (_ resources.Host, ferr fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
@@ -279,7 +279,7 @@ func (w *worker) identifyAvailableNode(ctx context.Context) (_ resources.Host, f
 }
 
 // identifyConcernedMasters returns a list of all the hosts acting as masters and keep this list
-// during all the install session
+// during all the installation session
 func (w *worker) identifyConcernedMasters(ctx context.Context) ([]resources.Host, fail.Error) {
 	if w.cluster == nil {
 		return []resources.Host{}, nil
@@ -347,7 +347,7 @@ func (w *worker) extractHostsFailingCheck(ctx context.Context, hosts []resources
 }
 
 // identifyAllMasters returns a list of all the hosts acting as masters and keep this list
-// during all the install session
+// during all the installation session
 func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail.Error) {
 	if w.cluster == nil {
 		return []resources.Host{}, nil
@@ -374,7 +374,7 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 }
 
 // identifyConcernedNodes returns a list of all the hosts acting nodes and keep this list
-// during all the install session
+// during all the installation session
 func (w *worker) identifyConcernedNodes(ctx context.Context) ([]resources.Host, fail.Error) {
 	if w.cluster == nil {
 		return []resources.Host{}, nil
@@ -399,7 +399,7 @@ func (w *worker) identifyConcernedNodes(ctx context.Context) ([]resources.Host, 
 }
 
 // identifyAllNodes returns a list of all the hosts acting as public of private nodes and keep this list
-// during all the install session
+// during all the installation session
 func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.Error) {
 	if w.cluster == nil {
 		return []resources.Host{}, nil
@@ -456,7 +456,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 				return nil, xerr
 			}
 			found = false
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		}
 
 		if !found {
@@ -492,7 +492,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 				return nil, xerr
 			}
 			found = false
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		}
 
 		if !found {
@@ -591,20 +591,20 @@ func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host,
 		gw, xerr := rs.InspectGateway(ctx, true)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		} else {
 			if _, xerr = gw.WaitSSHReady(ctx, timings.SSHConnectionTimeout()); xerr != nil {
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			} else {
 				list = append(list, gw)
 			}
 		}
 
 		if gw, xerr = rs.InspectGateway(ctx, false); xerr != nil {
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		} else {
 			if _, xerr = gw.WaitSSHReady(ctx, timings.SSHConnectionTimeout()); xerr != nil {
-				debug.IgnoreError(xerr)
+				debug.IgnoreError2(ctx, xerr)
 			} else {
 				list = append(list, gw)
 			}
@@ -677,7 +677,7 @@ func (w *worker) Proceed(
 			order = strings.Split(pace, ",")
 		}
 
-		// Applies reverseproxy rules and security to make Feature functional (Feature may need it during the install)
+		// Applies reverseproxy rules and security to make Feature functional (Feature may need it during the installation)
 		switch w.action {
 		case installaction.Add:
 			if !settings.SkipProxy {
@@ -779,55 +779,20 @@ func (w *worker) Proceed(
 				continue
 			}
 
-			var problem error
-			subtask, xerr := concurrency.NewTaskWithContext(ctx)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				chRes <- result{outcomes, xerr}
-				return
-			}
-
-			subtask, xerr = subtask.Start(w.taskLaunchStep, taskLaunchStepParameters{
+			_, xerr = w.taskLaunchStep(ctx, taskLaunchStepParameters{
 				stepName:  k,
 				stepKey:   stepKey,
 				stepMap:   stepMap,
 				variables: params,
 				hosts:     hostsList,
-			}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/feature/%s/%s/target/%s/step/%s", w.feature.GetName(), strings.ToLower(w.action.String()), strings.ToLower(w.target.TargetType().String()), k)))
+			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				problem = xerr
-				abErr := subtask.AbortWithCause(xerr)
-				if abErr != nil {
-					logrus.Warn("problem aborting task")
-				}
-			}
-
-			var tr concurrency.TaskResult
-			tr, xerr = subtask.Wait()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				if problem != nil {
-					_ = xerr.AddConsequence(problem)
-				}
-				if tr != nil {
-					if outcome, ok := tr.(*resources.UnitResults); ok {
-						_ = outcomes.Add(k, *outcome)
-					}
-				}
-				chRes <- result{outcomes, xerr}
+				chRes <- result{nil, xerr}
 				return
 			}
-
-			if tr != nil {
-				if outcome, ok := tr.(*resources.UnitResults); ok {
-					_ = outcomes.Add(k, *outcome)
-				}
-			}
 		}
-
 		chRes <- result{outcomes, nil}
-
 	}()
 	select {
 	case res := <-chRes:
@@ -849,22 +814,18 @@ type taskLaunchStepParameters struct {
 }
 
 // taskLaunchStep starts the step
-func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (
-	_ concurrency.TaskResult, ferr fail.Error,
+func (w *worker) taskLaunchStep(inctx context.Context, params interface{}) (
+	_ interface{}, ferr fail.Error,
 ) {
 	if w == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 
@@ -995,7 +956,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			YamlKey: p.stepKey,
 			Serial:  serial,
 		}
-		r, xerr := stepInstance.Run(task, p.hosts, p.variables, w.settings) // If an error occurred, do not execute the remaining steps, fail immediately
+		r, xerr := stepInstance.Run(ctx, p.hosts, p.variables, w.settings) // If an error occurred, do not execute the remaining steps, fail immediately
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
@@ -1308,6 +1269,7 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 			}
 		}
 		for _, r := range rules {
+			r := r
 			if r == nil {
 				continue
 			}
@@ -1325,6 +1287,7 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 			}
 
 			for _, h := range hosts { // FIXME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
+				h := h
 				primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -1356,88 +1319,61 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 
 				primaryGatewayVariables["Hostname"] = h.GetName() + domain
 
-				tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/proxy/rule/"))
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					chRes <- result{xerr}
-					return
-				}
+				tg := new(errgroup.Group)
 
-				_, xerr = tg.Start(taskApplyProxyRule, taskApplyProxyRuleParameters{
-					controller: primaryKongController,
-					rule:       r.(map[interface{}]interface{}),
-					variables:  &primaryGatewayVariables,
-				}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/apply", primaryKongController.GetHostname())))
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil { // we should abort then wait, but the previous defer takes care of it
-					if !tg.Aborted() {
-						_ = tg.AbortWithCause(xerr)
-					}
-					_, _ = tg.WaitGroup()
-
-					chRes <- result{xerr}
-					return
-				}
-
-				if secondaryKongController != nil {
-					secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						if !tg.Aborted() {
-							_ = tg.AbortWithCause(xerr)
-						}
-						_, _ = tg.WaitGroup()
-
-						chRes <- result{xerr}
-						return
-					}
-
-					secondaryGatewayVariables["ShortHostname"] = h.GetName()
-					domain = ""
-					xerr = h.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-						return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-							hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
-							if !ok {
-								return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
-							}
-
-							domain = hostDescriptionV1.Domain
-							if domain != "" {
-								domain = "." + domain
-							}
-							return nil
-						})
+				tg.Go(func() error {
+					_, err := taskApplyProxyRule(ctx, taskApplyProxyRuleParameters{
+						controller: primaryKongController,
+						rule:       r.(map[interface{}]interface{}),
+						variables:  &primaryGatewayVariables,
 					})
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						if !tg.Aborted() {
-							_ = tg.AbortWithCause(xerr)
+					return err
+				})
+
+				tg.Go(func() error {
+					if secondaryKongController != nil {
+						secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
+						xerr = debug.InjectPlannedFail(xerr)
+						if xerr != nil {
+							return xerr
 						}
-						_, _ = tg.WaitGroup()
 
-						chRes <- result{xerr}
-						return
-					}
+						secondaryGatewayVariables["ShortHostname"] = h.GetName()
+						domain = ""
+						xerr = h.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+							return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+								hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+								if !ok {
+									return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+								}
 
-					secondaryGatewayVariables["Hostname"] = h.GetName() + domain
-
-					_, xerr = tg.Start(taskApplyProxyRule, taskApplyProxyRuleParameters{
-						controller: secondaryKongController,
-						rule:       rule,
-						variables:  &secondaryGatewayVariables,
-					}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/apply", secondaryKongController.GetHostname())))
-					if xerr != nil { // we should abort then wait, but defer above takes care of it
-						if !tg.Aborted() {
-							_ = tg.AbortWithCause(xerr)
+								domain = hostDescriptionV1.Domain
+								if domain != "" {
+									domain = "." + domain
+								}
+								return nil
+							})
+						})
+						xerr = debug.InjectPlannedFail(xerr)
+						if xerr != nil {
+							return xerr
 						}
-						_, _ = tg.WaitGroup()
 
-						chRes <- result{xerr}
-						return
+						secondaryGatewayVariables["Hostname"] = h.GetName() + domain
+						_, xerr = taskApplyProxyRule(ctx, taskApplyProxyRuleParameters{
+							controller: secondaryKongController,
+							rule:       rule,
+							variables:  &secondaryGatewayVariables,
+						})
+						if xerr != nil {
+							return xerr
+						}
+						return nil
 					}
-				}
+					return nil
+				})
 
-				_, xerr = tg.WaitGroup()
+				xerr = fail.ConvertError(tg.Wait())
 				if xerr != nil {
 					chRes <- result{xerr}
 					return
@@ -1464,21 +1400,16 @@ type taskApplyProxyRuleParameters struct {
 	variables  *data.Map
 }
 
-func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (
-	_ concurrency.TaskResult, ferr fail.Error,
+func taskApplyProxyRule(inctx context.Context, params interface{}) (
+	_ interface{}, ferr fail.Error,
 ) {
 	defer fail.OnPanic(&ferr)
 
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -1504,13 +1435,10 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 				msg += " '" + ruleName + "'"
 			}
 			msg += " for host '" + hostName
-			logrus.WithContext(ctx).Error(msg + "': " + xerr.Error())
 			chRes <- result{nil, fail.Wrap(xerr, msg)}
 			return
 		}
-		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s' for host '%s'", ruleName, hostName)
 		chRes <- result{nil, nil}
-
 	}()
 	select {
 	case res := <-chRes:
@@ -1824,7 +1752,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 						switch xerr.(type) {
 						case *fail.ErrDuplicate:
 							// This rule already exists, considered as a success and continue
-							debug.IgnoreError(xerr)
+							debug.IgnoreError2(ctx, xerr)
 						default:
 							chRes <- result{xerr}
 							return
@@ -1876,7 +1804,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 								switch xerr.(type) {
 								case *fail.ErrDuplicate:
 									// This rule already exists, considered as a success and continue
-									debug.IgnoreError(xerr)
+									debug.IgnoreError2(ctx, xerr)
 								default:
 									chRes <- result{xerr}
 									return

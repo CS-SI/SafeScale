@@ -87,11 +87,16 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 	params["Safe"] = isSafe
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	maxLifeTime := 0
 	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
+	machineCreationLimit := 8
+	if _, ok = compute["ConcurrentMachineCreationLimit"].(string); ok {
+		machineCreationLimit, _ = strconv.Atoi(compute["ConcurrentMachineCreationLimit"].(string))
 	}
 
 	operatorUsername := abstract.DefaultUser
@@ -180,15 +185,16 @@ next:
 			"Hdd": volumespeed.Hdd,
 			"Ssd": volumespeed.Ssd,
 		},
-		MetadataBucket:           metadataBucketName,
-		DNSList:                  cloudferroDNSServers,
-		DefaultImage:             defaultImage,
-		OperatorUsername:         operatorUsername,
-		ProviderName:             providerName,
-		DefaultSecurityGroupName: "default",
-		MaxLifeTime:              maxLifeTime,
-		Timings:                  timings,
-		Safe:                     isSafe,
+		MetadataBucket:                 metadataBucketName,
+		DNSList:                        cloudferroDNSServers,
+		DefaultImage:                   defaultImage,
+		OperatorUsername:               operatorUsername,
+		ProviderName:                   providerName,
+		DefaultSecurityGroupName:       "default",
+		MaxLifeTime:                    maxLifeTime,
+		Timings:                        timings,
+		Safe:                           isSafe,
+		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -262,6 +268,7 @@ func (p provider) GetConfigurationOptions(ctx context.Context) (providers.Config
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 	cfg.Set("Safe", opts.Safe)
+	cfg.Set("ConcurrentMachineCreationLimit", opts.ConcurrentMachineCreationLimit)
 
 	return cfg, nil
 }

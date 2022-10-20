@@ -151,5 +151,7 @@ type ConfigurationOptions struct {
 
 	Safe bool
 
+	ConcurrentMachineCreationLimit int
+
 	Timings *temporal.MutableTimings
 }

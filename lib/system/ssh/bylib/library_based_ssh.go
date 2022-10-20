@@ -297,7 +297,7 @@ func PublicKeyFromStr(keyStr string) ssh.AuthMethod {
 // NewRunWithTimeout ...
 func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
-	tracer.Trace("command=\n%s\n", sc.Display())
+	tracer.Trace("command=%s", sc.Display())
 	defer tracer.Exiting()
 
 	type result struct {
@@ -728,14 +728,14 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(ctx, outputs.COLLECT, 60*time.Second) // FIXME: Remove hardcoded timeout
 			if xerr != nil {
 				if phase == "init" {
-					logrus.Debugf("SSH still not ready for %s", sconf.Hostname)
+					logrus.Debugf("SSH still not ready for %s, phase %s", sconf.Hostname, phase)
 				}
 				return xerr
 			}
 
 			if retcode != 0 {
 				if phase == "init" {
-					logrus.Debugf("SSH still not ready for %s", sconf.Hostname)
+					logrus.Debugf("SSH still not ready for %s, phase %s", sconf.Hostname, phase)
 				}
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
 				fe.Annotate("retcode", retcode)
@@ -752,7 +752,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		timeout+time.Minute,
 	)
 	if retryErr != nil {
-		logrus.WithContext(ctx).Debugf("WaitServerReady: the wait finished with: %v", retryErr)
+		logrus.WithContext(ctx).Debugf("WaitServerReady: the wait of %s finished with: %v", sconf.Hostname, retryErr)
 		return stdout, retryErr
 	}
 

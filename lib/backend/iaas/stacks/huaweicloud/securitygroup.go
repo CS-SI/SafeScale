@@ -87,7 +87,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 			asg = abstract.NewSecurityGroup()
 			asg.Name = name
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		case *fail.ErrDuplicate:
 			// Special case : a duplicate error may come from OpenStack after normalization, because there are already more than 1
 			// security groups with the same name. In this situation, returns a DuplicateError with the xerr as cause
@@ -399,7 +399,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreError2(ctx, xerr)
 		default:
 			return asg, xerr
 		}
