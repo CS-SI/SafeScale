@@ -34,7 +34,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -326,7 +325,7 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 
 	type partResult struct {
 		who  string
-		what concurrency.TaskResult
+		what interface{}
 		err  fail.Error
 	}
 
@@ -456,9 +455,9 @@ type runOnHostParameters struct {
 	Variables data.Map
 }
 
-func (is *step) taskRunOnHostWithLoop(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	var res concurrency.TaskResult
+	var res interface{}
 
 	var ok bool
 	if params == nil {
@@ -487,9 +486,9 @@ func (is *step) taskRunOnHostWithLoop(inctx context.Context, params concurrency.
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
-func (is *step) taskRunOnHost(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	var res concurrency.TaskResult
+	var res interface{}
 
 	var ok bool
 	if params == nil {
@@ -521,7 +520,7 @@ func (is *step) taskRunOnHost(inctx context.Context, params concurrency.TaskPara
 	}()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)

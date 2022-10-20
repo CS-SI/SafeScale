@@ -22,7 +22,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -34,8 +33,8 @@ import (
 // taskUnbindFromHost unbinds a Host from the security group
 // params is intended to receive a '*host'
 func (instance *SecurityGroup) taskUnbindFromHost(
-	inctx context.Context, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+	inctx context.Context, params interface{},
+) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -46,7 +45,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -123,8 +122,8 @@ type taskUnbindFromHostsAttachedToSubnetParams struct {
 // taskUnbindFromHostsAttachedToSubnet unbinds security group from hosts attached to a Subnet
 // 'params' expects to be a *propertiesv1.SubnetHosts
 func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
-	inctx context.Context, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+	inctx context.Context, params interface{},
+) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -140,7 +139,7 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -201,8 +200,8 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
 // - nil, *fail.ErrAborted: received abortion signal
 // - nil, *fail.ErrNotFound: Host identified by params not found
 func (instance *SecurityGroup) taskBindEnabledOnHost(
-	inctx context.Context, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+	inctx context.Context, params interface{},
+) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -213,7 +212,7 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -267,8 +266,8 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(
 // taskBindDisabledOnHost removes rules of security group from host
 // params is intended to receive a non-empty string corresponding to host ID
 func (instance *SecurityGroup) taskBindDisabledOnHost(
-	inctx context.Context, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+	inctx context.Context, params interface{},
+) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -279,7 +278,7 @@ func (instance *SecurityGroup) taskBindDisabledOnHost(
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)

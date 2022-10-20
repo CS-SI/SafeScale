@@ -56,7 +56,7 @@ import (
 )
 
 // taskCreateCluster is the TaskAction that creates a Cluster
-func (instance *Cluster) taskCreateCluster(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskCreateCluster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	req, ok := params.(abstract.ClusterRequest)
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "should be an abstract.ClusterRequest")
@@ -66,7 +66,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params concurr
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -1328,7 +1328,7 @@ func complementSizingRequirements(req *abstract.HostSizingRequirements, def abst
 }
 
 // taskStartHost is the code called in a Task to start a Host
-func (instance *Cluster) taskStartHost(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskStartHost(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1339,7 +1339,7 @@ func (instance *Cluster) taskStartHost(inctx context.Context, params concurrency
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -1411,7 +1411,7 @@ func (instance *Cluster) taskStartHost(inctx context.Context, params concurrency
 
 }
 
-func (instance *Cluster) taskStopHost(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskStopHost(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -1423,7 +1423,7 @@ func (instance *Cluster) taskStopHost(inctx context.Context, params concurrency.
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -1486,7 +1486,7 @@ type taskInstallGatewayParameters struct {
 }
 
 // taskInstallGateway installs necessary components on one gateway
-func (instance *Cluster) taskInstallGateway(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskInstallGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1495,7 +1495,7 @@ func (instance *Cluster) taskInstallGateway(inctx context.Context, params concur
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -1574,7 +1574,7 @@ type taskConfigureGatewayParameters struct {
 }
 
 // taskConfigureGateway prepares one gateway
-func (instance *Cluster) taskConfigureGateway(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskConfigureGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	var xerr fail.Error
 
 	if valid.IsNil(instance) {
@@ -1585,7 +1585,7 @@ func (instance *Cluster) taskConfigureGateway(inctx context.Context, params conc
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -1647,7 +1647,7 @@ type taskCreateMastersParameters struct {
 }
 
 // taskCreateMasters creates masters
-func (instance *Cluster) taskCreateMasters(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskCreateMasters(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1656,7 +1656,7 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params concurr
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -1763,7 +1763,7 @@ type taskCreateMasterParameters struct {
 }
 
 // taskCreateMaster creates one master
-func (instance *Cluster) taskCreateMaster(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskCreateMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	var xerr fail.Error
 
 	if valid.IsNil(instance) {
@@ -1774,7 +1774,7 @@ func (instance *Cluster) taskCreateMaster(inctx context.Context, params concurre
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -2053,7 +2053,7 @@ type taskConfigureMastersParameters struct {
 }
 
 // taskConfigureMasters configure masters
-func (instance *Cluster) taskConfigureMasters(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskConfigureMasters(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -2068,7 +2068,7 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params conc
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			logrus.WithContext(ctx).Debugf(
-				"[Cluster %s] Masters configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr),
+				"[Cluster %s] Masters configuration failed with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr),
 				temporal.FormatDuration(time.Since(started)),
 			)
 		} else {
@@ -2080,7 +2080,7 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params conc
 	}()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -2164,7 +2164,7 @@ type taskConfigureMasterParameters struct {
 }
 
 // taskConfigureMaster configures one master
-func (instance *Cluster) taskConfigureMaster(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskConfigureMaster(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -2179,7 +2179,7 @@ func (instance *Cluster) taskConfigureMaster(inctx context.Context, params concu
 	defer tracer.Exiting()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -2375,7 +2375,7 @@ type StdResult struct {
 }
 
 // taskCreateNodes creates nodes
-func (instance *Cluster) taskCreateNodes(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -2384,7 +2384,7 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params concurren
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -2485,7 +2485,7 @@ func cleanupContextFrom(inctx context.Context) context.Context {
 }
 
 // taskCreateNode creates a node in the Cluster
-func (instance *Cluster) taskCreateNode(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	var xerr fail.Error
 
 	if valid.IsNil(instance) {
@@ -2496,7 +2496,7 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params concurrenc
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -2804,7 +2804,7 @@ type taskConfigureNodesParameters struct {
 }
 
 // taskConfigureNodes configures nodes
-func (instance *Cluster) taskConfigureNodes(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -2824,7 +2824,7 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params concur
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			logrus.WithContext(ctx).Debugf(
-				"[Cluster %s] Nodes configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr),
+				"[Cluster %s] Nodes configuration failed with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr),
 				temporal.FormatDuration(time.Since(started)),
 			)
 		} else {
@@ -2836,7 +2836,7 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params concur
 	}()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -2869,7 +2869,7 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params concur
 
 		type cfgRes struct {
 			who  string
-			what concurrency.TaskResult
+			what interface{}
 		}
 
 		resCh := make(chan cfgRes, len(list))
@@ -2927,7 +2927,7 @@ type taskConfigureNodeParameters struct {
 }
 
 // taskConfigureNode configure one node
-func (instance *Cluster) taskConfigureNode(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskConfigureNode(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -2936,7 +2936,7 @@ func (instance *Cluster) taskConfigureNode(inctx context.Context, params concurr
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -3023,7 +3023,7 @@ type taskDeleteNodeOnFailureParameters struct {
 }
 
 // taskDeleteNodeOnFailure deletes a node when a failure occurred
-func (instance *Cluster) taskDeleteNodeOnFailure(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskDeleteNodeOnFailure(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -3041,7 +3041,7 @@ func (instance *Cluster) taskDeleteNodeOnFailure(inctx context.Context, params c
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 
@@ -3090,7 +3090,7 @@ type taskDeleteNodeParameters struct {
 	master *Host
 }
 
-func (instance *Cluster) taskDeleteNodeWithCtx(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskDeleteNodeWithCtx(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	var xerr fail.Error
 
 	if valid.IsNil(instance) {
@@ -3101,7 +3101,7 @@ func (instance *Cluster) taskDeleteNodeWithCtx(inctx context.Context, params con
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -3167,7 +3167,7 @@ func (instance *Cluster) taskDeleteNodeWithCtx(inctx context.Context, params con
 }
 
 // taskDeleteNode deletes one node
-func (instance *Cluster) taskDeleteNode(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskDeleteNode(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -3176,7 +3176,7 @@ func (instance *Cluster) taskDeleteNode(inctx context.Context, params concurrenc
 }
 
 // taskDeleteMaster deletes one master
-func (instance *Cluster) taskDeleteMaster(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskDeleteMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -3185,7 +3185,7 @@ func (instance *Cluster) taskDeleteMaster(inctx context.Context, params concurre
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -3292,7 +3292,7 @@ type taskUpdateClusterInventoryMasterParameters struct {
 }
 
 // taskUpdateClusterInventoryMaster task to update a Host (master) ansible inventory
-func (instance *Cluster) taskUpdateClusterInventoryMaster(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskUpdateClusterInventoryMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -3301,7 +3301,7 @@ func (instance *Cluster) taskUpdateClusterInventoryMaster(inctx context.Context,
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)

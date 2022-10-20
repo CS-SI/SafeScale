@@ -74,7 +74,7 @@ func BenchmarkTestAbortByChannels(b *testing.B) {
 		case <-otherstopper: // cancel got here 1st as it should
 			botched = nil
 		case <-timeOut: // that should never happen (unless overhead introduced by goroutine scheduler, like when setting tunit to 1 nanosecond)
-			botched = fmt.Errorf("IT FAILED")
+			botched = fmt.Errorf("IT failed")
 		}
 
 		select {
@@ -153,7 +153,7 @@ func BenchmarkTestAlternativeAbortByChannels(b *testing.B) {
 		case <-stopper:
 			botched = nil
 		case <-timeOut:
-			botched = fmt.Errorf("IT FAILED")
+			botched = fmt.Errorf("IT failed")
 		}
 
 		select {

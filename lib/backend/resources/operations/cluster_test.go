@@ -155,6 +155,7 @@ func TestCluster_Exists(t *testing.T) {
 
 }
 
+/*
 func Test_LoadCluster(t *testing.T) {
 
 	ctx := context.Background()
@@ -180,6 +181,7 @@ func Test_LoadCluster(t *testing.T) {
 	require.Nil(t, err)
 
 }
+*/
 
 func TestCluster_IsNull(t *testing.T) {
 

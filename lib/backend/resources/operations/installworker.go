@@ -48,7 +48,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/app"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -815,8 +814,8 @@ type taskLaunchStepParameters struct {
 }
 
 // taskLaunchStep starts the step
-func (w *worker) taskLaunchStep(inctx context.Context, params concurrency.TaskParameters) (
-	_ concurrency.TaskResult, ferr fail.Error,
+func (w *worker) taskLaunchStep(inctx context.Context, params interface{}) (
+	_ interface{}, ferr fail.Error,
 ) {
 	if w == nil {
 		return nil, fail.InvalidInstanceError()
@@ -826,7 +825,7 @@ func (w *worker) taskLaunchStep(inctx context.Context, params concurrency.TaskPa
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 
@@ -1401,8 +1400,8 @@ type taskApplyProxyRuleParameters struct {
 	variables  *data.Map
 }
 
-func taskApplyProxyRule(inctx context.Context, params concurrency.TaskParameters) (
-	_ concurrency.TaskResult, ferr fail.Error,
+func taskApplyProxyRule(inctx context.Context, params interface{}) (
+	_ interface{}, ferr fail.Error,
 ) {
 	defer fail.OnPanic(&ferr)
 
@@ -1410,7 +1409,7 @@ func taskApplyProxyRule(inctx context.Context, params concurrency.TaskParameters
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)

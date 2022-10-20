@@ -494,7 +494,6 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (ferr fail.Error) {
 
 	svc := handler.job.Service()
-	task := handler.job.Task()
 	tenantName, xerr := svc.GetName()
 	if xerr != nil {
 		return xerr
@@ -521,7 +520,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		Image: defaultScanImage,
 	}
 
-	if _, xerr = host.Create(task.Context(), req, def); xerr != nil {
+	if _, xerr = host.Create(handler.job.Context(), req, def); xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': error creation", template.Name, hostName)
 	}
 
@@ -542,7 +541,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		}
 	}()
 
-	_, cout, _, xerr := host.Run(task.Context(), cmd, outputs.COLLECT, temporal.ConnectionTimeout(), 5*temporal.ContextTimeout())
+	_, cout, _, xerr := host.Run(handler.job.Context(), cmd, outputs.COLLECT, temporal.ConnectionTimeout(), 5*temporal.ContextTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
 	}
@@ -698,7 +697,6 @@ func (handler *tenantHandler) dumpImages(ctx context.Context) (ferr fail.Error) 
 }
 
 func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr fail.Error) {
-	task := handler.job.Task()
 	svc := handler.job.Service()
 
 	var xerr fail.Error
@@ -716,7 +714,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr 
 			Name: scanNetworkName,
 			CIDR: scanNetworkCIDR,
 		}
-		if xerr = network.Create(task.Context(), req); xerr != nil {
+		if xerr = network.Create(handler.job.Context(), req); xerr != nil {
 			return nil, xerr
 		}
 		return network, xerr
@@ -725,7 +723,6 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr 
 }
 
 func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.Subnet, ferr fail.Error) {
-	task := handler.job.Task()
 	svc := handler.job.Service()
 
 	var xerr fail.Error
@@ -749,7 +746,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 		subnetHostSizing := abstract.HostSizingRequirements{
 			MinGPU: -1,
 		}
-		if xerr = subnet.Create(task.Context(), req, "", &subnetHostSizing); xerr != nil {
+		if xerr = subnet.Create(handler.job.Context(), req, "", &subnetHostSizing); xerr != nil {
 			return nil, xerr
 		}
 

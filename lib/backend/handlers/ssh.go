@@ -103,7 +103,6 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 		SecondaryGatewayConfig *Profile `json:"secondary_gateway_config,omitempty"`
 	}
 
-	task := handler.job.Task()
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
 
@@ -112,7 +111,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 		return nil, xerr
 	}
 
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -138,7 +137,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 		user = abstract.DefaultUser
 	}
 
-	ip, xerr := host.GetAccessIP(task.Context())
+	ip, xerr := host.GetAccessIP(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -246,11 +245,11 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 				return nil, xerr
 			}
 
-			if ip, xerr = gw.GetAccessIP(task.Context()); xerr != nil {
+			if ip, xerr = gw.GetAccessIP(handler.job.Context()); xerr != nil {
 				return nil, xerr
 			}
 
-			gwConfig, xerr := gw.GetSSHConfig(task.Context())
+			gwConfig, xerr := gw.GetSSHConfig(handler.job.Context())
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -286,11 +285,11 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 				return nil, xerr
 			}
 
-			if ip, xerr = gw.GetAccessIP(task.Context()); xerr != nil {
+			if ip, xerr = gw.GetAccessIP(handler.job.Context()); xerr != nil {
 				return nil, xerr
 			}
 
-			gwConfig, xerr := gw.GetSSHConfig(task.Context())
+			gwConfig, xerr := gw.GetSSHConfig(handler.job.Context())
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -442,7 +441,7 @@ func (handler *sshHandler) runWithTimeout(ssh api.Connector, cmd string, duratio
 	}()
 
 	// Create the command
-	sshCmd, xerr = ssh.NewCommand(handler.job.Task().Context(), cmd)
+	sshCmd, xerr = ssh.NewCommand(handler.job.Context(), cmd)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -465,7 +464,7 @@ func (handler *sshHandler) runWithTimeout(ssh api.Connector, cmd string, duratio
 			_ = sshCmd.Close()
 		}
 	}()
-	rc, stdout, stderr, xerr := sshCmd.RunWithTimeout(handler.job.Task().Context(), outputs.DISPLAY, duration) // FIXME: What if this never returns ?
+	rc, stdout, stderr, xerr := sshCmd.RunWithTimeout(handler.job.Context(), outputs.DISPLAY, duration) // FIXME: What if this never returns ?
 	return rc, stdout, stderr, xerr
 }
 
@@ -646,7 +645,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 					md5hash = getMD5Hash(string(content))
 				}
 
-				crcCtx := handler.job.Task().Context()
+				crcCtx := handler.job.Context()
 
 				var crcCmd api.Command
 				var finnerXerr fail.Error

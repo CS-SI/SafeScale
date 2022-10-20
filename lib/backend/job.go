@@ -36,7 +36,6 @@ type Job interface {
 	ID() string
 	Name() string
 	Context() context.Context
-	Task() concurrency.Task
 	Tenant() string
 	Service() iaas.Service
 	Duration() time.Duration
@@ -53,7 +52,6 @@ type job struct {
 	uuid        string
 	tenant      string
 	ctx         context.Context
-	task        concurrency.Task
 	cancel      context.CancelFunc
 	service     iaas.Service
 	startTime   time.Time
@@ -108,28 +106,18 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		id = uuid.String()
 	}
 
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if xerr = task.SetID(id + description); xerr != nil {
-		return nil, xerr
-	}
-
 	// attach task instance to the context
-	ctx = context.WithValue(ctx, concurrency.KeyForTaskInContext, task) // nolint
-	ctx = context.WithValue(ctx, concurrency.KeyForID, id)              // nolint
+	ctx = context.WithValue(ctx, concurrency.KeyForID, id) // nolint
 
 	nj := job{
 		description: description,
 		uuid:        id,
 		ctx:         ctx,
-		task:        task,
 		cancel:      cancel,
 		service:     svc,
 		startTime:   time.Now(),
 	}
+	var xerr fail.Error
 	if svc != nil {
 		nj.tenant, xerr = svc.GetName()
 		if xerr != nil {
@@ -168,11 +156,6 @@ func (instance job) Context() context.Context {
 	return instance.ctx
 }
 
-// Task returns the task instance
-func (instance job) Task() concurrency.Task {
-	return instance.task
-}
-
 // Service returns the service instance
 func (instance job) Service() iaas.Service {
 	return instance.service
@@ -201,11 +184,12 @@ func (instance *job) Abort() (ferr fail.Error) {
 
 // Aborted tells if the job has been aborted
 func (instance job) Aborted() (bool, fail.Error) {
-	status, err := instance.task.Status()
-	if err != nil {
-		return false, fail.Wrap(err, "problem getting aborted status")
+	select {
+	case <-instance.ctx.Done():
+		return true, fail.ConvertError(instance.ctx.Err())
+	default:
+		return false, nil
 	}
-	return status == concurrency.ABORTED, nil
 }
 
 // Close tells the job to wait for end of operation; this ensures everything is cleaned up correctly

@@ -28,7 +28,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -41,7 +40,7 @@ type taskCreateGatewayParameters struct {
 	sizing  abstract.HostSizingRequirements
 }
 
-func (instance *Subnet) taskCreateGateway(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Subnet) taskCreateGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -50,7 +49,7 @@ func (instance *Subnet) taskCreateGateway(inctx context.Context, params concurre
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -160,7 +159,7 @@ func (instance *Subnet) taskCreateGateway(inctx context.Context, params concurre
 					})
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
-						logrus.WithContext(ctx).Warnf("error marking host '%s' in FAILED state: %v", hostReq.ResourceName, xerr)
+						logrus.WithContext(ctx).Warnf("error marking host '%s' in failed state: %v", hostReq.ResourceName, xerr)
 					}
 				}
 			}
@@ -220,7 +219,7 @@ type taskFinalizeGatewayConfigurationParameters struct {
 	userdata *userdata.Content
 }
 
-func (instance *Subnet) taskFinalizeGatewayConfiguration(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, gerr fail.Error) {
+func (instance *Subnet) taskFinalizeGatewayConfiguration(inctx context.Context, params interface{}) (_ interface{}, gerr fail.Error) {
 	defer fail.OnPanic(&gerr)
 
 	if valid.IsNil(instance) {
@@ -231,7 +230,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(inctx context.Context, 
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)

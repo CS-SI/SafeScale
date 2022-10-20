@@ -1125,7 +1125,7 @@ func (instance *Host) implCreate(
 			if ferr != nil {
 				if ahf.IsConsistent() {
 					if ahf.Core.LastState != hoststate.Deleted {
-						logrus.WithContext(cleanupContextFrom(ctx)).Warnf("Marking instance '%s' as FAILED", ahf.GetName())
+						logrus.WithContext(cleanupContextFrom(ctx)).Warnf("Marking instance '%s' as failed", ahf.GetName())
 						derr := instance.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 							ahc, ok := clonable.(*abstract.HostCore)
 							if !ok {
@@ -1141,7 +1141,7 @@ func (instance *Host) implCreate(
 						if derr != nil {
 							_ = ferr.AddConsequence(derr)
 						} else {
-							logrus.WithContext(cleanupContextFrom(ctx)).Warnf("Instance now should be in FAILED state")
+							logrus.WithContext(cleanupContextFrom(ctx)).Warnf("Instance now should be in failed state")
 						}
 					}
 				}
