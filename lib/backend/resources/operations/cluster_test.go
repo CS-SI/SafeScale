@@ -883,6 +883,7 @@ func TestCluster_GetState(t *testing.T) {
 
 }
 
+/*
 func TestCluster_AddNodes(t *testing.T) {
 
 	ctx := context.Background()
@@ -943,6 +944,7 @@ func TestCluster_AddNodes(t *testing.T) {
 	require.Nil(t, err)
 
 }
+*/
 
 func TestCluster_DeleteSpecificNode(t *testing.T) {}
 
