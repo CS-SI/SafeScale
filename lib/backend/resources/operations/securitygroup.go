@@ -1296,48 +1296,69 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ctx := inctx // FIXME: OPP Sad
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-	// Unbind Security Group from Hosts attached to Subnet
-	_, xerr := instance.taskUnbindFromHostsAttachedToSubnet(ctx, params)
-	if xerr != nil {
-		return xerr
+	type result struct {
+		rErr fail.Error
 	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		gerr := func() (ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-	// -- Remove Hosts attached to Subnet referenced in Security Group
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			// Unbind Security Group from Hosts attached to Subnet
+			_, xerr := instance.taskUnbindFromHostsAttachedToSubnet(ctx, params)
+			if xerr != nil {
+				return xerr
 			}
 
-			// updates security group metadata
-			for k, v := range sghV1.ByID {
-				delete(sghV1.ByID, k)
-				delete(sghV1.ByName, v.Name)
+			// -- Remove Hosts attached to Subnet referenced in Security Group
+			xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+					sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					// updates security group metadata
+					for k, v := range sghV1.ByID {
+						delete(sghV1.ByID, k)
+						delete(sghV1.ByName, v.Name)
+					}
+					return nil
+				})
+			}, data.NewImmutableKeyValue("Reload", !params.onRemoval))
+			if xerr != nil {
+				return xerr
 			}
-			return nil
-		})
-	}, data.NewImmutableKeyValue("Reload", !params.onRemoval))
-	if xerr != nil {
-		return xerr
+
+			// -- Remove Subnet referenced in Security Group
+			return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+					sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					// updates security group metadata
+					delete(sgsV1.ByID, params.subnetID)
+					delete(sgsV1.ByName, params.subnetName)
+					return nil
+				})
+			})
+		}()
+		chRes <- result{gerr}
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
 	}
-
-	// -- Remove Subnet referenced in Security Group
-	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			// updates security group metadata
-			delete(sgsV1.ByID, params.subnetID)
-			delete(sgsV1.ByName, params.subnetName)
-			return nil
-		})
-	})
 }
 
 // UnbindFromSubnetByReference unbinds the security group from a subnet

@@ -1288,8 +1288,6 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	// for OVH, we have to ignore the errors and keep trying until we have 'count'
 	nodesChan := make(chan StdResult, count)
-
-	// FIXME: OPP This is our second problem.
 	err = runWindow(ctx, count, uint(math.Min(float64(count), float64(winSize))), timeout, nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
 		nodeDef:       nodeDef,
 		timeout:       timings.HostCreationTimeout(),

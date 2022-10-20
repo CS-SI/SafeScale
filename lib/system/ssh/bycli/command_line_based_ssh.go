@@ -886,7 +886,6 @@ func (scmd *CliCommand) taskExecute(inctx context.Context, p concurrency.TaskPar
 
 		}()
 		chRes <- result{gres, gerr}
-		return
 	}()
 	select {
 	case res := <-chRes:
