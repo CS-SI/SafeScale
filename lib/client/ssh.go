@@ -270,7 +270,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
-	ctx := task.Context()
+	ctx := task
 
 	var (
 		stdout, stderr string

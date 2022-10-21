@@ -27,7 +27,6 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -76,8 +75,6 @@ func NewTracer(thing interface{}, enable bool, msg ...interface{}) Tracer {
 	switch casted := thing.(type) {
 	case context.Context:
 		return NewTracerFromCtx(casted, enable, msg...)
-	case concurrency.Task:
-		return NewTracerFromTask(casted, enable, msg...)
 	default:
 		return nil
 	}
@@ -90,7 +87,7 @@ func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Trac
 		context: ctx,
 	}
 
-	if aID := ctx.Value(concurrency.KeyForID); aID != nil { // nolint
+	if aID := ctx.Value("ID"); aID != nil { // nolint
 		var ok bool
 		t.taskSig, ok = aID.(string) // nolint
 		if !ok {
@@ -100,38 +97,6 @@ func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Trac
 	} else {
 		nID, _ := uuid.NewV4() // nolint
 		t.taskSig = nID.String()
-	}
-
-	message := strprocess.FormatStrings(msg...)
-	if message == "" {
-		message = "()"
-	}
-	t.callerParams = strings.TrimSpace(message)
-
-	if pc, file, _, ok := runtime.Caller(2); ok {
-		t.fileName = callstack.SourceFilePathUpdater()(file)
-		if f := runtime.FuncForPC(pc); f != nil {
-			t.funcName = filepath.Base(f.Name())
-		}
-	}
-	if t.funcName == "" {
-		t.funcName = unknownFunction
-	}
-	if t.fileName == "" {
-		t.funcName = unknownFile
-	}
-
-	return &t
-}
-
-// NewTracerFromTask creates a new Tracer instance
-func NewTracerFromTask(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
-	t := tracer{
-		enabled: enable,
-		context: task.Context(),
-	}
-	if task != nil {
-		t.taskSig = task.Signature()
 	}
 
 	message := strprocess.FormatStrings(msg...)

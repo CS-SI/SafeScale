@@ -61,7 +61,6 @@ import (
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/eko/gocache/v2/cache"
@@ -69,7 +68,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/taskqueue"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -1664,12 +1662,6 @@ func (e *ServiceTest) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 
 	e._logf("ServiceTest::CreateSubnet { NetworkID: \"%s\", Name: \"%s\", IPVersion: \"%s\", CIDR: \"%s\" }", req.NetworkID, req.Name, req.IPVersion.String(), req.CIDR)
 
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	v := abstract.NewVirtualIP()
 	v.ID = "VirtualIP ID"
 	v.Name = "VirtualIP Name"
@@ -2481,13 +2473,6 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 		xerr fail.Error
 		err  error
 	)
-
-	// Context
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-	ctx = context.WithValue(ctx, "task", task)
 
 	// In param control
 	if valid.IsNil(request) {
@@ -3635,14 +3620,7 @@ func (e *SSHConnectorTest) CopyWithTimeout(ctx context.Context, remotePath strin
 	if valid.IsNil(e) {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return -1, "", "", xerr
-	}
-	if task.Aborted() {
-		return -1, "", "", fail.AbortedError(nil, "aborted")
-	}
+
 	if isUpload {
 		b, err := os.ReadFile(localPath)
 		if err != nil {
@@ -3729,15 +3707,6 @@ func (e *SSHConnectorTest) WaitServerReady(ctx context.Context, phase string, de
 	}
 	if phase == "" {
 		return "", fail.InvalidParameterError("phase", "cannot be empty string")
-	}
-
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return "", xerr
-	}
-	if task.Aborted() {
-		return "", fail.AbortedError(nil, "aborted")
 	}
 
 	originalPhase := phase

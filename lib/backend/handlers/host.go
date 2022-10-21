@@ -268,7 +268,7 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 	}
 
 	if reduce {
-		logrus.Warn("Asking for less resource... is not going to happen")
+		logrus.WithContext(handler.job.Context()).Warn("Asking for less resource... is not going to happen")
 	}
 
 	xerr = hostInstance.Resize(handler.job.Context(), sizing)

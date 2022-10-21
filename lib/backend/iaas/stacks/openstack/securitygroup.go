@@ -123,7 +123,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.DeleteSecurityGroup(context.Background(), asg); derr != nil {
+			if derr := s.DeleteSecurityGroup(cleanupContextFrom(ctx), asg); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete security group"))
 			}
 		}

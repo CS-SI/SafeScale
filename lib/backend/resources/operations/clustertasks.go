@@ -43,7 +43,6 @@ import (
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -1352,8 +1351,8 @@ func (instance *Cluster) taskStartHost(inctx context.Context, params interface{}
 			return
 		}
 
-		if oldKey := ctx.Value(concurrency.KeyForID); oldKey != nil {
-			ctx = context.WithValue(ctx, concurrency.KeyForID, fmt.Sprintf("%s/start/host/%s", oldKey, id))
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/start/host/%s", oldKey, id))
 		}
 
 		svc := instance.Service()
@@ -1436,8 +1435,8 @@ func (instance *Cluster) taskStopHost(inctx context.Context, params interface{})
 			return
 		}
 
-		if oldKey := ctx.Value(concurrency.KeyForID); oldKey != nil {
-			ctx = context.WithValue(ctx, concurrency.KeyForID, fmt.Sprintf("%s/stop/host/%s", oldKey, id))
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/stop/host/%s", oldKey, id))
 		}
 
 		svc := instance.Service()
@@ -1517,8 +1516,8 @@ func (instance *Cluster) taskInstallGateway(inctx context.Context, params interf
 		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
 		defer tracer.Exiting()
 
-		if oldKey := ctx.Value(concurrency.KeyForID); oldKey != nil {
-			ctx = context.WithValue(ctx, concurrency.KeyForID, fmt.Sprintf("%s/install/gateway/%s", oldKey, hostLabel))
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/install/gateway/%s", oldKey, hostLabel))
 		}
 
 		timings, xerr := instance.Service().Timings()
@@ -1607,8 +1606,8 @@ func (instance *Cluster) taskConfigureGateway(inctx context.Context, params inte
 		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 		defer tracer.Exiting()
 
-		if oldKey := ctx.Value(concurrency.KeyForID); oldKey != nil {
-			ctx = context.WithValue(ctx, concurrency.KeyForID, fmt.Sprintf("%s/configure/gateway/%s", oldKey, hostLabel))
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/gateway/%s", oldKey, hostLabel))
 		}
 
 		logrus.WithContext(ctx).Debugf("starting configuration")
@@ -1662,14 +1661,8 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
 
-		tracer := debug.NewTracer(tg, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
+		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 		defer tracer.Exiting()
 
 		// Convert and validate parameters
@@ -1683,10 +1676,8 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 			return
 		}
 
-		clusterName := instance.GetName()
-
 		if p.count == 0 {
-			logrus.WithContext(ctx).Debugf("[Cluster %s] no masters to create.", clusterName)
+			logrus.WithContext(ctx).Debugf("No masters to create.")
 			chRes <- result{nil, nil}
 			return
 		}
@@ -1697,7 +1688,7 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 			return
 		}
 
-		logrus.WithContext(ctx).Debugf("[Cluster %s] creating %d master%s...", clusterName, p.count, strprocess.Plural(p.count))
+		logrus.WithContext(ctx).Debugf("Creating %d master%s...", p.count, strprocess.Plural(p.count))
 
 		timeout := time.Duration(p.count) * timings.HostCreationTimeout() // FIXME: OPP This became the timeout for the whole cluster creation....
 
@@ -1740,7 +1731,7 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 			listMasters = append(listMasters, v)
 		}
 
-		logrus.WithContext(ctx).Debugf("[Cluster %s] masters creation successful: %v", clusterName, listMasters)
+		logrus.WithContext(ctx).Debugf("Masters creation successful: %v", listMasters)
 		chRes <- result{listMasters, nil}
 
 	}()
@@ -1801,8 +1792,8 @@ func (instance *Cluster) taskCreateMaster(inctx context.Context, params interfac
 			return xerr
 		}
 
-		if oldKey := ctx.Value(concurrency.KeyForID); oldKey != nil {
-			ctx = context.WithValue(ctx, concurrency.KeyForID, fmt.Sprintf("%s/create/master/%s", oldKey, hostReq.ResourceName))
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/create/master/%s", oldKey, hostReq.ResourceName))
 		}
 
 		// First creates master in metadata, to keep track of its tried creation, in case of failure
@@ -2202,8 +2193,8 @@ func (instance *Cluster) taskConfigureMaster(inctx context.Context, params inter
 
 		started := time.Now()
 
-		if oldKey := ctx.Value(concurrency.KeyForID); oldKey != nil {
-			ctx = context.WithValue(ctx, concurrency.KeyForID, fmt.Sprintf("%s/configure/master/%s", oldKey, p.Host.GetName()))
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/master/%s", oldKey, p.Host.GetName()))
 		}
 		logrus.WithContext(ctx).Debugf("starting configuration...")
 
@@ -2410,9 +2401,7 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 			return
 		}
 
-		clusterName := instance.GetName()
-
-		logrus.WithContext(ctx).Debugf("[Cluster %s] creating %d node%s...", clusterName, p.count, strprocess.Plural(p.count))
+		logrus.WithContext(ctx).Debugf("Creating %d node%s...", p.count, strprocess.Plural(p.count))
 
 		timeout := time.Duration(p.count) * timings.HostCreationTimeout()
 
@@ -2452,7 +2441,7 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 			listNodes = append(listNodes, v)
 		}
 
-		logrus.WithContext(ctx).Debugf("[Cluster %s] %d node%s creation successful.", clusterName, p.count, strprocess.Plural(p.count))
+		logrus.WithContext(ctx).Debugf("%d node%s creation successful.", p.count, strprocess.Plural(p.count))
 		chRes <- result{listNodes, nil}
 	}()
 	select {
@@ -2475,8 +2464,8 @@ type taskCreateNodeParameters struct {
 }
 
 func cleanupContextFrom(inctx context.Context) context.Context {
-	if oldKey := inctx.Value(concurrency.KeyForID); oldKey != nil {
-		ctx := context.WithValue(context.Background(), concurrency.KeyForID, oldKey) // nolint
+	if oldKey := inctx.Value("ID"); oldKey != nil {
+		ctx := context.WithValue(context.Background(), "ID", oldKey) // nolint
 		// cleanup functions can look for "cleanup" to decide if a ctx is a cleanup context
 		ctx = context.WithValue(ctx, "cleanup", true) // nolint
 		return ctx
@@ -2523,8 +2512,8 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 			return xerr
 		}
 
-		if oldKey := ctx.Value(concurrency.KeyForID); oldKey != nil {
-			ctx = context.WithValue(ctx, concurrency.KeyForID, fmt.Sprintf("%s/create/node/%s", oldKey, hostReq.ResourceName))
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/create/node/%s", oldKey, hostReq.ResourceName))
 		}
 
 		// -- First creates node in metadata, to keep track of its tried creation, in case of failure --
@@ -2899,7 +2888,7 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interf
 			return
 		}
 
-		tgMap := make(concurrency.TaskGroupResult)
+		tgMap := make(map[string]interface{})
 		close(resCh)
 		for v := range resCh {
 			tgMap[v.who] = v.what
@@ -2957,8 +2946,8 @@ func (instance *Cluster) taskConfigureNode(inctx context.Context, params interfa
 		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%s)", p.node.Name).WithStopwatch().Entering()
 		defer tracer.Exiting()
 
-		if oldKey := ctx.Value(concurrency.KeyForID); oldKey != nil {
-			ctx = context.WithValue(ctx, concurrency.KeyForID, fmt.Sprintf("%s/configure/node/%s", oldKey, p.node.Name))
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/node/%s", oldKey, p.node.Name))
 		}
 
 		hostLabel := fmt.Sprintf("node (%s)", p.node.Name)
@@ -3131,8 +3120,8 @@ func (instance *Cluster) taskDeleteNodeWithCtx(inctx context.Context, params int
 			nodeName = p.node.ID
 		}
 
-		if oldKey := ctx.Value(concurrency.KeyForID); oldKey != nil {
-			ctx = context.WithValue(ctx, concurrency.KeyForID, fmt.Sprintf("%s/delete/node/%s", oldKey, nodeName))
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/delete/node/%s", oldKey, nodeName))
 		}
 
 		logrus.WithContext(ctx).Debugf("Deleting Node...")
@@ -3211,8 +3200,8 @@ func (instance *Cluster) taskDeleteMaster(inctx context.Context, params interfac
 			nodeRef = p.node.ID
 		}
 
-		if oldKey := ctx.Value(concurrency.KeyForID); oldKey != nil {
-			ctx = context.WithValue(ctx, concurrency.KeyForID, fmt.Sprintf("%s/delete/master/%s", oldKey, nodeRef))
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/delete/master/%s", oldKey, nodeRef))
 		}
 
 		host, xerr := LoadHost(ctx, instance.Service(), nodeRef)

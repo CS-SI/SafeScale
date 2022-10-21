@@ -24,7 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/stretchr/testify/require"
 )
@@ -34,12 +33,8 @@ func TestHost_AddFeature(t *testing.T) {
 	var ohost *Host = nil
 	ctx := context.Background()
 
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
-
 	// Wrong *Host instance
-	_, xerr = ohost.AddFeature(ctx, "ansible", data.Map{}, resources.FeatureSettings{})
+	_, xerr := ohost.AddFeature(ctx, "ansible", data.Map{}, resources.FeatureSettings{})
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -92,12 +87,8 @@ func TestHost_CheckFeature(t *testing.T) {
 	var ohost *Host = nil
 	ctx := context.Background()
 
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
-
 	// Wrong *Host instance
-	_, xerr = ohost.CheckFeature(ctx, "ansible", data.Map{}, resources.FeatureSettings{})
+	_, xerr := ohost.CheckFeature(ctx, "ansible", data.Map{}, resources.FeatureSettings{})
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -150,12 +141,8 @@ func TestHost_DeleteFeature(t *testing.T) {
 	var ohost *Host = nil
 	ctx := context.Background()
 
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
-
 	// Wrong *Host instance
-	_, xerr = ohost.DeleteFeature(ctx, "ansible", data.Map{}, resources.FeatureSettings{})
+	_, xerr := ohost.DeleteFeature(ctx, "ansible", data.Map{}, resources.FeatureSettings{})
 	require.Contains(t, xerr.Error(), "invalid instance: in function")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -211,9 +198,6 @@ func TestHost_TargetType(t *testing.T) {
 	require.EqualValues(t, result.String(), "Unknown")
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -249,12 +233,9 @@ func TestHost_TargetType(t *testing.T) {
 func TestHost_InstallMethods(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ohost *Host = nil
-	_, xerr = ohost.InstallMethods(ctx)
+	_, xerr := ohost.InstallMethods(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -299,9 +280,6 @@ func TestHost_InstallMethods(t *testing.T) {
 func TestHost_RegisterFeature(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -350,11 +328,8 @@ func TestHost_ListEligibleFeatures(t *testing.T) {
 	var ohost *Host = nil
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
-	_, xerr = ohost.ListEligibleFeatures(ctx)
+	_, xerr := ohost.ListEligibleFeatures(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -401,11 +376,8 @@ func TestHost_ListInstalledFeatures(t *testing.T) {
 	var ohost *Host = nil
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
-	_, xerr = ohost.ListInstalledFeatures(ctx)
+	_, xerr := ohost.ListInstalledFeatures(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -453,9 +425,6 @@ func TestHost_ListInstalledFeatures(t *testing.T) {
 func TestHost_InstalledFeatures(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ohost *Host = nil
 	results, _ := ohost.InstalledFeatures(ctx)
@@ -505,12 +474,9 @@ func TestHost_InstalledFeatures(t *testing.T) {
 func TestHost_IsFeatureInstalled(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ohost *Host = nil
-	_, xerr = ohost.IsFeatureInstalled(ctx, "ansible")
+	_, xerr := ohost.IsFeatureInstalled(ctx, "ansible")
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {

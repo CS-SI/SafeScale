@@ -38,7 +38,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -89,10 +88,6 @@ func Test_LoadHost(t *testing.T) {
 
 	var svc iaas.Service
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	host, err := LoadHost(ctx, svc, "localhost")
 	require.Nil(t, host)
@@ -340,9 +335,6 @@ func TestHost_ForceGetState(t *testing.T) {
 func TestHost_Unsafereload(t *testing.T) {
 
 	ctx := context.Background()
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -417,10 +409,6 @@ func TestHost_Reload(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
 		var nullAhc *Host = nil
@@ -481,10 +469,6 @@ func TestHost_GetState(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
 		var nullAhc *Host = nil
@@ -531,10 +515,6 @@ func TestHost_Create(t *testing.T) {
 	os.Setenv("SAFESCALE_REBOOT_TIMEOUT", "0")
 
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	var ohost *Host = nil
 
@@ -645,10 +625,6 @@ func TestHost_setSecurityGroups(t *testing.T) {
 	// var ohost *Host
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
 		svc._setLogLevel(0)
@@ -741,10 +717,6 @@ func TestHost_thePhaseDoesSomething(t *testing.T) {
 	// var ohost *Host
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
 		HostName:       "MyHostTest",
@@ -820,10 +792,6 @@ func TestHost_WaitSSHReady(t *testing.T) {
 	// var ohost *Host
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
 		HostName:       "MyHostTest",
@@ -861,10 +829,6 @@ func TestHost_Delete(t *testing.T) {
 
 	// var ohost *Host
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
@@ -904,10 +868,6 @@ func TestHost_Run(t *testing.T) {
 
 	// var ohost *Host
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
@@ -975,10 +935,6 @@ func TestHost_Push(t *testing.T) {
 
 	// var ohost *Host
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
@@ -1059,10 +1015,6 @@ func TestHost_StartStop(t *testing.T) {
 	// var ohost *Host
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
 		HostName:       "MyHostTest",
@@ -1117,10 +1069,6 @@ func TestHost_Reboot(t *testing.T) {
 
 	// var ohost *Host
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
@@ -1179,10 +1127,6 @@ func TestHost_Resize(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
 		HostName:       "MyHostTest",
@@ -1232,10 +1176,6 @@ func TestHost_GetPublicIP(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
 		HostName:       "MyHostTest",
@@ -1272,10 +1212,6 @@ func TestHost_GetPublicIP(t *testing.T) {
 func TestHost_GetPrivateIP(t *testing.T) {
 
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
@@ -1314,10 +1250,6 @@ func TestHost_GetPrivateIP(t *testing.T) {
 func TestHost_GetPrivateIPOnSubnet(t *testing.T) {
 
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1391,10 +1323,6 @@ func TestHost_GetAccessIP(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
 		HostName:       "MyHostTest",
@@ -1431,10 +1359,6 @@ func TestHost_GetAccessIP(t *testing.T) {
 func TestHost_GetShares(t *testing.T) {
 
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
@@ -1473,10 +1397,6 @@ func TestHost_GetMounts(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
 		HostName:       "MyHostTest",
@@ -1513,10 +1433,6 @@ func TestHost_IsClusterMember(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
 		HostName:       "MyHostTest",
@@ -1549,10 +1465,6 @@ func TestHost_IsClusterMember(t *testing.T) {
 func TestHost_IsGateway(t *testing.T) {
 
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1616,10 +1528,6 @@ func TestHost_IsGateway(t *testing.T) {
 func TestHost_IsSingle(t *testing.T) {
 
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1704,10 +1612,6 @@ func TestHost_PushStringToFile(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	hostReq := abstract.HostRequest{
 		ResourceName:   "MyHostTest",
 		HostName:       "MyHostTest",
@@ -1751,10 +1655,6 @@ func TestHost_PushStringToFile(t *testing.T) {
 func TestHost_GetDefaultSubnet(t *testing.T) {
 
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1816,10 +1716,6 @@ func TestHost_GetDefaultSubnet(t *testing.T) {
 func TestHost_ToProtocol(t *testing.T) {
 
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1886,10 +1782,6 @@ func TestHost_ToProtocol(t *testing.T) {
 func TestHost_BindSecurityGroup(t *testing.T) {
 
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 

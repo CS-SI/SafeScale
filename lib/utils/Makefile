@@ -9,7 +9,6 @@ generate:
 	@echo "package valid" > ./valid/consts.go
 	@grep EmbeddedErrorStructName ./fail/errors.go >> ./valid/consts.go
 	@$(GO) generate -run stringer . >/dev/null || true
-	@(cd concurrency && $(MAKE) $@)
 	@(cd cli && $(MAKE) $@)
 	@(cd data && $(MAKE) $@)
 	@(cd debug && $(MAKE) $@)
@@ -25,7 +24,6 @@ test:
 
 clean:
 	@(find . | grep _string | xargs rm 2>/dev/null || true)
-	@(cd concurrency && $(MAKE) $@)
 	@(cd cli && $(MAKE) $@)
 	@(cd data && $(MAKE) $@)
 	@(cd debug && $(MAKE) $@)

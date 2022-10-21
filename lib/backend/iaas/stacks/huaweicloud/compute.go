@@ -127,7 +127,7 @@ type serverCreateOpts struct {
 
 	// ImageRef [optional; required if ImageName is not provided] is the ID or
 	// full URL to the image that contains the server's OS and initial state.
-	// Also optional if using the boot-from-volume extension.
+	// Also, optional if using the boot-from-volume extension.
 	ImageRef string `json:"imageRef,omitempty"`
 
 	// ImageName [optional; required if ImageRef is not provided] is the name of
@@ -762,7 +762,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		}
 	}
 
-	logrus.Infoln(msgSuccess)
+	logrus.WithContext(ctx).Infoln(msgSuccess)
 	return host, userData, nil
 }
 

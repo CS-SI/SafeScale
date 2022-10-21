@@ -119,7 +119,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := stacks.RetryableRemoteCall(context.Background(),
+			derr := stacks.RetryableRemoteCall(cleanupContextFrom(ctx),
 				func() error {
 					return networks.Delete(s.NetworkClient, network.ID).ExtractErr()
 				},
@@ -348,6 +348,16 @@ func ToAbstractIPVersion(v int) ipversion.Enum {
 	}
 }
 
+func cleanupContextFrom(inctx context.Context) context.Context {
+	if oldKey := inctx.Value("ID"); oldKey != nil {
+		ctx := context.WithValue(context.Background(), "ID", oldKey) // nolint
+		// cleanup functions can look for "cleanup" to decide if a ctx is a cleanup context
+		ctx = context.WithValue(ctx, "cleanup", true) // nolint
+		return ctx
+	}
+	return context.Background()
+}
+
 // CreateSubnet creates a subnet
 func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (newNet *abstract.Subnet, ferr fail.Error) {
 	if valid.IsNil(s) {
@@ -409,36 +419,38 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (ne
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.DeleteSubnet(context.Background(), subnet.ID)
+			derr := s.DeleteSubnet(cleanupContextFrom(ctx), subnet.ID)
 			if derr != nil {
 				wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", subnet.Name)
-				logrus.Error(wrapErr.Error())
 				_ = ferr.AddConsequence(wrapErr)
 			}
 		}
 	}()
 
 	if s.cfgOpts.UseLayer3Networking {
-		router, xerr := s.createRouter(ctx, RouterRequest{
+		// Starting from here, delete router if exit with error
+		var router *Router
+
+		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
+			if ferr != nil {
+				if router != nil {
+					derr := s.deleteRouter(cleanupContextFrom(ctx), router.ID)
+					if derr != nil {
+						wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", router.Name)
+						_ = ferr.AddConsequence(wrapErr)
+					}
+				}
+			}
+		}()
+
+		router, xerr = s.createRouter(ctx, RouterRequest{
 			Name:      subnet.ID,
 			NetworkID: s.ProviderNetworkID,
 		})
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to create router '%s'", subnet.ID)
 		}
-
-		// Starting from here, delete router if exit with error
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil {
-				derr := s.deleteRouter(context.Background(), router.ID)
-				if derr != nil {
-					wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", router.Name)
-					_ = ferr.AddConsequence(wrapErr)
-					logrus.Error(wrapErr.Error())
-				}
-			}
-		}()
 
 		xerr = s.addSubnetToRouter(ctx, router.ID, subnet.ID)
 		if xerr != nil {
@@ -653,6 +665,28 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 		}
 		if xerr := s.deleteRouter(ctx, router.ID); xerr != nil {
 			return fail.Wrap(xerr, "failed to delete router %s associated with Subnet %s", router.ID, id)
+		}
+	}
+
+	// delete detached ports and ports in error state
+	opos, xerr := s.rpcListPorts(ctx, ports.ListOpts{})
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to list ports associated with Subnet %s", id)
+	}
+
+	for _, opo := range opos {
+		switch opo.Status {
+		case "DOWN":
+			xerr = s.rpcDeletePort(ctx, opo.ID)
+			if xerr != nil {
+				debug.IgnoreError2(ctx, xerr)
+			}
+		case "ERROR":
+			xerr = s.rpcDeletePort(ctx, opo.ID)
+			if xerr != nil {
+				debug.IgnoreError2(ctx, xerr)
+			}
+		default:
 		}
 	}
 

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	uuidpkg "github.com/gofrs/uuid"
@@ -81,7 +80,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 
 	md, ok = metadata.FromIncomingContext(ctx)
 	if !ok {
-		logrus.Warn("context does not contain a grpc uuid, generating one")
+		logrus.WithContext(ctx).Warn("context does not contain a grpc uuid, generating one")
 		uuid, err := uuidpkg.NewV4()
 		if err != nil {
 			return nil, fail.Wrap(err, "failed to generate uuid for job")
@@ -91,10 +90,10 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	} else {
 		u := md.Get("uuid")
 		if len(u) == 0 {
-			logrus.Warnf(fail.InvalidParameterError("ctx", "does not contain a grpc uuid").Error())
+			logrus.WithContext(ctx).Warnf(fail.InvalidParameterError("ctx", "does not contain a grpc uuid").Error())
 		} else {
 			if id = u[0]; id == "" {
-				logrus.Warnf(fail.InvalidParameterError("ctx", "does not contain a valid gRPC uuid").Error())
+				logrus.WithContext(ctx).Warnf(fail.InvalidParameterError("ctx", "does not contain a valid gRPC uuid").Error())
 			}
 		}
 
@@ -107,7 +106,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	}
 
 	// attach task instance to the context
-	ctx = context.WithValue(ctx, concurrency.KeyForID, id) // nolint
+	ctx = context.WithValue(ctx, "ID", id) // nolint
 
 	nj := job{
 		description: description,
