@@ -1352,7 +1352,7 @@ func (instance *Cluster) taskStartHost(inctx context.Context, params interface{}
 		}
 
 		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/start/host/%s", oldKey, id))
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/start/host/%s", oldKey, id)) // nolint
 		}
 
 		svc := instance.Service()
@@ -1436,7 +1436,7 @@ func (instance *Cluster) taskStopHost(inctx context.Context, params interface{})
 		}
 
 		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/stop/host/%s", oldKey, id))
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/stop/host/%s", oldKey, id)) // nolint
 		}
 
 		svc := instance.Service()
@@ -1517,7 +1517,7 @@ func (instance *Cluster) taskInstallGateway(inctx context.Context, params interf
 		defer tracer.Exiting()
 
 		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/install/gateway/%s", oldKey, hostLabel))
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/install/gateway/%s", oldKey, hostLabel)) // nolint
 		}
 
 		timings, xerr := instance.Service().Timings()
@@ -1607,7 +1607,7 @@ func (instance *Cluster) taskConfigureGateway(inctx context.Context, params inte
 		defer tracer.Exiting()
 
 		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/gateway/%s", oldKey, hostLabel))
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/gateway/%s", oldKey, hostLabel)) // nolint
 		}
 
 		logrus.WithContext(ctx).Debugf("starting configuration")
@@ -1793,7 +1793,7 @@ func (instance *Cluster) taskCreateMaster(inctx context.Context, params interfac
 		}
 
 		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/create/master/%s", oldKey, hostReq.ResourceName))
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/create/master/%s", oldKey, hostReq.ResourceName)) // nolint
 		}
 
 		// First creates master in metadata, to keep track of its tried creation, in case of failure
@@ -2194,7 +2194,7 @@ func (instance *Cluster) taskConfigureMaster(inctx context.Context, params inter
 		started := time.Now()
 
 		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/master/%s", oldKey, p.Host.GetName()))
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/master/%s", oldKey, p.Host.GetName())) // nolint
 		}
 		logrus.WithContext(ctx).Debugf("starting configuration...")
 
@@ -2513,7 +2513,7 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 		}
 
 		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/create/node/%s", oldKey, hostReq.ResourceName))
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/create/node/%s", oldKey, hostReq.ResourceName)) // nolint
 		}
 
 		// -- First creates node in metadata, to keep track of its tried creation, in case of failure --
@@ -2947,7 +2947,7 @@ func (instance *Cluster) taskConfigureNode(inctx context.Context, params interfa
 		defer tracer.Exiting()
 
 		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/node/%s", oldKey, p.node.Name))
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/node/%s", oldKey, p.node.Name)) // nolint
 		}
 
 		hostLabel := fmt.Sprintf("node (%s)", p.node.Name)
@@ -3121,7 +3121,7 @@ func (instance *Cluster) taskDeleteNodeWithCtx(inctx context.Context, params int
 		}
 
 		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/delete/node/%s", oldKey, nodeName))
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/delete/node/%s", oldKey, nodeName)) // nolint
 		}
 
 		logrus.WithContext(ctx).Debugf("Deleting Node...")
@@ -3201,7 +3201,7 @@ func (instance *Cluster) taskDeleteMaster(inctx context.Context, params interfac
 		}
 
 		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/delete/master/%s", oldKey, nodeRef))
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/delete/master/%s", oldKey, nodeRef)) // nolint
 		}
 
 		host, xerr := LoadHost(ctx, instance.Service(), nodeRef)
