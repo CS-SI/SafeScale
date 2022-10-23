@@ -30,7 +30,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
@@ -397,17 +396,6 @@ func DefaultNotifierWithContext(ctx context.Context) (func(t Try, v verdict.Enum
 
 	ctxID := ""
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var err fail.Error
-	ctxID, err = task.ID()
-	if err != nil {
-		return nil, err
-	}
-
 	if ctxID == "" {
 		return func(t Try, v verdict.Enum) {
 			switch v {
@@ -428,7 +416,7 @@ func DefaultNotifierWithContext(ctx context.Context) (func(t Try, v verdict.Enum
 	}
 
 	ctxID = fmt.Sprintf("[%s]", ctxID)
-	ctxLog := logrus.WithField(concurrency.KeyForTaskInContext, ctxID)
+	ctxLog := logrus.WithField("ID", ctxID)
 
 	return func(t Try, v verdict.Enum) {
 		switch v {

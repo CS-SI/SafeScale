@@ -595,6 +595,8 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(ctx context.Context, id s
 		return xerr
 	}
 
+	// FIXME: OPP List the ports, delete the ports, and then...
+
 	xerr = svc.DeleteSubnet(ctx, id)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

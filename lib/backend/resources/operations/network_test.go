@@ -27,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	serializer "github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -119,10 +118,6 @@ func TestNetwork_Create(t *testing.T) {
 
 	var onetwork *Network
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -232,21 +227,15 @@ func TestNetwork_Import(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
-
-		require.Nil(t, err)
 
 		fld, xerr := NewMetadataFolder(svc, "networks")
 		xerr = debug.InjectPlannedFail(xerr)
 		require.Nil(t, xerr)
 
 		props, xerr := serializer.NewJSONProperties("resources.network")
-		err = debug.InjectPlannedFail(xerr)
-		require.Nil(t, err)
+		xerr = debug.InjectPlannedFail(xerr)
+		require.Nil(t, xerr)
 
 		onetwork := &Network{
 			MetadataCore: &MetadataCore{
@@ -373,10 +362,6 @@ func TestNetwork_Delete(t *testing.T) {
 
 		svc._reset()
 
-		task, err := concurrency.NewTaskWithContext(ctx)
-		ctx = context.WithValue(ctx, "task", task)
-		require.Nil(t, err)
-
 		_, xerr = svc.CreateNetwork(ctx, abstract.NetworkRequest{
 			Name:          "mynetwork",
 			CIDR:          "192.168.16.4/32",
@@ -466,10 +451,6 @@ func TestNetwork_InspectSubnet(t *testing.T) {
 
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
 		networkReq := abstract.NetworkRequest{
@@ -527,10 +508,6 @@ func TestNetwork_InspectSubnet(t *testing.T) {
 func Test_FreeCIDRForSingleHost(t *testing.T) {
 
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 

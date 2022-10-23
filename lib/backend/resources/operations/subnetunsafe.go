@@ -1349,7 +1349,7 @@ func (instance *Subnet) unsafeCreateGateways(
 				defer func() {
 					derr := instance.undoBindInternalSecurityGroupToGateway(cleanupContextFrom(ctx), secondaryGateway, req.KeepOnFailure, &ferr)
 					if derr != nil {
-						logrus.Warn(derr.Error())
+						logrus.WithContext(cleanupContextFrom(ctx)).Warn(derr.Error())
 					}
 				}()
 

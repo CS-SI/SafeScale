@@ -24,7 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/require"
 )
@@ -110,10 +109,6 @@ func TestVolume_Create(t *testing.T) {
 
 	var ovolume *volume
 	ctx := context.Background()
-
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 

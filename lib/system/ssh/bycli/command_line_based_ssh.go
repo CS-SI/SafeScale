@@ -69,7 +69,7 @@ type Profile struct {
 	SecondaryGatewayConfig sshapi.Config `json:"secondary_gateway_config,omitempty"`
 }
 
-func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig *Profile, secondaryGatewayConfig *Profile) *Profile {
+func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig sshapi.Config, secondaryGatewayConfig sshapi.Config) *Profile {
 	return &Profile{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
@@ -88,7 +88,7 @@ func NewConnector(ac sshapi.Config) (*Profile, fail.Error) {
 	gatewayConfig, _ := ac.GetPrimaryGatewayConfig()
 	secondaryGatewayConfig, _ := ac.GetSecondaryGatewayConfig()
 
-	return &Profile{Hostname: hostname, IPAddress: IPAddress, Port: int(port), User: user, PrivateKey: privateKey, LocalPort: int(localPort), LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}, nil
+	return NewProfile(hostname, IPAddress, int(port), user, privateKey, int(localPort), localHost, gatewayConfig, secondaryGatewayConfig), nil
 }
 
 func (sconf *Profile) Config() (sshapi.Config, fail.Error) {
@@ -212,12 +212,8 @@ type Tunnels []*Tunnel
 
 // Close closes ssh tunnel
 func (stun *Tunnel) Close() fail.Error {
-	defer debug.NewTracer(context.Background(), true).Entering().Exiting()
-
 	defer func() {
-		if lazyErr := utils.LazyRemove(stun.keyFile.Name()); lazyErr != nil {
-			logrus.WithContext(context.Background()).Error(lazyErr)
-		}
+		_ = utils.LazyRemove(stun.keyFile.Name())
 	}()
 
 	xerr := killProcess(stun.cmd.Process)
@@ -233,11 +229,9 @@ func (stun *Tunnel) Close() fail.Error {
 			return fail.Wrap(err, "unable to close tunnel, running pgrep")
 		}
 		if code == 1 { // no process found
-			debug.IgnoreError(err)
 			return nil
 		}
 		if code == 127 { // pgrep not installed
-			debug.IgnoreError(fmt.Errorf("pgrep not installed"))
 			return nil
 		}
 		return fail.Wrap(err, "unable to close tunnel, unexpected errorcode running pgrep: %d", code)
@@ -265,14 +259,12 @@ func killProcess(proc *os.Process) fail.Error {
 			switch cerr {
 			case syscall.ESRCH:
 				// process not found, continue
-				debug.IgnoreError(err)
 			default:
 				return fail.Wrap(err, "unable to send kill signal to process")
 			}
 		default:
 			switch err.Error() {
 			case "os: process already finished":
-				debug.IgnoreError(err)
 			default:
 				return fail.Wrap(err, "unable to send kill signal to process")
 			}
@@ -289,7 +281,6 @@ func killProcess(proc *os.Process) fail.Error {
 		switch err {
 		case syscall.ESRCH, syscall.ECHILD:
 			// process not found or has no child, continue
-			debug.IgnoreError(err)
 		default:
 			return fail.Wrap(err, "unable to wait on SSH tunnel process")
 		}
@@ -441,7 +432,7 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		gwPort,
 	)
 
-	logrus.WithContext(context.Background()).Debugf("Creating SSH tunnel with '%s'", cmdString)
+	// logrus.WithContext(context.Background()).Tracef("Creating SSH tunnel with '%s'", cmdString)
 
 	cmd := exec.Command("bash", "-c", cmdString)
 	cmd.SysProcAttr = getSyscallAttrs()
@@ -690,7 +681,6 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 			case *fail.ErrTimeout:
 				xerr = fail.Wrap(fail.Cause(xerr), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
 			default:
-				debug.IgnoreError(xerr)
 			}
 
 			// FIXME: This kind of resource exhaustion deserves its own handling and its own kind of error

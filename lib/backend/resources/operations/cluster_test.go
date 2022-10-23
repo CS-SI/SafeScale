@@ -41,7 +41,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -106,11 +105,8 @@ func createClusterRequest() abstract.ClusterRequest {
 func Test_NewCluster(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
-	_, xerr = NewCluster(ctx, nil)
+	_, xerr := NewCluster(ctx, nil)
 	require.Contains(t, xerr.Error(), "invalid parameter: svc")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -128,9 +124,6 @@ func Test_NewCluster(t *testing.T) {
 func TestCluster_Exists(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
 	exists, xerr := ocluster.Exists(ctx)
@@ -163,9 +156,6 @@ func TestCluster_Exists(t *testing.T) {
 func Test_LoadCluster(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -189,9 +179,6 @@ func Test_LoadCluster(t *testing.T) {
 func TestCluster_IsNull(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
 	require.True(t, ocluster.IsNull())
@@ -230,12 +217,9 @@ func TestCluster_Create(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	xerr = ocluster.Create(ctx, createClusterRequest())
+	xerr := ocluster.Create(ctx, createClusterRequest())
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -286,7 +270,7 @@ func TestCluster_Create(t *testing.T) {
 		// Securitygroups
 		sgNames := []string{"PublicIPSecurityGroupID", "GWSecurityGroupID", "InternalSecurityGroupID"}
 		for _, sgName := range sgNames {
-			_, xerr = svc.CreateSecurityGroup(ctx, network.ID, sgName, fmt.Sprintf("Sg desc %s", sgName), abstract.SecurityGroupRules{
+			_, xerr := svc.CreateSecurityGroup(ctx, network.ID, sgName, fmt.Sprintf("Sg desc %s", sgName), abstract.SecurityGroupRules{
 				&abstract.SecurityGroupRule{
 					IDs:         make([]string, 0),
 					Description: "",
@@ -400,12 +384,9 @@ func TestCluster_Sdump(t *testing.T) {
 	}()
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	_, xerr = ocluster.Sdump(ctx)
+	_, xerr := ocluster.Sdump(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -442,12 +423,9 @@ func TestCluster_Sdump(t *testing.T) {
 func TestCluster_Deserialize(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	_, xerr = ocluster.Sdump(ctx)
+	_, xerr := ocluster.Sdump(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -494,9 +472,6 @@ func TestCluster_Deserialize(t *testing.T) {
 func TestCluster_Browse(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -532,12 +507,9 @@ func TestCluster_Browse(t *testing.T) {
 func TestCluster_GetIdentity(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	_, xerr = ocluster.GetIdentity(ctx)
+	_, xerr := ocluster.GetIdentity(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -572,12 +544,9 @@ func TestCluster_GetIdentity(t *testing.T) {
 func TestCluster_GetFlavor(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	_, xerr = ocluster.GetFlavor(ctx)
+	_, xerr := ocluster.GetFlavor(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -610,12 +579,9 @@ func TestCluster_GetFlavor(t *testing.T) {
 func TestCluster_GetComplexity(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	_, xerr = ocluster.GetComplexity(ctx)
+	_, xerr := ocluster.GetComplexity(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -646,12 +612,9 @@ func TestCluster_GetComplexity(t *testing.T) {
 func TestCluster_GetAdminPassword(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	_, xerr = ocluster.GetAdminPassword(ctx)
+	_, xerr := ocluster.GetAdminPassword(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -682,12 +645,9 @@ func TestCluster_GetAdminPassword(t *testing.T) {
 func TestCluster_GetKeyPair(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	_, xerr = ocluster.GetKeyPair(ctx)
+	_, xerr := ocluster.GetKeyPair(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -719,12 +679,9 @@ func TestCluster_GetKeyPair(t *testing.T) {
 func TestCluster_GetNetworkConfig(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	_, xerr = ocluster.GetNetworkConfig(ctx)
+	_, xerr := ocluster.GetNetworkConfig(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -763,12 +720,9 @@ func TestCluster_GetNetworkConfig(t *testing.T) {
 func TestCluster_StartStop(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	xerr = ocluster.Start(ctx)
+	xerr := ocluster.Start(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -855,12 +809,9 @@ func TestCluster_StartStop(t *testing.T) {
 func TestCluster_GetState(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	_, xerr = ocluster.GetState(ctx)
+	_, xerr := ocluster.GetState(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -891,9 +842,6 @@ func TestCluster_GetState(t *testing.T) {
 func TestCluster_AddNodes(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
 	var hsizing = abstract.HostSizingRequirements{
@@ -908,7 +856,7 @@ func TestCluster_AddNodes(t *testing.T) {
 		Image:       "HostSizingRequirements Image",
 		Template:    "HostSizingRequirements Template",
 	}
-	_, xerr = ocluster.AddNodes(ctx, 1, hsizing, make(data.Map), false)
+	_, xerr := ocluster.AddNodes(ctx, 1, hsizing, make(data.Map), false)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -954,9 +902,6 @@ func TestCluster_DeleteSpecificNode(t *testing.T) {}
 func TestCluster_ListMasters(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -987,9 +932,6 @@ func TestCluster_ListMasters(t *testing.T) {
 func TestCluster_ListMasterNames(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1020,9 +962,6 @@ func TestCluster_ListMasterNames(t *testing.T) {
 func TestCluster_ListMasterIDs(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1053,9 +992,6 @@ func TestCluster_ListMasterIDs(t *testing.T) {
 func TestCluster_ListMasterIPs(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1086,9 +1022,6 @@ func TestCluster_ListMasterIPs(t *testing.T) {
 func TestCluster_FindAvailableMaster(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1122,9 +1055,6 @@ func TestCluster_FindAvailableMaster(t *testing.T) {
 func TestCluster_ListNodes(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1155,9 +1085,6 @@ func TestCluster_ListNodes(t *testing.T) {
 func TestCluster_ListNodeNames(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1188,9 +1115,6 @@ func TestCluster_ListNodeNames(t *testing.T) {
 func TestCluster_ListNodeIDs(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1221,9 +1145,6 @@ func TestCluster_ListNodeIDs(t *testing.T) {
 func TestCluster_ListNodeIPs(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1254,9 +1175,6 @@ func TestCluster_ListNodeIPs(t *testing.T) {
 func TestCluster_FindAvailableNode(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1286,9 +1204,6 @@ func TestCluster_FindAvailableNode(t *testing.T) {
 func TestCluster_LookupNode(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1328,9 +1243,6 @@ func TestCluster_LookupNode(t *testing.T) {
 func TestCluster_CountNodes(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1360,9 +1272,6 @@ func TestCluster_CountNodes(t *testing.T) {
 func TestCluster_GetNodeByID(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -1404,9 +1313,6 @@ func TestCluster_Delete(t *testing.T) {}
 func TestCluster_ToProtocol(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 

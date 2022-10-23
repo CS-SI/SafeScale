@@ -128,9 +128,9 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 	if anon, ok := cfg.Get("OperatorUsername"); ok {
 		user, ok = anon.(string)
 		if !ok {
-			logrus.Warnf("OperatorUsername is not a string, check your tenants.toml file. Using 'safescale' user instead.")
+			logrus.WithContext(ctx).Warnf("OperatorUsername is not a string, check your tenants.toml file. Using 'safescale' user instead.")
 		} else if user == "" {
-			logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
+			logrus.WithContext(ctx).Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
 		}
 	}
 	if user == "" {
@@ -676,7 +676,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 					return fail.WarningError(finnerXerr, "unexpected return code of md5 command")
 				}
 				if !strings.Contains(fstdout, md5hash) {
-					logrus.Warnf("WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath, fstdout, fstderr, md5hash)
+					logrus.WithContext(ctx).Warnf("WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath, fstdout, fstderr, md5hash)
 					return fail.NewError("wrong md5 of '%s'", remotePath)
 				}
 				return nil
@@ -686,7 +686,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 				if _, ok := checksumErr.(*fail.ErrWarning); !ok || valid.IsNil(checksumErr) {
 					return checksumErr
 				}
-				logrus.Warnf(checksumErr.Error())
+				logrus.WithContext(ctx).Warnf(checksumErr.Error())
 			}
 
 			retcode = iretcode

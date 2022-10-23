@@ -389,7 +389,7 @@ func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Host
 	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
 	flavors, xerr := p.requestOVHAPI(ctx, restURL, "GET")
 	if xerr != nil {
-		logrus.WithContext(context.Background()).Warnf("Unable to request OVH API, flavors availability will not be checked: %v", xerr)
+		logrus.WithContext(context.Background()).Infof("Unable to request OVH API, flavors availability will not be checked: %v", xerr)
 		listAvailableTemplates = allTemplates
 	} else {
 		flavorMap := map[string]map[string]interface{}{}

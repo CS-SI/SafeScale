@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -215,18 +214,18 @@ type taskReadParameters struct {
 }
 
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
-func taskRead(inctx context.Context, p concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func taskRead(inctx context.Context, p interface{}) (_ interface{}, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rRes concurrency.TaskResult
+		rRes interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		gres, gerr := func() (_ concurrency.TaskResult, ferr fail.Error) {
+		gres, gerr := func() (_ interface{}, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
 			if p == nil {
@@ -299,18 +298,18 @@ type taskDisplayParameters struct {
 	ch <-chan outputItem
 }
 
-func taskDisplay(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func taskDisplay(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		tRes concurrency.TaskResult
+		tRes interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		gres, gerr := func() (_ concurrency.TaskResult, ferr fail.Error) {
+		gres, gerr := func() (_ interface{}, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
 			p, ok := params.(taskDisplayParameters)

@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -230,12 +229,9 @@ func TestMetadataCore_GetKind(t *testing.T) {
 func TestMetadataCore_Inspect(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	require.Nil(t, xerr)
-	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *MetadataCore = nil
-	xerr = amc.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := amc.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return nil
 	})
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
@@ -279,12 +275,9 @@ func TestMetadataCore_Inspect(t *testing.T) {
 func TestMetadataCore_Review(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	require.Nil(t, xerr)
-	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *MetadataCore = nil
-	xerr = amc.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := amc.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return nil
 	})
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
@@ -328,12 +321,9 @@ func TestMetadataCore_Review(t *testing.T) {
 
 func TestMetadataCore_Alter(t *testing.T) {
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	require.Nil(t, xerr)
-	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *MetadataCore = nil
-	xerr = amc.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := amc.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return nil
 	})
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
@@ -429,12 +419,9 @@ func TestMetadataCore_Carry(t *testing.T) {
 func TestMetadataCore_Read(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	require.Nil(t, xerr)
-	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *MetadataCore = nil
-	xerr = amc.Read(ctx, "networks/byID/Network_ID")
+	xerr := amc.Read(ctx, "networks/byID/Network_ID")
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
 	network := abstract.NewNetwork()
@@ -464,12 +451,9 @@ func TestMetadataCore_Read(t *testing.T) {
 func TestMetadataCore_ReadByID(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	require.Nil(t, xerr)
-	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *MetadataCore = nil
-	xerr = amc.ReadByID(ctx, "networks/byID/Network_ID")
+	xerr := amc.ReadByID(ctx, "networks/byID/Network_ID")
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
 	network := abstract.NewNetwork()
@@ -513,12 +497,9 @@ func TestMetadataCore_ReadByID(t *testing.T) {
 
 func TestMetadataCore_Reload(t *testing.T) {
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	require.Nil(t, xerr)
-	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *MetadataCore = nil
-	xerr = amc.Reload(ctx)
+	xerr := amc.Reload(ctx)
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
 	network := abstract.NewNetwork()
@@ -574,12 +555,9 @@ func TestMetadataCore_Reload(t *testing.T) {
 func TestMetadataCore_BrowseFolder(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	require.Nil(t, xerr)
-	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *MetadataCore = nil
-	xerr = amc.BrowseFolder(ctx, func(data []byte) fail.Error {
+	xerr := amc.BrowseFolder(ctx, func(data []byte) fail.Error {
 		return nil
 	})
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
@@ -615,12 +593,9 @@ func TestMetadataCore_BrowseFolder(t *testing.T) {
 func TestMetadataCore_Delete(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	require.Nil(t, xerr)
-	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *MetadataCore = nil
-	xerr = amc.Delete(ctx)
+	xerr := amc.Delete(ctx)
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
 	network := abstract.NewNetwork()
@@ -655,12 +630,9 @@ func TestMetadataCore_Delete(t *testing.T) {
 func TestMetadataCore_UnsafeSerialize(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	require.Nil(t, xerr)
-	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *MetadataCore = nil
-	_, xerr = amc.unsafeSerialize(ctx)
+	_, xerr := amc.unsafeSerialize(ctx)
 
 	// require.Contains(t, xerr.Error(), "calling method from a nil pointer"), true)
 	require.Contains(t, xerr.Error(), "runtime error: invalid memory address or nil pointer dereference") // FIXME: aw, runtime error -__-
@@ -697,9 +669,6 @@ func TestMetadataCore_UnsafeSerialize(t *testing.T) {
 func TestMetadataCore_Deserialize(t *testing.T) {
 
 	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	require.Nil(t, xerr)
-	ctx = context.WithValue(ctx, "task", task)
 
 	network := abstract.NewNetwork()
 	network.ID = "Network_ID"

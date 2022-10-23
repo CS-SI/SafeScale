@@ -25,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/require"
 )
@@ -185,10 +184,6 @@ func TestBucket_Browse(t *testing.T) {
 	var callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error
 	ctx := context.Background()
 
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
-
 	// FIXME: should not panic here
 	func() {
 		defer func() {
@@ -235,9 +230,6 @@ func TestBucket_Browse(t *testing.T) {
 func TestBucket_GetHost(t *testing.T) {
 
 	ctx := context.Background()
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	// FIXME: should not panic here
 	func() {
@@ -273,9 +265,6 @@ func TestBucket_GetHost(t *testing.T) {
 func TestBucket_GetMountPoint(t *testing.T) {
 
 	ctx := context.Background()
-	task, err := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, err)
 
 	// FIXME: should not panic here
 	func() {

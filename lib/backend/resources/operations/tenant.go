@@ -47,7 +47,7 @@ func CurrentTenant(ctx context.Context) *Tenant {
 		}
 
 		// Set unique tenant as selected
-		logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
+		logrus.WithContext(ctx).Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
 		for _, tenant := range tenants {
 			name, ok := tenant["name"].(string)
 			if !ok {

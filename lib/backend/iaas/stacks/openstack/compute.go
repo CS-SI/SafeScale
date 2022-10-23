@@ -767,7 +767,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		if ferr != nil {
 			if ahc.IsConsistent() {
 				logrus.WithContext(ctx).Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
-				if derr := s.DeleteHost(context.Background(), ahc.ID); derr != nil {
+				if derr := s.DeleteHost(cleanupContextFrom(ctx), ahc.ID); derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
 						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
@@ -808,7 +808,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			// Starting from here, delete created ports if exiting with error
 			defer func() {
 				if innerXErr != nil {
-					if derr := s.deletePortsInSlice(context.Background(), createdPorts); derr != nil {
+					if derr := s.deletePortsInSlice(cleanupContextFrom(ctx), createdPorts); derr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
 					}
 				}
@@ -848,7 +848,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				if innerXErr != nil {
 					if ahc.IsConsistent() {
 						logrus.WithContext(ctx).Debugf("deleting unresponsive server '%s'...", request.ResourceName)
-						if derr := s.DeleteHost(context.Background(), ahc.ID); derr != nil {
+						if derr := s.DeleteHost(cleanupContextFrom(ctx), ahc.ID); derr != nil {
 							logrus.WithContext(ctx).Debugf(derr.Error())
 							_ = innerXErr.AddConsequence(
 								fail.Wrap(
@@ -943,10 +943,9 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
 				logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
-				if derr := s.rpcDeleteFloatingIP(context.Background(), ip.ID); derr != nil {
+				if derr := s.rpcDeleteFloatingIP(cleanupContextFrom(ctx), ip.ID); derr != nil {
 					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
 					_ = ferr.AddConsequence(derr)
-					logrus.Error(derr.Error())
 					return
 				}
 				logrus.WithContext(ctx).Debugf("Cleaning up on failure, floating ip '%s' successfully deleted", ip.ID)
@@ -976,7 +975,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		userData.PublicIP = ip.IP
 	}
 
-	logrus.Infoln(msgSuccess)
+	logrus.WithContext(ctx).Infoln(msgSuccess)
 	return newHost, userData, nil
 }
 
@@ -1090,7 +1089,7 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.deletePortsInSlice(context.Background(), createdPorts); derr != nil {
+			if derr := s.deletePortsInSlice(cleanupContextFrom(ctx), createdPorts); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
 			}
 		}
@@ -1733,7 +1732,7 @@ func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, r
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	// TODO: RESIZE Resize IPAddress HERE
-	logrus.Warn("Trying to resize a Host...") // FIXME: OPP This should trigger a build failure
+	logrus.WithContext(ctx).Warn("Trying to resize a Host...") // FIXME: OPP This should trigger a build failure
 
 	// TODO: RESIZE Call this
 	// servers.Resize()

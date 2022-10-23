@@ -27,6 +27,7 @@ import (
 type NillableInterface interface {
 	IsNil() bool
 }
+
 type Nillable struct {
 	NillableInterface
 	isnil bool

@@ -826,7 +826,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 					return nil
 				})
 				if innerXErr != nil {
-					logrus.Warnf("Failed to set host '%s' metadata about volumes", volumeName)
+					logrus.WithContext(cleanupContextFrom(ctx)).Warnf("Failed to set host '%s' metadata about volumes", volumeName)
 				}
 				return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 					hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
