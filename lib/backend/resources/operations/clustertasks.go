@@ -1092,9 +1092,12 @@ func (instance *Cluster) createHostResources(
 				for _, invol := range hosts {
 					theName := invol.GetName()
 					theID, _ := invol.GetID()
+					iname, _ := instance.getName()
 					if strings.Contains(theName, "master") {
-						if strings.Contains(theName, instance.GetName()) {
-							list = append(list, machineID{ID: theID, Name: invol.GetName()})
+						if len(iname) > 0 {
+							if strings.Contains(theName, iname) {
+								list = append(list, machineID{ID: theID, Name: invol.GetName()})
+							}
 						}
 					}
 				}
@@ -1212,9 +1215,12 @@ func (instance *Cluster) createHostResources(
 				for _, invol := range hosts {
 					theName := invol.GetName()
 					theID, _ := invol.GetID()
+					iname, _ := instance.getName()
 					if strings.Contains(theName, "node") {
-						if strings.Contains(theName, instance.GetName()) {
-							list = append(list, machineID{ID: theID, Name: invol.GetName()})
+						if len(iname) > 0 {
+							if strings.Contains(theName, iname) {
+								list = append(list, machineID{ID: theID, Name: invol.GetName()})
+							}
 						}
 					}
 				}
@@ -2056,15 +2062,16 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params inte
 
 	started := time.Now()
 	defer func() {
+		iname, _ := instance.getName()
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			logrus.WithContext(ctx).Debugf(
-				"[Cluster %s] Masters configuration failed with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr),
+				"[Cluster %s] Masters configuration failed with [%s] in [%s].", iname, spew.Sdump(ferr),
 				temporal.FormatDuration(time.Since(started)),
 			)
 		} else {
 			logrus.WithContext(ctx).Debugf(
-				"[Cluster %s] Masters configuration successful in [%s].", instance.GetName(),
+				"[Cluster %s] Masters configuration successful in [%s].", iname,
 				temporal.FormatDuration(time.Since(started)),
 			)
 		}
@@ -2087,7 +2094,8 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params inte
 		tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 		defer tracer.Exiting()
 
-		logrus.WithContext(ctx).Debugf("[Cluster %s] Configuring masters...", instance.GetName())
+		iname, _ := instance.getName()
+		logrus.WithContext(ctx).Debugf("[Cluster %s] Configuring masters...", iname)
 
 		masters, xerr := instance.unsafeListMasters(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2096,7 +2104,7 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params inte
 			return
 		}
 		if len(masters) == 0 {
-			ar := result{nil, fail.NewError("[Cluster %s] master list cannot be empty.", instance.GetName())}
+			ar := result{nil, fail.NewError("[Cluster %s] master list cannot be empty.", iname)}
 			chRes <- result{nil, ar.rErr}
 			return
 		}
@@ -2132,7 +2140,7 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params inte
 			return
 		}
 
-		logrus.WithContext(ctx).Debugf("[Cluster %s] masters configuration successful", instance.GetName())
+		logrus.WithContext(ctx).Debugf("[Cluster %s] masters configuration successful", iname)
 		chRes <- result{nil, nil}
 
 	}()
@@ -2633,13 +2641,13 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !p.keepOnFailure {
 				if hostInstance != nil {
-					hostName := hostInstance.GetName()
 					if derr := hostInstance.Delete(cleanupContextFrom(ctx)); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
 							// missing Host is considered as a successful deletion, continue
 							debug.IgnoreError2(ctx, derr)
 						default:
+							hostName, _ := hostInstance.getName()
 							_ = ferr.AddConsequence(
 								fail.Wrap(
 									derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr),
@@ -2751,10 +2759,11 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 					)
 				})
 				if derr != nil {
+					iname, _ := instance.getName()
 					_ = ferr.AddConsequence(
 						fail.Wrap(
 							derr, "cleaning up on failure, failed to remove node '%s' from metadata of cluster '%s'",
-							hostInstance.GetName(), instance.GetName(),
+							hostInstance.GetName(), iname,
 						),
 					)
 				}
@@ -2810,15 +2819,16 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interf
 
 	started := time.Now()
 	defer func() {
+		iname, _ := instance.getName()
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			logrus.WithContext(ctx).Debugf(
-				"[Cluster %s] Nodes configuration failed with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr),
+				"[Cluster %s] Nodes configuration failed with [%s] in [%s].", iname, spew.Sdump(ferr),
 				temporal.FormatDuration(time.Since(started)),
 			)
 		} else {
 			logrus.WithContext(ctx).Debugf(
-				"[Cluster %s] Nodes configuration successful in [%s].", instance.GetName(),
+				"[Cluster %s] Nodes configuration successful in [%s].", iname,
 				temporal.FormatDuration(time.Since(started)),
 			)
 		}
@@ -2831,7 +2841,7 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interf
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		clusterName := instance.GetName()
+		clusterName, _ := instance.getName()
 
 		tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 		defer tracer.Exiting()
@@ -2843,7 +2853,7 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interf
 			return
 		}
 		if len(list) == 0 {
-			chRes <- result{nil, fail.NewError("[Cluster %s] node list cannot be empty.", instance.GetName())}
+			chRes <- result{nil, fail.NewError("[Cluster %s] node list cannot be empty.", clusterName)}
 			return
 		}
 
@@ -3250,15 +3260,15 @@ func (instance *Cluster) taskDeleteMaster(inctx context.Context, params interfac
 }
 
 // deleteHostOnFailure deletes a Host with appropriate logs
-func deleteHostOnFailure(inctx context.Context, instance resources.Host) fail.Error {
+func deleteHostOnFailure(inctx context.Context, host resources.Host) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	prefix := "Cleaning up on failure, "
-	hostName := instance.GetName()
+	hostName := host.GetName()
 	logrus.WithContext(ctx).Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
 
-	xerr := instance.Delete(ctx)
+	xerr := host.Delete(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -3337,6 +3347,8 @@ func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, mas
 			return
 		}
 
+		iname, _ := instance.getName()
+
 		rfcItem := Item{
 			Remote:       fmt.Sprintf("%s/%s", utils.TempFolder, "ansible-inventory.py"),
 			RemoteOwner:  "cladm:cladm",
@@ -3352,7 +3364,7 @@ func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, mas
 			fmt.Sprintf("[ -f %sinventory.py ] && sudo rm -f %sinventory.py  || exit 0", target, target),
 			fmt.Sprintf("sudo mv %s_inventory.py %sinventory.py", target, target),
 		}
-		prerr := fmt.Sprintf("[Cluster %s, master %s] Ansible inventory update: ", instance.GetName(), master.GetName())
+		prerr := fmt.Sprintf("[Cluster %s, master %s] Ansible inventory update: ", iname, master.GetName())
 		errmsg := []string{
 			fmt.Sprintf("%sfail to clean up temporaries", prerr),
 			fmt.Sprintf("%sfail to move uploaded inventory", prerr),

@@ -8,7 +8,7 @@ $ ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/maste
 ```
 
 ## Install go
-Should be at least `go` version 1.16; at the time this doc is written, it's 1.17.12.
+Should be at least `go` version 1.17; at the time this doc is written, it's 1.17.12.
 ```bash
 $ brew update
 $ brew install golang

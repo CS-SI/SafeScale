@@ -887,7 +887,12 @@ func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (inter
 }
 
 // Close is called to clean Command (close tunnel(s), remove temporary files, ...)
-func (scmd *CliCommand) Close() fail.Error {
+func (scmd *CliCommand) Close() (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if scmd == nil {
+		return fail.InvalidInstanceError()
+	}
+
 	var err1 error
 
 	if len(scmd.tunnels) > 0 {
