@@ -164,6 +164,32 @@ func (myself *MetadataCore) getName() (string, fail.Error) {
 	return name, nil
 }
 
+func (myself *MetadataCore) IsValid() (bool, fail.Error) {
+	if myself == nil {
+		return false, fail.InvalidInstanceError()
+	}
+
+	aId, xerr := myself.getID()
+	if xerr != nil {
+		return false, nil
+	}
+
+	if aId == "" {
+		return false, nil
+	}
+
+	name, xerr := myself.getName()
+	if xerr != nil {
+		return false, nil
+	}
+
+	if name == "" {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (myself *MetadataCore) IsTaken() bool {
 	taken, ok := myself.taken.Load().(bool)
 	if !ok {
