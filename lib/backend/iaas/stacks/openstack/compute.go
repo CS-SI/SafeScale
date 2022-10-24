@@ -765,16 +765,17 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
+			cleanCtx := cleanupContextFrom(ctx)
 			if ahc.IsConsistent() {
-				logrus.WithContext(ctx).Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
-				if derr := s.DeleteHost(cleanupContextFrom(ctx), ahc.ID); derr != nil {
+				logrus.WithContext(cleanCtx).Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
+				if derr := s.DeleteHost(cleanCtx, ahc.ID); derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
-						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
+						logrus.WithContext(cleanCtx).Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
 					case *fail.ErrTimeout:
-						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
+						logrus.WithContext(cleanCtx).Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
 					default:
-						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
+						logrus.WithContext(cleanCtx).Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
 					}
 					_ = fail.AddConsequence(ferr, derr)
 				}
@@ -786,14 +787,28 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	// Retry creation until success, for 10 minutes
 	var (
-		server       *servers.Server
-		hostNets     []servers.Network
-		hostPorts    []ports.Port
-		createdPorts []string
+		finalServer    *servers.Server
+		finalHostNets  []servers.Network
+		finalHostPorts []ports.Port
 	)
+
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			var hostNets []servers.Network
+			var hostPorts []ports.Port
+			var createdPorts []string
+
+			var server *servers.Server
 			var innerXErr fail.Error
+
+			// Starting from here, delete created ports if exiting with error
+			defer func() {
+				if innerXErr != nil {
+					if derr := s.deletePortsInSlice(cleanupContextFrom(ctx), createdPorts); derr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
+					}
+				}
+			}()
 
 			hostNets, hostPorts, createdPorts, innerXErr = s.identifyOpenstackSubnetsAndPorts(ctx, request, defaultSubnet)
 			if innerXErr != nil {
@@ -805,11 +820,22 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 			}
 
-			// Starting from here, delete created ports if exiting with error
+			// Starting from here, delete host if exiting with error
 			defer func() {
 				if innerXErr != nil {
-					if derr := s.deletePortsInSlice(cleanupContextFrom(ctx), createdPorts); derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
+					cleanCtx := cleanupContextFrom(ctx)
+					if server != nil && server.ID != "" {
+						logrus.WithContext(cleanCtx).Debugf("deleting unresponsive server '%s'...", request.ResourceName)
+						if derr := s.DeleteHost(cleanCtx, server.ID); derr != nil {
+							logrus.WithContext(cleanCtx).Debugf(derr.Error())
+							_ = innerXErr.AddConsequence(
+								fail.Wrap(
+									derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName,
+								),
+							)
+							return
+						}
+						logrus.WithContext(cleanCtx).Debugf("unresponsive server '%s' deleted", request.ResourceName)
 					}
 				}
 			}()
@@ -823,44 +849,13 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 					return fail.Wrap(fail.Cause(innerXErr), "stopping retries")
 				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 					return retry.StopRetryError(innerXErr)
+				default:
+					return innerXErr
 				}
-				if server != nil && server.ID != "" {
-					if rerr := s.DeleteHost(ctx, server.ID); rerr != nil {
-						_ = innerXErr.AddConsequence(
-							fail.Wrap(
-								rerr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName,
-							),
-						)
-					}
-				}
-				return innerXErr
-			}
-			if server == nil || server.ID == "" { // TODO: this should be a validation method
-				innerXErr = fail.NewError("failed to create server")
-				return innerXErr
 			}
 
 			ahc.ID = server.ID
 			ahc.Name = request.ResourceName
-
-			// Starting from here, delete host if exiting with error
-			defer func() {
-				if innerXErr != nil {
-					if ahc.IsConsistent() {
-						logrus.WithContext(ctx).Debugf("deleting unresponsive server '%s'...", request.ResourceName)
-						if derr := s.DeleteHost(cleanupContextFrom(ctx), ahc.ID); derr != nil {
-							logrus.WithContext(ctx).Debugf(derr.Error())
-							_ = innerXErr.AddConsequence(
-								fail.Wrap(
-									derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName,
-								),
-							)
-							return
-						}
-						logrus.WithContext(ctx).Debugf("unresponsive server '%s' deleted", request.ResourceName)
-					}
-				}
-			}()
 
 			creationZone, innerXErr := s.GetAvailabilityZoneOfServer(ctx, ahc.ID)
 			if innerXErr != nil {
@@ -896,6 +891,9 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 			}
 
+			finalHostNets = hostNets
+			finalHostPorts = hostPorts
+
 			return nil
 		},
 		timings.NormalDelay(),
@@ -910,9 +908,9 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		default:
 			cause := fail.Cause(xerr)
 			if _, ok := cause.(*fail.ErrNotAvailable); ok {
-				if server != nil {
-					ahc.ID = server.ID
-					ahc.Name = server.Name
+				if finalServer != nil {
+					ahc.ID = finalServer.ID
+					ahc.Name = finalServer.Name
 					ahc.LastState = hoststate.Error
 				}
 			}
@@ -920,7 +918,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		}
 	}
 
-	newHost, xerr := s.complementHost(ctx, ahc, *server, hostNets, hostPorts)
+	newHost, xerr := s.complementHost(ctx, ahc, *finalServer, finalHostNets, finalHostPorts)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -934,23 +932,27 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 	if s.cfgOpts.UseFloatingIP && request.PublicIP {
 		// Create the floating IP
 		var ip *floatingips.FloatingIP
-		if ip, xerr = s.rpcCreateFloatingIP(ctx); xerr != nil {
-			return nil, nil, xerr
-		}
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
-				if derr := s.rpcDeleteFloatingIP(cleanupContextFrom(ctx), ip.ID); derr != nil {
-					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
-					_ = ferr.AddConsequence(derr)
-					return
+				if ip != nil {
+					cleanupCtx := cleanupContextFrom(ctx)
+					logrus.WithContext(cleanupCtx).Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
+					if derr := s.rpcDeleteFloatingIP(cleanupCtx, ip.ID); derr != nil {
+						derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
+						_ = ferr.AddConsequence(derr)
+						return
+					}
+					logrus.WithContext(cleanupCtx).Debugf("Cleaning up on failure, floating ip '%s' successfully deleted", ip.ID)
 				}
-				logrus.WithContext(ctx).Debugf("Cleaning up on failure, floating ip '%s' successfully deleted", ip.ID)
 			}
 		}()
+
+		if ip, xerr = s.rpcCreateFloatingIP(ctx); xerr != nil {
+			return nil, nil, xerr
+		}
 
 		// Associate floating IP to host
 		xerr = stacks.RetryableRemoteCall(ctx,
@@ -1390,6 +1392,33 @@ func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter)
 		return hoststate.Error, xerr
 	}
 	return host.CurrentState, nil
+}
+
+func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+	if valid.IsNil(s) {
+		return hoststate.Unknown, fail.InvalidInstanceError()
+	}
+
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	if xerr != nil {
+		return hoststate.Unknown, xerr
+	}
+
+	if ahf.Core.ID != "" {
+		server, innerErr := s.rpcGetHostByID(ctx, ahf.Core.ID)
+		if innerErr != nil {
+			return hoststate.Unknown, innerErr
+		}
+
+		return toHostState(server.Status), nil
+	} else {
+		server, innerErr := s.rpcGetHostByName(ctx, ahf.Core.Name)
+		if innerErr != nil {
+			return hoststate.Unknown, innerErr
+		}
+
+		return toHostState(server.Status), nil
+	}
 }
 
 // ListHosts lists all hosts

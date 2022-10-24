@@ -818,6 +818,21 @@ func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter)
 	return host.CurrentState, nil
 }
 
+func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+
+	if valid.IsNil(s) {
+		return hoststate.Error, fail.InvalidInstanceError()
+	}
+
+	host, xerr := s.InspectHost(ctx, hostParam)
+	if xerr != nil {
+		return hoststate.Error, xerr
+	}
+
+	return host.CurrentState, nil
+}
+
 // -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones

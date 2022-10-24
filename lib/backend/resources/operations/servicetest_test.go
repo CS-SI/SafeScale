@@ -145,7 +145,7 @@ func (e *ServiceTestCacheData) Get(ctx context.Context, key interface{}) (interf
 	}
 	return value, nil
 
-	//return e.tq.Push(func() (interface{}, fail.Error) {
+	// return e.tq.Push(func() (interface{}, fail.Error) {
 	//	e.data.mu.RLock()
 	//	defer e.data.mu.RUnlock()
 	//	value, ok := e.data.data[skey]
@@ -153,7 +153,7 @@ func (e *ServiceTestCacheData) Get(ctx context.Context, key interface{}) (interf
 	//		return nil, fail.NotFoundError()
 	//	}
 	//	return value, nil
-	//}, 10*time.Second)
+	// }, 10*time.Second)
 }
 func (e *ServiceTestCacheData) Set(ctx context.Context, key interface{}, object interface{}, options *store.Options) error {
 	skey, ok := key.(string)
@@ -658,7 +658,7 @@ func (e *ServiceTest) _getLogLevel() uint {
 	e.internals.loglevel.mu.RLock()
 	defer e.internals.loglevel.mu.RUnlock()
 	level := e.internals.loglevel.value
-	//e._logf("ServiceTest::_getLogLevel { value: %d }", level)
+	// e._logf("ServiceTest::_getLogLevel { value: %d }", level)
 	return level
 }
 
@@ -1442,17 +1442,17 @@ func (e *ServiceTest) BindSecurityGroupToHost(ctx context.Context, sgParam stack
 	e._logf("ServiceTest::BindSecurityGroupToHost { sgName: \"%s\", host: \"%s\" }", asgName, hostName)
 	return nil
 
-	//sgb := &propertiesv1.SecurityGroupBond{
+	// sgb := &propertiesv1.SecurityGroupBond{
 	//	ID:       hostName,
 	//	Name:     hostName,
 	//	Disabled: true,
-	//}
+	// }
 	//
-	//sg, xerr := LoadSecurityGroup(ctx, e, asgName)
-	//if xerr != nil {
+	// sg, xerr := LoadSecurityGroup(ctx, e, asgName)
+	// if xerr != nil {
 	//	return xerr
-	//}
-	//return sg.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// }
+	// return sg.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 	//	return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 	//		sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 	//		if !ok {
@@ -1462,7 +1462,7 @@ func (e *ServiceTest) BindSecurityGroupToHost(ctx context.Context, sgParam stack
 	//		sghV1.ByName[hostName] = hostName
 	//		return nil
 	//	})
-	//})
+	// })
 
 }
 func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
@@ -1497,11 +1497,11 @@ func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam s
 	e._logf("ServiceTest::UnbindSecurityGroupFromHost { sgName: \"%s\", host: \"%s\" }", asgName, hostName)
 	return nil
 
-	//sg, xerr := LoadSecurityGroup(ctx, e, asgName)
-	//if xerr != nil {
+	// sg, xerr := LoadSecurityGroup(ctx, e, asgName)
+	// if xerr != nil {
 	//	return xerr
-	//}
-	//return sg.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// }
+	// return sg.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 	//	return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 	//		sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 	//		if !ok {
@@ -1521,7 +1521,7 @@ func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam s
 	//		}
 	//		return nil
 	//	})
-	//})
+	// })
 
 }
 
@@ -2331,6 +2331,10 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 }
 func (e *ServiceTest) GetHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	e._survey("ServiceTest::GetHostState (not implemented)")
+	return hoststate.Enum(0), nil
+}
+func (e *ServiceTest) GetTrueHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error) {
+	e._survey("ServiceTest::GetTrueHostState (not implemented)")
 	return hoststate.Enum(0), nil
 }
 func (e *ServiceTest) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {

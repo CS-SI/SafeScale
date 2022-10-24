@@ -55,6 +55,26 @@ func List(ctx context.Context, svc iaas.Service, all bool) (abstract.HostList, f
 	return hosts, xerr
 }
 
+func Wipe(ctx context.Context, svc iaas.Service, all bool) fail.Error {
+	hol, xerr := List(ctx, svc, all)
+	if xerr != nil {
+		return xerr
+	}
+
+	for _, host := range hol {
+		hid, err := host.GetID()
+		if err != nil {
+			continue
+		}
+
+		xerr = svc.DeleteHost(ctx, hid)
+		if xerr != nil {
+			return xerr
+		}
+	}
+	return nil
+}
+
 // New creates an instance of resources.Host
 func New(svc iaas.Service) (_ resources.Host, err fail.Error) {
 	return operations.NewHost(svc)

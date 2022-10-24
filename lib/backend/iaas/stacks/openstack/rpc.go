@@ -311,6 +311,13 @@ func (s stack) rpcCreateServer(ctx context.Context, name string, networks []serv
 		return &servers.Server{}, xerr
 	}
 
+	if server == nil {
+		return nil, fail.NewError("invalid server")
+	}
+	if server.ID == "" {
+		return nil, fail.NewError("invalid server")
+	}
+
 	return server, nil
 }
 

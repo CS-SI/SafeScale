@@ -1011,6 +1011,19 @@ func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter)
 	return host.CurrentState, nil
 }
 
+func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return hoststate.Unknown, fail.InvalidInstanceError()
+	}
+
+	host, xerr := s.InspectHost(ctx, hostParam)
+	if xerr != nil {
+		return hoststate.Error, xerr
+	}
+
+	return host.CurrentState, nil
+}
+
 // ListHosts returns a list of hosts
 func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.HostList, ferr fail.Error) {
 	nullList := abstract.HostList{}

@@ -576,24 +576,15 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	// Retry creation until success, for 10 minutes
 	var (
-		r      servers.CreateResult
-		server *servers.Server
+		finalServer *servers.Server
 	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() (extErr error) {
-					var hr *http.Response
-					hr, r.Err = s.ComputeClient.Post( // nolint
-						s.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
-							OkCodes: []int{200, 202},
-						},
-					)
-					defer closer(hr)
-					var innerErr error
-					server, innerErr = r.Extract()
-					xerr := normalizeError(innerErr)
-					if xerr != nil {
+					var server *servers.Server
+					var r servers.CreateResult
+					defer func() {
 						if server != nil && server.ID != "" {
 							derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
@@ -604,13 +595,38 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 								)
 							}
 						}
+					}()
+
+					var hr *http.Response
+					hr, r.Err = s.ComputeClient.Post( // nolint
+						s.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
+							OkCodes: []int{200, 202},
+						},
+					)
+					defer closer(hr)
+
+					var innerErr error
+					server, innerErr = r.Extract()
+					xerr := normalizeError(innerErr)
+					if xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+							return retry.StopRetryError(xerr)
+						default:
+							return xerr
+						}
 					}
-					switch xerr.(type) {
-					case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
-						return retry.StopRetryError(xerr)
-					default:
-						return xerr
+
+					if server == nil {
+						return fail.NewError("invalid server")
 					}
+
+					if server.ID == "" {
+						return fail.NewError("invalid server")
+					}
+
+					finalServer = server
+					return nil
 				},
 				normalizeError,
 			)
@@ -623,14 +639,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 			}
 
-			ahc.ID = server.ID
-			ahc.Name = server.Name
+			ahc.ID = finalServer.ID
+			ahc.Name = finalServer.Name
 
 			if ahc.ID == "" {
 				return fail.InconsistentError("machine created with empty id")
 			}
 
-			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ctx, server.ID)
+			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ctx, finalServer.ID)
 			if zoneErr != nil {
 				logrus.WithContext(ctx).Tracef("Host successfully created but cannot confirm Availability Zone: %s", zoneErr)
 			} else {
@@ -647,8 +663,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 			defer func() {
 				if innerXErr != nil {
-					if server != nil && server.ID != "" {
-						derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
+					if finalServer != nil && finalServer.ID != "" {
+						derr := servers.Delete(s.ComputeClient, finalServer.ID).ExtractErr()
 						if derr != nil {
 							logrus.WithContext(ctx).Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
 						}
@@ -660,13 +676,13 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			// FIXME: timings.HostOperationTimeout() may not be sufficient time to wait when hosts are created in parallel...
 			//       at least with it's current default value of 2 minutes and at least for flexibleengine provider
 			//       We should think of a way to increase this timing based on number of hosts are created
-			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, 2*timings.HostOperationTimeout())
+			finalServer, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, 2*timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					if server != nil {
-						ahc.ID = server.ID
-						ahc.Name = server.Name
+					if finalServer != nil {
+						ahc.ID = finalServer.ID
+						ahc.Name = finalServer.Name
 						ahc.LastState = hoststate.Error
 					}
 
@@ -714,7 +730,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		}
 	}()
 
-	host, xerr = s.complementHost(ctx, ahc, server)
+	host, xerr = s.complementHost(ctx, ahc, finalServer)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
