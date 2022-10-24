@@ -169,12 +169,12 @@ func (myself *MetadataCore) IsValid() (bool, fail.Error) {
 		return false, fail.InvalidInstanceError()
 	}
 
-	aId, xerr := myself.getID()
+	aID, xerr := myself.getID()
 	if xerr != nil {
 		return false, nil
 	}
 
-	if aId == "" {
+	if aID == "" {
 		return false, nil
 	}
 
