@@ -446,6 +446,8 @@ func toHostState(status string) hoststate.Enum {
 		return hoststate.Stopping
 	case "stopped", "shutoff":
 		return hoststate.Stopped
+	case "":
+		return hoststate.Unknown
 	default:
 		return hoststate.Error
 	}
@@ -876,6 +878,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 			}
 
+			if hs := toHostState(server.Status); hs == hoststate.Error || hs == hoststate.Failed {
+				_ = s.DeleteHost(context.Background(), server.ID)
+				return fail.NewError("host creation of %s failed, wrong status %s", request.ResourceName, hs.String())
+			}
+
 			// Wait that host is ready, not just that the build is started
 			timeout := timings.HostOperationTimeout()
 			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, timeout)
@@ -886,13 +893,13 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				)
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
+					_ = s.DeleteHost(context.Background(), server.ID)
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
+					_ = s.DeleteHost(context.Background(), server.ID)
 					return innerXErr
 				}
 			}
-
-			// FIXME: OPP Fucking incredible, do we need another Hard Reset here ??
 
 			finalServer = server
 			finalHostNets = hostNets

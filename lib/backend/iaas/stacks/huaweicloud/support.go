@@ -13,7 +13,7 @@ func closer(hr *http.Response) {
 	}
 }
 
-func cleanupContextFrom(inctx context.Context) context.Context {
+func cleanupContextFrom(inctx context.Context) context.Context { // nolint
 	if oldKey := inctx.Value("ID"); oldKey != nil {
 		ctx := context.WithValue(context.Background(), "ID", oldKey) // nolint
 		// cleanup functions can look for "cleanup" to decide if a ctx is a cleanup context
