@@ -891,6 +891,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 			}
 
+			finalServer = server
 			finalHostNets = hostNets
 			finalHostPorts = hostPorts
 
@@ -916,6 +917,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			}
 			return nil, nil, xerr
 		}
+	}
+
+	if finalServer == nil {
+		return nil, nil, fail.NewError("invalid server")
 	}
 
 	newHost, xerr := s.complementHost(ctx, ahc, *finalServer, finalHostNets, finalHostPorts)
