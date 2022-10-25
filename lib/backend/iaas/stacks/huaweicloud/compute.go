@@ -575,9 +575,32 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 	// --- query provider for host creation ---
 
 	// Retry creation until success, for 10 minutes
-	var (
-		finalServer *servers.Server
-	)
+	var finalServer *servers.Server
+
+	// Starting from here, delete host if exiting with error
+	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
+			if finalServer != nil && finalServer.ID != "" {
+				cleanCtx := cleanupContextFrom(ctx)
+				derr := s.DeleteHost(cleanCtx, finalServer.ID)
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						logrus.WithContext(cleanCtx).Errorf(
+							"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr,
+						)
+					case *fail.ErrTimeout:
+						logrus.WithContext(cleanCtx).Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
+					default:
+						logrus.WithContext(cleanCtx).Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
+					}
+					_ = ferr.AddConsequence(derr)
+				}
+			}
+		}
+	}()
+
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			select {
@@ -713,29 +736,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		}
 	}
 
-	// Starting from here, delete host if exiting with error
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			if ahc.IsConsistent() {
-				derr := s.DeleteHost(context.Background(), ahc.ID)
-				if derr != nil {
-					switch derr.(type) {
-					case *fail.ErrNotFound:
-						logrus.WithContext(ctx).Errorf(
-							"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr,
-						)
-					case *fail.ErrTimeout:
-						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
-					default:
-						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
-					}
-					_ = ferr.AddConsequence(derr)
-				}
-			}
-		}
-	}()
-
 	host, xerr = s.complementHost(ctx, ahc, finalServer)
 	if xerr != nil {
 		return nil, nil, xerr
@@ -761,9 +761,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := s.DeleteFloatingIP(context.Background(), fip.ID)
+				cleanCtx := cleanupContextFrom(ctx)
+				derr := s.DeleteFloatingIP(cleanCtx, fip.ID)
 				if derr != nil {
-					logrus.WithContext(ctx).Errorf("Error deleting Floating IP: %v", derr)
+					logrus.WithContext(cleanCtx).Errorf("Error deleting Floating IP: %v", derr)
 					_ = ferr.AddConsequence(derr)
 				}
 			}
