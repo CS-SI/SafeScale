@@ -617,11 +617,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 						if server != nil && server.ID != "" {
 							derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
-								_ = xerr.AddConsequence(
-									fail.Wrap(
-										derr, "cleaning up on failure, failed to delete host",
-									),
-								)
+								logrus.WithContext(ctx).Warnf("Failed to delete host: %s", request.ResourceName)
 							}
 						}
 					}()
@@ -652,6 +648,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 					if server.ID == "" {
 						return fail.NewError("invalid server")
+					}
+
+					if hs := toHostState(server.Status); hs == hoststate.Error || hs == hoststate.Failed {
+						_ = s.DeleteHost(context.Background(), server.ID)
+						return fail.NewError("host creation of %s failed, wrong status %s", request.ResourceName, hs.String())
 					}
 
 					finalServer = server
@@ -1606,6 +1607,8 @@ func toHostState(status string) hoststate.Enum {
 		return hoststate.Stopping
 	case "Stopped", "stopped", "SHUTOFF", "shutoff":
 		return hoststate.Stopped
+	case "":
+		return hoststate.Unknown
 	default:
 		return hoststate.Error
 	}
