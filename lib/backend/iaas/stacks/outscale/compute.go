@@ -529,6 +529,12 @@ func (s stack) WaitHostState(ctx context.Context, hostParam stacks.HostParameter
 
 	xerr = retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			st, innerXErr := s.hostState(ctx, ahf.Core.ID)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -919,6 +925,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	var vm osc.Vm
 	xerr = retry.WhileUnsuccessful(
 		func() (ferr error) {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			resp, innerXErr := s.rpcCreateVMs(ctx, vmsRequest)
 			if innerXErr != nil {
 				casted := normalizeError(innerXErr)

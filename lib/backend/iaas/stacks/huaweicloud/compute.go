@@ -580,6 +580,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() (extErr error) {
 					var server *servers.Server
@@ -1323,6 +1329,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 	resourcePresent := true
 	outerRetryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			// 1st, send delete host order
 			if resourcePresent { // nolint
 				innerRetryErr := stacks.RetryableRemoteCall(ctx,
@@ -1346,6 +1358,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 				var host *servers.Server
 				innerRetryErr = retry.WhileUnsuccessful(
 					func() error {
+						select {
+						case <-ctx.Done():
+							return retry.StopRetryError(ctx.Err())
+						default:
+						}
+
 						commRetryErr := stacks.RetryableRemoteCall(ctx,
 							func() (innerErr error) {
 								host, innerErr = servers.Get(s.ComputeClient, hostRef).Extract()
@@ -1478,6 +1496,12 @@ func (s stack) enableHostRouterMode(ctx context.Context, host *abstract.HostFull
 	// Sometimes, getOpenstackPortID doesn't find network interface, so let's retry in case it's a bad timing issue
 	retryErr := retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			var innerErr fail.Error
 			portID, innerErr = s.getOpenstackPortID(ctx, host)
 			if innerErr != nil {

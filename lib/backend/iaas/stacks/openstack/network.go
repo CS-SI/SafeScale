@@ -692,6 +692,12 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
 					return subnets.Delete(s.NetworkClient, id).ExtractErr()

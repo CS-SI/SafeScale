@@ -309,6 +309,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 	// Retry creation until success, for 10 minutes
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			var innerXErr fail.Error
 			ahf, innerXErr = s.buildGcpMachine(ctx, request.ResourceName, an, defaultSubnet, *template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs)
 			if innerXErr != nil {
@@ -402,6 +408,12 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostComplete, innerErr := s.InspectHost(ctx, ahf)
 			if innerErr != nil {
 				return innerErr

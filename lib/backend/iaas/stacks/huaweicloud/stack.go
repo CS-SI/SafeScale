@@ -770,6 +770,12 @@ func (s stack) WaitHostState(ctx context.Context, hostParam stacks.HostParameter
 
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			if ahf.Core.ID != "" {
 				server, innerErr = s.rpcGetHostByID(ctx, ahf.Core.ID)
 			} else {
@@ -957,6 +963,12 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	timeout := timings.OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
 					return volumesv2.Delete(s.VolumeClient, id, nil).ExtractErr()

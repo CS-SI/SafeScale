@@ -794,6 +794,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			var hostNets []servers.Network
 			var hostPorts []ports.Port
 			var createdPorts []string
@@ -871,11 +877,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			}
 
 			// Wait that host is ready, not just that the build is started
-			timings, innerXErr := s.Timings()
-			if innerXErr != nil {
-				return innerXErr
-			}
-
 			timeout := timings.HostOperationTimeout()
 			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, timeout)
 			if innerXErr != nil {
@@ -890,6 +891,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 					return innerXErr
 				}
 			}
+
+			// FIXME: OPP Fucking incredible, do we need another Hard Reset here ??
 
 			finalServer = server
 			finalHostNets = hostNets
@@ -1303,6 +1306,12 @@ func (s stack) WaitHostState(ctx context.Context, hostParam stacks.HostParameter
 
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			if ahf.Core.ID != "" {
 				server, innerErr = s.rpcGetHostByID(ctx, ahf.Core.ID)
 			} else {
@@ -1571,6 +1580,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 	// Try to remove host for 3 minutes
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			if innerXErr := s.rpcDeleteServer(ctx, ahf.Core.ID); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrTimeout:
@@ -1588,6 +1603,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 			var state = hoststate.Unknown
 			innerXErr := retry.WhileUnsuccessful(
 				func() error {
+					select {
+					case <-ctx.Done():
+						return retry.StopRetryError(ctx.Err())
+					default:
+					}
+
 					server, gerr := s.rpcGetServer(ctx, ahf.Core.ID)
 					if gerr != nil {
 						switch gerr.(type) { // nolint

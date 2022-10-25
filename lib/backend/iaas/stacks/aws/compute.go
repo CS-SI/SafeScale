@@ -456,6 +456,12 @@ func (s stack) WaitHostReady(
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, innerXErr := s.InspectHost(ctx, ahf)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -654,6 +660,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 	// Retry creation until success, for 10 minutes
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			var (
 				server    *abstract.HostCore
 				innerXErr fail.Error
@@ -1224,6 +1236,12 @@ func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, graceful
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, err := s.InspectHost(ctx, ahf.Core.ID)
 			if err != nil {
 				return err
@@ -1281,6 +1299,12 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (f
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, innerErr := s.InspectHost(ctx, ahf.Core.ID)
 			if innerErr != nil {
 				return innerErr
@@ -1335,6 +1359,12 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, innerErr := s.InspectHost(ctx, ahf)
 			if innerErr != nil {
 				return innerErr

@@ -139,6 +139,12 @@ func (s stack) WaitForVolumeState(ctx context.Context, volumeID string, state vo
 
 	return retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			vol, innerErr := s.InspectVolume(ctx, volumeID)
 			if innerErr != nil {
 				return innerErr
