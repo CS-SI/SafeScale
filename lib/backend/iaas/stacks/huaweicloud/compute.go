@@ -575,25 +575,45 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 	// --- query provider for host creation ---
 
 	// Retry creation until success, for 10 minutes
-	var (
-		r      servers.CreateResult
-		server *servers.Server
-	)
+	var finalServer *servers.Server
+
+	// Starting from here, delete host if exiting with error
+	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
+			if finalServer != nil && finalServer.ID != "" {
+				cleanCtx := cleanupContextFrom(ctx)
+				derr := s.DeleteHost(cleanCtx, finalServer.ID)
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						logrus.WithContext(cleanCtx).Errorf(
+							"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr,
+						)
+					case *fail.ErrTimeout:
+						logrus.WithContext(cleanCtx).Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
+					default:
+						logrus.WithContext(cleanCtx).Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
+					}
+					_ = ferr.AddConsequence(derr)
+				}
+			}
+		}
+	}()
+
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() (extErr error) {
-					var hr *http.Response
-					hr, r.Err = s.ComputeClient.Post( // nolint
-						s.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
-							OkCodes: []int{200, 202},
-						},
-					)
-					defer closer(hr)
-					var innerErr error
-					server, innerErr = r.Extract()
-					xerr := normalizeError(innerErr)
-					if xerr != nil {
+					var server *servers.Server
+					var r servers.CreateResult
+					defer func() {
 						if server != nil && server.ID != "" {
 							derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
@@ -604,13 +624,38 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 								)
 							}
 						}
+					}()
+
+					var hr *http.Response
+					hr, r.Err = s.ComputeClient.Post( // nolint
+						s.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
+							OkCodes: []int{200, 202},
+						},
+					)
+					defer closer(hr)
+
+					var innerErr error
+					server, innerErr = r.Extract()
+					xerr := normalizeError(innerErr)
+					if xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+							return retry.StopRetryError(xerr)
+						default:
+							return xerr
+						}
 					}
-					switch xerr.(type) {
-					case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
-						return retry.StopRetryError(xerr)
-					default:
-						return xerr
+
+					if server == nil {
+						return fail.NewError("invalid server")
 					}
+
+					if server.ID == "" {
+						return fail.NewError("invalid server")
+					}
+
+					finalServer = server
+					return nil
 				},
 				normalizeError,
 			)
@@ -623,14 +668,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 			}
 
-			ahc.ID = server.ID
-			ahc.Name = server.Name
+			ahc.ID = finalServer.ID
+			ahc.Name = finalServer.Name
 
 			if ahc.ID == "" {
 				return fail.InconsistentError("machine created with empty id")
 			}
 
-			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ctx, server.ID)
+			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ctx, finalServer.ID)
 			if zoneErr != nil {
 				logrus.WithContext(ctx).Tracef("Host successfully created but cannot confirm Availability Zone: %s", zoneErr)
 			} else {
@@ -647,8 +692,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 			defer func() {
 				if innerXErr != nil {
-					if server != nil && server.ID != "" {
-						derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
+					if finalServer != nil && finalServer.ID != "" {
+						derr := servers.Delete(s.ComputeClient, finalServer.ID).ExtractErr()
 						if derr != nil {
 							logrus.WithContext(ctx).Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
 						}
@@ -660,13 +705,13 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			// FIXME: timings.HostOperationTimeout() may not be sufficient time to wait when hosts are created in parallel...
 			//       at least with it's current default value of 2 minutes and at least for flexibleengine provider
 			//       We should think of a way to increase this timing based on number of hosts are created
-			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, 2*timings.HostOperationTimeout())
+			finalServer, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, 2*timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					if server != nil {
-						ahc.ID = server.ID
-						ahc.Name = server.Name
+					if finalServer != nil {
+						ahc.ID = finalServer.ID
+						ahc.Name = finalServer.Name
 						ahc.LastState = hoststate.Error
 					}
 
@@ -691,30 +736,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		}
 	}
 
-	// Starting from here, delete host if exiting with error
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			if ahc.IsConsistent() {
-				derr := s.DeleteHost(context.Background(), ahc.ID)
-				if derr != nil {
-					switch derr.(type) {
-					case *fail.ErrNotFound:
-						logrus.WithContext(ctx).Errorf(
-							"Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr,
-						)
-					case *fail.ErrTimeout:
-						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
-					default:
-						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
-					}
-					_ = ferr.AddConsequence(derr)
-				}
-			}
-		}
-	}()
-
-	host, xerr = s.complementHost(ctx, ahc, server)
+	host, xerr = s.complementHost(ctx, ahc, finalServer)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -739,9 +761,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := s.DeleteFloatingIP(context.Background(), fip.ID)
+				cleanCtx := cleanupContextFrom(ctx)
+				derr := s.DeleteFloatingIP(cleanCtx, fip.ID)
 				if derr != nil {
-					logrus.WithContext(ctx).Errorf("Error deleting Floating IP: %v", derr)
+					logrus.WithContext(cleanCtx).Errorf("Error deleting Floating IP: %v", derr)
 					_ = ferr.AddConsequence(derr)
 				}
 			}
@@ -1307,6 +1330,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 	resourcePresent := true
 	outerRetryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			// 1st, send delete host order
 			if resourcePresent { // nolint
 				innerRetryErr := stacks.RetryableRemoteCall(ctx,
@@ -1330,6 +1359,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 				var host *servers.Server
 				innerRetryErr = retry.WhileUnsuccessful(
 					func() error {
+						select {
+						case <-ctx.Done():
+							return retry.StopRetryError(ctx.Err())
+						default:
+						}
+
 						commRetryErr := stacks.RetryableRemoteCall(ctx,
 							func() (innerErr error) {
 								host, innerErr = servers.Get(s.ComputeClient, hostRef).Extract()
@@ -1462,6 +1497,12 @@ func (s stack) enableHostRouterMode(ctx context.Context, host *abstract.HostFull
 	// Sometimes, getOpenstackPortID doesn't find network interface, so let's retry in case it's a bad timing issue
 	retryErr := retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			var innerErr fail.Error
 			portID, innerErr = s.getOpenstackPortID(ctx, host)
 			if innerErr != nil {

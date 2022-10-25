@@ -456,6 +456,12 @@ func (s stack) WaitHostReady(
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, innerXErr := s.InspectHost(ctx, ahf)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -654,6 +660,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 	// Retry creation until success, for 10 minutes
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			var (
 				server    *abstract.HostCore
 				innerXErr fail.Error
@@ -1011,6 +1023,19 @@ func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter)
 	return host.CurrentState, nil
 }
 
+func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
+	if valid.IsNil(s) {
+		return hoststate.Unknown, fail.InvalidInstanceError()
+	}
+
+	host, xerr := s.InspectHost(ctx, hostParam)
+	if xerr != nil {
+		return hoststate.Error, xerr
+	}
+
+	return host.CurrentState, nil
+}
+
 // ListHosts returns a list of hosts
 func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.HostList, ferr fail.Error) {
 	nullList := abstract.HostList{}
@@ -1211,6 +1236,12 @@ func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, graceful
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, err := s.InspectHost(ctx, ahf.Core.ID)
 			if err != nil {
 				return err
@@ -1268,6 +1299,12 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (f
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, innerErr := s.InspectHost(ctx, ahf.Core.ID)
 			if innerErr != nil {
 				return innerErr
@@ -1322,6 +1359,12 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, innerErr := s.InspectHost(ctx, ahf)
 			if innerErr != nil {
 				return innerErr

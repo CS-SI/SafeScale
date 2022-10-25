@@ -819,6 +819,12 @@ func (s stack) createSubnet(ctx context.Context, req abstract.SubnetRequest) (*s
 
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
 					var hr *http.Response

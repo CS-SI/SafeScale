@@ -363,6 +363,8 @@ func (handler *hostHandler) Delete(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
+	// FIXME: OPP The same mistake one more time
+
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
 		return xerr

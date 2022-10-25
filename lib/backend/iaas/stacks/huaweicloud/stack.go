@@ -639,6 +639,33 @@ func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter)
 	return host.CurrentState, nil
 }
 
+func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+	if valid.IsNil(s) {
+		return hoststate.Unknown, fail.InvalidInstanceError()
+	}
+
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	if xerr != nil {
+		return hoststate.Unknown, xerr
+	}
+
+	if ahf.Core.ID != "" {
+		server, innerErr := s.rpcGetHostByID(ctx, ahf.Core.ID)
+		if innerErr != nil {
+			return hoststate.Unknown, innerErr
+		}
+
+		return toHostState(server.Status), nil
+	} else {
+		server, innerErr := s.rpcGetHostByName(ctx, ahf.Core.Name)
+		if innerErr != nil {
+			return hoststate.Unknown, innerErr
+		}
+
+		return toHostState(server.Status), nil
+	}
+}
+
 // StopHost stops the host identified by id
 func (s stack) StopHost(ctx context.Context, hostParam stacks.HostParameter, gracefully bool) fail.Error {
 	if valid.IsNil(s) {
@@ -743,6 +770,12 @@ func (s stack) WaitHostState(ctx context.Context, hostParam stacks.HostParameter
 
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			if ahf.Core.ID != "" {
 				server, innerErr = s.rpcGetHostByID(ctx, ahf.Core.ID)
 			} else {
@@ -930,6 +963,12 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	timeout := timings.OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
 					return volumesv2.Delete(s.VolumeClient, id, nil).ExtractErr()

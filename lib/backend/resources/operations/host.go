@@ -1396,6 +1396,24 @@ func (instance *Host) implCreate(
 			return xerr
 		}
 
+		var trueState hoststate.Enum
+		hostID, err := instance.GetID()
+		if err != nil {
+			chRes <- result{nil, fail.ConvertError(err)}
+			return fail.ConvertError(err)
+		}
+
+		// FIXME: OPP Again another problem
+		trueState, err = svc.GetTrueHostState(ctx, hostID)
+		if err != nil {
+			chRes <- result{nil, fail.ConvertError(err)}
+			return fail.ConvertError(err)
+		}
+		if trueState == hoststate.Error {
+			chRes <- result{nil, fail.ConvertError(fmt.Errorf("broken machine"))}
+			return fail.ConvertError(fmt.Errorf("broken machine"))
+		}
+
 		if !valid.IsNil(ahf) {
 			if !valid.IsNil(ahf.Core) {
 				logrus.WithContext(ctx).Debugf("Marking instance '%s' as started", instance.GetName())

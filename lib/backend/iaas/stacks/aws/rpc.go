@@ -1880,6 +1880,12 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 	// Wait for effective removal of host (status terminated)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			resp, innerXErr := s.rpcDescribeInstances(ctx, []*string{instance.InstanceId})
 			if innerXErr != nil {
 				switch innerXErr.(type) {

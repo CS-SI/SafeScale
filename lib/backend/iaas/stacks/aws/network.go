@@ -94,6 +94,12 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 	if IsOperation(theVpc, "State", reflect.TypeOf("")) {
 		retryErr := retry.WhileUnsuccessful(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				vpcTmp, innerXErr := s.rpcDescribeVpcByID(ctx, theVpc.VpcId)
 				if innerXErr != nil {
 					return innerXErr
@@ -420,6 +426,12 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (re
 	if IsOperation(resp, "State", reflect.TypeOf("")) {
 		retryErr := retry.WhileUnsuccessful(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				descr, innerXErr := s.rpcDescribeSubnetByID(ctx, resp.SubnetId)
 				if innerXErr != nil {
 					return innerXErr
