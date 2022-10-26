@@ -512,7 +512,7 @@ func TestHost_GetState(t *testing.T) {
 func TestHost_Create(t *testing.T) {
 
 	// Remove sleep delay wait send rebbot command, else test is too long
-	os.Setenv("SAFESCALE_REBOOT_TIMEOUT", "0")
+	os.Setenv("SAFESCALE_REBOOT_TIMEOUT", "1")
 
 	ctx := context.Background()
 
