@@ -285,6 +285,12 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 	retcode := -1
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			iretcode, istdout, istderr, xerr := sshConn.CopyWithTimeout(
 				ctx, remotePath, localPath, upload, executionTimeout,
 			)

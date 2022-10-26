@@ -610,6 +610,12 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			theTime := timings.HostLongOperationTimeout()
 			if upload {
 				fi, err := os.Stat(localPath)

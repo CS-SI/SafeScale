@@ -15,7 +15,7 @@ generate: sdk
 
 sdk:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building using $(GOMODPATH)/pkg/mod, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;
-	@ln -f -s $(GOMODPATH)/pkg/mod/google.golang.org/protobuf@v1.28.0 $(GOMODPATH)/pkg/mod/google.golang.org/protobuf 2> /dev/null || true
+	@ln -f -s $(GOMODPATH)/pkg/mod/google.golang.org/protobuf@v1.28.1 $(GOMODPATH)/pkg/mod/google.golang.org/protobuf 2> /dev/null || true
 	@protoc -I. -I$(GOMODPATH)/pkg/mod --go_out=. --go-grpc_out=. safescale.proto
 
 has_python:
