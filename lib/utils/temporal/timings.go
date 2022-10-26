@@ -164,6 +164,7 @@ func NewTimings() *MutableTimings {
 			Context:                ContextTimeout(),
 			HostCreation:           HostCreationTimeout(),
 			HostCleanup:            HostCleanupTimeout(),
+			HostBoot:               HostBootTimeout(),
 			HostOperation:          HostOperationTimeout(),
 			HostLongOperation:      HostLongOperationTimeout(),
 			Operation:              OperationTimeout(),
@@ -191,6 +192,7 @@ func (t *MutableTimings) Update(a *MutableTimings) error {
 	t.Timeouts.Connection = a.Timeouts.Connection
 	t.Timeouts.Context = a.Timeouts.Context
 	t.Timeouts.HostCreation = a.HostCreation
+	t.Timeouts.HostBoot = a.HostBoot
 	t.Timeouts.HostCleanup = a.Timeouts.HostCleanup
 	t.Timeouts.HostOperation = a.HostOperation
 	t.Timeouts.HostLongOperation = a.Timeouts.HostLongOperation

@@ -511,8 +511,9 @@ func TestHost_GetState(t *testing.T) {
 
 func TestHost_Create(t *testing.T) {
 
-	// Remove sleep delay wait send rebbot command, else test is too long
+	// Remove sleep delay wait send reboot command, else test is too long
 	os.Setenv("SAFESCALE_REBOOT_TIMEOUT", "0")
+	defer os.Unsetenv("SAFESCALE_REBOOT_TIMEOUT")
 
 	ctx := context.Background()
 
@@ -545,7 +546,6 @@ func TestHost_Create(t *testing.T) {
 	}
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
-
 		host, err := LoadHost(ctx, svc, "MyHostTest")
 		require.Nil(t, host)
 		require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotFound")
@@ -593,7 +593,7 @@ func TestHost_Create(t *testing.T) {
 		svc._setLogLevel(2)
 		ua, xerr := ohost.Create(ctx, hostReq, hostDef)
 		require.EqualValues(t, reflect.TypeOf(ua).String(), "*userdata.Content")
-
+		// require.Nil(t, xerr)
 	})
 	require.Nil(t, xerr)
 

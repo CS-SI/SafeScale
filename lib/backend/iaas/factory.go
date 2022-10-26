@@ -74,8 +74,8 @@ func GetTenants() ([]map[string]interface{}, fail.Error) {
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(tenantName, metadataVersion string) (newService Service, ferr fail.Error) {
-	ctx := context.Background() // FIXME: Check context
+func UseService(inctx context.Context, tenantName string, metadataVersion string) (newService Service, ferr fail.Error) {
+	ctx := inctx
 
 	defer fail.OnExitLogError(ctx, &ferr)
 	defer fail.OnPanic(&ferr)

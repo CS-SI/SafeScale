@@ -43,6 +43,7 @@ func TestMutableTimings_Update(t *testing.T) {
 	a.Timeouts.Metadata = 0
 	a.Timeouts.MetadataReadAfterWrite = 0
 	a.Timeouts.Operation = 0
+	a.Timeouts.HostBoot = 0
 	a.Delays.Small = 0
 	a.Delays.Normal = 0
 	a.Delays.Big = 0
@@ -60,6 +61,7 @@ func TestMutableTimings_Update(t *testing.T) {
 	b.Delays.Small = 11
 	b.Delays.Normal = 12
 	b.Delays.Big = 13
+	b.Timeouts.HostBoot = 14
 
 	_ = a.Update(b)
 
@@ -76,6 +78,7 @@ func TestMutableTimings_Update(t *testing.T) {
 	require.EqualValues(t, a.Small, 11)
 	require.EqualValues(t, a.Normal, 12)
 	require.EqualValues(t, a.Big, 13)
+	require.EqualValues(t, a.HostBoot, 14)
 
 }
 
