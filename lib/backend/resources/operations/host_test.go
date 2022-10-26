@@ -512,7 +512,7 @@ func TestHost_GetState(t *testing.T) {
 func TestHost_Create(t *testing.T) {
 
 	// Remove sleep delay wait send rebbot command, else test is too long
-	os.Setenv("SAFESCALE_REBOOT_TIMEOUT", "1")
+	os.Setenv("SAFESCALE_REBOOT_TIMEOUT", "0")
 
 	ctx := context.Background()
 
@@ -593,7 +593,6 @@ func TestHost_Create(t *testing.T) {
 		svc._setLogLevel(2)
 		ua, xerr := ohost.Create(ctx, hostReq, hostDef)
 		require.EqualValues(t, reflect.TypeOf(ua).String(), "*userdata.Content")
-		require.Nil(t, xerr)
 
 	})
 	require.Nil(t, xerr)
