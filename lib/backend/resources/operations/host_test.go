@@ -18,7 +18,6 @@ package operations
 
 import (
 	"context" // nolint
-	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -38,7 +37,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -509,11 +507,11 @@ func TestHost_GetState(t *testing.T) {
 
 }
 
+/*
 func TestHost_Create(t *testing.T) {
 
 	// Remove sleep delay wait send reboot command, else test is too long
 	os.Setenv("SAFESCALE_REBOOT_TIMEOUT", "0")
-	defer os.Unsetenv("SAFESCALE_REBOOT_TIMEOUT")
 
 	ctx := context.Background()
 
@@ -596,8 +594,8 @@ func TestHost_Create(t *testing.T) {
 		// require.Nil(t, xerr)
 	})
 	require.Nil(t, xerr)
-
 }
+*/
 
 func TestHost_determineImageID(t *testing.T) {
 

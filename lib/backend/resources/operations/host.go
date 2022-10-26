@@ -1323,6 +1323,8 @@ func (instance *Host) implCreate(
 						if numReboots == 1 {
 							chRes <- result{nil, fail.Wrap(xerr, "timeout after Host creation waiting for SSH availability")}
 							return xerr
+						} else {
+							continue
 						}
 					default:
 						if abstract.IsProvisioningError(xerr) {
