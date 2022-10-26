@@ -29,8 +29,11 @@ const (
 	// defaultHostOperationTimeout default timeout to handle operations
 	defaultHostOperationTimeout = 120 * time.Second
 
-	// defaultHostCreationTimeout timeout for grpc command relative to host creation
-	defaultHostCreationTimeout = 8 * time.Minute
+	// defaultHostBootTimeout default boot timeout
+	defaultHostBootTimeout = 3 * time.Minute
+
+	// defaultHostCreationTimeout timeout for grpc command relative to host creation (3x boot + 1)
+	defaultHostCreationTimeout = 10 * time.Minute
 
 	// defaultHostLongOperationTimeout is a Long timeout
 	defaultHostLongOperationTimeout = 14 * time.Minute
@@ -59,7 +62,7 @@ const (
 	// defaultExecutionTimeout is the default linux command operation timeout
 	defaultExecutionTimeout = 8 * time.Minute
 
-	// DefaultMetadataReadAfterWriteTimeout is the default timeout applied to validate metadata write is effective
+	// defaultMetadataReadAfterWriteTimeout is the default timeout applied to validate metadata write is effective
 	defaultMetadataReadAfterWriteTimeout = 30 * time.Second
 
 	// defaultSmallDelay is the predefined small delay
@@ -86,6 +89,9 @@ type Timings interface {
 
 	// HostCreationTimeout ...
 	HostCreationTimeout() time.Duration
+
+	// HostBootTimeout ...
+	HostBootTimeout() time.Duration
 
 	// HostCleanupTimeout ...
 	HostCleanupTimeout() time.Duration
@@ -127,6 +133,7 @@ type Timeouts struct {
 	Connection             time.Duration `json:"timeout_connection,omitempty" mapstructure:"connection"`
 	Context                time.Duration `json:"timeout_context,omitempty" mapstructure:"context"`
 	HostCreation           time.Duration `json:"timeout_host_creation,omitempty" mapstructure:"hostcreation"`
+	HostBoot               time.Duration `json:"timeout_host_boot,omitempty" mapstructure:"hostboot"`
 	HostCleanup            time.Duration `json:"timeout_host_cleanup,omitempty" mapstructure:"hostcleanup"`
 	HostOperation          time.Duration `json:"timeout_host_operation,omitempty" mapstructure:"hostoperation"`
 	HostLongOperation      time.Duration `json:"timeout_host_long_operation,omitempty" mapstructure:"hostlongoperation"`
@@ -242,6 +249,15 @@ func (t *MutableTimings) HostCreationTimeout() time.Duration {
 	}
 
 	return t.Timeouts.HostCreation
+}
+
+// HostBootTimeout ...
+func (t *MutableTimings) HostBootTimeout() time.Duration {
+	if t == nil {
+		return HostBootTimeout()
+	}
+
+	return t.Timeouts.HostBoot
 }
 
 // HostCleanupTimeout returns the configured timeout for host cleanup
@@ -385,6 +401,11 @@ func OperationTimeout() time.Duration {
 // HostCreationTimeout ...
 func HostCreationTimeout() time.Duration {
 	return getFromEnv(defaultHostCreationTimeout, "SAFESCALE_HOST_CREATION_TIMEOUT")
+}
+
+// HostBootTimeout ...
+func HostBootTimeout() time.Duration {
+	return getFromEnv(defaultHostBootTimeout, "SAFESCALE_HOST_BOOT_TIMEOUT")
 }
 
 // HostCleanupTimeout ...

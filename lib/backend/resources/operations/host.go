@@ -1273,13 +1273,18 @@ func (instance *Host) implCreate(
 			}
 		}
 
+		timings, xerr := svc.Timings()
+		if xerr != nil {
+			return xerr
+		}
+
 		// A Host claimed ready by a Cloud provider is not necessarily ready
 		// to be used until ssh service is up and running. So we wait for it before
 		// claiming Host is created
 		logrus.WithContext(ctx).Infof("Waiting SSH availability on Host '%s' ...", instance.GetName())
 
 		maybePackerFailure := false
-		status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, 3*time.Minute) // FIXME: OPP Hardcoded timeout
+		status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, timings.HostBootTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -1295,34 +1300,38 @@ func (instance *Host) implCreate(
 			}
 		}
 
-		if maybePackerFailure {
-			logrus.WithContext(ctx).Warningf("Hard Rebooting the host %s", instance.GetName())
-			hostID, err := instance.GetID()
-			if err != nil {
-				chRes <- result{nil, fail.ConvertError(err)}
-				return fail.ConvertError(err)
-			}
+		for numReboots := 0; numReboots < 2; numReboots++ { // 2 reboots at most
+			if maybePackerFailure {
+				logrus.WithContext(ctx).Warningf("Hard Rebooting the host %s", instance.GetName())
+				hostID, err := instance.GetID()
+				if err != nil {
+					chRes <- result{nil, fail.ConvertError(err)}
+					return fail.ConvertError(err)
+				}
 
-			xerr = svc.RebootHost(ctx, hostID)
-			if xerr != nil {
-				chRes <- result{nil, xerr}
-				return xerr
-			}
-
-			status, xerr = instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, 3*time.Minute) // FIXME: OPP Hardcoded timeout
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrTimeout:
-					chRes <- result{nil, fail.Wrap(xerr, "timeout after Host creation waiting for SSH availability")}
-					return xerr
-				default:
-					if abstract.IsProvisioningError(xerr) {
-						chRes <- result{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", instance.GetName())}
-						return
-					}
+				xerr = svc.RebootHost(ctx, hostID)
+				if xerr != nil {
 					chRes <- result{nil, xerr}
 					return xerr
+				}
+
+				status, xerr = instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, timings.HostBootTimeout())
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrTimeout:
+						if numReboots == 1 {
+							chRes <- result{nil, fail.Wrap(xerr, "timeout after Host creation waiting for SSH availability")}
+							return xerr
+						}
+					default:
+						if abstract.IsProvisioningError(xerr) {
+							chRes <- result{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", instance.GetName())}
+							return
+						}
+						chRes <- result{nil, xerr}
+						return xerr
+					}
 				}
 			}
 		}

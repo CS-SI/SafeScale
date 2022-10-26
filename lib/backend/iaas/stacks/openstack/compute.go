@@ -879,7 +879,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			}
 
 			if hs := toHostState(server.Status); hs == hoststate.Error || hs == hoststate.Failed {
-				_ = s.DeleteHost(context.Background(), server.ID)
+				_ = s.DeleteHost(cleanupContextFrom(ctx), server.ID)
 				return fail.NewError("host creation of %s failed, wrong status %s", request.ResourceName, hs.String())
 			}
 
@@ -893,10 +893,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				)
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					_ = s.DeleteHost(context.Background(), server.ID)
+					_ = s.DeleteHost(cleanupContextFrom(ctx), server.ID)
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
-					_ = s.DeleteHost(context.Background(), server.ID)
+					_ = s.DeleteHost(cleanupContextFrom(ctx), server.ID)
 					return innerXErr
 				}
 			}

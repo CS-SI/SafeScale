@@ -576,8 +576,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	// Retry creation until success, for 10 minutes
 	var (
-		r      servers.CreateResult
-		server *servers.Server
+		finalServer *servers.Server
 	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -595,7 +594,9 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 					default:
 					}
 
+					var r servers.CreateResult
 					var hr *http.Response
+					var server *servers.Server
 					hr, r.Err = s.ComputeClient.Post( // nolint
 						s.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
 							OkCodes: []int{200, 202},
@@ -616,13 +617,16 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 								)
 							}
 						}
+						switch xerr.(type) {
+						case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+							return retry.StopRetryError(xerr)
+						default:
+							return xerr
+						}
 					}
-					switch xerr.(type) {
-					case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
-						return retry.StopRetryError(xerr)
-					default:
-						return xerr
-					}
+
+					finalServer = server
+					return nil
 				},
 				normalizeError,
 			)
@@ -635,14 +639,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 			}
 
-			ahc.ID = server.ID
-			ahc.Name = server.Name
+			ahc.ID = finalServer.ID
+			ahc.Name = finalServer.Name
 
 			if ahc.ID == "" {
 				return fail.InconsistentError("machine created with empty id")
 			}
 
-			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ctx, server.ID)
+			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ctx, finalServer.ID)
 			if zoneErr != nil {
 				logrus.WithContext(ctx).Tracef("Host successfully created but cannot confirm Availability Zone: %s", zoneErr)
 			} else {
@@ -659,8 +663,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 			defer func() {
 				if innerXErr != nil {
-					if server != nil && server.ID != "" {
-						derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
+					if finalServer != nil && finalServer.ID != "" {
+						derr := servers.Delete(s.ComputeClient, finalServer.ID).ExtractErr()
 						if derr != nil {
 							logrus.WithContext(ctx).Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
 						}
@@ -669,21 +673,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			}()
 
 			// Wait that host is ready, not just that the build is started
-			// FIXME: timings.HostOperationTimeout() may not be sufficient time to wait when hosts are created in parallel...
-			//       at least with it's current default value of 2 minutes and at least for flexibleengine provider
-			//       We should think of a way to increase this timing based on number of hosts are created
-			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, 2*timings.HostOperationTimeout())
+			finalServer, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, 2*timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					if server != nil {
-						ahc.ID = server.ID
-						ahc.Name = server.Name
-						ahc.LastState = hoststate.Error
-					}
-
+					_ = s.DeleteHost(cleanupContextFrom(ctx), finalServer.ID)
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
+					_ = s.DeleteHost(cleanupContextFrom(ctx), finalServer.ID)
 					return innerXErr
 				}
 			}
@@ -708,7 +705,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			if ahc.IsConsistent() {
-				derr := s.DeleteHost(context.Background(), ahc.ID)
+				derr := s.DeleteHost(cleanupContextFrom(ctx), ahc.ID)
 				if derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
@@ -726,7 +723,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		}
 	}()
 
-	host, xerr = s.complementHost(ctx, ahc, server)
+	host, xerr = s.complementHost(ctx, ahc, finalServer)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -740,24 +737,27 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	if request.PublicIP {
 		var fip *FloatingIP
+
+		// Starting from here, delete Floating IP if exiting with error
+		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
+			if ferr != nil {
+				if fip != nil {
+					derr := s.DeleteFloatingIP(cleanupContextFrom(ctx), fip.ID)
+					if derr != nil {
+						logrus.WithContext(ctx).Errorf("Error deleting Floating IP: %v", derr)
+						_ = ferr.AddConsequence(derr)
+					}
+				}
+			}
+		}()
+
 		if fip, xerr = s.attachFloatingIP(ctx, host); xerr != nil {
 			return nil, userData, fail.Wrap(xerr, "error attaching public IP for host '%s'", request.ResourceName)
 		}
 		if fip == nil {
 			return nil, userData, fail.NewError("error attaching public IP for host: unknown error")
 		}
-
-		// Starting from here, delete Floating IP if exiting with error
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil {
-				derr := s.DeleteFloatingIP(context.Background(), fip.ID)
-				if derr != nil {
-					logrus.WithContext(ctx).Errorf("Error deleting Floating IP: %v", derr)
-					_ = ferr.AddConsequence(derr)
-				}
-			}
-		}()
 
 		if valid.IsIPv4(fip.PublicIPAddress) {
 			host.Networking.PublicIPv4 = fip.PublicIPAddress
@@ -1247,7 +1247,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 	if xerr != nil {
 		return emptyList, xerr
 	}
-	// VPL: empty host list is not an abnormal situation, do not log or raise error
+
 	return hostList, nil
 }
 
