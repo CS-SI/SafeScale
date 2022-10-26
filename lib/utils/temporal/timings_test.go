@@ -141,7 +141,7 @@ func TestMutableTimings_OperationTimeout(t *testing.T) {
 func TestMutableTimings_HostCreationTimeout(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.HostCreationTimeout(), 8*time.Minute)
+	require.EqualValues(t, mt.HostCreationTimeout(), 10*time.Minute)
 
 	mt = NewTimings()
 	mt.Timeouts.HostCreation = 42 * time.Second
