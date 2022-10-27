@@ -850,6 +850,9 @@ func (instance *Host) Create(
 
 	select {
 	case res := <-chRes: // if it works return the result
+		if res.ct == nil && res.err == nil {
+			return nil, fail.NewError("creation failed unexpectedly")
+		}
 		return res.ct, res.err
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())

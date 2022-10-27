@@ -262,7 +262,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 		}()
 
 		// Creates and configures hosts
-		xerr = instance.createHostResources(ctx, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, ExtractFeatureParameters(req.FeatureParameters), req.KeepOnFailure)
+		xerr = instance.createHostResources(ctx, subnetInstance, *mastersDef, *nodesDef, req, ExtractFeatureParameters(req.FeatureParameters), req.KeepOnFailure)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
@@ -982,7 +982,7 @@ func (instance *Cluster) createHostResources(
 	subnet resources.Subnet,
 	mastersDef abstract.HostSizingRequirements,
 	nodesDef abstract.HostSizingRequirements,
-	initialNodeCount uint,
+	cluReq abstract.ClusterRequest,
 	parameters data.Map,
 	keepOnFailure bool,
 ) (_ fail.Error) {
@@ -1092,7 +1092,7 @@ func (instance *Cluster) createHostResources(
 				for _, invol := range hosts {
 					theName := invol.GetName()
 					theID, _ := invol.GetID()
-					iname, _ := instance.getName()
+					iname := cluReq.Name
 					if strings.Contains(theName, "master") {
 						if len(iname) > 0 {
 							if strings.Contains(theName, iname) {
@@ -1215,7 +1215,7 @@ func (instance *Cluster) createHostResources(
 				for _, invol := range hosts {
 					theName := invol.GetName()
 					theID, _ := invol.GetID()
-					iname, _ := instance.getName()
+					iname := cluReq.Name
 					if strings.Contains(theName, "node") {
 						if len(iname) > 0 {
 							if strings.Contains(theName, iname) {
@@ -1244,7 +1244,7 @@ func (instance *Cluster) createHostResources(
 		egNod := new(errgroup.Group)
 		egNod.Go(func() error {
 			_, xerr := instance.taskCreateNodes(ctx, taskCreateNodesParameters{
-				count:         initialNodeCount,
+				count:         cluReq.InitialNodeCount,
 				public:        false,
 				nodesDef:      nodesDef,
 				keepOnFailure: keepOnFailure,
@@ -2000,7 +2000,7 @@ func (instance *Cluster) taskCreateMaster(inctx context.Context, params interfac
 			return ar.rErr
 		}
 
-		hostLabel = fmt.Sprintf("master (%s)", hostInstance.GetName())
+		hostLabel = fmt.Sprintf("master (%s)", hostReq.ResourceName)
 
 		xerr = instance.installNodeRequirements(ctx, clusternodetype.Master, hostInstance, hostLabel)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2165,7 +2165,6 @@ type taskConfigureMasterParameters struct {
 // taskConfigureMaster configures one master
 func (instance *Cluster) taskConfigureMaster(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	var xerr fail.Error
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -2205,6 +2204,17 @@ func (instance *Cluster) taskConfigureMaster(inctx context.Context, params inter
 			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/master/%s", oldKey, p.Host.GetName())) // nolint
 		}
 		logrus.WithContext(ctx).Debugf("starting configuration...")
+
+		does, xerr := p.Host.Exists(ctx)
+		if xerr != nil {
+			chRes <- result{nil, xerr}
+			return
+		}
+
+		if !does {
+			chRes <- result{nil, nil}
+			return
+		}
 
 		// install docker feature (including docker-compose)
 		hostLabel := fmt.Sprintf("master (%s)", p.Host.GetName())
@@ -2966,7 +2976,22 @@ func (instance *Cluster) taskConfigureNode(inctx context.Context, params interfa
 		hostInstance, xerr := LoadHost(ctx, instance.Service(), p.node.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			chRes <- result{nil, fail.Wrap(xerr, "failed to get metadata of node '%s'", p.node.Name)}
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+			default:
+				chRes <- result{nil, fail.Wrap(xerr, "failed to get metadata of node '%s'", p.node.Name)}
+				return
+			}
+		}
+
+		does, xerr := hostInstance.Exists(ctx)
+		if xerr != nil {
+			chRes <- result{nil, xerr}
+			return
+		}
+
+		if !does {
+			chRes <- result{nil, nil}
 			return
 		}
 
@@ -3288,6 +3313,7 @@ type taskUpdateClusterInventoryMasterParameters struct {
 	ctx           context.Context
 	master        resources.Host
 	inventoryData string
+	clusterName   string
 }
 
 // taskUpdateClusterInventoryMaster task to update a Host (master) ansible inventory

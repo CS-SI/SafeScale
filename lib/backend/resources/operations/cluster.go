@@ -2877,6 +2877,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 					ctx:           ctx,
 					master:        masters[master],
 					inventoryData: dataBuffer.String(),
+					clusterName:   params["Clustername"].(string),
 				})
 				return err
 			})
