@@ -1361,13 +1361,15 @@ func (sconf *Profile) copy(
 
 	// Do not forget to close sshCommand, allowing the SSH tunnel close and corresponding process cleanup
 	defer func() {
-		derr := sshCommand.Close()
-		if derr != nil {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
-			} else {
-				ferr = derr
+		if sshCommand != nil {
+			derr := sshCommand.Close()
+			if derr != nil {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
+				} else {
+					ferr = derr
+				}
 			}
 		}
 	}()

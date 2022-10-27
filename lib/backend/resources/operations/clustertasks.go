@@ -160,9 +160,9 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 		var subnetInstance resources.Subnet
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && !req.KeepOnFailure { // FIXME: subnetInstance nil
+			if ferr != nil && !req.KeepOnFailure {
 				if subnetInstance != nil && networkInstance != nil {
-					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Subnet '%s'...", subnetInstance.GetName())
+					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Subnet '%s'...", req.Name)
 					if derr := subnetInstance.Delete(cleanupContextFrom(ctx)); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
@@ -171,14 +171,14 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 						default:
 							cleanFailure = true
 							logrus.WithContext(cleanupContextFrom(ctx)).Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr),
-								subnetInstance.GetName())
+								req.Name)
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 						}
 					} else {
 						logrus.WithContext(ctx).Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr),
-							subnetInstance.GetName())
+							req.Name)
 						if req.NetworkID == "" {
-							logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
+							logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), req.NetworkID)
 							if derr := networkInstance.Delete(cleanupContextFrom(ctx)); derr != nil {
 								switch derr.(type) {
 								case *fail.ErrNotFound:
@@ -187,12 +187,12 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 								default:
 									cleanFailure = true
 									logrus.WithContext(cleanupContextFrom(ctx)).Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr),
-										networkInstance.GetName())
+										req.NetworkID)
 									_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr)))
 								}
 							} else {
 								logrus.WithContext(ctx).Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr),
-									networkInstance.GetName())
+									req.NetworkID)
 							}
 						}
 					}
@@ -878,7 +878,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				if subXErr := subnetInstance.Create(ctx, subnetReq, "", gatewaysDef); subXErr != nil {
 					ar := result{nil, nil, fail.Wrap(
 						subXErr, "failed to create Subnet '%s' (with CIDR %s) in Network '%s' (with CIDR %s)",
-						subnetReq.Name, subnetReq.CIDR, networkInstance.GetName(), req.CIDR,
+						subnetReq.Name, subnetReq.CIDR, req.NetworkID, req.CIDR,
 					)}
 					chRes <- ar
 					return ar.rErr
@@ -889,7 +889,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				)
 			default:
 				ar := result{nil, nil, fail.Wrap(
-					xerr, "failed to create Subnet '%s' in Network '%s'", req.Name, networkInstance.GetName(),
+					xerr, "failed to create Subnet '%s' in Network '%s'", req.Name, req.NetworkID,
 				)}
 				chRes <- ar
 				return ar.rErr
@@ -958,7 +958,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			return xerr
 		}
 
-		logrus.WithContext(ctx).Debugf("[Cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, networkInstance.GetName(), req.Name)
+		logrus.WithContext(ctx).Debugf("[Cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, req.NetworkID, req.Name)
 		chRes <- result{networkInstance, subnetInstance, nil}
 		return nil
 	}() // nolint
@@ -1628,7 +1628,7 @@ func (instance *Cluster) taskConfigureGateway(inctx context.Context, params inte
 			}
 		}
 
-		logrus.WithContext(ctx).Debugf("[%s] configuration successful in [%s].", p.Host.GetName(), tracer.Stopwatch().String())
+		logrus.WithContext(ctx).Debugf("[%s] configuration successful in [%s].", hostLabel, tracer.Stopwatch().String())
 		chRes <- result{nil, nil}
 
 	}()

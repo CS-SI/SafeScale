@@ -869,7 +869,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			if innerXErr != nil {
 				logrus.WithContext(ctx).Tracef("Host '%s' successfully created but cannot confirm AZ: %s", ahc.Name, innerXErr)
 			} else {
-				logrus.WithContext(ctx).Tracef("Host '%s' successfully created in requested AZ '%s'", ahc.Name, creationZone)
+				logrus.WithContext(ctx).Tracef("Host '%s' (%s) successfully created in requested AZ '%s'", ahc.Name, ahc.ID, creationZone)
 				if creationZone != azone && azone != "" {
 					logrus.WithContext(ctx).Warnf(
 						"Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'",
@@ -879,12 +879,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			}
 
 			if hs := toHostState(server.Status); hs == hoststate.Error || hs == hoststate.Failed {
-				_ = s.DeleteHost(cleanupContextFrom(ctx), server.ID)
+				if server != nil {
+					_ = s.DeleteHost(cleanupContextFrom(ctx), server.ID)
+				}
 				return fail.NewError("host creation of %s failed, wrong status %s", request.ResourceName, hs.String())
 			}
 
 			// Wait that host is ready, not just that the build is started
-			timeout := timings.HostOperationTimeout()
+			timeout := 2 * timings.HostOperationTimeout()
 			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, timeout)
 			if innerXErr != nil {
 				logrus.WithContext(ctx).Errorf(
@@ -893,10 +895,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				)
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					_ = s.DeleteHost(cleanupContextFrom(ctx), server.ID)
+					if server != nil {
+						_ = s.DeleteHost(cleanupContextFrom(ctx), server.ID)
+					}
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
-					_ = s.DeleteHost(cleanupContextFrom(ctx), server.ID)
+					if server != nil {
+						_ = s.DeleteHost(cleanupContextFrom(ctx), server.ID)
+					}
 					return innerXErr
 				}
 			}
@@ -1536,6 +1542,8 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
+	machineName, machineID := ahf.Core.Name, ahf.Core.ID
+
 	// Detach floating IP
 	if s.cfgOpts.UseFloatingIP {
 		fip, xerr := s.getFloatingIP(ctx, ahf.Core.ID)
@@ -1693,6 +1701,8 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 	if len(errors) > 0 {
 		return fail.NewErrorList(errors)
 	}
+
+	logrus.WithContext(ctx).Debugf("Deleted host %s (%s)", machineName, machineID)
 
 	return nil
 }
