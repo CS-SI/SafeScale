@@ -36,8 +36,9 @@ import (
 )
 
 type taskCreateGatewayParameters struct {
-	request abstract.HostRequest
-	sizing  abstract.HostSizingRequirements
+	request     abstract.HostRequest
+	sizing      abstract.HostSizingRequirements
+	clusterName string
 }
 
 func (instance *Subnet) taskCreateGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {

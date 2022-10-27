@@ -305,7 +305,7 @@ func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingReq
 	}
 
 	// Instructs adding nodes
-	return instance.AddNodes(handler.job.Context(), count, sizing, parameters, keepOnFailure)
+	return instance.AddNodes(handler.job.Context(), name, count, sizing, parameters, keepOnFailure)
 }
 
 // Shrink removes node(s) from a cluster
@@ -336,7 +336,7 @@ func (handler *clusterHandler) Shrink(name string, count uint) (_ []*propertiesv
 		return nil, xerr
 	}
 
-	return instance.Shrink(handler.job.Context(), count)
+	return instance.Shrink(handler.job.Context(), name, count)
 }
 
 // ListNodes lists node(s) of a cluster

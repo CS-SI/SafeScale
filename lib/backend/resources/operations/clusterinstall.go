@@ -373,29 +373,10 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 		return nil, fail.InvalidInstanceError()
 	}
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
 	list, xerr := instance.InstalledFeatures(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
-	// var list map[string]*propertiesv1.ClusterInstalledFeature
-	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-	// 		if !ok {
-	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 		}
-	//
-	// 		list = featuresV1.Installed
-	// 		return nil
-	// 	})
-	// })
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return emptySlice, xerr
-	// }
 
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
@@ -915,6 +896,26 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 				chRes <- result{fail.NewError("[Cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)}
 				return
 			}
+
+			xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					featuresV1.Installed[feat.GetName()] = &propertiesv1.ClusterInstalledFeature{
+						Name: feat.GetName(),
+					}
+					return nil
+				})
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
+			}
+
 			logrus.WithContext(ctx).Debugf("[Cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
 			chRes <- result{nil}
 			return
@@ -1029,8 +1030,28 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 				return
 			}
 
+			xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					featuresV1.Installed["remotedesktop"] = &propertiesv1.ClusterInstalledFeature{
+						Name: "remotedesktop",
+					}
+					return nil
+				})
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
+			}
+
 			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'remotedesktop' added successfully", identity.Name)
 		}
+
 		chRes <- result{nil}
 
 	}()
@@ -1132,6 +1153,26 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 				chRes <- result{fail.NewError("[Cluster %s] failed to add 'ansible-for-cluster': %s", identity.Name, msg)}
 				return
 			}
+
+			xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					featuresV1.Installed["ansible-for-cluster"] = &propertiesv1.ClusterInstalledFeature{
+						Name: "ansible-for-cluster",
+					}
+					return nil
+				})
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
+			}
+
 			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'ansible-for-cluster' added successfully", identity.Name)
 		}
 		chRes <- result{nil}
@@ -1219,9 +1260,28 @@ func (instance *Cluster) installDocker(
 				return
 			}
 		}
+
+		xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				featuresV1.Installed[feat.GetName()] = &propertiesv1.ClusterInstalledFeature{
+					Name: feat.GetName(),
+				}
+				return nil
+			})
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+
 		logrus.WithContext(ctx).Debugf("[%s] feature 'docker' addition successful.", hostLabel)
 		chRes <- result{nil}
-
 	}()
 	select {
 	case res := <-chRes:
