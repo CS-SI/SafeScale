@@ -2552,6 +2552,8 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 	go func() {
 		defer close(chRes)
 
+		// FIXME: OPP This should use instance.AddFeature instead
+
 		// Install reverse-proxy feature on Cluster (gateways)
 		parameters := ExtractFeatureParameters(req.FeatureParameters)
 		xerr := instance.installReverseProxy(ctx, parameters)
@@ -2572,7 +2574,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			}
 		}
 
-		// FIXME: OPP Who the fuck updates installed features ??
+		// FIXME: OPP Check installed features
 
 		// Install ansible feature on Cluster (all masters)
 		xerr = instance.installAnsible(ctx, parameters)
@@ -2582,7 +2584,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			return
 		}
 
-		// FIXME: OPP Who the fuck updates installed features ??
+		// FIXME: OPP Check installed features
 
 		// configure what has to be done Cluster-wide
 		makers := instance.localCache.makers
@@ -2592,9 +2594,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			return
 		}
 
-		// Not finding a callback isn't an error, so return nil in this case
 		chRes <- result{nil}
-
 	}()
 	select {
 	case res := <-chRes:

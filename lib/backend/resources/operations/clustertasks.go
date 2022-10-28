@@ -3411,6 +3411,16 @@ func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, par
 		inventoryData := param.inventoryData
 		iname := param.clusterName
 
+		does, xerr := master.Exists(ctx)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+		if !does {
+			chRes <- result{nil}
+			return
+		}
+
 		rfcItem := Item{
 			Remote:       fmt.Sprintf("%s/%s", utils.TempFolder, "ansible-inventory.py"),
 			RemoteOwner:  "cladm:cladm",
@@ -3420,7 +3430,7 @@ func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, par
 		target := fmt.Sprintf("%s/ansible/inventory/", utils.EtcFolder)
 		commands := []string{
 			fmt.Sprintf("[ -f %s_inventory.py ] && sudo rm -f %s_inventory.py || exit 0", target, target),
-			fmt.Sprintf("sudo mv %s %s_inventory.py", rfcItem.Remote, target),
+			fmt.Sprintf("sudo mkdir -p %s && sudo mv %s %s_inventory.py", target, rfcItem.Remote, target),
 			fmt.Sprintf("sudo chown cladm:root %s_inventory.py", target),
 			fmt.Sprintf("ansible-inventory -i %s_inventory.py --list", target),
 			fmt.Sprintf("[ -f %sinventory.py ] && sudo rm -f %sinventory.py  || exit 0", target, target),

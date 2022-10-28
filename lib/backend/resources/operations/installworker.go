@@ -733,6 +733,7 @@ func (w *worker) Proceed(
 
 		// Now enumerate steps and execute each of them
 		for _, k := range order {
+			k := k
 			stepKey := stepsKey + "." + k
 			stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
 			if !ok {
@@ -779,7 +780,8 @@ func (w *worker) Proceed(
 				continue
 			}
 
-			_, xerr = w.taskLaunchStep(ctx, taskLaunchStepParameters{
+			var ur resources.UnitResults
+			ur, xerr = w.taskLaunchStep(ctx, taskLaunchStepParameters{
 				stepName:  k,
 				stepKey:   stepKey,
 				stepMap:   stepMap,
@@ -787,6 +789,12 @@ func (w *worker) Proceed(
 				hosts:     hostsList,
 			})
 			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{nil, xerr}
+				return
+			}
+
+			xerr = fail.ConvertError(outcomes.Add(k, ur))
 			if xerr != nil {
 				chRes <- result{nil, xerr}
 				return
@@ -814,8 +822,8 @@ type taskLaunchStepParameters struct {
 }
 
 // taskLaunchStep starts the step
-func (w *worker) taskLaunchStep(inctx context.Context, params interface{}) (
-	_ interface{}, ferr fail.Error,
+func (w *worker) taskLaunchStep(inctx context.Context, p taskLaunchStepParameters) (
+	_ resources.UnitResults, ferr fail.Error,
 ) {
 	if w == nil {
 		return nil, fail.InvalidInstanceError()
@@ -825,13 +833,8 @@ func (w *worker) taskLaunchStep(inctx context.Context, params interface{}) (
 	defer cancel()
 
 	type result struct {
-		rTr  interface{}
+		rTr  resources.UnitResults
 		rErr fail.Error
-	}
-
-	p, ok := params.(taskLaunchStepParameters)
-	if !ok {
-		return nil, fail.InvalidParameterError("params", "should be taskLaunchStepParameters")
 	}
 
 	defer fail.OnExitLogError(ctx, &ferr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), p.stepName))
@@ -843,10 +846,6 @@ func (w *worker) taskLaunchStep(inctx context.Context, params interface{}) (
 
 		if w.feature == nil {
 			chRes <- result{nil, fail.InvalidInstanceContentError("w.Feature", "cannot be nil")}
-			return
-		}
-		if params == nil {
-			chRes <- result{nil, fail.InvalidParameterError("params", "can't be nil")}
 			return
 		}
 
@@ -964,7 +963,7 @@ func (w *worker) taskLaunchStep(inctx context.Context, params interface{}) (
 		}
 
 		if !r.Successful() {
-			// If there are some not completed steps, reports them and break
+			// If there are some not complete steps, reports them and break
 			if !r.Completed() {
 				var errpack []error
 				for _, key := range r.Keys() {
@@ -984,14 +983,14 @@ func (w *worker) taskLaunchStep(inctx context.Context, params interface{}) (
 				}
 
 				if len(errpack) > 0 {
-					chRes <- result{&r, fail.NewErrorList(errpack)}
+					chRes <- result{r, fail.NewErrorList(errpack)}
 					return
 				}
 			}
 
-			// not successful but completed, if action is check means the Feature is not installed, it's an information not a failure
+			// not successful but complete, if action is check means the Feature is not installed, it's an information not a failure
 			if w.action == installaction.Check {
-				chRes <- result{&r, nil}
+				chRes <- result{r, nil}
 				return
 			}
 
@@ -1013,12 +1012,12 @@ func (w *worker) taskLaunchStep(inctx context.Context, params interface{}) (
 			}
 
 			if len(newerrpack) > 0 {
-				chRes <- result{&r, fail.NewErrorList(newerrpack)}
+				chRes <- result{r, fail.NewErrorList(newerrpack)}
 				return
 			}
 		}
 
-		chRes <- result{&r, nil}
+		chRes <- result{r, nil}
 
 	}()
 	select {

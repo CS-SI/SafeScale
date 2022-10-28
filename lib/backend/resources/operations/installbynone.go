@@ -44,12 +44,12 @@ func (i *noneInstaller) Check(_ context.Context, f resources.Feature, t resource
 		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
-	// Forge a completed but unsuccessful results
+	// Forge a complete but unsuccessful results
 	out := &results{
 		t.GetName(): &unitResults{
 			"none": &stepResult{
-				completed: true,
-				success:   false,
+				complete: true,
+				success:  false,
 			},
 		},
 	}

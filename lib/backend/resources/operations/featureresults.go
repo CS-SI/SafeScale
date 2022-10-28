@@ -48,7 +48,7 @@ func (urs unitResults) ErrorMessages() string {
 	return output
 }
 
-// Uncompleted returns an array of string of all keys where the script to run action wasn't completed
+// Uncompleted returns an array of string of all keys where the script to run action wasn't complete
 func (urs unitResults) Uncompleted() []string {
 	var output []string
 	for k, v := range urs {
@@ -72,7 +72,7 @@ func (urs unitResults) Successful() bool {
 	return true
 }
 
-// Completed tells if all the scripts corresponding to action have been completed.
+// Completed tells if all the scripts corresponding to action have been complete.
 func (urs unitResults) Completed() bool {
 	if len(urs) == 0 {
 		return false

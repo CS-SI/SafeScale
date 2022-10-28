@@ -181,13 +181,14 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 
 // CreateHost creates a host meeting the requirements specified by request
 func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(s) {
 		return nil, nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(ctx, &ferr)
-	defer fail.OnPanic(&ferr)
 
 	resourceName := request.ResourceName
 	subnets := request.Subnets
@@ -473,6 +474,8 @@ func (s stack) buildGcpMachine(
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
 func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -494,7 +497,6 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.Host
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
 	defer tracer.Exiting()
-	defer fail.OnPanic(&ferr)
 
 	return s.rpcResetStartupScriptOfInstance(ctx, ahfid)
 }
@@ -505,6 +507,8 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool,
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
 func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -522,7 +526,6 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
 	defer tracer.Exiting()
-	defer fail.OnPanic(&ferr)
 
 	var (
 		tryByName = true

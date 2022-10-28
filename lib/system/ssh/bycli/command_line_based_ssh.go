@@ -31,6 +31,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/app"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -664,8 +665,9 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 			timeout = 1200 * time.Second // nothing should take more than 20 min
 		}
 
-		trch := make(chan interface{}, 1)
+		trch := make(chan data.Map, 1)
 		subtask.Go(func() error {
+			defer close(trch)
 			tctx, cat := context.WithTimeout(ctx, timeout)
 			defer cat()
 			tr, xerr := scmd.taskExecute(tctx, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY})
@@ -675,8 +677,6 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 
 		xerr := fail.ConvertError(subtask.Wait())
 		if xerr != nil {
-			defer close(trch)
-
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
 				xerr = fail.Wrap(fail.Cause(xerr), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
@@ -696,19 +696,18 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 				}
 			}
 
-			tracer.Trace("run failed: %v", xerr)
+			logrus.WithContext(ctx).Errorf("run failed: %v", xerr)
 			chRes <- result{invalid, "", "", xerr}
 			return
 		}
 
-		close(trch)
-		r := <-trch
-		if res, ok := r.(data.Map); ok {
-			tracer.Trace("run succeeded, retcode=%d", res["retcode"].(int))
-			chRes <- result{res["retcode"].(int), res["stdout"].(string), res["stderr"].(string), nil}
-			return
+		res := <-trch
+		if app.Release {
+			logrus.WithContext(ctx).Debugf("run succeeded, retcode=%d", res["retcode"].(int))
+		} else {
+			logrus.WithContext(ctx).Debugf("run succeeded, retcode=%d, out=%s, err=%s", res["retcode"].(int), res["stdout"].(string), res["stderr"].(string))
 		}
-		chRes <- result{invalid, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")}
+		chRes <- result{res["retcode"].(int), res["stdout"].(string), res["stderr"].(string), nil}
 	}()
 	select {
 	case res := <-chRes:
@@ -724,7 +723,7 @@ type taskExecuteParameters struct {
 	collectOutputs bool
 }
 
-func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (interface{}, fail.Error) {
+func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (data.Map, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -733,13 +732,13 @@ func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (inter
 	defer cancel()
 
 	type result struct {
-		rRes interface{}
+		rRes data.Map
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		gres, gerr := func() (_ interface{}, ferr fail.Error) {
+		gres, gerr := func() (_ data.Map, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
 			params, ok := p.(taskExecuteParameters)

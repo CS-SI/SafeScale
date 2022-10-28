@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
@@ -50,11 +49,11 @@ const (
 )
 
 type stepResult struct {
-	completed bool // if true, the script has been run to completion
-	retcode   int
-	output    string
-	success   bool  // if true, the script has finished, and the result is a success
-	err       error // if an error occurred, 'err' contains it
+	complete bool // if true, the script has been run to completion
+	retcode  int
+	output   string
+	success  bool  // if true, the script has finished, and the result is a success
+	err      error // if an error occurred, 'err' contains it
 }
 
 // Successful returns true if the script has finished AND its results is a success
@@ -64,7 +63,7 @@ func (sr stepResult) Successful() bool {
 
 // Completed returns true if the script has finished, false otherwise
 func (sr stepResult) Completed() bool {
-	return sr.completed
+	return sr.complete
 }
 
 func (sr stepResult) Error() error {
@@ -286,9 +285,7 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 			return nil, xerr
 		}
 
-		if outcome != nil {
-			outcomes.AddOne(h.GetName(), outcome.(resources.UnitResult))
-		}
+		outcomes.AddOne(h.GetName(), outcome)
 
 		if !outcomes.Successful() {
 			if is.Worker.action == installaction.Check { // Checks can fail and it's ok
@@ -325,7 +322,7 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 
 	type partResult struct {
 		who  string
-		what interface{}
+		what stepResult
 		err  fail.Error
 	}
 
@@ -338,7 +335,9 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 		for _, h := range hosts {
 			h := h
 			tg.Go(func() error {
-				tr, err := is.taskRunOnHostWithLoop(ctx, runOnHostParameters{Host: h, Variables: v})
+				moctx, lord := context.WithCancel(ctx)
+				defer lord()
+				tr, err := is.taskRunOnHostWithLoop(moctx, runOnHostParameters{Host: h, Variables: v})
 				hid, _ := h.GetID()
 				blue <- partResult{who: hid, what: tr, err: err}
 				if err != nil {
@@ -350,19 +349,10 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 
 		xerr := fail.ConvertError(tg.Wait())
 		xerr = debug.InjectPlannedFail(xerr)
-
 		outcomes := &unitResults{}
 		close(blue)
 		for ur := range blue {
-			if ur.what != nil {
-				oko, ok := ur.what.(stepResult)
-				if !ok {
-					chRes <- result{nil, fail.InconsistentError("outcome should be a stepResult (implements resources.UnitResult)")}
-					return
-				}
-
-				outcomes.AddOne(ur.who, oko)
-			}
+			outcomes.AddOne(ur.who, ur.what)
 		}
 
 		if xerr != nil {
@@ -455,72 +445,52 @@ type runOnHostParameters struct {
 	Variables data.Map
 }
 
-func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
+func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	var res interface{}
 
 	var ok bool
 	if params == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("params")
+		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")
 	}
 	p, ok := params.(runOnHostParameters)
 	if !ok {
-		return nil, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
+		return stepResult{}, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
 	}
 
 	cv, xerr := is.initLoopTurnForHost(inctx, p.Host, p.Variables)
 	if xerr != nil {
-		return nil, xerr
+		return stepResult{}, xerr
 	}
 
-	res, xerr = is.taskRunOnHost(inctx, runOnHostParameters{
+	res, xerr := is.taskRunOnHost(inctx, runOnHostParameters{
 		Host:      p.Host,
 		Variables: cv,
 	})
+
 	if xerr != nil {
-		return nil, xerr
+		return stepResult{}, xerr
 	}
 	return res, nil
 }
 
 // taskRunOnHost ...
-// Respects interface concurrency.TaskFunc
-// func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
-func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
+func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	var res interface{}
 
 	var ok bool
 	if params == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("params")
+		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")
 	}
 	p, ok := params.(runOnHostParameters)
 	if !ok {
-		return nil, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
+		return stepResult{}, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	defer func() {
-		if res != nil {
-			if sres, ok := res.(stepResult); ok {
-				if !sres.Completed() || !sres.Successful() || sres.Error() != nil {
-					dur := spew.Sdump(res)
-					if !strings.Contains(dur, "check_") {
-						logrus.WithContext(ctx).Debugf("task result: %s", spew.Sdump(res))
-					}
-				}
-			}
-		}
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			logrus.WithContext(ctx).Debugf("task error: %v", ferr)
-		}
-	}()
-
 	type result struct {
-		rTr  interface{}
+		rTr  stepResult
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -572,7 +542,7 @@ func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ inte
 		svc := p.Host.Service()
 		timings, xerr := svc.Timings()
 		if xerr != nil {
-			chRes <- result{nil, xerr}
+			chRes <- result{stepResult{}, xerr}
 			return
 		}
 
@@ -580,7 +550,7 @@ func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ inte
 		for {
 			select {
 			case <-ctx.Done():
-				chRes <- result{nil, fail.ConvertError(ctx.Err())}
+				chRes <- result{stepResult{}, fail.ConvertError(ctx.Err())}
 				return
 			default:
 			}
@@ -628,16 +598,15 @@ func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ inte
 			time.Sleep(timings.SmallDelay())
 		}
 
-		chRes <- result{stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil}
-
+		chRes <- result{stepResult{success: retcode == 0, complete: true, err: nil, retcode: retcode, output: outrun}, nil}
 	}()
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return stepResult{}, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return stepResult{}, fail.ConvertError(inctx.Err())
 	}
 }
 

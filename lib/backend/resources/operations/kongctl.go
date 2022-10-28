@@ -359,7 +359,8 @@ func (k *KongController) createUpstream(ctx context.Context, name string, option
 	return nil
 }
 
-func (k *KongController) addSourceControl(ctx context.Context,
+func (k *KongController) addSourceControl(
+	ctx context.Context,
 	ruleName, url, resourceType, resourceID string,
 	sourceControl map[string]interface{},
 	v *data.Map,
