@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sanity-io/litter"
@@ -28,26 +28,28 @@ import (
 
 // Shielded allows to store data with controlled access to it
 type Shielded struct {
-	witness data.Clonable
-	lock    sync.RWMutex
+	witness clonable.Clonable
+	lock    *sync.RWMutex
 }
 
 // NewShielded creates a new protected data from a cloned witness
-func NewShielded(witness data.Clonable) (*Shielded, error) {
+func NewShielded(witness clonable.Clonable) (*Shielded, error) {
 	cloned, err := witness.Clone()
 	if err != nil {
 		return nil, err
 	}
 
-	return &Shielded{
+	out := &Shielded{
 		witness: cloned,
-	}, nil
+		lock:    &sync.RWMutex{},
+	}
+	return out, nil
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (instance *Shielded) IsNull() bool {
-	return instance == nil || valid.IsNil(instance.witness)
+	return instance == nil || valid.IsNil(instance.witness) || instance.lock == nil
 }
 
 // Clone ...
@@ -56,10 +58,11 @@ func (instance *Shielded) Clone() (*Shielded, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return NewShielded(cloned)
 }
 
-func (instance *Shielded) Sdump() (string, error) {
+func (instance *Shielded) String() (string, error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
@@ -70,7 +73,7 @@ func (instance *Shielded) Sdump() (string, error) {
 }
 
 // Inspect is used to lock a clonable for read
-func (instance *Shielded) Inspect(inspector func(clonable data.Clonable) fail.Error) (ferr fail.Error) {
+func (instance *Shielded) Inspect(inspector func(clonable clonable.Clonable) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
@@ -95,11 +98,11 @@ func (instance *Shielded) Inspect(inspector func(clonable data.Clonable) fail.Er
 	return inspector(cloned)
 }
 
-// Alter allows to update a cloneable using a write lock
+// Alter allows to update a cloneable using a write-lock
 // 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
 // generated with fail.AlteredNothingError().
 // The caller of the Alter() method will then be able to known, when an error occurs, if it's because there was no change.
-func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (ferr fail.Error) {
+func (instance *Shielded) Alter(alterer func(clonable.Clonable) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
@@ -126,7 +129,7 @@ func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (ferr fa
 		return xerr
 	}
 
-	_, err = instance.witness.Replace(clone)
+	err = instance.witness.Replace(clone)
 	if err != nil {
 		return fail.Wrap(err)
 	}
@@ -144,7 +147,7 @@ func (instance *Shielded) Serialize() (_ []byte, ferr fail.Error) {
 	}
 
 	var jsoned []byte
-	xerr := instance.Inspect(func(clonable data.Clonable) fail.Error {
+	xerr := instance.Inspect(func(clonable clonable.Clonable) fail.Error {
 		var innerErr error
 		jsoned, innerErr = json.Marshal(clonable)
 		if innerErr != nil {
@@ -172,7 +175,7 @@ func (instance *Shielded) Deserialize(buf []byte) (ferr fail.Error) {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")
 	}
 
-	return instance.Alter(func(clonable data.Clonable) fail.Error {
+	return instance.Alter(func(clonable clonable.Clonable) fail.Error {
 		if innerErr := json.Unmarshal(buf, clonable); innerErr != nil {
 			return fail.SyntaxError("failed to unmarshal: %s", innerErr.Error())
 		}

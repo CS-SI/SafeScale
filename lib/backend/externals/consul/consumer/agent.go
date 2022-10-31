@@ -1,6 +1,3 @@
-//go:build windows
-// +build windows
-
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -18,18 +15,13 @@
  * limitations under the License.
  */
 
-package consul
+package consumer
 
 import (
-	"os/exec"
-	"syscall"
+	consulapi "github.com/hashicorp/consul/api"
 )
 
-// adaptToOS ...
-func adaptToOS(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow: true,
-		// Setpgid: true,
-		// Chroot:  filepath.Join(global.Settings.Folders.ShareDir, "consul"),
-	}
+type Agent struct {
+	client *Client
+	agent  *consulapi.Agent
 }

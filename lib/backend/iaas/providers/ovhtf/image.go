@@ -19,7 +19,6 @@ package ovhtf
 import (
 	"context"
 
-	tfapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -36,9 +35,12 @@ type (
 	}
 )
 
-func newImageResource(name string) tfapi.Resource {
-	out := &imageResource{terraformer.NewResourceCore(name, imageResourceSnippetPath)}
-	return out
+func newImageResource(name string) (imageResource, fail.Error) {
+	rc, xerr := terraformer.NewResourceCore(name, imageResourceSnippetPath)
+	if xerr != nil {
+		return imageResource{}, xerr
+	}
+	return imageResource{ResourceCore: rc}, nil
 }
 
 // ToMap returns a map of imageResource field to be used where needed

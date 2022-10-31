@@ -50,8 +50,8 @@ func (instance *Cluster) unsafeGetIdentity(inctx context.Context) (_ abstract.Cl
 		defer fail.OnPanic(&ferr)
 
 		var clusterIdentity abstract.ClusterIdentity
-		xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			aci, ok := clonable.(*abstract.ClusterIdentity)
+		xerr := instance.Review(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			aci, err := lang.Cast[*abstract.ClusterIdentity)
 			if !ok {
 				return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -123,9 +123,9 @@ func (instance *Cluster) unsafeGetState(inctx context.Context) (_ clusterstate.E
 				return
 			}
 
-			chRes <- result{state, instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-					stateV1, ok := clonable.(*propertiesv1.ClusterState)
+			chRes <- result{state, instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(clusterproperty.StateV1, func(clonable clonable.Clonable) fail.Error {
+					stateV1, err := lang.Cast[*propertiesv1.ClusterState)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
@@ -137,9 +137,9 @@ func (instance *Cluster) unsafeGetState(inctx context.Context) (_ clusterstate.E
 			return
 		}
 
-		xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-				stateV1, ok := clonable.(*propertiesv1.ClusterState)
+		xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.StateV1, func(clonable clonable.Clonable) fail.Error {
+				stateV1, err := lang.Cast[*propertiesv1.ClusterState)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -184,9 +184,9 @@ func (instance *Cluster) unsafeListMasters(inctx context.Context) (_ resources.I
 		var list resources.IndexedListOfClusterNodes
 		emptyList := resources.IndexedListOfClusterNodes{}
 
-		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+		xerr := instance.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.NodesV3, func(clonable clonable.Clonable) (innerXErr fail.Error) {
+				nodesV3, err := lang.Cast[*propertiesv3.ClusterNodes)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -245,9 +245,9 @@ func (instance *Cluster) unsafeListMasterIDs(inctx context.Context) (_ data.Inde
 			return
 		}
 
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+		xerr = instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.NodesV3, func(clonable clonable.Clonable) fail.Error {
+				nodesV3, err := lang.Cast[*propertiesv3.ClusterNodes)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -303,9 +303,9 @@ func (instance *Cluster) unsafeListMasterIPs(inctx context.Context) (_ data.Inde
 			return
 		}
 
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+		xerr = instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+			return props.Inspect(clusterproperty.NodesV3, func(clonable clonable.Clonable) fail.Error {
+				nodesV3, err := lang.Cast[*propertiesv3.ClusterNodes)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -355,9 +355,9 @@ func (instance *Cluster) unsafeListNodeIPs(inctx context.Context) (_ data.Indexe
 		emptyList := data.IndexedListOfStrings{}
 		var outlist data.IndexedListOfStrings
 
-		xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+		xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.NodesV3, func(clonable clonable.Clonable) fail.Error {
+				nodesV3, err := lang.Cast[*propertiesv3.ClusterNodes)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -484,9 +484,9 @@ func (instance *Cluster) unsafeListNodes(inctx context.Context) (_ resources.Ind
 		emptyList := resources.IndexedListOfClusterNodes{}
 		var list resources.IndexedListOfClusterNodes
 
-		xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+		xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.NodesV3, func(clonable clonable.Clonable) fail.Error {
+				nodesV3, err := lang.Cast[*propertiesv3.ClusterNodes)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -544,9 +544,9 @@ func (instance *Cluster) unsafeListNodeIDs(inctx context.Context) (_ data.Indexe
 
 		var outlist data.IndexedListOfStrings
 
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+		xerr = instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.NodesV3, func(clonable clonable.Clonable) fail.Error {
+				nodesV3, err := lang.Cast[*propertiesv3.ClusterNodes)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}

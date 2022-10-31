@@ -66,15 +66,10 @@ func startBackend(cmd *cobra.Command) error {
 	defer cancel()
 
 	// Starts consul agent (which may be server also)
-	var xerr fail.Error
-	_, xerr = consul.StartAgent(ctx)
+	agentStartedCh, agentDoneCh, cancelConsulAgent, xerr := consul.StartAgent(ctx)
 	if xerr != nil {
 		return xerr
 	}
-
-	// FIXME: check consul is working
-
-	logrus.Infof("Starting backend, listening on '%s', using metadata suffix '%s'", global.Settings.Backend.Listen, suffix)
 
 	// enable heartbeat
 	go heartbeat.RunHeartbeatService(":10102")
@@ -85,7 +80,34 @@ func startBackend(cmd *cobra.Command) error {
 
 	operations.StartFeatureFileWatcher()
 
-	// Starting everything
+	// Wait for Consul agent start
+	select {
+	case agentStarted := <-agentStartedCh:
+		if !agentStarted {
+			out := <-agentDoneCh
+			if out.Failed() {
+				return fail.Wrap(out.Error(), "failed to start Consul agent")
+			}
+		}
+		break
+	}
+
+	// Wait Consul agent to fail within 3 seconds...
+	select {
+	case out := <-agentDoneCh:
+		if out.Failed() {
+			return fail.Wrap(out.Error(), "failed to start Consul agent")
+		}
+
+	case <-time.After(3 * time.Second):
+		// If timeout occurs without signal on agentDoneCh, Consul agent started successfully, continue
+		logrus.Infof("Consul agent started on localhost:%s", global.Settings.Backend.Consul.HttpPort)
+	}
+
+	defer cancelConsulAgent()
+
+	// Starts backend
+	logrus.Infof("Starting backend, listening on '%s', using metadata suffix '%s'", global.Settings.Backend.Listen, suffix)
 	errChan := make(chan error)
 	serve(errChan)
 

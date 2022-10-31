@@ -17,12 +17,11 @@
 package propertiesv2
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterNode describes a node in the cluster
@@ -57,27 +56,32 @@ func newClusterNodes() *ClusterNodes {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (n *ClusterNodes) IsNull() bool {
 	return n == nil || (len(n.Masters) == 0 && len(n.PublicNodes) == 0 && len(n.PrivateNodes) == 0)
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (n ClusterNodes) Clone() (data.Clonable, error) {
-	return newClusterNodes().Replace(&n)
-}
-
-// Replace ...
-// satisfies interface data.Clonable
-func (n *ClusterNodes) Replace(p data.Clonable) (data.Clonable, error) {
-	if n == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (n *ClusterNodes) Clone() (clonable.Clonable, error) {
+	if n == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*ClusterNodes)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *ClusterNodes")
+	nn := newClusterNodes()
+	return nn, nn.Replace(n)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (n *ClusterNodes) Replace(p clonable.Clonable) error {
+	if n == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*ClusterNodes](p)
+	if err != nil {
+		return err
 	}
 
 	*n = *src
@@ -94,7 +98,7 @@ func (n *ClusterNodes) Replace(p data.Clonable) (data.Clonable, error) {
 		node := *v
 		n.PrivateNodes = append(n.PrivateNodes, &node)
 	}
-	return n, nil
+	return nil
 }
 
 func init() {

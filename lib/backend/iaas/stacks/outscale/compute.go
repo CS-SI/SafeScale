@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
@@ -498,7 +499,7 @@ func (s stack) hostState(ctx context.Context, id string) (hoststate.Enum, fail.E
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
 func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	if valid.IsNil(s) {
-		return abstract.NewHostCore(), fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	return s.WaitHostState(ctx, hostParam, hoststate.Started, timeout)
@@ -530,7 +531,7 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 
 	xerr = retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
-			st, innerXErr := s.hostState(ctx, ahf.Core.ID)
+			st, innerXErr := s.hostState(ctx, ahf.ID)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -549,7 +550,7 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 			case hoststate.Error:
 				return retry.StopRetryError(fail.NewError("host in 'error' state"))
 			case state:
-				ahf.CurrentState, ahf.Core.LastState = st, st
+				ahf.CurrentState, ahf.LastState = st, st
 				return nil
 			default:
 				return fail.NewError("wrong state: %s", st)
@@ -568,7 +569,7 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 			return nil, xerr
 		}
 	}
-	return ahf.Core, nil
+	return ahf.HostCore, nil
 }
 
 func outscaleTemplateID(id string) (string, fail.Error) {
@@ -672,7 +673,7 @@ func (s stack) setHostProperties(
 	}
 
 	state := hostState(vm.State)
-	ahf.CurrentState, ahf.Core.LastState = state, state
+	ahf.CurrentState, ahf.HostCore.LastState = state, state
 
 	// Updates Host Property propsv1.HostDescription
 	ahf.Description.Created = time.Now()
@@ -733,8 +734,8 @@ func (s stack) initHostProperties(
 		return err
 	}
 
-	host.Core.PrivateKey = udc.FirstPrivateKey
-	host.Core.Password = request.Password
+	host.HostCore.PrivateKey = udc.FirstPrivateKey
+	host.HostCore.Password = request.Password
 
 	host.Networking.DefaultSubnetID = func() string {
 		if defaultSubnet == nil {
@@ -771,7 +772,7 @@ func (s stack) addPublicIPs(ctx context.Context, primaryNIC osc.Nic, otherNICs [
 }
 
 // CreateHost creates a host that fulfills the request
-func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ *abstract.HostFull, udc *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -829,7 +830,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 		}
 	}()
 
-	ahf = abstract.NewHostFull()
+	ahf, err := abstract.NewHostFull(request.ResourceName)
+	if err != nil {
+		return nil, nil, fail.Wrap(err)
+	}
+
 	if xerr = s.initHostProperties(ctx, &request, ahf, *udc); xerr != nil {
 		return nil, nil, xerr
 	}
@@ -1014,19 +1019,21 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 		return nil, nil, xerr
 	}
 
-	ahf = abstract.NewHostFull()
-	ahf.Core.ID = vm.VmId
-	ahf.Core.Name = request.ResourceName
-	ahf.Core.Password = request.Password
-	ahf.Core.PrivateKey = udc.FirstPrivateKey
-	ahf.CurrentState, ahf.Core.LastState = hoststate.Started, hoststate.Started
+	ahf, err = abstract.NewHostFull(request.ResourceName)
+	if err != nil {
+		return nil, nil, fail.Wrap(err)
+	}
 
-	ahf.Core.Tags["Template"] = vm.VmType
-	ahf.Core.Tags["Image"] = vm.ImageId
+	ahf.ID = vm.VmId
+	ahf.Password = request.Password
+	ahf.PrivateKey = udc.FirstPrivateKey
+	ahf.CurrentState, ahf.LastState = hoststate.Started, hoststate.Started
+	ahf.Tags["Template"] = vm.VmType
+	ahf.Tags["Image"] = vm.ImageId
 
 	// recover metadata
 	for _, rt := range vm.Tags {
-		ahf.Core.Tags[rt.Key] = rt.Value
+		ahf.Tags[rt.Key] = rt.Value
 	}
 
 	nics = append(nics, defaultNic)
@@ -1080,19 +1087,20 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	publicIPs, xerr := s.rpcReadPublicIPsOfVM(ctx, ahf.Core.ID)
+	publicIPs, xerr := s.rpcReadPublicIPsOfVM(ctx, ahf.ID)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to read public IPs of Host with ID %s", ahf.Core.ID)
+		return fail.Wrap(xerr, "failed to read public IPs of Host with ID %s", ahf.ID)
 	}
 
 	// list attached volumes
-	volumes, xerr := s.ListVolumeAttachments(ctx, ahf.Core.ID)
+	volumes, xerr := s.ListVolumeAttachments(ctx, ahf.ID)
 	if xerr != nil {
 		volumes = []*abstract.VolumeAttachment{}
 	}
 
 	// delete host
-	if xerr = s.deleteHost(ctx, ahf.Core.ID); xerr != nil {
+	xerr = s.deleteHost(ctx, ahf.ID)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -1100,11 +1108,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	if len(publicIPs) == 0 {
 		return nil
 	}
+
 	var lastErr fail.Error
 	for _, ip := range publicIPs {
 		if xerr = s.rpcDeletePublicIPByID(ctx, ip.PublicIpId); xerr != nil { // continue to delete even if error
 			lastErr = xerr
-			logrus.WithContext(ctx).Errorf("failed to delete public IP %s of Host %s: %v", ip.PublicIpId, ahf.Core.ID, xerr)
+			logrus.WithContext(ctx).Errorf("failed to delete public IP %s of Host %s: %v", ip.PublicIpId, ahf.ID, xerr)
 		}
 	}
 
@@ -1116,7 +1125,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 		}
 		if _, ok := tags["DeleteWithVM"]; ok {
 			if xerr = s.DeleteVolume(ctx, v.VolumeID); xerr != nil { // continue to delete even if error
-				logrus.WithContext(ctx).Errorf("Unable to delete Volume %s of Host %s", v.VolumeID, ahf.Core.ID)
+				logrus.WithContext(ctx).Errorf("Unable to delete Volume %s of Host %s", v.VolumeID, ahf.ID)
 			}
 		}
 	}
@@ -1140,13 +1149,13 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 	defer tracer.Exiting()
 
 	var vm osc.Vm
-	if ahf.Core.ID != "" {
-		vm, xerr = s.rpcReadVMByID(ctx, ahf.Core.ID)
+	if ahf.ID != "" {
+		vm, xerr = s.rpcReadVMByID(ctx, ahf.ID)
 		if xerr != nil {
 			return nil, xerr
 		}
 	} else {
-		vm, xerr = s.rpcReadVMByName(ctx, ahf.Core.Name)
+		vm, xerr = s.rpcReadVMByName(ctx, ahf.Name)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1156,22 +1165,22 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 }
 
 func (s stack) complementHost(ctx context.Context, ahf *abstract.HostFull, vm osc.Vm) fail.Error {
-	ahf.Core.ID = vm.VmId
+	ahf.ID = vm.VmId
 
 	tags, xerr := s.rpcReadTagsOfResource(ctx, vm.VmId)
 	if xerr != nil {
 		return xerr
 	}
 
-	if ahf.Core.Name == "" {
+	if ahf.Name == "" {
 		if tag, ok := tags["name"]; ok {
-			ahf.Core.Name = tag
+			ahf.Name = tag
 		}
 	}
 
 	// refresh tags
 	for k, v := range tags {
-		ahf.Core.Tags[k] = v
+		ahf.Tags[k] = v
 	}
 
 	subnets, nics, xerr := s.listSubnetsByHost(ctx, vm.VmId)
@@ -1195,7 +1204,7 @@ func (s stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter
 		return hoststate.Unknown, xerr
 	}
 
-	return s.hostState(ctx, ahf.Core.ID)
+	return s.hostState(ctx, ahf.ID)
 }
 
 // ListHosts lists all hosts
@@ -1220,9 +1229,13 @@ func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList
 		}
 
 		state := hostState(vm.State)
-		ahf := abstract.NewHostFull()
-		ahf.Core.ID = vm.VmId
-		ahf.CurrentState, ahf.Core.LastState = state, state
+		ahf, err := abstract.NewHostFull("unknown")
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
+
+		ahf.ID = vm.VmId
+		ahf.CurrentState, ahf.LastState = state, state
 		if details {
 			ahf, xerr = s.InspectHost(ctx, ahf)
 			if xerr != nil {
@@ -1233,8 +1246,9 @@ func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList
 			if xerr != nil {
 				return emptyList, xerr
 			}
+
 			if tag, ok := tags["name"]; ok {
-				ahf.Core.Name = tag
+				ahf.Name = tag
 			}
 		}
 		hosts = append(hosts, ahf)
@@ -1255,7 +1269,7 @@ func (s stack) StopHost(ctx context.Context, host iaasapi.HostParameter, gracefu
 	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return s.rpcStopVMs(ctx, []string{ahf.Core.ID})
+	return s.rpcStopVMs(ctx, []string{ahf.ID})
 }
 
 // StartHost starts the host identified by id
@@ -1268,10 +1282,10 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) (
 		return xerr
 	}
 
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return s.rpcStartVMs(ctx, []string{ahf.Core.ID})
+	return s.rpcStartVMs(ctx, []string{ahf.ID})
 }
 
 // RebootHost Reboot host
@@ -1287,7 +1301,7 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return s.rpcRebootVMs(ctx, []string{ahf.Core.ID})
+	return s.rpcRebootVMs(ctx, []string{ahf.ID})
 }
 
 func (s stack) perfFromFreq(freq float32) int {
@@ -1322,11 +1336,11 @@ func (s stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, 
 	perf := s.perfFromFreq(sizing.MinCPUFreq)
 	t := gpuTemplateName(0, sizing.MaxCores, int(sizing.MaxRAMSize), perf, 0, "")
 
-	if xerr := s.rpcUpdateVMType(ctx, ahf.Core.ID, t); xerr != nil {
+	if xerr := s.rpcUpdateVMType(ctx, ahf.ID, t); xerr != nil {
 		return nil, xerr
 	}
 
-	return s.InspectHost(ctx, ahf.Core.ID)
+	return s.InspectHost(ctx, ahf.ID)
 }
 
 // BindSecurityGroupToHost ...
@@ -1350,7 +1364,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 		return xerr
 	}
 
-	vm, xerr := s.rpcReadVMByID(ctx, ahf.Core.ID)
+	vm, xerr := s.rpcReadVMByID(ctx, ahf.ID)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
 	}
@@ -1371,7 +1385,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 
 	// Add new SG to Host
 	sgs = append(sgs, asg.ID)
-	return s.rpcUpdateVMSecurityGroups(ctx, ahf.Core.ID, sgs)
+	return s.rpcUpdateVMSecurityGroups(ctx, ahf.ID, sgs)
 }
 
 // UnbindSecurityGroupFromHost ...
@@ -1388,7 +1402,7 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.
 		return xerr
 	}
 
-	vm, xerr := s.rpcReadVMByID(ctx, ahf.Core.ID)
+	vm, xerr := s.rpcReadVMByID(ctx, ahf.ID)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1415,5 +1429,5 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.
 	}
 
 	// Update Security Groups of Host
-	return s.rpcUpdateVMSecurityGroups(ctx, ahf.Core.ID, sgs)
+	return s.rpcUpdateVMSecurityGroups(ctx, ahf.ID, sgs)
 }

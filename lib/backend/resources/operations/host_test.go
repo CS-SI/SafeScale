@@ -688,8 +688,8 @@ func TestHost_setSecurityGroups(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(subnet).String(), "*operations.Subnet")
 
 		asubnet := &abstract.Subnet{}
-		xerr = subnet.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
+		xerr = subnet.Inspect(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, err := lang.Cast[*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -942,8 +942,8 @@ func TestHost_Run(t *testing.T) {
 		require.EqualValues(t, stderr, "")
 		require.Contains(t, xerr.Error(), "cannot run anything on 'MyHostTest', 'MyHostTest' is NOT started")
 
-		xerr = host.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			ahc, ok := clonable.(*abstract.HostCore)
+		xerr = host.Alter(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			ahc, err := lang.Cast[*abstract.HostCore)
 			if !ok {
 				return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -1007,8 +1007,8 @@ func TestHost_Push(t *testing.T) {
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 
-		xerr = host.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			ahc, ok := clonable.(*abstract.HostCore)
+		xerr = host.Alter(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			ahc, err := lang.Cast[*abstract.HostCore)
 			if !ok {
 				return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -1978,9 +1978,9 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		xerr = host.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-				hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
+		xerr = host.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable clonable.Clonable) fail.Error {
+				hsgV1, err := lang.Cast[*propertiesv1.HostSecurityGroups)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -2030,9 +2030,9 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		xerr = host.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-				hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
+		xerr = host.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable clonable.Clonable) fail.Error {
+				hsgV1, err := lang.Cast[*propertiesv1.HostSecurityGroups)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}

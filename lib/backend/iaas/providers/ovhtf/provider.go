@@ -25,6 +25,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
@@ -86,7 +88,7 @@ var (
 		},
 		"ovh": {
 			Source:  "ovh/ovh",
-			Version: ">= 0.13.0",
+			Version: "= 0.22.0",
 		},
 	}
 
@@ -100,7 +102,7 @@ var (
 
 // provider is the provider implementation of the OVH provider
 type provider struct {
-	// stacks.Stack
+	iaasapi.MiniStack
 	summonerConfig    terraformerapi.Configuration
 	ExternalNetworkID string
 
@@ -291,22 +293,22 @@ next:
 		Timings:                  timings,
 	}
 
-	// serviceVersions := map[string]string{"volume": "v2"}
+	serviceVersions := map[string]string{"volume": "v2"}
 
-	// stack, xerr := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
+	stack, xerr := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	// Note: if timings have to be tuned, update stack.MutableTimings
-	//
-	// wrapped := stacks.Remediator{
-	// 	Stack: stack,
-	// 	Name:      providerName,
-	// }
+
+	wrapped := stacks.Remediator{
+		Stack: stack,
+		Name:  providerName,
+	}
 
 	out := &provider{
-		// Stack:            wrapped,
+		MiniStack:        wrapped,
 		tenantParameters: params,
 		authOptions:      authOptions,
 		configOptions:    cfgOptions,
@@ -317,16 +319,6 @@ next:
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	// out.summonerConfig.Scope.Project, xerr = options.Value[string](opts, "Project")
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// out.summonerConfig.Scope.Tenant, xerr = options.Value[string](opts, "Tenant")
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
 
 	return out, nil
 }

@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // SubnetSecurityGroups contains a list of security groups bound to the network, applied to each host created in it
@@ -50,38 +49,41 @@ func (ssg *SubnetSecurityGroups) IsNull() bool {
 }
 
 // Clone ...
-func (ssg SubnetSecurityGroups) Clone() (data.Clonable, error) {
-	return NewSubnetSecurityGroups().Replace(&ssg)
-}
-
-// Replace ...
-func (ssg *SubnetSecurityGroups) Replace(p data.Clonable) (data.Clonable, error) {
-	if ssg == nil || p == nil {
+func (ssg *SubnetSecurityGroups) Clone() (clonable.Clonable, error) {
+	if ssg == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*SubnetSecurityGroups)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *SubnetDescription")
+	nssg := NewSubnetSecurityGroups()
+	return nssg, nssg.Replace(ssg)
+}
+
+// Replace ...
+func (ssg *SubnetSecurityGroups) Replace(p clonable.Clonable) error {
+	if ssg == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*SubnetSecurityGroups](p)
+	if err != nil {
+		return err
 	}
 
 	*ssg = *src
 	ssg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		cloned, err := v.Clone()
+		cloned, err := clonable.CastedClone[*SecurityGroupBond](v)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		ssg.ByID[k], ok = cloned.(*SecurityGroupBond)
-		if !ok {
-			return nil, fmt.Errorf("cloned is not a *SecurityGroupBond")
-		}
+
+		ssg.ByID[k] = cloned
 	}
 	ssg.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
 		ssg.ByName[k] = v
 	}
-	return ssg, nil
+	return nil
 }
 
 func init() {

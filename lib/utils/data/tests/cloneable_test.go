@@ -65,11 +65,11 @@ func NewMemoria(num int, cts ...string) *Memoria {
 	}
 }
 
-func (m Memoria) Clone() data.Clonable {
+func (m Memoria) Clone() clonable.Clonable {
 	return NewMemoria(0, "").Replace(&m)
 }
 
-func (m *Memoria) Replace(clonable data.Clonable) data.Clonable {
+func (m *Memoria) Replace(clonable clonable.Clonable) clonable.Clonable {
 	*m = *clonable.(*Memoria)
 	return m
 }

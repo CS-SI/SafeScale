@@ -35,12 +35,12 @@ func (m *StructWithoutPointers) IsNull() bool {
 	return m == nil || (m.Content == "" && m.Rumba == 0)
 }
 
-func (m StructWithoutPointers) Clone() (data.Clonable, error) {
+func (m StructWithoutPointers) Clone() (clonable.Clonable, error) {
 	return NewStructWithoutPointers().Replace(&m)
 }
 
-func (m *StructWithoutPointers) Replace(clonable data.Clonable) (data.Clonable, error) {
-	p, ok := clonable.(*StructWithoutPointers)
+func (m *StructWithoutPointers) Replace(clonable clonable.Clonable) (clonable.Clonable, error) {
+	p, err := lang.Cast[*StructWithoutPointers)
 	if !ok {
 		return nil, fmt.Errorf("p is not a *StructWithoutPointers")
 	}
@@ -63,13 +63,13 @@ func (m *StructWithPointersAndDefectiveReplace) IsNull() bool {
 	return m == nil || (m.Content == "" && m.Rumba == 0 && len(m.List) == 0 && len(m.Map) == 0)
 }
 
-func (m StructWithPointersAndDefectiveReplace) Clone() (data.Clonable, error) {
+func (m StructWithPointersAndDefectiveReplace) Clone() (clonable.Clonable, error) {
 	newM := &StructWithPointersAndDefectiveReplace{}
 	return newM.Replace(&m)
 }
 
-func (m *StructWithPointersAndDefectiveReplace) Replace(clonable data.Clonable) (data.Clonable, error) {
-	p, ok := clonable.(*StructWithPointersAndDefectiveReplace)
+func (m *StructWithPointersAndDefectiveReplace) Replace(clonable clonable.Clonable) (clonable.Clonable, error) {
+	p, err := lang.Cast[*StructWithPointersAndDefectiveReplace)
 	if !ok {
 		return nil, fmt.Errorf("p is not a *StructWithPointersAndDefectiveReplace")
 	}
@@ -92,12 +92,12 @@ func (m *StructWithPointersAndCorrectReplace) IsNull() bool {
 	return m == nil || (m.content == "" && m.Rumba == 0 && len(m.List) == 0 && len(m.Map) == 0)
 }
 
-func (m StructWithPointersAndCorrectReplace) Clone() (data.Clonable, error) {
+func (m StructWithPointersAndCorrectReplace) Clone() (clonable.Clonable, error) {
 	return NewStructWithPointersAndCorrectReplace().Replace(&m)
 }
 
-func (m *StructWithPointersAndCorrectReplace) Replace(clonable data.Clonable) (data.Clonable, error) {
-	src, ok := clonable.(*StructWithPointersAndCorrectReplace)
+func (m *StructWithPointersAndCorrectReplace) Replace(clonable clonable.Clonable) (clonable.Clonable, error) {
+	src, err := lang.Cast[*StructWithPointersAndCorrectReplace)
 	if !ok {
 		panic("clonable cannot be casted to '*StructWithPointersAndCorrectReplace'")
 	}

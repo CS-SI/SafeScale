@@ -271,8 +271,8 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequ
 			}
 
 			xerr = subnetInstance.Review(ctx,
-				func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-					as, ok := clonable.(*abstract.Subnet)
+				func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+					as, err := lang.Cast[*abstract.Subnet)
 					if !ok {
 						return fail.InconsistentError(
 							"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
@@ -294,8 +294,8 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequ
 			return nil, xerr
 		}
 
-		xerr = subnetInstance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
+		xerr = subnetInstance.Review(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, err := lang.Cast[*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}

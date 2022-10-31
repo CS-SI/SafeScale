@@ -569,7 +569,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	// --- Initializes abstract.HostCore ---
 
-	ahc := abstract.NewHostCore()
+	ahc, xerr := abstract.NewHostCore(request.ResourceName)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
 	ahc.PrivateKey = userData.FirstPrivateKey
 	ahc.Password = request.Password
 
@@ -598,11 +602,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 						if server != nil && server.ID != "" {
 							derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
-								_ = xerr.AddConsequence(
-									fail.Wrap(
-										derr, "cleaning up on failure, failed to delete host",
-									),
-								)
+								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
 							}
 						}
 					}
@@ -638,10 +638,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				logrus.WithContext(ctx).Tracef("Host successfully created in requested Availability Zone '%s'", creationZone)
 				if creationZone != srvOpts.AvailabilityZone {
 					if srvOpts.AvailabilityZone != "" {
-						logrus.WithContext(ctx).Warnf(
-							"Host created in the WRONG availability zone: requested '%s' and got instead '%s'",
-							srvOpts.AvailabilityZone, creationZone,
-						)
+						logrus.WithContext(ctx).Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'",
+							srvOpts.AvailabilityZone, creationZone)
 					}
 				}
 			}
@@ -908,9 +906,9 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			if server != nil {
-				ahf.Core.ID = server.ID
-				ahf.Core.Name = server.Name
-				ahf.Core.LastState = hoststate.Error
+				ahf.ID = server.ID
+				ahf.Name = server.Name
+				ahf.LastState = hoststate.Error
 				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 			}
 			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
@@ -923,7 +921,7 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 		return nil, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
-	host, xerr = s.complementHost(ctx, ahf.Core, server)
+	host, xerr = s.complementHost(ctx, ahf.HostCore, server)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1048,8 +1046,8 @@ func (s stack) complementHost(ctx context.Context, host *abstract.HostCore, serv
 	}
 	host.LastState = toHostState(server.Status)
 
-	completedHost = abstract.NewHostFull()
-	completedHost.Core = host
+	completedHost, xerr = abstract.NewHostFull(host.Name)
+	completedHost.HostCore = host
 	completedHost.Description.Created = server.Created
 	completedHost.Description.Updated = server.Updated
 	completedHost.CurrentState = host.LastState
@@ -1212,7 +1210,11 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 					}
 
 					for _, srv := range list {
-						h := abstract.NewHostCore()
+						h, err := abstract.NewHostCore("unknown")
+						if err != nil {
+							return false, err
+						}
+
 						h.ID = srv.ID
 						var ah *abstract.HostFull
 						if details {
@@ -1221,8 +1223,8 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 								return false, err
 							}
 						} else {
-							ah = abstract.NewHostFull()
-							ah.Core = h
+							ah, err = abstract.NewHostFull(h.Name)
+							ah.HostCore = h
 						}
 						hostList = append(hostList, ah)
 					}
@@ -1262,7 +1264,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	}
 
 	if s.cfgOpts.UseFloatingIP {
-		fip, xerr := s.getFloatingIPOfHost(ctx, ahf.Core.ID)
+		fip, xerr := s.getFloatingIPOfHost(ctx, ahf.ID)
 		if xerr != nil {
 			return xerr
 		}
@@ -1272,7 +1274,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 			retryErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
 					err := floatingips.DisassociateInstance(
-						s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
+						s.ComputeClient, ahf.ID, floatingips.DisassociateOpts{
 							FloatingIP: fip.IP,
 						},
 					).ExtractErr()
@@ -1312,7 +1314,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 			if resourcePresent { // nolint
 				innerRetryErr := stacks.RetryableRemoteCall(ctx,
 					func() error {
-						innerErr := servers.Delete(s.ComputeClient, ahf.Core.ID).ExtractErr()
+						innerErr := servers.Delete(s.ComputeClient, ahf.ID).ExtractErr()
 						return normalizeError(innerErr)
 					},
 					normalizeError,
@@ -1436,7 +1438,7 @@ func (s stack) attachFloatingIP(ctx context.Context, host *abstract.HostFull) (*
 		return nil, xerr
 	}
 
-	xerr = s.AssociateFloatingIP(ctx, host.Core, fip.ID)
+	xerr = s.AssociateFloatingIP(ctx, host.HostCore, fip.ID)
 	if xerr != nil {
 		rerr := s.DeleteFloatingIP(ctx, fip.ID)
 		if rerr != nil {
@@ -1524,7 +1526,7 @@ func (s stack) getOpenstackPortID(ctx context.Context, host *abstract.HostFull) 
 	nic := nics.Interface{}
 	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			innerErr := s.listInterfaces(host.Core.ID).EachPage(
+			innerErr := s.listInterfaces(host.ID).EachPage(
 				func(page pagination.Page) (bool, error) {
 					list, err := nics.ExtractInterfaces(page)
 					if err != nil {
@@ -1547,10 +1549,10 @@ func (s stack) getOpenstackPortID(ctx context.Context, host *abstract.HostFull) 
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		return nil, fail.Wrap(commRetryErr, "failed to list OpenStack Interfaces of host '%s'", host.Core.Name)
+		return nil, fail.Wrap(commRetryErr, "failed to list OpenStack Interfaces of host '%s'", host.Name)
 	}
 	if !found {
-		return nil, abstract.ResourceNotFoundError("Port ID corresponding to host", host.Core.Name)
+		return nil, abstract.ResourceNotFoundError("Port ID corresponding to host", host.Name)
 	}
 	return &nic.PortID, nil
 }

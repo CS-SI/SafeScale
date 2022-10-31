@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/labelproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // LabelHosts contains the values associated with Host bound to the Label
@@ -49,19 +48,24 @@ func (hlabel *LabelHosts) IsNull() bool {
 }
 
 // Clone ...
-func (hlabel LabelHosts) Clone() (data.Clonable, error) {
-	return NewLabelHosts().Replace(&hlabel)
-}
-
-// Replace ...
-func (hlabel *LabelHosts) Replace(p data.Clonable) (data.Clonable, error) {
-	if hlabel == nil || p == nil {
+func (hlabel *LabelHosts) Clone() (clonable.Clonable, error) {
+	if hlabel == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*LabelHosts)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *HostTags")
+	nhl := NewLabelHosts()
+	return nhl, nhl.Replace(hlabel)
+}
+
+// Replace ...
+func (hlabel *LabelHosts) Replace(p clonable.Clonable) error {
+	if hlabel == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*LabelHosts](p)
+	if err != nil {
+		return err
 	}
 
 	*hlabel = *src
@@ -73,7 +77,7 @@ func (hlabel *LabelHosts) Replace(p data.Clonable) (data.Clonable, error) {
 	for k, v := range src.ByName {
 		hlabel.ByName[k] = v
 	}
-	return hlabel, nil
+	return nil
 }
 
 func init() {

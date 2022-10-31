@@ -1327,9 +1327,9 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 
 				primaryGatewayVariables["ShortHostname"] = h.GetName()
 				domain := ""
-				xerr = h.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-						hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+				xerr = h.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Inspect(hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
+						hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
 						if !ok {
 							return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
@@ -1387,9 +1387,9 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 
 					secondaryGatewayVariables["ShortHostname"] = h.GetName()
 					domain = ""
-					xerr = h.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-						return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-							hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+					xerr = h.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+						return props.Inspect(hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
+							hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
 							if !ok {
 								return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 							}
@@ -1906,9 +1906,9 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 		// 		}
 		// 		primaryGatewayVariables["ShortHostname"] = h.GetName()
 		// 		domain := ""
-		// 		xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
-		// 			return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-		// 				hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+		// 		xerr = h.Inspect(w.feature.task, func(clonable clonable.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
+		// 			return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
+		// 				hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
 		// 				if !ok {
 		// 					return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		// 				}
@@ -1941,9 +1941,9 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 		// 			}
 		// 			secondaryGatewayVariables["ShortHostname"] = h.GetName()
 		// 			domain = ""
-		// 			xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
-		// 				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-		// 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+		// 			xerr = h.Inspect(w.feature.task, func(clonable clonable.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
+		// 				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
+		// 					hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
 		// 					if !ok {
 		// 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		// 					}

@@ -102,9 +102,9 @@ func NewKongController(ctx context.Context, svc iaasapi.Service, subnet resource
 		}
 
 		if results.Successful() {
-			xerr = addressedGateway.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-					featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+			xerr = addressedGateway.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+					featuresV1, err := lang.Cast[*propertiesv1.HostFeatures)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
@@ -185,8 +185,8 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 	var sourceControl map[string]interface{}
 
 	// Sets the values usable in all cases
-	xerr = k.subnet.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
+	xerr = k.subnet.Inspect(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, err := lang.Cast[*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}

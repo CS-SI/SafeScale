@@ -36,9 +36,8 @@ type IndexedListOfClusterNodes map[uint]*propertiesv3.ClusterNode
 
 // Cluster is the interface of all cluster object instances
 type Cluster interface {
+	Core
 	Metadata
-	Targetable
-	Consistent
 
 	AddFeature(ctx context.Context, name string, vars data.Map[string, any], settings FeatureSettings) (Results, fail.Error)                                  // adds feature on cluster
 	AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map[string, any], keepOnFailure bool) ([]Host, fail.Error) // adds several nodes

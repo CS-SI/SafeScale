@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // NetworkSecurityGroups contains a list of security groups owned by the Network
@@ -49,19 +48,24 @@ func (nsg *NetworkSecurityGroups) IsNull() bool {
 }
 
 // Clone ...
-func (nsg NetworkSecurityGroups) Clone() (data.Clonable, error) {
-	return NewNetworkSecurityGroups().Replace(&nsg)
-}
-
-// Replace ...
-func (nsg *NetworkSecurityGroups) Replace(p data.Clonable) (data.Clonable, error) {
-	if nsg == nil || p == nil {
+func (nsg *NetworkSecurityGroups) Clone() (clonable.Clonable, error) {
+	if nsg == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*NetworkSecurityGroups)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *NetworkSecurityGroups")
+	nnsg := NewNetworkSecurityGroups()
+	return nnsg, nnsg.Replace(nsg)
+}
+
+// Replace ...
+func (nsg *NetworkSecurityGroups) Replace(p clonable.Clonable) error {
+	if nsg == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*NetworkSecurityGroups](p)
+	if err != nil {
+		return err
 	}
 
 	*nsg = *src
@@ -73,7 +77,7 @@ func (nsg *NetworkSecurityGroups) Replace(p data.Clonable) (data.Clonable, error
 	for k, v := range src.ByName {
 		nsg.ByName[k] = v
 	}
-	return nsg, nil
+	return nil
 }
 
 func init() {

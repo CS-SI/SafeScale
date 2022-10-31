@@ -25,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -33,9 +32,8 @@ import (
 
 // Subnet links Object Storage folder and Network
 type Subnet interface {
+	Core
 	Metadata
-	data.Identifiable
-	Consistent
 
 	DetachHost(ctx context.Context, hostID string) fail.Error                                                                    // unlinks host ID from subnet
 	AttachHost(context.Context, Host) fail.Error                                                                                 // links Host to the Subnet

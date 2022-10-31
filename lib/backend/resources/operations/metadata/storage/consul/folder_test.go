@@ -118,7 +118,7 @@ func TestMetadataFolder_GetBucket(t *testing.T) {
 		require.Nil(t, xerr)
 		_, xerr = mf.GetBucket(ctx)
 		require.EqualValues(t, xerr.Error(), "Fail to acces to bucket metadata")
-		_, xerr = mf.getBucket(ctx)
+		_, xerr = mf.bucket(ctx)
 		require.EqualValues(t, xerr.Error(), "Fail to acces to bucket metadata")
 
 		svc._reset()
@@ -129,7 +129,7 @@ func TestMetadataFolder_GetBucket(t *testing.T) {
 		require.Nil(t, xerr)
 		_, xerr = mf.GetBucket(ctx)
 		require.EqualValues(t, xerr.Error(), "Fail to acces to bucket metadata")
-		_, xerr = mf.getBucket(ctx)
+		_, xerr = mf.bucket(ctx)
 		require.EqualValues(t, xerr.Error(), "Fail to acces to bucket metadata")
 
 	})
@@ -140,7 +140,7 @@ func TestMetadataFolder_GetBucket(t *testing.T) {
 func TestMetadataFolder_Path(t *testing.T) {
 
 	var mfa folder
-	path := mfa.Path()
+	path := mfa.Prefix()
 	require.EqualValues(t, path, "")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -149,7 +149,7 @@ func TestMetadataFolder_Path(t *testing.T) {
 
 		mf, xerr := NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
-		path := mf.Path()
+		path := mf.Prefix()
 		require.EqualValues(t, path, "myfolder")
 	})
 	require.Nil(t, err)

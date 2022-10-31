@@ -18,11 +18,11 @@ package abstract
 
 import (
 	stdjson "encoding/json"
-	"fmt"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -58,27 +58,34 @@ func (instance ObjectStorageBucket) OK() bool {
 
 // Clone does a deep-copy of the Host
 //
-// satisfies interface data.Clonable
-func (instance ObjectStorageBucket) Clone() (data.Clonable, error) {
+// satisfies interface clonable.Clonable
+func (instance *ObjectStorageBucket) Clone() (clonable.Clonable, error) {
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	newB := NewObjectStorageBucket()
-	return newB.Replace(&instance)
+	return newB, newB.Replace(instance)
 }
 
 // Replace ...
 //
-// satisfies interface data.Clonable
-func (instance *ObjectStorageBucket) Replace(p data.Clonable) (data.Clonable, error) {
-	if instance == nil || p == nil {
-		return nil, fail.InvalidInstanceError()
+// satisfies interface clonable.Clonable
+func (instance *ObjectStorageBucket) Replace(p clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if p == nil {
+		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	casted, ok := p.(*ObjectStorageBucket)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *ObjectStorageBucket")
+	src, err := lang.Cast[*ObjectStorageBucket](p)
+	if err != nil {
+		return err
 	}
 
-	*instance = *casted
-	return instance, nil
+	*instance = *src
+	return nil
 }
 
 // Serialize serializes Host 'instance' into bytes (output json code)

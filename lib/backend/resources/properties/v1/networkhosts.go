@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // NetworkHosts contains information about hosts connected to the network
@@ -47,25 +46,30 @@ func (nh *NetworkHosts) Reset() {
 	}
 }
 
-// IsNull ... (data.Clonable interface)
+// IsNull ... (clonable.Clonable interface)
 func (nh *NetworkHosts) IsNull() bool {
 	return nh == nil || len(nh.ByID) == 0
 }
 
-// Clone ... (data.Clonable interface)
-func (nh NetworkHosts) Clone() (data.Clonable, error) {
-	return NewNetworkHosts().Replace(&nh)
-}
-
-// Replace ... (data.Clonable interface)
-func (nh *NetworkHosts) Replace(p data.Clonable) (data.Clonable, error) {
-	if nh == nil || p == nil {
+// Clone ... (clonable.Clonable interface)
+func (nh *NetworkHosts) Clone() (clonable.Clonable, error) {
+	if nh == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*NetworkHosts)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *NetworkHosts")
+	rnh := NewNetworkHosts()
+	return rnh, rnh.Replace(nh)
+}
+
+// Replace ... (clonable.Clonable interface)
+func (nh *NetworkHosts) Replace(p clonable.Clonable) error {
+	if nh == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*NetworkHosts](p)
+	if err != nil {
+		return err
 	}
 
 	nh.ByID = make(map[string]string, len(src.ByID))
@@ -76,7 +80,7 @@ func (nh *NetworkHosts) Replace(p data.Clonable) (data.Clonable, error) {
 	for k, v := range src.ByName {
 		nh.ByName[k] = v
 	}
-	return nh, nil
+	return nil
 }
 
 func init() {

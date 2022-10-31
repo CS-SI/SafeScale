@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/eko/gocache/v2/store"
+	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -39,16 +41,16 @@ import (
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/eko/gocache/v2/store"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -78,21 +80,21 @@ type Subnet struct {
 }
 
 // ListSubnets returns a list of available subnets
-func ListSubnets(ctx context.Context, svc iaasapi.Service, networkID string, all bool) (_ []*abstract.Subnet, ferr fail.Error) {
+func ListSubnets(ctx context.Context, frame *scope.Frame, networkID string, all bool) (_ []*abstract.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	if frame == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("frame")
 	}
 
 	if all {
-		return svc.ListSubnets(ctx, networkID)
+		return frame.Service().ListSubnets(ctx, networkID)
 	}
 
-	subnetInstance, xerr := NewSubnet(svc)
+	subnetInstance, xerr := NewSubnet(frame)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -114,14 +116,14 @@ func ListSubnets(ctx context.Context, svc iaasapi.Service, networkID string, all
 }
 
 // NewSubnet creates an instance of Subnet used as resources.Subnet
-func NewSubnet(svc iaasapi.Service) (_ *Subnet, ferr fail.Error) {
+func NewSubnet(frame *scope.Frame) (_ *Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	if valid.IsNull(frame) {
+		return nil, fail.InvalidParameterCannotBeNilError("frame")
 	}
 
-	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, subnetKind, subnetsFolderName, &abstract.Subnet{})
+	coreInstance, xerr := metadata.NewCore(frame, metadata.MethodObjectStorage, subnetKind, subnetsFolderName, &abstract.Subnet{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -134,7 +136,14 @@ func NewSubnet(svc iaasapi.Service) (_ *Subnet, ferr fail.Error) {
 }
 
 // LoadSubnet loads the metadata of a Subnet
-func LoadSubnet(inctx context.Context, svc iaasapi.Service, networkRef, subnetRef string, options ...data.ImmutableKeyValue) (*Subnet, fail.Error) {
+func LoadSubnet(inctx context.Context, frame *scope.Frame, networkRef, subnetRef string) (*Subnet, fail.Error) {
+	if valid.IsNull(frame) {
+		return nil, fail.InvalidParameterCannotBeNilError("frame")
+	}
+	if subnetRef = strings.TrimSpace(subnetRef); subnetRef == "" {
+		return nil, fail.InvalidParameterError("subnetRef", "cannot be empty string")
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -149,18 +158,11 @@ func LoadSubnet(inctx context.Context, svc iaasapi.Service, networkRef, subnetRe
 		ga, gerr := func() (_ *Subnet, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			if svc == nil {
-				return nil, fail.InvalidParameterCannotBeNilError("svc")
-			}
-			if subnetRef = strings.TrimSpace(subnetRef); subnetRef == "" {
-				return nil, fail.InvalidParameterError("subnetRef", "cannot be empty string")
-			}
-
 			// trick to avoid collisions
 			var kt *Subnet
 			cachesubnetRef := fmt.Sprintf("%T/%s", kt, subnetRef)
 
-			cache, xerr := svc.GetCache(ctx)
+			cache, xerr := frame.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -187,7 +189,7 @@ func LoadSubnet(inctx context.Context, svc iaasapi.Service, networkRef, subnetRe
 				subnetID = subnetRef
 			default:
 				// Try to load Network metadata
-				networkInstance, xerr = LoadNetwork(ctx, svc, networkRef)
+				networkInstance, xerr = LoadNetwork(ctx, frame, networkRef)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -199,33 +201,26 @@ func LoadSubnet(inctx context.Context, svc iaasapi.Service, networkRef, subnetRe
 					}
 				}
 
-				withDefaultSubnetwork, err := svc.HasDefaultNetwork()
+				withDefaultSubnetwork, err := frame.Service().HasDefaultNetwork()
 				if err != nil {
 					return nil, err
 				}
 
 				if networkInstance != nil { // nolint
 					// Network metadata loaded, find the ID of the Subnet (subnetRef may be ID or Name)
-					xerr = networkInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-						return props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-							subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-							if !ok {
-								return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					xerr = metadata.InspectProperty[*propertiesv1.NetworkSubnets](ctx, networkInstance, networkproperty.SubnetsV1, func(subnetsV1 *propertiesv1.NetworkSubnets) fail.Error {
+						var found bool
+						for k, v := range subnetsV1.ByName {
+							if k == subnetRef || v == subnetRef {
+								subnetID = v
+								found = true
+								break
 							}
-
-							var found bool
-							for k, v := range subnetsV1.ByName {
-								if k == subnetRef || v == subnetRef {
-									subnetID = v
-									found = true
-									break
-								}
-							}
-							if !found {
-								return fail.NotFoundError("failed to find a Subnet referenced by '%s' in network '%s'", subnetRef, networkInstance.GetName())
-							}
-							return nil
-						})
+						}
+						if !found {
+							return fail.NotFoundError("failed to find a Subnet referenced by '%s' in network '%s'", subnetRef, networkInstance.GetName())
+						}
+						return nil
 					})
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
@@ -233,7 +228,7 @@ func LoadSubnet(inctx context.Context, svc iaasapi.Service, networkRef, subnetRe
 					}
 				} else if withDefaultSubnetwork {
 					// No Network Metadata, try to use the default Network if there is one
-					an, xerr := svc.DefaultNetwork(ctx)
+					an, xerr := frame.Service().DefaultNetwork(ctx)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						return nil, xerr
@@ -241,7 +236,7 @@ func LoadSubnet(inctx context.Context, svc iaasapi.Service, networkRef, subnetRe
 
 					if an.Name == networkRef || an.ID == networkRef {
 						// We are in default Network context, query Subnet list and search for the one requested
-						list, xerr := ListSubnets(ctx, svc, an.ID, false)
+						list, xerr := ListSubnets(ctx, frame, an.ID, false)
 						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
 							return nil, xerr
@@ -265,7 +260,7 @@ func LoadSubnet(inctx context.Context, svc iaasapi.Service, networkRef, subnetRe
 			}
 
 			// -- second step: search instance in service cache
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSubnetCacheMiss(ctx, svc, subnetID) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSubnetCacheMiss(ctx, frame, subnetID) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -329,8 +324,8 @@ func LoadSubnet(inctx context.Context, svc iaasapi.Service, networkRef, subnetRe
 }
 
 // onSubnetCacheMiss is called when there is no instance in cache of Subnet 'subnetID'
-func onSubnetCacheMiss(ctx context.Context, svc iaasapi.Service, subnetID string) (data.Identifiable, fail.Error) {
-	subnetInstance, innerXErr := NewSubnet(svc)
+func onSubnetCacheMiss(ctx context.Context, frame *scope.Frame, subnetID string) (data.Identifiable, fail.Error) {
+	subnetInstance, innerXErr := NewSubnet(frame)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -353,10 +348,10 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 	defer instance.localCache.Unlock()
 
 	var primaryGatewayID, secondaryGatewayID string
-	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, innerErr := lang.Cast[*abstract.Subnet](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		if len(as.GatewayIDs) > 0 {
@@ -373,7 +368,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 	}
 
 	if primaryGatewayID != "" {
-		hostInstance, xerr := LoadHost(ctx, instance.Service(), primaryGatewayID)
+		hostInstance, xerr := LoadHost(ctx, instance.Frame(), primaryGatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -393,7 +388,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 	}
 
 	if secondaryGatewayID != "" {
-		hostInstance, xerr := LoadHost(ctx, instance.Service(), secondaryGatewayID)
+		hostInstance, xerr := LoadHost(ctx, instance.Frame(), secondaryGatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -440,7 +435,7 @@ func (instance *Subnet) Exists(ctx context.Context) (bool, fail.Error) {
 }
 
 // Carry wraps rv.core.Carry() to add Volume to service cache
-func (instance *Subnet) Carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
+func (instance *Subnet) Carry(ctx context.Context, clonable clonable.Clonable) (ferr fail.Error) {
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
@@ -471,8 +466,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"),
-		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"), "('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	xerr := instance.unsafeCreateSubnet(ctx, req)
@@ -489,18 +483,14 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	// Starting from here, delete Subnet if exiting with error
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			if !req.KeepOnFailure {
-				if derr := instance.deleteSubnetThenWaitCompletion(context.Background(), snid); derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
-				} else {
-					logrus.WithContext(ctx).Infof("the subnet '%s' should be gone by now", snid)
-				}
+		if ferr != nil && req.CleanOnFailure() {
+			if derr := instance.deleteSubnetThenWaitCompletion(context.Background(), snid); derr != nil {
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
+			} else {
+				logrus.WithContext(ctx).Infof("the subnet '%s' should be gone by now", snid)
 			}
 		}
 	}()
-
-	// FIXME: What about host metadata itself ?
 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
@@ -538,13 +528,13 @@ func (instance *Subnet) CreateSecurityGroups(ctx context.Context, networkInstanc
 
 // bindInternalSecurityGroupToGateway does what its name says
 func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host) fail.Error {
-	return instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	return instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, innerErr := lang.Cast[*abstract.Subnet](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
-		sg, innerXErr := LoadSecurityGroup(ctx, instance.Service(), as.InternalSecurityGroupID)
+		sg, innerXErr := LoadSecurityGroup(ctx, instance.Frame(), as.InternalSecurityGroupID)
 		if innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", as.Name, as.InternalSecurityGroupID)
 		}
@@ -564,13 +554,13 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 	}
 
 	if xerr != nil && *xerr != nil && keepOnFailure {
-		_ = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		_ = instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, innerErr := lang.Cast[*abstract.Subnet](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
-			sg, derr := LoadSecurityGroup(ctx, instance.Service(), as.InternalSecurityGroupID)
+			sg, derr := LoadSecurityGroup(ctx, instance.Frame(), as.InternalSecurityGroupID)
 			if derr != nil {
 				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind External Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
 				return derr
@@ -660,7 +650,7 @@ func (instance *Subnet) validateCIDR(ctx context.Context, req *abstract.SubnetRe
 
 		// ... and if CIDR is inside VPC's one
 		if !netutils.CIDROverlap(*networkDesc, *subnetDesc) {
-			return fail.InvalidRequestError("not inside Network CIDR '%s'", req.CIDR, req.Name, network.CIDR)
+			return fail.InvalidRequestError("not inside Network CIDR '%s'", network.CIDR)
 		}
 		return nil
 	}
@@ -720,7 +710,7 @@ func wouldOverlap(allSubnets []*abstract.Subnet, subnet net.IPNet) fail.Error {
 
 // checkUnicity checks if the Subnet name is not already used
 func (instance *Subnet) checkUnicity(ctx context.Context, req abstract.SubnetRequest) fail.Error {
-	_, xerr := LoadSubnet(ctx, instance.Service(), req.NetworkID, req.Name)
+	_, xerr := LoadSubnet(ctx, instance.Frame(), req.NetworkID, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -737,12 +727,11 @@ func (instance *Subnet) checkUnicity(ctx context.Context, req abstract.SubnetReq
 // validateNetwork verifies the Network exists and make sure req.Network field is an ID
 func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.SubnetRequest) (resources.Network, *abstract.Network, fail.Error) {
 	var an *abstract.Network
-	svc := instance.Service()
-	networkInstance, xerr := LoadNetwork(ctx, svc, req.NetworkID)
+	networkInstance, xerr := LoadNetwork(ctx, instance.Frame(), req.NetworkID)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
-			withDefaultSubnetwork, err := svc.HasDefaultNetwork()
+			withDefaultSubnetwork, err := instance.Service().HasDefaultNetwork()
 			if err != nil {
 				return nil, nil, err
 			}
@@ -751,22 +740,23 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 				return nil, nil, xerr
 			}
 
-			an, xerr = svc.DefaultNetwork(ctx)
+			an, xerr = instance.Service().DefaultNetwork(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, nil, xerr
 			}
 		}
 	} else {
-		xerr = networkInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			var ok bool
-			an, ok = clonable.(*abstract.Network)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Networking' expected, %s' provided", reflect.TypeOf(clonable).String())
+		xerr = networkInstance.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			var innerErr error
+			an, innerErr = lang.Cast[*abstract.Network](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			// check the network exists on provider side
-			if _, innerXErr := svc.InspectNetwork(ctx, an.ID); innerXErr != nil {
+			_, innerXErr := instance.Service().InspectNetwork(ctx, an.ID)
+			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					// TODO: automatic metadata cleanup ?
@@ -826,11 +816,15 @@ func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subn
 	}
 
 	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
-		as := abstract.NewSubnet()
-		xerr := as.Deserialize(buf)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
+		as, innerXErr := abstract.NewSubnet("unknown")
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		innerXErr = as.Deserialize(buf)
+		innerXErr = debug.InjectPlannedFail(innerXErr)
+		if innerXErr != nil {
+			return innerXErr
 		}
 
 		return callback(as)
@@ -864,39 +858,37 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 	}
 
 	// To apply the request, the instance must be one of the Subnets of the Host
-	xerr := host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv2.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
+	xerr := host.InspectProperty(ctx, hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
+		hnV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
+		}
 
-			found := false
-			for k := range hnV2.SubnetsByID {
-				if k == snid {
-					found = true
-					break
-				}
+		found := false
+		for k := range hnV2.SubnetsByID {
+			if k == snid {
+				found = true
+				break
 			}
-			if !found {
-				return fail.InvalidRequestError("failed to adopt Host '%s' in Subnet '%s' as Host is not connected to it", hostName, snid)
-			}
-			return nil
-		})
+		}
+		if !found {
+			return fail.InvalidRequestError("failed to adopt Host '%s' in Subnet '%s' as Host is not connected to it", hostName, snid)
+		}
+		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		subnetAbstract, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	return instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		subnetAbstract, innerErr := lang.Cast[*abstract.Subnet](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		if subnetAbstract.InternalSecurityGroupID != "" {
-			sgInstance, innerXErr := LoadSecurityGroup(ctx, instance.Service(), subnetAbstract.InternalSecurityGroupID)
+			sgInstance, innerXErr := LoadSecurityGroup(ctx, instance.Frame(), subnetAbstract.InternalSecurityGroupID)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -923,7 +915,7 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 		}
 
 		if !isGateway && pubIP != "" && subnetAbstract.PublicIPSecurityGroupID != "" {
-			sgInstance, innerXErr := LoadSecurityGroup(ctx, instance.Service(), subnetAbstract.PublicIPSecurityGroupID)
+			sgInstance, innerXErr := LoadSecurityGroup(ctx, instance.Frame(), subnetAbstract.PublicIPSecurityGroupID)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -934,16 +926,17 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 			}
 		}
 
-		return props.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Alter(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+			subnetHostsV1, innerErr := lang.Cast[*propertiesv1.SubnetHosts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			hostID, err := host.GetID()
 			if err != nil {
 				return fail.ConvertError(err)
 			}
+
 			subnetHostsV1.ByID[hostID] = hostName
 			subnetHostsV1.ByName[hostName] = hostID
 			return nil
@@ -968,7 +961,7 @@ func (instance *Subnet) DetachHost(ctx context.Context, hostID string) (ferr fai
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"), "('"+hostID+"')").Entering()
 	defer tracer.Exiting()
 
-	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return instance.unsafeAbandonHost(props, hostID)
 	})
 }
@@ -990,22 +983,21 @@ func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, ferr
 	// defer instance.lock.RUnlock()
 
 	var list []resources.Host
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			shV1, ok := clonable.(*propertiesv1.SubnetHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.ReviewProperty(ctx, subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+		shV1, innerErr := lang.Cast[*propertiesv1.SubnetHosts](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
+		}
+
+		frame := instance.Frame()
+		for id := range shV1.ByID {
+			hostInstance, innerErr := LoadHost(ctx, frame, id)
+			if innerErr != nil {
+				return innerErr
 			}
-			svc := instance.Service()
-			for id := range shV1.ByID {
-				hostInstance, innerErr := LoadHost(ctx, svc, id)
-				if innerErr != nil {
-					return innerErr
-				}
-				list = append(list, hostInstance)
-			}
-			return nil
-		})
+			list = append(list, hostInstance)
+		}
+		return nil
 	})
 	return list, xerr
 }
@@ -1032,17 +1024,8 @@ func (instance *Subnet) GetGatewayPublicIP(ctx context.Context, primary bool) (_
 		return "", fail.InvalidInstanceError()
 	}
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
 	var ip string
-	svc := instance.Service()
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
+	xerr := metadata.Inspect(ctx, instance, func(as *abstract.Subnet, _ *serialize.JSONProperties) fail.Error {
 		var (
 			id  string
 			rgw resources.Host
@@ -1058,7 +1041,7 @@ func (instance *Subnet) GetGatewayPublicIP(ctx context.Context, primary bool) (_
 			id = as.GatewayIDs[1]
 		}
 		var inErr fail.Error
-		if rgw, inErr = LoadHost(ctx, svc, id); inErr != nil {
+		if rgw, inErr = LoadHost(ctx, instance.Frame(), id); inErr != nil {
 			return inErr
 		}
 
@@ -1089,16 +1072,15 @@ func (instance *Subnet) GetGatewayPublicIPs(ctx context.Context) (_ []string, fe
 	// defer instance.lock.RUnlock()
 
 	var gatewayIPs []string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, innerErr := lang.Cast[*abstract.Subnet](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		gatewayIPs = make([]string, 0, len(as.GatewayIDs))
-		svc := instance.Service()
 		for _, v := range as.GatewayIDs {
-			rgw, inErr := LoadHost(ctx, svc, v)
+			rgw, inErr := LoadHost(ctx, instance.Frame(), v)
 			if inErr != nil {
 				return inErr
 			}
@@ -1141,7 +1123,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 		rErr fail.Error
 	}
 	chRes := make(chan result)
-	go func() (ferr fail.Error) {
+	go func() (ferr fail.Error) { //nolint
 		defer fail.OnPanic(&ferr)
 		defer close(chRes)
 
@@ -1152,7 +1134,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			if !ok {
 				ar := result{fail.InvalidRequestError("force flag must be a bool")}
 				chRes <- ar
-				return
+				return nil
 			}
 		}
 
@@ -1165,20 +1147,19 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			subnetHosts    *propertiesv1.SubnetHosts
 			outprops       *serialize.JSONProperties
 		)
-		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			var ok bool
-			subnetAbstract, ok = clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr := instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			var innerErr error
+			subnetAbstract, innerErr = lang.Cast[*abstract.Subnet](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			outprops = props
-
-			return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-				var ok bool
-				subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+				var innerErr error
+				subnetHosts, innerErr = lang.Cast[*propertiesv1.SubnetHosts](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				return nil
@@ -1202,18 +1183,18 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 
 		svc := instance.Service()
 		subnetName := instance.GetName()
-		xerr = instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr = instance.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			as, innerErr := lang.Cast[*abstract.Subnet](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			// Check if hosts are still attached to Subnet according to metadata
 			var errorMsg string
-			return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-				shV1, ok := clonable.(*propertiesv1.SubnetHosts)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+				shV1, innerErr := lang.Cast[*propertiesv1.SubnetHosts](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				hostsLen := uint(len(shV1.ByName))
@@ -1221,7 +1202,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 				if hostsLen > 0 {
 					for k := range shV1.ByName {
 						// Check if Host still has metadata and count it if yes
-						if hess, innerXErr := LoadHost(ctx, svc, k); innerXErr != nil {
+						if hess, innerXErr := LoadHost(ctx, instance.Frame(), k); innerXErr != nil {
 							debug.IgnoreError(innerXErr)
 						} else {
 							if _, innerXErr := hess.ForceGetState(ctx); innerXErr != nil {
@@ -1252,10 +1233,10 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			return
 		}
 
-		xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			as, innerErr := lang.Cast[*abstract.Subnet](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			// 1st delete gateway(s)
@@ -1268,7 +1249,8 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			// Unbind Host from current Subnet (not done by relaxedDeleteHost as Hosts are gateways, to avoid deadlock as Subnet instance may already be locked)
 			if len(gwIDs) > 0 {
 				for _, v := range gwIDs {
-					if innerXErr = instance.unsafeAbandonHost(props, v); innerXErr != nil {
+					innerXErr = instance.unsafeAbandonHost(props, v)
+					if innerXErr != nil {
 						return innerXErr
 					}
 				}
@@ -1282,14 +1264,13 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			}
 
 			// 3rd delete security groups associated to Subnet by users (do not include SG created with Subnet, they will be deleted later)
-			innerXErr = props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-				ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			innerXErr = props.Alter(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+				ssgV1, innerErr := lang.Cast[*propertiesv1.SubnetSecurityGroups](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
-				innerXErr := instance.onRemovalUnbindSecurityGroups(ctx, subnetHosts, ssgV1)
-				return innerXErr
+				return instance.onRemovalUnbindSecurityGroups(ctx, subnetHosts, ssgV1)
 			})
 			if innerXErr != nil {
 				return innerXErr
@@ -1298,7 +1279,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			// 4st free CIDR index if the Subnet has been created for a single Host
 			if as.SingleHostCIDRIndex > 0 {
 				// networkInstance, innerXErr := instance.unsafeInspectNetwork()
-				networkInstance, innerXErr := LoadNetwork(ctx, instance.Service(), as.Network)
+				networkInstance, innerXErr := LoadNetwork(ctx, instance.Frame(), as.Network)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -1353,13 +1334,12 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 
 // deleteSecurityGroups deletes the Security Groups created for the Subnet
 func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string) (ferr fail.Error) {
-	svc := instance.Service()
 	for _, v := range sgs {
 		if v == "" {
 			return fail.NewError("unexpected empty security group")
 		}
 
-		sgInstance, xerr := LoadSecurityGroup(ctx, svc, v)
+		sgInstance, xerr := LoadSecurityGroup(ctx, instance.Frame(), v)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -1402,11 +1382,11 @@ func (instance *Subnet) InspectNetwork(ctx context.Context) (rn resources.Networ
 	}
 
 	var as *abstract.Subnet
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		var ok bool
-		as, ok = clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		var innerErr error
+		as, innerErr = lang.Cast[*abstract.Subnet](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		return nil
@@ -1415,20 +1395,18 @@ func (instance *Subnet) InspectNetwork(ctx context.Context) (rn resources.Networ
 		return nil, xerr
 	}
 
-	return LoadNetwork(ctx, instance.Service(), as.Network)
+	return LoadNetwork(ctx, instance.Frame(), as.Network)
 }
 
 // deleteGateways deletes all the gateways of the Subnet
 // A gateway host that is not found must be considered as a success
 func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Subnet) (ids []string, ferr fail.Error) {
-	svc := instance.Service()
-
 	if subnet.GatewayIDs == nil { // unlikely, either is an input error or we are dealing with metadata corruption
 		subnet.GatewayIDs = []string{}
 	}
 
 	if len(subnet.GatewayIDs) == 0 { // unlikely, either is an input error or we are dealing with metadata corruption
-		gwInstance, xerr := LoadHost(ctx, svc, fmt.Sprintf("gw-%s", subnet.Name))
+		gwInstance, xerr := LoadHost(ctx, instance.Frame(), fmt.Sprintf("gw-%s", subnet.Name))
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -1446,7 +1424,7 @@ func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Sub
 			}
 		}
 
-		gw2Instance, xerr := LoadHost(ctx, svc, fmt.Sprintf("gw2-%s", subnet.Name))
+		gw2Instance, xerr := LoadHost(ctx, instance.Frame(), fmt.Sprintf("gw2-%s", subnet.Name))
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -1467,7 +1445,7 @@ func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Sub
 
 	if len(subnet.GatewayIDs) > 0 {
 		for _, v := range subnet.GatewayIDs {
-			hostInstance, xerr := LoadHost(ctx, svc, v)
+			hostInstance, xerr := LoadHost(ctx, instance.Frame(), v)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -1483,9 +1461,9 @@ func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Sub
 				logrus.WithContext(ctx).Debugf("Deleting gateway '%s'...", name)
 
 				// delete Host
-				hostInstanceImpl, ok := hostInstance.(*Host)
-				if !ok {
-					return subnet.GatewayIDs, fail.InconsistentError("failed to cast hostInstance to '*Host'")
+				hostInstanceImpl, err := lang.Cast[*Host](hostInstance)
+				if err != nil {
+					return subnet.GatewayIDs, fail.Wrap(err)
 				}
 
 				xerr := hostInstanceImpl.RelaxedDeleteHost(ctx)
@@ -1526,9 +1504,8 @@ func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subne
 		subnetHosts: subnetHosts,
 		onRemoval:   true,
 	}
-	svc := instance.Service()
 	for k := range sgs.ByID {
-		sgInstance, xerr := LoadSecurityGroup(ctx, svc, k)
+		sgInstance, xerr := LoadSecurityGroup(ctx, instance.Frame(), k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -1578,16 +1555,16 @@ func (instance *Subnet) GetEndpointIP(ctx context.Context) (ip string, ferr fail
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, innerErr := lang.Cast[*abstract.Subnet](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		if as.VIP != nil && as.VIP.PublicIP != "" {
 			ip = as.VIP.PublicIP
 		} else {
-			objpgw, innerXErr := LoadHost(ctx, instance.Service(), as.GatewayIDs[0])
+			objpgw, innerXErr := LoadHost(ctx, instance.Frame(), as.GatewayIDs[0])
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1748,34 +1725,37 @@ func (instance *Subnet) BindSecurityGroup(ctx context.Context, sgInstance resour
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"), "(%s)", snid).Entering()
 	defer tracer.Exiting()
 
-	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		abstractSubnet, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	return instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		abstractSubnet, innerErr := lang.Cast[*abstract.Subnet](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		var subnetHosts *propertiesv1.SubnetHosts
-		innerXErr := props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		innerXErr := props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+			var innerErr error
+			subnetHosts, innerErr = lang.Cast[*propertiesv1.SubnetHosts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
+
 			return nil
 		})
 		if innerXErr != nil {
 			return innerXErr
 		}
 
-		return props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			nsgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Alter(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+			nsgV1, innerErr := lang.Cast[*propertiesv1.SubnetSecurityGroups](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			sgID, err := sgInstance.GetID()
 			if err != nil {
 				return fail.ConvertError(err)
 			}
+
 			// First check if the security group is not already registered for the host with the exact same state
 			for k, v := range nsgV1.ByID {
 				if k == sgID && v.Disabled == bool(!enabled) {
@@ -1784,12 +1764,13 @@ func (instance *Subnet) BindSecurityGroup(ctx context.Context, sgInstance resour
 			}
 
 			// Bind the security group to the Subnet (does the security group side of things)
-			sgInstanceImpl, ok := sgInstance.(*SecurityGroup)
-			if !ok {
-				return fail.InconsistentError("failed to cast sgInstance to '*SecurityGroup'")
+			sgInstanceImpl, innerErr := lang.Cast[*SecurityGroup](sgInstance)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
-			if innerXErr := sgInstanceImpl.unsafeBindToSubnet(ctx, abstractSubnet, subnetHosts, enabled, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+			innerXErr := sgInstanceImpl.unsafeBindToSubnet(ctx, abstractSubnet, subnetHosts, enabled, resources.MarkSecurityGroupAsSupplemental)
+			if innerXErr != nil {
 				return innerXErr
 			}
 
@@ -1843,16 +1824,14 @@ func (instance *Subnet) ListSecurityGroups(ctx context.Context, state securitygr
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	return list, instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
+	return list, instance.InspectProperty(ctx, subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+		ssgV1, innerErr := lang.Cast[*propertiesv1.SubnetSecurityGroups](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
+		}
 
-			list = FilterBondsByKind(ssgV1.ByID, state)
-			return nil
-		})
+		list = FilterBondsByKind(ssgV1.ByID, state)
+		return nil
 	})
 }
 
@@ -1876,36 +1855,38 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 	}
 
 	svc := instance.Service()
-	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		abstractSubnet, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	return instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		abstractSubnet, innerErr := lang.Cast[*abstract.Subnet](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		var subnetHosts *propertiesv1.SubnetHosts
-		innerXErr := props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			var ok bool
-			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable))
+		innerXErr := props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+			var innerErr error
+			subnetHosts, innerErr = lang.Cast[*propertiesv1.SubnetHosts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
+
 			return nil
 		})
 		if innerXErr != nil {
 			return innerXErr
 		}
 
-		return props.Inspect(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			nsgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Inspect(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+			nsgV1, innerErr := lang.Cast[*propertiesv1.SubnetSecurityGroups](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			var asg *abstract.SecurityGroup
-			innerXErr := sgInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				var ok bool
-				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
-					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			innerXErr := sgInstance.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+				var innerErr error
+				asg, innerErr = lang.Cast[*abstract.SecurityGroup](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				return nil
@@ -1932,12 +1913,13 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 					return innerXErr
 				}
 			} else {
-				sgInstanceImpl, ok := sgInstance.(*SecurityGroup)
-				if !ok {
-					return fail.InconsistentError("failed to cast sgInstance to '*SecurityGroup'")
+				sgInstanceImpl, err := lang.Cast[*SecurityGroup](sgInstance)
+				if err != nil {
+					return fail.Wrap(err)
 				}
 
-				if innerXErr = sgInstanceImpl.unsafeBindToSubnet(ctx, abstractSubnet, subnetHosts, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
+				innerXErr = sgInstanceImpl.unsafeBindToSubnet(ctx, abstractSubnet, subnetHosts, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
+				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrDuplicate:
 						// security group already bound to Subnet with the same state, considered as a success
@@ -1975,39 +1957,33 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 	}
 
 	svc := instance.Service()
-	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		abstractSubnet, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	return instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		abstractSubnet, innerErr := lang.Cast[*abstract.Subnet](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		var subnetHosts *propertiesv1.SubnetHosts
-		innerXErr := props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			var ok bool
-			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			return nil
+		innerXErr := props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+			var innerErr error
+			subnetHosts, innerErr = lang.Cast[*propertiesv1.SubnetHosts](p)
+			return fail.Wrap(innerErr)
 		})
 		if innerXErr != nil {
 			return innerXErr
 		}
 
-		return props.Inspect(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			nsgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Inspect(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+			nsgV1, innerErr := lang.Cast[*propertiesv1.SubnetSecurityGroups](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			var abstractSG *abstract.SecurityGroup
-			innerXErr := sgInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				var ok bool
-				if abstractSG, ok = clonable.(*abstract.SecurityGroup); !ok {
-					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				return nil
+			innerXErr := sgInstance.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+				var innerErr error
+				abstractSG, innerErr = lang.Cast[*abstract.SecurityGroup](p)
+				return fail.Wrap(innerErr)
 			})
 			if innerXErr != nil {
 				return innerXErr
@@ -2025,12 +2001,13 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 				}
 			} else {
 				// Do security group stuff to disable it
-				sgInstanceImpl, ok := sgInstance.(*SecurityGroup)
-				if !ok {
-					return fail.InconsistentError("failed to cast sgInstance to '*SecurityGroup'")
+				sgInstanceImpl, err := lang.Cast[*SecurityGroup](sgInstance)
+				if err != nil {
+					return fail.Wrap(err)
 				}
 
-				if innerXErr = sgInstanceImpl.unsafeBindToSubnet(ctx, abstractSubnet, subnetHosts, resources.SecurityGroupDisable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
+				innerXErr = sgInstanceImpl.unsafeBindToSubnet(ctx, abstractSubnet, subnetHosts, resources.SecurityGroupDisable, resources.KeepCurrentSecurityGroupMark)
+				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						// security group not bound to Subnet, considered as a success
@@ -2056,22 +2033,17 @@ func (instance *Subnet) InspectGatewaySecurityGroup(ctx context.Context) (_ reso
 		return nil, fail.InvalidInstanceError()
 	}
 
-	var sgInstance resources.SecurityGroup
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		var inErr fail.Error
-		sgInstance, inErr = LoadSecurityGroup(ctx, instance.Service(), as.GWSecurityGroupID)
-		return inErr
+	var abstractSubnet *abstract.Subnet
+	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		var innerErr error
+		abstractSubnet, innerErr = lang.Cast[*abstract.Subnet](p)
+		return fail.Wrap(innerErr)
 	})
-	return sgInstance, xerr
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return LoadSecurityGroup(ctx, instance.Frame(), abstractSubnet.GWSecurityGroupID)
 }
 
 // InspectInternalSecurityGroup returns the instance of SecurityGroup for internal security inside the Subnet
@@ -2082,22 +2054,17 @@ func (instance *Subnet) InspectInternalSecurityGroup(ctx context.Context) (_ res
 		return nil, fail.InvalidInstanceError()
 	}
 
-	var sg resources.SecurityGroup
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		var inErr fail.Error
-		sg, inErr = LoadSecurityGroup(ctx, instance.Service(), as.InternalSecurityGroupID)
-		return inErr
+	var abstractSubnet *abstract.Subnet
+	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		var innerErr error
+		abstractSubnet, innerErr = lang.Cast[*abstract.Subnet](p)
+		return fail.Wrap(innerErr)
 	})
-	return sg, xerr
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return LoadSecurityGroup(ctx, instance.Frame(), abstractSubnet.InternalSecurityGroupID)
 }
 
 // InspectPublicIPSecurityGroup returns the instance of SecurityGroup in Subnet for Hosts with Public IP (which does not apply on gateways)
@@ -2108,22 +2075,17 @@ func (instance *Subnet) InspectPublicIPSecurityGroup(ctx context.Context) (_ res
 		return nil, fail.InvalidInstanceError()
 	}
 
-	var sg resources.SecurityGroup
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		var inErr fail.Error
-		sg, inErr = LoadSecurityGroup(ctx, instance.Service(), as.PublicIPSecurityGroupID)
-		return inErr
+	var abstractSubnet *abstract.Subnet
+	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		var innerErr error
+		abstractSubnet, innerErr = lang.Cast[*abstract.Subnet](p)
+		return fail.Wrap(innerErr)
 	})
-	return sg, xerr
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return LoadSecurityGroup(ctx, instance.Frame(), abstractSubnet.PublicIPSecurityGroupID)
 }
 
 // CreateSubnetWithoutGateway creates a Subnet named like 'singleHostName', without gateway

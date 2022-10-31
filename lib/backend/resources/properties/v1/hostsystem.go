@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostSystem contains information about the operating system
@@ -48,23 +47,28 @@ func (hs *HostSystem) IsNull() bool {
 }
 
 // Clone ...
-func (hs HostSystem) Clone() (data.Clonable, error) {
-	return NewHostSystem().Replace(&hs)
-}
-
-// Replace ...
-func (hs *HostSystem) Replace(p data.Clonable) (data.Clonable, error) {
-	if hs == nil || p == nil {
+func (hs *HostSystem) Clone() (clonable.Clonable, error) {
+	if hs == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*HostSystem)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *HostSystem")
+	nhs := NewHostSystem()
+	return nhs, nhs.Replace(hs)
+}
+
+// Replace ...
+func (hs *HostSystem) Replace(p clonable.Clonable) error {
+	if hs == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostSystem](p)
+	if err != nil {
+		return err
 	}
 
 	*hs = *src
-	return hs, nil
+	return nil
 }
 
 func init() {

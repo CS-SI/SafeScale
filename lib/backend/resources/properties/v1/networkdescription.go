@@ -17,13 +17,13 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // NetworkDescription contains additional information describing the network, in V1
@@ -43,29 +43,34 @@ func NewNetworkDescription() *NetworkDescription {
 }
 
 // IsNull ...
-// (data.Clonable interface)
+// (clonable.Clonable interface)
 func (nd *NetworkDescription) IsNull() bool {
 	return nd == nil || (nd.Created.IsZero() && nd.Purpose == "")
 }
 
-// Clone ... (data.Clonable interface)
-func (nd NetworkDescription) Clone() (data.Clonable, error) {
-	return NewNetworkDescription().Replace(&nd)
-}
-
-// Replace ... (data.Clonable interface)
-func (nd *NetworkDescription) Replace(p data.Clonable) (data.Clonable, error) {
-	if nd == nil || p == nil {
+// Clone ... (clonable.Clonable interface)
+func (nd *NetworkDescription) Clone() (clonable.Clonable, error) {
+	if nd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	casted, ok := p.(*NetworkDescription)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *NetworkDescription")
+	nnd := NewNetworkDescription()
+	return nnd, nnd.Replace(nd)
+}
+
+// Replace ... (clonable.Clonable interface)
+func (nd *NetworkDescription) Replace(p clonable.Clonable) error {
+	if nd == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	casted, err := lang.Cast[*NetworkDescription](p)
+	if err != nil {
+		return err
 	}
 
 	*nd = *casted
-	return nd, nil
+	return nil
 }
 
 func init() {

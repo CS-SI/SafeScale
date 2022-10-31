@@ -151,8 +151,8 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 	}
 
 	if isSingle || isGateway {
-		xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			ahc, ok := clonable.(*abstract.HostCore)
+		xerr = host.Inspect(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			ahc, err := lang.Cast[*abstract.HostCore)
 			if !ok {
 				return fail.InconsistentError("")
 			}
@@ -166,16 +166,16 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 		}
 	} else {
 		var subnetInstance resources.Subnet
-		xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			ahc, ok := clonable.(*abstract.HostCore)
+		xerr = host.Inspect(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			ahc, err := lang.Cast[*abstract.HostCore)
 			if !ok {
 				return fail.InconsistentError("")
 			}
 
 			sshConfig.PrivateKey = ahc.PrivateKey
 			sshConfig.Port = int(ahc.SSHPort)
-			return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
+			return props.Inspect(hostproperty.NetworkV2, func(clonable clonable.Clonable) fail.Error {
+				hnV2, err := lang.Cast[*propertiesv2.HostNetworking)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -230,7 +230,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 				return nil, xerr
 			}
 		} else {
-			xerr = gw.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr = gw.Inspect(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
 				if gwahc, ok = clonable.(*abstract.HostCore); !ok {
 					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -270,7 +270,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 				return nil, xerr
 			}
 		} else {
-			xerr = gw.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr = gw.Inspect(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
 				gwahc, ok = clonable.(*abstract.HostCore)
 				if !ok {
 					return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())

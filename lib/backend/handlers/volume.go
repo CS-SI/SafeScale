@@ -142,9 +142,9 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 		}
 	}
 
-	xerr = volumeInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
-			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
+	xerr = volumeInstance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(volumeproperty.AttachedV1, func(clonable clonable.Clonable) fail.Error {
+			volumeAttachmentsV1, err := lang.Cast[*propertiesv1.VolumeAttachments)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}

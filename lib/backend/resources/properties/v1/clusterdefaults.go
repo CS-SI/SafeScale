@@ -17,13 +17,12 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterDefaults contains default information used by the cluster after initial creation
@@ -45,28 +44,33 @@ func newClusterDefaults() *ClusterDefaults {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (d *ClusterDefaults) IsNull() bool {
 	return d == nil || (d.GatewaySizing == abstract.HostEffectiveSizing{} && d.MasterSizing == abstract.HostEffectiveSizing{} && d.NodeSizing == abstract.HostEffectiveSizing{})
 }
 
-// Clone ... (data.Clonable interface)
-func (d ClusterDefaults) Clone() (data.Clonable, error) {
-	return newClusterDefaults().Replace(&d)
-}
-
-// Replace ... (data.Clonable interface)
-func (d *ClusterDefaults) Replace(p data.Clonable) (data.Clonable, error) {
-	if d == nil || p == nil {
+// Clone ... (clonable.Clonable interface)
+func (d *ClusterDefaults) Clone() (clonable.Clonable, error) {
+	if d == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	casted, ok := p.(*ClusterDefaults)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *ClusterDefaults")
+	nd := newClusterDefaults()
+	return nd, nd.Replace(d)
+}
+
+// Replace ... (clonable.Clonable interface)
+func (d *ClusterDefaults) Replace(p clonable.Clonable) error {
+	if d == nil {
+		return fail.InvalidInstanceError()
 	}
-	*d = *casted
-	return d, nil
+
+	src, err := lang.Cast[*ClusterDefaults](p)
+	if err != nil {
+		return err
+	}
+	*d = *src
+	return nil
 }
 
 func init() {

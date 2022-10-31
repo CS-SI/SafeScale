@@ -193,7 +193,7 @@ func TestClusterIdentity_Deserialize(t *testing.T) {
 func TestClusterIdentity_Replace(t *testing.T) {
 
 	var emptyCluster *ClusterIdentity
-	var emptyData data.Clonable = nil
+	var emptyData clonable.Clonable = nil
 
 	cluster := NewClusterIdentity()
 	cluster.Name = "cluster"

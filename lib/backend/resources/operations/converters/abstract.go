@@ -182,7 +182,7 @@ func HostCoreFromAbstractToProtocol(in *abstract.HostCore) *protocol.Host {
 
 // HostFullFromAbstractToProtocol ...
 func HostFullFromAbstractToProtocol(in *abstract.HostFull) *protocol.Host {
-	state := in.Core.LastState
+	state := in.LastState
 	if in.CurrentState != hoststate.Unknown {
 		state = in.CurrentState
 	}
@@ -195,11 +195,11 @@ func HostFullFromAbstractToProtocol(in *abstract.HostFull) *protocol.Host {
 	}
 
 	ph := &protocol.Host{
-		Id:           in.Core.ID,
-		Name:         in.Core.Name,
+		Id:           in.ID,
+		Name:         in.Name,
 		State:        HostStateFromAbstractToProtocol(state),
-		PrivateKey:   in.Core.PrivateKey,
-		CreationDate: in.Core.Tags["CreationDate"],
+		PrivateKey:   in.PrivateKey,
+		CreationDate: in.Tags["CreationDate"],
 		Managed:      managed,
 	}
 	if in.Networking != nil {
@@ -214,7 +214,7 @@ func HostFullFromAbstractToProtocol(in *abstract.HostFull) *protocol.Host {
 
 // HostCoreToHostFull ...
 func HostCoreToHostFull(in abstract.HostCore) *abstract.HostFull {
-	return &abstract.HostFull{Core: &in}
+	return &abstract.HostFull{HostCore: &in}
 }
 
 // HostDescriptionFromAbstractToPropertyV1 ...

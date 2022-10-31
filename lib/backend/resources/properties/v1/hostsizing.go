@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -94,25 +93,30 @@ func NewHostSizing() *HostSizing {
 }
 
 // IsNull ...
-// (data.Clonable interface)
+// (clonable.Clonable interface)
 func (hs *HostSizing) IsNull() bool {
 	return hs == nil || (valid.IsNil(hs.RequestedSize) && valid.IsNil(hs.AllocatedSize))
 }
 
-// Clone ... (data.Clonable interface)
-func (hs HostSizing) Clone() (data.Clonable, error) {
-	return NewHostSizing().Replace(&hs)
-}
-
-// Replace ...
-func (hs *HostSizing) Replace(p data.Clonable) (data.Clonable, error) {
-	if hs == nil || p == nil {
+// Clone ... (clonable.Clonable interface)
+func (hs *HostSizing) Clone() (clonable.Clonable, error) {
+	if hs == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*HostSizing)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *HostSizing")
+	nhs := NewHostSizing()
+	return nhs, nhs.Replace(hs)
+}
+
+// Replace ...
+func (hs *HostSizing) Replace(p clonable.Clonable) error {
+	if hs == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostSizing](p)
+	if err != nil {
+		return err
 	}
 
 	hs.RequestedSize = NewHostSizingRequirements()
@@ -124,7 +128,7 @@ func (hs *HostSizing) Replace(p data.Clonable) (data.Clonable, error) {
 		*hs.AllocatedSize = *src.AllocatedSize
 	}
 	hs.Template = src.Template
-	return hs, nil
+	return nil
 }
 
 func init() {

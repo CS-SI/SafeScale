@@ -17,13 +17,12 @@
 package propertiesv3
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterDefaults ...
@@ -45,27 +44,32 @@ func newClusterDefaults() *ClusterDefaults {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (cd *ClusterDefaults) IsNull() bool {
 	return cd == nil || (cd.GatewaySizing == propertiesv2.HostSizingRequirements{} && cd.MasterSizing == propertiesv2.HostSizingRequirements{} && cd.NodeSizing == propertiesv2.HostSizingRequirements{})
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (cd ClusterDefaults) Clone() (data.Clonable, error) {
-	return newClusterDefaults().Replace(&cd)
-}
-
-// Replace ...
-// satisfies interface data.Clonable
-func (cd *ClusterDefaults) Replace(p data.Clonable) (data.Clonable, error) {
-	if cd == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (cd *ClusterDefaults) Clone() (clonable.Clonable, error) {
+	if cd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*ClusterDefaults)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *ClusterDefaults")
+	ncd := newClusterDefaults()
+	return ncd, ncd.Replace(cd)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (cd *ClusterDefaults) Replace(p clonable.Clonable) error {
+	if cd == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*ClusterDefaults](p)
+	if err != nil {
+		return err
 	}
 
 	*cd = *src
@@ -74,7 +78,7 @@ func (cd *ClusterDefaults) Replace(p data.Clonable) (data.Clonable, error) {
 		cd.FeatureParameters = make([]string, len(src.FeatureParameters))
 		copy(cd.FeatureParameters, src.FeatureParameters)
 	}
-	return cd, nil
+	return nil
 }
 
 func init() {

@@ -360,7 +360,7 @@ func (instance *mapStore) unsafeFree(ctx context.Context, key string) fail.Error
 			return fail.InconsistentError("'*cached.reservation' expected, '%s' provided", reflect.TypeOf(ce.Content()).String())
 		}
 
-		// Cleanup key from cached and reservations
+		// Reset key from cached and reservations
 		delete(instance.cached, key)
 		delete(instance.reserved, key)
 

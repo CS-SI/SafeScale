@@ -28,14 +28,24 @@ import (
 type (
 	Resource interface {
 		Snippet() string
-		ToMap() map[string]any
+		// ToMap() map[string]any
+		// LocalState() bool
+		// RemoteState() bool
 	}
 
+	State = bool
+
 	Summoner interface {
-		Build(resources ...Resource) fail.Error
-		Apply(ctx context.Context) (map[string]tfexec.OutputMeta, fail.Error)
-		Destroy(ctx context.Context) fail.Error
-		Plan(ctx context.Context) (map[string]tfexec.OutputMeta, bool, fail.Error)
+		Apply(ctx context.Context, def string) (map[string]tfexec.OutputMeta, fail.Error)
+		Assemble(resources ...Resource) (string, fail.Error)
+		Close() fail.Error
+		Destroy(ctx context.Context, def string) fail.Error
+		// Import(ctx context.Context, resourceAddress, id string) fail.Error
+		Plan(ctx context.Context, def string) (map[string]tfexec.OutputMeta, bool, fail.Error)
+		SetEnv(key, value string) fail.Error
+		AddEnv(key, value string) fail.Error
+		Reset() fail.Error
+		// State(ctx context.Context) (_ *tfjson.State, ferr fail.Error)
 	}
 
 	RequiredProvider struct {

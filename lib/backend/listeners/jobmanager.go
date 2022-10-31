@@ -19,8 +19,8 @@ package listeners
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -44,13 +44,21 @@ func prepareJob(ctx context.Context, in scopeFromProtocol, description string) (
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	scope, xerr := common.NewScope(in.GetOrganization(), in.GetProject(), in.GetTenantId(), description)
+	scopeHolder, xerr := scope.Load(in.GetOrganization(), in.GetProject(), in.GetTenantId())
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			scopeHolder, xerr = scope.New(in.GetOrganization(), in.GetProject(), in.GetTenantId(), description)
+			if xerr != nil {
+				return nil, xerr
+			}
+		default:
+			return nil, xerr
+		}
 	}
 
 	newctx, cancel := context.WithCancel(ctx)
-	j, xerr := job.New(newctx, cancel, scope)
+	j, xerr := job.New(newctx, cancel, scopeHolder)
 	if xerr != nil {
 		return nil, xerr
 	}

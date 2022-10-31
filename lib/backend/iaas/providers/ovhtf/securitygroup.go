@@ -40,10 +40,13 @@ type securityGroupResource struct {
 	rules       abstract.SecurityGroupRules
 }
 
-func newSecurityGroupResource(name string) *securityGroupResource {
-	return &securityGroupResource{
-		ResourceCore: terraformer.NewResourceCore(name, createSecurityGroupResourceSnippet),
+func newSecurityGroupResource(name string) (*securityGroupResource, fail.Error) {
+	rc, xerr := terraformer.NewResourceCore(name, createSecurityGroupResourceSnippet)
+	if xerr != nil {
+		return nil, xerr
 	}
+
+	return &securityGroupResource{ResourceCore: rc}, nil
 }
 
 func (sgr *securityGroupResource) ToMap() map[string]any {
@@ -88,7 +91,11 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 	}
 
 	// create security group on provider side
-	sgRsc := newSecurityGroupResource(name)
+	sgRsc, xerr := newSecurityGroupResource(name)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	sgRsc.description = description
 
 	summoner, xerr := p.Terraformer()
@@ -96,12 +103,12 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 		return nil, xerr
 	}
 
-	xerr = summoner.Build(sgRsc)
+	def, xerr := summoner.Assemble(sgRsc)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	outputs, xerr := summoner.Apply(ctx)
+	outputs, xerr := summoner.Apply(ctx, def)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -21,7 +21,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -29,9 +28,8 @@ import (
 
 // Bucket GetBucket defines the interface to manipulate Object Storage buckets
 type Bucket interface {
+	Core
 	Metadata
-	data.Identifiable
-	Consistent
 
 	Browse(ctx context.Context, callback func(bucket *abstract.ObjectStorageBucket) fail.Error) fail.Error
 	Create(ctx context.Context, name string) fail.Error

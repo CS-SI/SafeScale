@@ -498,7 +498,7 @@ func (s stack) WaitHostReady(
 			return nil, retryErr
 		}
 	}
-	return ahf.Core, nil
+	return ahf.HostCore, nil
 }
 
 // CreateHost creates a host
@@ -622,9 +622,13 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 
 	// --- Initializes resources.Host ---
 
-	ahf = abstract.NewHostFull()
-	ahf.Core.PrivateKey = userData.FirstPrivateKey // Add initial PrivateKey to Host description
-	ahf.Core.Password = request.Password
+	ahf, xerr = abstract.NewHostFull(request.ResourceName)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
+	ahf.PrivateKey = userData.FirstPrivateKey // Add initial PrivateKey to Host description
+	ahf.Password = request.Password
 
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
 	ahf.Networking.IsGateway = request.IsGateway
@@ -696,12 +700,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 				return fail.NewError(nil, "failed to create server")
 			}
 
-			ahf.Core.ID = server.ID
-			ahf.Core.Name = server.Name
+			ahf.ID = server.ID
+			ahf.Name = server.Name
 
 			// Wait until Host is ready, not just until the build is started
 			if _, innerXErr = s.WaitHostReady(ctx, ahf, timings.HostLongOperationTimeout()); innerXErr != nil {
-				if rerr := s.DeleteHost(ctx, ahf.Core.ID); rerr != nil {
+				if rerr := s.DeleteHost(ctx, ahf.ID); rerr != nil {
 					_ = innerXErr.AddConsequence(fail.Wrap(rerr, "cleaning up on failure, failed to delete Host"))
 				}
 				return innerXErr
@@ -726,10 +730,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil && !request.KeepOnFailure {
+		if ferr != nil && request.CleanOnFailure() {
 			if ahf.IsConsistent() {
-				logrus.WithContext(ctx).Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
-				if derr := s.DeleteHost(context.Background(), ahf.Core.ID); derr != nil {
+				logrus.WithContext(ctx).Infof("Reset, deleting host '%s'", ahf.Core.Name)
+				if derr := s.DeleteHost(context.Background(), ahf.ID); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 					logrus.WithContext(ctx).Warnf("Error deleting host in cleanup: %v", derr)
 				}
@@ -778,11 +782,13 @@ func (s stack) buildAwsSpotMachine(
 
 	// FIXME: Listen to result.SpotInstanceRequests[0].GetState
 
-	host := abstract.HostCore{
-		ID:   aws.StringValue(instance.InstanceId),
-		Name: name,
+	host, err := abstract.NewHostCore(name)
+	if err != nil {
+		return nil, err
 	}
-	return &host, nil
+
+	host.ID = aws.StringValue(instance.InstanceId)
+	return host, nil
 }
 
 func (s stack) buildAwsMachine(
@@ -806,11 +812,12 @@ func (s stack) buildAwsMachine(
 		return nil, xerr
 	}
 
-	hostCore := abstract.HostCore{
-		ID:   aws.StringValue(instance.InstanceId),
-		Name: name,
+	hostCore, xerr := abstract.NewHostCore(name)
+	if xerr != nil {
+		return nil, xerr
 	}
-	return &hostCore, nil
+	hostCore.ID = aws.StringValue(instance.InstanceId)
+	return hostCore, nil
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
@@ -841,13 +848,13 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
 	var resp *ec2.Instance
-	if ahf.Core.ID != "" {
-		resp, xerr = s.rpcDescribeInstanceByID(ctx, aws.String(ahf.Core.ID))
+	if ahf.ID != "" {
+		resp, xerr = s.rpcDescribeInstanceByID(ctx, aws.String(ahf.ID))
 		if xerr != nil {
 			return nil, xerr
 		}
 	} else {
-		resp, xerr = s.rpcDescribeInstanceByName(ctx, aws.String(ahf.Core.Name))
+		resp, xerr = s.rpcDescribeInstanceByName(ctx, aws.String(ahf.Name))
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -867,7 +874,7 @@ func (s stack) inspectInstance(
 	if ahf.CurrentState, xerr = toHostState(instance.State); xerr != nil {
 		return xerr
 	}
-	ahf.Core.LastState = ahf.CurrentState
+	ahf.LastState = ahf.CurrentState
 
 	for _, tag := range instance.Tags {
 		if tag != nil && (aws.StringValue(tag.Key) == tagNameLabel || aws.StringValue(tag.Key) == "tag:"+tagNameLabel) && aws.StringValue(tag.Value) != "" {
@@ -994,7 +1001,11 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.
 	if xerr != nil {
 		return nil, xerr
 	}
-	ahf := abstract.NewHostFull()
+	ahf, xerr := abstract.NewHostFull(name)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	return ahf, s.inspectInstance(ctx, ahf, "'"+name+"'", resp)
 }
 
@@ -1014,9 +1025,9 @@ func (s stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter
 
 // ListHosts returns a list of hosts
 func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.HostList, ferr fail.Error) {
-	nullList := abstract.HostList{}
+	empty := abstract.HostList{}
 	if valid.IsNil(s) {
-		return nullList, fail.InvalidInstanceError()
+		return empty, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(details=%v)", details).WithStopwatch().Entering().Exiting()
@@ -1024,7 +1035,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.Host
 
 	resp, xerr := s.rpcDescribeInstances(ctx, nil)
 	if xerr != nil {
-		return nullList, xerr
+		return empty, xerr
 	}
 
 	hosts = abstract.HostList{}
@@ -1041,14 +1052,17 @@ func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.Host
 				}
 			}
 
-			ahf := abstract.NewHostFull()
-			ahf.Core.ID = aws.StringValue(instance.InstanceId)
-			ahf.Core.Name = name
-			ahf.CurrentState, ahf.Core.LastState = state, state
+			ahf, xerr := abstract.NewHostFull(name)
+			if xerr != nil {
+				return empty, xerr
+			}
+
+			ahf.ID = aws.StringValue(instance.InstanceId)
+			ahf.CurrentState, ahf.LastState = state, state
 			if details {
 				ahf, xerr = s.InspectHost(ctx, ahf)
 				if xerr != nil {
-					return nullList, xerr
+					return empty, xerr
 				}
 			}
 			hosts = append(hosts, ahf)
@@ -1206,13 +1220,13 @@ func (s stack) StopHost(ctx context.Context, host iaasapi.HostParameter, gracefu
 		return xerr
 	}
 
-	if xerr = s.rpcStopInstances(ctx, []*string{aws.String(ahf.Core.ID)}, aws.Bool(gracefully)); xerr != nil {
+	if xerr = s.rpcStopInstances(ctx, []*string{aws.String(ahf.ID)}, aws.Bool(gracefully)); xerr != nil {
 		return xerr
 	}
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			hostTmp, err := s.InspectHost(ctx, ahf.Core.ID)
+			hostTmp, err := s.InspectHost(ctx, ahf.ID)
 			if err != nil {
 				return err
 			}
@@ -1262,14 +1276,14 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) (
 		return xerr
 	}
 
-	xerr = s.rpcStartInstances(ctx, []*string{aws.String(ahf.Core.ID)})
+	xerr = s.rpcStartInstances(ctx, []*string{aws.String(ahf.ID)})
 	if xerr != nil {
 		return xerr
 	}
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			hostTmp, innerErr := s.InspectHost(ctx, ahf.Core.ID)
+			hostTmp, innerErr := s.InspectHost(ctx, ahf.ID)
 			if innerErr != nil {
 				return innerErr
 			}
@@ -1317,7 +1331,7 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	if xerr = s.rpcRebootInstances(ctx, []*string{aws.String(ahf.Core.ID)}); xerr != nil {
+	if xerr = s.rpcRebootInstances(ctx, []*string{aws.String(ahf.ID)}); xerr != nil {
 		return xerr
 	}
 

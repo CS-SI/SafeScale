@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage"
 	"github.com/sirupsen/logrus"
 
@@ -43,6 +44,7 @@ import (
 type folder struct {
 	// path contains the base path where to read/write record in Object Storage
 	path     string
+	frame    *scope.Frame
 	service  iaasapi.Service
 	crypt    bool
 	cryptKey *crypt.Key
@@ -84,6 +86,15 @@ func (instance folder) Service() iaasapi.Service {
 	return instance.service
 }
 
+// Frame returns the scope of the folder
+func (instance *folder) Frame() *scope.Frame {
+	if valid.IsNull(instance) {
+		return nil
+	}
+
+	return instance.frame
+}
+
 // GetBucket returns the bucket used by the folder to store Object Storage
 func (instance folder) GetBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
 	if valid.IsNil(instance) {
@@ -104,17 +115,18 @@ func (instance folder) getBucket(ctx context.Context) (abstract.ObjectStorageBuc
 	if xerr != nil {
 		return abstract.ObjectStorageBucket{}, xerr
 	}
+
 	return bucket, nil
 }
 
-// Path returns the base path of the folder
-func (instance folder) Path() string {
+// Prefix returns the base path of the folder
+func (instance folder) Prefix() string {
 	return instance.path
 }
 
-// AbsolutePath returns the full path to reach the 'path'+'name' starting from the folder path
+// AbsolutePath returns the full path to reach the 'path'
 func (instance folder) AbsolutePath(path ...string) string {
-	return storage.AbsolutePath(instance.path, path...)
+	return storage.AbsolutePath(instance.path, "/", path...)
 }
 
 // Lookup tells if the object named 'name' is inside the ObjectStorage folder

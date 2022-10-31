@@ -248,9 +248,9 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 	}
 
 	reduce := false
-	xerr = hostInstance.Inspect(handler.job.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
-			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
+	xerr = hostInstance.Inspect(handler.job.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.SizingV2, func(clonable clonable.Clonable) fail.Error {
+			hostSizingV2, err := lang.Cast[*propertiesv2.HostSizing)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -604,9 +604,9 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 	}
 
 	var list []*protocol.LabelInspectResponse
-	xerr = hostInstance.Review(handler.job.Context(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
-			hlV1, ok := clonable.(*propertiesv1.HostLabels)
+	xerr = hostInstance.Review(handler.job.Context(), func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.LabelsV1, func(clonable clonable.Clonable) fail.Error {
+			hlV1, err := lang.Cast[*propertiesv1.HostLabels)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -661,9 +661,9 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 	}
 
 	var outValue string
-	xerr = labelInstance.Review(handler.job.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			lhV1, ok := clonable.(*propertiesv1.LabelHosts)
+	xerr = labelInstance.Review(handler.job.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(labelproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
+			lhV1, err := lang.Cast[*propertiesv1.LabelHosts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}

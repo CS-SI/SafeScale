@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // SubnetHosts contains information about hosts attached to the subnet
@@ -40,25 +39,30 @@ func NewSubnetHosts() *SubnetHosts {
 }
 
 // IsNull
-// ... (data.Clonable interface)
+// ... (clonable.Clonable interface)
 func (sh *SubnetHosts) IsNull() bool {
 	return sh == nil || len(sh.ByID) == 0
 }
 
-// Clone ... (data.Clonable interface)
-func (sh SubnetHosts) Clone() (data.Clonable, error) {
-	return NewSubnetHosts().Replace(&sh)
-}
-
-// Replace ... (data.Clonable interface)
-func (sh *SubnetHosts) Replace(p data.Clonable) (data.Clonable, error) {
-	if sh == nil || p == nil {
+// Clone ... (clonable.Clonable interface)
+func (sh *SubnetHosts) Clone() (clonable.Clonable, error) {
+	if sh == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*SubnetHosts)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *SubnetHosts")
+	nsh := NewSubnetHosts()
+	return nsh, nsh.Replace(sh)
+}
+
+// Replace ... (clonable.Clonable interface)
+func (sh *SubnetHosts) Replace(p clonable.Clonable) error {
+	if sh == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*SubnetHosts](p)
+	if err != nil {
+		return err
 	}
 
 	sh.ByID = make(map[string]string, len(src.ByID))
@@ -69,7 +73,7 @@ func (sh *SubnetHosts) Replace(p data.Clonable) (data.Clonable, error) {
 	for k, v := range src.ByName {
 		sh.ByName[k] = v
 	}
-	return sh, nil
+	return nil
 }
 
 func init() {

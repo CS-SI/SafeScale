@@ -22,7 +22,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -30,9 +29,8 @@ import (
 
 // Network links Object Storage folder and Network
 type Network interface {
+	Core
 	Metadata
-	data.Identifiable
-	Consistent
 
 	AbandonSubnet(ctx context.Context, subnetID string) fail.Error                      // used to detach a Subnet from the Network
 	AdoptSubnet(ctx context.Context, subnet Subnet) fail.Error                          // used to attach a Subnet to the Network

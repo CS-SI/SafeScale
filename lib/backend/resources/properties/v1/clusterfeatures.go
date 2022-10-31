@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterInstalledFeature ...
@@ -46,27 +45,28 @@ func NewClusterInstalledFeature() *ClusterInstalledFeature {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (cif *ClusterInstalledFeature) IsNull() bool {
 	return cif == nil || cif.Name == ""
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (cif ClusterInstalledFeature) Clone() (data.Clonable, error) {
-	return NewClusterInstalledFeature().Replace(&cif)
+// satisfies interface clonable.Clonable
+func (cif ClusterInstalledFeature) Clone() (clonable.Clonable, error) {
+	ncif := NewClusterInstalledFeature()
+	return ncif, ncif.Replace(&cif)
 }
 
 // Replace ...
-// satisfies interface data.Clonable
-func (cif *ClusterInstalledFeature) Replace(p data.Clonable) (data.Clonable, error) {
-	if cif == nil || p == nil {
-		return nil, fail.InvalidInstanceError()
+// satisfies interface clonable.Clonable
+func (cif *ClusterInstalledFeature) Replace(p clonable.Clonable) error {
+	if cif == nil {
+		return fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*ClusterInstalledFeature)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *ClusterInstalledFeature")
+	src, err := lang.Cast[*ClusterInstalledFeature](p)
+	if err != nil {
+		return err
 	}
 
 	cif.RequiredBy = make(map[string]struct{}, len(src.RequiredBy))
@@ -77,7 +77,7 @@ func (cif *ClusterInstalledFeature) Replace(p data.Clonable) (data.Clonable, err
 	for k := range src.Requires {
 		cif.Requires[k] = struct{}{}
 	}
-	return cif, nil
+	return nil
 }
 
 // ClusterFeatures ...
@@ -98,45 +98,48 @@ func newClusterFeatures() *ClusterFeatures {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (f *ClusterFeatures) IsNull() bool {
 	return f == nil || (len(f.Installed) == 0 && len(f.Disabled) == 0)
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (f ClusterFeatures) Clone() (data.Clonable, error) {
-	return newClusterFeatures().Replace(&f)
-}
-
-// Replace ...
-// satisfies interface data.Clonable
-func (f *ClusterFeatures) Replace(p data.Clonable) (data.Clonable, error) {
-	if f == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (f *ClusterFeatures) Clone() (clonable.Clonable, error) {
+	if f == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*ClusterFeatures)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *ClusterFeatures")
+	ncf := newClusterFeatures()
+	return ncf, ncf.Replace(f)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (f *ClusterFeatures) Replace(p clonable.Clonable) error {
+	if f == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*ClusterFeatures](p)
+	if err != nil {
+		return err
 	}
 
 	f.Installed = make(map[string]*ClusterInstalledFeature, len(src.Installed))
 	for k, v := range src.Installed {
-		cloned, err := v.Clone()
+		cloned, err := clonable.CastedClone[*ClusterInstalledFeature](v)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		f.Installed[k], ok = cloned.(*ClusterInstalledFeature)
-		if !ok {
-			return nil, fmt.Errorf("cloned is not a *ClusterInstalledFeature")
-		}
+
+		f.Installed[k] = cloned
 	}
 	f.Disabled = make(map[string]struct{}, len(src.Disabled))
 	for k, v := range src.Disabled {
 		f.Disabled[k] = v
 	}
-	return f, nil
+	return nil
 }
 
 func init() {

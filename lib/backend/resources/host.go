@@ -37,9 +37,9 @@ import (
 
 // Host links Object Storage folder and Host
 type Host interface {
+	Core
 	Metadata
 	Targetable
-	Consistent
 
 	BindLabel(ctx context.Context, labelInstance Label, value string) fail.Error
 	BindSecurityGroup(ctx context.Context, sg SecurityGroup, enable SecurityGroupActivation) fail.Error                                // Binds a security group to host

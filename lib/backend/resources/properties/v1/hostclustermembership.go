@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostClusterMembership ...
@@ -46,28 +45,34 @@ func (hcm *HostClusterMembership) Reset() {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (hcm *HostClusterMembership) IsNull() bool {
 	return hcm == nil || hcm.Cluster == ""
 }
 
 // Clone ...
-func (hcm HostClusterMembership) Clone() (data.Clonable, error) {
-	return NewHostClusterMembership().Replace(&hcm)
-}
-
-// Replace ...
-func (hcm *HostClusterMembership) Replace(p data.Clonable) (data.Clonable, error) {
-	if hcm == nil || p == nil {
+func (hcm *HostClusterMembership) Clone() (clonable.Clonable, error) {
+	if hcm == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*HostClusterMembership)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *HostClusterMembership")
+	nhcm := NewHostClusterMembership()
+	return nhcm, nhcm.Replace(hcm)
+}
+
+// Replace ...
+func (hcm *HostClusterMembership) Replace(p clonable.Clonable) error {
+	if hcm == nil {
+		return fail.InvalidInstanceError()
 	}
+
+	src, err := lang.Cast[*HostClusterMembership](p)
+	if err != nil {
+		return err
+	}
+
 	*hcm = *src
-	return hcm, nil
+	return nil
 }
 
 func init() {

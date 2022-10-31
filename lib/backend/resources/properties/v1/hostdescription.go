@@ -17,13 +17,13 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostDescription contains description information for the host
@@ -46,29 +46,34 @@ func NewHostDescription() *HostDescription {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (hd *HostDescription) IsNull() bool {
 	return hd == nil || (hd.Created.IsZero() && hd.Tenant == "")
 }
 
-// Clone ... (data.Clonable interface)
-func (hd HostDescription) Clone() (data.Clonable, error) {
-	return NewHostDescription().Replace(&hd)
-}
-
-// Replace ... (data.Clonable interface)
-func (hd *HostDescription) Replace(p data.Clonable) (data.Clonable, error) {
-	if hd == nil || p == nil {
+// Clone ... (clonable.Clonable interface)
+func (hd *HostDescription) Clone() (clonable.Clonable, error) {
+	if hd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	casted, ok := p.(*HostDescription)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *HostDescription")
+	nhd := NewHostDescription()
+	return nhd, nhd.Replace(hd)
+}
+
+// Replace ... (clonable.Clonable interface)
+func (hd *HostDescription) Replace(p clonable.Clonable) error {
+	if hd == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	casted, err := lang.Cast[*HostDescription](p)
+	if err != nil {
+		return err
 	}
 
 	*hd = *casted
-	return hd, nil
+	return nil
 }
 
 func init() {

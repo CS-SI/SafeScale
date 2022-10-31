@@ -17,12 +17,11 @@
 package propertiesv2
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostNetworking contains network information related to Host
@@ -52,12 +51,12 @@ func NewHostNetworking() *HostNetworking {
 	}
 }
 
-func NewHostNetworkingFromProperty(propos *serialize.JSONProperties) (*HostNetworking, fail.Error) {
+func NewHostNetworkingFromProperty(props *serialize.JSONProperties) (*HostNetworking, fail.Error) {
 	var netInfo *HostNetworking
-	xerr := propos.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-		clod, ok := clonable.(*HostNetworking)
-		if !ok {
-			return fail.InconsistentError("Bad cast")
+	xerr := props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
+		clod, err := lang.Cast[*HostNetworking](p)
+		if err != nil {
+			return fail.Wrap(err)
 		}
 
 		*netInfo = *clod
@@ -86,21 +85,26 @@ func (hn *HostNetworking) Reset() {
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (hn HostNetworking) Clone() (data.Clonable, error) {
-	return NewHostNetworking().Replace(&hn)
-}
-
-// Replace ...
-// satisfies interface data.Clonable
-func (hn *HostNetworking) Replace(p data.Clonable) (data.Clonable, error) {
-	if hn == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (hn *HostNetworking) Clone() (clonable.Clonable, error) {
+	if hn == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*HostNetworking)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *HostNetworking")
+	nhn := NewHostNetworking()
+	return nhn, nhn.Replace(hn)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (hn *HostNetworking) Replace(p clonable.Clonable) error {
+	if hn == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostNetworking](p)
+	if err != nil {
+		return err
 	}
 
 	*hn = *src
@@ -120,7 +124,7 @@ func (hn *HostNetworking) Replace(p data.Clonable) (data.Clonable, error) {
 	for k, v := range src.IPv6Addresses {
 		hn.IPv6Addresses[k] = v
 	}
-	return hn, nil
+	return nil
 }
 
 func init() {

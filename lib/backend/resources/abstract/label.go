@@ -20,8 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 type Label struct {
@@ -39,89 +40,98 @@ func NewLabel() *Label {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
-func (t *Label) IsNull() bool {
-	return t == nil || (t.ID == "" && t.Name == "")
+// satisfies interface clonable.Clonable
+func (instance *Label) IsNull() bool {
+	return instance == nil || (instance.ID == "" && instance.Name == "")
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (t Label) Clone() (data.Clonable, error) {
-	return NewLabel().Replace(&t)
+// satisfies interface clonable.Clonable
+func (instance *Label) Clone() (clonable.Clonable, error) {
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	nl := NewLabel()
+	return nl, nl.Replace(instance)
 }
 
 // Replace ...
-// satisfies interface data.Clonable
-func (t *Label) Replace(p data.Clonable) (data.Clonable, error) {
-	if t == nil {
-		return nil, fail.InvalidInstanceError()
+// satisfies interface clonable.Clonable
+func (instance *Label) Replace(p clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
 	}
 	if p == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("p")
+		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, ok := p.(*Label) // nolint
-	if !ok {
-		return nil, fmt.Errorf("p is not a *Label")
+	src, err := lang.Cast[*Label](p)
+	if err != nil {
+		return err
 	}
 
-	*t = *src
-	return t, nil
+	*instance = *src
+	return nil
 }
 
 // Valid checks if content of Label is valid
-func (t *Label) Valid() bool {
-	result := t != nil
-	result = result && t.ID != ""
-	result = result && t.Name != ""
+func (instance *Label) Valid() bool {
+	result := instance != nil
+	result = result && instance.ID != ""
+	result = result && instance.Name != ""
 	return result
 }
 
 // OK is a synonym for Valid
-func (t Label) OK() bool {
-	return t.Valid()
+func (instance *Label) OK() bool {
+	if instance == nil {
+		return false
+	}
+
+	return instance.Valid()
 }
 
 // Serialize serializes instance into bytes (output json code)
-func (t *Label) Serialize() ([]byte, fail.Error) {
-	if t == nil {
+func (instance *Label) Serialize() ([]byte, fail.Error) {
+	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	r, err := json.Marshal(t)
+	r, err := json.Marshal(instance)
 	return r, fail.ConvertError(err)
 }
 
 // Deserialize reads json code and restores a Tag
-func (t *Label) Deserialize(buf []byte) (ferr fail.Error) {
-	if t == nil {
+func (instance *Label) Deserialize(buf []byte) (ferr fail.Error) {
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 
 	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
-	return fail.ConvertError(json.Unmarshal(buf, t))
+	return fail.ConvertError(json.Unmarshal(buf, instance))
 }
 
 // GetName returns the name of the tag
 // Satisfies interface data.Identifiable
-func (t *Label) GetName() string {
-	return t.Name
+func (instance *Label) GetName() string {
+	return instance.Name
 }
 
 // GetID returns the ID of the tag
 // Satisfies interface data.Identifiable
-func (t *Label) GetID() (string, error) {
-	if t == nil {
+func (instance *Label) GetID() (string, error) {
+	if instance == nil {
 		return "", fmt.Errorf("invalid instance")
 	}
-	return t.ID, nil
+	return instance.ID, nil
 }
 
 // IsTag tells of the Label represents a Tag (ie a Label without value)
-func (t *Label) IsTag() bool {
-	if t == nil {
+func (instance *Label) IsTag() bool {
+	if instance == nil {
 		return false
 	}
 
-	return t.HasDefault
+	return instance.HasDefault
 }

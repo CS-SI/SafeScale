@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -123,16 +124,16 @@ func (instance *Feature) IsNull() bool {
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (instance *Feature) Clone() (data.Clonable, error) {
+// satisfies interface clonable.Clonable
+func (instance *Feature) Clone() (clonable.Clonable, error) {
 	res := &Feature{}
 	return res.Replace(instance)
 }
 
 // Replace ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 // may panic
-func (instance *Feature) Replace(p data.Clonable) (data.Clonable, error) {
+func (instance *Feature) Replace(p clonable.Clonable) (clonable.Clonable, error) {
 	if instance == nil || p == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -291,9 +292,9 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
 		}
 
-		xerr := castedTarget.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
+		xerr := castedTarget.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+				hostFeaturesV1, err := lang.Cast[*propertiesv1.HostFeatures)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}

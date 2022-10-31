@@ -19,7 +19,6 @@ package operations
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -27,7 +26,7 @@ import (
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -38,10 +37,12 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/system/bucketfs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -59,12 +60,12 @@ type bucket struct {
 }
 
 // NewBucket instantiates bucket struct
-func NewBucket(svc iaasapi.Service) (resources.Bucket, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+func NewBucket(frame *scope.Frame) (resources.Bucket, fail.Error) {
+	if valid.IsNull(frame) {
+		return nil, fail.InvalidParameterCannotBeNilError("frame")
 	}
 
-	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, bucketKind, bucketsFolderName, &abstract.ObjectStorageBucket{})
+	coreInstance, xerr := metadata.NewCore(frame, metadata.MethodObjectStorage, bucketKind, bucketsFolderName, &abstract.ObjectStorageBucket{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -77,9 +78,9 @@ func NewBucket(svc iaasapi.Service) (resources.Bucket, fail.Error) {
 }
 
 // LoadBucket instantiates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
-func LoadBucket(inctx context.Context, svc iaasapi.Service, name string) (resources.Bucket, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+func LoadBucket(inctx context.Context, frame *scope.Frame, name string) (resources.Bucket, fail.Error) {
+	if valid.IsNull(frame) {
+		return nil, fail.InvalidParameterCannotBeNilError("frame")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -102,7 +103,7 @@ func LoadBucket(inctx context.Context, svc iaasapi.Service, name string) (resour
 			var kt *bucket
 			cachename := fmt.Sprintf("%T/%s", kt, name)
 
-			cache, xerr := svc.GetCache(ctx)
+			cache, xerr := frame.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -116,7 +117,7 @@ func LoadBucket(inctx context.Context, svc iaasapi.Service, name string) (resour
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(ctx, svc, name) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(ctx, frame, name) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -179,13 +180,13 @@ func LoadBucket(inctx context.Context, svc iaasapi.Service, name string) (resour
 	}
 }
 
-func onBucketCacheMiss(ctx context.Context, svc iaasapi.Service, ref string) (data.Identifiable, fail.Error) {
-	bucketInstance, innerXErr := NewBucket(svc)
+func onBucketCacheMiss(ctx context.Context, scope *scope.Frame, ref string) (data.Identifiable, fail.Error) {
+	bucketInstance, innerXErr := NewBucket(scope)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	blank, innerXErr := NewBucket(svc)
+	blank, innerXErr := NewBucket(scope)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -194,7 +195,7 @@ func onBucketCacheMiss(ctx context.Context, svc iaasapi.Service, ref string) (da
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(bucketInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(bucketInstance.String(ctx)).(string), fail.IgnoreError(blank.String(ctx)).(string)) == 0 {
 		return nil, fail.NotFoundError("bucket with ref '%s' does NOT exist", ref)
 	}
 
@@ -227,7 +228,7 @@ func (instance *bucket) Exists(ctx context.Context) (bool, fail.Error) {
 }
 
 // carry ...
-func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
+func (instance *bucket) carry(ctx context.Context, clonable clonable.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -251,9 +252,7 @@ func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr
 }
 
 // Browse walks through Bucket metadata folder and executes a callback for each entry
-func (instance *bucket) Browse(
-	ctx context.Context, callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error,
-) (ferr fail.Error) {
+func (instance *bucket) Browse(ctx context.Context, callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// Note: Do not test with Isnull here, as Browse may be used from null value
@@ -303,10 +302,10 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, ferr fail.Error)
 	defer instance.lock.RUnlock()
 
 	var res string
-	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		ab, ok := clonable.(*abstract.ObjectStorageBucket)
-		if !ok {
-			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		ab, err := lang.Cast[*abstract.ObjectStorageBucket](p)
+		if err != nil {
+			return fail.Wrap(err)
 		}
 
 		res = ab.Host
@@ -333,11 +332,12 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 	defer instance.lock.RUnlock()
 
 	var res string
-	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		ab, ok := clonable.(*abstract.ObjectStorageBucket)
-		if !ok {
-			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		ab, err := lang.Cast[*abstract.ObjectStorageBucket](p)
+		if err != nil {
+			return fail.Wrap(err)
 		}
+
 		res = ab.MountPoint
 		return nil
 	})
@@ -375,10 +375,10 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.Service()
+	frame := instance.Frame()
 
 	// -- check if bucket already exist in SafeScale
-	bucketInstance, xerr := LoadBucket(ctx, svc, name)
+	bucketInstance, xerr := LoadBucket(ctx, frame, name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -393,7 +393,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- check if bucket already exist on provider side
-	ab, xerr := svc.InspectBucket(ctx, name)
+	ab, xerr := frame.Service().InspectBucket(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -412,7 +412,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- create bucket
-	ab, xerr = svc.CreateBucket(ctx, name)
+	ab, xerr = frame.Service().CreateBucket(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -448,11 +448,11 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	bun := instance.GetName()
 
 	// -- check Bucket is not still mounted
-	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.BucketMount' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(bucketproperty.MountsV1, func(p clonable.Clonable) fail.Error {
+			mountsV1, err := lang.Cast[*propertiesv1.BucketMounts](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 
 			if len(mountsV1.ByHostID) > 0 {
@@ -529,11 +529,11 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 
 	// -- check if Bucket is already mounted on any Host (only one Mount by Bucket allowed by design, to mitigate sync issues induced by Object Storage)
-	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr = instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(bucketproperty.MountsV1, func(p clonable.Clonable) fail.Error {
+			mountsV1, err := lang.Cast[*propertiesv1.BucketMounts](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 
 			// First check if mounted on Host...
@@ -608,11 +608,11 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 
 	// -- update metadata of Bucket
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(bucketproperty.MountsV1, func(p clonable.Clonable) fail.Error {
+			mountsV1, innerErr := lang.Cast[*propertiesv1.BucketMounts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			mountsV1.ByHostID[hostID] = mountPoint
@@ -625,11 +625,11 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 
 	// -- update metadata of Host
-	return hostInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-			mountsV1, ok := clonable.(*propertiesv1.HostMounts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	return hostInstance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
+			mountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			mountsV1.BucketMounts[hostName] = mountPoint
@@ -710,11 +710,11 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 		}
 	}
 
-	xerr = hostInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-			mountsV1, ok := clonable.(*propertiesv1.HostMounts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr = hostInstance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
+			mountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			delete(mountsV1.BucketMounts, bucketName)
@@ -725,11 +725,11 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 		return xerr
 	}
 
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(bucketproperty.MountsV1, func(p clonable.Clonable) fail.Error {
+			mountsV1, innerErr := lang.Cast[*propertiesv1.BucketMounts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			delete(mountsV1.ByHostID, hostID)
@@ -753,23 +753,22 @@ func (instance *bucket) ToProtocol(ctx context.Context) (*protocol.BucketRespons
 		Name: bun,
 	}
 
-	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(bucketproperty.MountsV1, func(p clonable.Clonable) fail.Error {
+			mountsV1, innerErr := lang.Cast[*propertiesv1.BucketMounts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			svc := instance.Service()
 			out.Mounts = make([]*protocol.BucketMount, 0, len(mountsV1.ByHostID))
 			for k, v := range mountsV1.ByHostID {
-				hostInstance, xerr := LoadHost(ctx, svc, k)
-				if xerr != nil {
-					return xerr
+				hostInstance, innerXErr := LoadHost(ctx, svc, k)
+				if innerXErr != nil {
+					return innerXErr
 				}
 
 				hostName := hostInstance.GetName()
-
 				out.Mounts = append(out.Mounts, &protocol.BucketMount{
 					Host: &protocol.Reference{
 						Id:   k,

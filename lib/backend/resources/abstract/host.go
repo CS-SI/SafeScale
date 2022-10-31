@@ -22,12 +22,12 @@ import (
 	"math"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/gofrs/uuid"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -186,6 +186,11 @@ type HostRequest struct {
 	SecurityGroupIDs map[string]struct{} // List of Security Groups to attach to Host (using map as dict)
 }
 
+// CleanOnFailure tells if request asks for cleaning created ressource on failure
+func (hr HostRequest) CleanOnFailure() bool {
+	return !hr.KeepOnFailure
+}
+
 // HostEffectiveSizing ...
 type HostEffectiveSizing struct {
 	Cores     int     `json:"cores,omitempty"`
@@ -231,8 +236,9 @@ func (ht HostTemplate) OK() bool {
 // HostCore contains the core information about a host
 // This information should not change over time, but IT ACTUALLY happens
 type HostCore struct {
-	ID                string            `json:"id,omitempty"`
-	Name              string            `json:"name,omitempty"`
+	*Core
+	ID string `json:"id,omitempty"`
+	// Name              string            `json:"name,omitempty"`
 	PrivateKey        string            `json:"private_key,omitempty"`
 	SSHPort           uint32            `json:"ssh_port,omitempty"`
 	Password          string            `json:"password,omitempty"`
@@ -242,22 +248,24 @@ type HostCore struct {
 }
 
 // NewHostCore ...
-func NewHostCore() *HostCore {
-	hc := &HostCore{
-		SSHPort: 22,
-		Tags:    make(map[string]string),
+func NewHostCore(name string, options ...Option) (*HostCore, fail.Error) {
+	c, err := NewCore(name, options...)
+	if err != nil {
+		return nil, err
 	}
 
-	hc.LastState = hoststate.Unknown
-	hc.ProvisioningState = hoststate.Unknown
-	hc.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
-	hc.Tags["ManagedBy"] = "safescale"
-	return hc
+	hc := &HostCore{
+		Core:              c,
+		SSHPort:           22,
+		LastState:         hoststate.Unknown,
+		ProvisioningState: hoststate.Unknown,
+	}
+	return hc, nil
 }
 
 // IsNull tells if the instance should be considered as a null value
 func (hc *HostCore) IsNull() bool {
-	return hc == nil || (hc.ID == "" && hc.Name == "")
+	return hc == nil || hc.Core.IsNull() || (hc.ID == "" && hc.Name == "")
 }
 
 // IsConsistent tells if host struct is consistent
@@ -283,24 +291,39 @@ func (hc *HostCore) OK() bool {
 }
 
 // Clone does a deep-copy of the Host
-// satisfies interface data.Clonable
-func (hc HostCore) Clone() (data.Clonable, error) {
-	return NewHostCore().Replace(&hc)
-}
-
-// Replace ...
-// satisfies interface data.Clonable
-func (hc *HostCore) Replace(p data.Clonable) (data.Clonable, error) {
-	if hc == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (hc *HostCore) Clone() (clonable.Clonable, error) {
+	if hc == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	cloned, ok := p.(*HostCore)
-	if !ok || cloned == nil {
-		return nil, fmt.Errorf("p is not a *HostCore")
+	nhc, err := NewHostCore(hc.Name)
+	if err != nil {
+		return nil, err
 	}
-	*hc = *cloned
-	return hc, nil
+
+	return nhc, nhc.Replace(hc)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (hc *HostCore) Replace(p clonable.Clonable) error {
+	if hc == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostCore](p)
+	if err != nil {
+		return err
+	}
+
+	*hc = *src
+	hc.Core, err = clonable.CastedClone[*Core](src)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Serialize serializes Host instance into bytes (output json code)
@@ -392,7 +415,7 @@ type HostDescription struct {
 
 // HostFull groups information about host coming from provider
 type HostFull struct {
-	Core         *HostCore
+	*HostCore
 	Sizing       *HostEffectiveSizing
 	Networking   *HostNetworking
 	Description  *HostDescription
@@ -400,24 +423,31 @@ type HostFull struct {
 }
 
 // NewHostFull creates an instance of HostFull
-func NewHostFull() *HostFull {
-	return &HostFull{
-		Core:         NewHostCore(),
+func NewHostFull(name string, options ...Option) (*HostFull, fail.Error) {
+	hc, err := NewHostCore(name, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	hf := &HostFull{
+		HostCore: hc,
+
 		Sizing:       NewHostEffectiveSizing(),
 		Networking:   NewHostNetworking(),
 		Description:  &HostDescription{},
 		CurrentState: hoststate.Unknown,
 	}
+	return hf, nil
 }
 
 // IsNull tells if the instance should be considered as a null value
 func (hf *HostFull) IsNull() bool {
-	return hf == nil || valid.IsNil(hf.Core)
+	return hf == nil || hf.HostCore.IsNull()
 }
 
 // IsConsistent returns true if the struct is consistent
 func (hf *HostFull) IsConsistent() bool {
-	return hf != nil && hf.Core.IsConsistent() // && hc.Description.OK() && hc.Sizing.OK() && hc.Networking.OK()
+	return hf != nil && hf.HostCore.IsConsistent() // && hc.Description.OK() && hc.Sizing.OK() && hc.Networking.OK()
 }
 
 // OK is a synonym to IsConsistent
@@ -434,19 +464,19 @@ func (hf *HostFull) GetID() (string, error) {
 	if hf == nil {
 		return "", fmt.Errorf("invalid instance")
 	}
-	return hf.Core.ID, nil
+	return hf.ID, nil
 }
 
 // GetName returns the name of the host
 // satisfies interface data.Identifiable
 func (hf *HostFull) GetName() string {
-	return hf.Core.Name
+	return hf.Name
 }
 
 // SetName is a setter to initialize field 'Name'
 func (hf *HostFull) SetName(name string) *HostFull {
-	if hf != nil && hf.Core != nil {
-		hf.Core.SetName(name)
+	if hf != nil && hf.HostCore != nil {
+		hf.HostCore.SetName(name)
 	}
 	return hf
 }

@@ -17,11 +17,9 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -41,41 +39,40 @@ func newClusterControlPlane() *ClusterControlplane {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (cp *ClusterControlplane) IsNull() bool {
 	return cp == nil || valid.IsNil(cp.VirtualIP)
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (cp ClusterControlplane) Clone() (data.Clonable, error) {
-	return newClusterControlPlane().Replace(&cp)
+// satisfies interface clonable.Clonable
+func (cp ClusterControlplane) Clone() (clonable.Clonable, error) {
+	ncp := newClusterControlPlane()
+	return ncp, ncp.Replace(&cp)
 }
 
 // Replace ...
-// satisfies interface data.Clonable
-func (cp *ClusterControlplane) Replace(p data.Clonable) (data.Clonable, error) {
-	if cp == nil || p == nil {
-		return nil, fail.InvalidInstanceError()
+// satisfies interface clonable.Clonable
+func (cp *ClusterControlplane) Replace(p clonable.Clonable) error {
+	if cp == nil {
+		return fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*ClusterControlplane)
 	if !ok {
-		return nil, fmt.Errorf("p is not a *ClusterControlplane")
+		return fail.InconsistentError("failed to cast 'p' to '*ClusterControlplane'")
 	}
 
 	*cp = *src
 	if src.VirtualIP != nil {
-		cloned, err := src.VirtualIP.Clone()
+		cloned, err := clonable.CastedClone[*abstract.VirtualIP](src.VirtualIP)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		cp.VirtualIP, ok = cloned.(*abstract.VirtualIP)
-		if !ok {
-			return nil, fmt.Errorf("cloned is not a *abstract.VirtualIP")
-		}
+
+		cp.VirtualIP = cloned
 	}
-	return cp, nil
+	return nil
 }
 
 func init() {

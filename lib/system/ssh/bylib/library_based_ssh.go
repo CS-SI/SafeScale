@@ -370,7 +370,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			default:
 			}
 
-			// Each ClientConn can support multiple interactive sessions, represented by a Session.
+			// Each ClientConn can support multiple interactive sessions, represented by a sessionManager.
 			var internalErr error
 			var newsession *ssh.Session
 			newsession, internalErr = client.NewSession()
@@ -434,7 +434,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			return
 		}
 
-		// Once a Session is created, you can execute a single command on
+		// Once a sessionManager is created, you can execute a single command on
 		// the remote side using the Run method.
 		var errorCode int
 

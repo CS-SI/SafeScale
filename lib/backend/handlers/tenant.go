@@ -450,8 +450,8 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		}
 	}()
 
-	xerr = subnet.Inspect(context.Background(), func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
+	xerr = subnet.Inspect(context.Background(), func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, err := lang.Cast[*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}

@@ -69,7 +69,7 @@ func (s *stack) DefaultNetwork(context.Context) (*abstract.Network, fail.Error) 
 }
 
 // CreateNetwork creates a network named name
-func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (newNet *abstract.Network, ferr fail.Error) {
+func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (_ *abstract.Network, ferr fail.Error) {
 	var xerr fail.Error
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
@@ -132,9 +132,13 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		}
 	}()
 
-	newNet = abstract.NewNetwork()
+	newNet, err := abstract.NewNetwork(network.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	newNet.ID = network.ID
-	newNet.Name = network.Name
+	// newNet.Name = network.Name
 	newNet.CIDR = req.CIDR
 	return newNet, nil
 }
@@ -216,9 +220,13 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (*abstract.Network
 		}
 	}
 	if network != nil && network.ID != "" {
-		newNet := abstract.NewNetwork()
+		newNet, err := abstract.NewNetwork(network.Name)
+		if err != nil {
+			return nil, err
+		}
+
 		newNet.ID = network.ID
-		newNet.Name = network.Name
+		// newNet.Name = network.Name
 		return newNet, nil
 	}
 
@@ -253,9 +261,13 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 							continue
 						}
 
-						newNet := abstract.NewNetwork()
+						newNet, err := abstract.NewNetwork(n.Name)
+						if err != nil {
+							return false, err
+						}
+
 						newNet.ID = n.ID
-						newNet.Name = n.Name
+						// newNet.Name = n.Name
 
 						netList = append(netList, newNet)
 					}
@@ -446,14 +458,17 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (ne
 		}
 	}
 
-	out := &abstract.Subnet{
-		ID:        subnet.ID,
-		Name:      subnet.Name,
-		IPVersion: ToAbstractIPVersion(subnet.IPVersion),
-		CIDR:      subnet.CIDR,
-		Network:   subnet.NetworkID,
-		Domain:    req.Domain,
+	out, err := abstract.NewSubnet(subnet.Name)
+	if err != nil {
+		return nil, err
 	}
+
+	out.ID = subnet.ID
+	// out.Name = subnet.Name
+	out.IPVersion = ToAbstractIPVersion(subnet.IPVersion)
+	out.CIDR = subnet.CIDR
+	out.Network = subnet.NetworkID
+	out.Domain = req.Domain
 	return out, nil
 }
 
@@ -476,9 +491,13 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-	as := abstract.NewSubnet()
+	as, xerr := abstract.NewSubnet("unknown")
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	var sn *subnets.Subnet
-	xerr := stacks.RetryableRemoteCall(ctx,
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			sn, innerErr = subnets.Get(s.NetworkClient, id).Extract()
 			return innerErr
@@ -495,7 +514,6 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet
 	as.IPVersion = ToAbstractIPVersion(sn.IPVersion)
 	as.CIDR = sn.CIDR
 	as.DNSServers = sn.DNSNameservers
-
 	return as, nil
 }
 
@@ -560,22 +578,30 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, name string)
 			return nil, fail.NotFoundError(msg, name, an.Name)
 		}
 		return nil, fail.NotFoundError(msg, name)
+
 	case 1:
+		var xerr fail.Error
 		item := resp[0]
-		subnet = abstract.NewSubnet()
+		subnet, xerr = abstract.NewSubnet(name)
+		if xerr != nil {
+			return nil, xerr
+		}
+
 		subnet.ID = item.ID
 		subnet.Network = item.NetworkID
-		subnet.Name = name
+		// subnet.Name = name
 		subnet.CIDR = item.CIDR
 		subnet.DNSServers = item.DNSNameservers
 		subnet.IPVersion = ToAbstractIPVersion(item.IPVersion)
 		return subnet, nil
+
 	default:
 		msg := "more than one Subnet named '%s' found"
 		if an != nil {
 			msg += " in Network '%s'"
 			return nil, fail.DuplicateError(msg, name, an.Name)
 		}
+
 		return nil, fail.DuplicateError(msg, name)
 	}
 }
@@ -603,9 +629,13 @@ func (s stack) ListSubnets(ctx context.Context, networkID string) ([]*abstract.S
 				}
 
 				for _, subnet := range list {
-					item := abstract.NewSubnet()
+					item, xerr := abstract.NewSubnet(subnet.Name)
+					if xerr != nil {
+						return false, xerr
+					}
+
 					item.ID = subnet.ID
-					item.Name = subnet.Name
+					// item.Name = subnet.Name
 					item.Network = subnet.ID
 					item.IPVersion = ToAbstractIPVersion(subnet.IPVersion)
 					subnetList = append(subnetList, item)
@@ -839,7 +869,11 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 	// FIXME: OPP Now, and only for OVH, disable port security
 	// _, _ = s.rpcChangePortSecurity(ctx, port.ID, false)
 
-	vip := abstract.NewVirtualIP()
+	vip, err := abstract.NewVirtualIP(name)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
 	vip.ID = port.ID
 	vip.PrivateIP = port.FixedIPs[0].IPAddress
 	return vip, nil

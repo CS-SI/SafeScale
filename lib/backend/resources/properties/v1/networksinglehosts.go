@@ -17,13 +17,13 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 const (
@@ -57,30 +57,35 @@ func NewNetworkSingleHosts() *NetworkSingleHosts {
 }
 
 // IsNull ...
-// (data.Clonable interface)
+// (clonable.Clonable interface)
 func (nsh *NetworkSingleHosts) IsNull() bool {
 	return nsh == nil || len(nsh.FreeSlots) == 0
 }
 
-// Clone ... (data.Clonable interface)
-func (nsh NetworkSingleHosts) Clone() (data.Clonable, error) {
-	return NewNetworkSingleHosts().Replace(&nsh)
-}
-
-// Replace ... (data.Clonable interface)
-func (nsh *NetworkSingleHosts) Replace(p data.Clonable) (data.Clonable, error) {
-	if nsh == nil || p == nil {
+// Clone ... (clonable.Clonable interface)
+func (nsh *NetworkSingleHosts) Clone() (clonable.Clonable, error) {
+	if nsh == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*NetworkSingleHosts)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *NetworkSingleHosts")
+	nnsh := NewNetworkSingleHosts()
+	return nnsh, nnsh.Replace(nsh)
+}
+
+// Replace ... (clonable.Clonable interface)
+func (nsh *NetworkSingleHosts) Replace(p clonable.Clonable) error {
+	if nsh == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*NetworkSingleHosts](p)
+	if err != nil {
+		return err
 	}
 
 	nsh.FreeSlots = make([]FreeCIDRSlot, len(src.FreeSlots))
 	copy(nsh.FreeSlots, src.FreeSlots)
-	return nsh, nil
+	return nil
 }
 
 // ReserveSlot returns the first free slot and remove it from list

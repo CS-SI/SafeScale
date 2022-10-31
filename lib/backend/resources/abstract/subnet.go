@@ -19,13 +19,13 @@ package abstract
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -44,64 +44,96 @@ type SubnetRequest struct {
 	KeepOnFailure  bool           // tells if resources have to be kept in case of failure (default behavior is to delete them)
 }
 
-// Subnet represents a subnet
+// CleanOnFailure tells if request asks for cleaning created ressource on failure
+func (sr SubnetRequest) CleanOnFailure() bool {
+	return !sr.KeepOnFailure
+}
+
+// Subnet represents a subnet4
 type Subnet struct {
-	ID                      string            `json:"id"`                                   // ID of the subnet (from provider)
-	Name                    string            `json:"name"`                                 // Name of the subnet
-	Network                 string            `json:"network"`                              // parent Network of the subnet
-	CIDR                    string            `json:"mask"`                                 // ip network in CIDR notation
-	Domain                  string            `json:"domain,omitempty"`                     // contains the domain used to define host FQDN
-	DNSServers              []string          `json:"dns_servers,omitempty"`                // contains the DNSServers used on the subnet
-	GatewayIDs              []string          `json:"gateway_id,omitempty"`                 // contains the id of the host(s) acting as gateway(s) for the subnet
-	VIP                     *VirtualIP        `json:"vip,omitempty"`                        // contains the VIP of the network if created with HA
-	IPVersion               ipversion.Enum    `json:"ip_version,omitempty"`                 // IPVersion is IPv4 or IPv6 (see IPVersion)
-	State                   subnetstate.Enum  `json:"status,omitempty"`                     // indicates the current state of the Subnet
-	GWSecurityGroupID       string            `json:"gw_security_group_id,omitempty"`       // Contains the ID of the Security Group for external access of gateways in Subnet
-	PublicIPSecurityGroupID string            `json:"publicip_security_group_id,omitempty"` // contains the ID of the Security Group for hosts with public IP in Subnet
-	InternalSecurityGroupID string            `json:"internal_security_group_id,omitempty"` // contains the ID of the security group for internal access of hosts
-	DefaultSSHPort          uint32            `json:"default_ssh_port,omitempty"`           // contains the port to use for SSH by default on gateways in the Subnet
-	SingleHostCIDRIndex     uint              `json:"single_host_cidr_index,omitempty"`     // if > 0, contains the index of the CIDR in the single Host Network
-	Tags                    map[string]string `json:"tags,omitempty"`
+	*Core
+
+	ID string `json:"id"` // ID of the subnet (from provider)
+	// Name                    string            `json:"name"`                                 // Name of the subnet
+	Network                 string           `json:"network"`                              // parent Network of the subnet
+	CIDR                    string           `json:"mask"`                                 // ip network in CIDR notation
+	Domain                  string           `json:"domain,omitempty"`                     // contains the domain used to define host FQDN
+	DNSServers              []string         `json:"dns_servers,omitempty"`                // contains the DNSServers used on the subnet
+	GatewayIDs              []string         `json:"gateway_id,omitempty"`                 // contains the id of the host(s) acting as gateway(s) for the subnet
+	VIP                     *VirtualIP       `json:"vip,omitempty"`                        // contains the VIP of the network if created with HA
+	IPVersion               ipversion.Enum   `json:"ip_version,omitempty"`                 // IPVersion is IPv4 or IPv6 (see IPVersion)
+	State                   subnetstate.Enum `json:"status,omitempty"`                     // indicates the current state of the Subnet
+	GWSecurityGroupID       string           `json:"gw_security_group_id,omitempty"`       // Contains the ID of the Security Group for external access of gateways in Subnet
+	PublicIPSecurityGroupID string           `json:"publicip_security_group_id,omitempty"` // contains the ID of the Security Group for hosts with public IP in Subnet
+	InternalSecurityGroupID string           `json:"internal_security_group_id,omitempty"` // contains the ID of the security group for internal access of hosts
+	DefaultSSHPort          uint32           `json:"default_ssh_port,omitempty"`           // contains the port to use for SSH by default on gateways in the Subnet
+	SingleHostCIDRIndex     uint             `json:"single_host_cidr_index,omitempty"`     // if > 0, contains the index of the CIDR in the single Host Network
+	// Tags                    map[string]string `json:"tags,omitempty"`
 }
 
 // NewSubnet initializes a new instance of Subnet
-func NewSubnet() *Subnet {
+func NewSubnet(name string, options ...Option) (*Subnet, fail.Error) {
+	c, xerr := NewCore(name, options...)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	sn := &Subnet{
+		Core:           c,
 		State:          subnetstate.Unknown,
 		DefaultSSHPort: 22,
-		Tags:           make(map[string]string),
 	}
-	sn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
-	sn.Tags["ManagedBy"] = "safescale"
-	return sn
+	return sn, nil
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (s *Subnet) IsNull() bool {
-	return s == nil || (s.ID == "" && s.Name == "")
+	return s == nil || s.Core.IsNull() || (s.ID == "" && s.Name == "")
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (s Subnet) Clone() (data.Clonable, error) {
-	return NewSubnet().Replace(&s)
-}
-
-// Replace ...
-// satisfies interface data.Clonable
-func (s *Subnet) Replace(p data.Clonable) (data.Clonable, error) {
-	if s == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (s *Subnet) Clone() (clonable.Clonable, error) {
+	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	casted, ok := p.(*Subnet)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *Subnet")
+	ns, xerr := NewSubnet(s.Name)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	*s = *casted
-	return s, nil
+	return ns, ns.Replace(s)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (s *Subnet) Replace(p clonable.Clonable) error {
+	if s == nil {
+		return fail.InvalidInstanceError()
+	}
+	if p == nil {
+		return fail.InvalidParameterCannotBeNilError("p")
+	}
+
+	src, err := lang.Cast[*Subnet](p)
+	if err != nil {
+		return err
+	}
+
+	*s = *src
+	s.Core, err = src.Core.Clone()
+	if err != nil {
+		return err
+	}
+
+	s.DNSServers = make([]string, len(src.DNSServers), 0)
+	copy(s.DNSServers, src.DNSServers)
+	s.GatewayIDs = make([]string, len(src.GatewayIDs), 0)
+	copy(s.GatewayIDs, src.GatewayIDs)
+
+	return nil
 }
 
 // OK ...
@@ -168,53 +200,73 @@ func (s *Subnet) GetCIDR() string {
 
 // VirtualIP is a structure containing information needed to manage VIP (virtual IP)
 type VirtualIP struct {
-	ID        string      `json:"id,omitempty"`
-	Name      string      `json:"name,omitempty"`
+	*Core
+
+	ID string `json:"id,omitempty"`
+	// Name      string      `json:"name,omitempty"`    // Inside Core
 	SubnetID  string      `json:"subnet_id,omitempty"`
 	PrivateIP string      `json:"private_ip,omitempty"`
 	PublicIP  string      `json:"public_ip,omitempty"`
 	Hosts     []*HostCore `json:"hosts,omitempty"`
 
-	NetworkID string `json:"network_id,omitempty"` // DEPRECATED: deprecated, replaced by SubnetID
+	NetworkID string `json:"network_id,omitempty"` // DEPRECATED: replaced by SubnetID
 }
 
 // NewVirtualIP ...
-func NewVirtualIP() *VirtualIP {
-	return &VirtualIP{Hosts: []*HostCore{}}
+func NewVirtualIP(name string, options ...Option) (*VirtualIP, error) {
+	nc, err := NewCore(name, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	nvip := &VirtualIP{
+		Core:  nc,
+		Hosts: []*HostCore{},
+	}
+	return nvip, nil
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (vip *VirtualIP) IsNull() bool {
-	return vip == nil || (vip.ID == "" && vip.Name == "")
+	return vip == nil || vip.Core.IsNull() || (vip.ID == "" && vip.Name == "")
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (vip VirtualIP) Clone() (data.Clonable, error) {
-	return NewVirtualIP().Replace(&vip)
+// satisfies interface clonable.Clonable
+func (vip *VirtualIP) Clone() (clonable.Clonable, error) {
+	if vip == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	nvip, err := NewVirtualIP(vip.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	return nvip, nvip.Replace(vip)
 }
 
 // Replace ...
-// satisfies interface data.Clonable interface
-func (vip *VirtualIP) Replace(p data.Clonable) (data.Clonable, error) {
-	if vip == nil || p == nil {
-		return nil, fail.InvalidInstanceError()
+// satisfies interface clonable.Clonable interface
+func (vip *VirtualIP) Replace(p clonable.Clonable) error {
+	if vip == nil {
+		return fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*VirtualIP)
 	if !ok {
-		return nil, fmt.Errorf("p is not a *VirtualIP")
+		return fail.InconsistentError("failed to cast 'p' to '*VirtualIP'")
 	}
-
 	*vip = *src
 	vip.Hosts = make([]*HostCore, 0, len(src.Hosts))
 	for _, v := range src.Hosts {
-		cloned, err := v.Clone()
+		clone, err := clonable.CastedClone[*HostCore](v)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		vip.Hosts = append(vip.Hosts, cloned.(*HostCore))
+
+		vip.Hosts = append(vip.Hosts, clone)
 	}
-	return vip, nil
+	return nil
 }

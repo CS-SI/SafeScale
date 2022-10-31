@@ -17,13 +17,13 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // SubnetDescription contains additional information describing the subnet, in V1
@@ -43,29 +43,34 @@ func NewSubnetDescription() *SubnetDescription {
 }
 
 // IsNull ...
-// (data.Clonable interface)
+// (clonable.Clonable interface)
 func (sd *SubnetDescription) IsNull() bool {
 	return sd == nil || (sd.Created.IsZero() && sd.Purpose == "")
 }
 
-// Clone ... (data.Clonable interface)
-func (sd SubnetDescription) Clone() (data.Clonable, error) {
-	return NewSubnetDescription().Replace(&sd)
-}
-
-// Replace ... (data.Clonable interface)
-func (sd *SubnetDescription) Replace(p data.Clonable) (data.Clonable, error) {
-	if sd == nil || p == nil {
+// Clone ... (clonable.Clonable interface)
+func (sd *SubnetDescription) Clone() (clonable.Clonable, error) {
+	if sd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	casted, ok := p.(*SubnetDescription)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *SubnetDescription")
+	ssd := NewSubnetDescription()
+	return ssd, ssd.Replace(sd)
+}
+
+// Replace ... (clonable.Clonable interface)
+func (sd *SubnetDescription) Replace(p clonable.Clonable) error {
+	if sd == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	casted, err := lang.Cast[*SubnetDescription](p)
+	if err != nil {
+		return err
 	}
 
 	*sd = *casted
-	return sd, nil
+	return nil
 }
 
 func init() {

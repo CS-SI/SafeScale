@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -10,17 +13,23 @@
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
 
-package data
+package controller
 
-//go:generate minimock -o mocks/mock_clonable.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data.Clonable
+import (
+	"os/exec"
+	"syscall"
+)
 
-// Clonable is the interface a struct must satisfy to be able to be cloned
-type Clonable interface {
-	IsNull() bool                       // tells of Clonable represents a null value
-	Clone() (Clonable, error)           // allows duplication of a Clonable
-	Replace(Clonable) (Clonable, error) // allows replacing a Clonable with data from another one
+// operatingSystemSpecifics ...
+func operatingSystemSpecifics(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow: true,
+		// Setpgid: true,
+		// Chroot:  filepath.Join(global.Settings.Folders.ShareDir, "consul"),
+	}
 }

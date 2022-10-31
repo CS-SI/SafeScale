@@ -390,8 +390,8 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 // Note: must be used with wisdom
 func (instance *Host) unsafeGetVolumes(ctx context.Context) (*propertiesv1.HostVolumes, fail.Error) {
 	var hvV1 *propertiesv1.HostVolumes
-	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.VolumesV1, func(clonable clonable.Clonable) fail.Error {
 			var ok bool
 			hvV1, ok = clonable.(*propertiesv1.HostVolumes)
 			if !ok {
@@ -412,9 +412,9 @@ func (instance *Host) unsafeGetVolumes(ctx context.Context) (*propertiesv1.HostV
 // unsafeGetMounts returns the information about the mounts of the host
 // Intended to be used when instance is notoriously not nil (because previously checked)
 func (instance *Host) unsafeGetMounts(ctx context.Context) (mounts *propertiesv1.HostMounts, ferr fail.Error) {
-	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
+	xerr := instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.MountsV1, func(clonable clonable.Clonable) fail.Error {
+			hostMountsV1, err := lang.Cast[*propertiesv1.HostMounts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -518,10 +518,10 @@ func (instance *Host) unsafeGetDefaultSubnet(ctx context.Context) (subnetInstanc
 	defer fail.OnPanic(&ferr)
 
 	svc := instance.Service()
-	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(hostproperty.NetworkV2) {
-			return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-				networkV2, ok := clonable.(*propertiesv2.HostNetworking)
+			return props.Inspect(hostproperty.NetworkV2, func(clonable clonable.Clonable) fail.Error {
+				networkV2, err := lang.Cast[*propertiesv2.HostNetworking)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -533,8 +533,8 @@ func (instance *Host) unsafeGetDefaultSubnet(ctx context.Context) (subnetInstanc
 				return nil
 			})
 		}
-		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
+		return props.Inspect(hostproperty.NetworkV2, func(clonable clonable.Clonable) fail.Error {
+			hostNetworkV2, err := lang.Cast[*propertiesv2.HostNetworking)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}

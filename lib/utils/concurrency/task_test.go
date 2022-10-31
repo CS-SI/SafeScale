@@ -578,9 +578,9 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 			t.Errorf("Unexpected error: %v", xerr)
 		}
 
-		// Using Result() is valid, Task is terminated
+		// Using Output() is valid, Task is terminated
 		tr, xerr := got.Result()
-		require.Nil(t, xerr)  // Result succeeds, task is terminated
+		require.Nil(t, xerr)  // Output succeeds, task is terminated
 		require.NotNil(t, tr) // tr is not nil, contain "we were killed"
 
 		// Wit on a done Task. Everything is under control
@@ -588,7 +588,7 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		require.NotNil(t, xerr) // xerr is not nil
 		require.NotNil(t, res)  // res is not nil
 
-		// Now that we waited the Task, Result() returns useful information
+		// Now that we waited the Task, Output() returns useful information
 		tr, xerr = got.Result()
 		require.Nil(t, xerr)
 		require.NotNil(t, tr)
@@ -655,7 +655,7 @@ func TestTryWaitOfAbortedTask(t *testing.T) {
 	res, xerr = got.Wait()
 	require.NotNil(t, xerr)
 	require.NotNil(t, res)
-	// Now that we waited the Task, Result() returns useful information
+	// Now that we waited the Task, Output() returns useful information
 
 	tr, xerr := got.Result()
 	require.Nil(t, xerr)
@@ -721,7 +721,7 @@ func TestTryWaitOfOkTask(t *testing.T) {
 	res, xerr = got.Wait()
 	require.NotNil(t, xerr)
 	require.NotNil(t, res)
-	// Now that we waited the Task, Result() returns useful information
+	// Now that we waited the Task, Output() returns useful information
 
 	tr, xerr := got.Result()
 	require.Nil(t, xerr)

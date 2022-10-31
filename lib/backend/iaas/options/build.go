@@ -44,7 +44,7 @@ func (o Build) Store(key string, value any) (any, fail.Error) {
 }
 
 // BuildWithScope allows to define the tenant to use
-func BuildWithScope(scope common.Scope) options.Mutator {
+func BuildWithScope(scope *common.Scope) options.Mutator {
 	if valid.IsNull(scope) {
 		return func(o options.Options) fail.Error {
 			return fail.InvalidParameterError("scope", "cannot be null value of '%s'", reflect.TypeOf(scope).String())

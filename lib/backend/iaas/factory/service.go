@@ -183,8 +183,11 @@ func (instance service) WaitHostState(ctx context.Context, hostID string, state 
 	}
 
 	timer := time.After(timeout)
-	host := abstract.NewHostFull()
-	host.Core.ID = hostID
+	host, err := abstract.NewHostFull("unknown")
+	if err != nil {
+		return fail.Wrap(err)
+	}
+	host.ID = hostID
 
 	errCh := make(chan fail.Error)
 	done := make(chan struct{})
@@ -1005,8 +1008,12 @@ func (instance service) CreateHostWithKeyPair(inctx context.Context, request abs
 		defer close(chRes)
 
 		found := true
-		ah := abstract.NewHostCore()
-		ah.Name = request.ResourceName
+		ah, xerr := abstract.NewHostCore(request.ResourceName)
+		if xerr != nil {
+			chRes <- result{nil, nil, nil, xerr}
+			return
+		}
+
 		_, rerr := instance.InspectHost(ctx, ah)
 		var nilErrNotFound *fail.ErrNotFound = nil // nolint
 		if rerr != nil && rerr != nilErrNotFound {
@@ -1178,9 +1185,14 @@ func (instance service) InspectHostByName(inctx context.Context, name string) (*
 	go func() {
 		defer close(chRes)
 
-		ah, xerr := instance.InspectHost(ctx, abstract.NewHostCore().SetName(name))
-		chRes <- result{ah, xerr}
+		ahc, err := abstract.NewHostCore(name)
+		if err != nil {
+			chRes <- result{rErr: fail.Wrap(err)}
+			return
+		}
 
+		ah, xerr := instance.InspectHost(ctx, ahc)
+		chRes <- result{ah, xerr}
 	}()
 	select {
 	case res := <-chRes:

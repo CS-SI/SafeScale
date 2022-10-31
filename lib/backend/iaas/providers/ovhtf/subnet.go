@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -40,13 +41,17 @@ type subnetResource struct {
 	id             string
 	networkID      string
 	cidr           string
-	ipVersion      ipversion.Enum
+	ipVersion      string
 	dnsNameServers []string
 }
 
-func newSubnetResource(name string, snippet string) *subnetResource {
-	out := &subnetResource{ResourceCore: terraformer.NewResourceCore(name, snippet)}
-	return out
+func newSubnetResource(name string, snippet string) (*subnetResource, fail.Error) {
+	rc, xerr := terraformer.NewResourceCore(name, snippet)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return &subnetResource{ResourceCore: rc}, nil
 }
 
 // ToMap returns a map of networkResource field to be used where needed
@@ -67,9 +72,13 @@ type routerResource struct {
 	id string
 }
 
-func newRouterResource(name string, snippet string) *routerResource {
-	out := &routerResource{ResourceCore: terraformer.NewResourceCore(name, snippet)}
-	return out
+func newRouterResource(name string, snippet string) (*routerResource, fail.Error) {
+	rc, xerr := terraformer.NewResourceCore(name, snippet)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return &routerResource{ResourceCore: rc}, nil
 }
 
 // ToMap returns a map of networkResource field to be used where needed
@@ -94,10 +103,20 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		return nil, fail.ConvertError(err)
 	}
 
-	subnetRsc := newSubnetResource(req.Name, createSubnetResourceSnippetPath)
+	subnetRsc, xerr := newSubnetResource(req.Name, createSubnetResourceSnippetPath)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	subnetRsc.cidr = req.CIDR
-	subnetRsc.ipVersion = req.IPVersion
+	switch req.IPVersion {
+	case ipversion.IPv6:
+		subnetRsc.ipVersion = "6"
+	default:
+		subnetRsc.ipVersion = "4"
+	}
 	subnetRsc.dnsNameServers = req.DNSServers
+	subnetRsc.networkID = req.NetworkID
 
 	// // If req.IPVersion contains invalid value, force to IPv4
 	// var ipVersion gophercloud.IPVersion
@@ -136,38 +155,41 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		return nil, xerr
 	}
 
-	xerr = summoner.Build(subnetRsc)
+	def, xerr := summoner.Assemble(subnetRsc)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	outputs, xerr := summoner.Apply(ctx)
+	outputs, xerr := summoner.Apply(ctx, def)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	// FIXME: think about it: not deleting may allow to rerun to finalize creation...
-	// defer func() {
-	// 	if ferr != nil {
-	// 		derr := summoner.Destroy(ctx)
-	// 		if derr != nil {
-	// 			_ = ferr.AddConsequence(derr)
-	// 		}
-	// 	}
-	// }()
+	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil && req.CleanOnFailure() {
+			logrus.WithContext(ctx).Infof("cleaning up on failure, deleting Subnet '%s'", req.Name)
+			derr := summoner.Destroy(ctx, def)
+			if derr != nil {
+				_ = ferr.AddConsequence(derr)
+			}
+		}
+	}()
 
-	out := &abstract.Subnet{
-		Name:      req.Name,
-		Network:   req.NetworkID,
-		IPVersion: req.IPVersion,
-		Domain:    req.Domain,
-		CIDR:      req.CIDR,
+	out, xerr := abstract.NewSubnet(req.Name)
+	if xerr != nil {
+		return nil, xerr
 	}
+
 	out.ID, xerr = unmarshalOutput[string](outputs["subnet_id"])
 	if xerr != nil {
 		return nil, xerr
 	}
 
+	out.Network = req.NetworkID
+	out.IPVersion = req.IPVersion
+	out.Domain = req.Domain
+	out.CIDR = req.CIDR
 	return out, nil
 }
 
@@ -190,31 +212,8 @@ func (p *provider) InspectSubnet(ctx context.Context, id string) (_ *abstract.Su
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
+	// FIXME: implement like InspectNetwork or use MiniStack?
 	return nil, fail.NotImplementedError()
-
-	/*
-		as := abstract.NewSubnet()
-		var sn *subnets.Subnet
-		xerr := stacks.RetryableRemoteCall(ctx,
-			func() (innerErr error) {
-				sn, innerErr = subnets.Get(s.NetworkClient, id).Extract()
-				return innerErr
-			},
-			NormalizeError,
-		)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		as.ID = sn.ID
-		as.Name = sn.Name
-		as.Network = sn.NetworkID
-		as.IPVersion = ToAbstractIPVersion(sn.IPVersion)
-		as.CIDR = sn.CIDR
-		as.DNSServers = sn.DNSNameservers
-
-		return as, nil
-	*/
 }
 
 // InspectSubnetByName ...
@@ -228,78 +227,7 @@ func (p *provider) InspectSubnetByName(ctx context.Context, networkRef, name str
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
-	return nil, fail.NotImplementedError()
-
-	/*
-		listOpts := subnets.ListOpts{
-			Name: name,
-		}
-		var an *abstract.Network
-		if networkRef != "" {
-			var xerr fail.Error
-			an, xerr = s.InspectNetwork(ctx, networkRef)
-			if xerr != nil {
-				switch xerr.(type) { // nolint
-				case *fail.ErrNotFound:
-					an, xerr = s.InspectNetworkByName(ctx, networkRef)
-					if xerr != nil {
-						return nil, xerr
-					}
-				default:
-					return nil, xerr
-				}
-			}
-
-			listOpts.NetworkID = an.ID
-		}
-
-		var resp []subnets.Subnet
-		xerr := stacks.RetryableRemoteCall(ctx,
-			func() error {
-				var allPages pagination.Page
-				var innerErr error
-				if allPages, innerErr = subnets.List(s.NetworkClient, listOpts).AllPages(); innerErr != nil {
-					return innerErr
-				}
-				resp, innerErr = subnets.ExtractSubnets(allPages)
-				if innerErr != nil {
-					return innerErr
-				}
-				return nil
-			},
-			NormalizeError,
-		)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		switch len(resp) {
-		case 0:
-			msg := "failed to find a Subnet named '%s'"
-			if an != nil {
-				msg += " in Network '%s'"
-				return nil, fail.NotFoundError(msg, name, an.Name)
-			}
-			return nil, fail.NotFoundError(msg, name)
-		case 1:
-			item := resp[0]
-			subnet = abstract.NewSubnet()
-			subnet.ID = item.ID
-			subnet.Network = item.NetworkID
-			subnet.Name = name
-			subnet.CIDR = item.CIDR
-			subnet.DNSServers = item.DNSNameservers
-			subnet.IPVersion = ToAbstractIPVersion(item.IPVersion)
-			return subnet, nil
-		default:
-			msg := "more than one Subnet named '%s' found"
-			if an != nil {
-				msg += " in Network '%s'"
-				return nil, fail.DuplicateError(msg, name, an.Name)
-			}
-			return nil, fail.DuplicateError(msg, name)
-		}
-	*/
+	return p.MiniStack.InspectSubnetByName(ctx, networkRef, name)
 }
 
 // ListSubnets lists available subnets in a network
@@ -311,41 +239,7 @@ func (p *provider) ListSubnets(ctx context.Context, networkID string) ([]*abstra
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "").WithStopwatch().Entering().Exiting()
 
-	return nil, fail.NotImplementedError()
-
-	/*
-		listOpts := subnets.ListOpts{}
-		if networkID != "" {
-			listOpts.NetworkID = networkID
-		}
-		var subnetList []*abstract.Subnet
-		xerr := stacks.RetryableRemoteCall(ctx,
-			func() error {
-				return subnets.List(s.NetworkClient, listOpts).EachPage(func(page pagination.Page) (bool, error) {
-					list, err := subnets.ExtractSubnets(page)
-					if err != nil {
-						return false, NormalizeError(err)
-					}
-
-					for _, subnet := range list {
-						item := abstract.NewSubnet()
-						item.ID = subnet.ID
-						item.Name = subnet.Name
-						item.Network = subnet.ID
-						item.IPVersion = ToAbstractIPVersion(subnet.IPVersion)
-						subnetList = append(subnetList, item)
-					}
-					return true, nil
-				})
-			},
-			NormalizeError,
-		)
-		if xerr != nil {
-			return emptySlice, xerr
-		}
-		// VPL: empty subnet list is not an abnormal situation, do not log
-		return subnetList, nil
-	*/
+	return p.MiniStack.ListSubnets(ctx, networkID)
 }
 
 // DeleteSubnet deletes the network identified by id
@@ -359,6 +253,7 @@ func (p *provider) DeleteSubnet(ctx context.Context, id string) fail.Error {
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.openstack"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
+	// FIXME: implement like DeleteNetwork
 	return fail.NotImplementedError()
 
 	/*

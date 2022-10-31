@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -45,7 +46,8 @@ type Targetable interface {
 
 // Feature defines the interface of feature
 type Feature interface {
-	data.Clonable
+	// Core
+	clonable.Clonable
 	data.Identifiable
 
 	Add(ctx context.Context, t Targetable, v data.Map[string, any], fs FeatureSettings) (Results, fail.Error)    // installs the feature on the target

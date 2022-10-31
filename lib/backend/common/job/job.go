@@ -21,11 +21,10 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
-	"strings"
-	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/versions"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
@@ -38,13 +37,14 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	uuidpkg "github.com/gofrs/uuid"
+	"github.com/puzpuzpuz/xsync"
 )
 
 // Job is the interface of a daemon job
 type Job interface {
 	ID() string
 	Name() string
-	Scope() common.Scope
+	Scope() scope.Frame
 	Context() context.Context
 	Task() concurrency.Task
 	Service() iaasapi.Service
@@ -58,23 +58,22 @@ type Job interface {
 
 // job contains the information needed by safescaled to execute a request
 type job struct {
-	scope     common.Scope
+	frame     *scope.Frame
 	uuid      string
 	ctx       context.Context
 	task      concurrency.Task
 	cancel    context.CancelFunc
 	service   iaasapi.Service
+	kv        *consumer.KV
 	startTime time.Time
-	kv        *common.ConsulKVClient
 }
 
 var (
-	jobMap          = map[string]Job{}
-	mutexJobManager sync.Mutex
+	jobMap = xsync.MapOf[string, Job]{}
 )
 
 // New creates a new instance of struct Job
-func New(ctx context.Context, cancel context.CancelFunc, scope common.Scope) (_ *job, ferr fail.Error) { // nolint
+func New(ctx context.Context, cancel context.CancelFunc, frame *scope.Frame) (_ *job, ferr fail.Error) { // nolint
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -83,8 +82,8 @@ func New(ctx context.Context, cancel context.CancelFunc, scope common.Scope) (_ 
 	if cancel == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("cancel")
 	}
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterError("scope", "cannot be a null value of 'common.Scope'")
+	if valid.IsNull(frame) {
+		return nil, fail.InvalidParameterError("frame", "cannot be a null value of '*common.Frame'")
 	}
 
 	// VPL: I don't get the point of checking if context has an uuid or not, as this uuid is not used...
@@ -126,23 +125,17 @@ func New(ctx context.Context, cancel context.CancelFunc, scope common.Scope) (_ 
 		return nil, xerr
 	}
 
-	xerr = task.SetID(id + scope.Description())
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	kv, xerr := common.NewKVClient(strings.Join([]string{"safescale", "metadata", scope.KVPath()}, "/"))
+	xerr = task.SetID(id + frame.Description())
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	nj := &job{
-		scope:     scope,
+		frame:     frame,
 		uuid:      id,
 		task:      task,
 		cancel:    cancel,
 		startTime: time.Now(),
-		kv:        kv,
 	}
 
 	// attach task instance to the context
@@ -152,17 +145,17 @@ func New(ctx context.Context, cancel context.CancelFunc, scope common.Scope) (_ 
 	ctx = context.WithValue(ctx, KeyForJobInContext, nj) // nolint
 	nj.ctx = ctx
 
-	providerProfile, xerr := factory.FindProviderProfileForTenant(scope.Tenant())
+	providerProfile, xerr := factory.FindProviderProfileForTenant(frame.Tenant())
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	svcOptions := []options.Mutator{
-		// iaasoptions.BuildWithScope(scope.Organization(), scope.Project(), scope.Tenant()),
-		iaasoptions.BuildWithScope(scope),
+		// iaasoptions.BuildWithScope(frame.Organization(), frame.Project(), frame.Tenant()),
+		iaasoptions.BuildWithScope(frame),
 	}
 	if providerProfile.Capabilities().UseTerraformer {
-		config, xerr := prepareTerraformerConfiguration(providerProfile, scope)
+		config, xerr := prepareTerraformerConfiguration(providerProfile, frame)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -192,12 +185,12 @@ func New(ctx context.Context, cancel context.CancelFunc, scope common.Scope) (_ 
 }
 
 // prepareTerraformerConfiguration assembles needed configuration to use terraform with the provider
-func prepareTerraformerConfiguration(providerProfile *providers.Profile, scope common.Scope) (terraformerapi.Configuration, fail.Error) {
+func prepareTerraformerConfiguration(providerProfile *providers.Profile, scope *scope.Frame) (terraformerapi.Configuration, fail.Error) {
 	if valid.IsNull(providerProfile) {
 		return terraformerapi.Configuration{}, fail.InvalidParameterCannotBeNilError("providerProfile")
 	}
 	if valid.IsNull(scope) {
-		return terraformerapi.Configuration{}, fail.InvalidParameterError("scope", "cannot be null value of '%s'", reflect.TypeOf(scope).String())
+		return terraformerapi.Configuration{}, fail.InvalidParameterError("frame", "cannot be null value of '%s'", reflect.TypeOf(scope).String())
 	}
 
 	out := terraformerapi.Configuration{
@@ -219,37 +212,66 @@ func (instance *job) IsNull() bool {
 }
 
 // ID returns the id of the job (ie the uuid of gRPC message)
-func (instance job) ID() string {
+func (instance *job) ID() string {
+	if instance == nil {
+		return ""
+	}
+
 	return instance.uuid
 }
 
 // Name returns the name (== id) of the job
-func (instance job) Name() string {
+func (instance *job) Name() string {
+	if instance == nil {
+		return ""
+	}
+
 	return instance.uuid
 }
 
 // Scope returns the Scope of the job
-func (instance job) Scope() common.Scope {
-	return instance.scope
+func (instance *job) Scope() *scope.Frame {
+	if instance == nil {
+		return nil
+	}
+
+	return instance.frame
 }
 
 // Context returns the context of the job (should be the same as the one of the task)
-func (instance job) Context() context.Context {
+func (instance *job) Context() context.Context {
+	if instance == nil {
+		return context.Background()
+	}
+
 	return instance.ctx
 }
 
 // Task returns the task instance
-func (instance job) Task() concurrency.Task {
+func (instance *job) Task() concurrency.Task {
+	if instance == nil {
+		t, _ := concurrency.NewTask()
+		return t
+	}
+
 	return instance.task
 }
 
 // Service returns the service instance
-func (instance job) Service() iaasapi.Service {
+func (instance *job) Service() iaasapi.Service {
+	if instance == nil {
+		return nil
+	}
+
 	return instance.service
 }
 
 // Duration returns the duration of the job
-func (instance job) Duration() time.Duration {
+func (instance *job) Duration() time.Duration {
+	if instance == nil {
+		return time.Duration(0)
+	}
+
 	return time.Since(instance.startTime)
 }
 
@@ -270,7 +292,10 @@ func (instance *job) Abort() (ferr fail.Error) {
 }
 
 // Aborted tells if the job has been aborted
-func (instance job) Aborted() (bool, fail.Error) {
+func (instance *job) Aborted() (bool, fail.Error) {
+	if instance == nil {
+		return false, fail.InvalidInstanceError()
+	}
 	status, err := instance.task.Status()
 	if err != nil {
 		return false, fail.Wrap(err, "problem getting aborted status")
@@ -280,43 +305,43 @@ func (instance job) Aborted() (bool, fail.Error) {
 
 // Close tells the job to wait for end of operation; this ensures everything is cleaned up correctly
 func (instance *job) Close() {
-	_ = deregister(instance)
-	if instance.cancel != nil {
-		instance.cancel()
+	if instance != nil {
+		_ = deregister(instance.ID())
+		if instance.cancel != nil {
+			instance.cancel()
+		}
+		*instance = job{}
 	}
 }
 
 // String returns a string representation of job information
-func (instance job) String() string {
-	return fmt.Sprintf("Job: %s (started at %s)", instance.scope.Description(), instance.startTime.String())
+func (instance *job) String() string {
+	if instance == nil {
+		return ""
+	}
+	return fmt.Sprintf("Job: %s (started at %s)", instance.frame.Description(), instance.startTime.String())
 }
 
 // register ...
 func register(job Job) fail.Error {
-	mutexJobManager.Lock()
-	defer mutexJobManager.Unlock()
+	if valid.IsNull(job) {
+		return fail.InvalidParameterError("job", "cannot be null value of '*Job'")
+	}
 
-	jobMap[job.ID()] = job
+	_, loaded := jobMap.LoadOrStore(job.ID(), job)
+	if loaded {
+		return fail.DuplicateError("there is already a Job with ID '%s'", job.ID())
+	}
+
 	return nil
 }
 
 // deregister ...
-func deregister(job Job) fail.Error {
-	if job == nil {
-		return fail.InvalidParameterCannotBeNilError("job")
+func deregister(id string) fail.Error {
+	if id == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	uuid := job.ID()
-	if uuid != "" {
-		mutexJobManager.Lock()
-		defer mutexJobManager.Unlock()
-
-		if _, ok := jobMap[uuid]; !ok {
-			return fail.NotFoundError("failed to find a job identified by id '%s'", uuid)
-		}
-		delete(jobMap, uuid)
-		return nil
-	}
-
-	return fail.InvalidParameterError("job", "job id cannot be empty string")
+	jobMap.Delete(id)
+	return nil
 }

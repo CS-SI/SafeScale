@@ -22,7 +22,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -48,9 +47,8 @@ const (
 
 // SecurityGroup links Object Storage folder and SecurityGroup
 type SecurityGroup interface {
+	Core
 	Metadata
-	data.Identifiable
-	Consistent
 
 	AddRule(context.Context, *abstract.SecurityGroupRule) fail.Error                                               // returns true if the host is member of a cluster
 	AddRules(context.Context, abstract.SecurityGroupRules) fail.Error                                              // returns true if the host is member of a cluster

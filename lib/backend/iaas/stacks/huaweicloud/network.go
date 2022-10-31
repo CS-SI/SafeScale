@@ -105,10 +105,10 @@ func (s stack) HasDefaultNetwork() (bool, fail.Error) {
 // DefaultNetwork returns the *abstract.Network corresponding to the default network
 func (s stack) DefaultNetwork(context.Context) (*abstract.Network, fail.Error) {
 	if valid.IsNil(s) {
-		return abstract.NewNetwork(), fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if s.vpc == nil {
-		return abstract.NewNetwork(), fail.NotFoundError("no default Network in stack")
+		return nil, fail.NotFoundError("no default Network in stack")
 	}
 
 	return s.vpc, nil
@@ -153,7 +153,11 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		return nil, normalizeError(err)
 	}
 
-	an := abstract.NewNetwork()
+	an, xerr := abstract.NewNetwork(req.Name)
+	if err != nil {
+		return nil, xerr
+	}
+
 	an.ID = vpc.ID
 	an.Name = req.Name
 	an.CIDR = req.CIDR

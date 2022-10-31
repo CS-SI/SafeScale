@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/eko/gocache/v2/store"
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
@@ -192,7 +194,7 @@ func onLabelCacheMiss(ctx context.Context, svc iaasapi.Service, ref string) (dat
 		return nil, innerXErr
 	}
 
-	if strings.Compare(fail.IgnoreError(labelInstance.Sdump(ctx)).(string), fail.IgnoreError(blank.Sdump(ctx)).(string)) == 0 {
+	if strings.Compare(fail.IgnoreError(labelInstance.String(ctx)).(string), fail.IgnoreError(blank.String(ctx)).(string)) == 0 {
 		return nil, fail.NotFoundError("Label with ref '%s' does NOT exist", ref)
 	}
 
@@ -205,7 +207,7 @@ func (instance *label) IsNull() bool {
 }
 
 // carry overloads rv.core.Carry() to add Label to service cache
-func (instance *label) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
+func (instance *label) carry(ctx context.Context, clonable clonable.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -282,9 +284,9 @@ func (instance *label) Delete(inctx context.Context) fail.Error {
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-					lhV1, ok := clonable.(*propertiesv1.LabelHosts)
+			xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(labelproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
+					lhV1, err := lang.Cast[*propertiesv1.LabelHosts)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
@@ -393,8 +395,8 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 
 	var labelHostsV1 *propertiesv1.LabelHosts
 	out := &protocol.LabelInspectResponse{}
-	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		alabel, ok := clonable.(*abstract.Label)
+	xerr := instance.Inspect(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		alabel, err := lang.Cast[*abstract.Label)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
@@ -408,7 +410,7 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 		out.HasDefault = alabel.HasDefault
 		out.DefaultValue = alabel.DefaultValue
 
-		return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(labelproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
 			var ok bool
 			labelHostsV1, ok = clonable.(*propertiesv1.LabelHosts)
 			if !ok {
@@ -445,8 +447,8 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 // IsTag tells of the Label represents a Tag (ie a Label that does not carry a default value)
 func (instance label) IsTag(ctx context.Context) (bool, fail.Error) {
 	var out bool
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		alabel, ok := clonable.(*abstract.Label)
+	xerr := instance.Review(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		alabel, err := lang.Cast[*abstract.Label)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
@@ -464,8 +466,8 @@ func (instance label) IsTag(ctx context.Context) (bool, fail.Error) {
 // DefaultValue returns the default value of the Label
 func (instance label) DefaultValue(ctx context.Context) (string, fail.Error) {
 	var out string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		alabel, ok := clonable.(*abstract.Label)
+	xerr := instance.Review(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		alabel, err := lang.Cast[*abstract.Label)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
@@ -495,16 +497,16 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "('%s', '%s')", instance.GetName(), hostInstance.GetName()).Entering()
 	defer tracer.Exiting()
 
-	xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		alabel, ok := clonable.(*abstract.Label)
+	xerr := instance.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		alabel, err := lang.Cast[*abstract.Label)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
 		isTag := !alabel.HasDefault
 
-		return props.Alter(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			labelHostsV1, ok := clonable.(*propertiesv1.LabelHosts)
+		return props.Alter(labelproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
+			labelHostsV1, err := lang.Cast[*propertiesv1.LabelHosts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -550,9 +552,9 @@ func (instance *label) UnbindFromHost(ctx context.Context, hostInstance resource
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "(label='%s', host='%s')", instance.GetName(), hostInstance.GetName()).Entering()
 	defer tracer.Exiting()
 
-	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			labelHostsV1, ok := clonable.(*propertiesv1.LabelHosts)
+	xerr := instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(labelproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
+			labelHostsV1, err := lang.Cast[*propertiesv1.LabelHosts)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}

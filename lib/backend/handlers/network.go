@@ -73,9 +73,10 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkReq.Name")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), true, "('%s')", networkReq.Name).WithStopwatch().Entering()
+	ctx, svc := handler.job.Context(), handler.job.Service()
+	tracer := debug.NewTracer(ctx, true, "('%s')", networkReq.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	if networkReq.CIDR == "" {
 		networkReq.CIDR = defaultCIDR
@@ -91,20 +92,21 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 		return nil, fail.InvalidRequestError("requested CIDR '%s' intersects with default docker network '%s'", "172.17.0.0/16")
 	}
 
-	networkInstance, xerr := networkfactory.New(handler.job.Service())
+	networkInstance, xerr := networkfactory.New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = networkInstance.Create(handler.job.Context(), networkReq)
+	xerr = networkInstance.Create(ctx, networkReq)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil && !networkReq.KeepOnFailure {
-			if derr := networkInstance.Delete(context.Background()); derr != nil {
+		if ferr != nil && networkReq.CleanOnFailure() {
+			derr := networkInstance.Delete(context.Background())
+			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", networkReq.Name))
 			}
 		}
@@ -123,7 +125,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 			gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
 		}
 
-		subnetInstance, xerr := subnetfactory.New(handler.job.Service())
+		subnetInstance, xerr := subnetfactory.New(svc)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -132,10 +134,11 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 		if err != nil {
 			return nil, fail.ConvertError(err)
 		}
+
 		subnetReq.Name = networkReq.Name
 		subnetReq.CIDR = subnetNet.String()
 		subnetReq.KeepOnFailure = networkReq.KeepOnFailure
-		xerr = subnetInstance.Create(handler.job.Context(), *subnetReq, gwName, gwSizing)
+		xerr = subnetInstance.Create(ctx, *subnetReq, gwName, gwSizing)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", networkReq.Name)
 		}
@@ -212,33 +215,36 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 		logrus.Tracef("forcing network deletion")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
+	ctx, svc := handler.job.Context(), handler.job.Service()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
+	networkInstance, xerr := networkfactory.Load(ctx, svc, networkRef)
 	if xerr != nil {
+		var abstractNetwork *abstract.Network
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			abstractNetwork, xerr := handler.job.Service().InspectNetworkByName(handler.job.Context(), networkRef)
+			// FIXME: InspectNetworkByName is not yet implemented in ovhtf
+			// abstractNetwork, xerr := svc.InspectNetworkByName(ctx, networkRef)
+			// if xerr != nil {
+			// 	switch xerr.(type) {
+			// 	case *fail.ErrNotFound:
+			abstractNetwork, xerr = svc.InspectNetwork(ctx, networkRef)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					abstractNetwork, xerr = handler.job.Service().InspectNetwork(handler.job.Context(), networkRef)
-					if xerr != nil {
-						switch xerr.(type) {
-						case *fail.ErrNotFound:
-							return fail.NotFoundError("failed to find Network '%s'", networkRef)
-						default:
-							return xerr
-						}
-					}
+					return fail.NotFoundError("failed to find Network '%s'", networkRef)
 				default:
 					return xerr
 				}
 			}
+			//	default:
+			//		return xerr
+			//	}
+			// }
 
-			cfg, cerr := handler.job.Service().ConfigurationOptions()
+			cfg, cerr := svc.ConfigurationOptions()
 			if cerr != nil {
 				return cerr
 			}
@@ -253,5 +259,5 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 		}
 	}
 
-	return networkInstance.Delete(handler.job.Context())
+	return networkInstance.Delete(ctx)
 }

@@ -17,14 +17,14 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterState contains the bare minimum information about the state of a cluster
@@ -39,31 +39,36 @@ func newClusterState() *ClusterState {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (s *ClusterState) IsNull() bool {
 	return s == nil || (s.StateCollectInterval <= 0)
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (s ClusterState) Clone() (data.Clonable, error) {
-	return newClusterState().Replace(&s)
-}
-
-// Replace ...
-// satisfies interface data.Clonable
-func (s *ClusterState) Replace(p data.Clonable) (data.Clonable, error) {
-	if s == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (s *ClusterState) Clone() (clonable.Clonable, error) {
+	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	casted, ok := p.(*ClusterState)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *ClusterState")
+	ncs := newClusterState()
+	return ncs, ncs.Replace(s)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (s *ClusterState) Replace(p clonable.Clonable) error {
+	if s == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	casted, err := lang.Cast[*ClusterState](p)
+	if err != nil {
+		return err
 	}
 
 	*s = *casted
-	return s, nil
+	return nil
 }
 
 func init() {

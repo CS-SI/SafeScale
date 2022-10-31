@@ -16,17 +16,53 @@
 
 package terraformer
 
+import (
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+)
+
+const (
+	TerraformStateLocal uint8 = iota
+	TerraformStateRemote
+)
+
 type ResourceCore struct {
 	name    string // contains the name of the resource
 	snippet string // contains the snippet to use to handle the resource
+	state   uint8  // tells if resource state has to be stored locally or remotely (remotely by default)
+}
+
+type ResourceOption func(rc *ResourceCore) fail.Error
+
+// WithLocalState tells the resource will have its state saved locally
+func WithLocalState() ResourceOption {
+	return func(rc *ResourceCore) fail.Error {
+		rc.state = TerraformStateLocal
+		return nil
+	}
+}
+
+// WithRemoteState tells the resource will have its state saved remotely
+func WithRemoteState() ResourceOption {
+	return func(rc *ResourceCore) fail.Error {
+		rc.state = TerraformStateRemote
+		return nil
+	}
 }
 
 // NewResourceCore creates a new instance of ResourceCore
-func NewResourceCore(name string, snippet string) ResourceCore {
-	return ResourceCore{
+func NewResourceCore(name string, snippet string, opts ...ResourceOption) (ResourceCore, fail.Error) {
+	out := ResourceCore{
 		name:    name,
 		snippet: snippet,
+		state:   TerraformStateLocal,
 	}
+	for _, v := range opts {
+		xerr := v(&out)
+		if xerr != nil {
+			return ResourceCore{}, xerr
+		}
+	}
+	return out, nil
 }
 
 // Name returns the name of the resource
@@ -37,4 +73,14 @@ func (rc ResourceCore) Name() string {
 // Snippet returns the path of the snippet used to handle the resource
 func (rc ResourceCore) Snippet() string {
 	return rc.snippet
+}
+
+// LocalState tells if the state of the resource will be saved locally
+func (rc ResourceCore) LocalState() bool {
+	return rc.state == TerraformStateLocal
+}
+
+// RemoteState tells if the state of the resource will be saved remotely
+func (rc ResourceCore) RemoteState() bool {
+	return rc.state == TerraformStateRemote
 }

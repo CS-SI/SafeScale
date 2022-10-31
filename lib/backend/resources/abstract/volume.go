@@ -23,15 +23,22 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // VolumeRequest represents a volume request
 type VolumeRequest struct {
-	Name  string           `json:"name,omitempty"`
-	Size  int              `json:"size,omitempty"`
-	Speed volumespeed.Enum `json:"speed"`
+	Name          string           `json:"name,omitempty"`
+	Size          int              `json:"size,omitempty"`
+	Speed         volumespeed.Enum `json:"speed"`
+	KeepOnFailure bool
+}
+
+// CleanOnFailure tells if request asks for cleaning created ressource on failure
+func (vr VolumeRequest) CleanOnFailure() bool {
+	return !vr.KeepOnFailure
 }
 
 // Volume represents a block volume
@@ -55,31 +62,37 @@ func NewVolume() *Volume {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (v *Volume) IsNull() bool {
 	return v == nil || (v.ID == "" && v.Name == "")
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (v Volume) Clone() (data.Clonable, error) {
-	return NewVolume().Replace(&v)
+// satisfies interface clonable.Clonable
+func (v *Volume) Clone() (clonable.Clonable, error) {
+	if v == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	nv := NewVolume()
+	return nv, nv.Replace(v)
 }
 
 // Replace ...
 //
-// satisfies interface data.Clonable
-func (v *Volume) Replace(p data.Clonable) (data.Clonable, error) {
-	if v == nil || p == nil {
-		return nil, fail.InvalidInstanceError()
+// satisfies interface clonable.Clonable
+func (v *Volume) Replace(p clonable.Clonable) error {
+	if v == nil {
+		return fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*Volume) // nolint
-	if !ok {
-		return nil, fmt.Errorf("p is not a *Volume")
+	src, xerr := lang.Cast[*Volume](p)
+	if xerr != nil {
+		return xerr
 	}
+
 	*v = *src
-	return v, nil
+	return nil
 }
 
 // OK ...

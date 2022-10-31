@@ -17,13 +17,12 @@
 package propertiesv2
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterNetwork contains network information relative to cluster
@@ -50,31 +49,36 @@ func newClusterNetwork() *ClusterNetwork {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (n *ClusterNetwork) IsNull() bool {
 	return n == nil || (n.NetworkID == "" && n.CIDR == "" && n.GatewayID == "")
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (n ClusterNetwork) Clone() (data.Clonable, error) {
-	return newClusterNetwork().Replace(&n)
-}
-
-// Replace ...
-// satisfies interface data.Clonable
-func (n *ClusterNetwork) Replace(p data.Clonable) (data.Clonable, error) {
-	if n == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (n *ClusterNetwork) Clone() (clonable.Clonable, error) {
+	if n == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	cloned, ok := p.(*ClusterNetwork)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *ClusterNetwork")
+	newCN := newClusterNetwork()
+	return newCN, newCN.Replace(n)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (n *ClusterNetwork) Replace(p clonable.Clonable) error {
+	if n == nil {
+		return fail.InvalidInstanceError()
 	}
 
-	*n = *cloned
-	return n, nil
+	casted, err := lang.Cast[*ClusterNetwork](p)
+	if err != nil {
+		return err
+	}
+
+	*n = *casted
+	return nil
 }
 
 func init() {

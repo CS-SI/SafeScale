@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package consul
+package controller
 
 import (
 	"context"

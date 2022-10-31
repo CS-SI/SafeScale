@@ -77,10 +77,10 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		if xerr != nil {
 			return outcomes, xerr
 		}
-		xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			// updates HostFeatures property for host
-			return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
+			return props.Alter(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+				hostFeaturesV1, err := lang.Cast[*propertiesv1.HostFeatures)
 				if !ok {
 					return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
 				}
@@ -183,10 +183,10 @@ func (instance *Host) DeleteFeature(inctx context.Context, name string, vars dat
 			tracer.Trace(strprocess.Capitalize(msg) + ":\n" + outcomes.AllErrorMessages())
 			return fail.NewError(msg)
 		}
-		return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			// updates HostFeatures property for host
-			return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
+			return props.Alter(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+				hostFeaturesV1, err := lang.Cast[*propertiesv1.HostFeatures)
 				if !ok {
 					return fail.InconsistentError("expected '*propertiesv1.HostFeatures', provided '%s'", reflect.TypeOf(clonable))
 				}
@@ -240,9 +240,9 @@ func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Featur
 		return fail.InvalidParameterCannotBeNilError("feat")
 	}
 
-	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+	return instance.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+			featuresV1, err := lang.Cast[*propertiesv1.HostFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -292,9 +292,9 @@ func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr 
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
-	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+	return instance.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+			featuresV1, err := lang.Cast[*propertiesv1.HostFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -357,9 +357,9 @@ func (instance *Host) InstalledFeatures(ctx context.Context) ([]string, fail.Err
 	}
 
 	var out []string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+	xerr := instance.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+			featuresV1, err := lang.Cast[*propertiesv1.HostFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -396,9 +396,9 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 	v["ShortHostname"] = instance.GetName()
 	domain := ""
 
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+	xerr := instance.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
+			hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -539,9 +539,9 @@ func (instance *Host) IsFeatureInstalled(ctx context.Context, name string) (foun
 		return false, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	return found, instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+	return found, instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+			featuresV1, err := lang.Cast[*propertiesv1.HostFeatures)
 			if !ok {
 				return fail.InconsistentError("`propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}

@@ -74,7 +74,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil && !req.KeepOnFailure {
+		if ferr != nil && req.CleanOnFailure() {
 			if derr := s.DeleteNetwork(context.Background(), resp.NetId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", req.Name))
 			}
@@ -240,7 +240,7 @@ func (s stack) getDefaultRouteTable(ctx context.Context, id string) (osc.RouteTa
 }
 
 func toAbstractNetwork(in osc.Net) *abstract.Network {
-	out := abstract.NewNetwork()
+	out, _ := abstract.NewNetwork("unknown")
 	out.ID = in.NetId
 	out.CIDR = in.IpRange
 	tags := unwrapTags(in.Tags)
@@ -381,7 +381,7 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (as
 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil && !req.KeepOnFailure {
+		if ferr != nil && req.CleanOnFailure() {
 			if derr := s.rpcDeleteSubnet(context.Background(), resp.SubnetId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
 			}
@@ -390,13 +390,16 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (as
 
 	// Prevent automatic assignment of public ip to VM created in the subnet
 
-	as = abstract.NewSubnet()
+	as, err = abstract.NewSubnet(req.Name)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
 	as.ID = resp.SubnetId
 	as.CIDR = resp.IpRange
 	as.IPVersion = ipversion.IPv4
-	as.Name = req.Name
+	// as.Name = req.Name
 	as.Network = resp.NetId
-
 	return as, nil
 }
 
@@ -484,7 +487,7 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, subnetName s
 }
 
 func toAbstractSubnet(subnet osc.Subnet) *abstract.Subnet {
-	out := abstract.NewSubnet()
+	out, _ := abstract.NewSubnet("unknown")
 	out.ID = subnet.SubnetId
 	out.CIDR = subnet.IpRange
 	out.IPVersion = ipversion.IPv4

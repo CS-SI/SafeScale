@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package consul
+package controller
 
 import (
 	"bytes"
@@ -29,6 +29,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -50,13 +51,18 @@ var (
 )
 
 // StartAgent creates consul configuration file if needed and starts consul agent in server mode
-func StartAgent(ctx context.Context) (_ chan any, ferr fail.Error) {
-	doneCh := make(chan any)
+func StartAgent(ctx context.Context) (startedCh chan bool, doneCh chan Result[commandOutput], _ context.CancelFunc, ferr fail.Error) {
+	startedCh = make(chan bool)
+	doneCh = make(chan Result[commandOutput])
 	defer func() {
 		if ferr != nil {
+			startedCh <- false
+			close(startedCh)
 			close(doneCh)
 		}
 	}()
+
+	var cancelNOP context.CancelFunc = func() {}
 
 	// Make sure settings are coherent
 	if global.Settings.Backend.Consul.HttpPort == "" {
@@ -68,7 +74,7 @@ func StartAgent(ctx context.Context) (_ chan any, ferr fail.Error) {
 	if global.Settings.Backend.Consul.ServerPort != "" && (global.Settings.Backend.Consul.SerfLanPort == "" || global.Settings.Backend.Consul.SerfWanPort == "") {
 		val, err := strconv.Atoi(global.Settings.Backend.Consul.ServerPort)
 		if err != nil {
-			return nil, fail.Wrap(err, "invalid value '%s' found for Consul server port", global.Settings.Backend.Consul.ServerPort)
+			return nil, nil, cancelNOP, fail.Wrap(err, "invalid value '%s' found for Consul server port", global.Settings.Backend.Consul.ServerPort)
 		}
 
 		if global.Settings.Backend.Consul.SerfLanPort == "" {
@@ -89,23 +95,23 @@ func StartAgent(ctx context.Context) (_ chan any, ferr fail.Error) {
 		if errors.Is(err, os.ErrNotExist) {
 			file, err := os.Create(consulConfigFile)
 			if err != nil {
-				return doneCh, fail.Wrap(err, "failed to create consul configuration file")
+				return nil, nil, cancelNOP, fail.Wrap(err, "failed to create consul configuration file")
 			}
 
 			_, err = file.WriteString(consulConfigTemplate)
 			if err != nil {
-				return doneCh, fail.Wrap(err, "failed to write content of consul configuration file")
+				return nil, nil, cancelNOP, fail.Wrap(err, "failed to write content of consul configuration file")
 			}
 
 			err = file.Close()
 			if err != nil {
-				return doneCh, fail.Wrap(err, "failed to close consul configuration file")
+				return nil, nil, cancelNOP, fail.Wrap(err, "failed to close consul configuration file")
 			}
 		} else {
-			return doneCh, fail.Wrap(err, "failed to check if consul configuration file exists")
+			return nil, nil, cancelNOP, fail.Wrap(err, "failed to check if consul configuration file exists")
 		}
 	} else if st.IsDir() {
-		return doneCh, fail.NotAvailableError("'%s' is a directory; should be a file", consulConfigFile)
+		return nil, nil, cancelNOP, fail.NotAvailableError("'%s' is a directory; should be a file", consulConfigFile)
 	}
 
 	cliArgs := []string{
@@ -126,37 +132,59 @@ func StartAgent(ctx context.Context) (_ chan any, ferr fail.Error) {
 		}...)
 	}
 
-	// starts a goroutine to start consul server as long as it's needed, depending on the porocess end reason
+	agentCtx, cancelAgent := context.WithCancel(ctx)
+
+	// starts a goroutine to start consul server as long as it's needed, depending on the termination reason
 	go func() {
+		defer func() {
+			close(startedCh)
+			close(doneCh)
+		}()
+
 		const maxRetries = 5
 		for i := 0; i < maxRetries; i++ {
 			// Runs consul agent
-			exitcode, stdout, _, xerr := runCommand(ctx, cliArgs)
+			cmdDoneCh, xerr := startCommand(agentCtx, cliArgs)
 			if xerr != nil {
 				// Do not try again when binary cannot be started
 				logrus.Error(xerr.Error())
+				startedCh <- false
 				return
 			}
 
-			// reacts based on end reason
-			switch exitcode {
+			// Wait 10ms to be sure Consul Agent failed if it has to fail
+			time.Sleep(10 * time.Millisecond)
+
+			startedCh <- true
+
+			out := <-cmdDoneCh
+			// if out.err != nil {
+			// 	doneCh <- out
+			// 	return
+			// }
+
+			// reacts based on termination reason
+			switch out.Output().ExitCode() {
 			case 0:
-				logrus.Debugf("consul ends with status '%d'", exitcode)
-				doneCh <- exitcode
+				logrus.Debugf("consul ends with status '%d'", out.Output().ExitCode())
+				doneCh <- NewResult[commandOutput](nil, commandOutput{exitcode: 0})
 				return
+
 			default:
+				stdout := out.Output().Stdout()
 				if strings.Contains(stdout, "Failed to start Consul server") {
 					if strings.Contains(stdout, "bind: address already in use") {
-						logrus.Errorf("failed to start consul agent on port localhost:%s: address already in use", global.Settings.Backend.Consul.ServerPort)
+						xerr := fail.NewError("failed to start consul agent on port localhost:%s: address already in use", global.Settings.Backend.Consul.ServerPort)
+						logrus.Errorf(xerr.Error())
+						doneCh <- NewResult[commandOutput](xerr, out.Output())
 						return
 					}
-
 				}
 
 				if i < maxRetries {
-					logrus.Errorf("consul ends with unexpected status '%d' after %d retries:\nstdout=%s", exitcode, i, stdout)
+					logrus.Errorf("consul ends with unexpected status '%d' after %d retries:\nstdout=%s", out.Output().ExitCode(), i, out.Output().Stdout())
 				} else {
-					logrus.Errorf("consul ends with unexpected status '%d':\nstdout=%s", exitcode, stdout)
+					logrus.Errorf("consul ends with unexpected status '%d':\nstdout=%s", out.Output().ExitCode(), out.Output().Stdout())
 				}
 			}
 
@@ -166,22 +194,66 @@ func StartAgent(ctx context.Context) (_ chan any, ferr fail.Error) {
 		}
 	}()
 
-	return doneCh, nil
+	return startedCh, doneCh, cancelAgent, nil
 }
 
-// runCommand runs consul agent
-func runCommand(ctx context.Context, args []string) (int, string, string, fail.Error) {
+type Result[T any] struct {
+	err    error
+	output T
+}
+
+func NewResult[T any](err error, res T) Result[T] {
+	return Result[T]{
+		err:    err,
+		output: res,
+	}
+}
+
+func (r Result[T]) Failed() bool {
+	return r.err != nil
+}
+
+func (r Result[T]) Error() error {
+	return r.err
+}
+
+func (r Result[T]) Output() T {
+	return r.output
+}
+
+type commandOutput struct {
+	exitcode int
+	stdout   string
+	stderr   string
+}
+
+func (r commandOutput) ExitCode() int {
+	return r.exitcode
+}
+
+func (r commandOutput) Stdout() string {
+	return r.stdout
+}
+
+func (r commandOutput) Stderr() string {
+	return r.stderr
+}
+
+// startCommand starts consul agent
+func startCommand(ctx context.Context, args []string) (chan Result[commandOutput], fail.Error) {
 	var outbuf, errbuf bytes.Buffer
 
 	cmd := exec.Command(global.Settings.Backend.Consul.ExecPath, args...)
 	cmd.Dir = filepath.Dir(filepath.Dir(global.Settings.Backend.Consul.ExecPath))
 	cmd.Stdout = &outbuf
 	cmd.Stderr = &errbuf
-	adaptToOS(cmd)
+	operatingSystemSpecifics(cmd)
 	err := cmd.Start()
 	if err != nil {
-		return 1, "", "", fail.Wrap(err, "failed to start consul")
+		return nil, fail.Wrap(err, "failed to start consul")
 	}
+
+	doneCh := make(chan Result[commandOutput])
 
 	// Starts a goroutine to react to cancellation
 	go func() {
@@ -189,14 +261,38 @@ func runCommand(ctx context.Context, args []string) (int, string, string, fail.E
 		case <-ctx.Done():
 			err := cmd.Process.Signal(os.Interrupt)
 			if err != nil {
-				logrus.Errorf("Failed to signal consul to stop: %v", err)
+				if !strings.Contains(err.Error(), "os: process already finished") {
+					logrus.Errorf("Failed to signal consul to stop: %v", err)
+				}
 			}
 			return
 		}
 	}()
 
+	// starts a goroutine to react to agent termination
+	go func() {
+		defer close(doneCh)
+
+		exitcode, stdout, stderr, xerr := waitCommand(cmd, &outbuf, &errbuf)
+		if xerr != nil {
+			doneCh <- NewResult[commandOutput](xerr, commandOutput{})
+			return
+		}
+
+		xerr = nil
+		if exitcode != 0 {
+			xerr = fail.ExecutionError(nil)
+		}
+		doneCh <- NewResult[commandOutput](xerr, commandOutput{exitcode: exitcode, stdout: stdout, stderr: stderr})
+	}()
+
+	return doneCh, nil
+}
+
+// waitCommand waits the end of consul agent
+func waitCommand(cmd *exec.Cmd, outbuf, errbuf *bytes.Buffer) (int, string, string, fail.Error) {
 	exitCode := -1
-	err = cmd.Wait()
+	err := cmd.Wait()
 	stdout := outbuf.String()
 	stderr := errbuf.String()
 	if err != nil {

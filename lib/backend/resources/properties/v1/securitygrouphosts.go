@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // SecurityGroupHosts contains information about attached hosts to a security group
@@ -50,37 +49,40 @@ func (sgh *SecurityGroupHosts) IsNull() bool {
 }
 
 // Clone ...
-func (sgh *SecurityGroupHosts) Clone() (data.Clonable, error) {
-	return NewSecurityGroupHosts().Replace(sgh)
-}
-
-// Replace ...
-func (sgh *SecurityGroupHosts) Replace(p data.Clonable) (data.Clonable, error) {
-	if sgh == nil || p == nil {
+func (sgh *SecurityGroupHosts) Clone() (clonable.Clonable, error) {
+	if sgh == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*SecurityGroupHosts)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *SecurityGroupHosts")
+	nsgh := NewSecurityGroupHosts()
+	return nsgh, nsgh.Replace(sgh)
+}
+
+// Replace ...
+func (sgh *SecurityGroupHosts) Replace(p clonable.Clonable) error {
+	if sgh == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*SecurityGroupHosts](p)
+	if err != nil {
+		return err
 	}
 
 	sgh.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		cloned, err := v.Clone()
+		cloned, err := clonable.CastedClone[*SecurityGroupBond](v)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		sgh.ByID[k], ok = cloned.(*SecurityGroupBond)
-		if !ok {
-			return nil, fmt.Errorf("cloned is not a *SecurityGroupBond")
-		}
+
+		sgh.ByID[k] = cloned
 	}
 	sgh.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
 		sgh.ByName[k] = v
 	}
-	return sgh, nil
+	return nil
 }
 
 func init() {

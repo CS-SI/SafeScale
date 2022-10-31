@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -442,9 +444,9 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 
 	clonedV["ShortHostname"] = host.GetName()
 	domain := ""
-	xerr = host.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+	xerr = host.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
+			hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}

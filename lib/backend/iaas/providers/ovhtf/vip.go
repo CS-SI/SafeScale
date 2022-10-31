@@ -20,7 +20,6 @@ import (
 	"context"
 	"strings"
 
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -37,9 +36,13 @@ const (
 	vipResourceSnippetPath = "snippets/resource_vip.tf"
 )
 
-func newVIPResource(name string) terraformerapi.Resource {
-	out := &vipResource{terraformer.NewResourceCore(name, vipResourceSnippetPath)}
-	return out
+func newVIPResource(name string) (*vipResource, fail.Error) {
+	rc, xerr := terraformer.NewResourceCore(name, vipResourceSnippetPath)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return &vipResource{ResourceCore: rc}, nil
 }
 
 // ToMap returns a map of networkResource field to be used where needed

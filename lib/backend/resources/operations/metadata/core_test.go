@@ -36,15 +36,15 @@ import (
 )
 
 type SomeClonable struct {
-	data.Clonable
+	clonable.Clonable
 	data.Identifiable
 	value string
 }
 
-func (e *SomeClonable) Clone() (data.Clonable, error) {
+func (e *SomeClonable) Clone() (clonable.Clonable, error) {
 	return &SomeClonable{value: e.value}, nil
 }
-func (e *SomeClonable) Replace(data data.Clonable) (data.Clonable, error) {
+func (e *SomeClonable) Replace(data clonable.Clonable) (clonable.Clonable, error) {
 	e.value = data.(*SomeClonable).value
 	return e, nil
 }
@@ -240,7 +240,7 @@ func TestMetadataCore_Inspect(t *testing.T) {
 	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *Core = nil
-	xerr = amc.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = amc.Inspect(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return nil
 	})
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
@@ -249,7 +249,7 @@ func TestMetadataCore_Inspect(t *testing.T) {
 	network.ID = "Network_ID"
 	network.Name = "Network Name"
 
-	var callback func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error
+	var callback func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -264,10 +264,10 @@ func TestMetadataCore_Inspect(t *testing.T) {
 		xerr = mc.Inspect(ctx, callback)
 		require.Contains(t, xerr.Error(), "cannot be nil")
 
-		xerr = mc.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = mc.Inspect(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
 
-			an, ok := clonable.(*abstract.Network)
+			an, err := lang.Cast[*abstract.Network)
 			require.True(t, ok)
 			require.EqualValues(t, skip(an.GetID()), "Network_ID")
 			require.EqualValues(t, an.GetName(), "Network Name")
@@ -288,7 +288,7 @@ func TestMetadataCore_Review(t *testing.T) {
 	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *Core = nil
-	xerr = amc.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = amc.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return nil
 	})
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
@@ -297,7 +297,7 @@ func TestMetadataCore_Review(t *testing.T) {
 	network.ID = "Network_ID"
 	network.Name = "Network Name"
 
-	var callback func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error
+	var callback func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -312,10 +312,10 @@ func TestMetadataCore_Review(t *testing.T) {
 		xerr = mc.Review(ctx, callback)
 		require.Contains(t, xerr.Error(), "cannot be nil")
 
-		xerr = mc.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = mc.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
 
-			an, ok := clonable.(*abstract.Network)
+			an, err := lang.Cast[*abstract.Network)
 			require.EqualValues(t, ok, true)
 			require.EqualValues(t, skip(an.GetID()), "Network_ID")
 			require.EqualValues(t, an.GetName(), "Network Name")
@@ -336,7 +336,7 @@ func TestMetadataCore_Alter(t *testing.T) {
 	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *Core = nil
-	xerr = amc.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = amc.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return nil
 	})
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
@@ -345,7 +345,7 @@ func TestMetadataCore_Alter(t *testing.T) {
 	network.ID = "Network_ID"
 	network.Name = "Network Name"
 
-	var callback func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error
+	var callback func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
 
@@ -361,11 +361,11 @@ func TestMetadataCore_Alter(t *testing.T) {
 		xerr = mc.Alter(ctx, callback)
 		require.Contains(t, xerr.Error(), "cannot be nil")
 
-		xerr = mc.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = mc.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 
 			require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
 
-			n, ok := clonable.(*abstract.Network)
+			n, err := lang.Cast[*abstract.Network)
 			if !ok {
 				t.Error("Clonable object as *abstract.Network expected")
 				t.Fail()
@@ -376,11 +376,11 @@ func TestMetadataCore_Alter(t *testing.T) {
 		})
 		require.Nil(t, xerr)
 
-		xerr = mc.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = mc.Inspect(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 
 			require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
 
-			n, ok := clonable.(*abstract.Network)
+			n, err := lang.Cast[*abstract.Network)
 			if !ok {
 				t.Error("Clonable object as *abstract.Network expected")
 				t.Fail()

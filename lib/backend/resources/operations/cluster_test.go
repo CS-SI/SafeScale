@@ -388,7 +388,7 @@ func TestCluster_Create(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestCluster_Sdump(t *testing.T) {
+func TestCluster_String(t *testing.T) {
 
 	defer func() {
 		r := recover()
@@ -406,7 +406,7 @@ func TestCluster_Sdump(t *testing.T) {
 	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	_, xerr = ocluster.Sdump(ctx)
+	_, xerr = ocluster.String(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -425,7 +425,7 @@ func TestCluster_Sdump(t *testing.T) {
 			t.FailNow()
 		}
 
-		result, err := ocluster.Sdump(ctx)
+		result, err := ocluster.String(ctx)
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(result).String(), "string")
 		require.Contains(t, result, "&abstract.ClusterIdentity{")
@@ -448,7 +448,7 @@ func TestCluster_Deserialize(t *testing.T) {
 	require.Nil(t, xerr)
 
 	var ocluster *Cluster = nil
-	_, xerr = ocluster.Sdump(ctx)
+	_, xerr = ocluster.String(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -827,9 +827,9 @@ func TestCluster_StartStop(t *testing.T) {
 		}
 		for i := range tests {
 			t.Run(fmt.Sprintf("Start from state %s", tests[i].state.String()), func(t *testing.T) {
-				_ = cluster.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-						stateV1, ok := clonable.(*propertiesv1.ClusterState)
+				_ = cluster.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Alter(clusterproperty.StateV1, func(clonable clonable.Clonable) fail.Error {
+						stateV1, err := lang.Cast[*propertiesv1.ClusterState)
 						if !ok {
 							return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}

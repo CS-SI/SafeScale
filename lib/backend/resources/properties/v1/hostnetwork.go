@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostNetwork contains network information related to Host
@@ -69,21 +68,26 @@ func (hn *HostNetwork) Reset() {
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (hn HostNetwork) Clone() (data.Clonable, error) {
-	return NewHostNetwork().Replace(&hn)
-}
-
-// Replace ...
-// satisfies interface data.Clonable
-func (hn *HostNetwork) Replace(p data.Clonable) (data.Clonable, error) {
-	if hn == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (hn *HostNetwork) Clone() (clonable.Clonable, error) {
+	if hn == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*HostNetwork)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *HostNetwork")
+	nhn := NewHostNetwork()
+	return nhn, nhn.Replace(hn)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (hn *HostNetwork) Replace(p clonable.Clonable) error {
+	if hn == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostNetwork](p)
+	if err != nil {
+		return err
 	}
 
 	*hn = *src
@@ -103,7 +107,7 @@ func (hn *HostNetwork) Replace(p data.Clonable) (data.Clonable, error) {
 	for k, v := range src.IPv6Addresses {
 		hn.IPv6Addresses[k] = v
 	}
-	return hn, nil
+	return nil
 }
 
 func init() {

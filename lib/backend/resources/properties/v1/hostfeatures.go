@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostInstalledFeature ...
@@ -45,27 +44,32 @@ func NewHostInstalledFeature() *HostInstalledFeature {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (hif *HostInstalledFeature) IsNull() bool {
 	return hif == nil || (len(hif.RequiredBy) == 0 && len(hif.Requires) == 0) || hif.RequiredBy == nil || hif.Requires == nil
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (hif *HostInstalledFeature) Clone() (data.Clonable, error) {
-	return NewHostInstalledFeature().Replace(hif)
-}
-
-// Replace ...
-// satisfies interface data.Clonable
-func (hif *HostInstalledFeature) Replace(p data.Clonable) (data.Clonable, error) {
-	if hif == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (hif *HostInstalledFeature) Clone() (clonable.Clonable, error) {
+	if hif == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*HostInstalledFeature)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *HostInstalledFeature")
+	nhif := NewHostInstalledFeature()
+	return nhif, nhif.Replace(hif)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (hif *HostInstalledFeature) Replace(p clonable.Clonable) error {
+	if hif == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostInstalledFeature](p)
+	if err != nil {
+		return err
 	}
 
 	hif.HostContext = src.HostContext
@@ -77,7 +81,7 @@ func (hif *HostInstalledFeature) Replace(p data.Clonable) (data.Clonable, error)
 	for k := range src.Requires {
 		hif.Requires[k] = struct{}{}
 	}
-	return hif, nil
+	return nil
 }
 
 // HostFeatures ...
@@ -104,32 +108,37 @@ func (hf *HostFeatures) Reset() {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (hf *HostFeatures) IsNull() bool {
 	return hf == nil || len(hf.Installed) == 0
 }
 
-// Clone ...  (data.Clonable interface)
-func (hf HostFeatures) Clone() (data.Clonable, error) {
-	return NewHostFeatures().Replace(&hf)
-}
-
-// Replace ...  (data.Clonable interface)
-func (hf *HostFeatures) Replace(p data.Clonable) (data.Clonable, error) {
-	if hf == nil || p == nil {
+// Clone ...  (clonable.Clonable interface)
+func (hf *HostFeatures) Clone() (clonable.Clonable, error) {
+	if hf == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*HostFeatures)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *HostFeatures")
+	nhf := NewHostFeatures()
+	return nhf, nhf.Replace(hf)
+}
+
+// Replace ...  (clonable.Clonable interface)
+func (hf *HostFeatures) Replace(p clonable.Clonable) error {
+	if hf == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostFeatures](p)
+	if err != nil {
+		return err
 	}
 
 	hf.Installed = make(map[string]*HostInstalledFeature, len(src.Installed))
 	for k, v := range src.Installed {
 		hf.Installed[k] = v
 	}
-	return hf, nil
+	return nil
 }
 
 func init() {

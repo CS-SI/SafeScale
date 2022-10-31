@@ -1,3 +1,15 @@
+resource "openstack_networking_network_v2" "network_inspect" {
+    provider              = openstack.ovh
+{{ if .Resource.Name }}
+    name                  = "{{ .Resource.Name }}"
+{{ end }}
+    admin_state_up        = true
+    port_security_enabled = true
+    shared                = false
+    tenant_id             = "{{ .Provider.Authentication.TenantID }}"
+    region                = "{{ .Provider.Authentication.Region }}"
+}
+
 data "openstack_networking_network_v2" "network_inspect" {
     provider = openstack.ovh
 {{- if .Resource.ID }}

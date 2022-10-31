@@ -17,10 +17,8 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -38,31 +36,33 @@ func newClusterComposite() *ClusterComposite {
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (c *ClusterComposite) IsNull() bool {
 	return c == nil || len(c.Tenants) == 0
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (c ClusterComposite) Clone() (data.Clonable, error) {
-	return newClusterComposite().Replace(&c)
+// satisfies interface clonable.Clonable
+func (c ClusterComposite) Clone() (clonable.Clonable, error) {
+	nc := newClusterComposite()
+	return nc, nc.Replace(&c)
 }
 
 // Replace ...
-// satisfies interface data.Clonable
-func (c *ClusterComposite) Replace(p data.Clonable) (data.Clonable, error) {
-	if c == nil || p == nil {
-		return nil, fail.InvalidInstanceError()
+// satisfies interface clonable.Clonable
+func (c *ClusterComposite) Replace(p clonable.Clonable) error {
+	if c == nil {
+		return fail.InvalidInstanceError()
 	}
 
 	src, ok := p.(*ClusterComposite)
 	if !ok {
-		return nil, fmt.Errorf("p is not a *ClusterComposite")
+		return fail.InconsistentError("failed to cast 'p' to '*ClusterComposite'")
 	}
+
 	c.Tenants = make([]string, len(src.Tenants))
 	copy(c.Tenants, src.Tenants)
-	return c, nil
+	return nil
 }
 
 func init() {

@@ -93,12 +93,12 @@ func Test_AbsPathify(t *testing.T) {
 //	}
 //
 //	if filepath.IsAbs(inPath) {
-//		return filepath.Clean(inPath)
+//		return filepath.Reset(inPath)
 //	}
 //
 //	p, err := filepath.Abs(inPath)
 //	if err == nil {
-//		return filepath.Clean(p)
+//		return filepath.Reset(p)
 //	}
 //
 //	return ""

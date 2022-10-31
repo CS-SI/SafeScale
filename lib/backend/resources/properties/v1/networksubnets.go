@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // NetworkSubnets contains additional information describing the subnets in a network, in V1
@@ -44,25 +43,30 @@ func NewNetworkSubnets() *NetworkSubnets {
 }
 
 // IsNull
-// ... (data.Clonable interface)
+// ... (clonable.Clonable interface)
 func (nd *NetworkSubnets) IsNull() bool {
 	return nd == nil || len(nd.ByID) == 0
 }
 
-// Clone ... (data.Clonable interface)
-func (nd NetworkSubnets) Clone() (data.Clonable, error) {
-	return NewNetworkSubnets().Replace(&nd)
-}
-
-// Replace ... (data.Clonable interface)
-func (nd *NetworkSubnets) Replace(p data.Clonable) (data.Clonable, error) {
-	if nd == nil || p == nil {
+// Clone ... (clonable.Clonable interface)
+func (nd *NetworkSubnets) Clone() (clonable.Clonable, error) {
+	if nd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*NetworkSubnets)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *NetworkSubnets")
+	nnd := NewNetworkSubnets()
+	return nnd, nnd.Replace(nd)
+}
+
+// Replace ... (clonable.Clonable interface)
+func (nd *NetworkSubnets) Replace(p clonable.Clonable) error {
+	if nd == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*NetworkSubnets](p)
+	if err != nil {
+		return err
 	}
 
 	nd.ByID = make(map[string]string, len(src.ByID))
@@ -73,7 +77,7 @@ func (nd *NetworkSubnets) Replace(p data.Clonable) (data.Clonable, error) {
 	for k, v := range src.ByName {
 		nd.ByName[k] = v
 	}
-	return nd, nil
+	return nil
 }
 
 func init() {

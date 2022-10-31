@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostVolume contains information about attached volume
@@ -68,19 +67,24 @@ func (hv *HostVolumes) IsNull() bool {
 }
 
 // Clone ...
-func (hv HostVolumes) Clone() (data.Clonable, error) {
-	return NewHostVolumes().Replace(&hv)
-}
-
-// Replace ...
-func (hv *HostVolumes) Replace(p data.Clonable) (data.Clonable, error) {
-	if hv == nil || p == nil {
+func (hv *HostVolumes) Clone() (clonable.Clonable, error) {
+	if hv == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*HostVolumes)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *HostVolumes")
+	nhv := NewHostVolumes()
+	return nhv, nhv.Replace(hv)
+}
+
+// Replace ...
+func (hv *HostVolumes) Replace(p clonable.Clonable) error {
+	if hv == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostVolumes](p)
+	if err != nil {
+		return err
 	}
 
 	hv.VolumesByID = make(map[string]*HostVolume, len(src.VolumesByID))
@@ -99,7 +103,7 @@ func (hv *HostVolumes) Replace(p data.Clonable) (data.Clonable, error) {
 	for k, v := range src.DevicesByID {
 		hv.DevicesByID[k] = v
 	}
-	return hv, nil
+	return nil
 }
 
 func init() {

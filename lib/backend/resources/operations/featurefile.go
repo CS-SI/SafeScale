@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/eko/gocache/v2/store"
 	"github.com/farmergreg/rfsnotify"
 	"github.com/sirupsen/logrus"
@@ -96,23 +98,29 @@ func (ff *FeatureFile) IsNull() bool {
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (ff *FeatureFile) Clone() (data.Clonable, error) {
-	return newFeatureFile("", "", false, nil).Replace(ff)
+// satisfies interface clonable.Clonable
+func (ff *FeatureFile) Clone() (clonable.Clonable, error) {
+	// Do not test with IsNull(), it's allowed to clone a null value...
+	if ff == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	nff := newFeatureFile("", "", false, nil)
+	return nff, nff.Replace(ff)
 }
 
 // Replace ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 // may panic
-func (ff *FeatureFile) Replace(p data.Clonable) (data.Clonable, error) {
+func (ff *FeatureFile) Replace(p clonable.Clonable) error {
 	// Do not test with IsNull(), it's allowed to clone a null value...
-	if ff == nil || p == nil {
-		return ff, nil
+	if ff == nil {
+		return fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*FeatureFile)
-	if !ok {
-		return ff, fail.InvalidParameterError("p", "must be a '*FeatureFile'")
+	src, err := lang.Cast[*FeatureFile](p)
+	if err != nil {
+		return err
 	}
 
 	ff.displayName = src.displayName
@@ -120,10 +128,20 @@ func (ff *FeatureFile) Replace(p data.Clonable) (data.Clonable, error) {
 	ff.displayFileName = src.displayFileName
 	ff.specs = src.specs // Note: using same pointer here is wanted; do not raise an alert in UT on this
 	ff.embedded = src.embedded
+
+	ff.observers = make(map[string]observer.Observer, len(src.observers))
 	for k, v := range src.observers {
 		ff.observers[k] = v
 	}
-	return ff, nil
+	ff.versionControl = make(map[string]string, len(src.versionControl))
+	for k, v := range src.versionControl {
+		ff.versionControl[k] = v
+	}
+	ff.parameters = make(map[string]FeatureParameter, len(src.parameters))
+	for k, v := range src.parameters {
+		ff.parameters[k] = v
+	}
+	return nil
 }
 
 // GetName returns the display name of the Feature, with error handling

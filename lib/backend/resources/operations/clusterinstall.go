@@ -28,6 +28,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
@@ -94,11 +96,11 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.
 	}
 
 	var out []string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+			featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 
 			for k := range featuresV1.Installed {
@@ -163,12 +165,12 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	v["CIDR"] = networkCfg.CIDR
 
 	var controlPlaneV1 *propertiesv1.ClusterControlplane
-	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
-			var ok bool
-			controlPlaneV1, ok = clonable.(*propertiesv1.ClusterControlplane)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterControlplane' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr = instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.ControlPlaneV1, func(p clonable.Clonable) fail.Error {
+			var err error
+			controlPlaneV1, err = lang.Cast[*propertiesv1.ClusterControlplane](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 
 			return nil
@@ -251,9 +253,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
 // satisfies interface resources.Targetable
-func (instance *Cluster) RegisterFeature(
-	ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool,
-) (ferr fail.Error) {
+func (instance *Cluster) RegisterFeature(ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -263,15 +263,15 @@ func (instance *Cluster) RegisterFeature(
 		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
 	}
 
-	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+			featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 
-			var item *propertiesv1.ClusterInstalledFeature
-			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
+			item, ok := featuresV1.Installed[feat.GetName()]
+			if !ok {
 				requirements, innerXErr := feat.Dependencies(ctx)
 				if innerXErr != nil {
 					return innerXErr
@@ -283,8 +283,8 @@ func (instance *Cluster) RegisterFeature(
 				item.Requires = requirements
 				featuresV1.Installed[item.Name] = item
 			}
-			if rf, ok := requiredBy.(*Feature); ok && rf != nil && !valid.IsNil(rf) {
-				item.RequiredBy[rf.GetName()] = struct{}{}
+			if !valid.IsNil(requiredBy) {
+				item.RequiredBy[requiredBy.GetName()] = struct{}{}
 			}
 			return nil
 		})
@@ -303,11 +303,11 @@ func (instance *Cluster) UnregisterFeature(ctx context.Context, feat string) (fe
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
-	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+			featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 
 			delete(featuresV1.Installed, feat)
@@ -378,9 +378,9 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 		return nil, xerr
 	}
 	// var list map[string]*propertiesv1.ClusterInstalledFeature
-	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+	// xerr := instance.Inspect(func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+	// 		featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures)
 	// 		if !ok {
 	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 	// 		}
@@ -431,9 +431,7 @@ func (instance *Cluster) AddFeature(
 }
 
 // CheckFeature tells if a feature is installed on the Cluster
-func (instance *Cluster) CheckFeature(
-	ctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings,
-) (resources.Results, fail.Error) {
+func (instance *Cluster) CheckFeature(ctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -454,9 +452,7 @@ func (instance *Cluster) CheckFeature(
 }
 
 // RemoveFeature uninstalls a feature from the Cluster
-func (instance *Cluster) RemoveFeature(
-	ctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings,
-) (resources.Results, fail.Error) {
+func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -845,11 +841,11 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 		}
 
 		dockerDisabled := false
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr = instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
+				if innerErr {
+					return fail.Wrap(innerErr)
 				}
 
 				_, dockerDisabled = featuresV1.Disabled["docker"]
@@ -868,16 +864,14 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 
 		clusterName := identity.Name
 		disabled := false
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
+		xerr = instance.ReviewProperty(ctx, clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+			featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
+			}
 
-				_, disabled = featuresV1.Disabled["reverseproxy"]
-				return nil
-			})
+			_, disabled = featuresV1.Disabled["reverseproxy"]
+			return nil
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -948,9 +942,9 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 		}
 
 		dockerDisabled := false
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+		xerr = instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+				featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -970,9 +964,9 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 		}
 
 		disabled := false
-		xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+		xerr = instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+				featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -1058,9 +1052,9 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map[s
 		}
 
 		disabled := false
-		xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+		xerr = instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+				featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
@@ -1154,9 +1148,9 @@ func (instance *Cluster) installDocker(inctx context.Context, host resources.Hos
 		defer close(chRes)
 
 		dockerDisabled := false
-		xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+		xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+				featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}

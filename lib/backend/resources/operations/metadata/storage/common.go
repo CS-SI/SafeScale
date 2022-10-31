@@ -21,22 +21,22 @@ import (
 )
 
 // AbsolutePath returns the full path to reach the 'path'+'name' starting from the folder path
-func AbsolutePath(basePath string, path ...string) string {
+func AbsolutePath(basePath string, sep string, path ...string) string {
 	for len(path) > 0 && (path[0] == "" || path[0] == ".") {
 		path = path[1:]
 	}
 	var relativePath string
 	for _, item := range path {
-		if item != "" && item != "/" {
-			relativePath += "/" + item
+		if item != "" && item != sep {
+			relativePath += sep + item
 		}
 	}
-	relativePath = strings.Trim(relativePath, "/")
+	relativePath = strings.Trim(relativePath, sep)
 	if relativePath != "" {
-		absolutePath := strings.ReplaceAll(relativePath, "//", "/")
+		absolutePath := strings.ReplaceAll(relativePath, sep+sep, sep)
 		if basePath != "" {
-			absolutePath = basePath + "/" + relativePath
-			absolutePath = strings.ReplaceAll(absolutePath, "//", "/")
+			absolutePath = basePath + sep + relativePath
+			absolutePath = strings.ReplaceAll(absolutePath, sep+sep, sep)
 		}
 		return absolutePath
 	}

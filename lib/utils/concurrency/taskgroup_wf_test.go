@@ -319,7 +319,7 @@ func TestTimingOnlyOne(t *testing.T) {
 					t.Errorf("Wait should not have failed with: %v", xerr)
 				}
 				if res == nil {
-					t.Errorf("Result should NOT be nil")
+					t.Errorf("Output should NOT be nil")
 				}
 				require.Nil(t, xerr)
 				require.NotEmpty(t, res)

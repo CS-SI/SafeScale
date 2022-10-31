@@ -17,13 +17,13 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumeproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // VolumeDescription contains additional information describing the volume, in V1
@@ -49,23 +49,28 @@ func (vd *VolumeDescription) IsNull() bool {
 }
 
 // Clone ...
-func (vd VolumeDescription) Clone() (data.Clonable, error) {
-	return NewVolumeDescription().Replace(&vd)
-}
-
-// Replace ...
-func (vd *VolumeDescription) Replace(p data.Clonable) (data.Clonable, error) {
-	if vd == nil || p == nil {
+func (vd *VolumeDescription) Clone() (clonable.Clonable, error) {
+	if vd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	cloned, ok := p.(*VolumeDescription)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *VolumeDescription")
+	nvd := NewVolumeDescription()
+	return nvd, nvd.Replace(vd)
+}
+
+// Replace ...
+func (vd *VolumeDescription) Replace(p clonable.Clonable) error {
+	if vd == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	cloned, err := lang.Cast[*VolumeDescription](p)
+	if err != nil {
+		return err
 	}
 
 	*vd = *cloned
-	return vd, nil
+	return nil
 }
 
 // VolumeAttachments contains host ids where the volume is attached
@@ -86,25 +91,30 @@ func NewVolumeAttachments() *VolumeAttachments {
 }
 
 // IsNull ...
-// (data.Clonable interface)
+// (clonable.Clonable interface)
 func (va *VolumeAttachments) IsNull() bool {
 	return va == nil || len(va.Hosts) == 0
 }
 
-// Clone ... (data.Clonable interface)
-func (va VolumeAttachments) Clone() (data.Clonable, error) {
-	return NewVolumeAttachments().Replace(&va)
-}
-
-// Replace ... (data.Clonable interface)
-func (va *VolumeAttachments) Replace(p data.Clonable) (data.Clonable, error) {
-	if va == nil || p == nil {
+// Clone ... (clonable.Clonable interface)
+func (va *VolumeAttachments) Clone() (clonable.Clonable, error) {
+	if va == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*VolumeAttachments)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *VolumeAttachments")
+	nva := NewVolumeAttachments()
+	return nva, nva.Replace(va)
+}
+
+// Replace ... (clonable.Clonable interface)
+func (va *VolumeAttachments) Replace(p clonable.Clonable) error {
+	if va == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*VolumeAttachments](p)
+	if err != nil {
+		return err
 	}
 
 	*va = *src
@@ -112,7 +122,7 @@ func (va *VolumeAttachments) Replace(p data.Clonable) (data.Clonable, error) {
 	for k, v := range src.Hosts {
 		va.Hosts[k] = v
 	}
-	return va, nil
+	return nil
 }
 
 func init() {

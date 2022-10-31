@@ -101,8 +101,8 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		// Set link to Subnet before testing if Host has been successfully created;
 		// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
 		// be able to delete subnet on later safescale command
-		xerr = instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
+		xerr = instance.Alter(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, err := lang.Cast[*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
@@ -133,7 +133,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				if !hostReq.KeepOnFailure {
+				if hostReq.CleanOnFailure() {
 					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
 					derr := rgw.Delete(context.Background())
 					if derr != nil {
@@ -153,8 +153,8 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 					}
 					_ = ferr.AddConsequence(derr)
 				} else {
-					xerr = rgw.Alter(context.Background(), func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-						as, ok := clonable.(*abstract.HostCore)
+					xerr = rgw.Alter(context.Background(), func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+						as, err := lang.Cast[*abstract.HostCore)
 						if !ok {
 							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
@@ -171,8 +171,8 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		}()
 
 		// Binds gateway to VIP if needed
-		xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
+		xerr = instance.Review(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, err := lang.Cast[*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}

@@ -142,7 +142,7 @@ func TestMetadataFolder_GetBucket(t *testing.T) {
 func TestMetadataFolder_Path(t *testing.T) {
 
 	var mfa folder
-	path := mfa.Path()
+	path := mfa.Prefix()
 	require.EqualValues(t, path, "")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -151,7 +151,7 @@ func TestMetadataFolder_Path(t *testing.T) {
 
 		mf, xerr := NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
-		path := mf.Path()
+		path := mf.Prefix()
 		require.EqualValues(t, path, "myfolder")
 	})
 	require.Nil(t, err)

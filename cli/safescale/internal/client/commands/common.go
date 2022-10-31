@@ -202,7 +202,7 @@ func addPersistentPreRunE(in *cobra.Command) {
 
 func addCommonFlags(cmd *cobra.Command) {
 	flags := cmd.PersistentFlags()
-	flags.StringP("server", "L", "localhost:50051", "Connect to backend on server SERVER (default: localhost:50051)")
+	flags.StringP("server", "L", "localhost:50051", "Connect to backend on server SERVER")
 	flags.StringP("organization", "O", "", "Use organization ORG (default: 'default')")
 	flags.StringP("project", "P", "", "Use project PROJECT (default: 'default')")
 	flags.StringP("tenant", "T", "", "Use tenant TENANT (default: none)")

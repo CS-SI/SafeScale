@@ -93,7 +93,7 @@ type Stack interface {
 	// ListNetworks lists all networks
 	ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error)
 	// DeleteNetwork deletes the network identified by id
-	DeleteNetwork(ctx context.Context, id string) fail.Error
+	DeleteNetwork(ctx context.Context, parameter NetworkParameter) fail.Error
 
 	// CreateSubnet creates a subnet in an existing network
 	CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (*abstract.Subnet, fail.Error)

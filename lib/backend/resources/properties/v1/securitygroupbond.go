@@ -17,10 +17,9 @@
 package propertiesv1
 
 import (
-	"fmt"
-
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // SecurityGroupBond stores information about a resource bound to the SecurityGroup
@@ -37,29 +36,34 @@ func NewSecurityGroupBond() *SecurityGroupBond {
 }
 
 // IsNull ...
-// Satisfies interface data.Clonable
+// Satisfies interface clonable.Clonable
 func (sgb *SecurityGroupBond) IsNull() bool {
 	return sgb == nil || (sgb.Name == "" && sgb.ID == "")
 }
 
 // Clone ...
-func (sgb SecurityGroupBond) Clone() (data.Clonable, error) {
-	return NewSecurityGroupBond().Replace(&sgb)
-}
-
-// Replace ...
-func (sgb *SecurityGroupBond) Replace(p data.Clonable) (data.Clonable, error) {
-	if sgb == nil || p == nil {
+func (sgb *SecurityGroupBond) Clone() (clonable.Clonable, error) {
+	if sgb == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*SecurityGroupBond)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *SecurityGroupBond")
+	nsgb := NewSecurityGroupBond()
+	return nsgb, nsgb.Replace(sgb)
+}
+
+// Replace ...
+func (sgb *SecurityGroupBond) Replace(p clonable.Clonable) error {
+	if sgb == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*SecurityGroupBond](p)
+	if err != nil {
+		return err
 	}
 
 	*sgb = *src
-	return sgb, nil
+	return nil
 }
 
 // Note: no need to register this property, it is not used directly (component of other properties)

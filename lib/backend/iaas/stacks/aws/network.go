@@ -147,7 +147,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil && !req.KeepOnFailure {
+		if ferr != nil && req.CleanOnFailure() {
 			if theVpc != nil {
 				derr := s.DeleteNetwork(context.Background(), aws.StringValue(theVpc.VpcId))
 				if derr != nil {
@@ -168,7 +168,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil && !req.KeepOnFailure {
+		if ferr != nil && req.CleanOnFailure() {
 			if derr := s.rpcDetachInternetGateway(context.Background(), theVpc.VpcId, gw.InternetGatewayId); derr != nil {
 				_ = ferr.AddConsequence(normalizeError(derr))
 			}
@@ -189,16 +189,19 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil && !req.KeepOnFailure {
+		if ferr != nil && req.CleanOnFailure() {
 			if derr := s.rpcDeleteRoute(context.Background(), tables[0].RouteTableId, aws.String("0.0.0.0/0")); derr != nil {
 				_ = ferr.AddConsequence(normalizeError(derr))
 			}
 		}
 	}()
 
-	anet := abstract.NewNetwork()
+	anet, xerr := abstract.NewNetwork(req.Name)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	anet.ID = aws.StringValue(theVpc.VpcId)
-	anet.Name = req.Name
 	anet.CIDR = req.CIDR
 	anet.DNSServers = req.DNSServers
 
@@ -437,7 +440,7 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (re
 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil && !req.KeepOnFailure {
+		if ferr != nil && req.CleanOnFailure() {
 			if derr := s.DeleteSubnet(context.Background(), aws.StringValue(resp.SubnetId)); derr != nil {
 				_ = ferr.AddConsequence(derr)
 			}

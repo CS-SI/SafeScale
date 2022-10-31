@@ -893,7 +893,7 @@ func TestSecurityGroup_Replace(t *testing.T) {
 	sgcr, _ = sgc.Replace(sg)
 
 	assert.Equal(t, sgc, sgcr)
-	var clob data.Clonable = sg
+	var clob clonable.Clonable = sg
 	require.EqualValues(t, clob, sgcr)
 
 	areEqual := reflect.DeepEqual(&sg, sgcr.(*SecurityGroup))

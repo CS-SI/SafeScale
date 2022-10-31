@@ -35,12 +35,12 @@ type BrokenLabel struct {
 	DefaultValue string
 }
 
-func NewBrokenLabel() *BrokenLabel                                    { return &BrokenLabel{HasDefault: true} }
-func (t *BrokenLabel) IsNull() bool                                   { return false }
-func (t *BrokenLabel) Clone() (data.Clonable, error)                  { return t, nil }
-func (t *BrokenLabel) Replace(p data.Clonable) (data.Clonable, error) { return p, nil }
-func (t *BrokenLabel) Valid() bool                                    { return false }
-func (t BrokenLabel) OK() bool                                        { return true }
+func NewBrokenLabel() *BrokenLabel                                            { return &BrokenLabel{HasDefault: true} }
+func (t *BrokenLabel) IsNull() bool                                           { return false }
+func (t *BrokenLabel) Clone() (clonable.Clonable, error)                      { return t, nil }
+func (t *BrokenLabel) Replace(p clonable.Clonable) (clonable.Clonable, error) { return p, nil }
+func (t *BrokenLabel) Valid() bool                                            { return false }
+func (t BrokenLabel) OK() bool                                                { return true }
 func (t *BrokenLabel) Serialize() ([]byte, fail.Error) {
 	return nil, fail.ConvertError(fmt.Errorf("I'm broken!"))
 }

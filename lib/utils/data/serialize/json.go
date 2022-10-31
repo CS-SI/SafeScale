@@ -18,14 +18,13 @@ package serialize
 
 import (
 	stdjson "encoding/json"
-	"fmt"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/shielded"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -33,7 +32,7 @@ import (
 
 // jsonProperty contains data and a RWMutex to handle sync
 type jsonProperty struct {
-	*shielded.Shielded
+	shielded.Shielded
 	module, key string
 }
 
@@ -42,35 +41,31 @@ func (jp *jsonProperty) IsNull() bool {
 	return jp == nil || valid.IsNil(jp.Shielded)
 }
 
-func (jp jsonProperty) Clone() (data.Clonable, error) {
+func (jp *jsonProperty) Clone() (clonable.Clonable, error) {
 	newP := &jsonProperty{}
-	return newP.Replace(&jp)
+	if jp == nil {
+		return newP, fail.InvalidInstanceError()
+	}
+
+	return newP, newP.Replace(jp)
 }
 
-func (jp *jsonProperty) Replace(clonable data.Clonable) (data.Clonable, error) {
-	if jp == nil || clonable == nil {
-		return nil, fail.InvalidInstanceError()
+func (jp *jsonProperty) Replace(p clonable.Clonable) error {
+	if jp == nil {
+		return fail.InvalidInstanceError()
 	}
 
-	srcP, ok := clonable.(*jsonProperty)
+	casted, ok := p.(*jsonProperty)
 	if !ok {
-		return nil, fmt.Errorf("clonable is not a *jsonProperty")
+		return fail.InconsistentError("p type must be '*jsonProperty'")
 	}
 
-	*jp = *srcP
-
-	var err error
-	jp.Shielded, err = srcP.Shielded.Clone()
-	if err != nil {
-		return nil, err
-	}
-
-	return jp, nil
+	*jp = *casted
+	return nil
 }
 
 // JSONProperties ...
 type JSONProperties struct {
-	// properties jsonProperties
 	Properties map[string]*jsonProperty
 	// This lock is used to make sure addition or removal of keys in JSonProperties won't collide in go routines
 	sync.RWMutex
@@ -84,10 +79,12 @@ func NewJSONProperties(module string) (_ *JSONProperties, ferr fail.Error) {
 	if module == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("module")
 	}
-	return &JSONProperties{
+
+	out := &JSONProperties{
 		Properties: map[string]*jsonProperty{},
 		module:     module,
-	}, nil
+	}
+	return out, nil
 }
 
 // Lookup tells if a key is present in JSonProperties
@@ -104,7 +101,6 @@ func (x *JSONProperties) Lookup(key string) bool {
 }
 
 func (x *JSONProperties) Clone() (*JSONProperties, error) {
-
 	if x == nil {
 		return x, nil
 	}
@@ -117,18 +113,13 @@ func (x *JSONProperties) Clone() (*JSONProperties, error) {
 	}
 	if len(x.Properties) > 0 {
 		for k, v := range x.Properties {
-			b, err := v.Clone()
+			b, err := clonable.CastedClone[*jsonProperty](v)
 			if err == nil {
-				var ok bool
-				newP.Properties[k], ok = b.(*jsonProperty) // nolint
-				if !ok {
-					return nil, fail.InconsistentError("failed to cast to '*jsonProperty'")
-				}
+				newP.Properties[k] = b
 			}
 		}
 	}
 	return newP, nil
-
 }
 
 func (x *JSONProperties) hasKey(key string) (*jsonProperty, bool) {
@@ -144,13 +135,18 @@ func (x *JSONProperties) storeZero(key string) (*jsonProperty, error) {
 	defer x.Unlock()
 
 	zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
-	nsh, err := shielded.NewShielded(zeroValue)
+	clone, err := zeroValue.Clone()
+	if err != nil {
+		return nil, err
+	}
+
+	nsh, err := shielded.NewShielded(clone)
 	if err != nil {
 		return nil, err
 	}
 
 	item := &jsonProperty{
-		Shielded: nsh,
+		Shielded: *nsh,
 		module:   x.module,
 		key:      key,
 	}
@@ -172,7 +168,7 @@ func (x *JSONProperties) Count() uint {
 
 // Inspect allows to consult the content of the property 'key' inside 'inspector' function
 // Changes in the property won't be kept
-func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonable) fail.Error) (ferr fail.Error) {
+func (x *JSONProperties) Inspect(key string, inspector func(clonable clonable.Clonable) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if x == nil {
@@ -206,18 +202,13 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 	}
 
 	x.RLock()
-	clone, err := item.Clone()
+	clone, err := clonable.CastedClone[jsonProperty](item)
 	x.RUnlock() // nolint
 	if err != nil {
 		return fail.Wrap(err)
 	}
 
-	cloned, ok := clone.(*jsonProperty)
-	if !ok {
-		return fail.InconsistentError("clone is expected to be a *jsonProperty and it's not: %v", clone)
-	}
-
-	xerr := cloned.Shielded.Inspect(inspector)
+	xerr := clone.Shielded.Inspect(inspector)
 	if xerr != nil {
 		return xerr
 	}
@@ -231,7 +222,7 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 // can't fail because a key doesn't exist).
 // 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
 // generated with fail.AlteredNothingError().
-func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Error) (ferr fail.Error) {
+func (x *JSONProperties) Alter(key string, alterer func(clonable.Clonable) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if x == nil {
@@ -264,29 +255,26 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 		if err != nil {
 			return fail.Wrap(err)
 		}
+
 		item = &jsonProperty{
-			Shielded: nsh,
+			Shielded: *nsh,
 			module:   x.module,
 			key:      key,
 		}
 		x.Properties[key] = item
 	}
 
-	clone, err := item.Clone()
+	clone, err := clonable.CastedClone[*jsonProperty](item)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
-	castedClone, ok := clone.(*jsonProperty)
-	if !ok {
-		return fail.InconsistentError("failed to cast clone to '*jsonProperty'")
-	}
 
-	xerr := castedClone.Alter(alterer)
+	xerr := clone.Alter(alterer)
 	if xerr != nil {
 		return xerr
 	}
 
-	_, err = item.Replace(clone)
+	err = item.Replace(clone)
 	if err != nil {
 		return fail.Wrap(err)
 	}
@@ -343,7 +331,7 @@ func (x *JSONProperties) Serialize() (_ []byte, ferr fail.Error) {
 	return r, nil
 }
 
-func (x *JSONProperties) Sdump() (string, fail.Error) {
+func (x *JSONProperties) String() (string, fail.Error) {
 	sq := litter.Options{
 		HidePrivateFields: false,
 	}
@@ -386,8 +374,9 @@ func (x *JSONProperties) Deserialize(buf []byte) (ferr fail.Error) {
 			if err != nil {
 				return fail.Wrap(err)
 			}
+
 			item := &jsonProperty{
-				Shielded: nsh,
+				Shielded: *nsh,
 				module:   x.module,
 				key:      k,
 			}

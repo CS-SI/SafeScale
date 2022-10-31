@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/bucketproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // BucketMounts contains information about hosts that have mounted the bucket
@@ -44,25 +43,30 @@ func NewBucketMounts() *BucketMounts {
 }
 
 // IsNull ...
-// (data.Clonable interface)
+// (clonable.Clonable interface)
 func (bm *BucketMounts) IsNull() bool {
 	return bm == nil || len(bm.ByHostID) == 0
 }
 
-// Clone ...  (data.Clonable interface)
-func (bm *BucketMounts) Clone() (data.Clonable, error) {
-	return NewBucketMounts().Replace(bm)
-}
-
-// Replace ...  (data.Clonable interface)
-func (bm *BucketMounts) Replace(p data.Clonable) (data.Clonable, error) {
-	if bm == nil || p == nil {
+// Clone ...  (clonable.Clonable interface)
+func (bm *BucketMounts) Clone() (clonable.Clonable, error) {
+	if bm == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*BucketMounts)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *BucketMounts")
+	nbm := NewBucketMounts()
+	return nbm, nbm.Replace(bm)
+}
+
+// Replace ...  (clonable.Clonable interface)
+func (bm *BucketMounts) Replace(p clonable.Clonable) error {
+	if bm == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*BucketMounts](p)
+	if err != nil {
+		return err
 	}
 
 	bm.ByHostID = make(map[string]string, len(src.ByHostID))
@@ -73,7 +77,7 @@ func (bm *BucketMounts) Replace(p data.Clonable) (data.Clonable, error) {
 	for k, v := range src.ByHostName {
 		bm.ByHostName[k] = v
 	}
-	return bm, nil
+	return nil
 }
 
 func init() {

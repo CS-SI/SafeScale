@@ -17,12 +17,11 @@
 package propertiesv1
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostSecurityGroups contains a list of security groups bound to the host
@@ -50,38 +49,41 @@ func (hsg *HostSecurityGroups) IsNull() bool {
 }
 
 // Clone ...
-func (hsg HostSecurityGroups) Clone() (data.Clonable, error) {
-	return NewHostSecurityGroups().Replace(&hsg)
-}
-
-// Replace ...
-func (hsg *HostSecurityGroups) Replace(p data.Clonable) (data.Clonable, error) {
-	if hsg == nil || p == nil {
+func (hsg *HostSecurityGroups) Clone() (clonable.Clonable, error) {
+	if hsg == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*HostSecurityGroups)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *HostSecurityGroups")
+	nhsg := NewHostSecurityGroups()
+	return nhsg, nhsg.Replace(hsg)
+}
+
+// Replace ...
+func (hsg *HostSecurityGroups) Replace(p clonable.Clonable) error {
+	if hsg == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostSecurityGroups](p)
+	if err != nil {
+		return err
 	}
 
 	*hsg = *src
 	hsg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		cloned, err := v.Clone()
+		cloned, err := clonable.CastedClone[*SecurityGroupBond](v)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		hsg.ByID[k], ok = cloned.(*SecurityGroupBond)
-		if !ok {
-			return nil, fmt.Errorf("cloned is not a *SecurityGroupBond")
-		}
+
+		hsg.ByID[k] = cloned
 	}
 	hsg.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {
 		hsg.ByName[k] = v
 	}
-	return hsg, nil
+	return nil
 }
 
 func init() {

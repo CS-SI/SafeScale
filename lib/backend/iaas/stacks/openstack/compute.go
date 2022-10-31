@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/sirupsen/logrus"
@@ -472,9 +473,9 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			if server != nil {
-				ahf.Core.ID = server.ID
-				ahf.Core.Name = server.Name
-				ahf.Core.LastState = hoststate.Error
+				ahf.ID = server.ID
+				ahf.Name = server.Name
+				ahf.LastState = hoststate.Error
 				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong, it is not a ErrNotAvailable, it's a 404
 			}
 			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong, it is not a ErrNotAvailable, it's a 404
@@ -484,7 +485,7 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 	}
 
 	state := toHostState(server.Status)
-	ahf.CurrentState, ahf.Core.LastState = state, state
+	ahf.CurrentState, ahf.LastState = state, state
 
 	// refresh tags
 	for k, v := range server.Metadata {
@@ -504,7 +505,7 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(ctx context.Context, hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, ferr fail.Error) {
+func (s stack) complementHost(ctx context.Context, hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// Updates intrinsic data of host if needed
@@ -520,8 +521,12 @@ func (s stack) complementHost(ctx context.Context, hostCore *abstract.HostCore, 
 		logrus.WithContext(ctx).Warnf("[TRACE] Unexpected host's last state: %v", state)
 	}
 
-	host = abstract.NewHostFull()
-	host.Core = hostCore
+	host, err := abstract.NewHostFull(hostCore.Name)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	host.HostCore = hostCore
 	host.CurrentState, hostCore.LastState = state, state
 	host.Description = &abstract.HostDescription{
 		Created: server.Created,
@@ -637,22 +642,30 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (*abstract.Ho
 
 	serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
 	if found && len(serverList) > 0 {
+		var err error
 		for _, anon := range serverList {
 			entry, ok := anon.(map[string]interface{})
 			if !ok {
 				return nil, fail.InconsistentError("anon should be a map[string]interface{}")
 			}
+
 			if entry["name"].(string) == name {
-				host := abstract.NewHostCore()
-				host.ID, ok = entry["id"].(string)
-				if !ok {
-					return nil, fail.InconsistentError("entry[id] should be a string")
+				host, xerr := abstract.NewHostCore(name)
+				if xerr != nil {
+					return nil, fail.Wrap(xerr)
 				}
+
+				host.ID, err = lang.Cast[string](entry["id"])
+				if err != nil {
+					return nil, fail.Wrap(err)
+				}
+
 				host.Name = name
 				hostFull, xerr := s.InspectHost(ctx, host)
 				if xerr != nil {
 					return nil, fail.Wrap(xerr, "failed to inspect host '%s'", name)
 				}
+
 				return hostFull, nil
 			}
 		}
@@ -754,7 +767,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	// --- Initializes abstract.HostCore ---
 
-	ahc := abstract.NewHostCore()
+	ahc, err := abstract.NewHostCore(request.ResourceName)
+	if err != nil {
+		return nil, nil, fail.Wrap(err)
+	}
+
 	ahc.PrivateKey = userData.FirstPrivateKey
 	ahc.Password = request.Password
 
@@ -955,11 +972,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		// Associate floating IP to host
 		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
-				return floatingips.AssociateInstance(
-					s.ComputeClient, newHost.Core.ID, floatingips.AssociateOpts{
-						FloatingIP: ip.IP,
-					},
-				).ExtractErr()
+				return floatingips.AssociateInstance(s.ComputeClient, newHost.ID, floatingips.AssociateOpts{FloatingIP: ip.IP}).ExtractErr()
 			},
 			NormalizeError,
 		)
@@ -1255,10 +1268,10 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			if server != nil {
-				ahf.Core.ID = server.ID
-				ahf.Core.Name = server.Name
-				ahf.Core.LastState = hoststate.Error
-				return ahf.Core, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
+				ahf.ID = server.ID
+				ahf.Name = server.Name
+				ahf.LastState = hoststate.Error
+				return ahf.HostCore, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 			}
 			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 		default:
@@ -1266,12 +1279,12 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 		}
 	}
 
-	ahf, xerr = s.complementHost(ctx, ahf.Core, *server, nil, nil)
+	ahf, xerr = s.complementHost(ctx, ahf.HostCore, *server, nil, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return ahf.Core, nil
+	return ahf.HostCore, nil
 }
 
 // WaitHostState waits a host achieve defined state
@@ -1296,10 +1309,10 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
-			if ahf.Core.ID != "" {
-				server, innerErr = s.rpcGetHostByID(ctx, ahf.Core.ID)
+			if ahf.ID != "" {
+				server, innerErr = s.rpcGetHostByID(ctx, ahf.ID)
 			} else {
-				server, innerErr = s.rpcGetHostByName(ctx, ahf.Core.Name)
+				server, innerErr = s.rpcGetHostByName(ctx, ahf.Name)
 			}
 
 			if innerErr != nil {
@@ -1307,7 +1320,7 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 				case *fail.ErrNotFound:
 					// If error is "resource not found", we want to return error as-is to be able
 					// to behave differently in this special case. To do so, stop the retry
-					return retry.StopRetryError(abstract.ResourceNotFoundError("host", ahf.Core.Name), "")
+					return retry.StopRetryError(abstract.ResourceNotFoundError("host", ahf.Name), "")
 				case *fail.ErrInvalidRequest:
 					// If error is "invalid request", no need to retry, it will always be so
 					return retry.StopRetryError(innerErr, "error getting Host %s", hostLabel)
@@ -1327,7 +1340,7 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 				return fail.NotFoundError("provider did not send information for Host %s", hostLabel)
 			}
 
-			ahf.Core.ID = server.ID // makes sure that on next turn we get IPAddress by ID
+			ahf.ID = server.ID // makes sure that on next turn we get IPAddress by ID
 			lastState := toHostState(server.Status)
 
 			// If we had a response, and the target state is Any, this is a success no matter what
@@ -1412,7 +1425,11 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 					}
 
 					for _, srv := range list {
-						ahc := abstract.NewHostCore()
+						ahc, xerr := abstract.NewHostCore("unknown")
+						if xerr != nil {
+							return false, xerr
+						}
+
 						ahc.ID = srv.ID
 						var ahf *abstract.HostFull
 						if details {
@@ -1421,8 +1438,8 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 								return false, err
 							}
 						} else {
-							ahf = abstract.NewHostFull()
-							ahf.Core = ahc
+							ahf, err = abstract.NewHostFull(ahc.Name)
+							ahf.HostCore = ahc
 						}
 						hostList = append(hostList, ahf)
 					}
@@ -1488,7 +1505,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 
 	// Detach floating IP
 	if s.cfgOpts.UseFloatingIP {
-		fip, xerr := s.getFloatingIP(ctx, ahf.Core.ID)
+		fip, xerr := s.getFloatingIP(ctx, ahf.ID)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -1498,11 +1515,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 				return fail.Wrap(xerr, "failed to find floating ip of host '%s'", hostRef)
 			}
 		} else if fip != nil {
-			err := floatingips.DisassociateInstance(
-				s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
-					FloatingIP: fip.IP,
-				},
-			).ExtractErr()
+			err := floatingips.DisassociateInstance(s.ComputeClient, ahf.ID, floatingips.DisassociateOpts{FloatingIP: fip.IP}).ExtractErr()
 			if err != nil {
 				return NormalizeError(err)
 			}
@@ -1516,7 +1529,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 
 	// list ports to be able to remove them
 	req := ports.ListOpts{
-		DeviceID: ahf.Core.ID,
+		DeviceID: ahf.ID,
 	}
 	portList, xerr := s.rpcListPorts(ctx, req)
 	if xerr != nil {
@@ -1537,7 +1550,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	// Try to remove host for 3 minutes
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			if innerXErr := s.rpcDeleteServer(ctx, ahf.Core.ID); innerXErr != nil {
+			if innerXErr := s.rpcDeleteServer(ctx, ahf.ID); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrTimeout:
 					return fail.Wrap(innerXErr, "failed to submit Host '%s' deletion", hostRef)
@@ -1554,7 +1567,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 			var state = hoststate.Unknown
 			innerXErr := retry.WhileUnsuccessful(
 				func() error {
-					server, gerr := s.rpcGetServer(ctx, ahf.Core.ID)
+					server, gerr := s.rpcGetServer(ctx, ahf.ID)
 					if gerr != nil {
 						switch gerr.(type) { // nolint
 						case *fail.ErrNotFound:
@@ -1669,7 +1682,7 @@ func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gr
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return startstop.Stop(s.ComputeClient, ahf.Core.ID).ExtractErr()
+			return startstop.Stop(s.ComputeClient, ahf.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
@@ -1691,11 +1704,11 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := servers.Reboot(
-				s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.SoftReboot},
+				s.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.SoftReboot},
 			).ExtractErr()
 			if innerErr != nil {
 				innerErr = servers.Reboot(
-					s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.HardReboot},
+					s.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.HardReboot},
 				).ExtractErr()
 			}
 			return innerErr
@@ -1718,7 +1731,7 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) f
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return startstop.Start(s.ComputeClient, ahf.Core.ID).ExtractErr()
+			return startstop.Start(s.ComputeClient, ahf.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
@@ -1769,7 +1782,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 		func() error {
 			// list ports to be able to remove them
 			req := ports.ListOpts{
-				DeviceID: ahf.Core.ID,
+				DeviceID: ahf.ID,
 			}
 			portList, xerr := s.rpcListPorts(ctx, req)
 			if xerr != nil {
@@ -1799,7 +1812,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 				return nil
 			}
 
-			return secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
+			return secgroups.AddServer(s.ComputeClient, ahf.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
@@ -1826,7 +1839,7 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.
 				return nil
 			}
 
-			return secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
+			return secgroups.RemoveServer(s.ComputeClient, ahf.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,
 	)

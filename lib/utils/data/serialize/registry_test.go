@@ -20,23 +20,22 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/stretchr/testify/require"
 )
 
 type Item struct {
-	data.Clonable
+	clonable.Clonable
 	value string
 }
 
 func (e Item) IsNull() bool {
 	return false
 }
-func (e Item) Clone() (data.Clonable, error) {
-	var v data.Clonable = &Item{value: e.value}
+func (e Item) Clone() (clonable.Clonable, error) {
+	var v clonable.Clonable = &Item{value: e.value}
 	return v, nil
 }
-func (e Item) Replace(i data.Clonable) (data.Clonable, error) {
+func (e Item) Replace(i clonable.Clonable) (clonable.Clonable, error) {
 	r, ok := i.(*Item)
 	if !ok {
 		return nil, fmt.Errorf("i is not a *Item")

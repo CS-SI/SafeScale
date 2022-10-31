@@ -24,9 +24,10 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -291,22 +292,31 @@ func NewSecurityGroupRule() *SecurityGroupRule {
 
 // Clone does a deep-copy of the SecurityGroup
 //
-// satisfies interface data.Clonable
-func (instance *SecurityGroupRule) Clone() (data.Clonable, error) {
-	return NewSecurityGroupRule().Replace(instance)
+// satisfies interface clonable.Clonable
+func (instance *SecurityGroupRule) Clone() (clonable.Clonable, error) {
+	// Do not test with isNull(), it's allowed to clone a null value
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	nsgr := NewSecurityGroupRule()
+	return nsgr, nsgr.Replace(instance)
 }
 
 // Replace ...
-// satisfies interface data.Clonable
-func (instance *SecurityGroupRule) Replace(p data.Clonable) (data.Clonable, error) {
+// satisfies interface clonable.Clonable
+func (instance *SecurityGroupRule) Replace(p clonable.Clonable) error {
 	// Do not test with isNull(), it's allowed to clone a null value
-	if instance == nil || p == nil {
-		return instance, nil
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if p == nil {
+		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, ok := p.(*SecurityGroupRule)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *SecurityGroupRule")
+	src, err := lang.Cast[*SecurityGroupRule](p)
+	if err != nil {
+		return err
 	}
 
 	*instance = *src
@@ -316,7 +326,7 @@ func (instance *SecurityGroupRule) Replace(p data.Clonable) (data.Clonable, erro
 	copy(instance.Sources, src.Sources)
 	instance.Targets = make([]string, len(src.Targets))
 	copy(instance.Targets, src.Targets)
-	return instance, nil
+	return nil
 }
 
 // SecurityGroupRules ...
@@ -352,7 +362,6 @@ func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (i
 // Clone does a deep-copy of the SecurityGroupRules
 func (sgrs SecurityGroupRules) Clone() (SecurityGroupRules, error) {
 	var asgr = make(SecurityGroupRules, 0)
-	var cloneRule *SecurityGroupRule
 	for _, v := range sgrs {
 		if v == nil {
 			continue
@@ -363,12 +372,8 @@ func (sgrs SecurityGroupRules) Clone() (SecurityGroupRules, error) {
 			return nil, err
 		}
 
-		var ok bool
-		cloneRule, ok = cloned.(*SecurityGroupRule)
-		if !ok {
-			return nil, fmt.Errorf("this is not a *SecurityGroupRule: %v", cloned)
-		}
-		asgr = append(asgr, cloneRule)
+		casted, _ := cloned.(*SecurityGroupRule) //nolint
+		asgr = append(asgr, casted)
 	}
 	return asgr, nil
 }
@@ -475,7 +480,7 @@ func (instance *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
 
 // NewSecurityGroup ...
 func NewSecurityGroup() *SecurityGroup {
-	var asg = SecurityGroup{
+	asg := &SecurityGroup{
 		ID:               "",
 		Name:             "",
 		Network:          "",
@@ -484,36 +489,45 @@ func NewSecurityGroup() *SecurityGroup {
 		DefaultForSubnet: "",
 		DefaultForHost:   "",
 	}
-	return &asg
+	return asg
 }
 
 // Clone does a deep-copy of the SecurityGroup
-// satisfies interface data.Clonable
-func (instance SecurityGroup) Clone() (data.Clonable, error) {
-	return NewSecurityGroup().Replace(&instance)
+// satisfies interface clonable.Clonable
+func (instance *SecurityGroup) Clone() (clonable.Clonable, error) {
+	// Do not test with isNull(), it's allowed to clone a null value
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	nsg := NewSecurityGroup()
+	return nsg, nsg.Replace(instance)
 }
 
 // Replace ...
-// satisfies interface data.Clonable
-func (instance *SecurityGroup) Replace(p data.Clonable) (data.Clonable, error) {
+// satisfies interface clonable.Clonable
+func (instance *SecurityGroup) Replace(p clonable.Clonable) error {
 	// Do not test with isNull(), it's allowed to clone a null value
-	if instance == nil || p == nil {
-		return instance, nil
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if p == nil {
+		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, ok := p.(*SecurityGroup)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *SecurityGroup")
-	}
-	*instance = *src
-
-	var err error
-	instance.Rules, err = src.Rules.Clone()
+	src, err := lang.Cast[*SecurityGroup](p)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return instance, nil
+	nr, err := src.Rules.Clone()
+	if err != nil {
+		return err
+	}
+
+	*instance = *src
+	instance.Rules = nr
+	return nil
 }
 
 // Serialize serializes instance into bytes (output json code)

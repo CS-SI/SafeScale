@@ -19,12 +19,12 @@ package abstract
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -37,6 +37,11 @@ type NetworkRequest struct {
 	KeepOnFailure bool     // KeepOnFailure tells if resources have to be kept in case of failure (default behavior is to delete them)
 }
 
+// CleanOnFailure tells if request asks for cleaning created ressource on failure
+func (nr NetworkRequest) CleanOnFailure() bool {
+	return !nr.KeepOnFailure
+}
+
 // SubNetwork is deprecated
 type SubNetwork struct { // DEPRECATED: deprecated
 	CIDR string `json:"subnetmask,omitempty"` // DEPRECATED: deprecated
@@ -45,12 +50,13 @@ type SubNetwork struct { // DEPRECATED: deprecated
 
 // Network represents a virtual network
 type Network struct {
-	ID         string                   `json:"id"`                    // ID for the network (from provider)
-	Name       string                   `json:"name"`                  // name of the network
-	CIDR       string                   `json:"mask"`                  // network in CIDR notation (if it has a meaning...)
-	DNSServers []string                 `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
-	Imported   bool                     `json:"imported,omitempty"`    // tells if the Network has been imported (making it not deletable by SafeScale)
-	Tags       data.Map[string, string] `json:"tags,omitempty"`
+	*Core
+	ID string `json:"id"` // ID for the network (from provider)
+	// Name       string                   `json:"name"`                  // name of the network
+	CIDR       string   `json:"mask"`                  // network in CIDR notation (if it has a meaning...)
+	DNSServers []string `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
+	Imported   bool     `json:"imported,omitempty"`    // tells if the Network has been imported (making it not deletable by SafeScale)
+	// Tags       data.Map[string, string] `json:"tags,omitempty"`
 
 	Domain             string         `json:"domain,omitempty"`               // DEPRECATED: contains the domain used to define host FQDN
 	GatewayID          string         `json:"gateway_id,omitempty"`           // DEPRECATED: contains the id of the host acting as primary gateway for the network
@@ -61,43 +67,67 @@ type Network struct {
 }
 
 // NewNetwork initializes a new instance of Network
-func NewNetwork() *Network {
-	nn := &Network{
-		DNSServers: make([]string, 0),
-		Tags:       data.NewMap[string, string](),
+func NewNetwork(name string, options ...Option) (*Network, fail.Error) {
+	c, xerr := NewCore(name, options...)
+	if xerr != nil {
+		return nil, xerr
 	}
-	nn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
-	nn.Tags["ManagedBy"] = "safescale"
-	return nn
+
+	nn := &Network{
+		Core:       c,
+		DNSServers: make([]string, 0),
+		// Tags:       data.NewMap[string, string](),
+	}
+	// nn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
+	// nn.Tags["ManagedBy"] = "safescale"
+	return nn, nil
 }
 
 // IsNull ...
-// satisfies interface data.Clonable
+// satisfies interface clonable.Clonable
 func (n *Network) IsNull() bool {
-	return n == nil || (n.ID == "" && n.Name == "")
+	return n == nil || n.Core.IsNull() || n.ID == ""
 }
 
 // Clone ...
-// satisfies interface data.Clonable
-func (n Network) Clone() (data.Clonable, error) {
-	return NewNetwork().Replace(&n)
-}
-
-// Replace ...
-// satisfies interface data.Clonable
-func (n *Network) Replace(p data.Clonable) (data.Clonable, error) {
-	if n == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (n *Network) Clone() (clonable.Clonable, error) {
+	if n == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*Network)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *Network")
+	nn, xerr := NewNetwork(n.Name)
+	if xerr != nil {
+		return nil, xerr
 	}
+
+	return nn, nn.Replace(n)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (n *Network) Replace(p clonable.Clonable) error {
+	if n == nil {
+		return fail.InvalidInstanceError()
+	}
+	if p == nil {
+		return fail.InvalidParameterCannotBeNilError("p")
+	}
+
+	src, err := lang.Cast[*Network](p)
+	if err != nil {
+		return err
+	}
+
 	*n = *src
+	n.Core, err = src.Core.Clone()
+	if err != nil {
+		return err
+	}
+
 	n.DNSServers = make([]string, len(src.DNSServers))
 	copy(n.DNSServers, src.DNSServers)
-	return n, nil
+	return nil
 }
 
 // OK ...
@@ -125,6 +155,7 @@ func (n *Network) Serialize() ([]byte, fail.Error) {
 	if n == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+
 	r, err := json.Marshal(n)
 	return r, fail.ConvertError(err)
 }
@@ -135,6 +166,7 @@ func (n *Network) Deserialize(buf []byte) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
+
 	return fail.ConvertError(json.Unmarshal(buf, n))
 }
 

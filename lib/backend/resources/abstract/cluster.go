@@ -18,14 +18,14 @@ package abstract
 
 import (
 	stdjson "encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -48,6 +48,11 @@ type ClusterRequest struct {
 	Force                   bool                   // set to True in order to ignore sizing recommendations
 	FeatureParameters       []string               // contains parameter values of automatically installed Features
 	DefaultSshPort          uint                   // default ssh port for gateways // nolint
+}
+
+// CleanOnFailure tells if request asks for cleaning created ressource on failure
+func (cr ClusterRequest) CleanOnFailure() bool {
+	return !cr.KeepOnFailure
 }
 
 // ClusterIdentity contains the bare minimum information about a cluster
@@ -76,29 +81,38 @@ func (instance *ClusterIdentity) IsNull() bool {
 }
 
 // Clone makes a copy of the instance
-// satisfies interface data.Clonable
-func (instance ClusterIdentity) Clone() (data.Clonable, error) {
-	return NewClusterIdentity().Replace(&instance)
-}
-
-// Replace replaces the content of the instance with the content of the parameter
-// satisfies interface data.Clonable
-func (instance *ClusterIdentity) Replace(p data.Clonable) (data.Clonable, error) {
-	if instance == nil || p == nil {
+// satisfies interface clonable.Clonable
+func (instance *ClusterIdentity) Clone() (clonable.Clonable, error) {
+	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*ClusterIdentity)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *ClusterIdentity")
+	nci := NewClusterIdentity()
+	return nci, nci.Replace(instance)
+}
+
+// Replace replaces the content of the instance with the content of the parameter
+// satisfies interface clonable.Clonable
+func (instance *ClusterIdentity) Replace(p clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
 	}
+	if p == nil {
+		return fail.InvalidParameterCannotBeNilError("p")
+	}
+
+	src, err := lang.Cast[*ClusterIdentity](p)
+	if err != nil {
+		return err
+	}
+
 	*instance = *src
 	instance.Keypair = nil
 	if src.Keypair != nil {
 		instance.Keypair = &KeyPair{}
 		*instance.Keypair = *src.Keypair
 	}
-	return instance, nil
+	return nil
 }
 
 // GetName returns the name of the cluster

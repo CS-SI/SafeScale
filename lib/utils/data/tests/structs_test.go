@@ -19,7 +19,6 @@ package tests
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/stretchr/testify/require"
 )
 
@@ -126,7 +125,7 @@ func TestStructWithPointersAndCorrectReplace_Replace(t *testing.T) {
 	}()
 
 	var s *StructWithPointersAndCorrectReplace
-	var c data.Clonable
+	var c clonable.Clonable
 	_, _ = s.Replace(c)
 
 }
