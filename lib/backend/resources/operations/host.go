@@ -850,6 +850,9 @@ func (instance *Host) Create(
 
 	select {
 	case res := <-chRes: // if it works return the result
+		if res.ct == nil && res.err == nil {
+			return nil, fail.NewError("creation failed unexpectedly")
+		}
 		return res.ct, res.err
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
@@ -1243,7 +1246,7 @@ func (instance *Host) implCreate(
 			}
 		}()
 
-		logrus.WithContext(ctx).Infof("Compute resource '%s' created", instance.GetName())
+		logrus.WithContext(ctx).Infof("Compute resource '%s' (%s) created", ahf.Core.Name, ahf.Core.ID)
 
 		safe := false
 
@@ -1281,7 +1284,7 @@ func (instance *Host) implCreate(
 		// A Host claimed ready by a Cloud provider is not necessarily ready
 		// to be used until ssh service is up and running. So we wait for it before
 		// claiming Host is created
-		logrus.WithContext(ctx).Infof("Waiting SSH availability on Host '%s' ...", instance.GetName())
+		logrus.WithContext(ctx).Infof("Waiting SSH availability on Host '%s' ...", hostReq.ResourceName)
 
 		maybePackerFailure := false
 		status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, timings.HostBootTimeout())
@@ -1292,7 +1295,7 @@ func (instance *Host) implCreate(
 				maybePackerFailure = true
 			default:
 				if abstract.IsProvisioningError(xerr) {
-					chRes <- result{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", instance.GetName())}
+					chRes <- result{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", hostReq.ResourceName)}
 					return
 				}
 				chRes <- result{nil, xerr}
@@ -1302,7 +1305,7 @@ func (instance *Host) implCreate(
 
 		for numReboots := 0; numReboots < 2; numReboots++ { // 2 reboots at most
 			if maybePackerFailure {
-				logrus.WithContext(ctx).Warningf("Hard Rebooting the host %s", instance.GetName())
+				logrus.WithContext(ctx).Warningf("Hard Rebooting the host %s", hostReq.ResourceName)
 				hostID, err := instance.GetID()
 				if err != nil {
 					chRes <- result{nil, fail.ConvertError(err)}
@@ -1328,7 +1331,7 @@ func (instance *Host) implCreate(
 						}
 					default:
 						if abstract.IsProvisioningError(xerr) {
-							chRes <- result{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", instance.GetName())}
+							chRes <- result{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", hostReq.ResourceName)}
 							return
 						}
 						chRes <- result{nil, xerr}
@@ -1383,7 +1386,7 @@ func (instance *Host) implCreate(
 			userdataContent.SSHPort = strconv.Itoa(int(hostReq.SSHPort))
 		}
 
-		xerr = instance.finalizeProvisioning(ctx, userdataContent)
+		xerr = instance.finalizeProvisioning(ctx, hostReq, userdataContent)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
@@ -1429,7 +1432,7 @@ func (instance *Host) implCreate(
 
 		if !valid.IsNil(ahf) {
 			if !valid.IsNil(ahf.Core) {
-				logrus.WithContext(ctx).Debugf("Marking instance '%s' as started", instance.GetName())
+				logrus.WithContext(ctx).Debugf("Marking instance '%s' as started", hostReq.ResourceName)
 				rerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 					ahc, ok := clonable.(*abstract.HostCore)
 					if !ok {
@@ -1448,7 +1451,7 @@ func (instance *Host) implCreate(
 			}
 		}
 
-		logrus.WithContext(ctx).Infof("Host '%s' created successfully", instance.GetName())
+		logrus.WithContext(ctx).Infof("Host '%s' created successfully", hostReq.ResourceName)
 		chRes <- result{userdataContent, nil}
 		return nil
 	}() // nolint
@@ -1607,7 +1610,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					if finnerXErr != nil && !req.KeepOnFailure {
 						derr := gwsg.UnbindFromHost(cleanupContextFrom(ctx), instance)
 						if derr != nil {
-							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), gwsg.GetName(), instance.GetName()))
+							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), gwsg.GetName(), req.ResourceName))
 						}
 					}
 				}()
@@ -1643,7 +1646,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					if finnerXErr != nil && !req.KeepOnFailure {
 						derr := pubipsg.UnbindFromHost(cleanupContextFrom(ctx), instance)
 						if derr != nil {
-							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), pubipsg.GetName(), instance.GetName()))
+							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), pubipsg.GetName(), req.ResourceName))
 						}
 					}
 				}()
@@ -2299,7 +2302,7 @@ func (instance *Host) undoUpdateSubnets(inctx context.Context, req abstract.Host
 	}
 }
 
-func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent *userdata.Content) fail.Error {
+func (instance *Host) finalizeProvisioning(ctx context.Context, hr abstract.HostRequest, userdataContent *userdata.Content) fail.Error {
 	instance.localCache.RLock()
 	notok := instance.localCache.sshProfile == nil
 	instance.localCache.RUnlock() // nolint
@@ -2355,7 +2358,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to update Keypair of machine '%s'", instance.GetName())
+		return fail.Wrap(xerr, "failed to update Keypair of machine '%s'", hr.ResourceName)
 	}
 
 	xerr = instance.updateCachedInformation(ctx)
@@ -2375,7 +2378,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())
 	// If the script doesn't reboot, we force a reboot
 	if !instance.thePhaseReboots(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent) {
-		logrus.WithContext(ctx).Infof("finalizing Host provisioning of '%s': rebooting", instance.GetName())
+		logrus.WithContext(ctx).Infof("finalizing Host provisioning of '%s': rebooting", hr.ResourceName)
 
 		// Reboot Host
 		xerr = instance.Reboot(ctx, true)
@@ -2411,7 +2414,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 			}
 
 			// Reboot Host
-			logrus.WithContext(ctx).Infof("finalizing Host provisioning of '%s' (not-gateway): rebooting", instance.GetName())
+			logrus.WithContext(ctx).Infof("finalizing Host provisioning of '%s' (not-gateway): rebooting", hr.ResourceName)
 			xerr = instance.Reboot(ctx, true)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -2448,7 +2451,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 			if abstract.IsProvisioningError(xerr) {
 				logrus.WithContext(ctx).Errorf("%+v", xerr)
 				return fail.Wrap(
-					xerr, "error provisioning the new Host, please check safescaled logs", instance.GetName(),
+					xerr, "error provisioning the new Host, please check safescaled logs", hr.ResourceName,
 				)
 			}
 			return xerr

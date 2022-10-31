@@ -1180,7 +1180,7 @@ func (instance *Cluster) GetState(ctx context.Context) (state clusterstate.Enum,
 }
 
 // AddNodes adds several nodes
-func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
+func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uint, def abstract.HostSizingRequirements, parameters data.Map, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1292,6 +1292,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		nodeDef:       nodeDef,
 		timeout:       timings.HostCreationTimeout(),
 		keepOnFailure: keepOnFailure,
+		clusterName:   cluName,
 	})
 	if err != nil {
 		close(nodesChan)
@@ -1304,7 +1305,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			continue
 		}
 		if v.ToBeDeleted {
-			_, xerr = instance.taskDeleteNodeWithCtx(ctx, taskDeleteNodeParameters{node: v.Content.(*propertiesv3.ClusterNode)})
+			_, xerr = instance.taskDeleteNodeWithCtx(ctx, taskDeleteNodeParameters{node: v.Content.(*propertiesv3.ClusterNode), clusterName: cluName})
 			debug.IgnoreError2(ctx, xerr)
 			continue
 		}
@@ -1320,7 +1321,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			for _, v := range nodes {
 				v := v
 				egDeletion.Go(func() error {
-					_, err := instance.taskDeleteNode(cleanupContextFrom(ctx), taskDeleteNodeParameters{node: v})
+					_, err := instance.taskDeleteNode(cleanupContextFrom(ctx), taskDeleteNodeParameters{node: v, clusterName: cluName})
 					return err
 				})
 			}
@@ -1343,7 +1344,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	incrementExpVar("cluster.cache.hit")
 
 	// Now configure new nodes
-	xerr = instance.configureNodesFromList(ctx, nodes, parameters)
+	xerr = instance.configureNodesFromList(ctx, cluName, nodes, parameters)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1592,7 +1593,6 @@ func (instance *Cluster) ListMasterIPs(ctx context.Context) (list data.IndexedLi
 func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	master = nil
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -2130,7 +2130,9 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Erro
 		}
 	}
 
-	xerr := instance.delete(ctx)
+	clusterName := instance.GetName()
+
+	xerr := instance.delete(ctx, clusterName)
 	if xerr != nil {
 		return xerr
 	}
@@ -2139,7 +2141,7 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Erro
 }
 
 // delete does the work to delete Cluster
-func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
+func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -2243,7 +2245,7 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 					foundSomething = true
 
 					egKill.Go(func() error {
-						_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: n})
+						_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: n, clusterName: cluName})
 						return err
 					})
 				}
@@ -2255,7 +2257,7 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 					foundSomething = true
 
 					egKill.Go(func() error {
-						_, err := instance.taskDeleteMaster(ctx, taskDeleteNodeParameters{node: n})
+						_, err := instance.taskDeleteMaster(ctx, taskDeleteNodeParameters{node: n, clusterName: cluName})
 						return err
 					})
 				}
@@ -2302,7 +2304,7 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 			for _, v := range all {
 				v := v
 				egKill.Go(func() error {
-					_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: v})
+					_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: v, clusterName: cluName})
 					return err
 				})
 			}
@@ -2550,6 +2552,8 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 	go func() {
 		defer close(chRes)
 
+		// FIXME: OPP This should use instance.AddFeature instead
+
 		// Install reverse-proxy feature on Cluster (gateways)
 		parameters := ExtractFeatureParameters(req.FeatureParameters)
 		xerr := instance.installReverseProxy(ctx, parameters)
@@ -2570,6 +2574,8 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			}
 		}
 
+		// FIXME: OPP Check installed features
+
 		// Install ansible feature on Cluster (all masters)
 		xerr = instance.installAnsible(ctx, parameters)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2577,6 +2583,8 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			chRes <- result{xerr}
 			return
 		}
+
+		// FIXME: OPP Check installed features
 
 		// configure what has to be done Cluster-wide
 		makers := instance.localCache.makers
@@ -2586,9 +2594,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			return
 		}
 
-		// Not finding a callback isn't an error, so return nil in this case
 		chRes <- result{nil}
-
 	}()
 	select {
 	case res := <-chRes:
@@ -2877,6 +2883,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 					ctx:           ctx,
 					master:        masters[master],
 					inventoryData: dataBuffer.String(),
+					clusterName:   params["Clustername"].(string),
 				})
 				return err
 			})
@@ -2910,7 +2917,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 }
 
 // configureNodesFromList configures nodes from a list
-func (instance *Cluster) configureNodesFromList(ctx context.Context, nodes []*propertiesv3.ClusterNode, parameters data.Map) (ferr fail.Error) {
+func (instance *Cluster) configureNodesFromList(ctx context.Context, name string, nodes []*propertiesv3.ClusterNode, parameters data.Map) (ferr fail.Error) {
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
@@ -2921,8 +2928,9 @@ func (instance *Cluster) configureNodesFromList(ctx context.Context, nodes []*pr
 			captured := i
 			eg.Go(func() error {
 				_, xerr := instance.taskConfigureNode(ctx, taskConfigureNodeParameters{
-					node:      nodes[captured],
-					variables: parameters,
+					node:        nodes[captured],
+					variables:   parameters,
+					clusterName: name,
 				})
 				return xerr
 			})
@@ -3162,7 +3170,7 @@ func (instance *Cluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterRes
 }
 
 // Shrink reduces cluster size by 'count' nodes
-func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertiesv3.ClusterNode, ferr fail.Error) {
+func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint) (_ []*propertiesv3.ClusterNode, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	emptySlice := make([]*propertiesv3.ClusterNode, 0)
@@ -3271,7 +3279,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 		for _, v := range removedNodes {
 			v := v
 			tg.Go(func() error {
-				_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: v, master: selectedMaster.(*Host)})
+				_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: v, master: selectedMaster.(*Host), clusterName: cluName})
 				return err
 			})
 		}

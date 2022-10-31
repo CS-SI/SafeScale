@@ -517,7 +517,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	// assert.NoError(t, err)
 	// cmd, err := ssh.NewCommand("whoami")
 	// assert.Nil(t, err)
-	// out, err := cmd.Output()
+	// out, err := cmd.output()
 	// assert.Nil(t, err)
 	// content := strings.Trim(string(out), "\n")
 	// assert.Equal(t, abstract.DefaultUser, content)

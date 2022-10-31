@@ -23,7 +23,6 @@ import (
 	"os"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"golang.org/x/sync/errgroup"
 )
@@ -134,7 +133,7 @@ func NewPipeBridgeController(bridges ...PipeBridge) (*PipeBridgeController, fail
 }
 
 // Start initiates the capture of pipe outputs and the display of what is captured
-func (pbc *PipeBridgeController) Start(inctx context.Context) fail.Error {
+func (pbc *PipeBridgeController) Start(ctx context.Context) fail.Error {
 	if pbc == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -142,59 +141,39 @@ func (pbc *PipeBridgeController) Start(inctx context.Context) fail.Error {
 		return fail.InvalidInstanceContentError("pbc.bridges", "cannot be nil")
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		gerr := func() (ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			pipeCount := uint(len(pbc.bridges))
-			// if no pipes, do nothing
-			if pipeCount == 0 {
-				return nil
-			}
-
-			// First starts the "displayer" routine...
-			displayGroup := new(errgroup.Group)
-			pbc.displayTask = displayGroup
-
-			pbc.displayCh = make(chan outputItem, pipeCount)
-			displayGroup.Go(
-				func() error {
-					_, xerr := taskDisplay(ctx, taskDisplayParameters{ch: pbc.displayCh})
-					return xerr
-				})
-
-			taskGroup := new(errgroup.Group)
-			pbc.readersGroup = taskGroup
-
-			// ... then starts the "pipe readers"
-
-			for _, v := range pbc.bridges {
-				taskGroup.Go(func() error {
-					_, xerr := taskRead(ctx, taskReadParameters{bridge: v, ch: pbc.displayCh})
-					return xerr
-				})
-			}
-			return nil
-		}()
-		chRes <- result{gerr}
-	}()
 	select {
-	case res := <-chRes:
-		return res.rErr
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.AbortedError(ctx.Err())
+	default:
 	}
 
+	pipeCount := uint(len(pbc.bridges))
+	// if no pipes, do nothing
+	if pipeCount == 0 {
+		return nil
+	}
+
+	// First starts the "displayer" routine...
+	pbc.displayTask = new(errgroup.Group)
+
+	pbc.displayCh = make(chan outputItem, pipeCount)
+	pbc.displayTask.Go(func() error {
+		_, err := taskDisplay(ctx, taskDisplayParameters{ch: pbc.displayCh})
+		return err
+	})
+
+	// ... then starts the "pipe readers"
+	taskGroup := new(errgroup.Group)
+
+	for _, v := range pbc.bridges {
+		v := v
+		taskGroup.Go(func() error {
+			_, err := taskRead(ctx, taskReadParameters{bridge: v, ch: pbc.displayCh})
+			return err
+		})
+	}
+	pbc.readersGroup = taskGroup
+	return nil
 }
 
 type outputItem struct {
@@ -214,83 +193,54 @@ type taskReadParameters struct {
 }
 
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
-func taskRead(inctx context.Context, p interface{}) (_ interface{}, _ fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
+func taskRead(ctx context.Context, p taskReadParameters) (_ interface{}, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	type result struct {
-		rRes interface{}
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		gres, gerr := func() (_ interface{}, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			if p == nil {
-				return nil, fail.InvalidParameterCannotBeNilError("p")
-			}
-
-			params, ok := p.(taskReadParameters)
-			if !ok {
-				return nil, fail.InvalidParameterError("p", "must be a 'taskReadParameters'")
-			}
-
-			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("cli")).WithStopwatch().Entering()
-			defer tracer.Exiting()
-
-			// bufio.Scanner.Scan() may panic...
-			scanner := bufio.NewScanner(params.bridge.Reader())
-			scanner.Split(bufio.ScanLines)
-
-			var err error
-			for {
-				// If task aborted, stop the loop
-				select {
-				case <-ctx.Done():
-					err = fail.AbortedError(ctx.Err())
-				default:
-				}
-				if err != nil {
-					break
-				}
-
-				if scanner.Scan() {
-					item := outputItem{
-						bridge: params.bridge,
-						data:   scanner.Text() + "\n",
-					}
-					params.ch <- item
-				} else {
-					err = scanner.Err()
-					break
-				}
-			}
-			if err != nil {
-				if err == io.EOF {
-					err = nil
-				} else {
-					switch err.(type) { // nolint
-					// case fail.ErrAborted, *os.PathError:
-					case *os.PathError:
-						err = nil
-					}
-				}
-			}
-			return nil, fail.ConvertError(err)
-
-		}()
-		chRes <- result{gres, gerr}
-	}()
 	select {
-	case res := <-chRes:
-		return res.rRes, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.AbortedError(ctx.Err())
+	default:
 	}
+
+	// bufio.Scanner.Scan() may panic...
+	scanner := bufio.NewScanner(p.bridge.Reader())
+	scanner.Split(bufio.ScanLines)
+
+	var err error
+	for {
+		// If task aborted, stop the loop
+		select {
+		case <-ctx.Done():
+			err = fail.AbortedError(ctx.Err())
+		default:
+		}
+		if err != nil {
+			break
+		}
+
+		if scanner.Scan() {
+			item := outputItem{
+				bridge: p.bridge,
+				data:   scanner.Text() + "\n",
+			}
+			p.ch <- item
+		} else {
+			err = scanner.Err()
+			break
+		}
+	}
+	if err != nil {
+		if err == io.EOF {
+			err = nil
+		} else {
+			switch err.(type) { // nolint
+			// case fail.ErrAborted, *os.PathError:
+			case *os.PathError:
+				err = nil
+			}
+		}
+	}
+	return nil, fail.ConvertError(err)
 }
 
 // Structure to store taskRead parameters
@@ -298,40 +248,19 @@ type taskDisplayParameters struct {
 	ch <-chan outputItem
 }
 
-func taskDisplay(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
+func taskDisplay(ctx context.Context, params taskDisplayParameters) (_ interface{}, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	type result struct {
-		tRes interface{}
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		gres, gerr := func() (_ interface{}, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			p, ok := params.(taskDisplayParameters)
-			if !ok {
-				return nil, fail.InvalidParameterError("p", "must be a 'taskDisplayParameters'")
-			}
-			for item := range p.ch {
-				item.Print()
-			}
-			return nil, nil
-
-		}()
-		chRes <- result{gres, gerr}
-	}()
 	select {
-	case res := <-chRes:
-		return res.tRes, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.AbortedError(ctx.Err())
+	default:
 	}
+
+	for item := range params.ch {
+		item.Print()
+	}
+	return nil, nil
 }
 
 // Wait waits the end of the goroutines

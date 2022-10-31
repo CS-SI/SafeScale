@@ -30,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -222,7 +223,7 @@ func (s stack) findOpenStackNetworkBoundToVPC(ctx context.Context, vpcName strin
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		return nil, fail.Wrap(commRetryErr, "failed to get information of binded network")
+		return nil, fail.Wrap(commRetryErr, "failed to get information of bound network")
 	}
 	return network, nil
 }
@@ -277,7 +278,7 @@ func toAbstractNetwork(vpc VPC) *abstract.Network {
 }
 
 // InspectNetworkByName returns the information about a Network/VPC identified by 'name'
-func (s stack) InspectNetworkByName(ctx context.Context, name string) (an *abstract.Network, ferr fail.Error) {
+func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstract.Network, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -290,7 +291,7 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (an *abstr
 		return nil, xerr
 	}
 
-	an = nil
+	var an *abstract.Network
 	for _, v := range nets {
 		if v.Name == name {
 			an = v
@@ -337,6 +338,9 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 			if !ok {
 				return emptySlice, fail.InconsistentError("vpc should be a map[string]interface{}")
 			}
+
+			logrus.Warningf("Ambient: %s", litter.Sdump(item)) // FIXME: OPP Remove this later
+
 			an := abstract.NewNetwork()
 			an.Name, ok = item["name"].(string)
 			if !ok {
@@ -350,7 +354,10 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 			if !ok {
 				return emptySlice, fail.InconsistentError("cidr should NOT be empty")
 			}
-			// FIXME: Missing validation, all previous fields should be NOT empty
+			if an.Name == "" || an.ID == "" || an.CIDR == "" {
+				continue
+			}
+
 			list = append(list, an)
 		}
 	}

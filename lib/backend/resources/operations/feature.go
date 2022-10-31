@@ -308,8 +308,8 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			outcomes := &results{}
 			_ = outcomes.Add(featureName, &unitResults{
 				targetName: &stepResult{
-					completed: true,
-					success:   true,
+					complete: true,
+					success:  true,
 				},
 			})
 			return outcomes, nil
@@ -326,18 +326,6 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 		if state != hoststate.Started {
 			return nil, fail.InvalidRequestError(fmt.Sprintf("cannot check feature on '%s', '%s' is NOT started", targetName, targetName))
 		}
-		// FIXME: Fix deadlock
-		/*
-			case resources.Cluster:
-				state, xerr := ata.GetState()
-				if xerr != nil {
-					return nil, xerr
-				}
-
-				if state != clusterstate.Nominal {
-					return nil, fail.InvalidRequestError(fmt.Sprintf("cannot check feature on '%s', '%s' is NOT nominal", targetName, targetName))
-				}
-		*/
 	default:
 	}
 

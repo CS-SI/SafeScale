@@ -88,7 +88,7 @@ func Test_WhileUnsuccessfulButRetryable(t *testing.T) {
 	require.Contains(t, err.Error(), "Hard timeout")
 	require.Contains(t, err.Error(), "Any error")
 
-	// Success one
+	// success one
 	waitfor = retry.Linear(50 * time.Millisecond)
 	timeout = 5 * time.Second
 	callback = func() error {
@@ -608,7 +608,7 @@ func Test_normalizeURLError(t *testing.T) {
 		/* TODO: *url.Error can't be *net.DNSError, fix normalizeURLError header
 		{
 			in: &net.DNSError{
-				Err:          "DNSError err",
+				err:          "DNSError err",
 				Name:         "DNSError name",
 				Server:       "DNSError server",
 				IsTimeout:    false,

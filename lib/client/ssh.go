@@ -69,10 +69,13 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 		connectionTimeout = DefaultConnectionTimeout
 	}
 
-	ctx, xerr := srvutils.GetContext(true)
+	rootCtx, xerr := srvutils.GetContext(true)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
+
+	ctx, cancel := context.WithCancel(rootCtx)
+	defer cancel()
 
 	sshConn, xerr := sshfactory.NewConnector(sshCfg)
 	if xerr != nil {

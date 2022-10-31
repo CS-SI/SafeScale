@@ -3746,7 +3746,7 @@ type SSHCommandTest struct {
 }
 
 func (e *SSHCommandTest) Output() (data []byte, xerr fail.Error) {
-	e.svc._logf("SSHCommandTest::Output { output: \"%s\" }", e.svc._cramp(e.output, 64))
+	e.svc._logf("SSHCommandTest::output { output: \"%s\" }", e.svc._cramp(e.output, 64))
 	return []byte(e.output), nil
 }
 func (e *SSHCommandTest) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (retcode int, stdout string, stderr string, xerr fail.Error) {
