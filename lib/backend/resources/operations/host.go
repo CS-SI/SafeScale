@@ -1419,7 +1419,6 @@ func (instance *Host) implCreate(
 			return fail.ConvertError(err)
 		}
 
-		// FIXME: OPP Again another problem
 		trueState, err = svc.GetTrueHostState(ctx, hostID)
 		if err != nil {
 			chRes <- result{nil, fail.ConvertError(err)}
