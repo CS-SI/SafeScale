@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -338,8 +337,6 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 			if !ok {
 				return emptySlice, fail.InconsistentError("vpc should be a map[string]interface{}")
 			}
-
-			logrus.Warningf("Ambient: %s", litter.Sdump(item)) // FIXME: OPP Remove this later
 
 			an := abstract.NewNetwork()
 			an.Name, ok = item["name"].(string)

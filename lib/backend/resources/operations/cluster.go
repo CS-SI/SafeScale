@@ -2574,8 +2574,6 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			}
 		}
 
-		// FIXME: OPP Check installed features
-
 		// Install ansible feature on Cluster (all masters)
 		xerr = instance.installAnsible(ctx, parameters)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2583,8 +2581,6 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			chRes <- result{xerr}
 			return
 		}
-
-		// FIXME: OPP Check installed features
 
 		// configure what has to be done Cluster-wide
 		makers := instance.localCache.makers

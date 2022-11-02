@@ -288,11 +288,6 @@ feature:
                                 sfFirewallReload || sfFail 210 "Firewall problem"
                             }
                             
-                            {{- if or .PublicIP .IsGateway }}
-                            # drop outside connections to docker
-                            # sudo iptables -I DOCKER-USER -i $(basename /sys/class/net/en*) ! -s {{ .CIDR }} -j DROP || sfFail 210 "Firewall blocking problem"
-                            {{- end }}
-                            
                             sfExit
                     enable:
                         targets:

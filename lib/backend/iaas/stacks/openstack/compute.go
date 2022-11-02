@@ -1803,9 +1803,6 @@ func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, r
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	// TODO: RESIZE Resize IPAddress HERE
-	logrus.WithContext(ctx).Warn("Trying to resize a Host...") // FIXME: OPP This should trigger a build failure
-
 	// TODO: RESIZE Call this
 	// servers.Resize()
 
