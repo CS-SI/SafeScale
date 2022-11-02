@@ -69,10 +69,10 @@ const (
 	defaultSmallDelay = 1 * time.Second
 
 	// defaultNormalDelay is the default delay
-	defaultNormalDelay = 10 * time.Second
+	defaultNormalDelay = 2 * time.Second
 
 	// defaultBigDelay is a big delay
-	defaultBigDelay = 30 * time.Second
+	defaultBigDelay = 5 * time.Second
 )
 
 //go:generate minimock -o mocks/mock_timings.go -i github.com/CS-SI/SafeScale/v22/lib/utils/temporal.Timings
