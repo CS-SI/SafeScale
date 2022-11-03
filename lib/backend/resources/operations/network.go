@@ -248,98 +248,102 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		rErr fail.Error
 	}
 	chRes := make(chan result)
-	go func() (ferr fail.Error) {
-		defer fail.OnPanic(&ferr)
+	go func() {
 		defer close(chRes)
 
-		// Check if Network already exists and is managed by SafeScale
-		_, xerr := LoadNetwork(ctx, svc, req.Name)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// continue
-				debug.IgnoreError2(ctx, xerr)
-			default:
-				chRes <- result{xerr}
-				return xerr
-			}
-		} else {
-			xerr := fail.DuplicateError("Network '%s' already exists", req.Name)
-			_ = xerr.Annotate("managed", true)
-			chRes <- result{xerr}
-			return xerr
-		}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		// Verify if the subnet already exist and in this case is not managed by SafeScale
-		_, xerr = svc.InspectNetworkByName(ctx, req.Name)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// continue
-				debug.IgnoreError2(ctx, xerr)
-			default:
-				chRes <- result{xerr}
-				return xerr
+			// Check if Network already exists and is managed by SafeScale
+			_, xerr := LoadNetwork(ctx, svc, req.Name)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// continue
+					debug.IgnoreError2(ctx, xerr)
+				default:
+					ar := result{xerr}
+					return ar, ar.rErr
+				}
+			} else {
+				xerr := fail.DuplicateError("Network '%s' already exists", req.Name)
+				_ = xerr.Annotate("managed", true)
+				ar := result{xerr}
+				return ar, ar.rErr
 			}
-		} else {
-			xerr := fail.DuplicateError("Network '%s' already exists ", req.Name)
-			_ = xerr.Annotate("managed", false)
-			chRes <- result{xerr}
-			return xerr
-		}
 
-		// Verify the CIDR is not routable
-		if req.CIDR != "" {
-			routable, xerr := netretry.IsCIDRRoutable(req.CIDR)
+			// Verify if the subnet already exist and in this case is not managed by SafeScale
+			_, xerr = svc.InspectNetworkByName(ctx, req.Name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				rv := fail.Wrap(xerr, "failed to determine if CIDR is not routable")
-				chRes <- result{rv}
-				return rv
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// continue
+					debug.IgnoreError2(ctx, xerr)
+				default:
+					ar := result{xerr}
+					return ar, ar.rErr
+				}
+			} else {
+				xerr := fail.DuplicateError("Network '%s' already exists ", req.Name)
+				_ = xerr.Annotate("managed", false)
+				ar := result{xerr}
+				return ar, ar.rErr
 			}
 
-			if routable {
-				rv := fail.InvalidRequestError("cannot create such a Networking, CIDR must not be routable; please choose abstractNetwork appropriate CIDR (RFC1918)")
-				chRes <- result{rv}
-				return rv
-			}
-		}
+			// Verify the CIDR is not routable
+			if req.CIDR != "" {
+				routable, xerr := netretry.IsCIDRRoutable(req.CIDR)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					rv := fail.Wrap(xerr, "failed to determine if CIDR is not routable")
+					ar := result{rv}
+					return ar, ar.rErr
+				}
 
-		var abstractNetwork *abstract.Network
-
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && !req.KeepOnFailure {
-				derr := svc.DeleteNetwork(cleanupContextFrom(ctx), abstractNetwork.ID)
-				derr = debug.InjectPlannedFail(derr)
-				if derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
+				if routable {
+					rv := fail.InvalidRequestError("cannot create such a Networking, CIDR must not be routable; please choose abstractNetwork appropriate CIDR (RFC1918)")
+					ar := result{rv}
+					return ar, ar.rErr
 				}
 			}
+
+			var abstractNetwork *abstract.Network
+
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && !req.KeepOnFailure {
+					derr := svc.DeleteNetwork(cleanupContextFrom(ctx), abstractNetwork.ID)
+					derr = debug.InjectPlannedFail(derr)
+					if derr != nil {
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
+					}
+				}
+			}()
+
+			// Create the Network
+			logrus.WithContext(ctx).Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
+			abstractNetwork, xerr = svc.CreateNetwork(ctx, req)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				rv := fail.Wrap(xerr, "failure creating provider network")
+				ar := result{rv}
+				return ar, ar.rErr
+			}
+
+			// Write subnet object metadata
+			logrus.WithContext(ctx).Debugf("Saving Subnet metadata '%s' ...", abstractNetwork.Name)
+			abstractNetwork.Imported = false
+			xerr = instance.carry(ctx, abstractNetwork)
+			if xerr != nil {
+				ar := result{xerr}
+				return ar, ar.rErr
+			}
+
+			ar := result{nil}
+			return ar, ar.rErr
 		}()
-
-		// Create the Network
-		logrus.WithContext(ctx).Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
-		abstractNetwork, xerr = svc.CreateNetwork(ctx, req)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			rv := fail.Wrap(xerr, "failure creating provider network")
-			chRes <- result{rv}
-			return rv
-		}
-
-		// Write subnet object metadata
-		logrus.WithContext(ctx).Debugf("Saving Subnet metadata '%s' ...", abstractNetwork.Name)
-		abstractNetwork.Imported = false
-		xerr = instance.carry(ctx, abstractNetwork)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		chRes <- result{nil}
-		return nil
+		chRes <- gres
 	}() // nolint
 	select {
 	case res := <-chRes:

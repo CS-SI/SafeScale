@@ -6,11 +6,26 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/sirupsen/logrus"
 )
 
 func tak(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	time.Sleep(250 * time.Millisecond)
 	return nil, nil
+}
+
+func taf(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+	time.Sleep(250 * time.Millisecond)
+	logrus.Info("One more round")
+	return nil, fail.NewError("it failed")
+}
+
+func tap(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	time.Sleep(250 * time.Millisecond)
+	logrus.Info("One more round")
+	panic("boom")
+	return nil, fail.NewError("it failed")
 }
 
 func TestRunWindow(t *testing.T) {
@@ -50,6 +65,32 @@ func TestRunWindow(t *testing.T) {
 				timeout:    1 * time.Second,
 				uat:        make(chan StdResult, 1),
 				runner:     tak,
+				data:       struct{}{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "basic with error",
+			args: args{
+				inctx:      context.Background(),
+				count:      1,
+				windowSize: 1,
+				timeout:    1 * time.Second,
+				uat:        make(chan StdResult, 1),
+				runner:     taf,
+				data:       struct{}{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "basic with panic",
+			args: args{
+				inctx:      context.Background(),
+				count:      1,
+				windowSize: 1,
+				timeout:    1 * time.Second,
+				uat:        make(chan StdResult, 1),
+				runner:     tap,
 				data:       struct{}{},
 			},
 			wantErr: true,

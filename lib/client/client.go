@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -108,6 +109,9 @@ func New(server, tenantID string) (_ *Session, ferr fail.Error) {
 	}
 
 	s := &Session{server: server, tenant: tenantID}
+
+	u, _ := uuid.NewV4()
+	s.clientCtx = context.WithValue(context.Background(), "ID", u.String())
 
 	s.Bucket = bucketConsumer{session: s}
 	s.Cluster = clusterConsumer{session: s}
@@ -203,7 +207,7 @@ func (s *Session) GetTask() (context.Context, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if s.clientCtx == nil {
-		return nil, fail.InvalidInstanceContentError("s.task", "cannot be nil")
+		return nil, fail.InvalidInstanceContentError("s.clientCtx", "cannot be nil")
 	}
 	return s.clientCtx, nil
 }

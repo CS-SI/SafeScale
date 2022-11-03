@@ -166,7 +166,7 @@ func TestMutableTimings_HostCleanupTimeout(t *testing.T) {
 func TestMutableTimings_HostOperationTimeout(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.HostOperationTimeout(), 2*time.Minute)
+	require.EqualValues(t, mt.HostOperationTimeout(), 150*time.Second)
 
 	mt = NewTimings()
 	mt.Timeouts.HostOperation = 42 * time.Second
