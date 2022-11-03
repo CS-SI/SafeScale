@@ -254,7 +254,7 @@ func TestMutableTimings_SmallDelay(t *testing.T) {
 func TestMutableTimings_NormalDelay(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.NormalDelay(), 10*time.Second)
+	require.EqualValues(t, mt.NormalDelay(), 2*time.Second)
 
 	mt = NewTimings()
 	mt.Delays.Normal = 42 * time.Second
@@ -278,7 +278,7 @@ func TestMutableTimings_DefaultDelay(t *testing.T) {
 func TestMutableTimings_BigDelay(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.BigDelay(), 30*time.Second)
+	require.EqualValues(t, mt.BigDelay(), 5*time.Second)
 
 	mt = NewTimings()
 	mt.Delays.Big = 42 * time.Second
