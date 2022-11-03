@@ -181,34 +181,36 @@ func (instance *Cluster) unsafeListMasters(inctx context.Context) (_ resources.I
 	go func() {
 		defer close(chRes)
 
-		var list resources.IndexedListOfClusterNodes
-		emptyList := resources.IndexedListOfClusterNodes{}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			var list resources.IndexedListOfClusterNodes
+			emptyList := resources.IndexedListOfClusterNodes{}
 
-		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				list = make(resources.IndexedListOfClusterNodes, len(nodesV3.Masters))
-
-				for _, v := range nodesV3.Masters {
-					if node, found := nodesV3.ByNumericalID[v]; found {
-						list[node.NumericalID] = node
+			xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
+					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
-				}
-				return nil
+
+					list = make(resources.IndexedListOfClusterNodes, len(nodesV3.Masters))
+
+					for _, v := range nodesV3.Masters {
+						if node, found := nodesV3.ByNumericalID[v]; found {
+							list[node.NumericalID] = node
+						}
+					}
+					return nil
+				})
 			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{emptyList, xerr}
-			return
-		}
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{emptyList, xerr}, xerr
+			}
 
-		chRes <- result{list, nil}
-
+			return result{list, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -235,40 +237,41 @@ func (instance *Cluster) unsafeListMasterIDs(inctx context.Context) (_ data.Inde
 	go func() {
 		defer close(chRes)
 
-		var list data.IndexedListOfStrings
-		emptyList := data.IndexedListOfStrings{}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			var list data.IndexedListOfStrings
+			emptyList := data.IndexedListOfStrings{}
 
-		xerr := instance.beingRemoved(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{emptyList, xerr}
-			return
-		}
+			xerr := instance.beingRemoved(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{emptyList, xerr}, xerr
+			}
 
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				list = make(data.IndexedListOfStrings, len(nodesV3.Masters))
-				for _, v := range nodesV3.Masters {
-					if node, found := nodesV3.ByNumericalID[v]; found {
-						list[node.NumericalID] = node.ID
+			xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
-				}
-				return nil
+
+					list = make(data.IndexedListOfStrings, len(nodesV3.Masters))
+					for _, v := range nodesV3.Masters {
+						if node, found := nodesV3.ByNumericalID[v]; found {
+							list[node.NumericalID] = node.ID
+						}
+					}
+					return nil
+				})
 			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{emptyList, xerr}
-			return
-		}
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{emptyList, xerr}, xerr
+			}
 
-		chRes <- result{list, nil}
-
+			return result{list, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -293,40 +296,41 @@ func (instance *Cluster) unsafeListMasterIPs(inctx context.Context) (_ data.Inde
 	go func() {
 		defer close(chRes)
 
-		emptyList := data.IndexedListOfStrings{}
-		var list data.IndexedListOfStrings
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			emptyList := data.IndexedListOfStrings{}
+			var list data.IndexedListOfStrings
 
-		xerr := instance.beingRemoved(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{emptyList, xerr}
-			return
-		}
+			xerr := instance.beingRemoved(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{emptyList, xerr}, xerr
+			}
 
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				list = make(data.IndexedListOfStrings, len(nodesV3.Masters))
-				for _, v := range nodesV3.Masters {
-					if node, found := nodesV3.ByNumericalID[v]; found {
-						list[node.NumericalID] = node.PrivateIP
+			xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+				return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
-				}
-				return nil
+
+					list = make(data.IndexedListOfStrings, len(nodesV3.Masters))
+					for _, v := range nodesV3.Masters {
+						if node, found := nodesV3.ByNumericalID[v]; found {
+							list[node.NumericalID] = node.PrivateIP
+						}
+					}
+					return nil
+				})
 			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{emptyList, xerr}
-			return
-		}
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{emptyList, xerr}, xerr
+			}
 
-		chRes <- result{list, nil}
-
+			return result{list, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -352,32 +356,33 @@ func (instance *Cluster) unsafeListNodeIPs(inctx context.Context) (_ data.Indexe
 	go func() {
 		defer close(chRes)
 
-		emptyList := data.IndexedListOfStrings{}
-		var outlist data.IndexedListOfStrings
+		gres, _ := func() (_ result, ferr fail.Error) {
+			emptyList := data.IndexedListOfStrings{}
+			var outlist data.IndexedListOfStrings
 
-		xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				list := make(data.IndexedListOfStrings, len(nodesV3.PrivateNodes))
-				for _, v := range nodesV3.PrivateNodes {
-					if node, found := nodesV3.ByNumericalID[v]; found {
-						list[node.NumericalID] = node.PrivateIP
+			xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
-				}
-				outlist = list
-				return nil
+					list := make(data.IndexedListOfStrings, len(nodesV3.PrivateNodes))
+					for _, v := range nodesV3.PrivateNodes {
+						if node, found := nodesV3.ByNumericalID[v]; found {
+							list[node.NumericalID] = node.PrivateIP
+						}
+					}
+					outlist = list
+					return nil
+				})
 			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{emptyList, xerr}
-			return
-		}
-		chRes <- result{outlist, nil}
-
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{emptyList, xerr}, xerr
+			}
+			return result{outlist, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -404,57 +409,55 @@ func (instance *Cluster) unsafeFindAvailableMaster(inctx context.Context) (_ res
 	go func() {
 		defer close(chRes)
 
-		var master resources.Host
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			var master resources.Host
 
-		masters, xerr := instance.unsafeListMasters(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		timings, xerr := instance.Service().Timings()
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		var lastError fail.Error
-		lastError = fail.NotFoundError("no master found")
-		master = nil
-		for _, v := range masters {
-			if v.ID == "" {
-				continue
-			}
-
-			master, xerr = LoadHost(ctx, instance.Service(), v.ID)
+			masters, xerr := instance.unsafeListMasters(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{nil, xerr}
-				return
+				return result{nil, xerr}, xerr
 			}
 
-			_, xerr = master.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
-			xerr = debug.InjectPlannedFail(xerr)
+			timings, xerr := instance.Service().Timings()
 			if xerr != nil {
-				switch xerr.(type) {
-				case *retry.ErrTimeout:
-					lastError = xerr
+				return result{nil, xerr}, xerr
+			}
+
+			var lastError fail.Error
+			lastError = fail.NotFoundError("no master found")
+			master = nil
+			for _, v := range masters {
+				if v.ID == "" {
 					continue
-				default:
-					chRes <- result{nil, xerr}
-					return
 				}
+
+				master, xerr = LoadHost(ctx, instance.Service(), v.ID)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return result{nil, xerr}, xerr
+				}
+
+				_, xerr = master.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					switch xerr.(type) {
+					case *retry.ErrTimeout:
+						lastError = xerr
+						continue
+					default:
+						return result{nil, xerr}, xerr
+					}
+				}
+				break
 			}
-			break
-		}
-		if master == nil {
-			chRes <- result{nil, lastError}
-			return
-		}
+			if master == nil {
+				return result{nil, lastError}, lastError
+			}
 
-		chRes <- result{master, nil}
-
+			return result{master, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -480,33 +483,35 @@ func (instance *Cluster) unsafeListNodes(inctx context.Context) (_ resources.Ind
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		emptyList := resources.IndexedListOfClusterNodes{}
-		var list resources.IndexedListOfClusterNodes
+			emptyList := resources.IndexedListOfClusterNodes{}
+			var list resources.IndexedListOfClusterNodes
 
-		xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				list = make(resources.IndexedListOfClusterNodes, len(nodesV3.PrivateNodes))
-				for _, v := range nodesV3.PrivateNodes {
-					if node, found := nodesV3.ByNumericalID[v]; found {
-						list[node.NumericalID] = node
+			xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
-				}
-				return nil
+					list = make(resources.IndexedListOfClusterNodes, len(nodesV3.PrivateNodes))
+					for _, v := range nodesV3.PrivateNodes {
+						if node, found := nodesV3.ByNumericalID[v]; found {
+							list[node.NumericalID] = node
+						}
+					}
+					return nil
+				})
 			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{emptyList, xerr}
-			return
-		}
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{emptyList, xerr}, xerr
+			}
 
-		chRes <- result{list, nil}
-
+			return result{list, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -520,7 +525,7 @@ func (instance *Cluster) unsafeListNodes(inctx context.Context) (_ resources.Ind
 
 // unsafeListNodeIDs is the not goroutine-safe version of ListNodeIDs and no parameter validation, that does the real work
 // Note: must be used wisely
-func (instance *Cluster) unsafeListNodeIDs(inctx context.Context) (_ data.IndexedListOfStrings, ferr fail.Error) {
+func (instance *Cluster) unsafeListNodeIDs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -532,43 +537,43 @@ func (instance *Cluster) unsafeListNodeIDs(inctx context.Context) (_ data.Indexe
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			emptyList := data.IndexedListOfStrings{}
 
-		emptyList := data.IndexedListOfStrings{}
+			xerr := instance.beingRemoved(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{emptyList, xerr}, xerr
+			}
 
-		xerr := instance.beingRemoved(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{emptyList, xerr}
-			return
-		}
+			var outlist data.IndexedListOfStrings
 
-		var outlist data.IndexedListOfStrings
-
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				list := make(data.IndexedListOfStrings, len(nodesV3.PrivateNodes))
-				for _, v := range nodesV3.PrivateNodes {
-					if node, found := nodesV3.ByNumericalID[v]; found {
-						list[node.NumericalID] = node.ID
+			xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
-				}
-				outlist = list
-				return nil
+
+					list := make(data.IndexedListOfStrings, len(nodesV3.PrivateNodes))
+					for _, v := range nodesV3.PrivateNodes {
+						if node, found := nodesV3.ByNumericalID[v]; found {
+							list[node.NumericalID] = node.ID
+						}
+					}
+					outlist = list
+					return nil
+				})
 			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{emptyList, xerr}
-			return
-		}
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{emptyList, xerr}, xerr
+			}
 
-		chRes <- result{outlist, nil}
-
+			return result{outlist, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -582,7 +587,7 @@ func (instance *Cluster) unsafeListNodeIDs(inctx context.Context) (_ data.Indexe
 
 // unsafeFindAvailableNode is the package restricted, not goroutine-safe, no parameter validation version of FindAvailableNode, that does the real work
 // Note: must be used wisely
-func (instance *Cluster) unsafeFindAvailableNode(inctx context.Context) (node resources.Host, ferr fail.Error) {
+func (instance *Cluster) unsafeFindAvailableNode(inctx context.Context) (node resources.Host, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -593,59 +598,57 @@ func (instance *Cluster) unsafeFindAvailableNode(inctx context.Context) (node re
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		timings, xerr := instance.Service().Timings()
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		xerr = instance.beingRemoved(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		list, xerr := instance.unsafeListNodes(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		svc := instance.Service()
-		node = nil
-		found := false
-		for _, v := range list {
-			node, xerr = LoadHost(ctx, svc, v.ID)
-			xerr = debug.InjectPlannedFail(xerr)
+			timings, xerr := instance.Service().Timings()
 			if xerr != nil {
-				chRes <- result{nil, xerr}
-				return
+				return result{nil, xerr}, xerr
 			}
 
-			_, xerr = node.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
+			xerr = instance.beingRemoved(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				switch xerr.(type) {
-				case *retry.ErrTimeout:
-					continue
-				default:
-					chRes <- result{nil, xerr}
-					return
+				return result{nil, xerr}, xerr
+			}
+
+			list, xerr := instance.unsafeListNodes(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
+
+			svc := instance.Service()
+			node = nil
+			found := false
+			for _, v := range list {
+				node, xerr = LoadHost(ctx, svc, v.ID)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return result{nil, xerr}, xerr
 				}
+
+				_, xerr = node.WaitSSHReady(ctx, timings.SSHConnectionTimeout())
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					switch xerr.(type) {
+					case *retry.ErrTimeout:
+						continue
+					default:
+						return result{nil, xerr}, xerr
+					}
+				}
+				found = true
+				break
 			}
-			found = true
-			break
-		}
-		if !found {
-			chRes <- result{nil, fail.NotAvailableError("failed to find available node")}
-			return
-		}
+			if !found {
+				ar := result{nil, fail.NotAvailableError("failed to find available node")}
+				return ar, ar.rErr
+			}
 
-		chRes <- result{node, nil}
-
+			return result{node, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
