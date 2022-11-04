@@ -2787,9 +2787,16 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 						nodes[node.NumericalID] = node
 						master, err := LoadHost(ctx, instance.Service(), node.ID)
 						if err != nil {
-							return fail.InconsistentError("Fail to load master '%s'", node.ID)
+							switch err.(type) {
+							case *fail.ErrNotFound:
+								continue
+							default:
+								return fail.Wrap(err, "Fail to load master '%s'", node.ID)
+							}
 						}
-						masters = append(masters, master)
+						if does, err := master.Exists(ctx); err == nil && does {
+							masters = append(masters, master)
+						}
 					}
 				}
 				params["ClusterMasters"] = nodes
@@ -3283,9 +3290,7 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 }
 
 // IsFeatureInstalled tells if a Feature identified by name is installed on Cluster, using only metadata
-func (instance *Cluster) IsFeatureInstalled(inctx context.Context, name string) (_ bool, gerr fail.Error) {
-	defer fail.OnPanic(&gerr)
-
+func (instance *Cluster) IsFeatureInstalled(inctx context.Context, name string) (_ bool, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 

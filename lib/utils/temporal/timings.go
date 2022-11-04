@@ -27,7 +27,7 @@ const (
 	defaultContextTimeout = 1 * time.Minute
 
 	// defaultHostOperationTimeout default timeout to handle operations
-	defaultHostOperationTimeout = 120 * time.Second
+	defaultHostOperationTimeout = 150 * time.Second
 
 	// defaultHostBootTimeout default boot timeout
 	defaultHostBootTimeout = 3 * time.Minute

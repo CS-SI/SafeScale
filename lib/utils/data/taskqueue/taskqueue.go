@@ -50,7 +50,7 @@ func CreateTaskQueue(size uint) *TaskQueue {
 		size:       size,
 		processing: false,
 		mu:         &sync.RWMutex{},
-		handlers:   make(map[string][]chan uint, 0),
+		handlers:   make(map[string][]chan uint),
 	}
 }
 

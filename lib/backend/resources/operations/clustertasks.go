@@ -2254,7 +2254,7 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 	done := make(chan struct{})
 
 	treeCtx, cancel := context.WithCancel(inctx)
-	time.AfterFunc(timeout, cancel)
+	time.AfterFunc(4*timeout, cancel)
 	defer cancel()
 
 	finished := false
@@ -2330,6 +2330,8 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 	select {
 	case <-done:
 		return nil
+	case <-inctx.Done():
+		return errors.Errorf("Task was cancelled by parent: %s", inctx.Err())
 	case <-treeCtx.Done():
 		if len(uat) == int(count) {
 			return nil

@@ -286,9 +286,7 @@ func (instance *SecurityGroup) Browse(
 // If the metadata is already carrying a SecurityGroup, returns fail.ErrNotAvailable
 func (instance *SecurityGroup) Create(
 	inctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules,
-) (gerr fail.Error) {
-	defer fail.OnPanic(&gerr)
-
+) (_ fail.Error) {
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
@@ -315,164 +313,169 @@ func (instance *SecurityGroup) Create(
 		rErr fail.Error
 	}
 	chRes := make(chan result)
-	go func() (ferr fail.Error) {
+	go func() {
 		defer close(chRes)
 
-		if strings.HasPrefix(name, "instance") {
-			xerr := fail.InvalidParameterError("name", "cannot start with 'instance'")
-			chRes <- result{xerr}
-			return xerr
-		}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.security-group"), "('%s')", name).WithStopwatch().Entering()
-		defer tracer.Exiting()
-
-		// Check if SecurityGroup exists and is managed by SafeScale
-		svc := instance.Service()
-		_, xerr := LoadSecurityGroup(ctx, svc, name)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// continue
-				debug.IgnoreError2(ctx, xerr)
-			default:
-				xerr := fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
-				chRes <- result{xerr}
-				return xerr
+			if strings.HasPrefix(name, "instance") {
+				xerr := fail.InvalidParameterError("name", "cannot start with 'instance'")
+				ar := result{xerr}
+				return ar, ar.rErr
 			}
-		} else {
-			xerr := fail.DuplicateError("a Security Group named '%s' already exists", name)
-			chRes <- result{xerr}
-			return xerr
-		}
 
-		// Check if SecurityGroup exists but is not managed by SafeScale
-		asg := abstract.NewSecurityGroup()
-		asg.Name = name
-		asg.Network = networkID
-		_, xerr = svc.InspectSecurityGroup(ctx, asg)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotImplemented:
-				// not all providers implement security groups, and I do not want to see it even in !release mode, so no debug.IgnoreError()
-			case *fail.ErrNotFound:
-				// continue
-				debug.IgnoreError2(ctx, xerr)
-			default:
-				xerr := fail.Wrap(xerr, "failed to check if Security Group name '%s' is already used", name)
-				chRes <- result{xerr}
-				return xerr
-			}
-		} else {
-			xerr := fail.DuplicateError("a Security Group named '%s' already exists (not managed by SafeScale)", name)
-			chRes <- result{xerr}
-			return xerr
-		}
+			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.security-group"), "('%s')", name).WithStopwatch().Entering()
+			defer tracer.Exiting()
 
-		asg, xerr = svc.CreateSecurityGroup(ctx, networkID, name, description, rules)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
-				chRes <- result{xerr}
-				return xerr
-			}
-			xerr := fail.Wrap(xerr, "failed to create security group '%s'", name)
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		// make sure Network ID is stored in Security Group abstract
-		asg.Network = networkID
-
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil {
-				if derr := svc.DeleteSecurityGroup(cleanupContextFrom(ctx), asg); derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), name))
-				}
-			}
-		}()
-
-		// Creates metadata
-		xerr = instance.carry(ctx, asg)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil {
-				if derr := instance.MetadataCore.Delete(cleanupContextFrom(ctx)); derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(ferr)))
-				}
-			}
-		}()
-
-		if len(rules) == 0 {
-			xerr = instance.unsafeClear(ctx)
+			// Check if SecurityGroup exists and is managed by SafeScale
+			svc := instance.Service()
+			_, xerr := LoadSecurityGroup(ctx, svc, name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{xerr}
-				return xerr
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// continue
+					debug.IgnoreError2(ctx, xerr)
+				default:
+					xerr := fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
+					ar := result{xerr}
+					return ar, ar.rErr
+				}
+			} else {
+				xerr := fail.DuplicateError("a Security Group named '%s' already exists", name)
+				ar := result{xerr}
+				return ar, ar.rErr
 			}
-		}
 
-		// -- update SecurityGroups in Network metadata
-		updateFunc := func(props *serialize.JSONProperties) fail.Error {
-			return props.Alter(networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-				nsgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.NetworkSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			// Check if SecurityGroup exists but is not managed by SafeScale
+			asg := abstract.NewSecurityGroup()
+			asg.Name = name
+			asg.Network = networkID
+			_, xerr = svc.InspectSecurityGroup(ctx, asg)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotImplemented:
+					// not all providers implement security groups, and I do not want to see it even in !release mode, so no debug.IgnoreError()
+				case *fail.ErrNotFound:
+					// continue
+					debug.IgnoreError2(ctx, xerr)
+				default:
+					xerr := fail.Wrap(xerr, "failed to check if Security Group name '%s' is already used", name)
+					ar := result{xerr}
+					return ar, ar.rErr
+				}
+			} else {
+				xerr := fail.DuplicateError("a Security Group named '%s' already exists (not managed by SafeScale)", name)
+				ar := result{xerr}
+				return ar, ar.rErr
+			}
+
+			asg, xerr = svc.CreateSecurityGroup(ctx, networkID, name, description, rules)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
+					ar := result{xerr}
+					return ar, ar.rErr
+				}
+				xerr := fail.Wrap(xerr, "failed to create security group '%s'", name)
+				ar := result{xerr}
+				return ar, ar.rErr
+			}
+
+			// make sure Network ID is stored in Security Group abstract
+			asg.Network = networkID
+
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil {
+					if derr := svc.DeleteSecurityGroup(cleanupContextFrom(ctx), asg); derr != nil {
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), name))
+					}
+				}
+			}()
+
+			// Creates metadata
+			xerr = instance.carry(ctx, asg)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				ar := result{xerr}
+				return ar, ar.rErr
+			}
+
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil {
+					if derr := instance.MetadataCore.Delete(cleanupContextFrom(ctx)); derr != nil {
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(ferr)))
+					}
+				}
+			}()
+
+			if len(rules) == 0 {
+				xerr = instance.unsafeClear(ctx)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					ar := result{xerr}
+					return ar, ar.rErr
+				}
+			}
+
+			// -- update SecurityGroups in Network metadata
+			updateFunc := func(props *serialize.JSONProperties) fail.Error {
+				return props.Alter(networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+					nsgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.NetworkSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					nsgV1.ByID[asg.ID] = asg.Name
+					nsgV1.ByName[asg.Name] = asg.ID
+					return nil
+				})
+			}
+
+			currentNetworkProps, ok := ctx.Value(CurrentNetworkPropertiesContextKey).(*serialize.JSONProperties)
+			if !ok { // Is nil or is something else
+				if ctx.Value(CurrentNetworkPropertiesContextKey) != nil { // If it's something else, return inconsistent error
+					xerr := fail.InconsistentError("wrong value of type %T stored in context value, *unsafeSerialize.JSONProperties was expected instead", ctx.Value(CurrentNetworkPropertiesContextKey))
+					ar := result{xerr}
+					return ar, ar.rErr
 				}
 
-				nsgV1.ByID[asg.ID] = asg.Name
-				nsgV1.ByName[asg.Name] = asg.ID
-				return nil
-			})
-		}
+				// so it's nil...
+				networkInstance, xerr := LoadNetwork(ctx, svc, networkID)
+				if xerr != nil {
+					ar := result{xerr}
+					return ar, ar.rErr
+				}
 
-		currentNetworkProps, ok := ctx.Value(CurrentNetworkPropertiesContextKey).(*serialize.JSONProperties)
-		if !ok { // Is nil or is something else
-			if ctx.Value(CurrentNetworkPropertiesContextKey) != nil { // If it's something else, return inconsistent error
-				xerr := fail.InconsistentError("wrong value of type %T stored in context value, *unsafeSerialize.JSONProperties was expected instead", ctx.Value(CurrentNetworkPropertiesContextKey))
-				chRes <- result{xerr}
-				return xerr
+				xerr = networkInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return updateFunc(props)
+				})
+				if xerr != nil {
+					ar := result{xerr}
+					return ar, ar.rErr
+				}
+
+				logrus.WithContext(ctx).Infof("Security Group '%s' created successfully", name)
+				ar := result{nil}
+				return ar, ar.rErr
 			}
 
-			// so it's nil...
-			networkInstance, xerr := LoadNetwork(ctx, svc, networkID)
+			// it is a *unsafeSerialize.JSONProperties, (it was ok, also avoid else if possible)
+			xerr = updateFunc(currentNetworkProps)
 			if xerr != nil {
-				chRes <- result{xerr}
-				return xerr
-			}
-
-			xerr = networkInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return updateFunc(props)
-			})
-			if xerr != nil {
-				chRes <- result{xerr}
-				return xerr
+				ar := result{xerr}
+				return ar, ar.rErr
 			}
 
 			logrus.WithContext(ctx).Infof("Security Group '%s' created successfully", name)
-			chRes <- result{nil}
-			return nil
-		}
-
-		// it is a *unsafeSerialize.JSONProperties, (it was ok, also avoid else if possible)
-		xerr = updateFunc(currentNetworkProps)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		logrus.WithContext(ctx).Infof("Security Group '%s' created successfully", name)
-		chRes <- result{nil}
-		return nil
+			ar := result{nil}
+			return ar, ar.rErr
+		}()
+		chRes <- gres
 	}() // nolint
 	select {
 	case res := <-chRes:
