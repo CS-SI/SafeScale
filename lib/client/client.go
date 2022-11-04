@@ -110,8 +110,11 @@ func New(server, tenantID string) (_ *Session, ferr fail.Error) {
 
 	s := &Session{server: server, tenant: tenantID}
 
-	u, _ := uuid.NewV4()
-	s.clientCtx = context.WithValue(context.Background(), "ID", u.String())
+	u, err := uuid.NewV4()
+	if err != nil {
+		return nil, fail.Wrap(err, "uuid generation failed")
+	}
+	s.clientCtx = context.WithValue(context.Background(), "ID", u.String()) // nolint
 
 	s.Bucket = bucketConsumer{session: s}
 	s.Cluster = clusterConsumer{session: s}
