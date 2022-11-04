@@ -25,7 +25,6 @@ func tap(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Er
 	time.Sleep(250 * time.Millisecond)
 	logrus.Info("One more round")
 	panic("boom")
-	return nil, fail.NewError("it failed")
 }
 
 func TestRunWindow(t *testing.T) {
