@@ -230,7 +230,7 @@ func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Hos
 		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
-	return p.Stack.(iaasapi.StackReservedForProviderUse).ListTemplates(ctx, all)
+	return p.Stack.(providers.StackReservedForProviderUse).ListTemplates(ctx, all)
 }
 
 // ListImages ... ; overloads stack.ListImages() to allow to filter images to show

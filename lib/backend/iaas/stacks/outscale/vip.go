@@ -57,9 +57,9 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 		return nil, fail.InconsistentError("inconsistent provider response, no interface found")
 	}
 
-	vip, err := abstract.NewVirtualIP(name)
-	if err != nil {
-		return nil, fail.Wrap(err)
+	vip, xerr := abstract.NewVirtualIP(abstract.WithName(name))
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	vip.ID = resp.NicId

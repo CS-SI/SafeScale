@@ -71,7 +71,7 @@ func (rc ResourceCore) Name() string {
 }
 
 // Snippet returns the path of the snippet used to handle the resource
-func (rc ResourceCore) Snippet() string {
+func (rc ResourceCore) ProviderData() string {
 	return rc.snippet
 }
 

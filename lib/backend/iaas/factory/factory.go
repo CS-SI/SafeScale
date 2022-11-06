@@ -26,7 +26,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
@@ -124,17 +124,14 @@ func findProfile(providerName string) (*providers.Profile, fail.Error) {
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(mutators ...options.Mutator) (_ iaasapi.Service, ferr fail.Error) {
+func UseService(Options ...options.Option) (_ iaasapi.Service, ferr fail.Error) {
 	ctx := context.Background() // FIXME: Check context
 	defer fail.OnExitLogError(ctx, &ferr)
 	defer fail.OnPanic(&ferr)
 
-	opts := options.New()
-	for k, v := range mutators {
-		xerr := v(opts)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to apply option #%d", k)
-		}
+	opts, xerr := options.New(Options...)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	var (
@@ -143,7 +140,7 @@ func UseService(mutators ...options.Mutator) (_ iaasapi.Service, ferr fail.Error
 		provider    string
 	)
 
-	scope, xerr := options.Value[common.Scope](opts, "Scope")
+	scope, xerr := options.Value[scopeapi.Scope](opts, iaasoptions.OptionScope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -467,9 +464,7 @@ func validateRegexpsOfKeyword(keyword string, content interface{}) (out []*regex
 }
 
 // initObjectStorageLocationConfig initializes objectstorage.Config struct with map
-func initObjectStorageLocationConfig(authOpts iaasoptions.Authentication, tenant map[string]interface{}) (
-	objectstorage.Config, fail.Error,
-) {
+func initObjectStorageLocationConfig(authOpts iaasoptions.Authentication, tenant map[string]interface{}) (objectstorage.Config, fail.Error) {
 	var (
 		config objectstorage.Config
 		ok     bool

@@ -19,7 +19,7 @@ package handlers
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupstate"
@@ -50,10 +50,10 @@ type SubnetHandler interface {
 
 // SubnetHandler ...
 type subnetHandler struct {
-	job job.Job
+	job jobapi.Job
 }
 
-func NewSubnetHandler(job job.Job) SubnetHandler {
+func NewSubnetHandler(job jobapi.Job) SubnetHandler {
 	return &subnetHandler{job}
 }
 
@@ -89,7 +89,7 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 		return nil, fail.InvalidRequestError("cidr %s intersects with default docker network %s", req.CIDR, "172.17.0.0/16")
 	}
 
-	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
+	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -99,7 +99,7 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 		return nil, fail.ConvertError(err)
 	}
 
-	subnetInstance, xerr := subnetfactory.New(handler.job.Service())
+	subnetInstance, xerr := subnetfactory.New(handler.job.Scope())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -136,15 +136,14 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var networkID string
-	svc := handler.job.Service()
 	if networkRef == "" {
-		withDefaultNetwork, xerr := svc.HasDefaultNetwork()
+		withDefaultNetwork, xerr := handler.job.Service().HasDefaultNetwork()
 		if xerr != nil {
 			return nil, xerr
 		}
 
 		if withDefaultNetwork {
-			an, xerr := svc.DefaultNetwork(handler.job.Context())
+			an, xerr := handler.job.Service().DefaultNetwork(handler.job.Context())
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -152,7 +151,7 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 			networkID = an.ID
 		}
 	} else {
-		networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
+		networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -163,7 +162,7 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 		}
 	}
 
-	return subnetfactory.List(handler.job.Context(), handler.job.Service(), networkID, all)
+	return subnetfactory.List(handler.job.Context(), handler.job.Scope(), networkID, all)
 }
 
 // Inspect returns infos on a subnet
@@ -189,7 +188,7 @@ func (handler *subnetHandler) Inspect(networkRef, subnetRef string) (_ resources
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	return subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	return subnetfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef, subnetRef)
 }
 
 // Delete a/many subnet/s
@@ -221,7 +220,7 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 		networkInstance resources.Network
 		subnetInstance  resources.Subnet
 	)
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef, subnetRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -302,12 +301,12 @@ func (handler *subnetHandler) BindSecurityGroup(networkRef, subnetRef, sgRef str
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef, subnetRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -338,12 +337,12 @@ func (handler *subnetHandler) UnbindSecurityGroup(networkRef, subnetRef, sgRef s
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef, subnetRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -383,12 +382,12 @@ func (handler *subnetHandler) EnableSecurityGroup(networkRef, subnetRef, sgRef s
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef, subnetRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -424,12 +423,12 @@ func (handler *subnetHandler) DisableSecurityGroup(networkRef, subnetRef, sgRef 
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef, subnetRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -465,7 +464,7 @@ func (handler *subnetHandler) ListSecurityGroups(networkRef, subnetRef string, s
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef, subnetRef)
 	if xerr != nil {
 		return nil, xerr
 	}

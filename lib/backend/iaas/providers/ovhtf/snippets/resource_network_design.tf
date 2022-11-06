@@ -11,6 +11,6 @@ resource "openstack_networking_network_v2" "{{ .Resource.Name }}" {
     region                = "{{ .Provider.Authentication.Region }}"
 }
 
-output "id" {
-    value = "${openstack_networking_network_v2.{{ .Resource.Name }}.id}"
-}
+#output "id" {
+#    value = "${openstack_networking_network_v2.{{ .Resource.Name }}.id}"
+#}

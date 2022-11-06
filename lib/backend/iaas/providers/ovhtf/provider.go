@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
@@ -103,8 +102,8 @@ var (
 // provider is the provider implementation of the OVH provider
 type provider struct {
 	iaasapi.MiniStack
-	summonerConfig    terraformerapi.Configuration
-	ExternalNetworkID string
+	terraformerOptions options.Options
+	ExternalNetworkID  string
 
 	// FIXME: move these fields in a provider Core?
 	authOptions   iaasoptions.Authentication
@@ -314,8 +313,17 @@ next:
 		configOptions:    cfgOptions,
 	}
 
-	out.summonerConfig, _ = options.ValueOrDefault(opts, "TerraformerConfiguration", terraformerapi.Configuration{})
-	out.summonerConfig.Scope, xerr = options.Value[common.Scope](opts, "Scope")
+	terraformerConfig, xerr := options.ValueOrDefault(opts, iaasoptions.BuildOptionTerraformerConfiguration, terraformerapi.Configuration{})
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out.terraformerOptions, xerr = opts.Subset(iaasoptions.OptionScope)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	_, xerr = out.terraformerOptions.Store(iaasoptions.BuildOptionTerraformerConfiguration, terraformerConfig)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -355,16 +363,16 @@ func (p provider) EmbeddedFS() embed.FS {
 	return snippets
 }
 
-func (p provider) Snippet() string {
+func (p provider) RenderingData() string {
 	return configSnippetPath
 }
 
-func (p provider) Terraformer() (terraformerapi.Summoner, fail.Error) {
-	summoner, xerr := terraformer.NewSummoner(&p, p.summonerConfig)
+func (p provider) RenderingEngine() (terraformerapi.Renderer, fail.Error) {
+	renderer, xerr := terraformer.NewRenderer(&p, p.terraformerOptions)
 	if xerr != nil {
 		return nil, xerr
 	}
-	return summoner, nil
+	return renderer, nil
 }
 
 func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
@@ -410,6 +418,15 @@ func (p *provider) DeleteTags(ctx context.Context, kind abstract.Enum, id string
 	}
 
 	return fail.NotImplementedError()
+}
+
+// TerraformerOptions returns the option for terraform usage
+func (p *provider) TerraformerOptions() options.Options {
+	if valid.IsNull(p) {
+		return nil
+	}
+
+	return p.terraformerOptions
 }
 
 func init() {

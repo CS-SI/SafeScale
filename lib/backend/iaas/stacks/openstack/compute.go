@@ -22,15 +22,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
 	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -49,6 +48,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -489,12 +489,12 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 
 	// refresh tags
 	for k, v := range server.Metadata {
-		ahf.Core.Tags[k] = v
+		ahf.Tags[k] = v
 	}
 
-	ct, ok := ahf.Core.Tags["CreationDate"]
+	ct, ok := ahf.Tags["CreationDate"]
 	if !ok || ct == "" {
-		ahf.Core.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
+		ahf.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
 	}
 
 	if !ahf.OK() {
@@ -521,9 +521,9 @@ func (s stack) complementHost(ctx context.Context, hostCore *abstract.HostCore, 
 		logrus.WithContext(ctx).Warnf("[TRACE] Unexpected host's last state: %v", state)
 	}
 
-	host, err := abstract.NewHostFull(hostCore.Name)
-	if err != nil {
-		return nil, fail.Wrap(err)
+	host, xerr := abstract.NewHostFull(abstract.WithName(hostCore.Name))
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	host.HostCore = hostCore
@@ -533,20 +533,19 @@ func (s stack) complementHost(ctx context.Context, hostCore *abstract.HostCore, 
 		Updated: server.Updated,
 	}
 
-	host.Core.Tags["Template"], _ = server.Image["id"].(string) // nolint
-	host.Core.Tags["Image"], _ = server.Flavor["id"].(string)   // nolint
+	host.Tags["Template"], _ = server.Image["id"].(string) // nolint
+	host.Tags["Image"], _ = server.Flavor["id"].(string)   // nolint
 
 	// recover metadata
 	for k, v := range server.Metadata {
-		host.Core.Tags[k] = v
+		host.Tags[k] = v
 	}
 
-	ct, ok := host.Core.Tags["CreationDate"]
+	ct, ok := host.Tags["CreationDate"]
 	if !ok || ct == "" {
-		host.Core.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
+		host.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
 	}
 
-	var xerr fail.Error
 	host.Sizing, xerr = s.toHostSize(ctx, server.Flavor)
 	if xerr != nil {
 		return nil, xerr
@@ -650,7 +649,7 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (*abstract.Ho
 			}
 
 			if entry["name"].(string) == name {
-				host, xerr := abstract.NewHostCore(name)
+				host, xerr := abstract.NewHostCore(abstract.WithName(name))
 				if xerr != nil {
 					return nil, fail.Wrap(xerr)
 				}
@@ -767,7 +766,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	// --- Initializes abstract.HostCore ---
 
-	ahc, err := abstract.NewHostCore(request.ResourceName)
+	ahc, err := abstract.NewHostCore(abstract.WithName(request.ResourceName))
 	if err != nil {
 		return nil, nil, fail.Wrap(err)
 	}
@@ -830,9 +829,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 			}()
 
-			server, innerXErr = s.rpcCreateServer(
-				ctx, request.ResourceName, hostNets, request.TemplateID, request.ImageID, diskSize, userDataPhase1, azone,
-			)
+			server, innerXErr = s.rpcCreateServer(ctx, request.ResourceName, hostNets, request.TemplateID, request.ImageID, diskSize, userDataPhase1, azone)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
@@ -842,11 +839,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 				if server != nil && server.ID != "" {
 					if rerr := s.DeleteHost(ctx, server.ID); rerr != nil {
-						_ = innerXErr.AddConsequence(
-							fail.Wrap(
-								rerr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName,
-							),
-						)
+						_ = innerXErr.AddConsequence(fail.Wrap(rerr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName))
 					}
 				}
 				return innerXErr
@@ -866,11 +859,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 						logrus.WithContext(ctx).Debugf("deleting unresponsive server '%s'...", request.ResourceName)
 						if derr := s.DeleteHost(context.Background(), ahc.ID); derr != nil {
 							logrus.WithContext(ctx).Debugf(derr.Error())
-							_ = innerXErr.AddConsequence(
-								fail.Wrap(
-									derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName,
-								),
-							)
+							_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName))
 							return
 						}
 						logrus.WithContext(ctx).Debugf("unresponsive server '%s' deleted", request.ResourceName)
@@ -884,10 +873,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			} else {
 				logrus.WithContext(ctx).Tracef("Host '%s' successfully created in requested AZ '%s'", ahc.Name, creationZone)
 				if creationZone != azone && azone != "" {
-					logrus.WithContext(ctx).Warnf(
-						"Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'",
-						ahc.Name, azone, creationZone,
-					)
+					logrus.WithContext(ctx).Warnf("Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'", ahc.Name, azone, creationZone)
 				}
 			}
 
@@ -1115,28 +1101,22 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 	if !s.cfgOpts.UseFloatingIP && request.PublicIP {
 		adminState := true
 		req := ports.CreateOpts{
-			NetworkID: s.ProviderNetworkID,
-			Name:      fmt.Sprintf("nic_%s_external", request.ResourceName),
-			Description: fmt.Sprintf(
-				"nic of host '%s' on external network %s", request.ResourceName, s.cfgOpts.ProviderNetwork,
-			),
+			NetworkID:      s.ProviderNetworkID,
+			Name:           fmt.Sprintf("nic_%s_external", request.ResourceName),
+			Description:    fmt.Sprintf("nic of host '%s' on external network %s", request.ResourceName, s.cfgOpts.ProviderNetwork),
 			AdminStateUp:   &adminState,
 			SecurityGroups: &[]string{},
 		}
 		port, xerr := s.rpcCreatePort(ctx, req)
 		if xerr != nil {
-			return nets, netPorts, createdPorts, fail.Wrap(
-				xerr, "failed to create port on external network '%s'", s.cfgOpts.ProviderNetwork,
-			)
+			return nets, netPorts, createdPorts, fail.Wrap(xerr, "failed to create port on external network '%s'", s.cfgOpts.ProviderNetwork)
 		}
 
 		// FIXME: OPP Use this only for Stein disaster, so it HAS to be OVH
 		if !s.cfgOpts.Safe && s.cfgOpts.ProviderName == "ovh" {
 			port, xerr = s.rpcChangePortSecurity(ctx, port.ID, false)
 			if xerr != nil {
-				return nets, netPorts, createdPorts, fail.Wrap(
-					xerr, "failed to disable port on external network '%s'", s.cfgOpts.ProviderNetwork,
-				)
+				return nets, netPorts, createdPorts, fail.Wrap(xerr, "failed to disable port on external network '%s'", s.cfgOpts.ProviderNetwork)
 			}
 		}
 
@@ -1166,9 +1146,7 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 		if !s.cfgOpts.Safe && s.cfgOpts.ProviderName == "ovh" {
 			port, xerr = s.rpcRemoveSGFromPort(ctx, port.ID)
 			if xerr != nil {
-				return nets, netPorts, createdPorts, fail.Wrap(
-					xerr, "failed to disable port on subnet '%s'", n.Name,
-				)
+				return nets, netPorts, createdPorts, fail.Wrap(xerr, "failed to disable port on subnet '%s'", n.Name)
 			}
 		}
 
@@ -1240,6 +1218,7 @@ func (s stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error
 			if xerr != nil {
 				return "", xerr
 			}
+
 			var azone string
 			for azone = range azList {
 				break
@@ -1424,21 +1403,21 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 						return false, err
 					}
 
+					var innerXErr fail.Error
 					for _, srv := range list {
-						ahc, xerr := abstract.NewHostCore("unknown")
-						if xerr != nil {
-							return false, xerr
-						}
-
+						ahc, _ := abstract.NewHostCore()
 						ahc.ID = srv.ID
 						var ahf *abstract.HostFull
 						if details {
-							ahf, err = s.complementHost(ctx, ahc, srv, nil, nil)
-							if err != nil {
-								return false, err
+							ahf, innerXErr = s.complementHost(ctx, ahc, srv, nil, nil)
+							if innerXErr != nil {
+								return false, innerXErr
 							}
 						} else {
-							ahf, err = abstract.NewHostFull(ahc.Name)
+							ahf, innerXErr = abstract.NewHostFull(abstract.WithName(ahc.Name))
+							if innerXErr != nil {
+								return false, innerXErr
+							}
 							ahf.HostCore = ahc
 						}
 						hostList = append(hostList, ahf)

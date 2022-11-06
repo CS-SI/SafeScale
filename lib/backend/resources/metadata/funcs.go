@@ -3,14 +3,14 @@ package metadata
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 )
 
-func Review[T clonable.Clonable](ctx context.Context, instance resources.Metadata, callback resources.ResourceCallback[T]) fail.Error {
+func Review[T clonable.Clonable](ctx context.Context, instance Metadata, callback ResourceCallback[T]) fail.Error {
 	return instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		casted, err := lang.Cast[T](p)
 		if err != nil {
@@ -21,7 +21,7 @@ func Review[T clonable.Clonable](ctx context.Context, instance resources.Metadat
 	})
 }
 
-func ReviewProperty[T clonable.Clonable](ctx context.Context, instance resources.Metadata, property string, callback resources.PropertyCallback[T]) fail.Error {
+func ReviewProperty[T clonable.Clonable](ctx context.Context, instance Metadata, property string, callback PropertyCallback[T]) fail.Error {
 	return instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(property, func(p clonable.Clonable) fail.Error {
 			casted, err := lang.Cast[T](p)
@@ -34,7 +34,7 @@ func ReviewProperty[T clonable.Clonable](ctx context.Context, instance resources
 	})
 }
 
-func Inspect[T clonable.Clonable](ctx context.Context, instance resources.Metadata, callback resources.ResourceCallback[T], opts ...Option) fail.Error {
+func Inspect[T clonable.Clonable](ctx context.Context, instance Metadata, callback ResourceCallback[T], opts ...options.Option) fail.Error {
 	return instance.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		casted, err := lang.Cast[T](p)
 		if err != nil {
@@ -45,7 +45,7 @@ func Inspect[T clonable.Clonable](ctx context.Context, instance resources.Metada
 	}, opts...)
 }
 
-func InspectProperty[T clonable.Clonable](ctx context.Context, instance resources.Metadata, property string, callback resources.PropertyCallback[T], opts ...Option) fail.Error {
+func InspectProperty[T clonable.Clonable](ctx context.Context, instance Metadata, property string, callback PropertyCallback[T], opts ...options.Option) fail.Error {
 	return instance.InspectProperty(ctx, property, func(p clonable.Clonable) fail.Error {
 		casted, err := lang.Cast[T](p)
 		if err != nil {
@@ -56,7 +56,7 @@ func InspectProperty[T clonable.Clonable](ctx context.Context, instance resource
 	}, opts...)
 }
 
-func Alter[T clonable.Clonable](ctx context.Context, instance resources.Metadata, callback resources.ResourceCallback[T], opts ...Option) fail.Error {
+func Alter[T clonable.Clonable](ctx context.Context, instance Metadata, callback ResourceCallback[T], opts ...options.Option) fail.Error {
 	return instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		casted, err := lang.Cast[T](p)
 		if err != nil {
@@ -67,7 +67,7 @@ func Alter[T clonable.Clonable](ctx context.Context, instance resources.Metadata
 	}, opts...)
 }
 
-func AlterProperty[T clonable.Clonable](ctx context.Context, instance resources.Metadata, property string, callback resources.PropertyCallback[T], opts ...Option) fail.Error {
+func AlterProperty[T clonable.Clonable](ctx context.Context, instance Metadata, property string, callback PropertyCallback[T], opts ...options.Option) fail.Error {
 	return instance.AlterProperty(ctx, property, func(p clonable.Clonable) fail.Error {
 		casted, err := lang.Cast[T](p)
 		if err != nil {

@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 
+	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
@@ -30,7 +31,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/ssm"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -39,8 +39,8 @@ import (
 )
 
 type stack struct {
-	Config      *iaasoptions.Configuration
-	AuthOptions *iaasoptions.Authentication
+	Config      iaasoptions.Configuration
+	AuthOptions iaasoptions.Authentication
 	AwsConfig   *stacks.AWSConfiguration
 
 	S3Service      *s3.S3
@@ -72,7 +72,7 @@ func (s *stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 		return iaasoptions.Configuration{}, fail.InvalidInstanceError()
 	}
 
-	return *s.Config, nil
+	return s.Config, nil
 }
 
 // AuthenticationOptions ...
@@ -81,7 +81,7 @@ func (s *stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error)
 		return iaasoptions.Authentication{}, fail.InvalidInstanceError()
 	}
 
-	return *s.AuthOptions, nil
+	return s.AuthOptions, nil
 }
 
 // New creates and initializes an AWS stack
@@ -94,8 +94,8 @@ func New(auth iaasoptions.Authentication, localCfg stacks.AWSConfiguration, cfg 
 	}
 
 	stack := &stack{
-		Config:      &cfg,
-		AuthOptions: &auth,
+		Config:      cfg,
+		AuthOptions: auth,
 		AwsConfig:   &localCfg,
 	}
 

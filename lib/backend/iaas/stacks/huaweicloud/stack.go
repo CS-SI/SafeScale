@@ -654,7 +654,7 @@ func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gr
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return startstop.Stop(s.ComputeClient, ahf.Core.ID).ExtractErr()
+			return startstop.Stop(s.ComputeClient, ahf.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
@@ -674,7 +674,7 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) f
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return startstop.Start(s.ComputeClient, ahf.Core.ID).ExtractErr()
+			return startstop.Start(s.ComputeClient, ahf.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
@@ -696,11 +696,11 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := servers.Reboot(
-				s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.SoftReboot},
+				s.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.SoftReboot},
 			).ExtractErr()
 			if innerErr != nil {
 				innerErr = servers.Reboot(
-					s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.HardReboot},
+					s.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.HardReboot},
 				).ExtractErr()
 			}
 			return innerErr
@@ -749,10 +749,10 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
-			if ahf.Core.ID != "" {
-				server, innerErr = s.rpcGetHostByID(ctx, ahf.Core.ID)
+			if ahf.ID != "" {
+				server, innerErr = s.rpcGetHostByID(ctx, ahf.ID)
 			} else {
-				server, innerErr = s.rpcGetHostByName(ctx, ahf.Core.Name)
+				server, innerErr = s.rpcGetHostByName(ctx, ahf.Name)
 			}
 
 			if innerErr != nil {
@@ -760,7 +760,7 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 				case *fail.ErrNotFound:
 					// If error is "resource not found", we want to return error as-is to be able
 					// to behave differently in this special case. To do so, stop the retry
-					return retry.StopRetryError(abstract.ResourceNotFoundError("host", ahf.Core.Name), "")
+					return retry.StopRetryError(abstract.ResourceNotFoundError("host", ahf.Name), "")
 				case *fail.ErrInvalidRequest:
 					// If error is "invalid request", no need to retry, it will always be so
 					return retry.StopRetryError(innerErr, "error getting Host %s", hostLabel)
@@ -780,7 +780,7 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 				return fail.NotFoundError("provider did not send information for Host %s", hostLabel)
 			}
 
-			ahf.Core.ID = server.ID // makes sure that on next turn we get Host by ID
+			ahf.ID = server.ID // makes sure that on next turn we get Host by ID
 			lastState := toHostState(server.Status)
 
 			// If we had a response, and the target state is Any, this is a success no matter what
@@ -846,10 +846,10 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			if server != nil {
-				ahf.Core.ID = server.ID
-				ahf.Core.Name = server.Name
-				ahf.Core.LastState = hoststate.Error
-				return ahf.Core, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
+				ahf.ID = server.ID
+				ahf.Name = server.Name
+				ahf.LastState = hoststate.Error
+				return ahf.HostCore, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 			}
 			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
 		default:
@@ -857,12 +857,12 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 		}
 	}
 
-	ahf, xerr = s.complementHost(ctx, ahf.Core, server)
+	ahf, xerr = s.complementHost(ctx, ahf.HostCore, server)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return ahf.Core, nil
+	return ahf.HostCore, nil
 }
 
 // BindSecurityGroupToHost binds a security group to a host
@@ -887,7 +887,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
+			return secgroups.AddServer(s.ComputeClient, ahf.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
@@ -909,7 +909,7 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
+			return secgroups.RemoveServer(s.ComputeClient, ahf.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,
 	)

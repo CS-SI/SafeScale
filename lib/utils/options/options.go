@@ -23,20 +23,28 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-type Options interface {
-	Load(key string) (any, fail.Error)
-	Store(key string, value any) (any, fail.Error)
-}
-
 type options struct {
 	m sync.Map
 }
 
-func New() *options {
-	return &options{}
+func New(opts ...Option) (*options, fail.Error) {
+	out := &options{}
+	for _, v := range opts {
+		xerr := v(out)
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+
+	return out, nil
 }
 
 // Load returns the value of key in options
+// returns:
+//  - <value>, nil: key found
+//  - nil, *fail.ErrNotFound:  key not found
+//  - nil, *fail.ErrInvalidInstance: 'o' is a null value of *options
+//  - nil, *fail.ErrInvalidParameter: a parameter is invalid
 func (o *options) Load(key string) (any, fail.Error) {
 	if valid.IsNull(o) {
 		return nil, fail.InvalidInstanceError()
@@ -64,4 +72,46 @@ func (o *options) Store(key string, value any) (any, fail.Error) {
 
 	o.m.Store(key, value)
 	return value, nil
+}
+
+// StoreMany ...
+func (o *options) StoreMany(entry ...Entry) fail.Error {
+	if valid.IsNull(o) {
+		return fail.InvalidInstanceError()
+	}
+
+	for _, v := range entry {
+		o.m.Store(v.Key, v.Value)
+	}
+	return nil
+}
+
+// Subset returns a new Options containing only listed keys
+func (o *options) Subset(keys ...string) (Options, fail.Error) {
+	if valid.IsNull(o) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	out, xerr := New()
+	if xerr != nil {
+		return nil, xerr
+	}
+	for _, v := range keys {
+		item, xerr := o.Load(v)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				continue
+			default:
+				return nil, xerr
+			}
+		}
+
+		_, xerr = out.Store(v, item)
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+
+	return out, nil
 }

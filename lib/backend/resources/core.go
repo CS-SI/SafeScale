@@ -17,7 +17,9 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 )
 
@@ -26,8 +28,9 @@ import (
 // Core defines the interface that all resources must satisfy
 type Core interface {
 	data.Identifiable
-	Consistent
+	metadata.Consistent
 
 	Kind() string
-	Frame() *scope.Frame
+	Scope() scopeapi.Scope
+	Service() iaasapi.Service
 }

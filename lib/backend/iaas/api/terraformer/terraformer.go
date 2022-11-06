@@ -19,23 +19,22 @@ package terraformerapi
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
+	"github.com/hashicorp/terraform-exec/tfexec"
+
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/hashicorp/terraform-exec/tfexec"
 )
 
 type (
 	Resource interface {
-		Snippet() string
+		TerraformSnippet() string
 		// ToMap() map[string]any
-		// LocalState() bool
-		// RemoteState() bool
+		// String() string
 	}
 
 	State = bool
 
-	Summoner interface {
+	Renderer interface {
 		Apply(ctx context.Context, def string) (map[string]tfexec.OutputMeta, fail.Error)
 		Assemble(resources ...Resource) (string, fail.Error)
 		Close() fail.Error
@@ -64,7 +63,11 @@ type (
 			Server string
 			Prefix string // should contains "safescale/terraformstate/{Scope.Organization}/{Scope.Project}/{Scope.Tenant}
 		}
-		Scope common.Scope
+		// Scope scopeapi.Scope
 		RequiredProviders
+	}
+
+	AbstractForTerraformer interface {
+		AllResources() ([]Resource, fail.Error)
 	}
 )

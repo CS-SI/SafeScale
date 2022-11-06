@@ -30,7 +30,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/controller"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/listeners"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
@@ -66,7 +66,7 @@ func startBackend(cmd *cobra.Command) error {
 	defer cancel()
 
 	// Starts consul agent (which may be server also)
-	agentStartedCh, agentDoneCh, cancelConsulAgent, xerr := consul.StartAgent(ctx)
+	agentStartedCh, agentDoneCh, cancelConsulAgent, xerr := controller.StartAgent(ctx)
 	if xerr != nil {
 		return xerr
 	}

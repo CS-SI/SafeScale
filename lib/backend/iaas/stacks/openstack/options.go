@@ -17,7 +17,7 @@
 package openstack
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
+	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 

@@ -309,14 +309,14 @@ func Test_HostCoreFromAbstractToProtocol(t *testing.T) {
 
 func Test_HostFullFromAbstractToProtocol(t *testing.T) {
 
-	ahf := abstract.NewHostFull()
-	ahf.Core.ID = "HostCore ID"
-	ahf.Core.Name = "HostCore Name"
-	ahf.Core.PrivateKey = "HostCore PrivateKey"
-	ahf.Core.SSHPort = 42
-	ahf.Core.Password = "HostCore Password"
-	ahf.Core.LastState = hoststate.Any
-	ahf.Core.Tags["DeclaredInBucket"] = "I'm managed !"
+	ahf := abstract.NewHostFull(abstract.WithName("HostCore Name"))
+	ahf.ID = "HostCore ID"
+	ahf.Name =
+	ahf.PrivateKey = "HostCore PrivateKey"
+	ahf.SSHPort = 42
+	ahf.Password = "HostCore Password"
+	ahf.LastState = hoststate.Any
+	ahf.Tags["DeclaredInBucket"] = "I'm managed !"
 
 	ahf.Sizing.Cores = 4
 	ahf.Sizing.RAMSize = 8192
@@ -345,22 +345,22 @@ func Test_HostFullFromAbstractToProtocol(t *testing.T) {
 
 	ph := HostFullFromAbstractToProtocol(ahf)
 
-	state := ahf.Core.LastState
+	state := ahf.LastState
 	if ahf.CurrentState != hoststate.Unknown {
 		state = ahf.CurrentState
 	}
 
 	managed := false
-	if ct, ok := ahf.Core.Tags["DeclaredInBucket"]; ok {
+	if ct, ok := ahf.Tags["DeclaredInBucket"]; ok {
 		if ct != "" {
 			managed = true
 		}
 	}
 
-	require.EqualValues(t, ahf.Core.ID, ph.Id)
-	require.EqualValues(t, ahf.Core.Name, ph.Name)
+	require.EqualValues(t, ahf.ID, ph.Id)
+	require.EqualValues(t, ahf.Name, ph.Name)
 	require.EqualValues(t, HostStateFromAbstractToProtocol(state), ph.State)
-	require.EqualValues(t, ahf.Core.Tags["CreationDate"], ph.CreationDate)
+	require.EqualValues(t, ahf.Tags["CreationDate"], ph.CreationDate)
 	require.EqualValues(t, managed, ph.Managed)
 	require.EqualValues(t, ahf.Networking.PublicIPv4, ph.PublicIp)
 	require.EqualValues(t, ahf.Networking.DefaultGatewayID, ph.GatewayId)

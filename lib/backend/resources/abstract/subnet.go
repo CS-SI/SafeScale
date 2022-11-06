@@ -20,13 +20,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // SubnetRequest represents requirements to create a subnet where Mask is defined in CIDR notation
@@ -72,8 +72,8 @@ type Subnet struct {
 }
 
 // NewSubnet initializes a new instance of Subnet
-func NewSubnet(name string, options ...Option) (*Subnet, fail.Error) {
-	c, xerr := NewCore(name, options...)
+func NewSubnet(opts ...Option) (*Subnet, fail.Error) {
+	c, xerr := New(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -99,7 +99,7 @@ func (s *Subnet) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ns, xerr := NewSubnet(s.Name)
+	ns, xerr := NewSubnet(WithName(s.Name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -123,7 +123,7 @@ func (s *Subnet) Replace(p clonable.Clonable) error {
 	}
 
 	*s = *src
-	s.Core, err = src.Core.Clone()
+	s.Core, err = clonable.CastedClone[*Core](src.Core)
 	if err != nil {
 		return err
 	}
@@ -213,8 +213,8 @@ type VirtualIP struct {
 }
 
 // NewVirtualIP ...
-func NewVirtualIP(name string, options ...Option) (*VirtualIP, error) {
-	nc, err := NewCore(name, options...)
+func NewVirtualIP(opts ...Option) (*VirtualIP, fail.Error) {
+	nc, err := New(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func (vip *VirtualIP) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	nvip, err := NewVirtualIP(vip.Name)
+	nvip, err := NewVirtualIP(WithName(vip.Name))
 	if err != nil {
 		return nil, err
 	}

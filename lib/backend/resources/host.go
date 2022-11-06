@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupstate"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
@@ -38,7 +39,7 @@ import (
 // Host links Object Storage folder and Host
 type Host interface {
 	Core
-	Metadata
+	metadata.Metadata
 	Targetable
 
 	BindLabel(ctx context.Context, labelInstance Label, value string) fail.Error

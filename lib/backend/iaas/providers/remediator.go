@@ -22,13 +22,18 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
+	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 )
+
+type ReservedForTerraformerUse interface {
+	TerraformRenderer(iaasapi.Provider) (terraformerapi.Renderer, fail.Error)
+}
 
 // Remediator encapsulates Provider interface to catch panic, to prevent panic from halting the app
 type Remediator struct {
@@ -347,10 +352,10 @@ func (s Remediator) ListNetworks(ctx context.Context) (_ []*abstract.Network, fe
 	return network, xerr
 }
 
-func (s Remediator) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
+func (s Remediator) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Provider.DeleteNetwork(ctx, id)
+	xerr := s.Provider.DeleteNetwork(ctx, networkParam)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
@@ -673,4 +678,12 @@ func (s Remediator) DeleteVolumeAttachment(ctx context.Context, serverID, id str
 		xerr.WithContext(ctx)
 	}
 	return xerr
+}
+
+func (s Remediator) TerraformerRenderer() (terraformerapi.Renderer, fail.Error) {
+	caps := s.Provider.Capabilities()
+	if caps.UseTerraformer {
+		return s.Provider.(ReservedForTerraformerUse).TerraformRenderer(s)
+	}
+	return nil, fail.InvalidRequestError("the provider does not use terraform")
 }

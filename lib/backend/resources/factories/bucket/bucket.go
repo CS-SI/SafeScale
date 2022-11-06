@@ -19,28 +19,29 @@ package bucket
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // List retrieves all available buckets
-func List(ctx context.Context, svc iaasapi.Service) ([]string, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+func List(ctx context.Context, scope scopeapi.Scope) ([]string, fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 
-	return svc.ListBuckets(ctx, objectstorage.RootPath)
+	return scope.Service().ListBuckets(ctx, objectstorage.RootPath)
 }
 
 // New creates a bucket instance
-func New(svc iaasapi.Service) (resources.Bucket, fail.Error) { // nolint
-	return operations.NewBucket(svc)
+func New(scope scopeapi.Scope) (resources.Bucket, fail.Error) { // nolint
+	return operations.NewBucket(scope)
 }
 
 // Load initializes the bucket with metadata from provider
-func Load(ctx context.Context, svc iaasapi.Service, name string) (resources.Bucket, fail.Error) { // nolint
-	return operations.LoadBucket(ctx, svc, name)
+func Load(ctx context.Context, scope scopeapi.Scope, name string) (resources.Bucket, fail.Error) { // nolint
+	return operations.LoadBucket(ctx, scope, name)
 }

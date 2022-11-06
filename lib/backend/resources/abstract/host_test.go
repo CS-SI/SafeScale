@@ -472,15 +472,15 @@ func TestHostFull_GetID_ThatPanics(t *testing.T) {
 }
 
 func TestHostFull_GetID(t *testing.T) {
-	hf := NewHostFull()
+	hf, _ := NewHostFull()
 	id, _ := hf.GetID()
 	if id != "" {
 		t.Error("(empty) *Hostfull has no id")
 		t.Fail()
 	}
-	hf.Core.ID = "HostFullId"
+	hf.ID = "HostFullId"
 	id, _ = hf.GetID()
-	if id != hf.Core.ID {
+	if id != hf.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()
 	}
@@ -510,9 +510,10 @@ func TestHostFull_GetName(t *testing.T) {
 		t.Error("(empty) *Hostfull has no id")
 		t.Fail()
 	}
-	hf.Core.Name = "HostFullId"
+
+	hf.Name = "HostFullId"
 	name = hf.GetName()
-	if name != hf.Core.Name {
+	if name != hf.Name {
 		t.Error("Wrong value restitution")
 		t.Fail()
 	}

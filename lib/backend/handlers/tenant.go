@@ -22,13 +22,14 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
@@ -42,7 +43,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -153,13 +153,13 @@ type TenantHandler interface {
 
 // tenantHandler service
 type tenantHandler struct {
-	job              job.Job
+	job              jobapi.Job
 	abstractSubnet   *abstract.Subnet
 	scannedHostImage *abstract.Image
 }
 
 // NewTenantHandler creates a scanner service
-func NewTenantHandler(job job.Job) TenantHandler {
+func NewTenantHandler(job jobapi.Job) TenantHandler {
 	return &tenantHandler{job: job}
 }
 
@@ -450,10 +450,10 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		}
 	}()
 
-	xerr = subnet.Inspect(context.Background(), func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, err := lang.Cast[*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr = subnet.Inspect(context.Background(), func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, innerErr := lang.Cast[*abstract.Subnet](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		handler.abstractSubnet = as
@@ -529,7 +529,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 	}
 
 	hostName := scannedHostPrefix + template.Name
-	host, xerr := hostfactory.New(svc)
+	host, xerr := hostfactory.New(handler.job.Scope())
 	if xerr != nil {
 		return xerr
 	}
@@ -726,17 +726,14 @@ func (handler *tenantHandler) dumpImages(ctx context.Context) (ferr fail.Error) 
 }
 
 func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr fail.Error) {
-	task := handler.job.Task()
-	svc := handler.job.Service()
-
 	var xerr fail.Error
-	network, xerr = networkfactory.Load(handler.job.Context(), svc, scanNetworkName)
+	network, xerr = networkfactory.Load(handler.job.Context(), handler.job.Scope(), scanNetworkName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
 
-		network, xerr = networkfactory.New(svc)
+		network, xerr = networkfactory.New(handler.job.Scope())
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -744,7 +741,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr 
 			Name: scanNetworkName,
 			CIDR: scanNetworkCIDR,
 		}
-		if xerr = network.Create(task.Context(), req); xerr != nil {
+		if xerr = network.Create(handler.job.Context(), req); xerr != nil {
 			return nil, xerr
 		}
 		return network, xerr
@@ -753,16 +750,14 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr 
 }
 
 func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.Subnet, ferr fail.Error) {
-	task := handler.job.Task()
-	svc := handler.job.Service()
-
 	var xerr fail.Error
-	subnet, xerr = subnetfactory.Load(handler.job.Context(), svc, scanNetworkName, scanSubnetName)
+	task := handler.job.Task()
+	subnet, xerr = subnetfactory.Load(handler.job.Context(), handler.job.Scope(), scanNetworkName, scanSubnetName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
-		subnet, xerr = subnetfactory.New(svc)
+		subnet, xerr = subnetfactory.New(handler.job.Scope())
 		if xerr != nil {
 			return nil, xerr
 		}

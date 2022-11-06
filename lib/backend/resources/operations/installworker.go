@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,10 +28,10 @@ import (
 	txttmpl "text/template"
 	"time"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
@@ -49,9 +48,11 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -105,7 +106,7 @@ type alterCommandCB func(string) string
 
 type worker struct {
 	mu        *sync.RWMutex
-	service   iaasapi.Service
+	scope     scopeapi.Scope
 	feature   *Feature
 	target    resources.Targetable
 	method    installmethod.Enum
@@ -159,14 +160,14 @@ func newWorker(
 		if !ok {
 			return nil, fail.InconsistentError("target should be a *Cluster")
 		}
-		w.service = w.cluster.Service()
+		w.scope = w.cluster.Scope()
 	case featuretargettype.Host:
 		var ok bool
 		w.host, ok = target.(*Host)
 		if !ok {
 			return nil, fail.InconsistentError("target should be a *Host")
 		}
-		w.service = w.host.Service()
+		w.scope = w.host.Scope()
 	default:
 		return nil, fail.InconsistentError("target should be either a *Cluster or a *Host, it's not: %v", target.TargetType())
 	}
@@ -361,7 +362,7 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 			return nil, xerr
 		}
 		for _, i := range masters {
-			hostInstance, xerr := LoadHost(ctx, w.cluster.Service(), i)
+			hostInstance, xerr := LoadHost(ctx, w.cluster.Scope(), i)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -413,7 +414,7 @@ func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.E
 			return nil, xerr
 		}
 		for _, i := range list {
-			hostInstance, xerr := LoadHost(ctx, w.cluster.Service(), i)
+			hostInstance, xerr := LoadHost(ctx, w.cluster.Scope(), i)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -433,7 +434,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		return w.availableGateway, nil
 	}
 
-	timings, xerr := w.service.Timings()
+	timings, xerr := w.scope.Service().Timings()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -484,8 +485,8 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		found := true
 		var nilErrNotFound *fail.ErrNotFound = nil // nolint
 		var gw resources.Host
-		svc := w.cluster.Service()
-		gw, xerr = LoadHost(ctx, svc, netCfg.GatewayID)
+		frame := w.cluster.Scope()
+		gw, xerr = LoadHost(ctx, frame, netCfg.GatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil && xerr != nilErrNotFound {
 			if _, ok := xerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care of in previous line
@@ -496,7 +497,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		}
 
 		if !found {
-			gw, xerr = LoadHost(ctx, svc, netCfg.SecondaryGatewayID)
+			gw, xerr = LoadHost(ctx, frame, netCfg.SecondaryGatewayID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, fail.Wrap(xerr, "failed to find an available gateway")
@@ -560,7 +561,7 @@ func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host,
 			rs   resources.Subnet
 		)
 
-		timings, xerr := w.service.Timings()
+		timings, xerr := w.scope.Service().Timings()
 		if xerr != nil {
 			chRes <- result{nil, xerr}
 			return
@@ -573,7 +574,7 @@ func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host,
 				chRes <- result{nil, xerr}
 				return
 			}
-			rs, xerr = LoadSubnet(ctx, w.service, "", netCfg.SubnetID)
+			rs, xerr = LoadSubnet(ctx, w.cluster.Scope(), "", netCfg.SubnetID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{nil, xerr}
@@ -915,7 +916,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			return
 		}
 
-		timings, xerr := w.service.Timings()
+		timings, xerr := w.scope.Service().Timings()
 		if xerr != nil {
 			chRes <- result{nil, xerr}
 			return
@@ -1269,14 +1270,14 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 			return
 		}
 
-		subnetInstance, xerr := LoadSubnet(ctx, w.service, "", netprops.SubnetID)
+		subnetInstance, xerr := LoadSubnet(ctx, w.scope, "", netprops.SubnetID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
 		}
 
-		primaryKongController, xerr := NewKongController(ctx, w.service, subnetInstance, true)
+		primaryKongController, xerr := NewKongController(ctx, w.scope, subnetInstance, true)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{fail.Wrap(xerr, "failed to apply reverse proxy rules")}
@@ -1285,7 +1286,7 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 
 		var secondaryKongController *KongController
 		if ok, _ := subnetInstance.HasVirtualIP(ctx); ok {
-			secondaryKongController, xerr = NewKongController(ctx, w.service, subnetInstance, false)
+			secondaryKongController, xerr = NewKongController(ctx, w.scope, subnetInstance, false)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{fail.Wrap(xerr, "failed to apply reverse proxy rules")}
@@ -1328,10 +1329,10 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 				primaryGatewayVariables["ShortHostname"] = h.GetName()
 				domain := ""
 				xerr = h.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Inspect(hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
-						hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
-						if !ok {
-							return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					return props.Inspect(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
+						hostDescriptionV1, innerErr := lang.Cast[*propertiesv1.HostDescription](p)
+						if innerErr != nil {
+							return fail.Wrap(innerErr)
 						}
 
 						domain = hostDescriptionV1.Domain
@@ -1388,10 +1389,10 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 					secondaryGatewayVariables["ShortHostname"] = h.GetName()
 					domain = ""
 					xerr = h.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-						return props.Inspect(hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
-							hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
-							if !ok {
-								return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						return props.Inspect(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
+							hostDescriptionV1, innerErr := lang.Cast[*propertiesv1.HostDescription](p)
+							if innerErr != nil {
+								return fail.Wrap(innerErr)
 							}
 
 							domain = hostDescriptionV1.Domain
@@ -1748,7 +1749,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 					return
 				}
 			} else {
-				rs, xerr = LoadSubnet(ctx, w.service, netprops.NetworkID, netprops.SubnetID)
+				rs, xerr = LoadSubnet(ctx, w.scope, netprops.NetworkID, netprops.SubnetID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					chRes <- result{xerr}
@@ -1906,8 +1907,8 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 		// 		}
 		// 		primaryGatewayVariables["ShortHostname"] = h.GetName()
 		// 		domain := ""
-		// 		xerr = h.Inspect(w.feature.task, func(clonable clonable.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
-		// 			return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
+		// 		xerr = h.Inspect(w.feature.task, func(p clonable.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
+		// 			return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
 		// 				hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
 		// 				if !ok {
 		// 					return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1941,8 +1942,8 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 		// 			}
 		// 			secondaryGatewayVariables["ShortHostname"] = h.GetName()
 		// 			domain = ""
-		// 			xerr = h.Inspect(w.feature.task, func(clonable clonable.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
-		// 				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
+		// 			xerr = h.Inspect(w.feature.task, func(p clonable.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
+		// 				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
 		// 					hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
 		// 					if !ok {
 		// 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())

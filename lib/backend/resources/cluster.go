@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -37,7 +38,8 @@ type IndexedListOfClusterNodes map[uint]*propertiesv3.ClusterNode
 // Cluster is the interface of all cluster object instances
 type Cluster interface {
 	Core
-	Metadata
+	metadata.Metadata
+	Targetable
 
 	AddFeature(ctx context.Context, name string, vars data.Map[string, any], settings FeatureSettings) (Results, fail.Error)                                  // adds feature on cluster
 	AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map[string, any], keepOnFailure bool) ([]Host, fail.Error) // adds several nodes

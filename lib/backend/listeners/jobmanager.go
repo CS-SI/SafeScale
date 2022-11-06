@@ -19,10 +19,11 @@ package listeners
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -37,7 +38,7 @@ type scopeFromProtocol interface {
 
 // prepareJob creates a new job and associated service
 // FIXME: include job and svc in context?
-func prepareJob(ctx context.Context, in scopeFromProtocol, description string) (_ job.Job, ferr fail.Error) {
+func prepareJob(ctx context.Context, in scopeFromProtocol, description string) (_ jobapi.Job, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {

@@ -17,7 +17,7 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	clusterfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/cluster"
@@ -45,10 +45,10 @@ type FeatureHandler interface {
 
 // featureHandler is an implementation of FeatureHandler
 type featureHandler struct {
-	job job.Job
+	job jobapi.Job
 }
 
-func NewFeatureHandler(job job.Job) FeatureHandler {
+func NewFeatureHandler(job jobapi.Job) FeatureHandler {
 	return &featureHandler{job: job}
 }
 
@@ -75,7 +75,7 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 
 	switch targetType {
 	case featuretargettype.Host:
-		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -93,7 +93,7 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 		return list, nil
 
 	case featuretargettype.Cluster:
-		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -139,7 +139,7 @@ func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, target
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
+	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Scope(), featureName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -149,7 +149,7 @@ func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, target
 
 	switch targetType {
 	case featuretargettype.Host:
-		_ /*hostInstance*/, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		_ /*hostInstance*/, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -157,7 +157,7 @@ func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, target
 		return nil, fail.NotImplementedError()
 
 	case featuretargettype.Cluster:
-		_ /*clusterInstance*/, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		_ /*clusterInstance*/, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -197,9 +197,9 @@ func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetR
 		xerr fail.Error
 	)
 	if embedded {
-		feat, xerr = featurefactory.NewEmbedded(handler.job.Context(), handler.job.Service(), featureName)
+		feat, xerr = featurefactory.NewEmbedded(handler.job.Context(), handler.job.Scope(), featureName)
 	} else {
-		feat, xerr = featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
+		feat, xerr = featurefactory.New(handler.job.Context(), handler.job.Scope(), featureName)
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -210,7 +210,7 @@ func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetR
 
 	switch targetType {
 	case featuretargettype.Host:
-		_ /*hostInstance*/, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		_ /*hostInstance*/, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -218,7 +218,7 @@ func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetR
 		return nil, fail.NotImplementedError()
 
 	case featuretargettype.Cluster:
-		_ /*clusterInstance*/, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		_ /*clusterInstance*/, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -253,14 +253,14 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
+	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Scope(), featureName)
 	if xerr != nil {
 		return xerr
 	}
 
 	switch targetType {
 	case featuretargettype.Host:
-		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return xerr
 		}
@@ -280,7 +280,7 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 		return xerr
 
 	case featuretargettype.Cluster:
-		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return xerr
 		}
@@ -341,14 +341,14 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
+	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Scope(), featureName)
 	if xerr != nil {
 		return xerr
 	}
 
 	switch targetType {
 	case featuretargettype.Host:
-		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return xerr
 		}
@@ -363,7 +363,7 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 		return fail.ExecutionError(nil, results.AllErrorMessages())
 
 	case featuretargettype.Cluster:
-		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return xerr
 		}
@@ -405,14 +405,14 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
+	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Scope(), featureName)
 	if xerr != nil {
 		return xerr
 	}
 
 	switch targetType {
 	case featuretargettype.Host:
-		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return xerr
 		}
@@ -427,7 +427,7 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 		return fail.ExecutionError(nil, results.AllErrorMessages())
 
 	case featuretargettype.Cluster:
-		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Scope(), targetRef)
 		if xerr != nil {
 			return xerr
 		}

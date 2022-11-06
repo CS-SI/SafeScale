@@ -17,9 +17,7 @@
 package handlers
 
 import (
-	"reflect"
-
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -32,11 +30,12 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 )
 
@@ -68,11 +67,11 @@ type HostHandler interface {
 
 // hostHandler is an implementation of interface HostHandler
 type hostHandler struct {
-	job job.Job
+	job jobapi.Job
 }
 
 // NewHostHandler is the constructor for HostHandler
-func NewHostHandler(job job.Job) HostHandler {
+func NewHostHandler(job jobapi.Job) HostHandler {
 	return &hostHandler{job}
 }
 
@@ -96,7 +95,7 @@ func (handler *hostHandler) Start(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -129,7 +128,7 @@ func (handler *hostHandler) Stop(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -161,7 +160,7 @@ func (handler *hostHandler) Reboot(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -191,7 +190,7 @@ func (handler *hostHandler) List(all bool) (_ abstract.HostList, ferr fail.Error
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	return hostfactory.List(handler.job.Context(), handler.job.Service(), all)
+	return hostfactory.List(handler.job.Context(), handler.job.Scope(), all)
 }
 
 // Create creates a new host
@@ -212,7 +211,7 @@ func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.Hos
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.New(handler.job.Service())
+	hostInstance, xerr := hostfactory.New(handler.job.Scope())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -242,17 +241,17 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	reduce := false
 	xerr = hostInstance.Inspect(handler.job.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.SizingV2, func(clonable clonable.Clonable) fail.Error {
-			hostSizingV2, err := lang.Cast[*propertiesv2.HostSizing)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Inspect(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
+			hostSizingV2, innerErr := lang.Cast[*propertiesv2.HostSizing](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			reduce = reduce || (sizing.MinCores < hostSizingV2.RequestedSize.MinCores)
@@ -299,7 +298,7 @@ func (handler *hostHandler) Status(ref string) (_ hoststate.Enum, ferr fail.Erro
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
 	if xerr != nil {
 		return hoststate.Unknown, xerr
 	}
@@ -330,7 +329,7 @@ func (handler *hostHandler) Inspect(ref string) (_ resources.Host, ferr fail.Err
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -363,7 +362,7 @@ func (handler *hostHandler) Delete(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -399,12 +398,12 @@ func (handler *hostHandler) BindSecurityGroup(hostRef, sgRef string, enable reso
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -440,12 +439,12 @@ func (handler *hostHandler) UnbindSecurityGroup(hostRef, sgRef string) (ferr fai
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -476,12 +475,12 @@ func (handler *hostHandler) EnableSecurityGroup(hostRef, sgRef string) (ferr fai
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -517,7 +516,7 @@ func (handler *hostHandler) DisableSecurityGroup(hostRef, sgRef string) (ferr fa
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -530,7 +529,7 @@ func (handler *hostHandler) DisableSecurityGroup(hostRef, sgRef string) (ferr fa
 		}
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -577,7 +576,7 @@ func (handler *hostHandler) ListSecurityGroups(hostRef string) (_ []*propertiesv
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -598,21 +597,21 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	var list []*protocol.LabelInspectResponse
-	xerr = hostInstance.Review(handler.job.Context(), func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.LabelsV1, func(clonable clonable.Clonable) fail.Error {
-			hlV1, err := lang.Cast[*propertiesv1.HostLabels)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr = hostInstance.Review(handler.job.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.LabelsV1, func(p clonable.Clonable) fail.Error {
+			hlV1, innerErr := lang.Cast[*propertiesv1.HostLabels](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			for k := range hlV1.ByID {
-				labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Service(), k)
+				labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), k)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -650,22 +649,22 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return nil, "", xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), labelRef)
 	if xerr != nil {
 		return nil, "", xerr
 	}
 
 	var outValue string
 	xerr = labelInstance.Review(handler.job.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(labelproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
-			lhV1, err := lang.Cast[*propertiesv1.LabelHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Inspect(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+			lhV1, innerErr := lang.Cast[*propertiesv1.LabelHosts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			hin, err := hostInstance.GetID()
@@ -673,6 +672,7 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 				return fail.ConvertError(err)
 			}
 
+			var ok bool
 			outValue, ok = lhV1.ByID[hin]
 			if !ok {
 				return fail.NotFoundError()
@@ -709,12 +709,12 @@ func (handler *hostHandler) BindLabel(hostRef, labelRef, value string) (ferr fai
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), labelRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -749,12 +749,12 @@ func (handler *hostHandler) UnbindLabel(hostRef, labelRef string) (ferr fail.Err
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), labelRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -783,12 +783,12 @@ func (handler *hostHandler) UpdateLabel(hostRef, labelRef, value string) (ferr f
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), labelRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -817,12 +817,12 @@ func (handler *hostHandler) ResetLabel(hostRef, labelRef string) (ferr fail.Erro
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), labelRef)
 	if xerr != nil {
 		return xerr
 	}

@@ -19,6 +19,7 @@ package outscale
 import (
 	"context"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
@@ -240,7 +241,7 @@ func (s stack) getDefaultRouteTable(ctx context.Context, id string) (osc.RouteTa
 }
 
 func toAbstractNetwork(in osc.Net) *abstract.Network {
-	out, _ := abstract.NewNetwork("unknown")
+	out, _ := abstract.NewNetwork()
 	out.ID = in.NetId
 	out.CIDR = in.IpRange
 	tags := unwrapTags(in.Tags)
@@ -311,16 +312,23 @@ func (s stack) ListNetworks(ctx context.Context) (_ []*abstract.Network, ferr fa
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
+func (s stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
+	an, networkLabel, xerr := iaasapi.ValidateNetworkParameter(networkParam)
+	if xerr != nil {
+		return xerr
+	}
+	if an.ID == "" {
+		return fail.InvalidParameterError("an", "invalid empty string in field 'ID'")
+	}
 
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", networkLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Reads NICs that belong to the subnet
-	resp, xerr := s.rpcReadNics(ctx, id, "")
+	resp, xerr := s.rpcReadNics(ctx, an.ID, "")
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -336,7 +344,7 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 	}
 
 	// Delete Internet Gateway
-	if xerr = s.deleteInternetService(ctx, id); xerr != nil {
+	if xerr = s.deleteInternetService(ctx, an.ID); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// no Internet Gateway, consider the deletion successful and continue
@@ -347,7 +355,7 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 	}
 
 	// delete VPC
-	return s.rpcDeleteNetwork(ctx, id)
+	return s.rpcDeleteNetwork(ctx, an.ID)
 }
 
 // CreateSubnet creates a Subnet
@@ -390,7 +398,7 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (as
 
 	// Prevent automatic assignment of public ip to VM created in the subnet
 
-	as, err = abstract.NewSubnet(req.Name)
+	as, err = abstract.NewSubnet(abstract.WithName(req.Name))
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
@@ -487,7 +495,7 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, subnetName s
 }
 
 func toAbstractSubnet(subnet osc.Subnet) *abstract.Subnet {
-	out, _ := abstract.NewSubnet("unknown")
+	out, _ := abstract.NewSubnet()
 	out.ID = subnet.SubnetId
 	out.CIDR = subnet.IpRange
 	out.IPVersion = ipversion.IPv4

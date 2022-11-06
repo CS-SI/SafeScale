@@ -20,30 +20,31 @@ package network
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // List returns a slice of *abstract.Network corresponding to managed networks
-func List(ctx context.Context, svc iaasapi.Service) ([]*abstract.Network, fail.Error) {
+func List(ctx context.Context, scope scopeapi.Scope) ([]*abstract.Network, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 
-	rn, xerr := New(svc)
+	rn, xerr := New(scope)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	var list []*abstract.Network
 
-	withDefaultNetwork, err := svc.HasDefaultNetwork()
+	withDefaultNetwork, err := scope.Service().HasDefaultNetwork()
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +52,7 @@ func List(ctx context.Context, svc iaasapi.Service) ([]*abstract.Network, fail.E
 	// Default network has no metadata, so we need to "simulate" them.
 	if withDefaultNetwork {
 		var an *abstract.Network
-		an, xerr = svc.DefaultNetwork(ctx)
+		an, xerr = scope.Service().DefaultNetwork(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -72,11 +73,11 @@ func List(ctx context.Context, svc iaasapi.Service) ([]*abstract.Network, fail.E
 }
 
 // New creates an instance of resources.Network
-func New(svc iaasapi.Service) (resources.Network, fail.Error) {
-	return operations.NewNetwork(svc)
+func New(scope scopeapi.Scope) (resources.Network, fail.Error) {
+	return operations.NewNetwork(scope)
 }
 
 // Load loads the metadata of a network and returns an instance of resources.Network
-func Load(ctx context.Context, svc iaasapi.Service, ref string) (resources.Network, fail.Error) {
-	return operations.LoadNetwork(ctx, svc, ref)
+func Load(ctx context.Context, scope scopeapi.Scope, ref string) (resources.Network, fail.Error) {
+	return operations.LoadNetwork(ctx, scope, ref)
 }

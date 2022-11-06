@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
@@ -83,9 +84,12 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		return nil, xerr
 	}
 
-	anet := abstract.NewNetwork()
+	anet, xerr := abstract.NewNetwork(abstract.WithName(req.Name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	anet.ID = strconv.FormatUint(resp.Id, 10)
-	anet.Name = req.Name
 	anet.CIDR = req.CIDR // Not enforced by GCP, but needed by SafeScale
 
 	// _ = net.OK()
@@ -135,8 +139,10 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (*abstract
 }
 
 func toAbstractNetwork(in compute.Network) *abstract.Network {
-	out := abstract.NewNetwork()
-	out.Name = in.Name
+	out, xerr := abstract.NewNetwork(abstract.WithName(in.Name))
+	if xerr != nil {
+		out, _ = abstract.NewNetwork()
+	}
 	out.ID = strconv.FormatUint(in.Id, 10)
 	out.CIDR = in.IPv4Range
 	return out
@@ -165,19 +171,23 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s stack) DeleteNetwork(ctx context.Context, ref string) (ferr fail.Error) {
+func (s stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if ref == "" {
-		return fail.InvalidParameterError("ref", "cannot be empty string")
+	an, networkLabel, xerr := iaasapi.ValidateNetworkParameter(networkParam)
+	if xerr != nil {
+		return xerr
+	}
+	if an.ID == "" {
+		return fail.InvalidParameterError("an", "invalid empty string in field 'ID'")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", networkLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	metadata := true
-	theNetwork, xerr := s.InspectNetwork(ctx, ref)
+	theNetwork, xerr := s.InspectNetwork(ctx, an.ID)
 	if xerr != nil {
 		metadata = false
 		switch xerr.(type) {
@@ -189,15 +199,11 @@ func (s stack) DeleteNetwork(ctx context.Context, ref string) (ferr fail.Error) 
 		}
 	}
 
-	if metadata {
-		if theNetwork != nil { // maybe nil
-			if theNetwork.ID != "" {
-				return s.rpcDeleteNetworkByID(ctx, theNetwork.ID)
-			}
-		}
+	if metadata && theNetwork != nil && theNetwork.ID != "" {
+		return s.rpcDeleteNetworkByID(ctx, theNetwork.ID)
 	}
 
-	xerr = s.rpcDeleteNetworkByID(ctx, ref)
+	xerr = s.rpcDeleteNetworkByID(ctx, an.ID)
 	if _, ok := xerr.(*fail.ErrNotFound); ok {
 		return nil
 	}
@@ -326,9 +332,12 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (_ 
 		}
 	}()
 
-	as := abstract.NewSubnet()
+	as, xerr := abstract.NewSubnet(abstract.WithName(req.Name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	as.ID = strconv.FormatUint(resp.Id, 10)
-	as.Name = req.Name
 	as.CIDR = resp.IpCidrRange
 	as.IPVersion = ipversion.IPv4
 	as.Network = req.NetworkID
@@ -449,7 +458,7 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstrac
 }
 
 func toAbstractSubnet(in compute.Subnetwork) *abstract.Subnet {
-	item := abstract.NewSubnet()
+	item, _ := abstract.NewSubnet() // note: not using WithName() here permits to have a Subnet with no name...
 	item.Name = in.Name
 	item.ID = strconv.FormatUint(in.Id, 10)
 	item.CIDR = in.IpCidrRange

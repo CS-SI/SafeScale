@@ -560,7 +560,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "", timings); xerr != nil {
+	if xerr = userData.Prepare(s.Config, request, defaultSubnet.CIDR, "", timings); xerr != nil {
 		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
 		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -622,7 +622,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 
 	// --- Initializes resources.Host ---
 
-	ahf, xerr = abstract.NewHostFull(request.ResourceName)
+	ahf, xerr = abstract.NewHostFull(abstract.WithName(request.ResourceName))
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -732,7 +732,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && request.CleanOnFailure() {
 			if ahf.IsConsistent() {
-				logrus.WithContext(ctx).Infof("Reset, deleting host '%s'", ahf.Core.Name)
+				logrus.WithContext(ctx).Infof("Reset, deleting host '%s'", ahf.Name)
 				if derr := s.DeleteHost(context.Background(), ahf.ID); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 					logrus.WithContext(ctx).Warnf("Error deleting host in cleanup: %v", derr)
@@ -782,9 +782,9 @@ func (s stack) buildAwsSpotMachine(
 
 	// FIXME: Listen to result.SpotInstanceRequests[0].GetState
 
-	host, err := abstract.NewHostCore(name)
-	if err != nil {
-		return nil, err
+	host, xerr := abstract.NewHostCore(abstract.WithName(name))
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	host.ID = aws.StringValue(instance.InstanceId)
@@ -812,7 +812,7 @@ func (s stack) buildAwsMachine(
 		return nil, xerr
 	}
 
-	hostCore, xerr := abstract.NewHostCore(name)
+	hostCore, xerr := abstract.NewHostCore(abstract.WithName(name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -943,17 +943,17 @@ func (s stack) inspectInstance(
 	ahf.Sizing.RAMSize = sizing.RAMSize
 	ahf.Sizing.DiskSize = sizing.DiskSize
 
-	ahf.Core.Name = instanceName
+	ahf.Name = instanceName
 
 	// Store template and image also in tags
 	for _, tag := range instance.Tags {
 		if tag != nil {
-			ahf.Core.Tags[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
+			ahf.Tags[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
 		}
 	}
 
-	ahf.Core.Tags["Template"] = instanceType
-	ahf.Core.Tags["Image"] = aws.StringValue(instance.ImageId)
+	ahf.Tags["Template"] = instanceType
+	ahf.Tags["Image"] = aws.StringValue(instance.ImageId)
 
 	return nil
 }
@@ -1001,7 +1001,7 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.
 	if xerr != nil {
 		return nil, xerr
 	}
-	ahf, xerr := abstract.NewHostFull(name)
+	ahf, xerr := abstract.NewHostFull(abstract.WithName(name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1052,7 +1052,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.Host
 				}
 			}
 
-			ahf, xerr := abstract.NewHostFull(name)
+			ahf, xerr := abstract.NewHostFull(abstract.WithName(name))
 			if xerr != nil {
 				return empty, xerr
 			}

@@ -27,15 +27,16 @@ import (
 	"sync"
 	"time"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/eko/gocache/v2/store"
 	"github.com/farmergreg/rfsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"gopkg.in/fsnotify.v1"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
@@ -190,7 +191,14 @@ func (ff *FeatureFile) Specs() *viper.Viper {
 //   - nil: everything worked as expected
 //   - fail.ErrNotFound: no FeatureFile is found with the name
 //   - fail.ErrSyntax: FeatureFile contains syntax error
-func LoadFeatureFile(inctx context.Context, svc iaasapi.Service, name string, embeddedOnly bool) (*FeatureFile, fail.Error) {
+func LoadFeatureFile(inctx context.Context, scope scopeapi.Scope, name string, embeddedOnly bool) (*FeatureFile, fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
+	}
+	if name == "" {
+		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -204,18 +212,11 @@ func LoadFeatureFile(inctx context.Context, svc iaasapi.Service, name string, em
 		ga, gerr := func() (_ *FeatureFile, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			if svc == nil {
-				return nil, fail.InvalidParameterCannotBeNilError("svc")
-			}
-			if name == "" {
-				return nil, fail.InvalidParameterError("name", "cannot be empty string")
-			}
-
 			// trick to avoid collisions
 			var kt *FeatureFile
 			cachename := fmt.Sprintf("%T/%s", kt, name)
 
-			cache, xerr := svc.GetCache(ctx)
+			cache, xerr := scope.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -230,7 +231,7 @@ func LoadFeatureFile(inctx context.Context, svc iaasapi.Service, name string, em
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onFeatureFileCacheMiss(svc, name, embeddedOnly) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onFeatureFileCacheMiss(scope, name, embeddedOnly) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -287,7 +288,7 @@ func LoadFeatureFile(inctx context.Context, svc iaasapi.Service, name string, em
 }
 
 // onFeatureFileCacheMiss is called when host 'ref' is not found in cache
-func onFeatureFileCacheMiss(_ iaasapi.Service, name string, embeddedOnly bool) (data.Identifiable, fail.Error) {
+func onFeatureFileCacheMiss(_ scopeapi.Scope, name string, embeddedOnly bool) (data.Identifiable, fail.Error) {
 	var (
 		newInstance *FeatureFile
 		xerr        fail.Error

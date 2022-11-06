@@ -21,6 +21,7 @@ import (
 	"net"
 	"reflect"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 
@@ -196,7 +197,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		}
 	}()
 
-	anet, xerr := abstract.NewNetwork(req.Name)
+	anet, xerr := abstract.NewNetwork(abstract.WithName(req.Name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -241,7 +242,7 @@ func toAbstractNetwork(in *ec2.Vpc) (*abstract.Network, fail.Error) {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	out := abstract.NewNetwork()
+	out, _ := abstract.NewNetwork()
 	out.ID = aws.StringValue(in.VpcId)
 	out.CIDR = aws.StringValue(in.CidrBlock)
 	for _, v := range in.Tags {
@@ -294,7 +295,7 @@ func (s stack) ListNetworks(ctx context.Context) (_ []*abstract.Network, ferr fa
 
 	nets := make([]*abstract.Network, 0, len(resp))
 	for _, vpc := range resp {
-		n := abstract.NewNetwork()
+		n, _ := abstract.NewNetwork()
 		n.ID = aws.StringValue(vpc.VpcId)
 		n.CIDR = aws.StringValue(vpc.CidrBlock)
 		for _, tag := range vpc.Tags {
@@ -309,29 +310,32 @@ func (s stack) ListNetworks(ctx context.Context) (_ []*abstract.Network, ferr fa
 }
 
 // DeleteNetwork ...
-func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
+func (s stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	an, networkLabel, xerr := iaasapi.ValidateNetworkParameter(networkParam)
+	if xerr != nil {
+		return xerr
+	}
+	if an.ID == "" {
+		return fail.InvalidParameterError("an", "invalid empty string in field 'ID'")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", networkLabel).WithStopwatch().Entering().Exiting()
 
-	var xerr fail.Error
-	if _, xerr = s.InspectNetwork(ctx, id); xerr != nil {
+	if _, xerr = s.InspectNetwork(ctx, an.ID); xerr != nil {
 		return xerr
 	}
 
-	gwTmp, xerr := s.rpcDescribeInternetGateways(ctx, aws.String(id), nil)
+	gwTmp, xerr := s.rpcDescribeInternetGateways(ctx, aws.String(an.ID), nil)
 	if xerr != nil {
 		return xerr
 	}
 
 	for _, agwTmp := range gwTmp {
 		for _, att := range agwTmp.Attachments {
-			if aws.StringValue(att.VpcId) == id {
+			if aws.StringValue(att.VpcId) == an.ID {
 				if xerr = s.rpcDetachInternetGateway(ctx, att.VpcId, agwTmp.InternetGatewayId); xerr != nil {
 					return xerr
 				}
@@ -343,7 +347,7 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 		}
 	}
 
-	rtTmp, xerr := s.rpcDescribeRouteTables(ctx, aws.String("vpc-id"), []*string{aws.String(id)})
+	rtTmp, xerr := s.rpcDescribeRouteTables(ctx, aws.String("vpc-id"), []*string{aws.String(an.ID)})
 	if xerr != nil {
 		return xerr
 	}
@@ -377,7 +381,7 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 		}
 	}
 
-	return s.rpcDeleteVpc(ctx, aws.String(id))
+	return s.rpcDeleteVpc(ctx, aws.String(an.ID))
 }
 
 func toHostState(state *ec2.InstanceState) (hoststate.Enum, fail.Error) {
@@ -486,9 +490,12 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (re
 		return nil, fail.Wrap(xerr, "failed to associate route tables to Subnet")
 	}
 
-	subnet := abstract.NewSubnet()
+	subnet, xerr := abstract.NewSubnet(abstract.WithName(req.Name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	subnet.ID = aws.StringValue(resp.SubnetId)
-	subnet.Name = req.Name
 	subnet.Network = req.NetworkID
 	subnet.CIDR = req.CIDR
 	subnet.Domain = req.Domain
@@ -524,7 +531,7 @@ func toAbstractSubnet(in *ec2.Subnet) (*abstract.Subnet, fail.Error) {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	out := abstract.NewSubnet()
+	out, _ := abstract.NewSubnet()
 	out.Network = aws.StringValue(in.VpcId)
 	out.ID = aws.StringValue(in.SubnetId)
 	out.CIDR = aws.StringValue(in.CidrBlock)
@@ -747,7 +754,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 }
 
 // CreateVIP ...
-func (s *stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
+func (s *stack) CreateVIP(_ context.Context, networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 

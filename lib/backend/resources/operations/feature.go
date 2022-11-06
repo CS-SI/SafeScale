@@ -19,14 +19,14 @@ package operations
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -48,7 +48,7 @@ import (
 type Feature struct {
 	file       *FeatureFile
 	installers map[installmethod.Enum]Installer // defines the installers available for the Feature
-	svc        iaasapi.Service                  // is the iaas.Service to use to interact with Cloud Provider
+	scope      scopeapi.Scope
 
 	machines map[string]resources.Host
 
@@ -60,9 +60,9 @@ type Feature struct {
 // error contains :
 //   - fail.ErrNotFound if no Feature is found by its name
 //   - fail.ErrSyntax if Feature found contains syntax error
-func NewFeature(ctx context.Context, svc iaasapi.Service, name string) (_ resources.Feature, ferr fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+func NewFeature(ctx context.Context, scope scopeapi.Scope, name string) (_ resources.Feature, ferr fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -74,7 +74,7 @@ func NewFeature(ctx context.Context, svc iaasapi.Service, name string) (_ resour
 	default:
 	}
 
-	featureFileInstance, xerr := LoadFeatureFile(ctx, svc, name, false)
+	featureFileInstance, xerr := LoadFeatureFile(ctx, scope, name, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -83,16 +83,16 @@ func NewFeature(ctx context.Context, svc iaasapi.Service, name string) (_ resour
 	featureInstance := &Feature{
 		file:     featureFileInstance,
 		machines: make(map[string]resources.Host),
-		svc:      svc,
+		scope:    scope,
 	}
 	return featureInstance, nil
 }
 
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
-func NewEmbeddedFeature(ctx context.Context, svc iaasapi.Service, name string) (_ resources.Feature, ferr fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+func NewEmbeddedFeature(ctx context.Context, scope scopeapi.Scope, name string) (_ resources.Feature, ferr fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -104,15 +104,15 @@ func NewEmbeddedFeature(ctx context.Context, svc iaasapi.Service, name string) (
 	default:
 	}
 
-	featureFileInstance, xerr := LoadFeatureFile(ctx, svc, name, true)
+	featureFileInstance, xerr := LoadFeatureFile(ctx, scope, name, true)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	featureInstance := &Feature{
-		file: featureFileInstance,
-		svc:  svc,
+		file:  featureFileInstance,
+		scope: scope,
 	}
 
 	return featureInstance, nil
@@ -126,21 +126,36 @@ func (instance *Feature) IsNull() bool {
 // Clone ...
 // satisfies interface clonable.Clonable
 func (instance *Feature) Clone() (clonable.Clonable, error) {
+	if valid.IsNull(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	res := &Feature{}
-	return res.Replace(instance)
+	return res, res.Replace(instance)
+}
+
+func (instance *Feature) Scope() scopeapi.Scope {
+	if valid.IsNull(instance) {
+		return nil
+	}
+
+	return instance.scope
 }
 
 // Replace ...
 // satisfies interface clonable.Clonable
 // may panic
-func (instance *Feature) Replace(p clonable.Clonable) (clonable.Clonable, error) {
-	if instance == nil || p == nil {
-		return nil, fail.InvalidInstanceError()
+func (instance *Feature) Replace(p clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if p == nil {
+		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, ok := p.(*Feature)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *Feature")
+	src, err := lang.Cast[*Feature](p)
+	if err != nil {
+		return err
 	}
 
 	*instance = *src
@@ -148,7 +163,7 @@ func (instance *Feature) Replace(p clonable.Clonable) (clonable.Clonable, error)
 	for k, v := range src.installers {
 		instance.installers[k] = v
 	}
-	return instance, nil
+	return nil
 }
 
 // GetName returns the display name of the Feature, with error handling
@@ -165,7 +180,7 @@ func (instance *Feature) GetID() (string, error) {
 }
 
 // GetFilename returns the filename of the Feature definition, with error handling
-func (instance *Feature) GetFilename(ctx context.Context) (string, fail.Error) {
+func (instance *Feature) GetFilename(_ context.Context) (string, fail.Error) {
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -174,10 +189,11 @@ func (instance *Feature) GetFilename(ctx context.Context) (string, fail.Error) {
 }
 
 // GetDisplayFilename returns the filename of the Feature definition, beautifulled, with error handling
-func (instance *Feature) GetDisplayFilename(ctx context.Context) string {
+func (instance *Feature) GetDisplayFilename(_ context.Context) string {
 	if valid.IsNil(instance) {
 		return ""
 	}
+
 	return instance.file.displayFileName
 }
 
@@ -292,12 +308,13 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
 		}
 
-		xerr := castedTarget.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-				hostFeaturesV1, err := lang.Cast[*propertiesv1.HostFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr := castedTarget.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+				hostFeaturesV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
+
 				_, found = hostFeaturesV1.Installed[instance.GetName()]
 				return nil
 			})
@@ -525,7 +542,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 		return nil, xerr
 	}
 
-	xerr = registerOnSuccessfulHostsInCluster(ctx, instance.svc, target, instance, nil, results)
+	xerr = registerOnSuccessfulHostsInCluster(ctx, instance.Scope(), target, instance, nil, results)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -583,7 +600,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		return results, xerr
 	}
 
-	xerr = unregisterOnSuccessfulHostsInCluster(ctx, instance.svc, target, instance, results)
+	xerr = unregisterOnSuccessfulHostsInCluster(ctx, instance.Scope(), target, instance, results)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -593,7 +610,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 }
 
 // Dependencies returns a list of features needed as dependencies
-func (instance *Feature) Dependencies(ctx context.Context) (map[string]struct{}, fail.Error) {
+func (instance *Feature) Dependencies(_ context.Context) (map[string]struct{}, fail.Error) {
 	emptyMap := map[string]struct{}{}
 	if valid.IsNil(instance) {
 		return emptyMap, fail.InvalidInstanceError()
@@ -655,7 +672,7 @@ func (instance *Feature) installRequirements(ctx context.Context, t resources.Ta
 
 		targetIsCluster := t.TargetType() == featuretargettype.Cluster
 		for requirement := range requirements {
-			needed, xerr := NewFeature(ctx, instance.svc, requirement)
+			needed, xerr := NewFeature(ctx, instance.Scope(), requirement)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to find required Feature '%s'", requirement)
@@ -690,7 +707,7 @@ func (instance *Feature) installRequirements(ctx context.Context, t resources.Ta
 	return nil
 }
 
-func registerOnSuccessfulHostsInCluster(ctx context.Context, svc iaasapi.Service, target resources.Targetable, installed resources.Feature, requiredBy resources.Feature, results resources.Results) fail.Error {
+func registerOnSuccessfulHostsInCluster(ctx context.Context, scope scopeapi.Scope, target resources.Targetable, installed resources.Feature, requiredBy resources.Feature, results resources.Results) fail.Error {
 	if target.TargetType() == featuretargettype.Cluster {
 		// Walk through results and register Feature in successful hosts
 		successfulHosts := map[string]struct{}{}
@@ -706,7 +723,7 @@ func registerOnSuccessfulHostsInCluster(ctx context.Context, svc iaasapi.Service
 			}
 		}
 		for k := range successfulHosts {
-			host, xerr := LoadHost(ctx, svc, k)
+			host, xerr := LoadHost(ctx, scope, k)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -722,7 +739,7 @@ func registerOnSuccessfulHostsInCluster(ctx context.Context, svc iaasapi.Service
 	return nil
 }
 
-func unregisterOnSuccessfulHostsInCluster(ctx context.Context, svc iaasapi.Service, target resources.Targetable, installed resources.Feature, results resources.Results) fail.Error {
+func unregisterOnSuccessfulHostsInCluster(ctx context.Context, scope scopeapi.Scope, target resources.Targetable, installed resources.Feature, results resources.Results) fail.Error {
 	if target.TargetType() == featuretargettype.Cluster {
 		// Walk through results and register Feature in successful hosts
 		successfulHosts := map[string]struct{}{}
@@ -738,7 +755,7 @@ func unregisterOnSuccessfulHostsInCluster(ctx context.Context, svc iaasapi.Servi
 			}
 		}
 		for k := range successfulHosts {
-			host, xerr := LoadHost(ctx, svc, k)
+			host, xerr := LoadHost(ctx, scope, k)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -764,7 +781,7 @@ func (instance Feature) ToProtocol(ctx context.Context) *protocol.FeatureRespons
 }
 
 // ListParametersWithControl returns a slice of parameter names that have control script
-func (instance Feature) ListParametersWithControl(ctx context.Context) []string {
+func (instance Feature) ListParametersWithControl(_ context.Context) []string {
 	out := make([]string, 0, len(instance.file.versionControl))
 	for k := range instance.file.versionControl {
 		out = append(out, k)
@@ -810,7 +827,7 @@ func (instance Feature) controlledParameter(ctx context.Context, p string, targe
 			return "", xerr
 		}
 
-		timings, xerr := instance.svc.Timings()
+		timings, xerr := instance.Scope().Service().Timings()
 		if xerr != nil {
 			return "", xerr
 		}
@@ -870,7 +887,7 @@ func filterEligibleFeatures(ctx context.Context, target resources.Targetable, fi
 
 	var out []resources.Feature
 	for _, v := range list {
-		entry, xerr := NewFeature(ctx, target.Service(), v)
+		entry, xerr := NewFeature(ctx, target.Scope(), v)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:

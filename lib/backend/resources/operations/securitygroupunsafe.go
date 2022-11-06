@@ -18,9 +18,10 @@ package operations
 
 import (
 	"context"
-	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -29,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -73,11 +73,11 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 			networkID = castedValue.ID
 		}
 
-		xerr := instance.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			var ok bool
-			abstractSG, ok = clonable.(*abstract.SecurityGroup)
-			if !ok {
-				return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr := instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			var innerErr error
+			abstractSG, innerErr = lang.Cast[*abstract.SecurityGroup](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			if networkID == "" {
@@ -86,10 +86,10 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 
 			if !force {
 				// check bonds to hosts
-				innerXErr := props.Inspect(securitygroupproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
-					hostsV1, err := lang.Cast[*propertiesv1.SecurityGroupHosts)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				innerXErr := props.Inspect(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+					hostsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
 					}
 
 					// Do not remove a SecurityGroup used on hosts
@@ -113,10 +113,10 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 				}
 
 				// check bonds to subnets
-				innerXErr = props.Inspect(securitygroupproperty.SubnetsV1, func(clonable clonable.Clonable) fail.Error {
-					subnetsV1, err := lang.Cast[*propertiesv1.SecurityGroupSubnets)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				innerXErr = props.Inspect(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
+					subnetsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupSubnets](p)
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
 					}
 
 					// Do not remove a SecurityGroup used on subnet(s)
@@ -143,10 +143,10 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 			// FIXME: how to restore bindings in case of failure or abortion ? This would prevent the use of DisarmAbortSignal here...
 
 			// unbind from Subnets (which will unbind from Hosts attached to these Subnets...)
-			innerXErr := props.Alter(securitygroupproperty.SubnetsV1, func(clonable clonable.Clonable) fail.Error {
-				sgnV1, err := lang.Cast[*propertiesv1.SecurityGroupSubnets)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			innerXErr := props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
+				sgnV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupSubnets](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				return instance.unbindFromSubnets(ctx, sgnV1)
@@ -156,11 +156,12 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 			}
 
 			// unbind from the Hosts if there are remaining ones
-			innerXErr = props.Alter(securitygroupproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
-				sghV1, err := lang.Cast[*propertiesv1.SecurityGroupHosts)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			innerXErr = props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+				sghV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
+
 				return instance.unbindFromHosts(ctx, sghV1)
 			})
 			if innerXErr != nil {
@@ -229,17 +230,17 @@ func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(inctx context.Cont
 		}
 
 		// -- update Security Groups in Network metadata
-		networkInstance, xerr := LoadNetwork(ctx, instance.Service(), networkID)
+		networkInstance, xerr := LoadNetwork(ctx, instance.Scope(), networkID)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
 		}
 
 		xerr = networkInstance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(networkproperty.SecurityGroupsV1, func(clonable clonable.Clonable) fail.Error {
-				nsgV1, err := lang.Cast[*propertiesv1.NetworkSecurityGroups)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.NetworkSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Alter(networkproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+				nsgV1, innerErr := lang.Cast[*propertiesv1.NetworkSecurityGroups](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				delete(nsgV1.ByID, sgid)
@@ -284,10 +285,10 @@ func (instance *SecurityGroup) unsafeClear(inctx context.Context) fail.Error {
 	go func() {
 		defer close(chRes)
 
-		xerr := instance.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			asg, err := lang.Cast[*abstract.SecurityGroup)
-			if !ok {
-				return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr := instance.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			asg, innerErr := lang.Cast[*abstract.SecurityGroup](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			_, innerXErr := instance.Service().ClearSecurityGroup(ctx, asg)
@@ -331,10 +332,10 @@ func (instance *SecurityGroup) unsafeAddRule(inctx context.Context, rule *abstra
 			return
 		}
 
-		xerr = instance.Alter(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			asg, err := lang.Cast[*abstract.SecurityGroup)
-			if !ok {
-				return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr = instance.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			asg, innerErr := lang.Cast[*abstract.SecurityGroup](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			_, innerXErr := instance.Service().AddRuleToSecurityGroup(ctx, asg, rule)
@@ -392,10 +393,10 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 
 		// Update instance metadata
 		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(securitygroupproperty.SubnetsV1, func(clonable clonable.Clonable) fail.Error {
-				sgsV1, err := lang.Cast[*propertiesv1.SecurityGroupSubnets)
-				if !ok {
-					return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
+				sgsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupSubnets](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				// updates security group metadata
@@ -457,11 +458,11 @@ func (instance *SecurityGroup) unsafeBindToSubnet(inctx context.Context, abstrac
 			return
 		}
 
-		xerr = instance.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			if mark == resources.MarkSecurityGroupAsDefault {
-				asg, err := lang.Cast[*abstract.SecurityGroup)
-				if !ok {
-					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				asg, innerErr := lang.Cast[*abstract.SecurityGroup](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				if asg.DefaultForHost != "" {
@@ -471,10 +472,10 @@ func (instance *SecurityGroup) unsafeBindToSubnet(inctx context.Context, abstrac
 				asg.DefaultForSubnet = abstractSubnet.ID
 			}
 
-			return props.Alter(securitygroupproperty.SubnetsV1, func(clonable clonable.Clonable) fail.Error {
-				sgsV1, err := lang.Cast[*propertiesv1.SecurityGroupSubnets)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
+				sgsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupSubnets](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				// First check if subnet is present with the state requested; if present with same state, consider situation as a success
@@ -535,11 +536,11 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 		hn := hostInstance.GetName()
 		logrus.WithContext(ctx).Warningf("Binding security group %s to host %s", sgid, hn)
 
-		xerr := instance.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr := instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			if mark == resources.MarkSecurityGroupAsDefault {
-				asg, err := lang.Cast[*abstract.SecurityGroup)
-				if !ok {
-					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				asg, innerErr := lang.Cast[*abstract.SecurityGroup](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				if asg.DefaultForHost != "" {
@@ -553,10 +554,10 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 				}
 			}
 
-			return props.Alter(securitygroupproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
-				sghV1, err := lang.Cast[*propertiesv1.SecurityGroupHosts)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+				sghV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				// First check if host is present; if not present or state is different, replace the entry

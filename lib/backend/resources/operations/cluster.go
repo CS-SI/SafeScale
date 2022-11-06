@@ -29,12 +29,12 @@ import (
 	"sync"
 	"time"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
@@ -43,11 +43,11 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/clusterflavors"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/clusterflavors/boh"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/clusterflavors/k8s"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v3"
@@ -88,14 +88,14 @@ type Cluster struct {
 }
 
 // NewCluster is the constructor of resources.Cluster struct
-func NewCluster(ctx context.Context, frame *scope.Frame) (_ *Cluster, ferr fail.Error) {
+func NewCluster(ctx context.Context, scope scopeapi.Scope) (_ *Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNull(frame) {
+	if valid.IsNull(scope) {
 		return nil, fail.InvalidParameterCannotBeNilError("frame")
 	}
 
-	coreInstance, xerr := metadata.NewCore(frame, metadata.MethodObjectStorage, clusterKind, clustersFolderName, &abstract.ClusterIdentity{})
+	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, clusterKind, clustersFolderName, &abstract.ClusterIdentity{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -126,8 +126,6 @@ func (instance *Cluster) Exists(ctx context.Context) (bool, fail.Error) {
 	}
 
 	// begin by inspecting all hosts...
-	svc := instance.Service()
-
 	ci, xerr := instance.unsafeGetIdentity(ctx)
 	if xerr != nil {
 		return false, xerr
@@ -138,7 +136,7 @@ func (instance *Cluster) Exists(ctx context.Context) (bool, fail.Error) {
 		return false, xerr
 	}
 
-	rh, xerr := LoadHost(ctx, svc, fmt.Sprintf("gw-%s", ci.Name))
+	rh, xerr := LoadHost(ctx, instance.Scope(), fmt.Sprintf("gw-%s", ci.Name))
 	if xerr != nil {
 		return false, xerr
 	}
@@ -153,7 +151,7 @@ func (instance *Cluster) Exists(ctx context.Context) (bool, fail.Error) {
 	}
 
 	if len(gws) == 2 {
-		rh, xerr := LoadHost(ctx, svc, fmt.Sprintf("gw2-%s", ci.Name))
+		rh, xerr := LoadHost(ctx, instance.Scope(), fmt.Sprintf("gw2-%s", ci.Name))
 		if xerr != nil {
 			return false, xerr
 		}
@@ -174,7 +172,7 @@ func (instance *Cluster) Exists(ctx context.Context) (bool, fail.Error) {
 	}
 
 	for _, mid := range mids {
-		rh, xerr := LoadHost(ctx, svc, mid.Name)
+		rh, xerr := LoadHost(ctx, instance.Scope(), mid.Name)
 		if xerr != nil {
 			return false, xerr
 		}
@@ -195,7 +193,7 @@ func (instance *Cluster) Exists(ctx context.Context) (bool, fail.Error) {
 	}
 
 	for _, nid := range nids {
-		rh, xerr := LoadHost(ctx, svc, nid.Name)
+		rh, xerr := LoadHost(ctx, instance.Scope(), nid.Name)
 		if xerr != nil {
 			return false, xerr
 		}
@@ -256,11 +254,11 @@ func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max
 }
 
 // LoadCluster loads cluster information from metadata
-func LoadCluster(inctx context.Context, frame *scope.Frame, name string) (_ resources.Cluster, ferr fail.Error) {
+func LoadCluster(inctx context.Context, scope scopeapi.Scope, name string) (_ resources.Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNull(frame) {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 	if name = strings.TrimSpace(name); name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -282,7 +280,7 @@ func LoadCluster(inctx context.Context, frame *scope.Frame, name string) (_ reso
 		var kt *Cluster
 		cachename := fmt.Sprintf("%T/%s", kt, name)
 
-		cache, xerr := frame.Service().GetCache(ctx)
+		cache, xerr := scope.Service().GetCache(ctx)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
 			return
@@ -298,7 +296,7 @@ func LoadCluster(inctx context.Context, frame *scope.Frame, name string) (_ reso
 			}
 		}
 
-		cacheMissLoader := func() (data.Identifiable, fail.Error) { return onClusterCacheMiss(ctx, frame, name) }
+		cacheMissLoader := func() (data.Identifiable, fail.Error) { return onClusterCacheMiss(ctx, scope, name) }
 		anon, xerr := cacheMissLoader()
 		if xerr != nil {
 			chRes <- result{nil, xerr}
@@ -378,7 +376,7 @@ func LoadCluster(inctx context.Context, frame *scope.Frame, name string) (_ reso
 }
 
 // onClusterCacheMiss is called when cluster cache does not contain an instance of cluster 'name'
-func onClusterCacheMiss(inctx context.Context, frame *scope.Frame, name string) (data.Identifiable, fail.Error) {
+func onClusterCacheMiss(inctx context.Context, scope scopeapi.Scope, name string) (data.Identifiable, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -389,7 +387,7 @@ func onClusterCacheMiss(inctx context.Context, frame *scope.Frame, name string) 
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		clusterInstance, xerr := NewCluster(ctx, frame)
+		clusterInstance, xerr := NewCluster(ctx, scope)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
 			return
@@ -487,16 +485,16 @@ func (instance *Cluster) IsNull() bool {
 }
 
 // carry ...
-func (instance *Cluster) carry(ctx context.Context, clonable clonable.Clonable) (ferr fail.Error) {
+func (instance *Cluster) carry(ctx context.Context, p clonable.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) && instance.Core.IsTaken() {
+	if !valid.IsNil(instance) && instance.IsTaken() {
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.Core.Carry(ctx, clonable)
+	xerr := instance.Carry(ctx, p)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -523,10 +521,8 @@ func (instance *Cluster) Create(inctx context.Context, req abstract.ClusterReque
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			if !valid.IsNil(instance.Core) {
-				if instance.Core.IsTaken() {
-					return fail.InconsistentError("already carrying information")
-				}
+			if !valid.IsNil(instance.Core) && instance.IsTaken() {
+				return fail.InconsistentError("already carrying information")
 			}
 			if ctx == nil {
 				return fail.InvalidParameterCannotBeNilError("ctx")
@@ -575,6 +571,7 @@ func (instance *Cluster) String(ctx context.Context) (_ string, ferr fail.Error)
 	if xerr != nil {
 		return "", xerr
 	}
+
 	return dumped, nil
 }
 
@@ -622,7 +619,7 @@ func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
+	return instance.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		aci := abstract.NewClusterIdentity()
 		xerr := aci.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1422,7 +1419,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	hosts := make([]resources.Host, 0, len(nodes))
 	for _, v := range nodes {
-		hostInstance, xerr := LoadHost(ctx, svc, v.ID)
+		hostInstance, xerr := LoadHost(ctx, instance.Scope(), v.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -1509,7 +1506,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 
 	var selectedMaster resources.Host
 	if selectedMasterID != "" {
-		selectedMaster, xerr = LoadHost(ctx, instance.Service(), selectedMasterID)
+		selectedMaster, xerr = LoadHost(ctx, instance.Scope(), selectedMasterID)
 	} else {
 		selectedMaster, xerr = instance.unsafeFindAvailableMaster(ctx)
 	}
@@ -1823,7 +1820,7 @@ func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool
 	}
 
 	var hostInstance resources.Host
-	hostInstance, xerr = LoadHost(ctx, instance.Service(), ref)
+	hostInstance, xerr = LoadHost(ctx, instance.Scope(), ref)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return false, xerr
@@ -1926,7 +1923,7 @@ func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (hostIn
 		return nil, fail.NotFoundError("failed to find node %s in Cluster '%s'", hostID, instance.GetName())
 	}
 
-	return LoadHost(ctx, instance.Service(), hostID)
+	return LoadHost(ctx, instance.Scope(), hostID)
 }
 
 // deleteMaster deletes the master specified by its ID
@@ -2090,7 +2087,7 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 		}()
 
 		// Deletes node
-		hostInstance, xerr := LoadHost(ctx, instance.Service(), nodeRef)
+		hostInstance, xerr := LoadHost(ctx, instance.Scope(), nodeRef)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -2558,20 +2555,20 @@ func (instance *Cluster) extractNetworkingInfo(ctx context.Context) (networkInst
 
 		var inErr fail.Error
 		if networkV3.SubnetID != "" {
-			if subnetInstance, inErr = LoadSubnet(ctx, instance.Frame(), networkV3.NetworkID, networkV3.SubnetID); inErr != nil {
+			if subnetInstance, inErr = LoadSubnet(ctx, instance.Scope(), networkV3.NetworkID, networkV3.SubnetID); inErr != nil {
 				return inErr
 			}
 		}
 
 		if networkV3.NetworkID != "" {
-			networkInstance, inErr = LoadNetwork(ctx, instance.Frame(), networkV3.NetworkID)
+			networkInstance, inErr = LoadNetwork(ctx, instance.Scope(), networkV3.NetworkID)
 			if inErr != nil {
 				return inErr
 			}
 			deleteNetwork = networkV3.CreatedNetwork
 		}
 		if networkV3.SubnetID != "" {
-			subnetInstance, inErr = LoadSubnet(ctx, instance.Frame(), networkV3.NetworkID, networkV3.SubnetID)
+			subnetInstance, inErr = LoadSubnet(ctx, instance.Scope(), networkV3.NetworkID, networkV3.SubnetID)
 			if inErr != nil {
 				return inErr
 			}
@@ -2823,7 +2820,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 				}
 
 				// Template params: gateways
-				rh, err := LoadHost(ctx, instance.Service(), networkCfg.GatewayID)
+				rh, err := LoadHost(ctx, instance.Scope(), networkCfg.GatewayID)
 				if err != nil {
 					return fail.InconsistentError("Fail to load primary gateway '%s'", networkCfg.GatewayID)
 				}
@@ -2844,7 +2841,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 				}
 
 				if networkCfg.SecondaryGatewayIP != "" {
-					rh, err = LoadHost(ctx, instance.Service(), networkCfg.SecondaryGatewayID)
+					rh, err = LoadHost(ctx, instance.Scope(), networkCfg.SecondaryGatewayID)
 					if err != nil {
 						return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.SecondaryGatewayID)
 					}
@@ -2870,7 +2867,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 				for _, v := range nodesV3.Masters {
 					if node, found := nodesV3.ByNumericalID[v]; found {
 						nodes[node.NumericalID] = node
-						master, err := LoadHost(ctx, instance.Service(), node.ID)
+						master, err := LoadHost(ctx, instance.Scope(), node.ID)
 						if err != nil {
 							return fail.InconsistentError("Fail to load master '%s'", node.ID)
 						}
@@ -3063,7 +3060,7 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 	makers := instance.localCache.makers
 	if makers.JoinNodeToCluster != nil {
 		for _, v := range nodes {
-			hostInstance, xerr := LoadHost(ctx, instance.Service(), v.ID)
+			hostInstance, xerr := LoadHost(ctx, instance.Scope(), v.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr

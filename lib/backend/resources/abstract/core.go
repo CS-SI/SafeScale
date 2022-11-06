@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // Core represents a virtual network
@@ -34,21 +35,32 @@ type (
 		Name string                   `json:"name"` // name of the abstract resource
 		Tags data.Map[string, string] `json:"tags,omitempty"`
 
-		snippet  string
-		summoner terraformerapi.Summoner
+		scope            ScopeLimitedToAbstractUse
+		terraformSnippet string
+		terraformData    []byte
+		useTerraform     bool
+	}
+
+	ScopeLimitedToAbstractUse interface {
+		Resource(kind string, ref string) (clonable.Clonable, fail.Error)
+		AllResources() ([]terraformerapi.Resource, fail.Error)
 	}
 )
 
-// NewCore initializes a new instance of Network
-func NewCore(name string, options ...Option) (*Core, fail.Error) {
+const (
+	Unnamed = "unnamed"
+)
+
+// New initializes a new instance of Network
+func New(opts ...Option) (*Core, fail.Error) {
 	c := &Core{
-		Name: name,
+		Name: Unnamed,
 		Tags: data.NewMap[string, string](),
 	}
 	c.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	c.Tags["ManagedBy"] = "safescale"
 
-	for _, v := range options {
+	for _, v := range opts {
 		if v != nil {
 			xerr := v(c)
 			if xerr != nil {
@@ -59,24 +71,27 @@ func NewCore(name string, options ...Option) (*Core, fail.Error) {
 	return c, nil
 }
 
+// WithName defines the name of the resource (otherwise will be set to "unnamed")
+func WithName(name string) Option {
+	return func(c *Core) fail.Error {
+		if name == "" {
+			c.Name = Unnamed
+		} else {
+			c.Name = name
+		}
+		return nil
+	}
+}
+
 // UseTerraformSnippet allows to attach a snippet to the abstract resource
 func UseTerraformSnippet(snippet string) Option {
 	return func(c *Core) fail.Error {
 		if snippet == "" {
 			return fail.InvalidParameterCannotBeEmptyStringError("snippet")
 		}
-		c.snippet = snippet
-		return nil
-	}
-}
 
-// UseSummoner ...
-func UseSummoner(summoner terraformerapi.Summoner) Option {
-	return func(c *Core) fail.Error {
-		if summoner == nil {
-			return fail.InvalidParameterCannotBeNilError("summoner")
-		}
-		c.summoner = summoner
+		c.terraformSnippet = snippet
+		c.useTerraform = true
 		return nil
 	}
 }
@@ -94,7 +109,7 @@ func (c *Core) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	nc, xerr := NewCore(c.Name)
+	nc, xerr := New(WithName(c.Name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -121,12 +136,41 @@ func (c *Core) Replace(p clonable.Clonable) error {
 	return nil
 }
 
-// Snippet returns the path of the snippet used by terraform to handle the resource
-func (c Core) Snippet() string {
-	return c.snippet
+// TerraformSnippet returns the name of the terraform Snippet used to define resource
+func (c *Core) TerraformSnippet() string {
+	if valid.IsNull(c) {
+		return ""
+	}
+
+	return c.terraformSnippet
 }
 
-// Summoner returns the summoner to use to realize the resource in terraform
-func (c Core) Summoner() terraformerapi.Summoner {
-	return c.summoner
+// func (c *Core) Prepare(provider terraformer.ProviderUsingTerraform) error {
+// 	if c.useTerraform {
+// 		renderer, variables, xerr := provider.Renderer()
+// 		if xerr != nil {
+// 			return xerr
+// 		}
+// 		defer func() { _ = renderer.Close() }()
+//
+// 		// lvars.Merge(map[string]any{"Resource": r.ToMap()})
+// 		variables.Merge(map[string]any{"Resource": c})
+// 		content, xerr := renderer.RealizeSnippet(provider.EmbeddedFS(), c.terraformSnippet, variables)
+// 		if xerr != nil {
+// 			return xerr
+// 		}
+//
+// 		c.terraformData= content
+// 	}
+//
+// 	return nil
+// }
+
+// AllResources returns the scope
+func (c *Core) AllResources() ([]terraformerapi.Resource, fail.Error) {
+	if valid.IsNull(c) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	return c.scope.AllResources()
 }

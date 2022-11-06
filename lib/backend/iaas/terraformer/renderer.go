@@ -28,13 +28,15 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -43,19 +45,27 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-// ProviderUseTerraformer ...
-type providerUseTerraformer interface {
+// ProviderUsingTerraform ...
+type ProviderUsingTerraform interface {
+	AuthenticationOptions() iaasoptions.Authentication
+	ConfigurationOptions() iaasoptions.Configuration
+	TerraformerOptions() options.Options
 	Name() string
 	EmbeddedFS() embed.FS
-	Snippet() string
+	// Renderer() (terraformerapi.Renderer, data.Map[string, any], fail.Error)
 }
 
-// summoner is an implementation of Summoner interface
-type summoner struct {
-	mu           *sync.Mutex
-	executor     *tfexec.Terraform
-	provider     iaasapi.Provider
-	config       terraformerapi.Configuration
+// renderer is an implementation of Renderer interface
+type renderer struct {
+	mu       *sync.Mutex
+	executor *tfexec.Terraform
+	provider ProviderUsingTerraform
+	scope    scopeapi.Scope
+	opts     options.Options
+	config   terraformerapi.Configuration
+	// workdir      string
+	// plugindir    string
+	// execpath     string
 	env          map[string]string // contains environment variables to set at each call
 	buildPath    string
 	lastFilename string
@@ -73,23 +83,42 @@ const (
 //go:embed snippets
 var layoutFiles embed.FS
 
-// NewSummoner instantiates a terraform file builder that will put file in 'workDir'
-func NewSummoner(provider iaasapi.Provider, conf terraformerapi.Configuration) (terraformerapi.Summoner, fail.Error) {
+// NewRenderer instantiates a terraform file builder that will put file in 'workDir'
+func NewRenderer(provider ProviderUsingTerraform, opts options.Options) (terraformerapi.Renderer, fail.Error) {
 	if valid.IsNull(provider) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if conf.WorkDir == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("workDir")
-	}
-	if conf.ExecPath == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("execPath")
-	}
-	if _, ok := provider.(providerUseTerraformer); !ok {
-		return nil, fail.InconsistentError("missing methods in 'provider' to be used by Summoner")
+	if _, ok := provider.(ProviderUsingTerraform); !ok {
+		return nil, fail.InconsistentError("missing methods in 'provider' to be used by Renderer")
 	}
 
-	out := &summoner{provider: provider, config: conf, mu: &sync.Mutex{}}
-	out.env = out.defaultEnv()
+	out := &renderer{
+		provider: provider,
+		opts:     provider.TerraformerOptions(),
+		mu:       &sync.Mutex{},
+	}
+
+	var xerr fail.Error
+	out.config, xerr = options.Value[terraformerapi.Configuration](opts, iaasoptions.BuildOptionTerraformerConfiguration)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// out.workdir, xerr = options.Value[string](opts, ConfigOptionWorkDir)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	if out.config.WorkDir == "" {
+		return nil, fail.InvalidRequestError("workdir cannot be empty string; please add 'UseWorkDir()'")
+	}
+
+	if out.config.ExecPath == "" {
+		return nil, fail.InvalidRequestError("execpath cannot be empty string; please add 'WithExecPath()'")
+	}
+
+	if out.config.PluginDir == "" {
+		return nil, fail.InvalidRequestError("plugindir cannot be empty string; please add 'WithPluginDir()'")
+	}
 
 	uuid, err := uuidpkg.NewV4()
 	if err != nil {
@@ -107,16 +136,29 @@ func NewSummoner(provider iaasapi.Provider, conf terraformerapi.Configuration) (
 		return nil, fail.Wrap(err, "failed to instantiate terraform executor")
 	}
 
+	out.env = out.defaultEnv()
 	return out, nil
 }
 
+// AddOptions allows to add option after instance creation
+func (instance *renderer) AddOptions(opts ...options.Option) fail.Error {
+	for _, v := range opts {
+		xerr := v(instance.opts)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	return nil
+}
+
 // IsNull tells if the instance must be considered as a null/zero value
-func (instance *summoner) IsNull() bool {
-	return instance == nil || instance.mu == nil || instance.config.WorkDir == "" || instance.config.ExecPath == ""
+func (instance *renderer) IsNull() bool {
+	return instance == nil || instance.mu == nil || instance.opts == nil || instance.config.WorkDir == "" || instance.config.ExecPath == ""
 }
 
 // SetEnv sets/replaces an environment var content
-func (instance *summoner) SetEnv(key, value string) fail.Error {
+func (instance *renderer) SetEnv(key, value string) fail.Error {
 	if key = strings.TrimSpace(key); key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
@@ -126,7 +168,7 @@ func (instance *summoner) SetEnv(key, value string) fail.Error {
 }
 
 // AddEnv adds an environment var (will fail if alreayd there)
-func (instance *summoner) AddEnv(key, value string) fail.Error {
+func (instance *renderer) AddEnv(key, value string) fail.Error {
 	if key = strings.TrimSpace(key); key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
@@ -141,7 +183,7 @@ func (instance *summoner) AddEnv(key, value string) fail.Error {
 }
 
 // Assemble creates a main.tf file in the appropriate folder
-func (instance *summoner) Assemble(resources ...terraformerapi.Resource) (_ string, ferr fail.Error) {
+func (instance *renderer) Assemble(resources ...terraformerapi.Resource) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNull(instance) {
@@ -151,7 +193,7 @@ func (instance *summoner) Assemble(resources ...terraformerapi.Resource) (_ stri
 		return "", fail.InvalidParameterCannotBeNilError("resources")
 	}
 	if instance.closed {
-		return "", fail.NotAvailableError("summoner has been closed")
+		return "", fail.NotAvailableError("renderer has been closed")
 	}
 	if instance.dirty {
 		return "", fail.InconsistentError("built more than once without Reset() in between")
@@ -160,19 +202,11 @@ func (instance *summoner) Assemble(resources ...terraformerapi.Resource) (_ stri
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
-	authOpts, xerr := instance.provider.AuthenticationOptions()
-	if xerr != nil {
-		return "", xerr
-	}
-
-	configOpts, xerr := instance.provider.ConfigurationOptions()
-	if xerr != nil {
-		return "", xerr
-	}
-
+	authOpts := instance.provider.AuthenticationOptions()
+	configOpts := instance.provider.ConfigurationOptions()
 	variables := data.NewMap[string, any]()
 	variables["Provider"] = map[string]any{
-		"Name":           instance.provider.(providerUseTerraformer).Name(),
+		"Name":           instance.provider.(ProviderUsingTerraform).Name(),
 		"Authentication": authOpts,
 		"Configuration":  configOpts,
 	}
@@ -199,7 +233,7 @@ func (instance *summoner) Assemble(resources ...terraformerapi.Resource) (_ stri
 		lvars := variables.Clone()
 		// lvars.Merge(map[string]any{"Resource": r.ToMap()})
 		lvars.Merge(map[string]any{"Resource": r})
-		content, xerr := instance.realizeTemplate(instance.provider.(providerUseTerraformer).EmbeddedFS(), r.Snippet(), lvars)
+		content, xerr := instance.RealizeSnippet(instance.provider.(ProviderUsingTerraform).EmbeddedFS(), r.TerraformSnippet(), lvars)
 		if xerr != nil {
 			return "", xerr
 		}
@@ -209,7 +243,8 @@ func (instance *summoner) Assemble(resources ...terraformerapi.Resource) (_ stri
 	variables["Resources"] = resourceContent
 
 	// render provider configuration
-	variables["ProviderDeclaration"], xerr = instance.realizeTemplate(instance.provider.(providerUseTerraformer).EmbeddedFS(), instance.provider.(providerUseTerraformer).Snippet(), variables)
+	var xerr fail.Error
+	variables["ProviderDeclaration"], xerr = instance.RealizeSnippet(instance.provider.(ProviderUsingTerraform).EmbeddedFS(), instance.provider.(ProviderUsingTerraform).ProviderData(), variables)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -218,7 +253,7 @@ func (instance *summoner) Assemble(resources ...terraformerapi.Resource) (_ stri
 	// if remoteStateStorage > 0 {
 	lvars := variables.Clone()
 	lvars["Consul"] = instance.config.Consul
-	content, xerr := instance.realizeTemplate(layoutFiles, consulBackendSnippetPath, lvars)
+	content, xerr := instance.RealizeSnippet(layoutFiles, consulBackendSnippetPath, lvars)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
@@ -227,7 +262,7 @@ func (instance *summoner) Assemble(resources ...terraformerapi.Resource) (_ stri
 	variables["ConsulBackendConfig"] = content
 
 	// VPL: disabled data.terraform_remote_state for now, troubles more than helps
-	// content, xerr = instance.realizeTemplate(layoutFiles, consulBackendDataSnippetPath, lvars)
+	// content, xerr = instance.RealizeSnippet(layoutFiles, consulBackendDataSnippetPath, lvars)
 	// xerr = debug.InjectPlannedFail(xerr)
 	// if xerr != nil {
 	// 	return xerr
@@ -239,7 +274,7 @@ func (instance *summoner) Assemble(resources ...terraformerapi.Resource) (_ stri
 	// }
 
 	// finally, render the layout
-	content, xerr = instance.realizeTemplate(layoutFiles, layoutSnippetPath, variables)
+	content, xerr = instance.RealizeSnippet(layoutFiles, layoutSnippetPath, variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
@@ -249,8 +284,8 @@ func (instance *summoner) Assemble(resources ...terraformerapi.Resource) (_ stri
 	return content, nil
 }
 
-// realizeTemplate generates a file from box template with variables updated
-func (instance *summoner) realizeTemplate(efs embed.FS, filename string, vars map[string]any) (string, fail.Error) {
+// RealizeSnippet generates a file from box template with variables updated
+func (instance *renderer) RealizeSnippet(efs embed.FS, filename string, vars map[string]any) (string, fail.Error) {
 	tmplString, err := efs.ReadFile(filename)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
@@ -277,7 +312,7 @@ func (instance *summoner) realizeTemplate(efs embed.FS, filename string, vars ma
 const mainFilename = "main.tf"
 
 // createFile creates the file in the appropriate path for terraform to execute it
-func (instance *summoner) createMainFile(content string) fail.Error {
+func (instance *renderer) createMainFile(content string) fail.Error {
 	instance.lastFilename = filepath.Join(instance.buildPath, mainFilename)
 	err := ioutil.WriteFile(instance.lastFilename, []byte(content), 0600)
 	if err != nil {
@@ -293,7 +328,7 @@ func (instance *summoner) createMainFile(content string) fail.Error {
 //   - false, fail.Error if the query returns no result
 //   - false, nil if no error occurred and no change would be made
 //   - true, nil if no error occurred and changes would be made
-func (instance *summoner) Plan(ctx context.Context, def string) (_ map[string]tfexec.OutputMeta, _ bool, ferr fail.Error) {
+func (instance *renderer) Plan(ctx context.Context, def string) (_ map[string]tfexec.OutputMeta, _ bool, ferr fail.Error) {
 	if valid.IsNull(instance) {
 		return nil, false, fail.InvalidInstanceError()
 	}
@@ -301,7 +336,7 @@ func (instance *summoner) Plan(ctx context.Context, def string) (_ map[string]tf
 		return nil, false, fail.InvalidParameterCannotBeEmptyStringError("def")
 	}
 	if instance.closed {
-		return nil, false, fail.NotAvailableError("summoner has been closed")
+		return nil, false, fail.NotAvailableError("renderer has been closed")
 	}
 	if !instance.dirty {
 		return nil, false, fail.InconsistentError("nothing has been built yet")
@@ -376,15 +411,13 @@ func (instance *summoner) Plan(ctx context.Context, def string) (_ map[string]tf
 	return outputs, success, nil
 }
 
-func (instance *summoner) defaultEnv() map[string]string {
-	return map[string]string{
-		"TF_DATA_DIR": instance.config.PluginDir,
-	}
+func (instance *renderer) defaultEnv() map[string]string {
+	return map[string]string{"TF_DATA_DIR": instance.config.PluginDir}
 }
 
 const terraformLockFile = ".terraform.lock.hcl"
 
-func (instance *summoner) copyTerraformLockFile() fail.Error {
+func (instance *renderer) copyTerraformLockFile() fail.Error {
 	lockPath := filepath.Join(instance.config.WorkDir, terraformLockFile)
 
 	// check if lock file exist in tenant folder
@@ -407,7 +440,7 @@ func (instance *summoner) copyTerraformLockFile() fail.Error {
 	return nil
 }
 
-func (instance *summoner) saveTerraformLockFile() fail.Error {
+func (instance *renderer) saveTerraformLockFile() fail.Error {
 	if instance.saveLockFile {
 		lockPath := filepath.Join(instance.buildPath, terraformLockFile)
 		copiedLockPath := filepath.Join(instance.config.WorkDir, terraformLockFile)
@@ -433,7 +466,7 @@ func (instance *summoner) saveTerraformLockFile() fail.Error {
 }
 
 // Apply calls terraform Apply command to operate changes
-func (instance *summoner) Apply(ctx context.Context, def string) (_ map[string]tfexec.OutputMeta, ferr fail.Error) {
+func (instance *renderer) Apply(ctx context.Context, def string) (_ map[string]tfexec.OutputMeta, ferr fail.Error) {
 	if valid.IsNull(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -441,7 +474,7 @@ func (instance *summoner) Apply(ctx context.Context, def string) (_ map[string]t
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("def")
 	}
 	if instance.closed {
-		return nil, fail.NotAvailableError("summoner has been closed")
+		return nil, fail.NotAvailableError("renderer has been closed")
 	}
 	if !instance.dirty {
 		return nil, fail.InconsistentError("nothing has been built yet")
@@ -521,8 +554,8 @@ func (instance *summoner) Apply(ctx context.Context, def string) (_ map[string]t
 	return outputs, nil
 }
 
-// Destroy calls the terraform Destroy command to operate changes
-func (instance *summoner) Destroy(ctx context.Context, def string) (ferr fail.Error) {
+// Destroy calls terraform Destroy command to operate changes
+func (instance *renderer) Destroy(ctx context.Context, def string) (ferr fail.Error) {
 	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -530,7 +563,7 @@ func (instance *summoner) Destroy(ctx context.Context, def string) (ferr fail.Er
 		return fail.InvalidParameterCannotBeEmptyStringError("def")
 	}
 	if instance.closed {
-		return fail.NotAvailableError("summoner has been closed")
+		return fail.NotAvailableError("renderer has been closed")
 	}
 	if !instance.dirty {
 		return fail.InconsistentError("nothing has been built yet")
@@ -588,12 +621,12 @@ func (instance *summoner) Destroy(ctx context.Context, def string) (ferr fail.Er
 }
 
 // // Import imports existing resource in local state file
-// func (instance *summoner) Import(ctx context.Context, resourceAddress, id string) (ferr fail.Error) {
+// func (instance *renderer) Import(ctx context.Context, resourceAddress, id string) (ferr fail.Error) {
 // 	if valid.IsNull(instance) {
 // 		return fail.InvalidInstanceError()
 // 	}
 // 	if instance.closed {
-// 		return fail.NotAvailableError("summoner has been closed")
+// 		return fail.NotAvailableError("renderer has been closed")
 // 	}
 // 	if !instance.dirty {
 // 		return fail.InconsistentError("nothing has been built yet")
@@ -650,12 +683,12 @@ func (instance *summoner) Destroy(ctx context.Context, def string) (ferr fail.Er
 // 	return nil
 // }
 
-// func (instance *summoner) State(ctx context.Context) (_ *tfjson.State, ferr fail.Error) {
+// func (instance *renderer) State(ctx context.Context) (_ *tfjson.State, ferr fail.Error) {
 // 	if valid.IsNull(instance) {
 // 		return nil, fail.InvalidInstanceError()
 // 	}
 // 	if instance.closed {
-// 		return nil, fail.NotAvailableError("summoner is closed")
+// 		return nil, fail.NotAvailableError("renderer is closed")
 // 	}
 // 	if !instance.dirty {
 // 		return nil, fail.InconsistentError("nothing has been built yet")
@@ -678,7 +711,7 @@ func (instance *summoner) Destroy(ctx context.Context, def string) (ferr fail.Er
 // }
 
 // Reset cleans up instance to be reused
-func (instance *summoner) Reset() fail.Error {
+func (instance *renderer) Reset() fail.Error {
 	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -704,7 +737,7 @@ func (instance *summoner) Reset() fail.Error {
 }
 
 // Close terminates instance and clean things up for good
-func (instance *summoner) Close() fail.Error {
+func (instance *renderer) Close() fail.Error {
 	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}

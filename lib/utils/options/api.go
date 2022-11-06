@@ -20,4 +20,11 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-type Mutator func(o Options) fail.Error
+type Option func(o Options) fail.Error
+
+type Options interface {
+	Load(key string) (any, fail.Error)
+	Store(key string, value any) (any, fail.Error)
+	StoreMany(entries ...Entry) fail.Error
+	Subset(keys ...string) (Options, fail.Error)
+}

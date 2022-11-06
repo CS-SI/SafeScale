@@ -183,7 +183,7 @@ func (instance service) WaitHostState(ctx context.Context, hostID string, state 
 	}
 
 	timer := time.After(timeout)
-	host, err := abstract.NewHostFull("unknown")
+	host, err := abstract.NewHostFull()
 	if err != nil {
 		return fail.Wrap(err)
 	}
@@ -1008,7 +1008,7 @@ func (instance service) CreateHostWithKeyPair(inctx context.Context, request abs
 		defer close(chRes)
 
 		found := true
-		ah, xerr := abstract.NewHostCore(request.ResourceName)
+		ah, xerr := abstract.NewHostCore(abstract.WithName(request.ResourceName))
 		if xerr != nil {
 			chRes <- result{nil, nil, nil, xerr}
 			return
@@ -1101,7 +1101,7 @@ func (instance service) ListHostsByName(inctx context.Context, details bool) (ma
 		}
 		hostMap := make(map[string]*abstract.HostFull)
 		for _, host := range hosts {
-			hostMap[host.Core.Name] = host
+			hostMap[host.Name] = host
 		}
 		chRes <- result{hostMap, nil}
 
@@ -1185,7 +1185,7 @@ func (instance service) InspectHostByName(inctx context.Context, name string) (*
 	go func() {
 		defer close(chRes)
 
-		ahc, err := abstract.NewHostCore(name)
+		ahc, err := abstract.NewHostCore(abstract.WithName(name))
 		if err != nil {
 			chRes <- result{rErr: fail.Wrap(err)}
 			return

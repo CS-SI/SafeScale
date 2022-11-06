@@ -21,6 +21,7 @@ import (
 	"net"
 	"strings"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
@@ -132,9 +133,9 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		}
 	}()
 
-	newNet, err := abstract.NewNetwork(network.Name)
-	if err != nil {
-		return nil, err
+	newNet, xerr := abstract.NewNetwork(abstract.WithName(network.Name))
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	newNet.ID = network.ID
@@ -220,9 +221,9 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (*abstract.Network
 		}
 	}
 	if network != nil && network.ID != "" {
-		newNet, err := abstract.NewNetwork(network.Name)
-		if err != nil {
-			return nil, err
+		newNet, xerr := abstract.NewNetwork(abstract.WithName(network.Name))
+		if xerr != nil {
+			return nil, xerr
 		}
 
 		newNet.ID = network.ID
@@ -261,9 +262,9 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 							continue
 						}
 
-						newNet, err := abstract.NewNetwork(n.Name)
-						if err != nil {
-							return false, err
+						newNet, xerr := abstract.NewNetwork(abstract.WithName(n.Name))
+						if xerr != nil {
+							return false, xerr
 						}
 
 						newNet.ID = n.ID
@@ -286,42 +287,46 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s stack) DeleteNetwork(ctx context.Context, id string) fail.Error {
+func (s stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	an, networkLabel, xerr := iaasapi.ValidateNetworkParameter(networkParam)
+	if xerr != nil {
+		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", networkLabel).WithStopwatch().Entering().Exiting()
 
 	var network *networks.Network
-	xerr := stacks.RetryableRemoteCall(ctx,
+	if an.ID == "" {
+		return fail.InvalidParameterError("networkParam", "does not contain valid value for 'ID' field")
+	}
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			network, innerErr = networks.Get(s.NetworkClient, id).Extract()
+			network, innerErr = networks.Get(s.NetworkClient, an.ID).Extract()
 			return innerErr
 		},
 		NormalizeError,
 	)
 	if xerr != nil {
-		logrus.WithContext(ctx).Errorf("failed to get Network '%s': %+v", id, xerr)
+		logrus.WithContext(ctx).Errorf("failed to get Network %s: %+v", networkLabel, xerr)
 		return xerr
 	}
 
-	sns, xerr := s.ListSubnets(ctx, id)
+	sns, xerr := s.ListSubnets(ctx, an.ID)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to list Subnets of Network '%s'", network.Name)
+		xerr = fail.Wrap(xerr, "failed to list Subnets of Network %s", networkLabel)
 		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(xerr.Error()))
 		return xerr
 	}
 	if len(sns) > 0 {
-		return fail.InvalidRequestError("cannot delete a Network '%s': there are Subnets in it", network.Name)
+		return fail.InvalidRequestError("cannot delete a Network %s: there are Subnets in it", networkLabel)
 	}
 
 	xerr = stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return networks.Delete(s.NetworkClient, id).ExtractErr()
+			return networks.Delete(s.NetworkClient, an.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
@@ -458,9 +463,9 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (ne
 		}
 	}
 
-	out, err := abstract.NewSubnet(subnet.Name)
-	if err != nil {
-		return nil, err
+	out, xerr := abstract.NewSubnet(abstract.WithName(subnet.Name))
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	out.ID = subnet.ID
@@ -491,13 +496,8 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-	as, xerr := abstract.NewSubnet("unknown")
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	var sn *subnets.Subnet
-	xerr = stacks.RetryableRemoteCall(ctx,
+	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			sn, innerErr = subnets.Get(s.NetworkClient, id).Extract()
 			return innerErr
@@ -508,8 +508,12 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet
 		return nil, xerr
 	}
 
+	as, xerr := abstract.NewSubnet(abstract.WithName(sn.Name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	as.ID = sn.ID
-	as.Name = sn.Name
 	as.Network = sn.NetworkID
 	as.IPVersion = ToAbstractIPVersion(sn.IPVersion)
 	as.CIDR = sn.CIDR
@@ -582,7 +586,7 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, name string)
 	case 1:
 		var xerr fail.Error
 		item := resp[0]
-		subnet, xerr = abstract.NewSubnet(name)
+		subnet, xerr = abstract.NewSubnet(abstract.WithName(name))
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -629,7 +633,7 @@ func (s stack) ListSubnets(ctx context.Context, networkID string) ([]*abstract.S
 				}
 
 				for _, subnet := range list {
-					item, xerr := abstract.NewSubnet(subnet.Name)
+					item, xerr := abstract.NewSubnet(abstract.WithName(subnet.Name))
 					if xerr != nil {
 						return false, xerr
 					}
@@ -869,9 +873,9 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 	// FIXME: OPP Now, and only for OVH, disable port security
 	// _, _ = s.rpcChangePortSecurity(ctx, port.ID, false)
 
-	vip, err := abstract.NewVirtualIP(name)
-	if err != nil {
-		return nil, fail.Wrap(err)
+	vip, xerr := abstract.NewVirtualIP(abstract.WithName(name))
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	vip.ID = port.ID

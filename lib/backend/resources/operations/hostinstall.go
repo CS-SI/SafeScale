@@ -19,7 +19,6 @@ package operations
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -30,10 +29,12 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -66,7 +67,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot install feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Scope(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -79,10 +80,10 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		}
 		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			// updates HostFeatures property for host
-			return props.Alter(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-				hostFeaturesV1, err := lang.Cast[*propertiesv1.HostFeatures)
-				if !ok {
-					return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
+			return props.Alter(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+				hostFeaturesV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				requires, innerXErr := feat.Dependencies(ctx)
@@ -127,7 +128,7 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 	tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Scope(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -167,7 +168,7 @@ func (instance *Host) DeleteFeature(inctx context.Context, name string, vars dat
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot delete feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Scope(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -185,11 +186,12 @@ func (instance *Host) DeleteFeature(inctx context.Context, name string, vars dat
 		}
 		return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			// updates HostFeatures property for host
-			return props.Alter(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-				hostFeaturesV1, err := lang.Cast[*propertiesv1.HostFeatures)
-				if !ok {
-					return fail.InconsistentError("expected '*propertiesv1.HostFeatures', provided '%s'", reflect.TypeOf(clonable))
+			return props.Alter(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+				hostFeaturesV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
+
 				delete(hostFeaturesV1.Installed, name)
 				return nil
 			})
@@ -210,7 +212,7 @@ func (instance *Host) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
-func (instance *Host) InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error) {
+func (instance *Host) InstallMethods(_ context.Context) (map[uint8]installmethod.Enum, fail.Error) {
 	if valid.IsNil(instance) {
 		return map[uint8]installmethod.Enum{}, fail.InvalidInstanceError()
 	}
@@ -240,15 +242,15 @@ func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Featur
 		return fail.InvalidParameterCannotBeNilError("feat")
 	}
 
-	return instance.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-			featuresV1, err := lang.Cast[*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	return instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+			featuresV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
-			var item *propertiesv1.HostInstalledFeature
-			if item, ok = featuresV1.Installed[feat.GetName()]; !ok {
+			item, ok := featuresV1.Installed[feat.GetName()]
+			if !ok {
 				requirements, innerXErr := feat.Dependencies(ctx)
 				if innerXErr != nil {
 					return innerXErr
@@ -292,11 +294,11 @@ func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr 
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
-	return instance.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-			featuresV1, err := lang.Cast[*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	return instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+			featuresV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			delete(featuresV1.Installed, feat)
@@ -335,7 +337,7 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 	list, _ := instance.InstalledFeatures(ctx)
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
-		item, xerr := NewFeature(ctx, instance.Service(), v)
+		item, xerr := NewFeature(ctx, instance.Scope(), v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return emptySlice, xerr
@@ -357,11 +359,11 @@ func (instance *Host) InstalledFeatures(ctx context.Context) ([]string, fail.Err
 	}
 
 	var out []string
-	xerr := instance.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-			featuresV1, err := lang.Cast[*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+			featuresV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			for k := range featuresV1.Installed {
@@ -396,14 +398,14 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 	v["ShortHostname"] = instance.GetName()
 	domain := ""
 
-	xerr := instance.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
-			hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
+			hostDescriptionV1, innerErr := lang.Cast[*propertiesv1.HostDescription](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
-			domain = hostDescriptionV1.Domain
 
+			domain = hostDescriptionV1.Domain
 			if domain != "" {
 				domain = "." + domain
 			}
@@ -540,10 +542,10 @@ func (instance *Host) IsFeatureInstalled(ctx context.Context, name string) (foun
 	}
 
 	return found, instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-			featuresV1, err := lang.Cast[*propertiesv1.HostFeatures)
-			if !ok {
-				return fail.InconsistentError("`propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Inspect(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+			featuresV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			_, found = featuresV1.Installed[name]

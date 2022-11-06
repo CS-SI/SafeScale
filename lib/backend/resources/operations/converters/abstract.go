@@ -188,7 +188,7 @@ func HostFullFromAbstractToProtocol(in *abstract.HostFull) *protocol.Host {
 	}
 
 	managed := false
-	if ct, ok := in.Core.Tags["DeclaredInBucket"]; ok {
+	if ct, ok := in.Tags["DeclaredInBucket"]; ok {
 		if ct != "" {
 			managed = true
 		}

@@ -20,7 +20,7 @@ package subnet
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
@@ -28,16 +28,16 @@ import (
 )
 
 // List returns a list of available subnets
-func List(ctx context.Context, svc iaasapi.Service, networkID string, all bool) ([]*abstract.Subnet, fail.Error) {
-	return operations.ListSubnets(ctx, svc, networkID, all)
+func List(ctx context.Context, scope scopeapi.Scope, networkID string, all bool) ([]*abstract.Subnet, fail.Error) {
+	return operations.ListSubnets(ctx, scope, networkID, all)
 }
 
 // New creates an instance of resources.Subnet
-func New(svc iaasapi.Service) (resources.Subnet, fail.Error) {
-	return operations.NewSubnet(svc)
+func New(scope scopeapi.Scope) (resources.Subnet, fail.Error) {
+	return operations.NewSubnet(scope)
 }
 
 // Load loads the metadata of a subnet and returns an instance of resources.Subnet
-func Load(ctx context.Context, svc iaasapi.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
-	return operations.LoadSubnet(ctx, svc, networkRef, subnetRef)
+func Load(ctx context.Context, scope scopeapi.Scope, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
+	return operations.LoadSubnet(ctx, scope, networkRef, subnetRef)
 }

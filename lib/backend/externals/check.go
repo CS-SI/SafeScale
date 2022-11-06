@@ -18,7 +18,7 @@
 package externals
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/controller"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -58,7 +58,7 @@ func Check(cmd *cobra.Command) (suffix string, ferr error) {
 		return "", fail.Wrap(err)
 	}
 
-	err = consul.Check()
+	err = controller.Check()
 	if err != nil {
 		return "", fail.Wrap(err)
 	}

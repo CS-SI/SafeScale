@@ -830,7 +830,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 		}
 	}()
 
-	ahf, err := abstract.NewHostFull(request.ResourceName)
+	ahf, err := abstract.NewHostFull(abstract.WithName(request.ResourceName))
 	if err != nil {
 		return nil, nil, fail.Wrap(err)
 	}
@@ -1019,7 +1019,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 		return nil, nil, xerr
 	}
 
-	ahf, err = abstract.NewHostFull(request.ResourceName)
+	ahf, err = abstract.NewHostFull(abstract.WithName(request.ResourceName))
 	if err != nil {
 		return nil, nil, fail.Wrap(err)
 	}
@@ -1229,7 +1229,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList
 		}
 
 		state := hostState(vm.State)
-		ahf, err := abstract.NewHostFull("unknown")
+		ahf, err := abstract.NewHostFull()
 		if err != nil {
 			return nil, fail.Wrap(err)
 		}

@@ -18,19 +18,19 @@ package handlers
 
 import (
 	"path"
-	"reflect"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
 	sharefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/share"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 //go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/backend/handlers.ShareHandler -o mocks/mock_share.go
@@ -49,11 +49,11 @@ type ShareHandler interface {
 
 // shareHandler nas service
 type shareHandler struct {
-	job job.Job
+	job jobapi.Job
 }
 
 // NewShareHandler creates a ShareHandler
-func NewShareHandler(job job.Job) ShareHandler {
+func NewShareHandler(job jobapi.Job) ShareHandler {
 	return &shareHandler{job: job}
 }
 
@@ -98,12 +98,12 @@ func (handler *shareHandler) Create(
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	shareInstance, xerr := sharefactory.New(handler.job.Service())
+	shareInstance, xerr := sharefactory.New(handler.job.Scope())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostName)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -135,7 +135,7 @@ func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	shareInstance, xerr := sharefactory.Load(handler.job.Context(), handler.job.Service(), name)
+	shareInstance, xerr := sharefactory.Load(handler.job.Context(), handler.job.Scope(), name)
 	if xerr != nil {
 		return xerr
 	}
@@ -164,7 +164,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	svc := handler.job.Service()
+	svc := handler.job.Scope()
 	objs, xerr := sharefactory.New(svc)
 	if xerr != nil {
 		return nil, xerr
@@ -191,11 +191,12 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 		}
 
 		xerr = host.Inspect(task.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(hostproperty.SharesV1, func(clonable clonable.Clonable) fail.Error {
-				hostSharesV1, err := lang.Cast[*propertiesv1.HostShares)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Inspect(hostproperty.SharesV1, func(p clonable.Clonable) fail.Error {
+				hostSharesV1, innerErr := lang.Cast[*propertiesv1.HostShares](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
+
 				shares[serverID] = hostSharesV1.ByID
 				return nil
 			})
@@ -238,7 +239,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	// Retrieve info about the share
-	svc := handler.job.Service()
+	svc := handler.job.Scope()
 	ctx := handler.job.Context()
 	shareInstance, xerr := sharefactory.Load(ctx, svc, shareName)
 	if xerr != nil {
@@ -280,7 +281,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	svc := handler.job.Service()
+	svc := handler.job.Scope()
 	ctx := handler.job.Context()
 	objs, xerr := sharefactory.Load(ctx, svc, shareRef)
 	if xerr != nil {
@@ -320,5 +321,5 @@ func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, fe
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	return sharefactory.Load(handler.job.Context(), handler.job.Service(), shareRef)
+	return sharefactory.Load(handler.job.Context(), handler.job.Scope(), shareRef)
 }

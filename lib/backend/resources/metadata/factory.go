@@ -19,33 +19,39 @@ package metadata
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage/bucket"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage/consul"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage/bucket"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage/consul"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 const (
 	MethodObjectStorage = "objectstorage"
 	MethodConsul        = "consul"
+
+	OptionUseMethodKey     = "method"
+	OptionWithPrefixKey    = "prefix"
+	OptionWithScopeKey     = "scope"
+	OptionWithoutReloadKey = "no_reload"
 )
 
 type config struct {
 	method   string
 	prefix   string
-	frame    *scope.Frame
+	scope    scopeapi.Scope
 	consulKV *consumer.KV
 	noReload bool
 }
 
-type Option func(*config) fail.Error
+// type Option func(*config) fail.Error
 
 // UseMethod defines the method used to store metadata
-func UseMethod(method string) Option {
-	return func(c *config) fail.Error {
+func UseMethod(method string) options.Option {
+	return func(opts options.Options) fail.Error {
 		method = strings.TrimSpace(method)
 		if method == "" {
 			return fail.InvalidParameterCannotBeEmptyStringError("method")
@@ -54,42 +60,37 @@ func UseMethod(method string) Option {
 		switch method {
 		case MethodObjectStorage, MethodConsul:
 		default:
-			return fail.InvalidParameterError("method", "invalid value '%s'", method)
+			return fail.InvalidParameterError(OptionUseMethodKey, "invalid value '%s'", method)
 		}
 
-		c.method = method
-		return nil
+		_, xerr := opts.Store(OptionUseMethodKey, method)
+		return xerr
 	}
 }
 
 // WithPrefix allows to define the prefix use by the folder
-func WithPrefix(prefix string) Option {
-	return func(c *config) fail.Error {
+func WithPrefix(prefix string) options.Option {
+	return func(c options.Options) fail.Error {
 		prefix = strings.TrimSpace(prefix)
 		if prefix == "" {
 			return fail.InvalidParameterCannotBeEmptyStringError("prefix")
 		}
 
-		c.prefix = prefix
-		return nil
+		_, xerr := c.Store(OptionWithPrefixKey, prefix)
+		return xerr
 	}
 }
 
 // WithScope allows to attach the corresponding scope
-func WithScope(scope *scope.Frame) Option {
-	return func(c *config) fail.Error {
+func WithScope(scope scopeapi.Scope) options.Option {
+	return func(o options.Options) fail.Error {
 		if valid.IsNull(scope) {
-			return fail.InvalidParameterError("svc", "cannot be null value of '*scope.Frame'")
+			return fail.InvalidParameterError("svc", "cannot be null value of 'scopeapi.Scope'")
 		}
 
-		c.frame = scope
-		return nil
+		_, xerr := o.Store(OptionWithScopeKey, scope)
+		return xerr
 	}
-}
-
-// WithFrame is an alias of WithScope
-func WithFrame(frame *scope.Frame) Option {
-	return WithScope(frame)
 }
 
 // func WithConsul(kv *consumer.KV) Option {
@@ -104,34 +105,46 @@ func WithFrame(frame *scope.Frame) Option {
 // }
 
 // WithoutReload tells to not reload, on Alter/Inspect
-func WithoutReload() func(*config) fail.Error {
-	return func(c *config) fail.Error {
-		c.noReload = true
-		return nil
+func WithoutReload() func(options.Options) fail.Error {
+	return func(opts options.Options) fail.Error {
+		_, xerr := opts.Store(OptionWithoutReloadKey, true)
+		return xerr
 	}
 }
 
 // NewFolder creates a Folder corresponding to the method wanted
-func NewFolder(opts ...Option) (storage.Folder, fail.Error) {
-	cfg := config{}
-	for _, v := range opts {
-		xerr := v(&cfg)
-		if xerr != nil {
-			return nil, xerr
-		}
+func NewFolder(opts ...options.Option) (storage.Folder, fail.Error) {
+	o, xerr := options.New(opts...)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	switch cfg.method {
-	case MethodObjectStorage:
-		return bucket.NewFolder(cfg.frame.Service(), cfg.prefix)
-	case MethodConsul:
-		if cfg.prefix == "" {
-			return nil, fail.InvalidRequestError("invalid use of empty 'prefix'")
-		}
-		if valid.IsNull(cfg.frame) {
-			return nil, fail.InvalidRequestError("cannot create new folder using Consul KV without a valid scope")
-		}
+	method, xerr := options.Value[string](o, OptionUseMethodKey)
+	if xerr != nil {
+		return nil, xerr
+	}
 
+	scope, xerr := options.Value[scopeapi.Scope](o, OptionWithScopeKey)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	prefix, xerr := options.Value[string](o, OptionWithPrefixKey)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if prefix == "" {
+		return nil, fail.InvalidRequestError("invalid use of empty 'prefix'")
+	}
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidRequestError("cannot create new folder using Consul KV without a valid scope")
+	}
+
+	switch method {
+	case MethodObjectStorage:
+		return bucket.NewFolder(scope.Service(), prefix)
+	case MethodConsul:
 		// consulClient, xerr := consumer.NewClient(consumer.WithAddress("localhost:" + global.Settings.Backend.Consul.HttpPort))
 		// if xerr != nil {
 		// 	return nil, xerr
@@ -142,9 +155,9 @@ func NewFolder(opts ...Option) (storage.Folder, fail.Error) {
 		// 	consumer.WithPrefix(cfg.prefix),
 		// }
 		// kv, xerr := consulClient.NewKV(opts...)
-		return consul.NewFolder(cfg.frame.ConsulKV(), cfg.prefix)
+		return consul.NewFolder(scope, prefix)
 
 	default:
-		return nil, fail.InvalidRequestError("method", "method '%s' is unsupported", cfg.method)
+		return nil, fail.InvalidRequestError("method", "method '%s' is unsupported", method)
 	}
 }

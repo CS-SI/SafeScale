@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -29,7 +30,7 @@ import (
 // Label links Object Storage folder and getTags
 type Label interface {
 	Core
-	Metadata
+	metadata.Metadata
 
 	BindToHost(ctx context.Context, hostInstance Host, value string) fail.Error                  // instructs Label to be bound to Host with overrided value (if not a Tag)
 	Browse(ctx context.Context, callback func(*abstract.Label) fail.Error) fail.Error            // walks through all the metadata objects in labels

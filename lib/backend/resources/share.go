@@ -19,6 +19,7 @@ package resources
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -29,7 +30,7 @@ import (
 // Share contains information to maintain in Object Storage a list of shared folders
 type Share interface {
 	Core
-	Metadata
+	metadata.Metadata
 
 	Browse(ctx context.Context, callback func(hostName string, shareID string) fail.Error) fail.Error
 	Create(ctx context.Context, shareName string, host Host, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) fail.Error // creates a share on host

@@ -308,7 +308,7 @@ func isBMSImage(image *abstract.Image) bool {
 
 // ListImages lists available OS images
 func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
-	images, xerr := p.Stack.(iaasapi.StackReservedForProviderUse).ListImages(ctx, all)
+	images, xerr := p.Stack.(providers.StackReservedForProviderUse).ListImages(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -341,7 +341,7 @@ func (p *provider) ConfigurationOptions() (iaasoptions.Configuration, fail.Error
 		return iaasoptions.Configuration{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
-	opts, xerr := p.Stack.(iaasapi.StackReservedForProviderUse).ConfigurationOptions()
+	opts, xerr := p.Stack.(providers.StackReservedForProviderUse).ConfigurationOptions()
 	if xerr != nil {
 		return iaasoptions.Configuration{}, xerr
 	}

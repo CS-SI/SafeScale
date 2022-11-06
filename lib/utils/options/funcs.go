@@ -96,3 +96,8 @@ func Add[O any](opts Options, key string, value O) fail.Error {
 
 	return nil
 }
+
+// Subset extracts elements from Options to create a new Options
+func Subset(in Options, keys ...string) (Options, fail.Error) {
+	return in.Subset(keys...)
+}

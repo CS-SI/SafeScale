@@ -67,8 +67,8 @@ type Network struct {
 }
 
 // NewNetwork initializes a new instance of Network
-func NewNetwork(name string, options ...Option) (*Network, fail.Error) {
-	c, xerr := NewCore(name, options...)
+func NewNetwork(opts ...Option) (*Network, fail.Error) {
+	c, xerr := New(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -96,7 +96,7 @@ func (n *Network) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	nn, xerr := NewNetwork(n.Name)
+	nn, xerr := NewNetwork(WithName(n.Name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -120,7 +120,7 @@ func (n *Network) Replace(p clonable.Clonable) error {
 	}
 
 	*n = *src
-	n.Core, err = src.Core.Clone()
+	n.Core, err = clonable.CastedClone[*Core](src.Core)
 	if err != nil {
 		return err
 	}

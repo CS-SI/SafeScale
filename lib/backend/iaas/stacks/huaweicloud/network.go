@@ -24,8 +24,10 @@ import (
 	"regexp"
 	"strings"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
@@ -153,7 +155,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		return nil, normalizeError(err)
 	}
 
-	an, xerr := abstract.NewNetwork(req.Name)
+	an, xerr := abstract.NewNetwork(abstract.WithName(req.Name))
 	if err != nil {
 		return nil, xerr
 	}
@@ -275,9 +277,11 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (*abstract.Network
 
 // toAbstractNetwork converts a VPC to an *abstract.Network
 func toAbstractNetwork(vpc VPC) *abstract.Network {
-	an := abstract.NewNetwork()
+	an, xerr := abstract.NewNetwork(abstract.WithName(vpc.Name))
+	if xerr != nil {
+		an, _ = abstract.NewNetwork()
+	}
 	an.ID = vpc.ID
-	an.Name = vpc.Name
 	an.CIDR = vpc.CIDR
 	return an
 }
@@ -336,26 +340,32 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 		return emptySlice, xerr
 	}
 
-	var list []*abstract.Network
+	var (
+		list []*abstract.Network
+	)
 	if vpcs, ok := r.Body.(map[string]interface{})["vpcs"].([]interface{}); ok {
 		for _, v := range vpcs {
-			item, ok := v.(map[string]interface{})
-			if !ok {
-				return emptySlice, fail.InconsistentError("vpc should be a map[string]interface{}")
+			item, err := lang.Cast[map[string]interface{}](v)
+			if err != nil {
+				return emptySlice, fail.Wrap(err)
 			}
-			an := abstract.NewNetwork()
-			an.Name, ok = item["name"].(string)
-			if !ok {
-				return emptySlice, fail.InconsistentError("name should NOT be empty")
+
+			an, _ := abstract.NewNetwork()
+			an.Name, err = lang.Cast[string](item["name"])
+			if err != nil {
+				return emptySlice, fail.Wrap(err)
 			}
-			an.ID, ok = item["id"].(string)
-			if !ok {
-				return emptySlice, fail.InconsistentError("id should NOT be empty")
+
+			an.ID, err = lang.Cast[string](item["id"])
+			if err != nil {
+				return emptySlice, fail.Wrap(err)
 			}
-			an.CIDR, ok = item["cidr"].(string)
-			if !ok {
-				return emptySlice, fail.InconsistentError("cidr should NOT be empty")
+
+			an.CIDR, err = lang.Cast[string](item["cidr"])
+			if err != nil {
+				return emptySlice, fail.Wrap(err)
 			}
+
 			// FIXME: Missing validation, all previous fields should be NOT empty
 			list = append(list, an)
 		}
@@ -364,16 +374,20 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 }
 
 // DeleteNetwork deletes a Network/VPC identified by 'id'
-func (s stack) DeleteNetwork(ctx context.Context, id string) fail.Error {
+func (s stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	an, _, xerr := iaasapi.ValidateNetworkParameter(networkParam)
+	if xerr != nil {
+		return xerr
+	}
+	if an.ID == "" {
+		return fail.InvalidParameterError("networkParam", "invalid empyty string in field 'ID'")
 	}
 
 	r := vpcCommonResult{}
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + an.ID // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201, 204},
@@ -440,9 +454,12 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (su
 		return nil, fail.Wrap(xerr, "error creating subnet '%s'", req.Name)
 	}
 
-	subnet = abstract.NewSubnet()
+	subnet, xerr = abstract.NewSubnet(abstract.WithName(resp.Name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	subnet.ID = resp.ID
-	subnet.Name = resp.Name
 	subnet.CIDR = resp.CIDR
 	subnet.IPVersion = fromIntIPVersion(resp.IPVersion)
 	subnet.Network = an.ID
@@ -559,9 +576,12 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (*abstract.Subnet, 
 		return nil, xerr
 	}
 
-	as := abstract.NewSubnet()
+	as, xerr := abstract.NewSubnet(abstract.WithName(resp.Subnet.Name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	as.ID = resp.Subnet.ID
-	as.Name = resp.Subnet.Name
 	as.CIDR = resp.Subnet.CIDR
 	as.Network = resp.VpcID
 	as.IPVersion = fromIntIPVersion(resp.IPVersion)
@@ -578,7 +598,6 @@ func (s stack) inspectOpenstackSubnet(ctx context.Context, id string) (*abstract
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-	as := abstract.NewSubnet()
 	var sn *subnets.Subnet
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
@@ -591,8 +610,12 @@ func (s stack) inspectOpenstackSubnet(ctx context.Context, id string) (*abstract
 		return nil, xerr
 	}
 
+	as, xerr := abstract.NewSubnet(abstract.WithName(sn.Name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	as.ID = sn.ID
-	as.Name = sn.Name
 	as.Network = sn.NetworkID
 	as.IPVersion = openstack.ToAbstractIPVersion(sn.IPVersion)
 	as.CIDR = sn.CIDR
@@ -626,9 +649,12 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) ([]*abstract.
 				}
 
 				for _, v := range list {
-					item := abstract.NewSubnet()
+					item, xerr := abstract.NewSubnet(abstract.WithName(v.Name))
+					if xerr != nil {
+						return false, xerr
+					}
+
 					item.ID = v.ID
-					item.Name = v.Name
 					item.CIDR = v.CIDR
 					item.Network = networkRef
 					item.IPVersion = ipversion.Enum(v.IPVersion)
@@ -912,12 +938,14 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
-	vip := abstract.VirtualIP{
-		ID:        port.ID,
-		Name:      name,
-		NetworkID: networkID,
-		SubnetID:  subnetID,
-		PrivateIP: port.FixedIPs[0].IPAddress,
+	vip, xerr := abstract.NewVirtualIP(abstract.WithName(name))
+	if xerr != nil {
+		return nil, xerr
 	}
-	return &vip, nil
+
+	vip.ID = port.ID
+	vip.NetworkID = networkID
+	vip.SubnetID = subnetID
+	vip.PrivateIP = port.FixedIPs[0].IPAddress
+	return vip, nil
 }

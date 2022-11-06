@@ -19,27 +19,28 @@ package securitygroup
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // List returns a list of available security groups
-func List(ctx context.Context, svc iaasapi.Service, all bool) ([]*abstract.SecurityGroup, fail.Error) {
+func List(ctx context.Context, scope scopeapi.Scope, all bool) ([]*abstract.SecurityGroup, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 
 	if all {
-		return svc.ListSecurityGroups(ctx, "")
+		return scope.Service().ListSecurityGroups(ctx, "")
 	}
 
-	sgInstance, xerr := New(svc)
+	sgInstance, xerr := New(scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -53,20 +54,11 @@ func List(ctx context.Context, svc iaasapi.Service, all bool) ([]*abstract.Secur
 }
 
 // New creates an instance of resources.SecurityGroup
-func New(svc iaasapi.Service) (_ resources.SecurityGroup, ferr fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
-	sgInstance, xerr := operations.NewSecurityGroup(svc)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return sgInstance, nil
+func New(scope scopeapi.Scope) (_ resources.SecurityGroup, ferr fail.Error) {
+	return operations.NewSecurityGroup(scope)
 }
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
-func Load(ctx context.Context, svc iaasapi.Service, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
-	return operations.LoadSecurityGroup(ctx, svc, ref)
+func Load(ctx context.Context, scope scopeapi.Scope, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
+	return operations.LoadSecurityGroup(ctx, scope, ref)
 }

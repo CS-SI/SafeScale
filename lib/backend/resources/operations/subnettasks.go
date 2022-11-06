@@ -19,10 +19,11 @@ package operations
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
@@ -88,7 +89,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		hostReq.PublicIP = true
 		hostReq.IsGateway = true
 
-		rgw, xerr := NewHost(svc)
+		rgw, xerr := NewHost(instance.Scope())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			ar := result{nil, xerr}
@@ -101,10 +102,10 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		// Set link to Subnet before testing if Host has been successfully created;
 		// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
 		// be able to delete subnet on later safescale command
-		xerr = instance.Alter(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, err := lang.Cast[*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr = instance.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, innerErr := lang.Cast[*abstract.Subnet](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			// If Host resources has been created and error occurred after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
@@ -153,10 +154,10 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 					}
 					_ = ferr.AddConsequence(derr)
 				} else {
-					xerr = rgw.Alter(context.Background(), func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-						as, err := lang.Cast[*abstract.HostCore)
-						if !ok {
-							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					xerr = rgw.Alter(context.Background(), func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+						as, innerErr := lang.Cast[*abstract.HostCore](p)
+						if innerErr != nil {
+							return fail.Wrap(innerErr)
 						}
 
 						as.LastState = hoststate.Failed
@@ -171,10 +172,10 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		}()
 
 		// Binds gateway to VIP if needed
-		xerr = instance.Review(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, err := lang.Cast[*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr = instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, innerErr := lang.Cast[*abstract.Subnet](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			hid, err := rgw.GetID()

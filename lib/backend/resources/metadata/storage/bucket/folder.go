@@ -22,15 +22,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
-	datadef "github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
@@ -44,7 +44,7 @@ import (
 type folder struct {
 	// path contains the base path where to read/write record in Object Storage
 	path     string
-	frame    *scope.Frame
+	scope    scopeapi.Scope
 	service  iaasapi.Service
 	crypt    bool
 	cryptKey *crypt.Key
@@ -86,13 +86,13 @@ func (instance folder) Service() iaasapi.Service {
 	return instance.service
 }
 
-// Frame returns the scope of the folder
-func (instance *folder) Frame() *scope.Frame {
+// Scope returns the scope of the folder
+func (instance *folder) Scope() scopeapi.Scope {
 	if valid.IsNull(instance) {
 		return nil
 	}
 
-	return instance.frame
+	return instance.scope
 }
 
 // GetBucket returns the bucket used by the folder to store Object Storage
@@ -190,7 +190,7 @@ func (instance folder) Delete(ctx context.Context, path string, name string) fai
 // returns true, nil if the object has been found
 // returns false, fail.Error if an error occurred (including object not found)
 // The callback function has to know how to decode it and where to store the result
-func (instance folder) Read(ctx context.Context, path string, name string, callback storage.FolderCallback, options ...datadef.ImmutableKeyValue) fail.Error {
+func (instance folder) Read(ctx context.Context, path string, name string, callback storage.FolderCallback, opts ...options.Option) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -247,26 +247,14 @@ func (instance folder) Read(ctx context.Context, path string, name string, callb
 		}
 	}
 
-	doCrypt := instance.crypt
-	for _, v := range options {
-		switch v.Key() {
-		case "doNotCrypt":
-			anon := v.Value()
-			if anon != nil {
-				switch c := anon.(type) {
-				case bool:
-					doCrypt = !c
-				case string:
-					switch c {
-					case "true", "yes":
-						doCrypt = false
-					case "false", "no":
-						doCrypt = true
-					}
-				}
-			}
-		default:
-		}
+	o, xerr := options.New(opts...)
+	if xerr != nil {
+		return xerr
+	}
+
+	doCrypt, xerr := instance.determineIfCryptIsEnabled(o)
+	if xerr != nil {
+		return xerr
 	}
 
 	datas := goodBuffer.Bytes()
@@ -288,11 +276,24 @@ func (instance folder) Read(ctx context.Context, path string, name string, callb
 	return nil
 }
 
+func (instance *folder) determineIfCryptIsEnabled(opts options.Options) (bool, fail.Error) {
+	if !instance.crypt {
+		return false, nil
+	}
+
+	enabled, xerr := storage.DetermineIfCryptIsEnabledInOptions(opts)
+	if xerr != nil {
+		return false, xerr
+	}
+
+	return enabled, nil
+}
+
 // Write writes the content in Object Storage, and check the write operation is committed.
 // Returns nil on success (with assurance the write operation has been committed on remote side)
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
-func (instance folder) Write(ctx context.Context, path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
+func (instance folder) Write(ctx context.Context, path string, name string, content []byte, opts ...options.Option) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -305,14 +306,16 @@ func (instance folder) Write(ctx context.Context, path string, name string, cont
 		return xerr
 	}
 
-	doCrypt := instance.crypt
-	for _, v := range options {
-		switch v.Key() {
-		case "doNotCrypt":
-			doCrypt = !v.Value().(bool)
-		default:
-		}
+	o, xerr := options.New(opts...)
+	if xerr != nil {
+		return xerr
 	}
+
+	doCrypt, xerr := instance.determineIfCryptIsEnabled(o)
+	if xerr != nil {
+		return xerr
+	}
+
 	var data []byte
 	if doCrypt {
 		var err error

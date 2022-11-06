@@ -21,13 +21,14 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 	"time"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -41,7 +42,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -68,11 +68,11 @@ type SSHHandler interface {
 
 // sshHandler SSH service
 type sshHandler struct {
-	job job.Job
+	job jobapi.Job
 }
 
 // NewSSHHandler ...
-func NewSSHHandler(job job.Job) SSHHandler {
+func NewSSHHandler(job jobapi.Job) SSHHandler {
 	return &sshHandler{job: job}
 }
 
@@ -105,9 +105,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 	}
 
 	task := handler.job.Task()
-	svc := handler.job.Service()
 	ctx := handler.job.Context()
-
 	_, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
@@ -117,12 +115,12 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	host, xerr := hostfactory.Load(ctx, svc, hostRef)
+	host, xerr := hostfactory.Load(ctx, handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	cfg, xerr := svc.ConfigurationOptions()
+	cfg, xerr := handler.job.Service().ConfigurationOptions()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -151,10 +149,10 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 	}
 
 	if isSingle || isGateway {
-		xerr = host.Inspect(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			ahc, err := lang.Cast[*abstract.HostCore)
-			if !ok {
-				return fail.InconsistentError("")
+		xerr = host.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			ahc, innerErr := lang.Cast[*abstract.HostCore](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			sshConfig.PrivateKey = ahc.PrivateKey
@@ -166,18 +164,18 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 		}
 	} else {
 		var subnetInstance resources.Subnet
-		xerr = host.Inspect(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			ahc, err := lang.Cast[*abstract.HostCore)
-			if !ok {
-				return fail.InconsistentError("")
+		xerr = host.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			ahc, innerErr := lang.Cast[*abstract.HostCore](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			sshConfig.PrivateKey = ahc.PrivateKey
 			sshConfig.Port = int(ahc.SSHPort)
-			return props.Inspect(hostproperty.NetworkV2, func(clonable clonable.Clonable) fail.Error {
-				hnV2, err := lang.Cast[*propertiesv2.HostNetworking)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
+				hnV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				var subnetID string
@@ -194,7 +192,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 				}
 
 				var innerXErr fail.Error
-				subnetInstance, innerXErr = subnetfactory.Load(ctx, svc, "", subnetID)
+				subnetInstance, innerXErr = subnetfactory.Load(ctx, host.Scope(), "", subnetID)
 				return innerXErr
 			})
 		})
@@ -204,20 +202,19 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 		if subnetInstance == nil {
 			return nil, fail.NotFoundError("failed to find default Subnet of Host")
 		}
+
 		if isGateway {
 			hs, err := host.GetState(ctx)
 			if err != nil {
 				return nil, fail.Wrap(err, "cannot retrieve host properties")
 			}
+
 			if hs != hoststate.Started {
 				return nil, fail.NewError("cannot retrieve network properties when the gateway is not in 'started' state")
 			}
 		}
 
-		var (
-			gwahc *abstract.HostCore
-			ok    bool
-		)
+		var gwahc *abstract.HostCore
 
 		// gets primary gateway information
 		gw, xerr := subnetInstance.InspectGateway(handler.job.Context(), true)
@@ -230,9 +227,11 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 				return nil, xerr
 			}
 		} else {
-			xerr = gw.Inspect(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-				if gwahc, ok = clonable.(*abstract.HostCore); !ok {
-					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			xerr = gw.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+				var innerErr error
+				gwahc, innerErr = lang.Cast[*abstract.HostCore](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				return nil
@@ -270,12 +269,10 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 				return nil, xerr
 			}
 		} else {
-			xerr = gw.Inspect(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-				gwahc, ok = clonable.(*abstract.HostCore)
-				if !ok {
-					return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				return nil
+			xerr = gw.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+				var innerErr error
+				gwahc, innerErr = lang.Cast[*abstract.HostCore](p)
+				return fail.Wrap(innerErr)
 			})
 			if xerr != nil {
 				return nil, xerr
@@ -366,7 +363,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
-	host, xerr := hostfactory.Load(ctx, handler.job.Service(), hostRef)
+	host, xerr := hostfactory.Load(ctx, handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -579,7 +576,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		upload = true
 	}
 
-	host, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostName)
+	host, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostName)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -760,12 +757,12 @@ func (handler *sshHandler) Copy(from, to, owner, mode string) (_ int, _ string, 
 		localPath = to
 	}
 
-	timings, xerr := handler.job.Service().Timings()
+	timings, xerr := handler.job.Scope().Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}

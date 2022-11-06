@@ -20,8 +20,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -41,10 +41,10 @@ const (
 )
 
 // CheckVersion checks if the content of /version in metadata bucket is equal to MetadataVersion
-func CheckVersion(ctx context.Context, svc iaasapi.Service, method string) (string, fail.Error) {
+func CheckVersion(ctx context.Context, scope scopeapi.Scope, method string) (string, fail.Error) {
 	// Read file /version in metadata
 	var currentMetadataVersion string
-	folder, xerr := NewFolder(method, svc, "")
+	folder, xerr := NewFolder(UseMethod(method), WithScope(scope))
 	if xerr != nil {
 		return "", xerr
 	}
@@ -52,7 +52,7 @@ func CheckVersion(ctx context.Context, svc iaasapi.Service, method string) (stri
 	xerr = folder.Read(ctx, "/", "version", func(data []byte) fail.Error {
 		currentMetadataVersion = string(data)
 		return nil
-	}, data.NewImmutableKeyValue("doNotCrypt", true),
+	}, storage.DisableCrypt(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -68,7 +68,7 @@ func CheckVersion(ctx context.Context, svc iaasapi.Service, method string) (stri
 		currentMetadataVersion = FirstMetadataVersion
 	}
 
-	svcName, xerr := svc.GetName()
+	svcName, xerr := scope.Service().GetName()
 	if xerr != nil {
 		return currentMetadataVersion, xerr
 	}

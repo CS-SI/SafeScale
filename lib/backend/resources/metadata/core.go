@@ -23,20 +23,20 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/shielded"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -64,11 +64,11 @@ type Core struct {
 }
 
 // NewCore creates an instance of Core
-func NewCore(frame *scope.Frame, method string, kind string, path string, instance clonable.Clonable) (_ *Core, ferr fail.Error) {
+func NewCore(scope scopeapi.Scope, method string, kind string, path string, instance clonable.Clonable) (_ *Core, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNull(frame) {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 	if kind == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("kind")
@@ -77,7 +77,7 @@ func NewCore(frame *scope.Frame, method string, kind string, path string, instan
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("path")
 	}
 
-	fld, xerr := NewFolder(UseMethod(method), WithScope(frame), WithPrefix(path))
+	fld, xerr := NewFolder(UseMethod(method), WithScope(scope), WithPrefix(path))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -121,8 +121,8 @@ func (myself *Core) Service() iaasapi.Service {
 	return myself.folder.Service()
 }
 
-func (myself *Core) Frame() *scope.Frame {
-	return myself.folder.Frame()
+func (myself *Core) Scope() scopeapi.Scope {
+	return myself.folder.Scope()
 }
 
 // GetID returns the id of the data protected
@@ -207,17 +207,25 @@ func (myself *Core) Kind() string {
 }
 
 // Inspect protects the data for shared read
-func (myself *Core) Inspect(inctx context.Context, callback resources.AnyResourceCallback, opts ...Option) (_ fail.Error) {
+func (myself *Core) Inspect(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
+	if callback == nil {
+		return fail.InvalidParameterCannotBeNilError("callback")
+	}
+	if myself.properties == nil {
+		return fail.InvalidInstanceContentError("myself.properties", "cannot be nil")
+	}
 
-	conf := &config{}
-	for _, v := range opts {
-		xerr := v(conf)
-		if xerr != nil {
-			return xerr
-		}
+	o, xerr := options.New(opts...)
+	if xerr != nil {
+		return xerr
+	}
+
+	noReload, xerr := options.Value[bool](o, OptionWithoutReloadKey)
+	if xerr != nil {
+		return xerr
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -233,19 +241,12 @@ func (myself *Core) Inspect(inctx context.Context, callback resources.AnyResourc
 			defer fail.OnPanic(&ferr)
 			var xerr fail.Error
 
-			if callback == nil {
-				return fail.InvalidParameterCannotBeNilError("callback")
-			}
-			if myself.properties == nil {
-				return fail.InvalidInstanceContentError("myself.properties", "cannot be nil")
-			}
-
 			timings, xerr := myself.Service().Timings()
 			if xerr != nil {
 				return xerr
 			}
 
-			if !conf.noReload {
+			if !noReload {
 				// Reload reloads data from Object Storage to be sure to have the last revision
 				xerr = retry.WhileUnsuccessfulWithLimitedRetries(
 					func() error {
@@ -311,7 +312,7 @@ func (myself *Core) Inspect(inctx context.Context, callback resources.AnyResourc
 }
 
 // InspectProperty allows to inspect directly a single property
-func (myself *Core) InspectProperty(ctx context.Context, property string, callback func(clonable.Clonable) fail.Error, opts ...Option) fail.Error {
+func (myself *Core) InspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
 	return myself.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(property, callback)
 	}, opts...)
@@ -320,21 +321,22 @@ func (myself *Core) InspectProperty(ctx context.Context, property string, callba
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change through time).
-func (myself *Core) Review(inctx context.Context, callback resources.AnyResourceCallback) (_ fail.Error) {
-	return myself.Inspect(inctx, callback, WithoutReload())
+func (myself *Core) Review(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
+	opts = append(opts, WithoutReload())
+	return myself.Inspect(inctx, callback, opts...)
 }
 
 // ReviewProperty allows to review directly a single property
-func (myself *Core) ReviewProperty(ctx context.Context, property string, callback func(clonable.Clonable) fail.Error) fail.Error {
+func (myself *Core) ReviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
 	return myself.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(property, callback)
-	})
+	}, opts...)
 }
 
 // Alter protects the data for exclusive write
 // Valid options are :
 // - WithoutReload() = disable reloading from metadata storage
-func (myself *Core) Alter(inctx context.Context, callback resources.AnyResourceCallback, options ...Option) (_ fail.Error) {
+func (myself *Core) Alter(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -355,12 +357,14 @@ func (myself *Core) Alter(inctx context.Context, callback resources.AnyResourceC
 		return fail.InconsistentError("uninitialized metadata should not be altered")
 	}
 
-	conf := &config{}
-	for _, v := range options {
-		xerr := v(conf)
-		if xerr != nil {
-			return xerr
-		}
+	o, xerr := options.New(opts...)
+	if xerr != nil {
+		return xerr
+	}
+
+	noReload, xerr := options.Value[bool](o, OptionWithoutReloadKey)
+	if xerr != nil {
+		return xerr
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -389,7 +393,7 @@ func (myself *Core) Alter(inctx context.Context, callback resources.AnyResourceC
 			}
 
 			// Reload reloads data from object storage to be sure to have the last revision
-			if !conf.noReload {
+			if !noReload {
 				xerr = myself.unsafeReload(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -397,8 +401,8 @@ func (myself *Core) Alter(inctx context.Context, callback resources.AnyResourceC
 				}
 			}
 
-			xerr = myself.shielded.Alter(func(clonable clonable.Clonable) fail.Error {
-				return callback(clonable, myself.properties)
+			xerr = myself.shielded.Alter(func(p clonable.Clonable) fail.Error {
+				return callback(p, myself.properties)
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -433,7 +437,7 @@ func (myself *Core) Alter(inctx context.Context, callback resources.AnyResourceC
 }
 
 // AlterProperty allows to alter directly a single property
-func (myself *Core) AlterProperty(ctx context.Context, property string, callback func(clonable.Clonable) fail.Error, opts ...Option) fail.Error {
+func (myself *Core) AlterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
 	return myself.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(property, callback)
 	}, opts...)

@@ -23,6 +23,10 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
+const (
+	OptionConfiguration = "authentication"
+)
+
 // Configuration are the stack configuration options
 type Configuration struct {
 	// Name of the provider (external) network

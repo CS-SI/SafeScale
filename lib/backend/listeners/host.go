@@ -19,9 +19,10 @@ package listeners
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/davecgh/go-spew/spew"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
@@ -34,7 +35,6 @@ import (
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -265,39 +265,35 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequ
 	}
 	if len(in.GetSubnets()) > 0 {
 		for _, v := range in.GetSubnets() {
-			subnetInstance, xerr = subnetfactory.Load(ctx, job.Service(), networkRef, v)
+			subnetInstance, xerr = subnetfactory.Load(ctx, job.Scope(), networkRef, v)
 			if xerr != nil {
 				return nil, xerr
 			}
 
-			xerr = subnetInstance.Review(ctx,
-				func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-					as, err := lang.Cast[*abstract.Subnet)
-					if !ok {
-						return fail.InconsistentError(
-							"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+			xerr = subnetInstance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+				as, innerErr := lang.Cast[*abstract.Subnet](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
 
-					subnets = append(subnets, as)
-					return nil
-				},
-			)
+				subnets = append(subnets, as)
+				return nil
+			})
 			if xerr != nil {
 				return nil, xerr
 			}
 		}
 	}
 	if len(subnets) == 0 && networkRef != "" {
-		subnetInstance, xerr = subnetfactory.Load(ctx, job.Service(), networkRef, networkRef)
+		subnetInstance, xerr = subnetfactory.Load(ctx, job.Scope(), networkRef, networkRef)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		xerr = subnetInstance.Review(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, err := lang.Cast[*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr = subnetInstance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, innerErr := lang.Cast[*abstract.Subnet](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			subnets = append(subnets, as)

@@ -176,7 +176,7 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		}
 	}()
 
-	out, xerr := abstract.NewSubnet(req.Name)
+	out, xerr := abstract.NewSubnet(abstract.WithName(req.Name))
 	if xerr != nil {
 		return nil, xerr
 	}

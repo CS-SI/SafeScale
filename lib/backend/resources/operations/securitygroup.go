@@ -19,15 +19,11 @@ package operations
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
@@ -39,17 +35,21 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 const (
@@ -65,12 +65,12 @@ type SecurityGroup struct {
 }
 
 // NewSecurityGroup ...
-func NewSecurityGroup(frame *scope.Frame) (*SecurityGroup, fail.Error) {
-	if valid.IsNull(frame) {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+func NewSecurityGroup(scope scopeapi.Scope) (*SecurityGroup, fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 
-	coreInstance, xerr := metadata.NewCore(frame, metadata.MethodObjectStorage, securityGroupKind, securityGroupsFolderName, &abstract.SecurityGroup{})
+	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, securityGroupKind, securityGroupsFolderName, &abstract.SecurityGroup{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -83,12 +83,12 @@ func NewSecurityGroup(frame *scope.Frame) (*SecurityGroup, fail.Error) {
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(inctx context.Context, frame *scope.Frame, ref string, options ...metadata.Option) (*SecurityGroup, fail.Error) {
+func LoadSecurityGroup(inctx context.Context, scope scopeapi.Scope, ref string) (*SecurityGroup, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	if frame == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 	if ref == "" {
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
@@ -108,7 +108,7 @@ func LoadSecurityGroup(inctx context.Context, frame *scope.Frame, ref string, op
 			var kt *SecurityGroup
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := frame.Service().GetCache(ctx)
+			cache, xerr := scope.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -122,7 +122,7 @@ func LoadSecurityGroup(inctx context.Context, frame *scope.Frame, ref string, op
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSGCacheMiss(ctx, frame, ref) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSGCacheMiss(ctx, scope, ref) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -186,13 +186,13 @@ func LoadSecurityGroup(inctx context.Context, frame *scope.Frame, ref string, op
 }
 
 // onSGCacheMiss is called when there is no instance in cache of Security Group 'ref'
-func onSGCacheMiss(ctx context.Context, frame *scope.Frame, ref string) (data.Identifiable, fail.Error) {
-	sgInstance, innerXErr := NewSecurityGroup(frame)
+func onSGCacheMiss(ctx context.Context, scope scopeapi.Scope, ref string) (data.Identifiable, fail.Error) {
+	sgInstance, innerXErr := NewSecurityGroup(scope)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	blank, innerXErr := NewSecurityGroup(frame)
+	blank, innerXErr := NewSecurityGroup(scope)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -328,7 +328,7 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 
 		// Check if SecurityGroup exists and is managed by SafeScale
 		svc := instance.Service()
-		_, xerr := LoadSecurityGroup(ctx, instance.Frame(), name)
+		_, xerr := LoadSecurityGroup(ctx, instance.Scope(), name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -443,7 +443,7 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 			}
 
 			// so it's nil...
-			networkInstance, xerr := LoadNetwork(ctx, instance.Frame(), networkID)
+			networkInstance, xerr := LoadNetwork(ctx, instance.Scope(), networkID)
 			if xerr != nil {
 				chRes <- result{xerr}
 				return xerr
@@ -567,7 +567,7 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 				return fail.InvalidRequestError("cannot unbind from host a security group applied from subnet; use disable instead or remove from bound subnet")
 			}
 
-			hostInstance, xerr := LoadHost(ctx, instance.Frame(), v.ID)
+			hostInstance, xerr := LoadHost(ctx, instance.Scope(), v.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -647,12 +647,13 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 		var subnetHosts *propertiesv1.SubnetHosts
 		// inspectFunc will get Hosts linked to Subnet from properties
 		inspectFunc := func(props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(subnetproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
-				var ok bool
-				subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+				var innerErr error
+				subnetHosts, innerErr = lang.Cast[*propertiesv1.SubnetHosts](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
+
 				return nil
 			})
 		}
@@ -665,7 +666,7 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 					return xerr
 				}
 			} else {
-				subnetInstance, xerr := LoadSubnet(ctx, instance.Frame(), "", v)
+				subnetInstance, xerr := LoadSubnet(ctx, instance.Scope(), "", v)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
@@ -1292,26 +1293,24 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 		return xerr
 	}
 
-	opts := []metadata.Option{}
+	var opts []options.Option
 	if !params.onRemoval {
 		opts = append(opts, metadata.WithoutReload())
 	}
 
 	// -- Remove Hosts attached to Subnet referenced in Security Group
-	xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			sghV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
+	xerr = instance.AlterProperty(ctx, securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+		sghV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
+		}
 
-			// updates security group metadata
-			for k, v := range sghV1.ByID {
-				delete(sghV1.ByID, k)
-				delete(sghV1.ByName, v.Name)
-			}
-			return nil
-		})
+		// updates security group metadata
+		for k, v := range sghV1.ByID {
+			delete(sghV1.ByID, k)
+			delete(sghV1.ByName, v.Name)
+		}
+		return nil
 	}, opts...)
 	if xerr != nil {
 		return xerr

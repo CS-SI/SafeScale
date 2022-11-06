@@ -248,8 +248,8 @@ type HostCore struct {
 }
 
 // NewHostCore ...
-func NewHostCore(name string, options ...Option) (*HostCore, fail.Error) {
-	c, err := NewCore(name, options...)
+func NewHostCore(opts ...Option) (*HostCore, fail.Error) {
+	c, err := New(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +297,7 @@ func (hc *HostCore) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	nhc, err := NewHostCore(hc.Name)
+	nhc, err := NewHostCore(WithName(hc.Name))
 	if err != nil {
 		return nil, err
 	}
@@ -423,8 +423,8 @@ type HostFull struct {
 }
 
 // NewHostFull creates an instance of HostFull
-func NewHostFull(name string, options ...Option) (*HostFull, fail.Error) {
-	hc, err := NewHostCore(name, options...)
+func NewHostFull(opts ...Option) (*HostFull, fail.Error) {
+	hc, err := NewHostCore(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -432,6 +432,23 @@ func NewHostFull(name string, options ...Option) (*HostFull, fail.Error) {
 	hf := &HostFull{
 		HostCore: hc,
 
+		Sizing:       NewHostEffectiveSizing(),
+		Networking:   NewHostNetworking(),
+		Description:  &HostDescription{},
+		CurrentState: hoststate.Unknown,
+	}
+	return hf, nil
+}
+
+// NewHostFullFromCore creates an instance of HostFull using Hostcore
+// FIXME: missing UT
+func NewHostFullFromCore(core *HostCore, opts ...Option) (*HostFull, fail.Error) {
+	if core == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("core")
+	}
+
+	hf := &HostFull{
+		HostCore:     core,
 		Sizing:       NewHostEffectiveSizing(),
 		Networking:   NewHostNetworking(),
 		Description:  &HostDescription{},

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
+	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
@@ -290,10 +290,10 @@ func (s Remediator) ListNetworks(ctx context.Context) (_ []*abstract.Network, fe
 	return network, xerr
 }
 
-func (s Remediator) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
+func (s Remediator) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Stack.DeleteNetwork(ctx, id)
+	xerr := s.Stack.DeleteNetwork(ctx, networkParam)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}

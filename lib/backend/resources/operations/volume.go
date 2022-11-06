@@ -22,9 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
@@ -36,17 +34,19 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumeproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -63,12 +63,12 @@ type volume struct {
 }
 
 // NewVolume creates an instance of Volume
-func NewVolume(frame *scope.Frame) (_ resources.Volume, ferr fail.Error) {
-	if valid.IsNull(frame) {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+func NewVolume(scope scopeapi.Scope) (_ resources.Volume, ferr fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 
-	coreInstance, xerr := metadata.NewCore(frame, metadata.MethodObjectStorage, volumeKind, volumesFolderName, &abstract.Volume{})
+	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, volumeKind, volumesFolderName, &abstract.Volume{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -81,9 +81,9 @@ func NewVolume(frame *scope.Frame) (_ resources.Volume, ferr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(inctx context.Context, frame *scope.Frame, ref string) (resources.Volume, fail.Error) {
-	if valid.IsNull(frame) {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+func LoadVolume(inctx context.Context, scope scopeapi.Scope, ref string) (resources.Volume, fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
@@ -106,7 +106,7 @@ func LoadVolume(inctx context.Context, frame *scope.Frame, ref string) (resource
 			var kt *volume
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := frame.Service().GetCache(ctx)
+			cache, xerr := scope.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -120,7 +120,7 @@ func LoadVolume(inctx context.Context, frame *scope.Frame, ref string) (resource
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, frame, ref) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, scope, ref) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -184,13 +184,13 @@ func LoadVolume(inctx context.Context, frame *scope.Frame, ref string) (resource
 }
 
 // onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'
-func onVolumeCacheMiss(ctx context.Context, frame *scope.Frame, ref string) (data.Identifiable, fail.Error) {
-	volumeInstance, innerXErr := NewVolume(frame)
+func onVolumeCacheMiss(ctx context.Context, scope scopeapi.Scope, ref string) (data.Identifiable, fail.Error) {
+	volumeInstance, innerXErr := NewVolume(scope)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	blank, innerXErr := NewVolume(frame)
+	blank, innerXErr := NewVolume(scope)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -322,7 +322,7 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume")).Entering()
 	defer tracer.Exiting()
 
-	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
+	return instance.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		av := abstract.NewVolume()
 		xerr := av.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -410,10 +410,8 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance.Core) {
-		if instance.Core.IsTaken() {
-			return fail.InconsistentError("already carrying information")
-		}
+	if !valid.IsNil(instance.Core) && instance.IsTaken() {
+		return fail.InconsistentError("already carrying information")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
@@ -429,7 +427,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	defer tracer.Exiting()
 
 	// Check if Volume exists and is managed by SafeScale
-	mdv, xerr := LoadVolume(ctx, instance.Frame(), req.Name)
+	mdv, xerr := LoadVolume(ctx, instance.Scope(), req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1154,9 +1152,8 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 		return nil, xerr
 	}
 
-	svc := instance.Service()
 	for k := range attachments.Hosts {
-		hostInstance, xerr := LoadHost(ctx, svc, k)
+		hostInstance, xerr := LoadHost(ctx, instance.Scope(), k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr

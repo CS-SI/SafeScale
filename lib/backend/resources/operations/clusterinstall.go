@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"time"
 
@@ -73,7 +72,7 @@ func incrementExpVar(name string) {
 
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 // satisfies resources.Targetable interface
-func (instance *Cluster) InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error) {
+func (instance *Cluster) InstallMethods(_ context.Context) (map[uint8]installmethod.Enum, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -340,7 +339,7 @@ func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resource
 
 	var out []resources.Feature
 	for _, v := range list {
-		entry, xerr := NewFeature(ctx, instance.Service(), v)
+		entry, xerr := NewFeature(ctx, instance.Scope(), v)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -379,7 +378,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 	}
 	// var list map[string]*propertiesv1.ClusterInstalledFeature
 	// xerr := instance.Inspect(func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
+	// 	return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
 	// 		featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures)
 	// 		if !ok {
 	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -396,7 +395,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
-		item, xerr := NewFeature(ctx, instance.Service(), v)
+		item, xerr := NewFeature(ctx, instance.Scope(), v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -421,7 +420,7 @@ func (instance *Cluster) AddFeature(
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Scope(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -442,7 +441,7 @@ func (instance *Cluster) CheckFeature(ctx context.Context, name string, vars dat
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Scope(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -463,7 +462,7 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Service(), name)
+	feat, xerr := NewFeature(ctx, instance.Scope(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -844,7 +843,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 		xerr = instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
 				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
-				if innerErr {
+				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
 
@@ -881,7 +880,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 
 		if !disabled {
 			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
-			feat, xerr := NewFeature(ctx, instance.Service(), "edgeproxy4subnet")
+			feat, xerr := NewFeature(ctx, instance.Scope(), "edgeproxy4subnet")
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{xerr}
@@ -943,10 +942,10 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 
 		dockerDisabled := false
 		xerr = instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-				featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				_, dockerDisabled = featuresV1.Disabled["docker"]
@@ -965,10 +964,10 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 
 		disabled := false
 		xerr = instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-				featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				_, disabled = featuresV1.Disabled["remotedesktop"]
@@ -984,7 +983,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 		if !disabled {
 			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'remotedesktop'", identity.Name)
 
-			feat, xerr := NewFeature(ctx, instance.Service(), "remotedesktop")
+			feat, xerr := NewFeature(ctx, instance.Scope(), "remotedesktop")
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{xerr}
@@ -1053,10 +1052,10 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map[s
 
 		disabled := false
 		xerr = instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-				featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				_, disabled = featuresV1.Disabled["ansible"]
@@ -1073,7 +1072,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map[s
 			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'ansible'", identity.Name)
 
 			// 1st, Feature 'ansible'
-			feat, xerr := NewFeature(ctx, instance.Service(), "ansible")
+			feat, xerr := NewFeature(ctx, instance.Scope(), "ansible")
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{xerr}
@@ -1099,7 +1098,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map[s
 			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'ansible' added successfully", identity.Name)
 
 			// 2nd, Feature 'ansible-for-cluster' (which does the necessary for a dynamic inventory)
-			feat, xerr = NewFeature(ctx, instance.Service(), "ansible-for-cluster")
+			feat, xerr = NewFeature(ctx, instance.Scope(), "ansible-for-cluster")
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{xerr}
@@ -1149,11 +1148,12 @@ func (instance *Cluster) installDocker(inctx context.Context, host resources.Hos
 
 		dockerDisabled := false
 		xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-				featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
+
 				_, dockerDisabled = featuresV1.Disabled["docker"]
 				return nil
 			})
@@ -1169,7 +1169,7 @@ func (instance *Cluster) installDocker(inctx context.Context, host resources.Hos
 		}
 
 		// uses NewFeature() to let a chance to the user to use its own docker feature
-		feat, xerr := NewFeature(ctx, instance.Service(), "docker")
+		feat, xerr := NewFeature(ctx, instance.Scope(), "docker")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}

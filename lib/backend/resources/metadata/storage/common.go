@@ -18,6 +18,9 @@ package storage
 
 import (
 	"strings"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 )
 
 // AbsolutePath returns the full path to reach the 'path'+'name' starting from the folder path
@@ -41,4 +44,33 @@ func AbsolutePath(basePath string, sep string, path ...string) string {
 		return absolutePath
 	}
 	return basePath
+}
+
+// DetermineIfCryptIsEnabledInOptions tells if there is an option disabling encryption
+func DetermineIfCryptIsEnabledInOptions(opts options.Options) (bool, fail.Error) {
+	value, xerr := opts.Load(OptionDisableCrypt)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			return true, nil
+		default:
+			return false, xerr
+		}
+	}
+
+	switch casted := value.(type) {
+	case bool:
+		return !casted, nil
+	case string:
+		switch casted {
+		case "true", "yes":
+			return false, nil
+		case "false", "no":
+			return true, nil
+		default:
+			return false, fail.InconsistentError("content of '%s' option is incorrect", OptionDisableCrypt)
+		}
+	}
+
+	return false, fail.InconsistentError("content of '%s' option is incorrect", OptionDisableCrypt)
 }

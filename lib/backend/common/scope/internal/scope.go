@@ -14,29 +14,31 @@
  * limitations under the License.
  */
 
-package scope
+package internal
 
 import (
 	"path/filepath"
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
-	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/puzpuzpuz/xsync"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 var (
-	frameList sync.Map
+	scopeList sync.Map
 )
 
-// Frame contains information about context of the Job
-type Frame struct {
+// scope contains information about context of the Job
+type scope struct {
 	organization   string
 	project        string
 	tenant         string
@@ -44,23 +46,23 @@ type Frame struct {
 	kvPath         string
 	fsPath         string
 	resourceByName xsync.MapOf[string, string]
-	resourceByID   xsync.MapOf[string, resources.Core]
+	resourceByID   xsync.MapOf[string, clonable.Clonable]
 	consulClient   *consumer.Client
 	consulKV       *consumer.KV
 	service        iaasapi.Service
 }
 
 // Load returns an existing scope from scope list
-func Load(organization, project, tenant string) (*Frame, fail.Error) {
+func Load(organization, project, tenant string) (*scope, fail.Error) {
 	kvPath := buildKVPath(organization, project, tenant)
-	entry, loaded := frameList.Load(kvPath)
+	entry, loaded := scopeList.Load(kvPath)
 	if !loaded {
-		return nil, fail.NotFoundError("failed to find a Frame identified by '%s'", kvPath)
+		return nil, fail.NotFoundError("failed to find a Scope identified by '%s'", kvPath)
 	}
 
-	out, ok := entry.(*Frame)
+	out, ok := entry.(*scope)
 	if !ok {
-		return nil, fail.InconsistentError("loaded scope is not of type '*Frame'")
+		return nil, fail.InconsistentError("loaded scope is not of type '*Scope'")
 	}
 
 	return out, nil
@@ -72,7 +74,7 @@ func buildKVPath(organization, project, tenant string) string {
 }
 
 // New creates a new scope
-func New(organization, project, tenant, description string) (*Frame, fail.Error) {
+func New(organization, project, tenant, description string) (*scope, fail.Error) {
 	if organization == "" {
 		organization = global.DefaultOrganization
 	}
@@ -83,7 +85,7 @@ func New(organization, project, tenant, description string) (*Frame, fail.Error)
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("tenant")
 	}
 
-	out := &Frame{
+	out := &scope{
 		organization: organization,
 		project:      project,
 		tenant:       tenant,
@@ -92,9 +94,9 @@ func New(organization, project, tenant, description string) (*Frame, fail.Error)
 		kvPath:       strings.Join([]string{organization, project, tenant}, "/"),
 	}
 
-	_, loaded := frameList.LoadOrStore(out.kvPath, out)
+	_, loaded := scopeList.LoadOrStore(out.kvPath, out)
 	if loaded {
-		return nil, fail.DuplicateError("there is already a Frame '%s'", out.ID())
+		return nil, fail.DuplicateError("there is already a Scope '%s'", out.ID())
 	}
 
 	var xerr fail.Error
@@ -111,13 +113,13 @@ func New(organization, project, tenant, description string) (*Frame, fail.Error)
 	return out, nil
 }
 
-// IsNull tells if the Frame is considered as null value
-func (s *Frame) IsNull() bool {
+// IsNull tells if the scope is considered as null value
+func (s *scope) IsNull() bool {
 	return s == nil || s.organization == "" || s.project == "" || s.tenant == ""
 }
 
 // ID returns the scope identifier (which is equal to KVPath())
-func (s *Frame) ID() string {
+func (s *scope) ID() string {
 	if s.IsNull() {
 		return ""
 	}
@@ -125,8 +127,8 @@ func (s *Frame) ID() string {
 	return s.kvPath
 }
 
-// Organization returns the organization of the Frame
-func (s *Frame) Organization() string {
+// Organization returns the organization of the scope
+func (s *scope) Organization() string {
 	if s.IsNull() {
 		return ""
 	}
@@ -134,8 +136,8 @@ func (s *Frame) Organization() string {
 	return s.organization
 }
 
-// Project returns the project of the Frame
-func (s *Frame) Project() string {
+// Project returns the project of the scope
+func (s *scope) Project() string {
 	if s.IsNull() {
 		return ""
 	}
@@ -143,8 +145,8 @@ func (s *Frame) Project() string {
 	return s.project
 }
 
-// Tenant returns the tenant of the Frame
-func (s *Frame) Tenant() string {
+// Tenant returns the tenant of the scope
+func (s *scope) Tenant() string {
 	if s.IsNull() {
 		return ""
 	}
@@ -152,8 +154,8 @@ func (s *Frame) Tenant() string {
 	return s.tenant
 }
 
-// Description returns the description of the Frame
-func (s *Frame) Description() string {
+// Description returns the description of the scope
+func (s *scope) Description() string {
 	if s.IsNull() {
 		return ""
 	}
@@ -161,8 +163,8 @@ func (s *Frame) Description() string {
 	return s.description
 }
 
-// KVPath returns the prefix path of the Frame in K/V store
-func (s *Frame) KVPath() string {
+// KVPath returns the prefix path of the scope in K/V store
+func (s *scope) KVPath() string {
 	if s.IsNull() {
 		return ""
 	}
@@ -170,8 +172,8 @@ func (s *Frame) KVPath() string {
 	return s.kvPath
 }
 
-// FSPath returns the prefix path of the Frame for FS use
-func (s *Frame) FSPath() string {
+// FSPath returns the prefix path of the scope for FS use
+func (s *scope) FSPath() string {
 	if s.IsNull() {
 		return ""
 	}
@@ -179,7 +181,7 @@ func (s *Frame) FSPath() string {
 	return s.fsPath
 }
 
-func (s *Frame) Service() iaasapi.Service {
+func (s *scope) Service() iaasapi.Service {
 	if s.IsNull() {
 		return nil
 	}
@@ -187,10 +189,61 @@ func (s *Frame) Service() iaasapi.Service {
 	return s.service
 }
 
-func (s *Frame) ConsulKV() *consumer.KV {
+func (s *scope) ConsulKV() *consumer.KV {
 	if valid.IsNull(s) {
 		return nil
 	}
 
 	return s.consulKV
+}
+
+// Resource returns the resource corresponding to key (being an id or a name)
+func (s *scope) Resource(kind string, ref string) (clonable.Clonable, fail.Error) {
+	if valid.IsNull(s) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ref = strings.TrimSpace(ref); ref == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+	}
+
+	index := kind + ":" + ref
+	id, found := s.resourceByName.Load(ref)
+	if found {
+		index = kind + ":" + id
+	}
+
+	rsc, found := s.resourceByID.Load(index)
+	if found {
+		return rsc, nil
+	}
+
+	return nil, fail.NotFoundError("failed to find resource identified by %s", ref)
+}
+
+func (s *scope) AllResources() ([]*abstract.Core, fail.Error) {
+	if valid.IsNull(s) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	var err error
+	list := make([]*abstract.Core, 0, s.resourceByID.Size())
+	s.resourceByID.Range(func(key string, value clonable.Clonable) bool {
+		if err != nil {
+			return false
+		}
+
+		var item *abstract.Core
+		item, err = lang.Cast[*abstract.Core](value)
+		if err != nil {
+			return false
+		}
+
+		list = append(list, item)
+		return true
+	})
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	return list, nil
 }

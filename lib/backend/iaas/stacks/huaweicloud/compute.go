@@ -569,7 +569,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	// --- Initializes abstract.HostCore ---
 
-	ahc, xerr := abstract.NewHostCore(request.ResourceName)
+	ahc, xerr := abstract.NewHostCore(abstract.WithName(request.ResourceName))
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -1046,18 +1046,22 @@ func (s stack) complementHost(ctx context.Context, host *abstract.HostCore, serv
 	}
 	host.LastState = toHostState(server.Status)
 
-	completedHost, xerr = abstract.NewHostFull(host.Name)
+	completedHost, xerr = abstract.NewHostFull(abstract.WithName(host.Name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	completedHost.HostCore = host
 	completedHost.Description.Created = server.Created
 	completedHost.Description.Updated = server.Updated
 	completedHost.CurrentState = host.LastState
 
-	completedHost.Core.Tags["Template"], _ = server.Image["id"].(string) // nolint
-	completedHost.Core.Tags["Image"], _ = server.Flavor["id"].(string)   // nolint
+	completedHost.Tags["Template"], _ = server.Image["id"].(string) // nolint
+	completedHost.Tags["Image"], _ = server.Flavor["id"].(string)   // nolint
 
 	// recover metadata
 	for k, v := range server.Metadata {
-		completedHost.Core.Tags[k] = v
+		completedHost.Tags[k] = v
 	}
 
 	if completedHost.Networking.PublicIPv4 == "" {
@@ -1202,7 +1206,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 	var hostList abstract.HostList
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			innerErr := servers.List(s.ComputeClient, servers.ListOpts{}).EachPage(
+			return servers.List(s.ComputeClient, servers.ListOpts{}).EachPage(
 				func(page pagination.Page) (bool, error) {
 					list, err := servers.ExtractServers(page)
 					if err != nil {
@@ -1210,11 +1214,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 					}
 
 					for _, srv := range list {
-						h, err := abstract.NewHostCore("unknown")
-						if err != nil {
-							return false, err
-						}
-
+						h, _ := abstract.NewHostCore()
 						h.ID = srv.ID
 						var ah *abstract.HostFull
 						if details {
@@ -1223,7 +1223,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 								return false, err
 							}
 						} else {
-							ah, err = abstract.NewHostFull(h.Name)
+							ah, _ = abstract.NewHostFull()
 							ah.HostCore = h
 						}
 						hostList = append(hostList, ah)
@@ -1231,7 +1231,6 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 					return true, nil
 				},
 			)
-			return normalizeError(innerErr)
 		},
 		normalizeError,
 	)

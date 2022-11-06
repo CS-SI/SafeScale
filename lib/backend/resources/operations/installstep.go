@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -444,11 +443,11 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 
 	clonedV["ShortHostname"] = host.GetName()
 	domain := ""
-	xerr = host.Review(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.DescriptionV1, func(clonable clonable.Clonable) fail.Error {
-			hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr = host.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
+			hostDescriptionV1, innerErr := lang.Cast[*propertiesv1.HostDescription](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			domain = hostDescriptionV1.Domain

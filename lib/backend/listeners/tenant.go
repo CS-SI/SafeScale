@@ -22,7 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -163,7 +163,7 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 	// }
 
 	// service, xerr := factory.UseService(iaasoptions.BuildWithScope(job.Scope().Organization(), job.Scope().Project(), job.Scope().Tenant()))
-	service, xerr := factory.UseService(iaasoptions.BuildWithScope(job.Scope()))
+	service, xerr := factory.UseService(metadata.WithScope(job.Scope()))
 	if xerr != nil {
 		return empty, xerr
 	}

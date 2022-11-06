@@ -458,7 +458,7 @@ func (s *SecurityGroupListener) Bonds(inctx context.Context, in *protocol.Securi
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(ctx, job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(ctx, job.Scope(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}

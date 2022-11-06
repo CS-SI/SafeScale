@@ -23,16 +23,16 @@ import (
 	"sync"
 	"time"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/bucketproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/system/bucketfs"
@@ -60,12 +60,12 @@ type bucket struct {
 }
 
 // NewBucket instantiates bucket struct
-func NewBucket(frame *scope.Frame) (resources.Bucket, fail.Error) {
-	if valid.IsNull(frame) {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+func NewBucket(scope scopeapi.Scope) (resources.Bucket, fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 
-	coreInstance, xerr := metadata.NewCore(frame, metadata.MethodObjectStorage, bucketKind, bucketsFolderName, &abstract.ObjectStorageBucket{})
+	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, bucketKind, bucketsFolderName, &abstract.ObjectStorageBucket{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -78,9 +78,9 @@ func NewBucket(frame *scope.Frame) (resources.Bucket, fail.Error) {
 }
 
 // LoadBucket instantiates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
-func LoadBucket(inctx context.Context, frame *scope.Frame, name string) (resources.Bucket, fail.Error) {
-	if valid.IsNull(frame) {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+func LoadBucket(inctx context.Context, scope scopeapi.Scope, name string) (resources.Bucket, fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -103,7 +103,7 @@ func LoadBucket(inctx context.Context, frame *scope.Frame, name string) (resourc
 			var kt *bucket
 			cachename := fmt.Sprintf("%T/%s", kt, name)
 
-			cache, xerr := frame.Service().GetCache(ctx)
+			cache, xerr := scope.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -117,7 +117,7 @@ func LoadBucket(inctx context.Context, frame *scope.Frame, name string) (resourc
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(ctx, frame, name) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(ctx, scope, name) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -127,7 +127,6 @@ func LoadBucket(inctx context.Context, frame *scope.Frame, name string) (resourc
 			if !ok {
 				return nil, fail.InconsistentError("cache content should be a resources.Bucket", name)
 			}
-
 			if b == nil {
 				return nil, fail.InconsistentError("nil value found in Bucket cache for key '%s'", name)
 			}
@@ -180,7 +179,7 @@ func LoadBucket(inctx context.Context, frame *scope.Frame, name string) (resourc
 	}
 }
 
-func onBucketCacheMiss(ctx context.Context, scope *scope.Frame, ref string) (data.Identifiable, fail.Error) {
+func onBucketCacheMiss(ctx context.Context, scope scopeapi.Scope, ref string) (data.Identifiable, fail.Error) {
 	bucketInstance, innerXErr := NewBucket(scope)
 	if innerXErr != nil {
 		return nil, innerXErr
@@ -228,21 +227,19 @@ func (instance *bucket) Exists(ctx context.Context) (bool, fail.Error) {
 }
 
 // carry ...
-func (instance *bucket) carry(ctx context.Context, clonable clonable.Clonable) (ferr fail.Error) {
+func (instance *bucket) carry(ctx context.Context, p clonable.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		if instance.Core.IsTaken() {
-			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
-		}
+	if !valid.IsNil(instance) && instance.IsTaken() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
-	if clonable == nil {
-		return fail.InvalidParameterCannotBeNilError("clonable")
+	if p == nil {
+		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.Core.Carry(ctx, clonable)
+	xerr := instance.Carry(ctx, p)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -272,7 +269,7 @@ func (instance *bucket) Browse(ctx context.Context, callback func(storageBucket 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr := instance.Core.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
+	xerr := instance.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
 		ab := abstract.NewObjectStorageBucket()
 		var inErr fail.Error
 		if inErr = ab.Deserialize(buf); inErr != nil {
@@ -356,16 +353,14 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance.Core) {
-		if instance.Core.IsTaken() {
-			return fail.InconsistentError("already carrying information")
-		}
+	if !valid.IsNil(instance.Core) && instance.IsTaken() {
+		return fail.InconsistentError("already carrying information")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if name == "" {
-		return fail.InvalidParameterError("name", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(ctx, true, "('"+name+"')").WithStopwatch().Entering()
@@ -375,7 +370,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	frame := instance.Frame()
+	frame := instance.Scope()
 
 	// -- check if bucket already exist in SafeScale
 	bucketInstance, xerr := LoadBucket(ctx, frame, name)
@@ -393,7 +388,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- check if bucket already exist on provider side
-	ab, xerr := frame.Service().InspectBucket(ctx, name)
+	ab, xerr := instance.Service().InspectBucket(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -412,7 +407,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- create bucket
-	ab, xerr = frame.Service().CreateBucket(ctx, name)
+	ab, xerr = instance.Service().CreateBucket(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -517,7 +512,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	bun := instance.GetName()
 
 	svc := instance.Service()
-	hostInstance, xerr := LoadHost(ctx, svc, hostName)
+	hostInstance, xerr := LoadHost(ctx, instance.Scope(), hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", bun, hostName)
@@ -659,8 +654,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.Service()
-	hostInstance, xerr := LoadHost(ctx, svc, hostName)
+	hostInstance, xerr := LoadHost(ctx, instance.Scope(), hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -760,10 +754,9 @@ func (instance *bucket) ToProtocol(ctx context.Context) (*protocol.BucketRespons
 				return fail.Wrap(innerErr)
 			}
 
-			svc := instance.Service()
 			out.Mounts = make([]*protocol.BucketMount, 0, len(mountsV1.ByHostID))
 			for k, v := range mountsV1.ByHostID {
-				hostInstance, innerXErr := LoadHost(ctx, svc, k)
+				hostInstance, innerXErr := LoadHost(ctx, instance.Scope(), k)
 				if innerXErr != nil {
 					return innerXErr
 				}

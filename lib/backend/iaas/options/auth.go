@@ -20,6 +20,8 @@ package iaasoptions
 const (
 	DefaultNetworkCIDR                          = "192.168.0.0/16" // Contains the CIDR to use when none is provided
 	AlphanumericWithDashesAndUnderscores string = "^[-a-zA-Z0-9-_]+$"
+
+	OptionAuthentication = "authentication"
 )
 
 // Authentication fields are the union of those recognized by each identity implementation and provider

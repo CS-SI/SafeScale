@@ -22,10 +22,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -36,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -391,11 +391,11 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 func (instance *Host) unsafeGetVolumes(ctx context.Context) (*propertiesv1.HostVolumes, fail.Error) {
 	var hvV1 *propertiesv1.HostVolumes
 	xerr := instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.VolumesV1, func(clonable clonable.Clonable) fail.Error {
-			var ok bool
-			hvV1, ok = clonable.(*propertiesv1.HostVolumes)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.unsafeGetVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Inspect(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
+			var innerErr error
+			hvV1, innerErr = lang.Cast[*propertiesv1.HostVolumes](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			return nil
@@ -413,24 +413,21 @@ func (instance *Host) unsafeGetVolumes(ctx context.Context) (*propertiesv1.HostV
 // Intended to be used when instance is notoriously not nil (because previously checked)
 func (instance *Host) unsafeGetMounts(ctx context.Context) (mounts *propertiesv1.HostMounts, ferr fail.Error) {
 	xerr := instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.MountsV1, func(clonable clonable.Clonable) fail.Error {
-			hostMountsV1, err := lang.Cast[*propertiesv1.HostMounts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Inspect(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
+			hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
-			clone, _ := hostMountsV1.Clone()
-			mounts, ok = clone.(*propertiesv1.HostMounts)
-			if !ok {
-				return fail.InconsistentError("clone should be a *propertiesv1.HostMounts")
-			}
-			return nil
+			mounts, innerErr = clonable.CastedClone[*propertiesv1.HostMounts](hostMountsV1)
+			return fail.Wrap(innerErr)
 		})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return mounts, nil
 }
 
@@ -517,32 +514,34 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 func (instance *Host) unsafeGetDefaultSubnet(ctx context.Context) (subnetInstance resources.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	svc := instance.Service()
 	xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(hostproperty.NetworkV2) {
-			return props.Inspect(hostproperty.NetworkV2, func(clonable clonable.Clonable) fail.Error {
-				networkV2, err := lang.Cast[*propertiesv2.HostNetworking)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
+				networkV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
+
 				var inErr fail.Error
-				subnetInstance, inErr = LoadSubnet(ctx, svc, "", networkV2.DefaultSubnetID)
+				subnetInstance, inErr = LoadSubnet(ctx, instance.Scope(), "", networkV2.DefaultSubnetID)
 				if inErr != nil {
 					return inErr
 				}
 				return nil
 			})
 		}
-		return props.Inspect(hostproperty.NetworkV2, func(clonable clonable.Clonable) fail.Error {
-			hostNetworkV2, err := lang.Cast[*propertiesv2.HostNetworking)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
+			hostNetworkV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
+
 			var inErr fail.Error
-			subnetInstance, inErr = LoadSubnet(ctx, svc, "", hostNetworkV2.DefaultSubnetID)
+			subnetInstance, inErr = LoadSubnet(ctx, instance.Scope(), "", hostNetworkV2.DefaultSubnetID)
 			if inErr != nil {
 				return inErr
 			}
+
 			return nil
 		})
 	})

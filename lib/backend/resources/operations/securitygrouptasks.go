@@ -154,9 +154,8 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 				return
 			}
 
-			svc := instance.Service()
 			for k, v := range p.subnetHosts.ByID {
-				hostInstance, xerr := LoadHost(ctx, svc, k)
+				hostInstance, xerr := LoadHost(ctx, instance.Scope(), k)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
@@ -238,7 +237,7 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(task concurrency.Task, para
 			return
 		}
 
-		hostInstance, innerXErr := LoadHost(ctx, instance.Frame(), hostID)
+		hostInstance, innerXErr := LoadHost(ctx, instance.Scope(), hostID)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
@@ -306,8 +305,7 @@ func (instance *SecurityGroup) taskBindDisabledOnHost(task concurrency.Task, par
 			return
 		}
 
-		svc := instance.Service()
-		hostInstance, innerXErr := LoadHost(ctx, svc, hostID)
+		hostInstance, innerXErr := LoadHost(ctx, instance.Scope(), hostID)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:

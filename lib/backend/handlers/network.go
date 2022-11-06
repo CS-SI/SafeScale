@@ -20,7 +20,7 @@ import (
 	"context"
 	"net"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	networkfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/network"
@@ -48,11 +48,11 @@ type NetworkHandler interface {
 
 // networkHandler is one implementation of NetworkHandler interface
 type networkHandler struct {
-	job job.Job
+	job jobapi.Job
 }
 
 // NewNetworkHandler returns an instance of *networkHandler that satisfies interface NetworkHandler
-func NewNetworkHandler(job job.Job) NetworkHandler {
+func NewNetworkHandler(job jobapi.Job) NetworkHandler {
 	return &networkHandler{job}
 }
 
@@ -73,7 +73,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkReq.Name")
 	}
 
-	ctx, svc := handler.job.Context(), handler.job.Service()
+	ctx, svc := handler.job.Context(), handler.job.Scope()
 	tracer := debug.NewTracer(ctx, true, "('%s')", networkReq.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
@@ -168,7 +168,7 @@ func (handler *networkHandler) List(all bool) (_ []*abstract.Network, ferr fail.
 		return handler.job.Service().ListNetworks(handler.job.Context())
 	}
 
-	return networkfactory.List(handler.job.Context(), handler.job.Service())
+	return networkfactory.List(handler.job.Context(), handler.job.Scope())
 }
 
 // Inspect returns infos on a network
@@ -192,7 +192,7 @@ func (handler *networkHandler) Inspect(networkRef string) (_ resources.Network, 
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	return networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
+	return networkfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef)
 }
 
 // Delete a network
@@ -215,7 +215,7 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 		logrus.Tracef("forcing network deletion")
 	}
 
-	ctx, svc := handler.job.Context(), handler.job.Service()
+	ctx, svc := handler.job.Context(), handler.job.Scope()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
@@ -230,7 +230,7 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 			// if xerr != nil {
 			// 	switch xerr.(type) {
 			// 	case *fail.ErrNotFound:
-			abstractNetwork, xerr = svc.InspectNetwork(ctx, networkRef)
+			abstractNetwork, xerr = handler.job.Service().InspectNetwork(ctx, networkRef)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -244,7 +244,7 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 			//	}
 			// }
 
-			cfg, cerr := svc.ConfigurationOptions()
+			cfg, cerr := handler.job.Service().ConfigurationOptions()
 			if cerr != nil {
 				return cerr
 			}

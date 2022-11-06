@@ -17,57 +17,24 @@
 package iaasoptions
 
 import (
-	"reflect"
-
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-type (
-	Build struct {
-		TenantName               string
-		TerraformerConfiguration terraformerapi.Configuration
-	}
+const (
+	BuildOptionTenantName               = "tenant_name"
+	BuildOptionTerraformerConfiguration = "terraformer_conf"
 )
 
-// Load is a dummy implementation to satisfy options.Options interface
-func (o Build) Load(key string) (any, fail.Error) {
-	return nil, nil
-}
-
-// Store ...
-func (o Build) Store(key string, value any) (any, fail.Error) {
-	return nil, nil
-}
-
-// BuildWithScope allows to define the tenant to use
-func BuildWithScope(scope *common.Scope) options.Mutator {
-	if valid.IsNull(scope) {
-		return func(o options.Options) fail.Error {
-			return fail.InvalidParameterError("scope", "cannot be null value of '%s'", reflect.TypeOf(scope).String())
-		}
-	}
-
-	return func(o options.Options) fail.Error {
-		xerr := options.Add(o, "Scope", scope)
-		if xerr != nil {
-			return xerr
-		}
-
-		return nil
-	}
-}
-
-// BuildWithTerraformer allows to indicate what terraformer.Configuration has to be used
-func BuildWithTerraformer(config terraformerapi.Configuration) options.Mutator {
+// WithTerraformer allows to indicate what terraformer.Configuration has to be used
+func WithTerraformer(config terraformerapi.Configuration) options.Option {
 	return func(o options.Options) fail.Error {
 		if valid.IsNull(config) {
 			return fail.InvalidParameterError("config", "must be a valid 'terraformer.Configuration' in WithTerraformer()")
 		}
 
-		return options.Add(o, "TerraformerConfiguration", config)
+		return options.Add(o, BuildOptionTerraformerConfiguration, config)
 	}
 }

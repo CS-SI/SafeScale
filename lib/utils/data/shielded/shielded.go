@@ -73,7 +73,7 @@ func (instance *Shielded) String() (string, error) {
 }
 
 // Inspect is used to lock a clonable for read
-func (instance *Shielded) Inspect(inspector func(clonable clonable.Clonable) fail.Error) (ferr fail.Error) {
+func (instance *Shielded) Inspect(inspector func(p clonable.Clonable) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
@@ -147,9 +147,9 @@ func (instance *Shielded) Serialize() (_ []byte, ferr fail.Error) {
 	}
 
 	var jsoned []byte
-	xerr := instance.Inspect(func(clonable clonable.Clonable) fail.Error {
+	xerr := instance.Inspect(func(p clonable.Clonable) fail.Error {
 		var innerErr error
-		jsoned, innerErr = json.Marshal(clonable)
+		jsoned, innerErr = json.Marshal(p)
 		if innerErr != nil {
 			return fail.SyntaxError("failed to marshal: %s", innerErr.Error())
 		}
@@ -175,8 +175,8 @@ func (instance *Shielded) Deserialize(buf []byte) (ferr fail.Error) {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")
 	}
 
-	return instance.Alter(func(clonable clonable.Clonable) fail.Error {
-		if innerErr := json.Unmarshal(buf, clonable); innerErr != nil {
+	return instance.Alter(func(p clonable.Clonable) fail.Error {
+		if innerErr := json.Unmarshal(buf, p); innerErr != nil {
 			return fail.SyntaxError("failed to unmarshal: %s", innerErr.Error())
 		}
 

@@ -19,25 +19,26 @@ package cluster
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // List returns a list of available hosts
-func List(ctx context.Context, svc iaasapi.Service) (list []abstract.ClusterIdentity, ferr fail.Error) {
+func List(ctx context.Context, scope scopeapi.Scope) (list []abstract.ClusterIdentity, ferr fail.Error) {
 	var emptyList []abstract.ClusterIdentity
 
 	if ctx == nil {
 		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if svc == nil {
-		return emptyList, fail.InvalidParameterCannotBeNilError("svc")
+	if valid.IsNull(scope) {
+		return emptyList, fail.InvalidParameterCannotBeNilError("scope")
 	}
 
-	instance, xerr := New(ctx, svc)
+	instance, xerr := New(ctx, scope)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -51,11 +52,11 @@ func List(ctx context.Context, svc iaasapi.Service) (list []abstract.ClusterIden
 }
 
 // New creates a new instance of resources.Cluster
-func New(ctx context.Context, svc iaasapi.Service) (_ resources.Cluster, ferr fail.Error) {
-	return operations.NewCluster(ctx, svc)
+func New(ctx context.Context, scope scopeapi.Scope) (_ resources.Cluster, ferr fail.Error) {
+	return operations.NewCluster(ctx, scope)
 }
 
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
-func Load(ctx context.Context, svc iaasapi.Service, name string) (_ resources.Cluster, ferr fail.Error) {
-	return operations.LoadCluster(ctx, svc, name)
+func Load(ctx context.Context, scope scopeapi.Scope, name string) (_ resources.Cluster, ferr fail.Error) {
+	return operations.LoadCluster(ctx, scope, name)
 }

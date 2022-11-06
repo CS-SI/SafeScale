@@ -18,6 +18,7 @@ package iaasapi
 
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -52,7 +53,7 @@ func ValidateNetworkParameter(networkParam NetworkParameter) (an *abstract.Netwo
 		}
 
 		var err error
-		an, err = networkParam.Clone()
+		an, err = clonable.CastedClone[*abstract.Network](networkParam)
 		if err != nil {
 			return nil, "", fail.Wrap(err)
 		}
@@ -89,10 +90,11 @@ func ValidateSubnetParameter(subnetParam SubnetParameter) (as *abstract.Subnet, 
 		}
 
 		var err error
-		as, err = subnetParam.Clone()
+		as, err = clonable.CastedClone[*abstract.Subnet](subnetParam)
 		if err != nil {
 			return nil, "", fail.Wrap(err)
 		}
+
 		if as.Name != "" {
 			subnetLabel = "'" + as.Name + "'"
 		} else {
@@ -117,12 +119,14 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 		if hostParam == "" {
 			return nil, "", fail.InvalidParameterCannotBeEmptyStringError("hostParam")
 		}
+
 		ahf.ID = hostParam
 		hostLabel = hostParam
 	case *abstract.HostCore:
 		if valid.IsNil(hostParam) {
 			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostCore null value")
 		}
+
 		ahf.HostCore = hostParam
 		if ahf.Name != "" {
 			hostLabel = "'" + ahf.Name + "'"
@@ -133,6 +137,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 		if valid.IsNil(hostParam) {
 			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostFull null value")
 		}
+
 		ahf = hostParam
 		if ahf.Name != "" {
 			hostLabel = "'" + ahf.Name + "'"
@@ -145,9 +150,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 	if hostLabel == "" {
 		return nil, "", fail.InvalidParameterError("hostParam", "at least one of fields 'ID' or 'Name' must not be empty string")
 	}
-	// if ahf.Core.ID == "" {
-	// 	return nil, "", fail.InvalidParameterError("hostParam", "field ID cannot be empty string")
-	// }
+
 	return ahf, hostLabel, nil
 }
 

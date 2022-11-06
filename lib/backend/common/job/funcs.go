@@ -3,20 +3,24 @@ package job
 import (
 	"context"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job/internal"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-const (
-	KeyForJobInContext = "job"
-)
+// New creates a new instance of struct Job
+func New(ctx context.Context, cancel context.CancelFunc, scope scopeapi.Scope) (_ jobapi.Job, ferr fail.Error) { // nolint
+	return internal.New(ctx, cancel, scope)
+}
 
 // FromContext returns the job instance carried by the context
-func FromContext(ctx context.Context) (Job, fail.Error) {
+func FromContext(ctx context.Context) (jobapi.Job, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	jobInstance, ok := ctx.Value(KeyForJobInContext).(Job)
+	jobInstance, ok := ctx.Value(jobapi.KeyForJobInContext).(jobapi.Job)
 	if !ok {
 		return nil, fail.InconsistentError("value in context must satisfy interface 'Job'")
 	}
@@ -32,7 +36,7 @@ func AbortByID(id string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	if job, ok := jobMap[id]; ok {
+	if job, ok := internal.JobList.Load(id); ok {
 		if xerr := job.Abort(); xerr != nil {
 			return fail.Wrap(xerr, "failed to stop job '%s'", id)
 		}
@@ -44,8 +48,9 @@ func AbortByID(id string) (ferr fail.Error) {
 // List ...
 func List() map[string]string {
 	listMap := map[string]string{}
-	for uuid, job := range jobMap {
-		listMap[uuid] = job.Name()
-	}
+	internal.JobList.Range(func(key string, value jobapi.Job) bool {
+		listMap[key] = value.Name()
+		return true
+	})
 	return listMap
 }

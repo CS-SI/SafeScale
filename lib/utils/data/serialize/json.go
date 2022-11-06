@@ -168,7 +168,7 @@ func (x *JSONProperties) Count() uint {
 
 // Inspect allows to consult the content of the property 'key' inside 'inspector' function
 // Changes in the property won't be kept
-func (x *JSONProperties) Inspect(key string, inspector func(clonable clonable.Clonable) fail.Error) (ferr fail.Error) {
+func (x *JSONProperties) Inspect(key string, inspector func(p clonable.Clonable) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if x == nil {

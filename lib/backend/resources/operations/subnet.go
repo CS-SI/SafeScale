@@ -24,10 +24,10 @@ import (
 	"sync"
 	"time"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -35,8 +35,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -80,21 +80,21 @@ type Subnet struct {
 }
 
 // ListSubnets returns a list of available subnets
-func ListSubnets(ctx context.Context, frame *scope.Frame, networkID string, all bool) (_ []*abstract.Subnet, ferr fail.Error) {
+func ListSubnets(ctx context.Context, scope scopeapi.Scope, networkID string, all bool) (_ []*abstract.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if frame == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 
 	if all {
-		return frame.Service().ListSubnets(ctx, networkID)
+		return scope.Service().ListSubnets(ctx, networkID)
 	}
 
-	subnetInstance, xerr := NewSubnet(frame)
+	subnetInstance, xerr := NewSubnet(scope)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -116,14 +116,14 @@ func ListSubnets(ctx context.Context, frame *scope.Frame, networkID string, all 
 }
 
 // NewSubnet creates an instance of Subnet used as resources.Subnet
-func NewSubnet(frame *scope.Frame) (_ *Subnet, ferr fail.Error) {
+func NewSubnet(scope scopeapi.Scope) (_ *Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNull(frame) {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 
-	coreInstance, xerr := metadata.NewCore(frame, metadata.MethodObjectStorage, subnetKind, subnetsFolderName, &abstract.Subnet{})
+	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, subnetKind, subnetsFolderName, &abstract.Subnet{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -136,9 +136,9 @@ func NewSubnet(frame *scope.Frame) (_ *Subnet, ferr fail.Error) {
 }
 
 // LoadSubnet loads the metadata of a Subnet
-func LoadSubnet(inctx context.Context, frame *scope.Frame, networkRef, subnetRef string) (*Subnet, fail.Error) {
-	if valid.IsNull(frame) {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+func LoadSubnet(inctx context.Context, scope scopeapi.Scope, networkRef, subnetRef string) (*Subnet, fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 	if subnetRef = strings.TrimSpace(subnetRef); subnetRef == "" {
 		return nil, fail.InvalidParameterError("subnetRef", "cannot be empty string")
@@ -162,7 +162,7 @@ func LoadSubnet(inctx context.Context, frame *scope.Frame, networkRef, subnetRef
 			var kt *Subnet
 			cachesubnetRef := fmt.Sprintf("%T/%s", kt, subnetRef)
 
-			cache, xerr := frame.Service().GetCache(ctx)
+			cache, xerr := scope.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -189,7 +189,7 @@ func LoadSubnet(inctx context.Context, frame *scope.Frame, networkRef, subnetRef
 				subnetID = subnetRef
 			default:
 				// Try to load Network metadata
-				networkInstance, xerr = LoadNetwork(ctx, frame, networkRef)
+				networkInstance, xerr = LoadNetwork(ctx, scope, networkRef)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -201,7 +201,7 @@ func LoadSubnet(inctx context.Context, frame *scope.Frame, networkRef, subnetRef
 					}
 				}
 
-				withDefaultSubnetwork, err := frame.Service().HasDefaultNetwork()
+				withDefaultSubnetwork, err := scope.Service().HasDefaultNetwork()
 				if err != nil {
 					return nil, err
 				}
@@ -228,7 +228,7 @@ func LoadSubnet(inctx context.Context, frame *scope.Frame, networkRef, subnetRef
 					}
 				} else if withDefaultSubnetwork {
 					// No Network Metadata, try to use the default Network if there is one
-					an, xerr := frame.Service().DefaultNetwork(ctx)
+					an, xerr := scope.Service().DefaultNetwork(ctx)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						return nil, xerr
@@ -236,7 +236,7 @@ func LoadSubnet(inctx context.Context, frame *scope.Frame, networkRef, subnetRef
 
 					if an.Name == networkRef || an.ID == networkRef {
 						// We are in default Network context, query Subnet list and search for the one requested
-						list, xerr := ListSubnets(ctx, frame, an.ID, false)
+						list, xerr := ListSubnets(ctx, scope, an.ID, false)
 						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
 							return nil, xerr
@@ -260,7 +260,7 @@ func LoadSubnet(inctx context.Context, frame *scope.Frame, networkRef, subnetRef
 			}
 
 			// -- second step: search instance in service cache
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSubnetCacheMiss(ctx, frame, subnetID) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSubnetCacheMiss(ctx, scope, subnetID) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -324,8 +324,8 @@ func LoadSubnet(inctx context.Context, frame *scope.Frame, networkRef, subnetRef
 }
 
 // onSubnetCacheMiss is called when there is no instance in cache of Subnet 'subnetID'
-func onSubnetCacheMiss(ctx context.Context, frame *scope.Frame, subnetID string) (data.Identifiable, fail.Error) {
-	subnetInstance, innerXErr := NewSubnet(frame)
+func onSubnetCacheMiss(ctx context.Context, scope scopeapi.Scope, subnetID string) (data.Identifiable, fail.Error) {
+	subnetInstance, innerXErr := NewSubnet(scope)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -368,7 +368,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 	}
 
 	if primaryGatewayID != "" {
-		hostInstance, xerr := LoadHost(ctx, instance.Frame(), primaryGatewayID)
+		hostInstance, xerr := LoadHost(ctx, instance.Scope(), primaryGatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -388,7 +388,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error 
 	}
 
 	if secondaryGatewayID != "" {
-		hostInstance, xerr := LoadHost(ctx, instance.Frame(), secondaryGatewayID)
+		hostInstance, xerr := LoadHost(ctx, instance.Scope(), secondaryGatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -534,7 +534,7 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 			return fail.Wrap(innerErr)
 		}
 
-		sg, innerXErr := LoadSecurityGroup(ctx, instance.Frame(), as.InternalSecurityGroupID)
+		sg, innerXErr := LoadSecurityGroup(ctx, instance.Scope(), as.InternalSecurityGroupID)
 		if innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", as.Name, as.InternalSecurityGroupID)
 		}
@@ -560,7 +560,7 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 				return fail.Wrap(innerErr)
 			}
 
-			sg, derr := LoadSecurityGroup(ctx, instance.Frame(), as.InternalSecurityGroupID)
+			sg, derr := LoadSecurityGroup(ctx, instance.Scope(), as.InternalSecurityGroupID)
 			if derr != nil {
 				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind External Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
 				return derr
@@ -710,7 +710,7 @@ func wouldOverlap(allSubnets []*abstract.Subnet, subnet net.IPNet) fail.Error {
 
 // checkUnicity checks if the Subnet name is not already used
 func (instance *Subnet) checkUnicity(ctx context.Context, req abstract.SubnetRequest) fail.Error {
-	_, xerr := LoadSubnet(ctx, instance.Frame(), req.NetworkID, req.Name)
+	_, xerr := LoadSubnet(ctx, instance.Scope(), req.NetworkID, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -727,7 +727,7 @@ func (instance *Subnet) checkUnicity(ctx context.Context, req abstract.SubnetReq
 // validateNetwork verifies the Network exists and make sure req.Network field is an ID
 func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.SubnetRequest) (resources.Network, *abstract.Network, fail.Error) {
 	var an *abstract.Network
-	networkInstance, xerr := LoadNetwork(ctx, instance.Frame(), req.NetworkID)
+	networkInstance, xerr := LoadNetwork(ctx, instance.Scope(), req.NetworkID)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
@@ -816,12 +816,8 @@ func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subn
 	}
 
 	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
-		as, innerXErr := abstract.NewSubnet("unknown")
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		innerXErr = as.Deserialize(buf)
+		as, _ := abstract.NewSubnet()
+		innerXErr := as.Deserialize(buf)
 		innerXErr = debug.InjectPlannedFail(innerXErr)
 		if innerXErr != nil {
 			return innerXErr
@@ -888,7 +884,7 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 		}
 
 		if subnetAbstract.InternalSecurityGroupID != "" {
-			sgInstance, innerXErr := LoadSecurityGroup(ctx, instance.Frame(), subnetAbstract.InternalSecurityGroupID)
+			sgInstance, innerXErr := LoadSecurityGroup(ctx, instance.Scope(), subnetAbstract.InternalSecurityGroupID)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -915,7 +911,7 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 		}
 
 		if !isGateway && pubIP != "" && subnetAbstract.PublicIPSecurityGroupID != "" {
-			sgInstance, innerXErr := LoadSecurityGroup(ctx, instance.Frame(), subnetAbstract.PublicIPSecurityGroupID)
+			sgInstance, innerXErr := LoadSecurityGroup(ctx, instance.Scope(), subnetAbstract.PublicIPSecurityGroupID)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -989,7 +985,7 @@ func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, ferr
 			return fail.Wrap(innerErr)
 		}
 
-		frame := instance.Frame()
+		frame := instance.Scope()
 		for id := range shV1.ByID {
 			hostInstance, innerErr := LoadHost(ctx, frame, id)
 			if innerErr != nil {
@@ -1041,7 +1037,7 @@ func (instance *Subnet) GetGatewayPublicIP(ctx context.Context, primary bool) (_
 			id = as.GatewayIDs[1]
 		}
 		var inErr fail.Error
-		if rgw, inErr = LoadHost(ctx, instance.Frame(), id); inErr != nil {
+		if rgw, inErr = LoadHost(ctx, instance.Scope(), id); inErr != nil {
 			return inErr
 		}
 
@@ -1080,7 +1076,7 @@ func (instance *Subnet) GetGatewayPublicIPs(ctx context.Context) (_ []string, fe
 
 		gatewayIPs = make([]string, 0, len(as.GatewayIDs))
 		for _, v := range as.GatewayIDs {
-			rgw, inErr := LoadHost(ctx, instance.Frame(), v)
+			rgw, inErr := LoadHost(ctx, instance.Scope(), v)
 			if inErr != nil {
 				return inErr
 			}
@@ -1202,7 +1198,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 				if hostsLen > 0 {
 					for k := range shV1.ByName {
 						// Check if Host still has metadata and count it if yes
-						if hess, innerXErr := LoadHost(ctx, instance.Frame(), k); innerXErr != nil {
+						if hess, innerXErr := LoadHost(ctx, instance.Scope(), k); innerXErr != nil {
 							debug.IgnoreError(innerXErr)
 						} else {
 							if _, innerXErr := hess.ForceGetState(ctx); innerXErr != nil {
@@ -1279,7 +1275,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			// 4st free CIDR index if the Subnet has been created for a single Host
 			if as.SingleHostCIDRIndex > 0 {
 				// networkInstance, innerXErr := instance.unsafeInspectNetwork()
-				networkInstance, innerXErr := LoadNetwork(ctx, instance.Frame(), as.Network)
+				networkInstance, innerXErr := LoadNetwork(ctx, instance.Scope(), as.Network)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -1339,7 +1335,7 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 			return fail.NewError("unexpected empty security group")
 		}
 
-		sgInstance, xerr := LoadSecurityGroup(ctx, instance.Frame(), v)
+		sgInstance, xerr := LoadSecurityGroup(ctx, instance.Scope(), v)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -1395,7 +1391,7 @@ func (instance *Subnet) InspectNetwork(ctx context.Context) (rn resources.Networ
 		return nil, xerr
 	}
 
-	return LoadNetwork(ctx, instance.Frame(), as.Network)
+	return LoadNetwork(ctx, instance.Scope(), as.Network)
 }
 
 // deleteGateways deletes all the gateways of the Subnet
@@ -1406,7 +1402,7 @@ func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Sub
 	}
 
 	if len(subnet.GatewayIDs) == 0 { // unlikely, either is an input error or we are dealing with metadata corruption
-		gwInstance, xerr := LoadHost(ctx, instance.Frame(), fmt.Sprintf("gw-%s", subnet.Name))
+		gwInstance, xerr := LoadHost(ctx, instance.Scope(), fmt.Sprintf("gw-%s", subnet.Name))
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -1424,7 +1420,7 @@ func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Sub
 			}
 		}
 
-		gw2Instance, xerr := LoadHost(ctx, instance.Frame(), fmt.Sprintf("gw2-%s", subnet.Name))
+		gw2Instance, xerr := LoadHost(ctx, instance.Scope(), fmt.Sprintf("gw2-%s", subnet.Name))
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -1445,7 +1441,7 @@ func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Sub
 
 	if len(subnet.GatewayIDs) > 0 {
 		for _, v := range subnet.GatewayIDs {
-			hostInstance, xerr := LoadHost(ctx, instance.Frame(), v)
+			hostInstance, xerr := LoadHost(ctx, instance.Scope(), v)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -1505,7 +1501,7 @@ func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subne
 		onRemoval:   true,
 	}
 	for k := range sgs.ByID {
-		sgInstance, xerr := LoadSecurityGroup(ctx, instance.Frame(), k)
+		sgInstance, xerr := LoadSecurityGroup(ctx, instance.Scope(), k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -1564,7 +1560,7 @@ func (instance *Subnet) GetEndpointIP(ctx context.Context) (ip string, ferr fail
 		if as.VIP != nil && as.VIP.PublicIP != "" {
 			ip = as.VIP.PublicIP
 		} else {
-			objpgw, innerXErr := LoadHost(ctx, instance.Frame(), as.GatewayIDs[0])
+			objpgw, innerXErr := LoadHost(ctx, instance.Scope(), as.GatewayIDs[0])
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -2043,7 +2039,7 @@ func (instance *Subnet) InspectGatewaySecurityGroup(ctx context.Context) (_ reso
 		return nil, xerr
 	}
 
-	return LoadSecurityGroup(ctx, instance.Frame(), abstractSubnet.GWSecurityGroupID)
+	return LoadSecurityGroup(ctx, instance.Scope(), abstractSubnet.GWSecurityGroupID)
 }
 
 // InspectInternalSecurityGroup returns the instance of SecurityGroup for internal security inside the Subnet
@@ -2064,7 +2060,7 @@ func (instance *Subnet) InspectInternalSecurityGroup(ctx context.Context) (_ res
 		return nil, xerr
 	}
 
-	return LoadSecurityGroup(ctx, instance.Frame(), abstractSubnet.InternalSecurityGroupID)
+	return LoadSecurityGroup(ctx, instance.Scope(), abstractSubnet.InternalSecurityGroupID)
 }
 
 // InspectPublicIPSecurityGroup returns the instance of SecurityGroup in Subnet for Hosts with Public IP (which does not apply on gateways)
@@ -2085,7 +2081,7 @@ func (instance *Subnet) InspectPublicIPSecurityGroup(ctx context.Context) (_ res
 		return nil, xerr
 	}
 
-	return LoadSecurityGroup(ctx, instance.Frame(), abstractSubnet.PublicIPSecurityGroupID)
+	return LoadSecurityGroup(ctx, instance.Scope(), abstractSubnet.PublicIPSecurityGroupID)
 }
 
 // CreateSubnetWithoutGateway creates a Subnet named like 'singleHostName', without gateway

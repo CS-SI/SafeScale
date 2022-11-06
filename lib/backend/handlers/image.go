@@ -17,7 +17,7 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -37,11 +37,11 @@ type ImageHandler interface {
 
 // imageHandler image service
 type imageHandler struct {
-	job job.Job
+	job jobapi.Job
 }
 
 // NewImageHandler creates a host service
-func NewImageHandler(job job.Job) ImageHandler {
+func NewImageHandler(job jobapi.Job) ImageHandler {
 	return &imageHandler{job: job}
 }
 

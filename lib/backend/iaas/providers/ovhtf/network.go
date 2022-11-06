@@ -35,44 +35,44 @@ import (
 )
 
 const (
-	networkDesignResourceSnippetPath  = "snippets/resource_network_design.tf"
-	networkCreateResourceSnippetPath  = "snippets/resource_network_create.tf"
-	networkDeleteResourceSnippetPath  = "snippets/resource_network_delete.tf"
-	networkInspectResourceSnippetPath = "snippets/resource_network_inspect.tf"
+	networkDesignResourceSnippetPath = "snippets/resource_network_design.tf"
+	// networkCreateResourceSnippetPath  = "snippets/resource_network_create.tf"
+	// networkDeleteResourceSnippetPath  = "snippets/resource_network_delete.tf"
+	// networkInspectResourceSnippetPath = "snippets/resource_network_inspect.tf"
 )
 
-type (
-	networkResource struct {
-		terraformer.ResourceCore
-		id string
-	}
-)
+// type (
+// 	networkResource struct {
+// 		terraformer.ResourceCore
+// 		id string
+// 	}
+// )
 
-func newNetworkResource(name string, snippet string, opts ...terraformer.ResourceOption) (*networkResource, fail.Error) {
-	rc, xerr := terraformer.NewResourceCore(name, snippet, opts...)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return &networkResource{ResourceCore: rc}, nil
-}
-
-// ToMap returns a map of networkResource field to be used where needed
-func (nr *networkResource) ToMap() map[string]any {
-	return map[string]any{
-		"Name": nr.Name(),
-		"ID":   nr.id,
-	}
-}
-
-// String returns a string that represents the network resource
-func (nr networkResource) String() string {
-	out := "'" + nr.Name() + "'"
-	if out == "''" {
-		out = nr.id
-	}
-	return out
-}
+// func newNetworkResource(name string, snippet string, opts ...terraformer.ResourceOption) (*networkResource, fail.Error) {
+// 	rc, xerr := terraformer.NewResourceCore(name, snippet, opts...)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	return &networkResource{ResourceCore: rc}, nil
+// }
+//
+// // ToMap returns a map of networkResource field to be used where needed
+// func (nr *networkResource) ToMap() map[string]any {
+// 	return map[string]any{
+// 		"Name": nr.Name(),
+// 		"ID":   nr.id,
+// 	}
+// }
+//
+// // String returns a string that represents the network resource
+// func (nr networkResource) String() string {
+// 	out := "'" + nr.Name() + "'"
+// 	if out == "''" {
+// 		out = nr.id
+// 	}
+// 	return out
+// }
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
 func (p *provider) HasDefaultNetwork() (bool, fail.Error) {
@@ -86,7 +86,7 @@ func (p *provider) DefaultNetwork(context.Context) (*abstract.Network, fail.Erro
 }
 
 // CreateNetwork creates a network named name
-func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (abstra_ctNetwork *abstract.Network, ferr fail.Error) {
+func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (_ *abstract.Network, ferr fail.Error) {
 	var xerr fail.Error
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
@@ -118,23 +118,29 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 		return nil, xerr
 	}
 
-	summoner, xerr := p.Terraformer()
+	renderer, xerr := terraformer.NewRenderer(p)
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer func() { _ = summoner.Close() }()
+	defer func() { _ = renderer.Close() }()
 
-	xerr = summoner.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	def, xerr := summoner.Assemble(abstractNetwork)
+	xerr = renderer.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	outputs, xerr := summoner.Apply(ctx, def)
+	created, xerr := abstractNetwork.AllResources()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	created = append(created, abstractNetwork)
+	def, xerr := renderer.Assemble(created...)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	outputs, xerr := renderer.Apply(ctx, def)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to create network '%s'", req.Name)
 	}
@@ -144,7 +150,7 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && req.CleanOnFailure() {
 			logrus.WithContext(ctx).Infof("Cleaninng up on failure, deleting Network '%s'", req.Name)
-			derr := summoner.Destroy(ctx, def)
+			derr := renderer.Destroy(ctx, def)
 			if derr != nil {
 				logrus.WithContext(ctx).Errorf("failed to delete Network '%s': %v", req.Name, derr)
 				_ = ferr.AddConsequence(derr)
@@ -188,10 +194,11 @@ func (p *provider) DesignNetwork(ctx context.Context, req abstract.NetworkReques
 		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
 	}
 
-	newNet, xerr := abstract.NewNetwork(req.Name, abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
+	newNet, xerr := abstract.NewNetwork(abstract.WithName(req.Name), abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	newNet.CIDR = req.CIDR
 
 	// summoner, xerr := p.Terraformer()
@@ -440,30 +447,30 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 		return nil
 	*/
 
-	abstractNetwork, xerr := abstract.NewNetwork(existingNetwork.Name, abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
+	abstractNetwork, xerr := abstract.NewNetwork(abstract.WithName(existingNetwork.Name), abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
 	if xerr != nil {
 		return xerr
 	}
 	abstractNetwork.ID = existingNetwork.ID
 	abstractNetwork.DNSServers = existingNetwork.DNSServers
 
-	summoner, xerr := p.Terraformer()
+	renderer, xerr := p.Terraformer()
 	if xerr != nil {
 		return xerr
 	}
-	defer func() { _ = summoner.Close() }()
+	defer func() { _ = renderer.Close() }()
 
-	xerr = summoner.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
-	if xerr != nil {
-		return xerr
-	}
-
-	def, xerr := summoner.Assemble(abstractNetwork)
+	xerr = renderer.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = summoner.Destroy(ctx, def)
+	def, xerr := renderer.Assemble(abstractNetwork)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = renderer.Destroy(ctx, def)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to delete network %s", an.ID)
 	}

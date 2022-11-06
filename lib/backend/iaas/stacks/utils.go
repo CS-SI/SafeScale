@@ -71,7 +71,7 @@ func ValidateHostParameter(_ context.Context, hostParam iaasapi.HostParameter) (
 	if hostLabel == "" {
 		return nil, "", fail.InvalidParameterError("hostParam", "at least one of fields 'ID' or 'Name' must not be empty string")
 	}
-	// if ahf.Core.ID == "" {
+	// if ahf.ID == "" {
 	// 	return nil, "", fail.InvalidParameterError("hostParam", "field ID cannot be empty string")
 	// }
 	return ahf, hostLabel, nil

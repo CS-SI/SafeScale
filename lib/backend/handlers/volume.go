@@ -17,10 +17,11 @@
 package handlers
 
 import (
-	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
@@ -31,7 +32,6 @@ import (
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
 	volumefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/volume"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -57,11 +57,11 @@ type VolumeHandler interface {
 
 // volumeHandler volume service
 type volumeHandler struct {
-	job job.Job
+	job jobapi.Job
 }
 
 // NewVolumeHandler creates a Volume service
-func NewVolumeHandler(job job.Job) VolumeHandler {
+func NewVolumeHandler(job jobapi.Job) VolumeHandler {
 	return &volumeHandler{job: job}
 }
 
@@ -86,13 +86,13 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr f
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	browseInstance, xerr := volumefactory.New(handler.job.Service())
+	browseInstance, xerr := volumefactory.New(handler.job.Scope())
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = browseInstance.Browse(ctx, func(volume *abstract.Volume) fail.Error {
-		volumeInstance, innerXErr := volumefactory.Load(handler.job.Context(), handler.job.Service(), volume.ID)
+		volumeInstance, innerXErr := volumefactory.Load(handler.job.Context(), handler.job.Scope(), volume.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -131,7 +131,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Scope(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -143,10 +143,10 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 	}
 
 	xerr = volumeInstance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(volumeproperty.AttachedV1, func(clonable clonable.Clonable) fail.Error {
-			volumeAttachmentsV1, err := lang.Cast[*propertiesv1.VolumeAttachments)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Inspect(volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
+			volumeAttachmentsV1, innerErr := lang.Cast[*propertiesv1.VolumeAttachments](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			nbAttach := uint(len(volumeAttachmentsV1.Hosts))
@@ -191,7 +191,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Scope(), ref)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("volume", ref)
@@ -235,7 +235,7 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var xerr fail.Error
-	objv, xerr = volumefactory.New(handler.job.Service())
+	objv, xerr = volumefactory.New(handler.job.Scope())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -282,14 +282,13 @@ func (handler *volumeHandler) Attach(volumeRef string, hostRef string, path stri
 	defer tracer.WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	svc := handler.job.Service()
 	ctx := handler.job.Context()
-	volumeInstance, xerr := volumefactory.Load(ctx, svc, volumeRef)
+	volumeInstance, xerr := volumefactory.Load(ctx, handler.job.Scope(), volumeRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(ctx, svc, hostRef)
+	hostInstance, xerr := hostfactory.Load(ctx, handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -323,10 +322,9 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	svc := handler.job.Service()
 	ctx := handler.job.Context()
 	// Load volume data
-	rv, xerr := volumefactory.Load(ctx, svc, volumeRef)
+	volumeInstance, xerr := volumefactory.Load(ctx, handler.job.Scope(), volumeRef)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
@@ -337,10 +335,10 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error
 	// mountPath := ""
 
 	// Load rh data
-	rh, xerr := hostfactory.Load(ctx, svc, hostRef)
+	rh, xerr := hostfactory.Load(ctx, handler.job.Scope(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	return rv.Detach(handler.job.Context(), rh)
+	return volumeInstance.Detach(handler.job.Context(), rh)
 }

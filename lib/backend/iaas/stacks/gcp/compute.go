@@ -370,8 +370,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 	logrus.WithContext(ctx).Debugf("Host '%s' created.", ahf.GetName())
 
 	// Add to abstract.HostFull data that does not come with creation data from provider
-	ahf.Core.PrivateKey = userData.FirstPrivateKey // Add PrivateKey to Host description
-	ahf.Core.Password = request.Password           // and OperatorUsername's password
+	ahf.PrivateKey = userData.FirstPrivateKey // Add PrivateKey to Host description
+	ahf.Password = request.Password           // and OperatorUsername's password
 	ahf.Networking.IsGateway = request.IsGateway
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
 	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
@@ -429,7 +429,7 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 		}
 	}
 
-	return ahf.Core, nil
+	return ahf.HostCore, nil
 }
 
 // buildGcpMachine ...
@@ -450,13 +450,13 @@ func (s stack) buildGcpMachine(
 		return nil, xerr
 	}
 
-	ahf := abstract.NewHostFull()
-	if xerr = s.complementHost(ctx, ahf, resp); xerr != nil {
+	ahf, _ := abstract.NewHostFull()
+	xerr = s.complementHost(ctx, ahf, resp)
+	if xerr != nil {
 		return nil, xerr
 	}
 
-	ahf.Core.Tags["Image"] = imageURL
-
+	ahf.Tags["Image"] = imageURL
 	return ahf, nil
 }
 
@@ -502,11 +502,8 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 	if xerr != nil {
 		return nil, xerr
 	}
-	if !(ahf.Core.ID != "" || ahf.Core.Name != "") {
-		return nil, fail.InvalidParameterError(
-			"hostParam",
-			"must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field",
-		)
+	if !(ahf.ID != "" || ahf.Name != "") {
+		return nil, fail.InvalidParameterError("hostParam", "must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field")
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
@@ -517,8 +514,9 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 		tryByName = true
 		instance  *compute.Instance
 	)
-	if ahf.Core.ID != "" {
-		if instance, xerr = s.rpcGetInstance(ctx, ahf.Core.ID); xerr != nil {
+	if ahf.ID != "" {
+		instance, xerr = s.rpcGetInstance(ctx, ahf.ID)
+		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
@@ -530,19 +528,20 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 			tryByName = false
 		}
 	}
-	if tryByName && ahf.Core.Name != "" {
-		instance, xerr = s.rpcGetInstance(ctx, ahf.Core.Name)
-	}
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			return nil, fail.NotFoundError("failed to find Host %s", hostLabel)
-		default:
-			return nil, xerr
+	if tryByName && ahf.Name != "" {
+		instance, xerr = s.rpcGetInstance(ctx, ahf.Name)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				return nil, fail.NotFoundError("failed to find Host %s", hostLabel)
+			default:
+				return nil, xerr
+			}
 		}
 	}
 
-	if xerr = s.complementHost(ctx, ahf, instance); xerr != nil {
+	xerr = s.complementHost(ctx, ahf, instance)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -555,9 +554,9 @@ func (s stack) complementHost(ctx context.Context, host *abstract.HostFull, inst
 		return xerr
 	}
 
-	host.CurrentState, host.Core.LastState = state, state
-	host.Core.Name = instance.Name
-	host.Core.ID = fmt.Sprintf("%d", instance.Id)
+	host.CurrentState, host.LastState = state, state
+	host.Name = instance.Name
+	host.ID = fmt.Sprintf("%d", instance.Id)
 
 	var subnets []IPInSubnet
 	for _, nit := range instance.NetworkInterfaces {
@@ -626,14 +625,14 @@ func (s stack) complementHost(ctx context.Context, host *abstract.HostFull, inst
 	if instance.Metadata != nil {
 		for _, item := range instance.Metadata.Items {
 			if item.Value != nil {
-				host.Core.Tags[item.Key] = *item.Value
+				host.Tags[item.Key] = *item.Value
 			}
 		}
 	}
 
-	host.Core.Tags["CreationDate"] = instance.CreationTimestamp
-	host.Core.Tags["Template"] = instance.MachineType
-	delete(host.Core.Tags, "startup-script")
+	host.Tags["CreationDate"] = instance.CreationTimestamp
+	host.Tags["Template"] = instance.MachineType
+	delete(host.Tags, "startup-script")
 
 	return nil
 }
@@ -680,14 +679,14 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 		return xerr
 	}
 
-	if xerr := s.rpcDeleteInstance(ctx, ahf.Core.ID); xerr != nil {
+	if xerr := s.rpcDeleteInstance(ctx, ahf.ID); xerr != nil {
 		return xerr
 	}
 
 	// Wait until instance disappear
 	xerr = retry.WhileSuccessful(
 		func() error {
-			_, innerXErr := s.rpcGetInstance(ctx, ahf.Core.ID)
+			_, innerXErr := s.rpcGetInstance(ctx, ahf.ID)
 			return innerXErr
 		},
 		timings.NormalDelay(),
@@ -727,9 +726,12 @@ func (s stack) ListHosts(ctx context.Context, detailed bool) (_ abstract.HostLis
 
 	out := make(abstract.HostList, 0, len(resp))
 	for _, v := range resp {
-		nhost := abstract.NewHostCore()
+		nhost, xerr := abstract.NewHostCore(abstract.WithName(v.Name))
+		if xerr != nil {
+			return nil, xerr
+		}
+
 		nhost.ID = strconv.FormatUint(v.Id, 10)
-		nhost.Name = v.Name
 		nhost.LastState, xerr = stateConvert(v.Status)
 		if xerr != nil {
 			return nil, xerr
@@ -743,8 +745,10 @@ func (s stack) ListHosts(ctx context.Context, detailed bool) (_ abstract.HostLis
 				return nil, xerr
 			}
 		} else {
-			hostFull = abstract.NewHostFull()
-			hostFull.Core = nhost
+			hostFull, xerr = abstract.NewHostFullFromCore(nhost)
+			if xerr != nil {
+				return nil, xerr
+			}
 		}
 
 		// FIXME: Populate host, what's missing ?
@@ -766,7 +770,7 @@ func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gr
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
 
-	return s.rpcStopInstance(ctx, ahf.Core.ID)
+	return s.rpcStopInstance(ctx, ahf.ID)
 }
 
 // StartHost starts the host identified by id
@@ -781,26 +785,27 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) f
 		return xerr
 	}
 
-	return s.rpcStartInstance(ctx, ahf.Core.ID)
+	return s.rpcStartInstance(ctx, ahf.ID)
 }
 
 // RebootHost reboot the host identified by id
 func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostParam).Entering().Exiting()
-
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	if xerr := s.rpcStopInstance(ctx, ahf.Core.ID); xerr != nil {
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
+
+	xerr = s.rpcStopInstance(ctx, ahf.ID)
+	if xerr != nil {
 		return xerr
 	}
 
-	return s.rpcStartInstance(ctx, ahf.Core.ID)
+	return s.rpcStartInstance(ctx, ahf.ID)
 }
 
 // GetHostState returns the host identified by id

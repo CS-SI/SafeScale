@@ -17,7 +17,7 @@
 package handlers
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -38,11 +38,11 @@ type LabelHandler interface {
 
 // labelHandler Label service
 type labelHandler struct {
-	job job.Job
+	job jobapi.Job
 }
 
 // NewTagHandler creates a Label service
-func NewTagHandler(job job.Job) LabelHandler {
+func NewTagHandler(job jobapi.Job) LabelHandler {
 	return &labelHandler{job: job}
 }
 
@@ -67,13 +67,13 @@ func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fa
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	browseInstance, xerr := labelfactory.New(handler.job.Service())
+	browseInstance, xerr := labelfactory.New(handler.job.Scope())
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = browseInstance.Browse(task.Context(), func(label *abstract.Label) fail.Error {
-		labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Service(), label.ID)
+		labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), label.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -119,7 +119,7 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -157,7 +157,7 @@ func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.E
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -194,7 +194,7 @@ func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue s
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var xerr fail.Error
-	instance, xerr = labelfactory.New(handler.job.Service())
+	instance, xerr = labelfactory.New(handler.job.Scope())
 	if xerr != nil {
 		return nil, xerr
 	}

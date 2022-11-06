@@ -19,23 +19,24 @@ package feature
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func New(ctx context.Context, svc iaasapi.Service, name string) (resources.Feature, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+func New(ctx context.Context, scope scopeapi.Scope, name string) (resources.Feature, fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	feat, xerr := operations.NewFeature(ctx, svc, name)
+	feat, xerr := operations.NewFeature(ctx, scope, name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -45,7 +46,7 @@ func New(ctx context.Context, svc iaasapi.Service, name string) (resources.Featu
 		}
 
 		// Failed to find a spec file on filesystem, trying with embedded ones
-		if feat, xerr = operations.NewEmbeddedFeature(ctx, svc, name); xerr != nil {
+		if feat, xerr = operations.NewEmbeddedFeature(ctx, scope, name); xerr != nil {
 			return nil, xerr
 		}
 	}
@@ -54,6 +55,6 @@ func New(ctx context.Context, svc iaasapi.Service, name string) (resources.Featu
 
 // NewEmbedded searches for an embedded feature called 'name' and initializes a new Feature object
 // with its content
-func NewEmbedded(ctx context.Context, svc iaasapi.Service, name string) (resources.Feature, fail.Error) {
-	return operations.NewEmbeddedFeature(ctx, svc, name)
+func NewEmbedded(ctx context.Context, scope scopeapi.Scope, name string) (resources.Feature, fail.Error) {
+	return operations.NewEmbeddedFeature(ctx, scope, name)
 }

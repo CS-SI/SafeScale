@@ -20,9 +20,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
@@ -57,12 +60,12 @@ type KongController struct {
 }
 
 // NewKongController creates a controller for Kong
-func NewKongController(ctx context.Context, svc iaasapi.Service, subnet resources.Subnet, addressPrimaryGateway bool) (*KongController, fail.Error) {
+func NewKongController(ctx context.Context, scope scopeapi.Scope, subnet resources.Subnet, addressPrimaryGateway bool) (*KongController, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 	if subnet == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("subnet")
@@ -89,7 +92,7 @@ func NewKongController(ctx context.Context, svc iaasapi.Service, subnet resource
 	if !present {
 		// try an active check and update InstalledFeatures if found
 		// Check if 'edgeproxy4subnet' feature is installed on host
-		featureInstance, xerr := NewFeature(ctx, svc, "edgeproxy4subnet")
+		featureInstance, xerr := NewFeature(ctx, scope, "edgeproxy4subnet")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -103,10 +106,10 @@ func NewKongController(ctx context.Context, svc iaasapi.Service, subnet resource
 
 		if results.Successful() {
 			xerr = addressedGateway.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(hostproperty.FeaturesV1, func(clonable clonable.Clonable) fail.Error {
-					featuresV1, err := lang.Cast[*propertiesv1.HostFeatures)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return props.Alter(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+					featuresV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
 					}
 
 					item := propertiesv1.NewHostInstalledFeature()
@@ -136,7 +139,7 @@ func NewKongController(ctx context.Context, svc iaasapi.Service, subnet resource
 	ctrl := &KongController{
 		subnet:  subnet,
 		gateway: addressedGateway,
-		service: svc,
+		service: scope.Service(),
 	}
 	ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -185,10 +188,10 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 	var sourceControl map[string]interface{}
 
 	// Sets the values usable in all cases
-	xerr = k.subnet.Inspect(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, err := lang.Cast[*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr = k.subnet.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, innerErr := lang.Cast[*abstract.Subnet](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		if as.VIP != nil {

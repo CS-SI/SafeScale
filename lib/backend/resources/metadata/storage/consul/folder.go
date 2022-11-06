@@ -22,12 +22,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata/storage"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -42,22 +43,22 @@ import (
 type folder struct {
 	// path contains the base path where to read/write record in Object Storage
 	path     string
-	frame    *scope.Frame
+	scope    scopeapi.Scope
 	kv       *consumer.KV
 	crypt    bool
 	cryptKey *crypt.Key
 }
 
 // NewFolder creates a new Metadata folder object, ready to help access the metadata inside it
-func NewFolder(frame *scope.Frame, path string) (*folder, fail.Error) {
-	if valid.IsNull(frame) {
+func NewFolder(scope scopeapi.Scope, path string) (*folder, fail.Error) {
+	if valid.IsNull(scope) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	f := &folder{
 		path:  strings.Trim(path, "/"),
-		frame: frame,
-		kv:    frame.ConsulKV(),
+		scope: scope,
+		kv:    scope.ConsulKV(),
 	}
 
 	// FIXME: consul not yet able to crypt
@@ -78,7 +79,7 @@ func NewFolder(frame *scope.Frame, path string) (*folder, fail.Error) {
 
 // IsNull tells if the folder instance should be considered as a null value
 func (instance *folder) IsNull() bool {
-	return instance == nil || valid.IsNull(instance.frame)
+	return instance == nil || valid.IsNull(instance.scope)
 }
 
 // Service returns the service used by the folder
@@ -87,16 +88,16 @@ func (instance folder) Service() iaasapi.Service {
 		return nil
 	}
 
-	return instance.frame.Service()
+	return instance.scope.Service()
 }
 
-// Frame returns the scope of the folder
-func (instance *folder) Frame() *scope.Frame {
+// Scope returns the scope of the folder
+func (instance *folder) Scope() scopeapi.Scope {
 	if valid.IsNull(instance) {
 		return nil
 	}
 
-	return instance.frame
+	return instance.scope
 }
 
 // Prefix returns the base path of the folder
@@ -169,7 +170,7 @@ func (instance folder) Delete(ctx context.Context, path string, name string) fai
 // returns true, nil if the object has been found
 // returns false, fail.Error if an error occurred (including object not found)
 // The callback function has to know how to decode it and where to store the result
-func (instance folder) Read(ctx context.Context, path string, name string, callback storage.FolderCallback) fail.Error {
+func (instance folder) Read(ctx context.Context, path string, name string, callback storage.FolderCallback, opts ...options.Option) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -179,6 +180,12 @@ func (instance folder) Read(ctx context.Context, path string, name string, callb
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
+
+	o, xerr := options.New(opts...)
+	if xerr != nil {
+		return xerr
+	}
+	_ = o
 
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
@@ -222,29 +229,10 @@ func (instance folder) Read(ctx context.Context, path string, name string, callb
 		}
 	}
 
-	// FIXME: no crypt in consul yet
-	// doCrypt := instance.crypt
-	// for _, v := range options {
-	// 	switch v.Key() {
-	// 	case "doNotCrypt":
-	// 		anon := v.Value()
-	// 		if anon != nil {
-	// 			switch c := anon.(type) {
-	// 			case bool:
-	// 				doCrypt = !c
-	// 			case string:
-	// 				switch c {
-	// 				case "true", "yes":
-	// 					doCrypt = false
-	// 				case "false", "no":
-	// 					doCrypt = true
-	// 				}
-	// 			}
-	// 		}
-	// 	default:
-	// 	}
+	// doCrypt := instance.determineIfCryptIsEnabledInOptions(o)
+	// if xerr != nil {
+	//  return xerr
 	// }
-
 	// datas := goodBuffer.Bytes()
 	// if doCrypt {
 	// 	decrypted, err := crypt.Decrypt(datas, instance.cryptKey)
@@ -265,11 +253,24 @@ func (instance folder) Read(ctx context.Context, path string, name string, callb
 	return nil
 }
 
+func (instance *folder) determineIfCryptIsEnabled(opts options.Options) (bool, fail.Error) {
+	if !instance.crypt {
+		return false, nil
+	}
+
+	enabled, xerr := storage.DetermineIfCryptIsEnabledInOptions(opts)
+	if xerr != nil {
+		return false, xerr
+	}
+
+	return enabled, nil
+}
+
 // Write writes the content in Object Storage, and check the write operation is committed.
 // Returns nil on success (with assurance the write operation has been committed on remote side)
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
-func (instance folder) Write(ctx context.Context, path string, name string, content []byte) fail.Error {
+func (instance folder) Write(ctx context.Context, path string, name string, content []byte, opts ...options.Option) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -283,13 +284,9 @@ func (instance folder) Write(ctx context.Context, path string, name string, cont
 	}
 
 	// FIXME: no crypt in consul yet
-	// doCrypt := instance.crypt
-	// for _, v := range options {
-	// 	switch v.Key() {
-	// 	case "doNotCrypt":
-	// 		doCrypt = !v.Value().(bool)
-	// 	default:
-	// 	}
+	// doCrypt := instance.determineIfCryptIsEnabledInOptions(o)
+	// if xerr != nil {
+	//  return xerr
 	// }
 	var data []byte
 	// if doCrypt {

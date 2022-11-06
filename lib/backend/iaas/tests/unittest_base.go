@@ -222,7 +222,7 @@ func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, 
 
 		gateway, _, err = tester.Service.CreateHost(context.Background(), gwRequest)
 		require.Nil(t, err)
-		subnet.GatewayIDs = []string{gateway.Core.ID}
+		subnet.GatewayIDs = []string{gateway.ID}
 	}
 
 	return subnet, gateway
@@ -275,7 +275,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fai
 	if xerr != nil {
 		return xerr
 	}
-	subnet.GatewayIDs = []string{gw.Core.ID}
+	subnet.GatewayIDs = []string{gw.ID}
 	return nil
 }
 
@@ -430,14 +430,14 @@ func (tester *ServiceTester) Subnets(t *testing.T) {
 	assert.NotNil(t, subnet1)
 	assert.NotNil(t, gw1)
 	defer func() {
-		_ = tester.Service.DeleteHost(context.Background(), gw1.Core.ID)
+		_ = tester.Service.DeleteHost(context.Background(), gw1.ID)
 		_ = tester.Service.DeleteNetwork(context.Background(), subnet1.ID)
 	}()
 	fmt.Println(subnet1Name + " created")
 
 	assert.Equal(t, subnet1.CIDR, subnet1CIDR)
-	assert.Equal(t, subnet1.GatewayIDs[0], gw1.Core.ID)
-	assert.Equal(t, gw1.Core.Name, "gw-"+subnet1.Name)
+	assert.Equal(t, subnet1.GatewayIDs[0], gw1.ID)
+	assert.Equal(t, gw1.Name, "gw-"+subnet1.Name)
 	assert.NotEmpty(t, gw1.Networking.PublicIPv4)
 
 	// VPL: properties are not inside stack instances anymore
@@ -508,7 +508,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	host1, _, err := tester.CreateHost(t, "host1", subnet, true)
 	assert.NoError(t, err)
 	defer func() {
-		_ = tester.Service.DeleteHost(context.Background(), host1.Core.ID)
+		_ = tester.Service.DeleteHost(context.Background(), host1.ID)
 	}()
 
 	// ssh, err := tester.Service.GetSSHConfig(host.ID)
@@ -543,7 +543,7 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	host2, _, err := tester.CreateHost(t, "host2", subnet, false)
 	assert.NoError(t, err)
 	defer func() {
-		_ = tester.Service.DeleteHost(context.Background(), host2.Core.ID)
+		_ = tester.Service.DeleteHost(context.Background(), host2.ID)
 	}()
 
 	subnet, err = tester.Service.InspectSubnet(context.Background(), subnet.ID)
@@ -554,11 +554,11 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 	found := 0
 	for _, v := range hosts {
 		switch {
-		case v.Core.Name == "gw-"+subnet.Name:
+		case v.Name == "gw-"+subnet.Name:
 			found++
-		case v.Core.ID == host1.Core.ID:
+		case v.ID == host1.ID:
 			found++
-		case v.Core.ID == host2.Core.ID:
+		case v.ID == host2.ID:
 			found++
 		default:
 			fmt.Printf("Unknown (preexisting?) host %+v\n", v)
@@ -569,8 +569,8 @@ func (tester *ServiceTester) Hosts(t *testing.T) {
 
 	host1Bis, err := tester.Service.InspectHost(context.Background(), host1)
 	assert.NoError(t, err)
-	assert.Equal(t, host1.Core.ID, host1Bis.Core.ID)
-	assert.Equal(t, host1.Core.Name, host1Bis.Core.Name)
+	assert.Equal(t, host1.ID, host1Bis.ID)
+	assert.Equal(t, host1.Name, host1Bis.Name)
 }
 
 // StartStopHost test
@@ -582,27 +582,27 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 
 	subnet, gw := tester.CreateSubnet(t, network.ID, "unit_test_subnet_startstophost", true, "1.4.1.0/24")
 	defer func() {
-		_ = tester.Service.DeleteHost(context.Background(), gw.Core.ID)
+		_ = tester.Service.DeleteHost(context.Background(), gw.ID)
 		_ = tester.Service.DeleteSubnet(context.Background(), subnet.ID)
 	}()
 	host, err := tester.Service.InspectHost(context.Background(), "gw-"+subnet.Name)
 	require.Nil(t, err)
 	require.NotNil(t, host)
 	{
-		err := tester.Service.StopHost(context.Background(), host.Core.ID, true)
+		err := tester.Service.StopHost(context.Background(), host.ID, true)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(context.Background(), host.Core.ID, hoststate.Stopped, temporal.BigDelay())
+		err = tester.Service.WaitHostState(context.Background(), host.ID, hoststate.Stopped, temporal.BigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
 		// assert.Equal(t, host.State, hoststate.Stopped)
 	}
 	{
-		err := tester.Service.StartHost(context.Background(), host.Core.ID)
+		err := tester.Service.StartHost(context.Background(), host.ID)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(context.Background(), host.Core.ID, hoststate.Started, temporal.BigDelay())
+		err = tester.Service.WaitHostState(context.Background(), host.ID, hoststate.Started, temporal.BigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)

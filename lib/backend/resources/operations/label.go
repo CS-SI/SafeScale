@@ -19,28 +19,27 @@ package operations
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/metadata"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/eko/gocache/v2/store"
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/labelproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -58,12 +57,12 @@ type label struct {
 var _ resources.Label = (*label)(nil)
 
 // NewLabel creates an instance of Label
-func NewLabel(svc iaasapi.Service) (_ resources.Label, ferr fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
+func NewLabel(scope scopeapi.Scope) (_ resources.Label, ferr fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 
-	coreInstance, xerr := metadata.NewCore(svc, metadata.MethodObjectStorage, labelKind, labelsFolderName, abstract.NewLabel())
+	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, labelKind, labelsFolderName, abstract.NewLabel())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -76,7 +75,14 @@ func NewLabel(svc iaasapi.Service) (_ resources.Label, ferr fail.Error) {
 }
 
 // LoadLabel loads the metadata of a Label
-func LoadLabel(inctx context.Context, svc iaasapi.Service, ref string, options ...data.ImmutableKeyValue) (resources.Label, fail.Error) {
+func LoadLabel(inctx context.Context, scope scopeapi.Scope, ref string) (resources.Label, fail.Error) {
+	if valid.IsNull(scope) {
+		return nil, fail.InvalidParameterCannotBeNilError("frame")
+	}
+	if ref = strings.TrimSpace(ref); ref == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -90,18 +96,11 @@ func LoadLabel(inctx context.Context, svc iaasapi.Service, ref string, options .
 		ga, gerr := func() (_ resources.Label, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			if svc == nil {
-				return nil, fail.InvalidParameterCannotBeNilError("svc")
-			}
-			if ref = strings.TrimSpace(ref); ref == "" {
-				return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-			}
-
 			// trick to avoid collisions
 			var kt *label
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := svc.GetCache(ctx)
+			cache, xerr := scope.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -115,7 +114,7 @@ func LoadLabel(inctx context.Context, svc iaasapi.Service, ref string, options .
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onLabelCacheMiss(ctx, svc, ref) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onLabelCacheMiss(ctx, scope, ref) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -178,13 +177,13 @@ func LoadLabel(inctx context.Context, svc iaasapi.Service, ref string, options .
 }
 
 // onLabelCacheMiss is called when there is no instance in cache of Label 'ref'
-func onLabelCacheMiss(ctx context.Context, svc iaasapi.Service, ref string) (data.Identifiable, fail.Error) {
-	labelInstance, innerXErr := NewLabel(svc)
+func onLabelCacheMiss(ctx context.Context, scope scopeapi.Scope, ref string) (data.Identifiable, fail.Error) {
+	labelInstance, innerXErr := NewLabel(scope)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	blank, innerXErr := NewLabel(svc)
+	blank, innerXErr := NewLabel(scope)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -206,22 +205,25 @@ func (instance *label) IsNull() bool {
 	return instance == nil || valid.IsNil(instance.Core)
 }
 
+// Exists checks if the resource actually exists in provider side (not in stow metadata)
+func (instance *label) Exists(_ context.Context) (bool, fail.Error) {
+	return false, fail.NotImplementedError()
+}
+
 // carry overloads rv.core.Carry() to add Label to service cache
-func (instance *label) carry(ctx context.Context, clonable clonable.Clonable) (ferr fail.Error) {
+func (instance *label) carry(ctx context.Context, p clonable.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		if instance.Core.IsTaken() {
-			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
-		}
+	if !valid.IsNil(instance) && instance.IsTaken() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
-	if clonable == nil {
+	if p == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.Core.Carry(ctx, clonable)
+	xerr := instance.Core.Carry(ctx, p)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -285,10 +287,10 @@ func (instance *label) Delete(inctx context.Context) fail.Error {
 			defer fail.OnPanic(&ferr)
 
 			xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(labelproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
-					lhV1, err := lang.Cast[*propertiesv1.LabelHosts)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return props.Inspect(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+					lhV1, innerErr := lang.Cast[*propertiesv1.LabelHosts](p)
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
 					}
 
 					if len(lhV1.ByID) > 0 {
@@ -357,8 +359,7 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 	}
 
 	// Check if Label exists and is managed by SafeScale
-	svc := instance.Service()
-	_, xerr := LoadLabel(ctx, svc, name)
+	_, xerr := LoadLabel(ctx, instance.Scope(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -395,10 +396,10 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 
 	var labelHostsV1 *propertiesv1.LabelHosts
 	out := &protocol.LabelInspectResponse{}
-	xerr := instance.Inspect(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		alabel, err := lang.Cast[*abstract.Label)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		alabel, innerErr := lang.Cast[*abstract.Label](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		var err error
@@ -410,11 +411,11 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 		out.HasDefault = alabel.HasDefault
 		out.DefaultValue = alabel.DefaultValue
 
-		return props.Inspect(labelproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
-			var ok bool
-			labelHostsV1, ok = clonable.(*propertiesv1.LabelHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Inspect(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+			var innerErr error
+			labelHostsV1, innerErr = lang.Cast[*propertiesv1.LabelHosts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			return nil
@@ -427,7 +428,7 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 	if withHosts {
 		hosts := make([]*protocol.LabelHostResponse, 0)
 		for k, v := range labelHostsV1.ByID {
-			hostInstance, xerr := LoadHost(ctx, instance.Service(), k)
+			hostInstance, xerr := LoadHost(ctx, instance.Scope(), k)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -445,12 +446,16 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 }
 
 // IsTag tells of the Label represents a Tag (ie a Label that does not carry a default value)
-func (instance label) IsTag(ctx context.Context) (bool, fail.Error) {
+func (instance *label) IsTag(ctx context.Context) (bool, fail.Error) {
+	if valid.IsNull(instance) {
+		return false, fail.InvalidInstanceError()
+	}
+
 	var out bool
-	xerr := instance.Review(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		alabel, err := lang.Cast[*abstract.Label)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		alabel, innerErr := lang.Cast[*abstract.Label](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		out = !alabel.HasDefault
@@ -464,12 +469,16 @@ func (instance label) IsTag(ctx context.Context) (bool, fail.Error) {
 }
 
 // DefaultValue returns the default value of the Label
-func (instance label) DefaultValue(ctx context.Context) (string, fail.Error) {
+func (instance *label) DefaultValue(ctx context.Context) (string, fail.Error) {
+	if valid.IsNull(instance) {
+		return "", fail.InvalidInstanceError()
+	}
+
 	var out string
-	xerr := instance.Review(ctx, func(clonable clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		alabel, err := lang.Cast[*abstract.Label)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+		alabel, innerErr := lang.Cast[*abstract.Label](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		out = alabel.DefaultValue
@@ -497,18 +506,18 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "('%s', '%s')", instance.GetName(), hostInstance.GetName()).Entering()
 	defer tracer.Exiting()
 
-	xerr := instance.Alter(ctx, func(clonable clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		alabel, err := lang.Cast[*abstract.Label)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	xerr := instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		alabel, innerErr := lang.Cast[*abstract.Label](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
 		isTag := !alabel.HasDefault
 
-		return props.Alter(labelproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
-			labelHostsV1, err := lang.Cast[*propertiesv1.LabelHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Alter(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+			labelHostsV1, innerErr := lang.Cast[*propertiesv1.LabelHosts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			// If the tag has this host, consider it a success
@@ -516,8 +525,9 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 			if err != nil {
 				return fail.ConvertError(err)
 			}
+
 			hostName := hostInstance.GetName()
-			_, ok = labelHostsV1.ByID[hostID]
+			_, ok := labelHostsV1.ByID[hostID]
 			if !ok {
 				if isTag {
 					value = ""
@@ -553,20 +563,22 @@ func (instance *label) UnbindFromHost(ctx context.Context, hostInstance resource
 	defer tracer.Exiting()
 
 	xerr := instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(labelproperty.HostsV1, func(clonable clonable.Clonable) fail.Error {
-			labelHostsV1, err := lang.Cast[*propertiesv1.LabelHosts)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		return props.Alter(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+			labelHostsV1, innerErr := lang.Cast[*propertiesv1.LabelHosts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
 
 			hID, err := hostInstance.GetID()
 			if err != nil {
 				return fail.ConvertError(err)
 			}
+
 			hName := hostInstance.GetName()
 
 			// If the Label does not reference this Host, consider it a success
-			if _, ok = labelHostsV1.ByID[hID]; ok {
+			_, ok := labelHostsV1.ByID[hID]
+			if ok {
 				delete(labelHostsV1.ByID, hID)
 				delete(labelHostsV1.ByName, hName)
 			}
