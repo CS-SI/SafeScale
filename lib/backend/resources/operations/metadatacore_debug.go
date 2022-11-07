@@ -1,5 +1,5 @@
-//go:build !debug
-// +build !debug
+//go:build debug
+// +build debug
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -26,6 +26,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
@@ -208,6 +209,13 @@ func (myself *MetadataCore) GetKind() string {
 
 // Inspect protects the data for shared read
 func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
+	defer func() {
+		if rerr != nil {
+			if myself != nil {
+				logrus.WithContext(inctx).Warningf("Inspection of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+			}
+		}
+	}()
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -297,6 +305,14 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change through time).
 func (myself *MetadataCore) Review(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
+	defer func() {
+		if rerr != nil {
+			if myself != nil {
+				logrus.WithContext(inctx).Warningf("Review of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+			}
+		}
+	}()
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -343,6 +359,14 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 // Valid keyvalues for options are :
 // - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)
 func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Callback, options ...data.ImmutableKeyValue) (rerr fail.Error) {
+	defer func() {
+		if rerr != nil {
+			if myself != nil {
+				logrus.WithContext(inctx).Warningf("Alter of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+			}
+		}
+	}()
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -455,6 +479,13 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 // - fail.ErrInvalidParameter
 // - fail.ErrNotAvailable if the MetadataCore instance already carries a data
 func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable) (rerr fail.Error) {
+	defer func() {
+		if rerr != nil {
+			if myself != nil {
+				logrus.WithContext(inctx).Warningf("Carry of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+			}
+		}
+	}()
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -569,6 +600,7 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 
 // Read gets the data from Object Storage
 func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Error) {
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -675,6 +707,7 @@ func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Erro
 
 // ReadByID reads a metadata identified by ID from Object Storage
 func (myself *MetadataCore) ReadByID(inctx context.Context, id string) (_ fail.Error) {
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -1013,6 +1046,7 @@ func (myself *MetadataCore) write(inctx context.Context) fail.Error {
 
 // Reload reloads the content from the Object Storage
 func (myself *MetadataCore) Reload(inctx context.Context) (ferr fail.Error) {
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -1178,6 +1212,7 @@ func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 
 // BrowseFolder walks through MetadataFolder and executes a callback for each entry
 func (myself *MetadataCore) BrowseFolder(inctx context.Context, callback func(buf []byte) fail.Error) (_ fail.Error) {
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -1224,6 +1259,7 @@ func (myself *MetadataCore) BrowseFolder(inctx context.Context, callback func(bu
 
 // Delete deletes the metadata
 func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -1356,6 +1392,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 }
 
 func (myself *MetadataCore) Sdump(inctx context.Context) (string, fail.Error) {
+
 	if valid.IsNil(myself) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -1471,6 +1508,7 @@ func (myself *MetadataCore) unsafeSerialize(inctx context.Context) ([]byte, fail
 
 // Deserialize reads json code and reinstantiates
 func (myself *MetadataCore) Deserialize(inctx context.Context, buf []byte) fail.Error {
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
