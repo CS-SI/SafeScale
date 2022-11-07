@@ -262,7 +262,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(inctx context.Context, 
 			tracer := debug.NewTracer(ctx, true, "(%s)", gwname).WithStopwatch().Entering()
 			defer tracer.Exiting()
 			defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
-			defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting final configuration phases on the gateway '%s'...", gwname), fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname))()
+			defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting final configuration phases on the gateway '%s' with err '%s' ...", gwname, ferr), fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname))()
 
 			waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())
 

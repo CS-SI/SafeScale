@@ -1966,8 +1966,8 @@ func (instance *Host) thePhaseReboots(_ context.Context, phase userdata.Phase, u
 }
 
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
-func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content, timeout time.Duration) fail.Error {
-	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting install phase %s on '%s'...", phase, instance.GetName()), fmt.Sprintf("Ending phase %s on '%s'...", phase, instance.GetName()))()
+func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content, timeout time.Duration) (ferr fail.Error) {
+	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting install phase %s on '%s'...", phase, instance.GetName()), fmt.Sprintf("Ending phase %s on '%s' with err '%s' ...", phase, instance.GetName(), ferr))()
 
 	instance.localCache.RLock()
 	notok := instance.localCache.sshProfile == nil
@@ -2078,7 +2078,7 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 	return nil
 }
 
-func (instance *Host) waitInstallPhase(inctx context.Context, phase userdata.Phase, timeout time.Duration) (string, fail.Error) {
+func (instance *Host) waitInstallPhase(inctx context.Context, phase userdata.Phase, timeout time.Duration) (_ string, rerr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -2089,11 +2089,11 @@ func (instance *Host) waitInstallPhase(inctx context.Context, phase userdata.Pha
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Waiting install phase %s on '%s'...", phase, instance.GetName()), fmt.Sprintf("Finish Waiting install phase %s on '%s'...", phase, instance.GetName()))()
+		defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Waiting install phase %s on '%s'...", phase, instance.GetName()), fmt.Sprintf("Finish Waiting install phase %s on '%s' with err '%s' ...", phase, instance.GetName(), rerr))()
 
-		sshDefaultTimeout := int(timeout.Minutes()) + 1
+		sshDefaultTimeout := timeout
+		duration := sshDefaultTimeout
 
-		duration := time.Duration(sshDefaultTimeout) * time.Minute
 		sshCfg, xerr := instance.GetSSHConfig(ctx)
 		if xerr != nil {
 			chRes <- result{"", xerr}
@@ -2106,7 +2106,7 @@ func (instance *Host) waitInstallPhase(inctx context.Context, phase userdata.Pha
 			return
 		}
 
-		status, xerr := sshProfile.WaitServerReady(ctx, string(phase), time.Duration(sshDefaultTimeout)*time.Minute)
+		status, xerr := sshProfile.WaitServerReady(ctx, string(phase), duration)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -2374,7 +2374,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, hr abstract.Host
 	}
 
 	if inBackground() {
-		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, timings.HostOperationTimeout())
+		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, timings.HostOperationTimeout()+timings.HostBootTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr

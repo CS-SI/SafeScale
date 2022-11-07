@@ -98,7 +98,9 @@ func TestRunWindow(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := runWindow(tt.args.inctx, tt.args.count, tt.args.windowSize, tt.args.timeout, tt.args.uat, tt.args.runner, tt.args.data); (err != nil) != tt.wantErr {
+			ttctx, cancel := context.WithCancel(tt.args.inctx)
+			time.AfterFunc(1*time.Second, cancel)
+			if err := runWindow(ttctx, tt.args.count, tt.args.windowSize, tt.args.timeout, tt.args.uat, tt.args.runner, tt.args.data); (err != nil) != tt.wantErr {
 				t.Errorf("RunWindow() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
