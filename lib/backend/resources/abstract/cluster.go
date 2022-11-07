@@ -55,9 +55,9 @@ func (cr ClusterRequest) CleanOnFailure() bool {
 	return !cr.KeepOnFailure
 }
 
-// ClusterIdentity contains the bare minimum information about a cluster
-type ClusterIdentity struct {
-	Name          string                 `json:"name"`           // Name is the name of the cluster
+// Cluster contains the bare minimum information about a cluster
+type Cluster struct {
+	*Core
 	Flavor        clusterflavor.Enum     `json:"flavor"`         // Flavor tells what kind of cluster it is
 	Complexity    clustercomplexity.Enum `json:"complexity"`     // Complexity is the mode of cluster
 	Keypair       *KeyPair               `json:"keypair"`        // Keypair contains the key-pair used inside the Cluster
@@ -65,35 +65,40 @@ type ClusterIdentity struct {
 	Tags          map[string]string      `json:"tags,omitempty"`
 }
 
-// NewClusterIdentity ...
-func NewClusterIdentity() *ClusterIdentity {
-	ci := &ClusterIdentity{
-		Tags: make(map[string]string),
+// NewCluster ...
+func NewCluster(opts ...Option) (*Cluster, fail.Error) {
+	c, xerr := New(opts...)
+	if xerr != nil {
+		return nil, xerr
 	}
-	ci.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
-	ci.Tags["ManagedBy"] = "safescale"
-	return ci
+
+	out := &Cluster{
+		Core: c,
+	}
+	out.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
+	out.Tags["ManagedBy"] = "safescale"
+	return out, nil
 }
 
 // IsNull ...
-func (instance *ClusterIdentity) IsNull() bool {
-	return instance == nil || instance.Name == ""
+func (instance *Cluster) IsNull() bool {
+	return instance == nil || instance.Core.IsNull()
 }
 
 // Clone makes a copy of the instance
 // satisfies interface clonable.Clonable
-func (instance *ClusterIdentity) Clone() (clonable.Clonable, error) {
+func (instance *Cluster) Clone() (clonable.Clonable, error) {
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	nci := NewClusterIdentity()
-	return nci, nci.Replace(instance)
+	nc, _ := NewCluster()
+	return nc, nc.Replace(instance)
 }
 
 // Replace replaces the content of the instance with the content of the parameter
 // satisfies interface clonable.Clonable
-func (instance *ClusterIdentity) Replace(p clonable.Clonable) error {
+func (instance *Cluster) Replace(p clonable.Clonable) error {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -101,12 +106,17 @@ func (instance *ClusterIdentity) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := lang.Cast[*ClusterIdentity](p)
+	src, err := lang.Cast[*Cluster](p)
 	if err != nil {
 		return err
 	}
 
 	*instance = *src
+	instance.Core, err = clonable.CastedClone[*Core](src.Core)
+	if err != nil {
+		return err
+	}
+
 	instance.Keypair = nil
 	if src.Keypair != nil {
 		instance.Keypair = &KeyPair{}
@@ -117,26 +127,26 @@ func (instance *ClusterIdentity) Replace(p clonable.Clonable) error {
 
 // GetName returns the name of the cluster
 // Satisfies interface data.Identifiable
-func (instance ClusterIdentity) GetName() string {
+func (instance Cluster) GetName() string {
 	return instance.Name
 }
 
 // GetID returns the ID of the cluster (== GetName)
 // Satisfies interface data.Identifiable
-func (instance ClusterIdentity) GetID() (string, error) {
+func (instance Cluster) GetID() (string, error) {
 	return instance.GetName(), nil
 }
 
 // OK ...
-func (instance ClusterIdentity) OK() bool {
+func (instance Cluster) OK() bool {
 	result := true
 	result = result && instance.Name != ""
 	result = result && instance.Flavor != 0
 	return result
 }
 
-// Serialize serializes ClusterIdentity instance into bytes (output json code)
-func (instance *ClusterIdentity) Serialize() ([]byte, fail.Error) {
+// Serialize serializes Cluster instance into bytes (output json code)
+func (instance *Cluster) Serialize() ([]byte, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -148,8 +158,8 @@ func (instance *ClusterIdentity) Serialize() ([]byte, fail.Error) {
 	return r, nil
 }
 
-// Deserialize reads json code and reinstantiates a ClusterIdentity
-func (instance *ClusterIdentity) Deserialize(buf []byte) (ferr fail.Error) {
+// Deserialize reads json code and reinstantiates a Cluster
+func (instance *Cluster) Deserialize(buf []byte) (ferr fail.Error) {
 	// instance cannot be nil, but can be null value (which will be filled by this method)
 	if instance == nil {
 		return fail.InvalidInstanceError()

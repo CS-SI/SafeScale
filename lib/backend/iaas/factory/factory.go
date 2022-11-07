@@ -247,7 +247,7 @@ func UseService(Options ...options.Option) (_ iaasapi.Service, ferr fail.Error) 
 
 		// Initializes Metadata Object Storage (maybe different from the Object Storage)
 		var (
-			metadataBucket   abstract.ObjectStorageBucket
+			metadataBucket   *abstract.ObjectStorageBucket
 			metadataCryptKey *crypt.Key
 		)
 		if tenantMetadataFound || tenantObjectStorageFound {

@@ -26,7 +26,7 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
+	terraformer "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -118,7 +118,7 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 		return nil, xerr
 	}
 
-	renderer, xerr := terraformer.NewRenderer(p)
+	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -454,7 +454,7 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 	abstractNetwork.ID = existingNetwork.ID
 	abstractNetwork.DNSServers = existingNetwork.DNSServers
 
-	renderer, xerr := p.Terraformer()
+	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
 	if xerr != nil {
 		return xerr
 	}
@@ -465,7 +465,12 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(abstractNetwork)
+	created, xerr := abstractNetwork.AllResources()
+	if xerr != nil {
+		return xerr
+	}
+
+	def, xerr := renderer.Assemble(created...)
 	if xerr != nil {
 		return xerr
 	}

@@ -428,7 +428,7 @@ func TestCluster_String(t *testing.T) {
 		result, err := ocluster.String(ctx)
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(result).String(), "string")
-		require.Contains(t, result, "&abstract.ClusterIdentity{")
+		require.Contains(t, result, "&abstract.Cluster{")
 		require.Contains(t, result, "  Name: \"ClusterName\",")
 		require.Contains(t, result, "  Flavor: 2,")
 		require.Contains(t, result, "  Complexity: 1,")
@@ -458,7 +458,7 @@ func TestCluster_Deserialize(t *testing.T) {
 		// KeyPair
 		kp, xerr := svc.CreateKeyPair(ctx, "MyPrivateKey")
 		require.Nil(t, xerr)
-		aci := &abstract.ClusterIdentity{
+		aci := &abstract.Cluster{
 			Name:          "mycluster",
 			Flavor:        clusterflavor.K8S,
 			Complexity:    clustercomplexity.Small,
@@ -515,7 +515,7 @@ func TestCluster_Browse(t *testing.T) {
 			t.FailNow()
 		}
 
-		err := ocluster.Browse(ctx, func(aci *abstract.ClusterIdentity) fail.Error {
+		err := ocluster.Browse(ctx, func(aci *abstract.Cluster) fail.Error {
 
 			require.EqualValues(t, aci.Name, "ClusterName")
 			require.EqualValues(t, aci.Complexity, clustercomplexity.Small)

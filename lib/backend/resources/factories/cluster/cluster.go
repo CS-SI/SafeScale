@@ -28,8 +28,8 @@ import (
 )
 
 // List returns a list of available hosts
-func List(ctx context.Context, scope scopeapi.Scope) (list []abstract.ClusterIdentity, ferr fail.Error) {
-	var emptyList []abstract.ClusterIdentity
+func List(ctx context.Context, scope scopeapi.Scope) (list []abstract.Cluster, ferr fail.Error) {
+	var emptyList []abstract.Cluster
 
 	if ctx == nil {
 		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
@@ -43,8 +43,8 @@ func List(ctx context.Context, scope scopeapi.Scope) (list []abstract.ClusterIde
 		return nil, xerr
 	}
 
-	list = []abstract.ClusterIdentity{}
-	xerr = instance.Browse(ctx, func(hc *abstract.ClusterIdentity) fail.Error {
+	list = []abstract.Cluster{}
+	xerr = instance.Browse(ctx, func(hc *abstract.Cluster) fail.Error {
 		list = append(list, *hc)
 		return nil
 	})

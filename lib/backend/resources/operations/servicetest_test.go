@@ -2523,7 +2523,7 @@ func (e *ServiceTest) WaitHostReady(ctx context.Context, hostParam common.HostPa
 }
 
 /* Cluster */
-func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.ClusterRequest, shorten bool) (*abstract.ClusterIdentity, fail.Error) { // nolint
+func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.ClusterRequest, shorten bool) (*abstract.Cluster, fail.Error) { // nolint
 
 	var (
 		name string
@@ -2555,9 +2555,9 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 	}
 	cladmPassword, err := utils.GeneratePassword(16)
 	if err != nil {
-		return &abstract.ClusterIdentity{}, fail.ConvertError(err)
+		return &abstract.Cluster{}, fail.ConvertError(err)
 	}
-	aci := &abstract.ClusterIdentity{
+	aci := &abstract.Cluster{
 		Name:          name,
 		Flavor:        request.Flavor,
 		Complexity:    request.Complexity,

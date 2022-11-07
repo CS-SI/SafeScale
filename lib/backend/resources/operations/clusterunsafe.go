@@ -37,12 +37,12 @@ import (
 )
 
 // unsafeGetIdentity returns the identity of the Cluster
-func (instance *Cluster) unsafeGetIdentity(inctx context.Context) (_ abstract.ClusterIdentity, ferr fail.Error) {
+func (instance *Cluster) unsafeGetIdentity(inctx context.Context) (_ abstract.Cluster, ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  abstract.ClusterIdentity
+		rTr  abstract.Cluster
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -50,9 +50,9 @@ func (instance *Cluster) unsafeGetIdentity(inctx context.Context) (_ abstract.Cl
 		defer close(chRes)
 		defer fail.OnPanic(&ferr)
 
-		var clusterIdentity abstract.ClusterIdentity
+		var clusterIdentity abstract.Cluster
 		xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			aci, innerErr := lang.Cast[*abstract.ClusterIdentity](p)
+			aci, innerErr := lang.Cast[*abstract.Cluster](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -68,9 +68,9 @@ func (instance *Cluster) unsafeGetIdentity(inctx context.Context) (_ abstract.Cl
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return abstract.ClusterIdentity{}, fail.ConvertError(ctx.Err())
+		return abstract.Cluster{}, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		return abstract.ClusterIdentity{}, fail.ConvertError(inctx.Err())
+		return abstract.Cluster{}, fail.ConvertError(inctx.Err())
 	}
 }
 

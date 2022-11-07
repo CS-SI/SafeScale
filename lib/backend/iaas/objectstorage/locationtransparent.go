@@ -32,11 +32,11 @@ func (l locationtransparent) FindBucket(ctx context.Context, s string) (bool, fa
 	return l.inner.FindBucket(ctx, s)
 }
 
-func (l locationtransparent) InspectBucket(ctx context.Context, s string) (abstract.ObjectStorageBucket, fail.Error) {
+func (l locationtransparent) InspectBucket(ctx context.Context, s string) (*abstract.ObjectStorageBucket, fail.Error) {
 	return l.inner.InspectBucket(ctx, s)
 }
 
-func (l locationtransparent) CreateBucket(ctx context.Context, s string) (abstract.ObjectStorageBucket, fail.Error) {
+func (l locationtransparent) CreateBucket(ctx context.Context, s string) (*abstract.ObjectStorageBucket, fail.Error) {
 	return l.inner.CreateBucket(ctx, s)
 }
 

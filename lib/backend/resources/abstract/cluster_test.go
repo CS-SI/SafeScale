@@ -21,13 +21,13 @@ import (
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestClusterIdentity_Clone(t *testing.T) {
-	c := NewClusterIdentity()
+	c, _ := NewCluster()
 	c.Name = "cluster"
 
 	cloned, err := c.Clone()
@@ -35,7 +35,7 @@ func TestClusterIdentity_Clone(t *testing.T) {
 		t.Error(err)
 	}
 
-	cc, ok := cloned.(*ClusterIdentity)
+	cc, ok := cloned.(*Cluster)
 	if !ok {
 		t.Fail()
 	}
@@ -54,7 +54,7 @@ func TestClusterIdentity_Clone(t *testing.T) {
 
 func TestClusterIdentity_OK(t *testing.T) {
 
-	c := NewClusterIdentity()
+	c, _ := NewCluster()
 	if c.OK() {
 		t.Error("Not ok, name and flavor missing")
 		t.FailNow()
@@ -80,7 +80,7 @@ func TestClusterIdentity_OK(t *testing.T) {
 func TestClusterIdentity_Serialize(t *testing.T) {
 
 	// Serialize empty clusterIdentity
-	c1 := NewClusterIdentity()
+	c1, _ := NewCluster()
 	_, err := c1.Serialize()
 	if err == nil {
 		t.Error("Should throw fail.InvalidInstanceError")
@@ -89,7 +89,7 @@ func TestClusterIdentity_Serialize(t *testing.T) {
 
 	// Junk attributes (broken pointer) for makes fail json.Marshal
 	var fkp *KeyPair
-	c1 = NewClusterIdentity()
+	c1, _ = NewCluster()
 	c1.Keypair = fkp
 	_, err = c1.Serialize()
 	if err == nil {
@@ -114,7 +114,7 @@ func TestClusterIdentity_Serialize(t *testing.T) {
 	}
 
 	// Deserialize
-	c2 := NewClusterIdentity()
+	c2, _ := NewCluster()
 	err = c2.Deserialize(serial)
 	if err != nil {
 		t.Error(err)
@@ -134,7 +134,7 @@ func TestClusterIdentity_Deserialize(t *testing.T) {
 	// Serialize empty clusterIdentity
 	var err error
 	var serial []byte
-	c1 := NewClusterIdentity()
+	c1, _ := NewCluster()
 	c1.Name = "cluster"
 	c1.Flavor = clusterflavor.K8S
 	c1.Keypair, err = NewKeyPair("MySecretKey")
@@ -149,7 +149,7 @@ func TestClusterIdentity_Deserialize(t *testing.T) {
 	}
 
 	// Empty cluster
-	var emptyCluster *ClusterIdentity
+	var emptyCluster *Cluster
 	err = emptyCluster.Deserialize(serial)
 	if err == nil {
 		t.Error("Should throw a fail.InvalidInstanceError")
@@ -192,10 +192,10 @@ func TestClusterIdentity_Deserialize(t *testing.T) {
 
 func TestClusterIdentity_Replace(t *testing.T) {
 
-	var emptyCluster *ClusterIdentity
+	var emptyCluster *Cluster
 	var emptyData clonable.Clonable = nil
 
-	cluster := NewClusterIdentity()
+	cluster, _ := NewCluster()
 	cluster.Name = "cluster"
 	cluster.Flavor = clusterflavor.K8S
 	kp1, err := NewKeyPair("Key1")
@@ -203,40 +203,38 @@ func TestClusterIdentity_Replace(t *testing.T) {
 	cluster.Keypair = kp1
 
 	// Nil cluster, nil data
-	result, xerr := emptyCluster.Replace(emptyData)
+	xerr := emptyCluster.Replace(emptyData)
 	if xerr == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
 	// Filled cluster, nil data
-	result, xerr = cluster.Replace(emptyData)
+	xerr = cluster.Replace(emptyData)
 	if xerr == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
 	// Filled cluster, invalid data
-	network := NewNetwork()
+	network, _ := NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, derr := cluster.Replace(network)
-	require.Contains(t, derr.Error(), "p is not a *ClusterIdentity")
+	derr := cluster.Replace(network)
+	require.Contains(t, derr.Error(), "p is not a *Cluster")
 
 	// Filled cluster, filled data
-	cluster2 := NewClusterIdentity()
+	cluster2, _ := NewCluster()
 	cluster2.Name = "cluster2"
 	cluster2.Flavor = clusterflavor.BOH
 	kp2, err := NewKeyPair("Key2")
 	require.NoError(t, err)
 	cluster2.Keypair = kp2
 
-	result, _ = cluster.Replace(cluster2)
-	require.EqualValues(t, result, cluster2)
-	require.EqualValues(t, result.(*ClusterIdentity).Keypair, kp2)
-	require.EqualValues(t, result.(*ClusterIdentity).GetName(), cluster2.Name)
-	clid, _ := result.(*ClusterIdentity).GetID()
+	_ = cluster.Replace(cluster2)
+	require.EqualValues(t, cluster, cluster2)
+	require.EqualValues(t, cluster.Keypair, kp2)
+	require.EqualValues(t, cluster.GetName(), cluster2.Name)
+	clid, _ := cluster.GetID()
 	require.EqualValues(t, clid, cluster2.Name)
 
 }

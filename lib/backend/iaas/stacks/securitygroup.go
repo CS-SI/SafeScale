@@ -32,7 +32,7 @@ import (
 
 // ValidateSecurityGroupParameter validates securitygroup parameter that can be a string as ID or an *abstract.SecurityGroup
 func ValidateSecurityGroupParameter(sgParam iaasapi.SecurityGroupParameter) (asg *abstract.SecurityGroup, sgLabel string, _ fail.Error) {
-	asg = abstract.NewSecurityGroup()
+	asg, _ = abstract.NewSecurityGroup()
 	switch sgParam := sgParam.(type) {
 	case string:
 		if sgParam == "" {

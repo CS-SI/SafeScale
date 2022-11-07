@@ -20,9 +20,8 @@ import (
 	"context"
 	"net"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
+	terraformer "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -35,59 +34,59 @@ const (
 	createRouterResourceSnippetPath = "snippets/resource_router_create.tf"
 )
 
-type subnetResource struct {
-	terraformer.ResourceCore
+// type subnetResource struct {
+// 	terraformer.ResourceCore
+//
+// 	id             string
+// 	networkID      string
+// 	cidr           string
+// 	ipVersion      string
+// 	dnsNameServers []string
+// }
+//
+// func newSubnetResource(name string, snippet string) (*subnetResource, fail.Error) {
+// 	rc, xerr := terraformer.NewResourceCore(name, snippet)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	return &subnetResource{ResourceCore: rc}, nil
+// }
+//
+// // ToMap returns a map of networkResource field to be used where needed
+// func (nr *subnetResource) ToMap() map[string]any {
+// 	return map[string]any{
+// 		"Name":       nr.Name(),
+// 		"ID":         nr.networkID,
+// 		"CIDR":       nr.cidr,
+// 		"IPVersion":  nr.ipVersion,
+// 		"NetworkID":  nr.networkID,
+// 		"DNSServers": nr.dnsNameServers,
+// 	}
+// }
 
-	id             string
-	networkID      string
-	cidr           string
-	ipVersion      string
-	dnsNameServers []string
-}
-
-func newSubnetResource(name string, snippet string) (*subnetResource, fail.Error) {
-	rc, xerr := terraformer.NewResourceCore(name, snippet)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return &subnetResource{ResourceCore: rc}, nil
-}
-
-// ToMap returns a map of networkResource field to be used where needed
-func (nr *subnetResource) ToMap() map[string]any {
-	return map[string]any{
-		"Name":       nr.Name(),
-		"ID":         nr.networkID,
-		"CIDR":       nr.cidr,
-		"IPVersion":  nr.ipVersion,
-		"NetworkID":  nr.networkID,
-		"DNSServers": nr.dnsNameServers,
-	}
-}
-
-type routerResource struct {
-	terraformer.ResourceCore
-
-	id string
-}
-
-func newRouterResource(name string, snippet string) (*routerResource, fail.Error) {
-	rc, xerr := terraformer.NewResourceCore(name, snippet)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return &routerResource{ResourceCore: rc}, nil
-}
-
-// ToMap returns a map of networkResource field to be used where needed
-func (rr *routerResource) ToMap() map[string]any {
-	return map[string]any{
-		"Name": rr.Name(),
-		"ID":   rr.id,
-	}
-}
+// type routerResource struct {
+// 	terraformer.ResourceCore
+//
+// 	id string
+// }
+//
+// func newRouterResource(name string, snippet string) (*routerResource, fail.Error) {
+// 	rc, xerr := terraformer.NewResourceCore(name, snippet)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	return &routerResource{ResourceCore: rc}, nil
+// }
+//
+// // ToMap returns a map of networkResource field to be used where needed
+// func (rr *routerResource) ToMap() map[string]any {
+// 	return map[string]any{
+// 		"Name": rr.Name(),
+// 		"ID":   rr.id,
+// 	}
+// }
 
 // CreateSubnet creates a subnet
 func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (newNet *abstract.Subnet, ferr fail.Error) {
@@ -103,20 +102,16 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		return nil, fail.ConvertError(err)
 	}
 
-	subnetRsc, xerr := newSubnetResource(req.Name, createSubnetResourceSnippetPath)
+	abstractSubnet, xerr := abstract.NewSubnet(abstract.WithName(req.Name), abstract.UseTerraformSnippet(createSubnetResourceSnippetPath))
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	subnetRsc.cidr = req.CIDR
-	switch req.IPVersion {
-	case ipversion.IPv6:
-		subnetRsc.ipVersion = "6"
-	default:
-		subnetRsc.ipVersion = "4"
-	}
-	subnetRsc.dnsNameServers = req.DNSServers
-	subnetRsc.networkID = req.NetworkID
+	abstractSubnet.CIDR = req.CIDR
+	abstractSubnet.IPVersion = req.IPVersion
+	abstractSubnet.DNSServers = req.DNSServers
+	abstractSubnet.Network = req.NetworkID
+	abstractSubnet.Domain = req.Domain
 
 	// // If req.IPVersion contains invalid value, force to IPv4
 	// var ipVersion gophercloud.IPVersion
@@ -140,9 +135,6 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 	// 	Name:       req.Name,
 	// 	EnableDHCP: &dhcp,
 	// }
-	if len(req.DNSServers) > 0 {
-		subnetRsc.dnsNameServers = req.DNSServers
-	}
 
 	// FIXME: is it necessary?
 	// if !p.configOptions.UseLayer3Networking {
@@ -150,17 +142,28 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 	// 	// opts.GatewayIP = &noGateway
 	// }
 
-	summoner, xerr := p.Terraformer()
+	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer func() { _ = renderer.Close() }()
+
+	xerr = renderer.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	def, xerr := summoner.Assemble(subnetRsc)
+	created, xerr := abstractSubnet.AllResources()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	outputs, xerr := summoner.Apply(ctx, def)
+	created = append(created, abstractSubnet)
+	def, xerr := renderer.Assemble(created...)
+	if xerr != nil {
+		return nil, xerr
+	}
+	outputs, xerr := renderer.Apply(ctx, def)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -169,28 +172,19 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && req.CleanOnFailure() {
 			logrus.WithContext(ctx).Infof("cleaning up on failure, deleting Subnet '%s'", req.Name)
-			derr := summoner.Destroy(ctx, def)
+			derr := renderer.Destroy(ctx, def)
 			if derr != nil {
 				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()
 
-	out, xerr := abstract.NewSubnet(abstract.WithName(req.Name))
+	abstractSubnet.ID, xerr = unmarshalOutput[string](outputs["subnet_id"])
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	out.ID, xerr = unmarshalOutput[string](outputs["subnet_id"])
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	out.Network = req.NetworkID
-	out.IPVersion = req.IPVersion
-	out.Domain = req.Domain
-	out.CIDR = req.CIDR
-	return out, nil
+	return abstractSubnet, nil
 }
 
 func (p *provider) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {

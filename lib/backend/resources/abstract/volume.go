@@ -43,8 +43,8 @@ func (vr VolumeRequest) CleanOnFailure() bool {
 
 // Volume represents a block volume
 type Volume struct {
+	*Core
 	ID    string            `json:"id,omitempty"`
-	Name  string            `json:"name,omitempty"`
 	Size  int               `json:"size,omitempty"`
 	Speed volumespeed.Enum  `json:"speed"`
 	State volumestate.Enum  `json:"state"`
@@ -52,13 +52,18 @@ type Volume struct {
 }
 
 // NewVolume ...
-func NewVolume() *Volume {
+func NewVolume(opts ...Option) (*Volume, fail.Error) {
+	c, xerr := New(opts...)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	nv := &Volume{
-		Tags: make(map[string]string),
+		Core: c,
 	}
 	nv.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	nv.Tags["ManagedBy"] = "safescale"
-	return nv
+	return nv, nil
 }
 
 // IsNull ...
@@ -74,7 +79,7 @@ func (v *Volume) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	nv := NewVolume()
+	nv, _ := NewVolume()
 	return nv, nv.Replace(v)
 }
 
@@ -86,12 +91,17 @@ func (v *Volume) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, xerr := lang.Cast[*Volume](p)
-	if xerr != nil {
-		return xerr
+	src, err := lang.Cast[*Volume](p)
+	if err != nil {
+		return err
 	}
 
 	*v = *src
+	v.Core, err = clonable.CastedClone[*Core](src.Core)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

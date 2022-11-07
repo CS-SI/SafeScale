@@ -20,37 +20,36 @@ import (
 	"context"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-)
-
-type (
-	vipResource struct {
-		terraformer.ResourceCore
-	}
 )
 
 const (
 	vipResourceSnippetPath = "snippets/resource_vip.tf"
 )
 
-func newVIPResource(name string) (*vipResource, fail.Error) {
-	rc, xerr := terraformer.NewResourceCore(name, vipResourceSnippetPath)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return &vipResource{ResourceCore: rc}, nil
-}
-
-// ToMap returns a map of networkResource field to be used where needed
-func (nr *vipResource) ToMap() map[string]any {
-	return map[string]any{
-		"Name": nr.Name(),
-	}
-}
+// type (
+// 	vipResource struct {
+// 		terraformer.ResourceCore
+// 	}
+// )
+//
+// func newVIPResource(name string) (*vipResource, fail.Error) {
+// 	rc, xerr := terraformer.NewResourceCore(name, vipResourceSnippetPath)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	return &vipResource{ResourceCore: rc}, nil
+// }
+//
+// // ToMap returns a map of networkResource field to be used where needed
+// func (nr *vipResource) ToMap() map[string]any {
+// 	return map[string]any{
+// 		"Name": nr.Name(),
+// 	}
+// }
 
 // // createRouter creates a router satisfying req
 // func (p *provider) createRouter(ctx context.Context, req RouterRequest) (*Router, fail.Error) {

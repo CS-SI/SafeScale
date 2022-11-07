@@ -229,12 +229,11 @@ func SecurityGroupFromProtocolToAbstract(in *protocol.SecurityGroupResponse) (*a
 		return &abstract.SecurityGroup{}, xerr
 	}
 
-	out := &abstract.SecurityGroup{
-		ID:          in.GetId(),
-		Name:        in.GetName(),
-		Description: in.GetDescription(),
-		Rules:       rules,
-	}
+	out, _ := abstract.NewSecurityGroup()
+	out.ID = in.GetId()
+	out.Name = in.GetName()
+	out.Description = in.GetDescription()
+	out.Rules = rules
 	return out, nil
 }
 

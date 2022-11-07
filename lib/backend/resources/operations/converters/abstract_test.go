@@ -580,8 +580,8 @@ func Test_ClusterIdentityFromAbstractToProtocol(t *testing.T) {
 		t.Error(innerXErr)
 		t.Fail()
 	}
-	aci := abstract.ClusterIdentity{
-		Name:          "ClusterIdentity Name",
+	aci := abstract.Cluster{
+		Name:          "Cluster Name",
 		Flavor:        clusterflavor.K8S,
 		Complexity:    clustercomplexity.Small,
 		Keypair:       kp,
@@ -591,7 +591,7 @@ func Test_ClusterIdentityFromAbstractToProtocol(t *testing.T) {
 			"ManagedBy":    "safescale",
 		},
 	}
-	pclr := ClusterListFromAbstractToProtocol([]abstract.ClusterIdentity{aci})
+	pclr := ClusterListFromAbstractToProtocol([]abstract.Cluster{aci})
 
 	require.EqualValues(t, pclr.Clusters[0].Identity, ClusterIdentityFromAbstractToProtocol(aci))
 }

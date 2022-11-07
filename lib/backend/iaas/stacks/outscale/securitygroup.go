@@ -58,7 +58,7 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) (list 
 }
 
 func toAbstractSecurityGroup(in osc.SecurityGroup) *abstract.SecurityGroup {
-	out := abstract.NewSecurityGroup()
+	out, _ := abstract.NewSecurityGroup()
 	out.Name = in.SecurityGroupName
 	out.ID = in.SecurityGroupId
 	out.Description = in.Description
@@ -177,7 +177,7 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Securit
 		return nil, xerr
 	}
 
-	out := abstract.NewSecurityGroup()
+	out, _ := abstract.NewSecurityGroup()
 	out.Name = group.SecurityGroupName
 	out.ID = asg.ID
 	out.Description = group.Description

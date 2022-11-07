@@ -305,8 +305,8 @@ func VolumeSpeedFromAbstractToProtocol(in volumespeed.Enum) protocol.VolumeSpeed
 	}
 }
 
-// ClusterIdentityFromAbstractToProtocol converts an abstract.ClusterIdentity to protocol.ClusterIdentity
-func ClusterIdentityFromAbstractToProtocol(in abstract.ClusterIdentity) *protocol.ClusterIdentity {
+// ClusterIdentityFromAbstractToProtocol converts an abstract.Cluster to protocol.ClusterIdentity
+func ClusterIdentityFromAbstractToProtocol(in abstract.Cluster) *protocol.ClusterIdentity {
 	return &protocol.ClusterIdentity{
 		Name:          in.Name,
 		Complexity:    protocol.ClusterComplexity(in.Complexity),
@@ -316,7 +316,7 @@ func ClusterIdentityFromAbstractToProtocol(in abstract.ClusterIdentity) *protoco
 }
 
 // ClusterListFromAbstractToProtocol converts list of cluster identity to protocol.ClusterListResponse
-func ClusterListFromAbstractToProtocol(in []abstract.ClusterIdentity) *protocol.ClusterListResponse {
+func ClusterListFromAbstractToProtocol(in []abstract.Cluster) *protocol.ClusterListResponse {
 	out := &protocol.ClusterListResponse{}
 	out.Clusters = make([]*protocol.ClusterResponse, 0, len(in))
 	for _, v := range in {

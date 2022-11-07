@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package terraform
+package controller
 
 import (
 	"context"

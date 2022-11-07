@@ -45,7 +45,7 @@ var (
 	}
 )
 
-func minimumRequiredServers(clusterIdentity abstract.ClusterIdentity) (uint, uint, uint, fail.Error) {
+func minimumRequiredServers(clusterIdentity abstract.Cluster) (uint, uint, uint, fail.Error) {
 	var (
 		privateNodeCount uint
 		masterNodeCount  uint

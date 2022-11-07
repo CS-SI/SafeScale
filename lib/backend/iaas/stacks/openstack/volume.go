@@ -60,24 +60,24 @@ func toVolumeState(status string) volumestate.Enum {
 	}
 }
 
-func (s stack) getVolumeType(speed volumespeed.Enum) string {
-	for t, s := range s.cfgOpts.VolumeSpeeds {
+func (instance *stack) getVolumeType(speed volumespeed.Enum) string {
+	for t, s := range instance.cfgOpts.VolumeSpeeds {
 		if s == speed {
 			return t
 		}
 	}
 	switch speed {
 	case volumespeed.Ssd:
-		return s.getVolumeType(volumespeed.Hdd)
+		return instance.getVolumeType(volumespeed.Hdd)
 	case volumespeed.Hdd:
-		return s.getVolumeType(volumespeed.Cold)
+		return instance.getVolumeType(volumespeed.Cold)
 	default:
 		return ""
 	}
 }
 
-func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
-	speed, ok := s.cfgOpts.VolumeSpeeds[vType]
+func (instance *stack) getVolumeSpeed(vType string) volumespeed.Enum {
+	speed, ok := instance.cfgOpts.VolumeSpeeds[vType]
 	if ok {
 		return speed
 	}
@@ -89,34 +89,38 @@ func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (volume *abstract.Volume, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (volume *abstract.Volume, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if request.Name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("request.Name")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "(%instance)", request.Name).WithStopwatch().Entering().Exiting()
 
-	az, xerr := s.SelectedAvailabilityZone(ctx)
+	az, xerr := instance.SelectedAvailabilityZone(ctx)
 	if xerr != nil { // nolint
 		return nil, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 
-	var v abstract.Volume
-	switch s.versions["volume"] {
+	v, xerr := abstract.NewVolume(abstract.WithName(request.Name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	switch instance.versions["volume"] {
 	case "v1":
 		var vol *volumesv1.Volume
 		opts := volumesv1.CreateOpts{
 			AvailabilityZone: az,
 			Name:             request.Name,
 			Size:             request.Size,
-			VolumeType:       s.getVolumeType(request.Speed),
+			VolumeType:       instance.getVolumeType(request.Speed),
 		}
 		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (innerErr error) {
-				vol, innerErr = volumesv1.Create(s.VolumeClient, opts).Extract()
+				vol, innerErr = volumesv1.Create(instance.VolumeClient, opts).Extract()
 				return innerErr
 			},
 			NormalizeError,
@@ -128,24 +132,23 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 			xerr = fail.InconsistentError("volume creation seems to have succeeded, but returned nil value is unexpected")
 			break
 		}
-		v = abstract.Volume{
-			ID:    vol.ID,
-			Name:  vol.Name,
-			Size:  vol.Size,
-			Speed: s.getVolumeSpeed(vol.VolumeType),
-			State: toVolumeState(vol.Status),
-		}
+
+		v.ID = vol.ID
+		v.Size = vol.Size
+		v.Speed = instance.getVolumeSpeed(vol.VolumeType)
+		v.State = toVolumeState(vol.Status)
+
 	case "v2":
 		opts := volumesv2.CreateOpts{
 			AvailabilityZone: az,
 			Name:             request.Name,
 			Size:             request.Size,
-			VolumeType:       s.getVolumeType(request.Speed),
+			VolumeType:       instance.getVolumeType(request.Speed),
 		}
 		var vol *volumesv2.Volume
 		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (innerErr error) {
-				vol, innerErr = volumesv2.Create(s.VolumeClient, opts).Extract()
+				vol, innerErr = volumesv2.Create(instance.VolumeClient, opts).Extract()
 				return innerErr
 			},
 			NormalizeError,
@@ -157,21 +160,20 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 			xerr = fail.InconsistentError("volume creation seems to have succeeded, but returned nil value is unexpected")
 			break
 		}
-		v = abstract.Volume{
-			ID:    vol.ID,
-			Name:  vol.Name,
-			Size:  vol.Size,
-			Speed: s.getVolumeSpeed(vol.VolumeType),
-			State: toVolumeState(vol.Status),
-		}
+
+		v.ID = vol.ID
+		v.Size = vol.Size
+		v.Speed = instance.getVolumeSpeed(vol.VolumeType)
+		v.State = toVolumeState(vol.Status)
+
 	default:
-		xerr = fail.NotImplementedError("unmanaged service 'volume' version '%s'", s.versions["volume"])
+		xerr = fail.NotImplementedError("unmanaged service 'volume' version '%instance'", instance.versions["volume"])
 	}
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return &v, nil
+	return v, nil
 }
 
 // InspectVolume returns the volume identified by id
@@ -202,14 +204,16 @@ func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, 
 		}
 	}
 
-	av := abstract.Volume{
-		ID:    vol.ID,
-		Name:  vol.Name,
-		Size:  vol.Size,
-		Speed: s.getVolumeSpeed(vol.VolumeType),
-		State: toVolumeState(vol.Status),
+	av, xerr := abstract.NewVolume(abstract.WithName(vol.Name))
+	if xerr != nil {
+		return nil, xerr
 	}
-	return &av, nil
+
+	av.ID = vol.ID
+	av.Size = vol.Size
+	av.Speed = s.getVolumeSpeed(vol.VolumeType)
+	av.State = toVolumeState(vol.Status)
+	return av, nil
 }
 
 // ListVolumes returns the list of all volumes known on the current tenant
@@ -231,13 +235,15 @@ func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error)
 					return false, err
 				}
 				for _, vol := range list {
-					av := &abstract.Volume{
-						ID:    vol.ID,
-						Name:  vol.Name,
-						Size:  vol.Size,
-						Speed: s.getVolumeSpeed(vol.VolumeType),
-						State: toVolumeState(vol.Status),
+					av, xerr := abstract.NewVolume(abstract.WithName(vol.Name))
+					if xerr != nil {
+						return false, xerr
 					}
+
+					av.ID = vol.ID
+					av.Size = vol.Size
+					av.Speed = s.getVolumeSpeed(vol.VolumeType)
+					av.State = toVolumeState(vol.Status)
 					vs = append(vs, av)
 				}
 				return true, nil

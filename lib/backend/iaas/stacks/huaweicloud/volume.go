@@ -55,7 +55,7 @@ func toVolumeState(status string) volumestate.Enum {
 	}
 }
 
-func (s stack) getVolumeType(speed volumespeed.Enum) string {
+func (s *stack) getVolumeType(speed volumespeed.Enum) string {
 	for t, s := range s.cfgOpts.VolumeSpeeds {
 		if s == speed {
 			return t
@@ -71,7 +71,7 @@ func (s stack) getVolumeType(speed volumespeed.Enum) string {
 	}
 }
 
-func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
+func (s *stack) getVolumeSpeed(vType string) volumespeed.Enum {
 	speed, ok := s.cfgOpts.VolumeSpeeds[vType]
 	if ok {
 		return speed
@@ -81,7 +81,7 @@ func (s stack) getVolumeSpeed(vType string) volumespeed.Enum {
 }
 
 // CreateVolume creates a block volume
-func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
+func (s *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -113,18 +113,16 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 		return nil, commRetryErr
 	}
 
-	v := abstract.Volume{
-		ID:    vol.ID,
-		Name:  vol.Name,
-		Size:  vol.Size,
-		Speed: s.getVolumeSpeed(vol.VolumeType),
-		State: toVolumeState(vol.Status),
-	}
-	return &v, nil
+	v, _ := abstract.NewVolume(abstract.WithName(request.Name))
+	v.ID = vol.ID
+	v.Size = vol.Size
+	v.Speed = s.getVolumeSpeed(vol.VolumeType)
+	v.State = toVolumeState(vol.Status)
+	return v, nil
 }
 
 // InspectVolume returns the volume identified by id
-func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error) {
+func (s *stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -149,18 +147,20 @@ func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, 
 		}
 	}
 
-	av := abstract.Volume{
-		ID:    vol.ID,
-		Name:  vol.Name,
-		Size:  vol.Size,
-		Speed: s.getVolumeSpeed(vol.VolumeType),
-		State: toVolumeState(vol.Status),
+	av, xerr := abstract.NewVolume(abstract.WithName(vol.Name))
+	if xerr != nil {
+		return nil, xerr
 	}
-	return &av, nil
+
+	av.ID = vol.ID
+	av.Size = vol.Size
+	av.Speed = s.getVolumeSpeed(vol.VolumeType)
+	av.State = toVolumeState(vol.Status)
+	return av, nil
 }
 
 // ListVolumes lists volumes
-func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error) {
+func (s *stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -175,13 +175,15 @@ func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error)
 					return false, err
 				}
 				for _, vol := range list {
-					av := &abstract.Volume{
-						ID:    vol.ID,
-						Name:  vol.Name,
-						Size:  vol.Size,
-						Speed: s.getVolumeSpeed(vol.VolumeType),
-						State: toVolumeState(vol.Status),
+					av, xerr := abstract.NewVolume(abstract.WithName(vol.Name))
+					if xerr != nil {
+						return false, xerr
 					}
+
+					av.ID = vol.ID
+					av.Size = vol.Size
+					av.Speed = s.getVolumeSpeed(vol.VolumeType)
+					av.State = toVolumeState(vol.Status)
 					vs = append(vs, av)
 				}
 				return true, nil

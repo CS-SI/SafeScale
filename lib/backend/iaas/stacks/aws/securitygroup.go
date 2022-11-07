@@ -86,14 +86,18 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteSecurityGroup(context.Background(), resp); derr != nil {
+			derr := s.rpcDeleteSecurityGroup(context.Background(), resp)
+			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
 			}
 		}
 	}()
 
-	asg := abstract.NewSecurityGroup()
-	asg.Name = name
+	asg, xerr := abstract.NewSecurityGroup(abstract.WithName(name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	asg.ID = aws.StringValue(resp)
 	asg.Network = network.ID
 	asg.Description = description
@@ -274,17 +278,20 @@ func toAbstractSecurityGroup(in *ec2.SecurityGroup) (_ *abstract.SecurityGroup, 
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
-	out := &abstract.SecurityGroup{
-		ID:          aws.StringValue(in.GroupId),
-		Network:     aws.StringValue(in.VpcId),
-		Name:        aws.StringValue(in.GroupName),
-		Description: aws.StringValue(in.Description),
+	out, xerr := abstract.NewSecurityGroup(abstract.WithName(aws.StringValue(in.GroupName)))
+	if xerr != nil {
+		return nil, xerr
 	}
-	var xerr fail.Error
+
+	out.ID = aws.StringValue(in.GroupId)
+	out.Network = aws.StringValue(in.VpcId)
+	out.Description = aws.StringValue(in.Description)
+
 	out.Rules, xerr = toAbstractSecurityGroupRules(in)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return out, nil
 }
 

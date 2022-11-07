@@ -554,11 +554,10 @@ func networkSecurityGroupCreateCommand() *cobra.Command {
 				return cli.FailureResponse(err)
 			}
 
-			req := abstract.SecurityGroup{
-				Name:        args[1],
-				Description: description,
-			}
-			resp, err := ClientSession.SecurityGroup.Create(args[0], req, 0)
+			abstractSG, _ := abstract.NewSecurityGroup()
+			abstractSG.Name = args[1]
+			abstractSG.Description = description
+			resp, err := ClientSession.SecurityGroup.Create(args[0], *abstractSG, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "creation of security-group", true).Error())))

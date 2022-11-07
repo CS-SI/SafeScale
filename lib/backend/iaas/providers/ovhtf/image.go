@@ -19,7 +19,6 @@ package ovhtf
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -28,27 +27,6 @@ import (
 const (
 	imageResourceSnippetPath = "snippets/resource_image.tf"
 )
-
-type (
-	imageResource struct {
-		terraformer.ResourceCore
-	}
-)
-
-func newImageResource(name string) (imageResource, fail.Error) {
-	rc, xerr := terraformer.NewResourceCore(name, imageResourceSnippetPath)
-	if xerr != nil {
-		return imageResource{}, xerr
-	}
-	return imageResource{ResourceCore: rc}, nil
-}
-
-// ToMap returns a map of imageResource field to be used where needed
-func (nr *imageResource) ToMap() map[string]any {
-	return map[string]any{
-		"Name": nr.Name(),
-	}
-}
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
@@ -62,5 +40,5 @@ func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image,
 
 func (p *provider) InspectImage(ctx context.Context, id string) (*abstract.Image, fail.Error) {
 	// TODO implement me
-	panic("implement me")
+	return nil, fail.NotImplementedError()
 }

@@ -40,7 +40,7 @@ type Service interface {
 	FindTemplateByName(context.Context, string) (*abstract.HostTemplate, fail.Error)
 	FindTemplateByID(context.Context, string) (*abstract.HostTemplate, fail.Error)
 	GetProviderName() (string, fail.Error)
-	GetMetadataBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error)
+	GetMetadataBucket(ctx context.Context) (*abstract.ObjectStorageBucket, fail.Error)
 	GetMetadataKey() (*crypt.Key, fail.Error)
 	GetCache(context.Context) (cache.CacheInterface, fail.Error)
 	InspectSecurityGroupByName(ctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error)

@@ -79,12 +79,15 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 		return nil, xerr
 	}
 
-	volume := abstract.NewVolume()
+	volume, xerr := abstract.NewVolume(abstract.WithName(request.Name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	volume.ID = resp.VolumeId
 	volume.Speed = s.toAbstractVolumeSpeed(resp.VolumeType)
 	volume.Size = int(resp.Size)
 	volume.State = volumestate.Available
-	volume.Name = request.Name
 	return volume, nil
 }
 
@@ -170,7 +173,8 @@ func (s stack) InspectVolume(ctx context.Context, id string) (av *abstract.Volum
 		return nil, xerr
 	}
 
-	av = abstract.NewVolume()
+	// Note: cannot use abstract.WithName() here, as it may happen that volume has no name...
+	av, _ = abstract.NewVolume()
 	av.ID = resp.VolumeId
 	av.Speed = s.toAbstractVolumeSpeed(resp.VolumeType)
 	av.Size = int(resp.Size)
@@ -196,12 +200,11 @@ func (s stack) InspectVolumeByName(ctx context.Context, name string) (av *abstra
 		return nil, xerr
 	}
 
-	av = abstract.NewVolume()
+	av, _ = abstract.NewVolume(abstract.WithName(name)) // note: no need to check error, 'name' is already validated
 	av.ID = resp.VolumeId
 	av.Speed = s.toAbstractVolumeSpeed(resp.VolumeType)
 	av.Size = int(resp.Size)
 	av.State = toAbstractVolumeState(resp.State)
-	av.Name = name
 	return av, nil
 }
 
@@ -221,12 +224,12 @@ func (s stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail
 
 	volumes := make([]*abstract.Volume, 0, len(resp))
 	for _, ov := range resp {
-		volume := abstract.NewVolume()
+		volume, _ := abstract.NewVolume() // note: cannot use abstract.WithName() here as Name may be empty...
+		volume.Name = getResourceTag(ov.Tags, "name", "")
 		volume.ID = ov.VolumeId
 		volume.Speed = s.toAbstractVolumeSpeed(ov.VolumeType)
 		volume.Size = int(ov.Size)
 		volume.State = toAbstractVolumeState(ov.State)
-		volume.Name = getResourceTag(ov.Tags, "name", "")
 		volume.Tags["CreationDate"] = getResourceTag(ov.Tags, "CreationDate", "")
 		volume.Tags["ManagedBy"] = getResourceTag(ov.Tags, "ManagedBy", "")
 		volume.Tags["DeclaredInBucket"] = getResourceTag(ov.Tags, "DeclaredInBucket", "")
@@ -375,7 +378,7 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (
 	return atts, nil
 }
 
-func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
+func (s stack) Migrate(_ context.Context, _ string, _ map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 

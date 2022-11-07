@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package terraformerapi
+package api
 
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/hashicorp/terraform-exec/tfexec"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -32,13 +33,13 @@ type (
 		// String() string
 	}
 
-	State = bool
+	// State = bool
 
-	Renderer interface {
+	Terraformer interface {
 		Apply(ctx context.Context, def string) (map[string]tfexec.OutputMeta, fail.Error)
 		Assemble(resources ...Resource) (string, fail.Error)
 		Close() fail.Error
-		Destroy(ctx context.Context, def string) fail.Error
+		Destroy(ctx context.Context, def string, opts ...options.Option) fail.Error
 		// Import(ctx context.Context, resourceAddress, id string) fail.Error
 		Plan(ctx context.Context, def string) (map[string]tfexec.OutputMeta, bool, fail.Error)
 		SetEnv(key, value string) fail.Error
@@ -67,7 +68,7 @@ type (
 		RequiredProviders
 	}
 
-	AbstractForTerraformer interface {
-		AllResources() ([]Resource, fail.Error)
-	}
+	// AbstractForTerraformer interface {
+	// 	AllResources() ([]Resource, fail.Error)
+	// }
 )

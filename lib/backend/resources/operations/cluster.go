@@ -95,7 +95,7 @@ func NewCluster(ctx context.Context, scope scopeapi.Scope) (_ *Cluster, ferr fai
 		return nil, fail.InvalidParameterCannotBeNilError("frame")
 	}
 
-	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, clusterKind, clustersFolderName, &abstract.ClusterIdentity{})
+	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, clusterKind, clustersFolderName, &abstract.Cluster{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -606,7 +606,7 @@ func (instance *Cluster) bootstrap(flavor clusterflavor.Enum) (ferr fail.Error) 
 
 // Browse walks through Cluster MetadataFolder and executes a callback for each entry
 // FIXME: adds a Cluster status check to prevent operations on removed clusters
-func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.ClusterIdentity) fail.Error) (ferr fail.Error) {
+func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.Cluster) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -620,7 +620,7 @@ func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 	}
 
 	return instance.BrowseFolder(ctx, func(buf []byte) fail.Error {
-		aci := abstract.NewClusterIdentity()
+		aci, _ := abstract.NewCluster()
 		xerr := aci.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -632,11 +632,11 @@ func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 }
 
 // GetIdentity returns the identity of the Cluster
-func (instance *Cluster) GetIdentity(ctx context.Context) (clusterIdentity abstract.ClusterIdentity, ferr fail.Error) {
+func (instance *Cluster) GetIdentity(ctx context.Context) (clusterIdentity abstract.Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
-		return abstract.ClusterIdentity{}, fail.InvalidInstanceError()
+		return abstract.Cluster{}, fail.InvalidInstanceError()
 	}
 
 	return instance.unsafeGetIdentity(ctx)
@@ -2683,7 +2683,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 func (instance *Cluster) determineRequiredNodes(ctx context.Context) (uint, uint, uint, fail.Error) {
 	makers := instance.localCache.makers
 	if makers.MinimumRequiredServers != nil {
-		g, m, n, xerr := makers.MinimumRequiredServers(func() abstract.ClusterIdentity { out, _ := instance.unsafeGetIdentity(ctx); return out }())
+		g, m, n, xerr := makers.MinimumRequiredServers(func() abstract.Cluster { out, _ := instance.unsafeGetIdentity(ctx); return out }())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return 0, 0, 0, xerr
@@ -2763,7 +2763,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 		}
 
 		xerr := instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			aci, err := lang.Cast[*abstract.ClusterIdentity](p)
+			aci, err := lang.Cast[*abstract.Cluster](p)
 			if err != nil {
 				return fail.Wrap(err)
 			}
@@ -3148,7 +3148,7 @@ func (instance *Cluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterRes
 
 	out := &protocol.ClusterResponse{}
 	xerr = instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		ci, err := lang.Cast[*abstract.ClusterIdentity](p)
+		ci, err := lang.Cast[*abstract.Cluster](p)
 		if err != nil {
 			return fail.Wrap(err)
 		}

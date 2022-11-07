@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package terraformer
+package consumer
 
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"

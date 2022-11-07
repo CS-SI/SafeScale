@@ -22,20 +22,21 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 
+	terraformer "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer"
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -101,9 +102,12 @@ var (
 
 // provider is the provider implementation of the OVH provider
 type provider struct {
+	mu *sync.Mutex
 	iaasapi.MiniStack
-	terraformerOptions options.Options
-	ExternalNetworkID  string
+
+	terraformerOptions                 options.Options
+	ExternalNetworkID                  string
+	terraformProviderDefinitionSnippet string
 
 	// FIXME: move these fields in a provider Core?
 	authOptions   iaasoptions.Authentication
@@ -355,24 +359,36 @@ func (p provider) TenantParameters() (map[string]interface{}, fail.Error) {
 }
 
 // Capabilities returns the capabilities of the provider
-func (p provider) Capabilities() iaasapi.Capabilities {
+func (p *provider) Capabilities() iaasapi.Capabilities {
+	if valid.IsNull(p) {
+		return iaasapi.Capabilities{}
+	}
+
 	return capabilities
 }
 
-func (p provider) EmbeddedFS() embed.FS {
+func (p *provider) EmbeddedFS() embed.FS {
+	if valid.IsNull(p) {
+		return embed.FS{}
+	}
+
 	return snippets
 }
 
-func (p provider) RenderingData() string {
+func (p *provider) RenderingData() string {
+	if valid.IsNull(p) {
+		return ""
+	}
+
 	return configSnippetPath
 }
 
-func (p provider) RenderingEngine() (terraformerapi.Renderer, fail.Error) {
-	renderer, xerr := terraformer.NewRenderer(&p, p.terraformerOptions)
-	if xerr != nil {
-		return nil, xerr
+func (p *provider) RenderingEngine() (terraformerapi.Terraformer, fail.Error) {
+	if valid.IsNull(p) {
+		return nil, fail.InvalidInstanceError()
 	}
-	return renderer, nil
+
+	return terraformer.New(p, p.terraformerOptions)
 }
 
 func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
@@ -427,6 +443,15 @@ func (p *provider) TerraformerOptions() options.Options {
 	}
 
 	return p.terraformerOptions
+}
+
+// TerraformDefinitionSnippet returns the terraform snippet to use to declare provider in terraform definition
+func (p *provider) TerraformDefinitionSnippet() string {
+	if valid.IsNull(p) {
+		return ""
+	}
+
+	return p.terraformProviderDefinitionSnippet
 }
 
 func init() {

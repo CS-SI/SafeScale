@@ -80,7 +80,7 @@ func Test_NewCore(t *testing.T) {
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(mc).String(), "*operations.Core")
 
-		mc, err = NewCore(svc, clusterKind, "clusters", &abstract.ClusterIdentity{})
+		mc, err = NewCore(svc, clusterKind, "clusters", &abstract.Cluster{})
 		require.Nil(t, err)
 		require.EqualValues(t, reflect.TypeOf(mc).String(), "*operations.Core")
 
@@ -500,7 +500,7 @@ func TestMetadataCore_ReadByID(t *testing.T) {
 	network.ID = "Network_ID"
 	network.Name = "Network_Name"
 
-	cluster := abstract.NewClusterIdentity()
+	cluster := abstract.NewCluster()
 	cluster.Name = "Cluster_Name"
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -549,7 +549,7 @@ func TestMetadataCore_Reload(t *testing.T) {
 	network.ID = "Network_ID"
 	network.Name = "Network_Name"
 
-	cluster := abstract.NewClusterIdentity()
+	cluster := abstract.NewCluster()
 	cluster.Name = "Cluster_Name"
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {

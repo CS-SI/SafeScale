@@ -21,8 +21,8 @@ import (
 	"regexp"
 	"time"
 
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -32,7 +32,7 @@ import (
 )
 
 type ReservedForTerraformerUse interface {
-	TerraformRenderer(iaasapi.Provider) (terraformerapi.Renderer, fail.Error)
+	TerraformRenderer(iaasapi.Provider) (terraformerapi.Terraformer, fail.Error)
 }
 
 // Remediator encapsulates Provider interface to catch panic, to prevent panic from halting the app
@@ -680,7 +680,7 @@ func (s Remediator) DeleteVolumeAttachment(ctx context.Context, serverID, id str
 	return xerr
 }
 
-func (s Remediator) TerraformerRenderer() (terraformerapi.Renderer, fail.Error) {
+func (s Remediator) TerraformerRenderer() (terraformerapi.Terraformer, fail.Error) {
 	caps := s.Provider.Capabilities()
 	if caps.UseTerraformer {
 		return s.Provider.(ReservedForTerraformerUse).TerraformRenderer(s)

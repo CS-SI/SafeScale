@@ -35,7 +35,7 @@ import (
 
 // ClusterHandler defines interface to manipulate buckets
 type ClusterHandler interface {
-	List() ([]abstract.ClusterIdentity, fail.Error)
+	List() ([]abstract.Cluster, fail.Error)
 	Create(abstract.ClusterRequest) (resources.Cluster, fail.Error)
 	State(string) (clusterstate.Enum, fail.Error)
 	Inspect(string) (resources.Cluster, fail.Error)
@@ -69,7 +69,7 @@ func NewClusterHandler(job jobapi.Job) ClusterHandler {
 }
 
 // List lists clusters
-func (handler *clusterHandler) List() (_ []abstract.ClusterIdentity, ferr fail.Error) {
+func (handler *clusterHandler) List() (_ []abstract.Cluster, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())

@@ -79,9 +79,9 @@ type Location interface {
 	// FindBucket returns true of bucket exists in stowLocation
 	FindBucket(context.Context, string) (bool, fail.Error)
 	// InspectBucket returns info of the GetBucket
-	InspectBucket(context.Context, string) (abstract.ObjectStorageBucket, fail.Error)
+	InspectBucket(context.Context, string) (*abstract.ObjectStorageBucket, fail.Error)
 	// CreateBucket creates a bucket
-	CreateBucket(context.Context, string) (abstract.ObjectStorageBucket, fail.Error)
+	CreateBucket(context.Context, string) (*abstract.ObjectStorageBucket, fail.Error)
 	// DeleteBucket removes a bucket (need to be cleared before)
 	DeleteBucket(context.Context, string) fail.Error
 	// DownloadBucket downloads a bucket
@@ -106,13 +106,9 @@ type Location interface {
 	// ReadObject ...
 	ReadObject(context.Context, string, string, io.Writer, int64, int64) fail.Error
 	// WriteMultiPartObject ...
-	WriteMultiPartObject(
-		context.Context, string, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata,
-	) (abstract.ObjectStorageItem, fail.Error)
+	WriteMultiPartObject(context.Context, string, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error)
 	// WriteObject ...
-	WriteObject(
-		context.Context, string, string, io.Reader, int64, abstract.ObjectStorageItemMetadata,
-	) (abstract.ObjectStorageItem, fail.Error)
+	WriteObject(context.Context, string, string, io.Reader, int64, abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error)
 	// DeleteObject delete an object from a stowContainer
 	DeleteObject(context.Context, string, string) fail.Error
 	// ItemEtag returns the Etag of an item
@@ -160,6 +156,7 @@ func NewLocation(conf Config) (_ Location, ferr fail.Error) { // nolint
 		if serr != nil {
 			return nil, fail.ConvertError(serr)
 		}
+
 		return nlt, nil
 	}
 
@@ -342,28 +339,29 @@ func (instance location) FindBucket(ctx context.Context, bucketName string) (_ b
 }
 
 // InspectBucket ...
-func (instance location) InspectBucket(ctx context.Context, bucketName string) (
-	_ abstract.ObjectStorageBucket, ferr fail.Error,
-) {
+func (instance location) InspectBucket(ctx context.Context, bucketName string) (_ *abstract.ObjectStorageBucket, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
-		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return abstract.ObjectStorageBucket{}, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%s)", bucketName).Entering().Exiting()
 
-	b, err := instance.GetBucket(bucketName)
-	if err != nil {
-		return abstract.ObjectStorageBucket{}, err
+	b, xerr := instance.GetBucket(bucketName)
+	if xerr != nil {
+		return nil, xerr
 	}
-	aosb := abstract.ObjectStorageBucket{
-		ID:   b.stowContainer.ID(),
-		Name: bucketName,
+
+	aosb, xerr := abstract.NewObjectStorageBucket(abstract.WithName(bucketName))
+	if xerr != nil {
+		return nil, xerr
 	}
+
+	aosb.ID = b.stowContainer.ID()
 	return aosb, nil
 }
 
@@ -402,29 +400,29 @@ func (instance *location) GetBucket(bucketName string) (_ bucket, ferr fail.Erro
 }
 
 // CreateBucket ...
-func (instance location) CreateBucket(ctx context.Context, bucketName string) (
-	aosb abstract.ObjectStorageBucket, ferr fail.Error,
-) {
+func (instance location) CreateBucket(ctx context.Context, bucketName string) (_ *abstract.ObjectStorageBucket, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	aosb = abstract.ObjectStorageBucket{}
 	if valid.IsNil(instance) {
-		return aosb, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return aosb, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", bucketName).Entering().Exiting()
 
 	c, err := instance.stowLocation.CreateContainer(bucketName)
 	if err != nil {
-		return aosb, fail.Wrap(err, fmt.Sprintf("failure creating bucket '%s'", bucketName))
+		return nil, fail.Wrap(err, fmt.Sprintf("failure creating bucket '%s'", bucketName))
 	}
-	aosb = abstract.ObjectStorageBucket{
-		ID:   c.ID(),
-		Name: bucketName,
+
+	aosb, xerr := abstract.NewObjectStorageBucket(abstract.WithName(bucketName))
+	if xerr != nil {
+		return nil, xerr
 	}
+
+	aosb.ID = c.ID()
 	return aosb, nil
 }
 
@@ -447,7 +445,7 @@ func (instance location) DeleteBucket(ctx context.Context, bucketName string) (f
 	return nil
 }
 
-func (instance location) InvalidateObject(ctx context.Context, bucketName string, objectName string) fail.Error {
+func (instance location) InvalidateObject(_ context.Context, _ string, _ string) fail.Error {
 	return nil
 }
 

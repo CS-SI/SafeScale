@@ -271,7 +271,7 @@ func (instance *SecurityGroup) Browse(ctx context.Context, callback func(*abstra
 	}
 
 	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
-		asg := abstract.NewSecurityGroup()
+		asg, _ := abstract.NewSecurityGroup()
 		xerr := asg.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -347,8 +347,11 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 		}
 
 		// Check if SecurityGroup exists but is not managed by SafeScale
-		asg := abstract.NewSecurityGroup()
-		asg.Name = name
+		asg, xerr := abstract.NewSecurityGroup(abstract.WithName(name))
+		if xerr != nil {
+			return xerr
+		}
+
 		asg.Network = networkID
 		_, xerr = svc.InspectSecurityGroup(ctx, asg)
 		xerr = debug.InjectPlannedFail(xerr)

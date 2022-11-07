@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	terraformer "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -32,31 +32,32 @@ const (
 	createSecurityGroupResourceSnippet = "resource_sg_create.tf"
 )
 
-type securityGroupResource struct {
-	terraformer.ResourceCore
-
-	id          string
-	description string
-	rules       abstract.SecurityGroupRules
-}
-
-func newSecurityGroupResource(name string) (*securityGroupResource, fail.Error) {
-	rc, xerr := terraformer.NewResourceCore(name, createSecurityGroupResourceSnippet)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return &securityGroupResource{ResourceCore: rc}, nil
-}
-
-func (sgr *securityGroupResource) ToMap() map[string]any {
-	return map[string]any{
-		"ID":          sgr.id,
-		"Name":        sgr.Name(),
-		"Description": sgr.description,
-		"Rules":       sgr.rules,
-	}
-}
+// type securityGroupResource struct {
+// 	terraformer.ResourceCore
+//
+// 	id          string
+// 	description string
+// 	rules       abstract.SecurityGroupRules
+// }
+//
+// func newSecurityGroupResource(name string) (*securityGroupResource, fail.Error) {
+// 	rc, xerr := terraformer.NewResourceCore(name, createSecurityGroupResourceSnippet)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	return &securityGroupResource{ResourceCore: rc}, nil
+// }
+//
+// func (sgr *securityGroupResource) ToMap() map[string]any {
+// 	return map[string]any{
+// 		"ID":          sgr.id,
+// 		"Name":        sgr.Name(),
+// 		"Description": sgr.description,
+// 		"Rules":       sgr.rules,
+// 	}
+// }
+//
 
 func (p *provider) ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	// TODO implement me
@@ -75,9 +76,6 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			asg = abstract.NewSecurityGroup()
-			asg.Name = name
-			// continue
 			debug.IgnoreError(xerr)
 		case *fail.ErrDuplicate:
 			// Special case : a duplicate error may come from OpenStack after normalization, because there are already more than 1
@@ -91,31 +89,41 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 	}
 
 	// create security group on provider side
-	sgRsc, xerr := newSecurityGroupResource(name)
+	asg, xerr = abstract.NewSecurityGroup(abstract.WithName(name))
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	sgRsc.description = description
-
-	summoner, xerr := p.Terraformer()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	def, xerr := summoner.Assemble(sgRsc)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	outputs, xerr := summoner.Apply(ctx, def)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	asg = abstract.NewSecurityGroup()
-	asg.Name = name
+	asg.Description = description
 	asg.Network = networkRef
+
+	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer func() { _ = renderer.Close() }()
+
+	xerr = renderer.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	created, xerr := asg.AllResources()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	created = append(created, asg)
+	def, xerr := renderer.Assemble(created...)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	outputs, xerr := renderer.Apply(ctx, def)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	asg.ID, xerr = unmarshalOutput[string](outputs["id"])
 	if xerr != nil {
 		return nil, xerr

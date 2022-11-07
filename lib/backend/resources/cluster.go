@@ -43,7 +43,7 @@ type Cluster interface {
 
 	AddFeature(ctx context.Context, name string, vars data.Map[string, any], settings FeatureSettings) (Results, fail.Error)                                  // adds feature on cluster
 	AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, parameters data.Map[string, any], keepOnFailure bool) ([]Host, fail.Error) // adds several nodes
-	Browse(ctx context.Context, callback func(*abstract.ClusterIdentity) fail.Error) fail.Error                                                               // browse in metadata clusters and execute a callback on each entry
+	Browse(ctx context.Context, callback func(*abstract.Cluster) fail.Error) fail.Error                                                                       // browse in metadata clusters and execute a callback on each entry
 	CheckFeature(ctx context.Context, name string, vars data.Map[string, any], settings FeatureSettings) (Results, fail.Error)                                // checks feature on cluster
 	CountNodes(ctx context.Context) (uint, fail.Error)                                                                                                        // counts the nodes of the cluster
 	Create(ctx context.Context, req abstract.ClusterRequest) fail.Error                                                                                       // creates a new cluster and save its metadata
@@ -51,7 +51,7 @@ type Cluster interface {
 	Delete(ctx context.Context, force bool) fail.Error                                                                                                        // deletes the cluster (Delete is not used to not collision with metadata)
 	FindAvailableMaster(ctx context.Context) (Host, fail.Error)                                                                                               // returns ID of the first master available to execute order
 	FindAvailableNode(ctx context.Context) (Host, fail.Error)                                                                                                 // returns node instance of the first node available to execute order
-	GetIdentity(ctx context.Context) (abstract.ClusterIdentity, fail.Error)                                                                                   // returns Cluster Identity
+	GetIdentity(ctx context.Context) (abstract.Cluster, fail.Error)                                                                                           // returns Cluster Identity
 	GetFlavor(ctx context.Context) (clusterflavor.Enum, fail.Error)                                                                                           // returns the flavor of the cluster
 	GetComplexity(ctx context.Context) (clustercomplexity.Enum, fail.Error)                                                                                   // returns the complexity of the cluster
 	GetAdminPassword(ctx context.Context) (string, fail.Error)                                                                                                // returns the password of the cluster admin account

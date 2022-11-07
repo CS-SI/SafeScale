@@ -323,7 +323,7 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 	defer tracer.Exiting()
 
 	return instance.BrowseFolder(ctx, func(buf []byte) fail.Error {
-		av := abstract.NewVolume()
+		av, _ := abstract.NewVolume()
 		xerr := av.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {

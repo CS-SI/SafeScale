@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package terraformer
+package internal
 
 import (
 	"bytes"
@@ -29,15 +29,15 @@ import (
 	"sync"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
-	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
-	uuidpkg "github.com/gofrs/uuid"
 	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -47,22 +47,25 @@ import (
 
 // ProviderUsingTerraform ...
 type ProviderUsingTerraform interface {
-	AuthenticationOptions() iaasoptions.Authentication
-	ConfigurationOptions() iaasoptions.Configuration
+	iaasapi.Provider
+
+	// AuthenticationOptions() iaasoptions.Authentication
+	// ConfigurationOptions() iaasoptions.Configuration
+	TerraformDefinitionSnippet() string
+	// Terraformer() (terraformerapi.Terraformer, data.Map[string, any], fail.Error)
 	TerraformerOptions() options.Options
 	Name() string
 	EmbeddedFS() embed.FS
-	// Renderer() (terraformerapi.Renderer, data.Map[string, any], fail.Error)
 }
 
-// renderer is an implementation of Renderer interface
+// renderer is an implementation of Terraformer interface
 type renderer struct {
 	mu       *sync.Mutex
 	executor *tfexec.Terraform
 	provider ProviderUsingTerraform
 	scope    scopeapi.Scope
 	opts     options.Options
-	config   terraformerapi.Configuration
+	config   api.Configuration
 	// workdir      string
 	// plugindir    string
 	// execpath     string
@@ -82,63 +85,6 @@ const (
 
 //go:embed snippets
 var layoutFiles embed.FS
-
-// NewRenderer instantiates a terraform file builder that will put file in 'workDir'
-func NewRenderer(provider ProviderUsingTerraform, opts options.Options) (terraformerapi.Renderer, fail.Error) {
-	if valid.IsNull(provider) {
-		return nil, fail.InvalidInstanceError()
-	}
-	if _, ok := provider.(ProviderUsingTerraform); !ok {
-		return nil, fail.InconsistentError("missing methods in 'provider' to be used by Renderer")
-	}
-
-	out := &renderer{
-		provider: provider,
-		opts:     provider.TerraformerOptions(),
-		mu:       &sync.Mutex{},
-	}
-
-	var xerr fail.Error
-	out.config, xerr = options.Value[terraformerapi.Configuration](opts, iaasoptions.BuildOptionTerraformerConfiguration)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// out.workdir, xerr = options.Value[string](opts, ConfigOptionWorkDir)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	if out.config.WorkDir == "" {
-		return nil, fail.InvalidRequestError("workdir cannot be empty string; please add 'UseWorkDir()'")
-	}
-
-	if out.config.ExecPath == "" {
-		return nil, fail.InvalidRequestError("execpath cannot be empty string; please add 'WithExecPath()'")
-	}
-
-	if out.config.PluginDir == "" {
-		return nil, fail.InvalidRequestError("plugindir cannot be empty string; please add 'WithPluginDir()'")
-	}
-
-	uuid, err := uuidpkg.NewV4()
-	if err != nil {
-		return nil, fail.Wrap(err, "failed to generate uuid")
-	}
-
-	out.buildPath = filepath.Join(out.config.WorkDir, uuid.String())
-	err = os.MkdirAll(out.buildPath, 0700)
-	if err != nil {
-		return nil, fail.Wrap(err, "failed to create temporary folder")
-	}
-
-	out.executor, err = tfexec.NewTerraform(out.buildPath, out.config.ExecPath)
-	if err != nil {
-		return nil, fail.Wrap(err, "failed to instantiate terraform executor")
-	}
-
-	out.env = out.defaultEnv()
-	return out, nil
-}
 
 // AddOptions allows to add option after instance creation
 func (instance *renderer) AddOptions(opts ...options.Option) fail.Error {
@@ -182,8 +128,53 @@ func (instance *renderer) AddEnv(key, value string) fail.Error {
 	return nil
 }
 
+func (instance *renderer) RenderProviderDefinition() (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if valid.IsNull(instance) {
+		return "", fail.InvalidInstanceError()
+	}
+	if instance.closed {
+		return "", fail.NotAvailableError("renderer has been closed")
+	}
+	if instance.dirty {
+		return "", fail.InconsistentError("built more than once without Reset() in between")
+	}
+
+	instance.mu.Lock()
+	defer instance.mu.Unlock()
+
+	authOpts, xerr := instance.provider.AuthenticationOptions()
+	if xerr != nil {
+		return "", xerr
+	}
+
+	configOpts, xerr := instance.provider.ConfigurationOptions()
+	if xerr != nil {
+		return "", xerr
+	}
+
+	variables := data.NewMap[string, any]()
+	variables["Provider"] = map[string]any{
+		"Name":           instance.provider.(ProviderUsingTerraform).Name(),
+		"Authentication": authOpts,
+		"Configuration":  configOpts,
+	}
+	variables["Terraformer"] = map[string]any{
+		"Config": instance.config,
+	}
+
+	// render provider configuration
+	content, xerr := instance.RealizeSnippet(instance.provider.(ProviderUsingTerraform).EmbeddedFS(), instance.provider.(ProviderUsingTerraform).TerraformDefinitionSnippet(), variables)
+	if xerr != nil {
+		return "", xerr
+	}
+
+	return content, nil
+}
+
 // Assemble creates a main.tf file in the appropriate folder
-func (instance *renderer) Assemble(resources ...terraformerapi.Resource) (_ string, ferr fail.Error) {
+func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNull(instance) {
@@ -202,8 +193,16 @@ func (instance *renderer) Assemble(resources ...terraformerapi.Resource) (_ stri
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
-	authOpts := instance.provider.AuthenticationOptions()
-	configOpts := instance.provider.ConfigurationOptions()
+	authOpts, xerr := instance.provider.AuthenticationOptions()
+	if xerr != nil {
+		return "", xerr
+	}
+
+	configOpts, xerr := instance.provider.ConfigurationOptions()
+	if xerr != nil {
+		return "", xerr
+	}
+
 	variables := data.NewMap[string, any]()
 	variables["Provider"] = map[string]any{
 		"Name":           instance.provider.(ProviderUsingTerraform).Name(),
@@ -241,13 +240,6 @@ func (instance *renderer) Assemble(resources ...terraformerapi.Resource) (_ stri
 		resourceContent = append(resourceContent, content)
 	}
 	variables["Resources"] = resourceContent
-
-	// render provider configuration
-	var xerr fail.Error
-	variables["ProviderDeclaration"], xerr = instance.RealizeSnippet(instance.provider.(ProviderUsingTerraform).EmbeddedFS(), instance.provider.(ProviderUsingTerraform).ProviderData(), variables)
-	if xerr != nil {
-		return "", xerr
-	}
 
 	// render consul backend configuration to store state
 	// if remoteStateStorage > 0 {
@@ -555,7 +547,7 @@ func (instance *renderer) Apply(ctx context.Context, def string) (_ map[string]t
 }
 
 // Destroy calls terraform Destroy command to operate changes
-func (instance *renderer) Destroy(ctx context.Context, def string) (ferr fail.Error) {
+func (instance *renderer) Destroy(ctx context.Context, def string, opts ...options.Option) (ferr fail.Error) {
 	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -569,11 +561,16 @@ func (instance *renderer) Destroy(ctx context.Context, def string) (ferr fail.Er
 		return fail.InconsistentError("nothing has been built yet")
 	}
 
+	o, xerr := options.New(opts...)
+	if xerr != nil {
+		return xerr
+	}
+
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
 	// Creates main.tf file
-	xerr := instance.createMainFile(def)
+	xerr = instance.createMainFile(def)
 	if xerr != nil {
 		return xerr
 	}
@@ -611,7 +608,26 @@ func (instance *renderer) Destroy(ctx context.Context, def string) (ferr fail.Er
 	// _ = output
 	// logrus.Trace("terraform validate ran successfully.")
 
-	err = instance.executor.Destroy(ctx)
+	// If targets are passed as options, we need to narrow the destruct to these targets only
+	value, xerr := o.Load(api.OptionTargets)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return xerr
+		}
+	}
+	targets, err := lang.Cast[[]string](value)
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
+	tfOpts := []tfexec.DestroyOption{}
+	for _, v := range targets {
+		tfOpts = append(tfOpts, tfexec.Target(v))
+	}
+	err = instance.executor.Destroy(ctx, tfOpts...)
 	if err != nil {
 		return fail.Wrap(err, "failed to apply terraform")
 	}

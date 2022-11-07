@@ -1485,7 +1485,7 @@ func (s stack) UnbindSecurityGroupFromHost(
 
 	// If there is one last Security Group bound to Host, restore bond to default SecurityGroup before removing
 	if len(resp.SecurityGroups) == 1 && aws.StringValue(resp.SecurityGroups[0].GroupId) == asg.ID {
-		defaultSG := abstract.NewSecurityGroup()
+		defaultSG, _ := abstract.NewSecurityGroup()
 		var err fail.Error
 		defaultSG.Name, err = s.GetDefaultSecurityGroupName(ctx)
 		if err != nil {

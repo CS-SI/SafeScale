@@ -14,4 +14,16 @@
  * limitations under the License.
  */
 
-package terraformer
+package internal
+
+import (
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/internal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
+)
+
+// New instantiates a terraform file builder that will put file in 'workDir'
+func New(provider internal.ProviderUsingTerraform, opts options.Options) (api.Terraformer, fail.Error) {
+	return internal.New(provider, opts)
+}

@@ -28,15 +28,21 @@ import (
 
 // ObjectStorageBucket abstracts an Objet Storage container (also known as bucket in some implementations)
 type ObjectStorageBucket struct {
+	*Core
 	ID         string `json:"id,omitempty"`
-	Name       string `json:"name,omitempty"`
 	Host       string `json:"host,omitempty"`
 	MountPoint string `json:"mountPoint,omitempty"`
 }
 
 // NewObjectStorageBucket ...
-func NewObjectStorageBucket() *ObjectStorageBucket {
-	return &ObjectStorageBucket{}
+func NewObjectStorageBucket(opts ...Option) (*ObjectStorageBucket, fail.Error) {
+	c, xerr := New(opts...)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out := &ObjectStorageBucket{Core: c}
+	return out, nil
 }
 
 // IsConsistent tells if host struct is consistent
@@ -47,16 +53,16 @@ func (instance ObjectStorageBucket) IsConsistent() bool {
 	return result
 }
 
-func (instance *ObjectStorageBucket) IsNull() bool {
-	return instance == nil || instance.Name == ""
-}
-
 // OK ...
 func (instance ObjectStorageBucket) OK() bool {
 	return instance.IsConsistent()
 }
 
-// Clone does a deep-copy of the Host
+func (instance *ObjectStorageBucket) IsNull() bool {
+	return instance == nil || instance.Core.IsNull() || (instance.Name == "" && instance.ID == "")
+}
+
+// Clone does a deep-copy of the ObjectStorageBucket
 //
 // satisfies interface clonable.Clonable
 func (instance *ObjectStorageBucket) Clone() (clonable.Clonable, error) {
@@ -64,7 +70,7 @@ func (instance *ObjectStorageBucket) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newB := NewObjectStorageBucket()
+	newB, _ := NewObjectStorageBucket()
 	return newB, newB.Replace(instance)
 }
 
@@ -85,6 +91,11 @@ func (instance *ObjectStorageBucket) Replace(p clonable.Clonable) error {
 	}
 
 	*instance = *src
+	instance.Core, err = clonable.CastedClone[*Core](src.Core)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

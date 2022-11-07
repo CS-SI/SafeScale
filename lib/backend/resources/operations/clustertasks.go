@@ -367,13 +367,17 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 		}
 
 		// Initializes instance
-		ci := abstract.NewClusterIdentity()
-		ci.Name = req.Name
+		ci, xerr := abstract.NewCluster(abstract.WithName(req.Name))
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+
 		ci.Flavor = req.Flavor
 		ci.Complexity = req.Complexity
 		ci.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 
-		xerr := instance.carry(ctx, ci)
+		xerr = instance.carry(ctx, ci)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -381,7 +385,7 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 		}
 
 		xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			aci, err := lang.Cast[*abstract.ClusterIdentity](p)
+			aci, err := lang.Cast[*abstract.Cluster](p)
 			if err != nil {
 				return fail.Wrap(err)
 			}
@@ -642,7 +646,7 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 
 		// Updates property
 		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(clusterproperty.DefaultsV2, func(p clonable.Clonable) fail.Error {
+			return props.Alter(clusterproperty.DefaultsV2, func(p clonable.Clonable) fail.Error { //nolint
 				defaultsV2, err := lang.Cast[*propertiesv2.ClusterDefaults](p)
 				if err != nil {
 					return fail.Wrap(err)

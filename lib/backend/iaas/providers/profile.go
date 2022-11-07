@@ -17,8 +17,8 @@
 package providers
 
 import (
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api/terraformer"
 )
 
 // Profile contains Provider profile

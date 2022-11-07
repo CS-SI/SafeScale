@@ -99,11 +99,7 @@ func (s *Subnet) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ns, xerr := NewSubnet(WithName(s.Name))
-	if xerr != nil {
-		return nil, xerr
-	}
-
+	ns, _ := NewSubnet()
 	return ns, ns.Replace(s)
 }
 

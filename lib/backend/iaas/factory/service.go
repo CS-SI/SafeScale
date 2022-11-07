@@ -58,7 +58,7 @@ type service struct {
 	cacheManager *wrappedCache
 
 	//	metadataBucket objectstorage.GetBucket
-	metadataBucket abstract.ObjectStorageBucket
+	metadataBucket *abstract.ObjectStorageBucket
 	metadataKey    *crypt.Key
 
 	whitelistTemplateREs []*regexp.Regexp
@@ -140,10 +140,11 @@ func (instance service) GetName() (string, fail.Error) {
 }
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket
-func (instance service) GetMetadataBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
+func (instance service) GetMetadataBucket(ctx context.Context) (*abstract.ObjectStorageBucket, fail.Error) {
 	if valid.IsNil(instance) {
-		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
+
 	return instance.metadataBucket, nil
 }
 
@@ -1233,7 +1234,13 @@ func (instance service) InspectSecurityGroupByName(inctx context.Context, networ
 	go func() {
 		defer close(chRes)
 
-		as, xerr := instance.InspectSecurityGroup(ctx, abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
+		as, xerr := abstract.NewSecurityGroup(abstract.WithName(name))
+		if xerr != nil {
+			chRes <- result{as, xerr}
+			return
+		}
+		as.SetNetworkID(networkID)
+		as, xerr = instance.InspectSecurityGroup(ctx, as)
 		chRes <- result{as, xerr}
 
 	}()

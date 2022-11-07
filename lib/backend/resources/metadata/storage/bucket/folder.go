@@ -96,24 +96,24 @@ func (instance *folder) Scope() scopeapi.Scope {
 }
 
 // GetBucket returns the bucket used by the folder to store Object Storage
-func (instance folder) GetBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
+func (instance folder) GetBucket(ctx context.Context) (*abstract.ObjectStorageBucket, fail.Error) {
 	if valid.IsNil(instance) {
-		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	bucket, xerr := instance.service.GetMetadataBucket(ctx)
 	if xerr != nil {
-		return abstract.ObjectStorageBucket{}, xerr
+		return nil, xerr
 	}
 
 	return bucket, nil
 }
 
 // getBucket is the same as GetBucket without instance validation (for internal use)
-func (instance folder) getBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
+func (instance folder) getBucket(ctx context.Context) (*abstract.ObjectStorageBucket, fail.Error) {
 	bucket, xerr := instance.service.GetMetadataBucket(ctx)
 	if xerr != nil {
-		return abstract.ObjectStorageBucket{}, xerr
+		return nil, xerr
 	}
 
 	return bucket, nil

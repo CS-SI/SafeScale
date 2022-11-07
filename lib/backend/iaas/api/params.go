@@ -156,7 +156,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 
 // ValidateSecurityGroupParameter validates securitygroup parameter that can be a string as ID or an *abstract.SecurityGroup
 func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstract.SecurityGroup, sgLabel string, _ fail.Error) {
-	asg = abstract.NewSecurityGroup()
+	asg, _ = abstract.NewSecurityGroup()
 	switch sgParam := sgParam.(type) {
 	case string:
 		if sgParam == "" {
@@ -168,6 +168,7 @@ func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstra
 		if valid.IsNil(sgParam) {
 			return asg, "", fail.InvalidParameterError("sgParam", "cannot be *abstract.ScurityGroup null value")
 		}
+
 		asg = sgParam
 		if asg.Name != "" {
 			sgLabel = "'" + asg.Name + "'"

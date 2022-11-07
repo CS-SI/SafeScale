@@ -37,7 +37,7 @@ import (
 )
 
 // CreateVolume ...
-func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
+func (s *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -59,24 +59,27 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteVolume(context.Background(), resp.VolumeId); derr != nil {
+			derr := s.rpcDeleteVolume(context.Background(), resp.VolumeId)
+			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", request.Name))
 			}
 		}
 	}()
 
-	volume := abstract.Volume{
-		ID:    aws.StringValue(resp.VolumeId),
-		Name:  request.Name,
-		Size:  int(aws.Int64Value(resp.Size)),
-		Speed: toAbstractVolumeSpeed(resp.VolumeType),
-		State: toAbstractVolumeState(resp.State),
+	volume, xerr := abstract.NewVolume(abstract.WithName(request.Name))
+	if xerr != nil {
+		return nil, xerr
 	}
-	return &volume, nil
+
+	volume.ID = aws.StringValue(resp.VolumeId)
+	volume.Size = int(aws.Int64Value(resp.Size))
+	volume.Speed = toAbstractVolumeSpeed(resp.VolumeType)
+	volume.State = toAbstractVolumeState(resp.State)
+	return volume, nil
 }
 
 // InspectVolume ...
-func (s stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volume, ferr fail.Error) {
+func (s *stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -119,14 +122,12 @@ func (s stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volum
 		}
 	}
 
-	volume := abstract.Volume{
-		ID:    aws.StringValue(resp.VolumeId),
-		Name:  name,
-		Size:  int(aws.Int64Value(resp.Size)),
-		Speed: toAbstractVolumeSpeed(resp.VolumeType),
-		State: toAbstractVolumeState(resp.State),
-	}
-	return &volume, nil
+	volume, _ := abstract.NewVolume(abstract.WithName(name))
+	volume.ID = aws.StringValue(resp.VolumeId)
+	volume.Size = int(aws.Int64Value(resp.Size))
+	volume.Speed = toAbstractVolumeSpeed(resp.VolumeType)
+	volume.State = toAbstractVolumeState(resp.State)
+	return volume, nil
 }
 
 func fromAbstractVolumeSpeed(speed volumespeed.Enum) (string, int) {
@@ -187,7 +188,7 @@ func toAbstractVolumeState(s *string) volumestate.Enum {
 }
 
 // ListVolumes ...
-func (s stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail.Error) {
+func (s *stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -220,21 +221,19 @@ func (s stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail
 			}
 		}
 
-		volume := abstract.Volume{
-			ID:    aws.StringValue(v.VolumeId),
-			Name:  volumeName,
-			Size:  int(aws.Int64Value(v.Size)),
-			Speed: toAbstractVolumeSpeed(v.VolumeType),
-			State: toAbstractVolumeState(v.State),
-		}
-		volumes = append(volumes, &volume)
+		volume, _ := abstract.NewVolume(abstract.WithName(volumeName))
+		volume.ID = aws.StringValue(v.VolumeId)
+		volume.Size = int(aws.Int64Value(v.Size))
+		volume.Speed = toAbstractVolumeSpeed(v.VolumeType)
+		volume.State = toAbstractVolumeState(v.State)
+		volumes = append(volumes, volume)
 	}
 
 	return volumes, nil
 }
 
 // DeleteVolume ...
-func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
+func (s *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -258,7 +257,7 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 }
 
 // CreateVolumeAttachment ...
-func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
+func (s *stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -307,7 +306,7 @@ func initAvailableDevices() map[string]struct{} {
 	return availableSlots
 }
 
-func (s stack) findNextAvailableDevice(ctx context.Context, hostID string, availableSlots map[string]struct{}) (string, map[string]struct{}, fail.Error) {
+func (s *stack) findNextAvailableDevice(ctx context.Context, hostID string, availableSlots map[string]struct{}) (string, map[string]struct{}, fail.Error) {
 	instance, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(hostID))
 	if xerr != nil {
 		return "", availableSlots, xerr
@@ -355,7 +354,7 @@ func (s stack) findNextAvailableDevice(ctx context.Context, hostID string, avail
 }
 
 // InspectVolumeAttachment returns information about a volume attachment
-func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
+func (s *stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
 	nilA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
 		return nilA, fail.InvalidInstanceError()
@@ -400,7 +399,7 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string)
 }
 
 // ListVolumeAttachments ...
-func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
+func (s *stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -444,12 +443,12 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []
 	return vas, nil
 }
 
-func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
+func (s *stack) Migrate(_ context.Context, _ string, _ map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 
 // DeleteVolumeAttachment detach from server 'serverID' the volume 'id'
-func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, id string) (ferr fail.Error) {
+func (s *stack) DeleteVolumeAttachment(ctx context.Context, serverID, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

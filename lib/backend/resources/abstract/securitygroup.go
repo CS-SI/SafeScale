@@ -427,13 +427,32 @@ func (instance *SecurityGroup) RemoveRuleByIndex(index int) fail.Error {
 // SecurityGroup represents a security group
 // Note: by design, security group names must be unique tenant-wide
 type SecurityGroup struct {
+	*Core
 	ID               string             `json:"id"`                    // ID of the group
-	Name             string             `json:"name"`                  // name of the group
 	Network          string             `json:"network,omitempty"`     // Contains the ID of the Network owning the Security Group
 	Description      string             `json:"description,omitempty"` // description of the group
 	Rules            SecurityGroupRules `json:"rules"`                 // rules of the Security Group
 	DefaultForSubnet string             `json:"default_for_subnets"`   // lists the ID of the subnet for which this SecurityGroup is considered as default (to be able to prevent removal of Subnet default Security Group until removal of the Subnet itself)
 	DefaultForHost   string             `json:"default_for_hosts"`     // lists the ID of the host for which this SecurityGroup is considered as default (to be able to prevent removal of default Security Group until removal of the Host itself)
+}
+
+// NewSecurityGroup ...
+func NewSecurityGroup(opts ...Option) (*SecurityGroup, fail.Error) {
+	c, xerr := New(opts...)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	asg := &SecurityGroup{
+		Core:             c,
+		ID:               "",
+		Network:          "",
+		Description:      "",
+		Rules:            make(SecurityGroupRules, 0),
+		DefaultForSubnet: "",
+		DefaultForHost:   "",
+	}
+	return asg, nil
 }
 
 // IsNull tells if the SecurityGroup is a null value
@@ -478,20 +497,6 @@ func (instance *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
 	return instance
 }
 
-// NewSecurityGroup ...
-func NewSecurityGroup() *SecurityGroup {
-	asg := &SecurityGroup{
-		ID:               "",
-		Name:             "",
-		Network:          "",
-		Description:      "",
-		Rules:            make(SecurityGroupRules, 0),
-		DefaultForSubnet: "",
-		DefaultForHost:   "",
-	}
-	return asg
-}
-
 // Clone does a deep-copy of the SecurityGroup
 // satisfies interface clonable.Clonable
 func (instance *SecurityGroup) Clone() (clonable.Clonable, error) {
@@ -500,7 +505,7 @@ func (instance *SecurityGroup) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	nsg := NewSecurityGroup()
+	nsg, _ := NewSecurityGroup()
 	return nsg, nsg.Replace(instance)
 }
 
@@ -520,12 +525,17 @@ func (instance *SecurityGroup) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	nr, err := src.Rules.Clone()
+	*instance = *src
+	instance.Core, err = clonable.CastedClone[*Core](src.Core)
 	if err != nil {
-		return err
+		return fail.Wrap(err)
 	}
 
-	*instance = *src
+	nr, xerr := src.Rules.Clone()
+	if xerr != nil {
+		return xerr
+	}
+
 	instance.Rules = nr
 	return nil
 }

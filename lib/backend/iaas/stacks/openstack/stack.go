@@ -256,36 +256,36 @@ func New(auth iaasoptions.Authentication, authScope *gophercloud.AuthScope, cfg 
 }
 
 // IsNull ...
-func (s *stack) IsNull() bool {
-	return s == nil || s.Driver == nil
+func (instance *stack) IsNull() bool {
+	return instance == nil || instance.Driver == nil
 }
 
 // GetStackName returns the name of the stack
-func (s stack) GetStackName() (string, fail.Error) {
+func (instance stack) GetStackName() (string, fail.Error) {
 	return "openstack", nil
 }
 
 // Timings returns the instance containing current timeout settings
-func (s *stack) Timings() (temporal.Timings, fail.Error) {
-	if s == nil {
+func (instance *stack) Timings() (temporal.Timings, fail.Error) {
+	if instance == nil {
 		return temporal.NewTimings(), fail.InvalidInstanceError()
 	}
-	if s.MutableTimings == nil {
-		s.MutableTimings = temporal.NewTimings()
+	if instance.MutableTimings == nil {
+		instance.MutableTimings = temporal.NewTimings()
 	}
-	return s.MutableTimings, nil
+	return instance.MutableTimings, nil
 }
 
-func (s *stack) UpdateTags(ctx context2.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+func (instance *stack) UpdateTags(ctx context2.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
 	if kind != abstract.HostResource {
 		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
 	}
 
-	xerr := s.rpcSetMetadataOfInstance(ctx, id, lmap)
+	xerr := instance.rpcSetMetadataOfInstance(ctx, id, lmap)
 	return xerr
 }
 
-func (s *stack) DeleteTags(ctx context2.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+func (instance *stack) DeleteTags(ctx context2.Context, kind abstract.Enum, id string, keys []string) fail.Error {
 	if kind != abstract.HostResource {
 		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
 	}
@@ -295,6 +295,6 @@ func (s *stack) DeleteTags(ctx context2.Context, kind abstract.Enum, id string, 
 		report[k] = ""
 	}
 
-	xerr := s.rpcDeleteMetadataOfInstance(ctx, id, report)
+	xerr := instance.rpcDeleteMetadataOfInstance(ctx, id, report)
 	return xerr
 }

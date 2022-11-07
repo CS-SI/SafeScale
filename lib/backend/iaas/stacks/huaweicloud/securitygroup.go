@@ -55,7 +55,7 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*ab
 					return false, err
 				}
 				for _, e := range l {
-					n := abstract.NewSecurityGroup()
+					n, _ := abstract.NewSecurityGroup()
 					n.Name = e.Name
 					n.ID = e.ID
 					n.Description = e.Description
@@ -85,9 +85,10 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			asg = abstract.NewSecurityGroup()
-			asg.Name = name
-			// continue
+			asg, xerr = abstract.NewSecurityGroup(abstract.WithName(name))
+			if xerr != nil {
+				return nil, xerr
+			}
 			debug.IgnoreError(xerr)
 		case *fail.ErrDuplicate:
 			// Special case : a duplicate error may come from OpenStack after normalization, because there are already more than 1

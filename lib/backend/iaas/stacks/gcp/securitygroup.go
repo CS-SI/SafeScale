@@ -69,9 +69,12 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 		return nil, fail.Wrap(err, "failed to generate unique id for Security Group")
 	}
 
-	asg := abstract.NewSecurityGroup()
+	asg, xerr := abstract.NewSecurityGroup(abstract.WithName(name))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	asg.ID = fmt.Sprintf("sfsg-%s", auuid)
-	asg.Name = name
 	asg.Description = description + " (" + asg.ID + ")"
 	asg.Network = networkRef
 	asg.Rules = rules

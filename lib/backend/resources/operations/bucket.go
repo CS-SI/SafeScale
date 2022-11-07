@@ -270,9 +270,9 @@ func (instance *bucket) Browse(ctx context.Context, callback func(storageBucket 
 	defer instance.lock.RUnlock()
 
 	xerr := instance.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
-		ab := abstract.NewObjectStorageBucket()
-		var inErr fail.Error
-		if inErr = ab.Deserialize(buf); inErr != nil {
+		ab, _ := abstract.NewObjectStorageBucket()
+		inErr := ab.Deserialize(buf)
+		if inErr != nil {
 			return inErr
 		}
 
@@ -414,7 +414,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- write metadata
-	xerr = instance.carry(ctx, &ab)
+	xerr = instance.carry(ctx, ab)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

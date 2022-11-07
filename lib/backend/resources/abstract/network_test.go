@@ -20,13 +20,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNetwork_NewNetwork(t *testing.T) {
 
-	n := NewNetwork()
+	n, _ := NewNetwork()
 	if !n.IsNull() {
 		t.Error("Network is null !")
 		t.Fail()
@@ -48,35 +49,34 @@ func TestNetwork_NewNetwork(t *testing.T) {
 	}
 }
 
-func TestNetwork_Replace(t *testing.T) {
+func TestNetwork_NewNetworkWithName(t *testing.T) {
+	n, xerr := NewNetwork(WithName(""))
+	require.NotNil(t, xerr)
 
+	n, xerr = NewNetwork(WithName("some name"))
+	require.Nil(t, xerr)
+	require.Equal(t, n.Name, "some name")
+}
+
+func TestNetwork_Replace(t *testing.T) {
 	var n1 *Network
 	var n2 *Network
-	result, err := n1.Replace(n2)
+	err := n1.Replace(n2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
-
 }
 
 func TestNetwork_Clone(t *testing.T) {
-	n := NewNetwork()
+	n, xerr := NewNetwork(WithName("Network Name"))
+	require.Nil(t, xerr)
 	n.ID = "Network ID"
-	n.Name = "Network Name"
 	n.CIDR = "Network CIDR"
 	n.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
 	n.Imported = false
 
-	at, err := n.Clone()
-	if err != nil {
-		t.Error(err)
-	}
-
-	n2, ok := at.(*Network)
-	if !ok {
-		t.Fail()
-	}
+	n2, err := clonable.CastedClone[*Network](n)
+	require.NotNil(t, err)
 	assert.Equal(t, n, n2)
 	areEqual := reflect.DeepEqual(n, n2)
 	if !areEqual {
@@ -93,22 +93,16 @@ func TestNetwork_Clone(t *testing.T) {
 }
 
 func TestNetwork_Clone_DNS(t *testing.T) {
-	n := NewNetwork()
+	n, xerr := NewNetwork(WithName("Network Name"))
+	require.Nil(t, xerr)
+
 	n.ID = "Network ID"
-	n.Name = "Network Name"
 	n.CIDR = "Network CIDR"
 	n.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
 	n.Imported = false
 
-	at, err := n.Clone()
-	if err != nil {
-		t.Error(err)
-	}
-
-	n2, ok := at.(*Network)
-	if !ok {
-		t.Fail()
-	}
+	n2, err := clonable.CastedClone[*Network](n)
+	require.Nil(t, err)
 	assert.Equal(t, n, n2)
 	areEqual := reflect.DeepEqual(n, n2)
 	if !areEqual {
@@ -129,11 +123,11 @@ func TestNetwork_Serialize(t *testing.T) {
 	var n *Network = nil
 	_, err := n.Serialize()
 	if err == nil {
-		t.Error("Can't serialize nil pointer")
+		t.Error("Cannot serialize nil pointer")
 		t.Fail()
 	}
 
-	n = NewNetwork()
+	n, _ = NewNetwork()
 	n.ID = "Network ID"
 	n.Name = "Network Name"
 	n.CIDR = "Network CIDR"
@@ -146,7 +140,7 @@ func TestNetwork_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	n2 := NewNetwork()
+	n2, _ := NewNetwork()
 	err = n2.Deserialize(serial)
 	if err != nil {
 		t.Error(err)
@@ -158,12 +152,11 @@ func TestNetwork_Serialize(t *testing.T) {
 		t.Error("Serialize/Deserialize does not restitute values")
 		t.Fail()
 	}
-
 }
 
 func TestNetwork_Deserialize(t *testing.T) {
 
-	n := NewNetwork()
+	n, _ := NewNetwork()
 	n.ID = "Network ID"
 	n.Name = "Network Name"
 	n.CIDR = "Network CIDR"
@@ -182,24 +175,20 @@ func TestNetwork_Deserialize(t *testing.T) {
 		t.Error("Can't deserialize nil pointer")
 		t.Fail()
 	}
-
 }
 
 func TestNetwork_GetName(t *testing.T) {
-
-	n := NewNetwork()
+	n, _ := NewNetwork()
 	n.Name = "Network Name"
 	name := n.GetName()
 	if name != n.Name {
 		t.Error("Wrong value restitution")
 		t.Fail()
 	}
-
 }
 
 func TestNetwork_GetID(t *testing.T) {
-
-	n := NewNetwork()
+	n, _ := NewNetwork()
 	n.ID = "Network Name"
 	id, _ := n.GetID()
 	if id != n.ID {
