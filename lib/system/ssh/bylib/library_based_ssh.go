@@ -725,7 +725,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			cmd, _ := sconf.Command(fmt.Sprintf("sudo cat %s/user_data.%s.done", utils.StateFolder, phase))
 
 			var xerr fail.Error
-			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(ctx, outputs.COLLECT, 60*time.Second) // FIXME: Remove hardcoded timeout
+			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(ctx, outputs.COLLECT, 45*time.Second) // FIXME: Remove hardcoded timeout
 			if xerr != nil {
 				if phase == "init" {
 					logrus.WithContext(ctx).Debugf("SSH still not ready for %s, phase %s", sconf.Hostname, phase)

@@ -23,6 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
@@ -204,7 +205,14 @@ func (myself *MetadataCore) GetKind() string {
 }
 
 // Inspect protects the data for shared read
-func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Callback) (_ fail.Error) {
+func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
+	defer func() {
+		if rerr != nil {
+			if myself != nil {
+				logrus.WithContext(inctx).Warningf("Inspection of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+			}
+		}
+	}()
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -220,7 +228,6 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
-			var xerr fail.Error
 
 			if callback == nil {
 				return fail.InvalidParameterCannotBeNilError("callback")
@@ -294,7 +301,15 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change through time).
-func (myself *MetadataCore) Review(inctx context.Context, callback resources.Callback) (_ fail.Error) {
+func (myself *MetadataCore) Review(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
+	defer func() {
+		if rerr != nil {
+			if myself != nil {
+				logrus.WithContext(inctx).Warningf("Review of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+			}
+		}
+	}()
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -340,7 +355,15 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)
-func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Callback, options ...data.ImmutableKeyValue) (_ fail.Error) {
+func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Callback, options ...data.ImmutableKeyValue) (rerr fail.Error) {
+	defer func() {
+		if rerr != nil {
+			if myself != nil {
+				logrus.WithContext(inctx).Warningf("Alter of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+			}
+		}
+	}()
+
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -359,7 +382,6 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
-			var xerr fail.Error
 
 			if callback == nil {
 				return fail.InvalidParameterCannotBeNilError("callback")
@@ -382,6 +404,7 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 
 			// Make sure myself.properties is populated
 			if myself.properties == nil {
+				var xerr fail.Error
 				myself.properties, xerr = serializer.NewJSONProperties("resources." + myself.kind)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -403,14 +426,14 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 			}
 			// Reload reloads data from object storage to be sure to have the last revision
 			if doReload {
-				xerr = myself.unsafeReload(ctx)
+				xerr := myself.unsafeReload(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return fail.Wrap(xerr, "failed to unsafeReload metadata")
 				}
 			}
 
-			xerr = myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
+			xerr := myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
 				return callback(clonable, myself.properties)
 			})
 			xerr = debug.InjectPlannedFail(xerr)
@@ -452,8 +475,14 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 // - fail.ErrInvalidInstance
 // - fail.ErrInvalidParameter
 // - fail.ErrNotAvailable if the MetadataCore instance already carries a data
-func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable) (_ fail.Error) {
-
+func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable) (rerr fail.Error) {
+	defer func() {
+		if rerr != nil {
+			if myself != nil {
+				logrus.WithContext(inctx).Warningf("Carry of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+			}
+		}
+	}()
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -472,7 +501,6 @@ func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable)
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
-			var xerr fail.Error
 
 			if myself == nil {
 				return fail.InvalidInstanceError()
@@ -499,7 +527,7 @@ func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable)
 			}
 			myself.loaded = true
 
-			xerr = myself.updateIdentity()
+			xerr := myself.updateIdentity()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -588,7 +616,6 @@ func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Erro
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
-			var xerr fail.Error
 
 			if myself == nil {
 				return fail.InvalidInstanceError()
@@ -1073,9 +1100,9 @@ func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 			if myself.loaded && !myself.committed {
 				name, ok := myself.name.Load().(string)
 				if ok {
-					return fail.InconsistentError("cannot unsafeReload a not committed data with name %s", name)
+					return fail.InconsistentError("cannot unsafeReload a not committed data with name %s and kind %s", name, myself.kind)
 				}
-				return fail.InconsistentError("cannot unsafeReload a not committed data")
+				return fail.InconsistentError("cannot unsafeReload a not committed data without name and kind %s", myself.kind)
 			}
 
 			if myself.kindSplittedStore {
@@ -1261,8 +1288,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 					return fail.InconsistentError("field 'id' is not set with string")
 				}
 
-				var xerr fail.Error
-				xerr = myself.folder.Lookup(ctx, byIDFolderName, id)
+				xerr := myself.folder.Lookup(ctx, byIDFolderName, id)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -1319,8 +1345,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 					return fail.InconsistentError("field 'name' is not set with string")
 				}
 
-				var xerr fail.Error
-				xerr = myself.folder.Lookup(ctx, "", name)
+				xerr := myself.folder.Lookup(ctx, "", name)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -1426,13 +1451,11 @@ func (myself *MetadataCore) unsafeSerialize(inctx context.Context) ([]byte, fail
 			defer fail.OnPanic(&ferr)
 
 			var (
-				shieldedJSONed []byte
 				shieldedMapped = map[string]interface{}{}
 				propsMapped    = map[string]string{}
 			)
 
-			var xerr fail.Error
-			shieldedJSONed, xerr = myself.shielded.Serialize()
+			shieldedJSONed, xerr := myself.shielded.Serialize()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr

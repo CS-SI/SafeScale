@@ -2254,7 +2254,6 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 	done := make(chan struct{})
 
 	treeCtx, cancel := context.WithCancel(inctx)
-	time.AfterFunc(4*timeout, cancel)
 	defer cancel()
 
 	finished := false
@@ -2279,7 +2278,7 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 			res, err := runner(treeCtx, data)
 			if err != nil {
 				// log the error
-				logrus.WithContext(treeCtx).Error(err)
+				logrus.WithContext(treeCtx).Errorf("window runner failed with: %s", err)
 				return
 			}
 

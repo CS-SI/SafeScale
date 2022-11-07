@@ -471,7 +471,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting addition of Feature '%s' on %s '%s'...", featureName, targetType, targetName), fmt.Sprintf("Ending addition of Feature '%s' on %s '%s'", featureName, targetType, targetName))()
+	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting addition of Feature '%s' on %s '%s'...", featureName, targetType, targetName), fmt.Sprintf("Ending addition of Feature '%s' on %s '%s' with err '%s'", featureName, targetType, targetName, ferr))()
 
 	installer, xerr := instance.determineInstallerForTarget(ctx, target, "check")
 	xerr = debug.InjectPlannedFail(xerr)

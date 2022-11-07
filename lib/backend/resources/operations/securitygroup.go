@@ -982,7 +982,8 @@ func (instance *SecurityGroup) BindToHost(
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
-	return instance.unsafeBindToHost(ctx, hostInstance, enable, mark)
+	xerr := instance.unsafeBindToHost(ctx, hostInstance, enable, mark)
+	return xerr
 }
 
 // UnbindFromHost unbinds the security group from a host
