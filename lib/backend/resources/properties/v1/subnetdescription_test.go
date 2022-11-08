@@ -50,23 +50,22 @@ func TestSubnetDescription_IsNull(t *testing.T) {
 func TestSubnetDescription_Replace(t *testing.T) {
 	var sd *SubnetDescription = nil
 	sd2 := NewSubnetDescription()
-	result, err := sd.Replace(sd2)
+	err := sd.Replace(sd2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := sd2.Replace(network)
-	if xerr == nil {
+	err = sd2.Replace(network)
+	if err == nil {
 		t.Error("SubnetDescription.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *SubnetDescription") {
-		t.Errorf("Expect error \"p is not a *SubnetDescription\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *SubnetDescription") {
+		t.Errorf("Expect error \"p is not a *SubnetDescription\", has \"%s\"", err.Error())
 	}
 
 }

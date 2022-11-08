@@ -49,23 +49,22 @@ func TestNetworkSubnets_IsNull(t *testing.T) {
 func TestNetworkSubnets_Replace(t *testing.T) {
 	var ns *NetworkSubnets = nil
 	ns2 := NewNetworkSubnets()
-	result, err := ns.Replace(ns2)
+	err := ns.Replace(ns2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := ns2.Replace(network)
-	if xerr == nil {
+	err = ns2.Replace(network)
+	if err == nil {
 		t.Error("NetworkSubnets.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *NetworkSubnets") {
-		t.Errorf("Expect error \"p is not a *NetworkSubnets\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *NetworkSubnets") {
+		t.Errorf("Expect error \"p is not a *NetworkSubnets\", has \"%s\"", err.Error())
 	}
 
 }

@@ -68,7 +68,7 @@ type Network struct {
 
 // NewNetwork initializes a new instance of Network
 func NewNetwork(opts ...Option) (*Network, fail.Error) {
-	c, xerr := New(opts...)
+	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}

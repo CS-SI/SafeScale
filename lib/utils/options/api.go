@@ -24,7 +24,7 @@ type Option func(o Options) fail.Error
 
 type Options interface {
 	Load(key string) (any, fail.Error)
-	Store(key string, value any) (any, fail.Error)
+	Store(key string, value any) fail.Error
 	StoreMany(entries ...Entry) fail.Error
 	Subset(keys ...string) (Options, fail.Error)
 }

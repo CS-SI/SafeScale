@@ -49,17 +49,16 @@ func TestClusterNetwork_IsNull(t *testing.T) {
 func TestClusterNetwork_Replace(t *testing.T) {
 	var cn *ClusterNetwork = nil
 	cn2 := newClusterNetwork()
-	result, err := cn.Replace(cn2)
+	err := cn.Replace(cn2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := cn2.Replace(network)
+	xerr := cn2.Replace(network)
 	if xerr == nil {
 		t.Error("ClusterNetwork.Replace(abstract.Network{}) expect an error")
 		t.FailNow()

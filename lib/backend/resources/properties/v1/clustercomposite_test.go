@@ -84,26 +84,25 @@ func TestClusterComposite_Replace(t *testing.T) {
 	bm2 := &ClusterComposite{
 		Tenants: []string{"MyWondertenant"},
 	}
-	result, err := bm.Replace(bm2)
+	err := bm.Replace(bm2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
 	bm = &ClusterComposite{
 		Tenants: []string{"MyWondertenant"},
 	}
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := bm.Replace(network)
-	if xerr == nil {
+	err = bm.Replace(network)
+	if err == nil {
 		t.Error("ClusterComposite.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *ClusterComposite") {
-		t.Errorf("Expect error \"p is not a *ClusterComposite\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *ClusterComposite") {
+		t.Errorf("Expect error \"p is not a *ClusterComposite\", has \"%s\"", err.Error())
 	}
 
 }

@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 )
 
 func TestStructWithoutPointers_IsNull(t *testing.T) {
@@ -126,6 +128,5 @@ func TestStructWithPointersAndCorrectReplace_Replace(t *testing.T) {
 
 	var s *StructWithPointersAndCorrectReplace
 	var c clonable.Clonable
-	_, _ = s.Replace(c)
-
+	_ = s.Replace(c)
 }

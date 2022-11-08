@@ -392,11 +392,11 @@ func (instance *KV) StopWatch(path ...string) fail.Error {
 			return xerr
 		}
 		if w == nil {
-			logrus.Debug("watcher on '%s' already stop", p)
+			logrus.Debugf("watcher on '%s' already stop", p)
 			continue
 		}
 
-		instance.removeWatcher(p)
+		_ = instance.removeWatcher(p)
 		w.stop()
 		for !w.IsStopped() {
 		}

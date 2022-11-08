@@ -22,8 +22,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 func TestNestedLocksWithWritesDanger(t *testing.T) {
@@ -34,7 +36,7 @@ func TestNestedLocksWithWritesDanger(t *testing.T) {
 	assert.NotNil(t, clusters)
 
 	xerr := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
@@ -49,12 +51,12 @@ func TestNestedLocksWithWritesDanger(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		oerr := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
-			thing := clonable.(*LikeFeatures)
+			thing := p.(*LikeFeatures)
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got first lock")
 			time.Sleep(50 * time.Millisecond)
 			return clusters.Inspect("second", func(p clonable.Clonable) fail.Error {
-				other := clonable.(*LikeFeatures)
+				other := p.(*LikeFeatures)
 				other.Installed["elit"] = "In"
 				fmt.Println("Two locks here")
 				return nil
@@ -68,12 +70,12 @@ func TestNestedLocksWithWritesDanger(t *testing.T) {
 		defer wg.Done()
 		time.Sleep(10 * time.Millisecond)
 		oerr := clusters.Alter("second", func(p clonable.Clonable) fail.Error {
-			thing := clonable.(*LikeFeatures)
+			thing := p.(*LikeFeatures)
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got second lock")
 			time.Sleep(50 * time.Millisecond)
 			return clusters.Inspect("first", func(p clonable.Clonable) fail.Error {
-				other := clonable.(*LikeFeatures)
+				other := p.(*LikeFeatures)
 				other.Installed["elit"] = "In"
 				fmt.Println("Two locks")
 				return nil

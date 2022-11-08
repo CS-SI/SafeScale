@@ -17,7 +17,6 @@
 package propertiesv1
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -55,23 +54,22 @@ func TestHostLocalMount_Replace(t *testing.T) {
 		FileSystem: "",
 		Options:    "",
 	}
-	result, err := mnt.Replace(mnt2)
+	err := mnt.Replace(mnt2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := mnt2.Replace(network)
-	if xerr == nil {
+	err = mnt2.Replace(network)
+	if err == nil {
 		t.Error("HostLocalMount.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *HostLocalMount") {
-		t.Errorf("Expect error \"p is not a *HostLocalMount\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *HostLocalMount") {
+		t.Errorf("Expect error \"p is not a *HostLocalMount\", has \"%s\"", err.Error())
 	}
 
 }
@@ -137,11 +135,11 @@ func TestHostRemoteMount_Replace(t *testing.T) {
 		FileSystem: "HostRemoteMount FileSystem",
 		Options:    "HostRemoteMount Options",
 	}
-	result, err := hrm.Replace(hrm2)
+	err := hrm.Replace(hrm2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
+
 	hrm = &HostRemoteMount{
 		ShareID:    "HostRemoteMount ShareID2",
 		Export:     "HostRemoteMount Export2",
@@ -150,26 +148,26 @@ func TestHostRemoteMount_Replace(t *testing.T) {
 		Options:    "HostRemoteMount Options2",
 	}
 
-	result, _ = hrm.Replace(hrm2)
-	areEqual := reflect.DeepEqual(result, hrm2)
+	err = hrm.Replace(hrm2)
+	require.Nil(t, err)
+	areEqual := reflect.DeepEqual(hrm, hrm2)
 	if !areEqual {
 		t.Error("Replace does not retitute values")
 		t.Fail()
 	}
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := hrm2.Replace(network)
-	if xerr == nil {
+	err = hrm2.Replace(network)
+	if err == nil {
 		t.Error("HostRemoteMount.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *HostRemoteMount") {
-		t.Errorf("Expect error \"p is not a *HostRemoteMount\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *HostRemoteMount") {
+		t.Errorf("Expect error \"p is not a *HostRemoteMount\", has \"%s\"", err.Error())
 	}
-
 }
 
 func TestHostMount_IsNull(t *testing.T) {
@@ -227,11 +225,9 @@ func TestHostMounts_Replace(t *testing.T) {
 
 	var mnt *HostMounts = nil
 	mnt2 := NewHostMounts()
-	result, _ := mnt.Replace(mnt2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Can't replace nil pointer")
-		t.Fail()
-	}
+	err := mnt.Replace(mnt2)
+	require.NotNil(t, err)
+
 	mnt = &HostMounts{
 		LocalMountsByDevice: map[string]string{
 			"Device1": "Mount1",
@@ -264,25 +260,26 @@ func TestHostMounts_Replace(t *testing.T) {
 			"Bucket3": "Mount3",
 		},
 	}
-	result, _ = mnt2.Replace(mnt)
+	err = mnt2.Replace(mnt)
+	require.Nil(t, err)
 
-	areEqual := reflect.DeepEqual(result, mnt)
+	areEqual := reflect.DeepEqual(mnt2, mnt)
 	if !areEqual {
 		t.Error("Replace does not restitute values")
 		t.Fail()
 	}
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := mnt2.Replace(network)
-	if xerr == nil {
+	err = mnt2.Replace(network)
+	if err == nil {
 		t.Error("HostMounts.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *HostMounts") {
-		t.Errorf("Expect error \"p is not a *HostMounts\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *HostMounts") {
+		t.Errorf("Expect error \"p is not a *HostMounts\", has \"%s\"", err.Error())
 	}
 
 }

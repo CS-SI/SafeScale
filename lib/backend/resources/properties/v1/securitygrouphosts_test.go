@@ -49,23 +49,22 @@ func TestSecurityGroupHosts_IsNull(t *testing.T) {
 func TestSecurityGroupHosts_Replace(t *testing.T) {
 	var sgh *SecurityGroupHosts = nil
 	sgh2 := NewSecurityGroupHosts()
-	result, err := sgh.Replace(sgh2)
+	err := sgh.Replace(sgh2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := sgh2.Replace(network)
-	if xerr == nil {
+	err = sgh2.Replace(network)
+	if err == nil {
 		t.Error("SecurityGroupHosts.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *SecurityGroupHosts") {
-		t.Errorf("Expect error \"p is not a *SecurityGroupHosts\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *SecurityGroupHosts") {
+		t.Errorf("Expect error \"p is not a *SecurityGroupHosts\", has \"%s\"", err.Error())
 	}
 
 }

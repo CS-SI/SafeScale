@@ -50,12 +50,10 @@ func TestHostLabels_Replace(t *testing.T) {
 
 	var ht *HostLabels = nil
 	ht2 := NewHostLabels()
-	result, err := ht.Replace(ht2)
+	err := ht.Replace(ht2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
-
 }
 
 func TestHostLabels_Clone(t *testing.T) {

@@ -61,23 +61,22 @@ func TestClusterState_Replace(t *testing.T) {
 
 	var cs *ClusterState = nil
 	cs2 := newClusterState()
-	result, err := cs.Replace(cs2)
+	err := cs.Replace(cs2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := cs2.Replace(network)
-	if xerr == nil {
+	err = cs2.Replace(network)
+	if err == nil {
 		t.Error("ClusterState.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *ClusterState") {
-		t.Errorf("Expect error \"p is not a *ClusterState\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *ClusterState") {
+		t.Errorf("Expect error \"p is not a *ClusterState\", has \"%s\"", err.Error())
 	}
 
 }

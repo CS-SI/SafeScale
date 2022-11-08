@@ -21,7 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-func Payload[T any](r Holder) (T, fail.Error) {
+func Payload[T any](r Holder[T]) (T, fail.Error) {
 	var empty T
 	casted, ok := r.(*holder[T])
 	if !ok {
@@ -36,7 +36,7 @@ func Payload[T any](r Holder) (T, fail.Error) {
 //   - if successful: payload of type T, true, nil
 //   - if unsuccessful: empty payload of type T, false, nil
 //   - if an error occurs: empty payload of type T, false, error
-func PayloadIfSuccessful[T any](r Holder) (T, bool, fail.Error) {
+func PayloadIfSuccessful[T any](r Holder[T]) (T, bool, fail.Error) {
 	var empty T
 	if valid.IsNull(r) {
 		return empty, false, fail.InvalidParameterError("r", "cannot be null value of 'Holder'")

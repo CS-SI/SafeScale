@@ -5,8 +5,10 @@ import (
 	"sync"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/api/watch"
+	"github.com/sirupsen/logrus"
 )
 
 type watcher struct {
@@ -56,7 +58,10 @@ func (w *watcher) setHybridHandler(prefix string, handler func(*consulapi.KVPair
 	defer w.lock.Unlock()
 
 	w.hybridHandler = func(bp watch.BlockingParamVal, data any) {
-		kvPairs := data.(consulapi.KVPairs)
+		kvPairs, err := lang.Cast[consulapi.KVPairs](data)
+		if err != nil {
+			logrus.Errorf("in watcher.hybridHandler call: %v", err)
+		}
 
 		for _, v := range kvPairs {
 			path := strings.TrimSuffix(strings.TrimPrefix(v.Key, prefix+"/"), "/")

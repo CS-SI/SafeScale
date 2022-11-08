@@ -26,17 +26,24 @@ import (
 )
 
 type Label struct {
+	*Core
 	ID           string `json:"id"`
-	Name         string `json:"name"`
 	HasDefault   bool   `json:"has_default"` // if false, this represents a Tag
 	DefaultValue string `json:"default_value,omitempty"`
 }
 
 // NewLabel creates a new empty Label...
-func NewLabel() *Label {
-	return &Label{
+func NewLabel(opts ...Option) (*Label, fail.Error) {
+	c, xerr := newCore(opts...)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out := &Label{
+		Core:       c,
 		HasDefault: true,
 	}
+	return out, nil
 }
 
 // IsNull ...
@@ -52,7 +59,7 @@ func (instance *Label) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	nl := NewLabel()
+	nl, _ := NewLabel()
 	return nl, nl.Replace(instance)
 }
 
@@ -61,9 +68,6 @@ func (instance *Label) Clone() (clonable.Clonable, error) {
 func (instance *Label) Replace(p clonable.Clonable) error {
 	if instance == nil {
 		return fail.InvalidInstanceError()
-	}
-	if p == nil {
-		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
 	src, err := lang.Cast[*Label](p)

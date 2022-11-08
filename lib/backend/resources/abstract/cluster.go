@@ -67,7 +67,7 @@ type Cluster struct {
 
 // NewCluster ...
 func NewCluster(opts ...Option) (*Cluster, fail.Error) {
-	c, xerr := New(opts...)
+	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}

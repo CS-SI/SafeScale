@@ -63,8 +63,7 @@ func UseMethod(method string) options.Option {
 			return fail.InvalidParameterError(OptionUseMethodKey, "invalid value '%s'", method)
 		}
 
-		_, xerr := opts.Store(OptionUseMethodKey, method)
-		return xerr
+		return opts.Store(OptionUseMethodKey, method)
 	}
 }
 
@@ -76,8 +75,7 @@ func WithPrefix(prefix string) options.Option {
 			return fail.InvalidParameterCannotBeEmptyStringError("prefix")
 		}
 
-		_, xerr := c.Store(OptionWithPrefixKey, prefix)
-		return xerr
+		return c.Store(OptionWithPrefixKey, prefix)
 	}
 }
 
@@ -88,8 +86,7 @@ func WithScope(scope scopeapi.Scope) options.Option {
 			return fail.InvalidParameterError("svc", "cannot be null value of 'scopeapi.Scope'")
 		}
 
-		_, xerr := o.Store(OptionWithScopeKey, scope)
-		return xerr
+		return o.Store(OptionWithScopeKey, scope)
 	}
 }
 
@@ -107,8 +104,7 @@ func WithScope(scope scopeapi.Scope) options.Option {
 // WithoutReload tells to not reload, on Alter/Inspect
 func WithoutReload() func(options.Options) fail.Error {
 	return func(opts options.Options) fail.Error {
-		_, xerr := opts.Store(OptionWithoutReloadKey, true)
-		return xerr
+		return opts.Store(OptionWithoutReloadKey, true)
 	}
 }
 

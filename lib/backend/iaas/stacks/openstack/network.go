@@ -76,19 +76,19 @@ func (instance stack) CreateNetwork(ctx context.Context, req abstract.NetworkReq
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%instance)", req.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Checks if CIDR is valid...
 	if req.CIDR != "" {
 		_, _, err := net.ParseCIDR(req.CIDR)
 		if err != nil {
-			return nil, fail.Wrap(err, "failed to create subnet '%instance (%instance)': %instance", req.Name, req.CIDR)
+			return nil, fail.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
 		}
 	} else { // CIDR is empty, choose the first Class C one possible
 		tracer.Trace("CIDR is empty, choosing one...")
 		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("CIDR chosen for network is '%instance'", req.CIDR)
+		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
 	}
 
 	// We specify a name and that it should forward packets
@@ -113,7 +113,7 @@ func (instance stack) CreateNetwork(ctx context.Context, req abstract.NetworkReq
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to create network '%instance'", req.Name)
+		return nil, fail.Wrap(xerr, "failed to create network '%s'", req.Name)
 	}
 
 	// Starting from here, delete network if exit with error
@@ -127,7 +127,7 @@ func (instance stack) CreateNetwork(ctx context.Context, req abstract.NetworkReq
 				NormalizeError,
 			)
 			if derr != nil {
-				logrus.WithContext(ctx).Errorf("failed to delete Network '%instance': %v", req.Name, derr)
+				logrus.WithContext(ctx).Errorf("failed to delete Network '%s': %v", req.Name, derr)
 				_ = ferr.AddConsequence(derr)
 			}
 		}
@@ -153,7 +153,7 @@ func (instance stack) InspectNetworkByName(ctx context.Context, name string) (*a
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%instance)", name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
@@ -171,7 +171,7 @@ func (instance stack) InspectNetworkByName(ctx context.Context, name string) (*a
 		case *fail.ErrForbidden:
 			return nil, abstract.ResourceForbiddenError("network", name)
 		default:
-			return nil, fail.NewError("query for network '%instance' failed: %v", name, r.Err)
+			return nil, fail.NewError("query for network '%s' failed: %v", name, r.Err)
 		}
 	}
 
@@ -199,7 +199,7 @@ func (instance stack) InspectNetwork(ctx context.Context, id string) (*abstract.
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%instance)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	// If not found, we look for any network from provider
 	// 1st try with id
@@ -296,7 +296,7 @@ func (instance stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.Ne
 		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%instance)", networkLabel).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", networkLabel).WithStopwatch().Entering().Exiting()
 
 	var network *networks.Network
 	if an.ID == "" {
@@ -310,18 +310,18 @@ func (instance stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.Ne
 		NormalizeError,
 	)
 	if xerr != nil {
-		logrus.WithContext(ctx).Errorf("failed to get Network %instance: %+v", networkLabel, xerr)
+		logrus.WithContext(ctx).Errorf("failed to get Network %s: %+v", networkLabel, xerr)
 		return xerr
 	}
 
 	sns, xerr := instance.ListSubnets(ctx, an.ID)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to list Subnets of Network %instance", networkLabel)
+		xerr = fail.Wrap(xerr, "failed to list Subnets of Network %s", networkLabel)
 		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(xerr.Error()))
 		return xerr
 	}
 	if len(sns) > 0 {
-		return fail.InvalidRequestError("cannot delete a Network %instance: there are Subnets in it", networkLabel)
+		return fail.InvalidRequestError("cannot delete a Network %s: there are Subnets in it", networkLabel)
 	}
 
 	xerr = stacks.RetryableRemoteCall(ctx,
@@ -331,7 +331,7 @@ func (instance stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.Ne
 		NormalizeError,
 	)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to delete Network '%instance'", network.Name)
+		xerr = fail.Wrap(xerr, "failed to delete Network '%s'", network.Name)
 		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(xerr.Error()))
 		return xerr
 	}
@@ -371,7 +371,7 @@ func (instance stack) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%instance)", req.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Checks if CIDR is valid...
@@ -428,7 +428,7 @@ func (instance stack) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 		if ferr != nil {
 			derr := instance.DeleteSubnet(context.Background(), subnet.ID)
 			if derr != nil {
-				wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%instance'", subnet.Name)
+				wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", subnet.Name)
 				logrus.Error(wrapErr.Error())
 				_ = ferr.AddConsequence(wrapErr)
 			}
@@ -441,7 +441,7 @@ func (instance stack) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 			NetworkID: instance.ProviderNetworkID,
 		})
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to create router '%instance'", subnet.ID)
+			return nil, fail.Wrap(xerr, "failed to create router '%s'", subnet.ID)
 		}
 
 		// Starting from here, delete router if exit with error
@@ -450,7 +450,7 @@ func (instance stack) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 			if ferr != nil {
 				derr := instance.deleteRouter(context.Background(), router.ID)
 				if derr != nil {
-					wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete route '%instance'", router.Name)
+					wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", router.Name)
 					_ = ferr.AddConsequence(wrapErr)
 					logrus.Error(wrapErr.Error())
 				}
@@ -459,7 +459,7 @@ func (instance stack) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 
 		xerr = instance.addSubnetToRouter(ctx, router.ID, subnet.ID)
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to add subnet '%instance' to router '%instance'", subnet.Name, router.Name)
+			return nil, fail.Wrap(xerr, "failed to add subnet '%s' to router '%s'", subnet.Name, router.Name)
 		}
 	}
 
@@ -480,7 +480,7 @@ func (instance stack) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 func (instance stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {
 	_, _ /*subnetDesc*/, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
-		return fail.Wrap(err, "failed to validate CIDR '%instance' for Subnet '%instance'", req.CIDR, req.Name)
+		return fail.Wrap(err, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
 	return nil
 }
@@ -494,7 +494,7 @@ func (instance stack) InspectSubnet(ctx context.Context, id string) (_ *abstract
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%instance)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	var sn *subnets.Subnet
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -530,7 +530,7 @@ func (instance stack) InspectSubnetByName(ctx context.Context, networkRef, name 
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%instance)", name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
 	listOpts := subnets.ListOpts{
 		Name: name,
@@ -576,9 +576,9 @@ func (instance stack) InspectSubnetByName(ctx context.Context, networkRef, name 
 
 	switch len(resp) {
 	case 0:
-		msg := "failed to find a Subnet named '%instance'"
+		msg := "failed to find a Subnet named '%s'"
 		if an != nil {
-			msg += " in Network '%instance'"
+			msg += " in Network '%s'"
 			return nil, fail.NotFoundError(msg, name, an.Name)
 		}
 		return nil, fail.NotFoundError(msg, name)
@@ -600,9 +600,9 @@ func (instance stack) InspectSubnetByName(ctx context.Context, networkRef, name 
 		return subnet, nil
 
 	default:
-		msg := "more than one Subnet named '%instance' found"
+		msg := "more than one Subnet named '%s' found"
 		if an != nil {
-			msg += " in Network '%instance'"
+			msg += " in Network '%s'"
 			return nil, fail.DuplicateError(msg, name, an.Name)
 		}
 
@@ -665,7 +665,7 @@ func (instance stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.openstack"), "(%instance)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.openstack"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := instance.Timings()
 	if xerr != nil {
@@ -683,10 +683,10 @@ func (instance stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 	}
 	if router != nil {
 		if xerr := instance.removeSubnetFromRouter(ctx, router.ID, id); xerr != nil {
-			return fail.Wrap(xerr, "failed to remove Subnet %instance from its router %instance", id, router.ID)
+			return fail.Wrap(xerr, "failed to remove Subnet %s from its router %s", id, router.ID)
 		}
 		if xerr := instance.deleteRouter(ctx, router.ID); xerr != nil {
-			return fail.Wrap(xerr, "failed to delete router %instance associated with Subnet %instance", router.ID, id)
+			return fail.Wrap(xerr, "failed to delete router %s associated with Subnet %s", router.ID, id)
 		}
 	}
 
@@ -752,7 +752,7 @@ func (instance stack) createRouter(ctx context.Context, req RouterRequest) (*Rou
 		return nil, xerr
 	}
 
-	logrus.WithContext(ctx).Debugf("Openstack router '%instance' (%instance) successfully created", router.Name, router.ID)
+	logrus.WithContext(ctx).Debugf("Openstack router '%s' (%s) successfully created", router.Name, router.ID)
 	return &Router{
 		ID:        router.ID,
 		Name:      router.Name,

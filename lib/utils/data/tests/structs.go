@@ -19,7 +19,8 @@ package tests
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 type StructWithoutPointers struct {
@@ -36,16 +37,18 @@ func (m *StructWithoutPointers) IsNull() bool {
 }
 
 func (m StructWithoutPointers) Clone() (clonable.Clonable, error) {
-	return NewStructWithoutPointers().Replace(&m)
+	n := NewStructWithoutPointers()
+	return n, n.Replace(&m)
 }
 
-func (m *StructWithoutPointers) Replace(clonable clonable.Clonable) (clonable.Clonable, error) {
-	p, err := lang.Cast[*StructWithoutPointers)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *StructWithoutPointers")
+func (m *StructWithoutPointers) Replace(p clonable.Clonable) error {
+	src, err := lang.Cast[*StructWithoutPointers](p)
+	if err != nil {
+		return fmt.Errorf("p is not a *StructWithoutPointers")
 	}
-	*m = *p
-	return m, nil
+
+	*m = *src
+	return nil
 }
 
 type StructWithPointersAndDefectiveReplace struct {
@@ -65,16 +68,17 @@ func (m *StructWithPointersAndDefectiveReplace) IsNull() bool {
 
 func (m StructWithPointersAndDefectiveReplace) Clone() (clonable.Clonable, error) {
 	newM := &StructWithPointersAndDefectiveReplace{}
-	return newM.Replace(&m)
+	return newM, newM.Replace(&m)
 }
 
-func (m *StructWithPointersAndDefectiveReplace) Replace(clonable clonable.Clonable) (clonable.Clonable, error) {
-	p, err := lang.Cast[*StructWithPointersAndDefectiveReplace)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *StructWithPointersAndDefectiveReplace")
+func (m *StructWithPointersAndDefectiveReplace) Replace(p clonable.Clonable) error {
+	src, err := lang.Cast[*StructWithPointersAndDefectiveReplace](p)
+	if err != nil {
+		return fmt.Errorf("p is not a *StructWithPointersAndDefectiveReplace")
 	}
-	*m = *p
-	return m, nil
+
+	*m = *src
+	return nil
 }
 
 type StructWithPointersAndCorrectReplace struct {
@@ -93,13 +97,14 @@ func (m *StructWithPointersAndCorrectReplace) IsNull() bool {
 }
 
 func (m StructWithPointersAndCorrectReplace) Clone() (clonable.Clonable, error) {
-	return NewStructWithPointersAndCorrectReplace().Replace(&m)
+	nm := NewStructWithPointersAndCorrectReplace()
+	return nm, nm.Replace(&m)
 }
 
-func (m *StructWithPointersAndCorrectReplace) Replace(clonable clonable.Clonable) (clonable.Clonable, error) {
-	src, err := lang.Cast[*StructWithPointersAndCorrectReplace)
-	if !ok {
-		panic("clonable cannot be casted to '*StructWithPointersAndCorrectReplace'")
+func (m *StructWithPointersAndCorrectReplace) Replace(p clonable.Clonable) error {
+	src, err := lang.Cast[*StructWithPointersAndCorrectReplace](p)
+	if err != nil {
+		panic(err.Error())
 	}
 
 	// This part copies non-pointers values
@@ -114,5 +119,5 @@ func (m *StructWithPointersAndCorrectReplace) Replace(clonable clonable.Clonable
 		m.Map[k] = v
 	}
 
-	return m, nil
+	return nil
 }

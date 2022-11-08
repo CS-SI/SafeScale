@@ -56,11 +56,11 @@ func TestClusterInstalledFeature_Replace(t *testing.T) {
 	cif2 := &ClusterInstalledFeature{
 		Name: "Feature Name",
 	}
-	result, err := cif.Replace(cif2)
+	err := cif.Replace(cif2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
+
 	cif = &ClusterInstalledFeature{
 		Name: "Feature Name 2",
 		RequiredBy: map[string]struct{}{
@@ -68,8 +68,9 @@ func TestClusterInstalledFeature_Replace(t *testing.T) {
 			"ParentFeature2": {},
 		},
 	}
-	result, _ = cif2.Replace(cif)
-	areEqual := reflect.DeepEqual(cif.RequiredBy, result.(*ClusterInstalledFeature).RequiredBy)
+	err = cif2.Replace(cif)
+	require.Nil(t, err)
+	areEqual := reflect.DeepEqual(cif.RequiredBy, cif2.RequiredBy)
 	if !areEqual {
 		t.Error("Replace does not restitute RequiredBy values")
 		t.Fail()
@@ -81,20 +82,19 @@ func TestClusterInstalledFeature_Replace(t *testing.T) {
 			"ParentFeature4": {},
 		},
 	}
-	result, _ = cif2.Replace(cif)
-	areEqual = reflect.DeepEqual(cif.Requires, result.(*ClusterInstalledFeature).Requires)
+	err = cif2.Replace(cif)
+	require.Nil(t, err)
+	areEqual = reflect.DeepEqual(cif.Requires, cif2.Requires)
 	if !areEqual {
 		t.Error("Replace does not restitute Requires values")
 		t.Fail()
 	}
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
-
-	_, err = cif2.Replace(network)
-	require.Contains(t, err.Error(), "p is not a *ClusterInstalledFeature")
-
+	err = cif2.Replace(network)
+	require.NotNil(t, err)
 }
 
 func TestClusterInstalledFeature_Clone(t *testing.T) {
@@ -159,23 +159,22 @@ func TestClusterFeatures_Replace(t *testing.T) {
 	var cif *ClusterFeatures = nil
 	cif2 := newClusterFeatures()
 
-	result, err := cif.Replace(cif2)
+	err := cif.Replace(cif2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := cif2.Replace(network)
-	if xerr == nil {
+	err = cif2.Replace(network)
+	if err == nil {
 		t.Error("ClusterFeatures.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *ClusterFeatures") {
-		t.Errorf("Expect error \"p is not a *ClusterFeatures\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *ClusterFeatures") {
+		t.Errorf("Expect error \"p is not a *ClusterFeatures\", has \"%s\"", err.Error())
 	}
 
 }

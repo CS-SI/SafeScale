@@ -57,23 +57,22 @@ func TestClusterNodes_IsNull(t *testing.T) {
 func TestClusterNodes_Replace(t *testing.T) {
 	var cn *ClusterNodes
 	cn2 := newClusterNodes()
-	result, err := cn.Replace(cn2)
+	err := cn.Replace(cn2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := cn2.Replace(network)
-	if xerr == nil {
+	err = cn2.Replace(network)
+	if err == nil {
 		t.Error("ClusterNodes.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *ClusterNodes") {
-		t.Errorf("Expect error \"p is not a *ClusterNodes\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *ClusterNodes") {
+		t.Errorf("Expect error \"p is not a *ClusterNodes\", has \"%s\"", err.Error())
 	}
 
 }

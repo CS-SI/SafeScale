@@ -36,7 +36,7 @@ type ObjectStorageBucket struct {
 
 // NewObjectStorageBucket ...
 func NewObjectStorageBucket(opts ...Option) (*ObjectStorageBucket, fail.Error) {
-	c, xerr := New(opts...)
+	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}

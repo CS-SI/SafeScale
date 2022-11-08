@@ -60,17 +60,17 @@ func TestBucketMounts_Replace(t *testing.T) {
 
 	var bm *BucketMounts = nil
 	bm2 := NewBucketMounts()
-	_, err := bm.Replace(bm2)
+	err := bm.Replace(bm2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
 	bm = NewBucketMounts()
-	_, xerr := bm.Replace(network)
+	xerr := bm.Replace(network)
 	if xerr == nil {
 		t.Error("BucketMounts.Replace(abstract.Network{}) expect an error")
 		t.FailNow()

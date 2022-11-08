@@ -65,19 +65,20 @@ func TestHostInstalledFeature_Replace(t *testing.T) {
 			"Feature2": {},
 		},
 	}
-	result, err := hif.Replace(hif2)
+	err := hif.Replace(hif2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
+
 	hif = &HostInstalledFeature{
 		RequiredBy: map[string]struct{}{
 			"ParentFeature1": {},
 			"ParentFeature2": {},
 		},
 	}
-	result, _ = hif2.Replace(hif)
-	areEqual := reflect.DeepEqual(hif.RequiredBy, result.(*HostInstalledFeature).RequiredBy)
+	err = hif2.Replace(hif)
+	require.Nil(t, err)
+	areEqual := reflect.DeepEqual(hif.RequiredBy, hif2.RequiredBy)
 	if !areEqual {
 		t.Error("Replace does not restitute RequiredBy values")
 		t.Fail()
@@ -88,20 +89,20 @@ func TestHostInstalledFeature_Replace(t *testing.T) {
 			"ParentFeature4": {},
 		},
 	}
-	result, _ = hif2.Replace(hif)
-	areEqual = reflect.DeepEqual(hif.Requires, result.(*HostInstalledFeature).Requires)
+	err = hif2.Replace(hif)
+	require.Nil(t, err)
+	areEqual = reflect.DeepEqual(hif.Requires, hif2.Requires)
 	if !areEqual {
 		t.Error("Replace does not restitute Requires values")
 		t.Fail()
 	}
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, err = hif2.Replace(network)
+	err = hif2.Replace(network)
 	require.Contains(t, err.Error(), "p is not a *HostInstalledFeature")
-
 }
 
 func TestHostInstalledFeature_Clone(t *testing.T) {
@@ -237,11 +238,11 @@ func TestHostFeatures_Replace(t *testing.T) {
 			},
 		},
 	}
-	result, err := hf.Replace(hf2)
+	err := hf.Replace(hf2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
+
 	hf = &HostFeatures{
 		Installed: map[string]*HostInstalledFeature{
 			"Feature": {
@@ -254,24 +255,24 @@ func TestHostFeatures_Replace(t *testing.T) {
 			},
 		},
 	}
-	result, _ = hf2.Replace(hf)
-	areEqual := reflect.DeepEqual(hf, result.(*HostFeatures))
+	err = hf2.Replace(hf)
+	require.Nil(t, err)
+	areEqual := reflect.DeepEqual(hf, hf2)
 	if !areEqual {
 		t.Error("Replace does not restitute values")
 		t.Fail()
 	}
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := hf2.Replace(network)
-	if xerr == nil {
+	err = hf2.Replace(network)
+	if err == nil {
 		t.Error("HostFeatures.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *HostFeatures") {
-		t.Errorf("Expect error \"p is not a *HostFeatures\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *HostFeatures") {
+		t.Errorf("Expect error \"p is not a *HostFeatures\", has \"%s\"", err.Error())
 	}
-
 }

@@ -120,13 +120,22 @@ func (r *holder[T]) ErrorMessage() (string, fail.Error) {
 				stdout, stderr string
 			)
 			if anon, ok := casterr.Annotation("retcode"); ok {
-				retcode = anon.(int)
+				retcode, ok = anon.(int)
+				if !ok {
+					_ = casterr.AddConsequence(fail.InconsistentError("failed to cast 'retcode' to int"))
+				}
 			}
 			if anon, ok := casterr.Annotation("stdout"); ok {
-				stdout = anon.(string)
+				stdout, ok = anon.(string)
+				if !ok {
+					_ = casterr.AddConsequence(fail.InconsistentError("failed to cast 'stdout' to string"))
+				}
 			}
 			if anon, ok := casterr.Annotation("stderr"); ok {
-				stderr = anon.(string)
+				stderr, ok = anon.(string)
+				if !ok {
+					_ = casterr.AddConsequence(fail.InconsistentError("failed to cast 'stderr' to string"))
+				}
 			}
 			recoveredErr := ""
 			output := stdout

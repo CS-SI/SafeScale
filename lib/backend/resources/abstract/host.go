@@ -249,7 +249,7 @@ type HostCore struct {
 
 // NewHostCore ...
 func NewHostCore(opts ...Option) (*HostCore, fail.Error) {
-	c, err := New(opts...)
+	c, err := newCore(opts...)
 	if err != nil {
 		return nil, err
 	}

@@ -92,12 +92,12 @@ func (instance stack) CreateSecurityGroup(ctx context.Context, networkRef, name,
 		case *fail.ErrDuplicate:
 			// Special case : a duplicate error may come from OpenStack after normalization, because there are already more than 1
 			// security groups with the same name. In this situation, returns a DuplicateError with the xerr as cause
-			return nil, fail.DuplicateErrorWithCause(xerr, nil, "more than one Security Group named '%instance' found", name)
+			return nil, fail.DuplicateErrorWithCause(xerr, nil, "more than one Security Group named '%s' found", name)
 		default:
 			return nil, xerr
 		}
 	} else {
-		return nil, fail.DuplicateError("a security group named '%instance' already exist", name)
+		return nil, fail.DuplicateError("a security group named '%s' already exist", name)
 	}
 
 	// create security group on provider side
@@ -214,7 +214,7 @@ func (instance stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.
 				}
 			}
 			if id == "" {
-				return fail.NotFoundError("failed to query Security Group %instance", asgLabel)
+				return fail.NotFoundError("failed to query Security Group %s", asgLabel)
 			}
 			r, innerErr = secgroups.Get(instance.NetworkClient, id).Extract()
 			return innerErr
@@ -226,17 +226,17 @@ func (instance stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.
 		case *retry.ErrStopRetry:
 			cause := fail.ConvertError(xerr.Cause())
 			if _, ok := cause.(*fail.ErrNotFound); ok {
-				return nil, fail.NotFoundError("failed to query Security Group %instance", asgLabel)
+				return nil, fail.NotFoundError("failed to query Security Group %s", asgLabel)
 			}
 			return nil, cause
 		case *fail.ErrNotFound:
-			return nil, fail.NotFoundError("failed to query Security Group %instance", asgLabel)
+			return nil, fail.NotFoundError("failed to query Security Group %s", asgLabel)
 		default:
 			return nil, xerr
 		}
 	}
 	if r == nil {
-		return nil, fail.NotFoundError("failed to find Security Group %instance", asgLabel)
+		return nil, fail.NotFoundError("failed to find Security Group %s", asgLabel)
 	}
 
 	asg.ID = r.ID
@@ -408,7 +408,7 @@ func (instance stack) AddRuleToSecurityGroup(ctx context.Context, sgParam iaasap
 
 	direction := convertDirectionFromAbstract(rule.Direction)
 	if direction == "" { // Invalid direction is not permitted
-		return asg, fail.InvalidRequestError("invalid value '%instance' in 'Direction' field of rule", rule.Direction)
+		return asg, fail.InvalidRequestError("invalid value '%s' in 'Direction' field of rule", rule.Direction)
 	}
 
 	var (

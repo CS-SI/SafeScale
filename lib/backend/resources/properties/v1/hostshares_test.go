@@ -52,23 +52,22 @@ func TestHostShare_Replace(t *testing.T) {
 
 	var hs *HostShare = nil
 	hs2 := NewHostShare()
-	result, err := hs.Replace(hs2)
+	err := hs.Replace(hs2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := hs2.Replace(network)
-	if xerr == nil {
+	err = hs2.Replace(network)
+	if err == nil {
 		t.Error("HostShare.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *HostShare") {
-		t.Errorf("Expect error \"p is not a *HostShare\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *HostShare") {
+		t.Errorf("Expect error \"p is not a *HostShare\", has \"%s\"", err.Error())
 	}
 
 }
@@ -144,23 +143,22 @@ func TestHostShares_Replace(t *testing.T) {
 
 	var hs *HostShares = nil
 	hs2 := NewHostShares()
-	result, err := hs.Replace(hs2)
+	err := hs.Replace(hs2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := hs2.Replace(network)
-	if xerr == nil {
+	err = hs2.Replace(network)
+	if err == nil {
 		t.Error("HostShares.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *HostShares") {
-		t.Errorf("Expect error \"p is not a *HostShares\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *HostShares") {
+		t.Errorf("Expect error \"p is not a *HostShares\", has \"%s\"", err.Error())
 	}
 
 }

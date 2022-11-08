@@ -51,8 +51,8 @@ const (
 	Unnamed = "unnamed"
 )
 
-// New initializes a new instance of Network
-func New(opts ...Option) (*Core, fail.Error) {
+// newCore initializes a new instance of Network
+func newCore(opts ...Option) (*Core, fail.Error) {
 	c := &Core{
 		Name: Unnamed,
 		Tags: data.NewMap[string, string](),
@@ -109,7 +109,7 @@ func (c *Core) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	nc, xerr := New(WithName(c.Name))
+	nc, xerr := newCore(WithName(c.Name))
 	if xerr != nil {
 		return nil, xerr
 	}

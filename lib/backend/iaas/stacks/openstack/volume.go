@@ -97,7 +97,7 @@ func (instance stack) CreateVolume(ctx context.Context, request abstract.VolumeR
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("request.Name")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "(%instance)", request.Name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
 
 	az, xerr := instance.SelectedAvailabilityZone(ctx)
 	if xerr != nil { // nolint
@@ -167,7 +167,7 @@ func (instance stack) CreateVolume(ctx context.Context, request abstract.VolumeR
 		v.State = toVolumeState(vol.Status)
 
 	default:
-		xerr = fail.NotImplementedError("unmanaged service 'volume' version '%instance'", instance.versions["volume"])
+		xerr = fail.NotImplementedError("unmanaged service 'volume' version '%s'", instance.versions["volume"])
 	}
 	if xerr != nil {
 		return nil, xerr

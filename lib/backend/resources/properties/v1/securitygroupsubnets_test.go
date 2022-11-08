@@ -48,17 +48,17 @@ func TestSecurityGroupSubnets_IsNull(t *testing.T) {
 func TestSecurityGroupSubnets_Replace(t *testing.T) {
 	var sgs *SecurityGroupSubnets = nil
 	sgs2 := NewSecurityGroupSubnets()
-	result, err := sgs.Replace(sgs2)
+	err := sgs.Replace(sgs2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, err = sgs2.Replace(network)
+	err = sgs2.Replace(network)
+	require.Nil(t, err)
 	require.Contains(t, err.Error(), "p is not a *SecurityGroupSubnets")
 }
 

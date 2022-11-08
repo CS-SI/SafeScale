@@ -24,7 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
 	fuzz "github.com/google/gofuzz"
@@ -373,12 +373,8 @@ func TestSecurityGroupRule_Replace(t *testing.T) {
 		Sources:   []string{"Earth"},
 		Targets:   []string{"Hell"},
 	}
-	result, _ := sgr1.Replace(sgr2)
-	if fmt.Sprintf("%p", result) != "0x0" {
-		t.Error("Can't Replace a nil SecurityGroupRule pointer")
-		t.Fail()
-	}
-
+	err := sgr1.Replace(sgr2)
+	require.NotNil(t, err)
 }
 
 func TestSecurityGroupRules_IndexOfEquivalentRule(t *testing.T) {
@@ -543,13 +539,13 @@ func TestSecurityGroupRules_IndexOfRuleByID(t *testing.T) {
 func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
 	sg := &SecurityGroup{
 		ID:               "SG ID",
-		Name:             "SG Name",
 		Network:          "SG Network",
 		Description:      "SG Description",
 		Rules:            SecurityGroupRules{},
 		DefaultForSubnet: "SG DefaultForSubnet",
 		DefaultForHost:   "SG DefaultForHost",
 	}
+	sg.Name = "SG Name"
 	err := sg.RemoveRuleByIndex(0)
 	if err == nil {
 		t.Error("Can't remove anything from empty list")
@@ -557,7 +553,6 @@ func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
 	}
 	sg = &SecurityGroup{
 		ID:          "SG ID",
-		Name:        "SG Name",
 		Network:     "SG Network",
 		Description: "SG Description",
 		Rules: SecurityGroupRules{
@@ -598,6 +593,8 @@ func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
 		DefaultForSubnet: "SG DefaultForSubnet",
 		DefaultForHost:   "SG DefaultForHost",
 	}
+	sg.Name = "SG Name"
+
 	err = sg.RemoveRuleByIndex(-1)
 	if err == nil {
 		t.Error("Can't remove anything from -1 index")
@@ -627,7 +624,7 @@ func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
 
 func TestSecurityGroup_SetID(t *testing.T) {
 
-	sg := NewSecurityGroup()
+	sg, _ := NewSecurityGroup()
 	sg.SetID("toto")
 	id, _ := sg.GetID()
 	if id != "toto" {
@@ -639,7 +636,7 @@ func TestSecurityGroup_SetID(t *testing.T) {
 
 func TestSecurityGroup_SetName(t *testing.T) {
 
-	sg := NewSecurityGroup()
+	sg, _ := NewSecurityGroup()
 	sg.SetName("toto")
 	name := sg.GetName()
 	if name != "toto" {
@@ -651,7 +648,7 @@ func TestSecurityGroup_SetName(t *testing.T) {
 
 func TestSecurityGroup_SetNetworkID(t *testing.T) {
 
-	sg := NewSecurityGroup()
+	sg, _ := NewSecurityGroup()
 	sg.SetNetworkID("toto")
 	network := sg.GetNetworkID()
 	if network != "toto" {
@@ -734,7 +731,7 @@ func TestFuzzSg(t *testing.T) {
 }
 
 func TestSecurityGroup_Clone(t *testing.T) {
-	sg := NewSecurityGroup()
+	sg, _ := NewSecurityGroup()
 	sg.ID = "SecurityGroup ID"
 	sg.Name = "SecurityGroup Name"
 	sg.Network = "SecurityGroup Network"
@@ -834,7 +831,7 @@ func TestSecurityGroup_Clone(t *testing.T) {
 
 func TestSecurityGroup_NewSecurityGroup(t *testing.T) {
 
-	sg := NewSecurityGroup()
+	sg, _ := NewSecurityGroup()
 	if !sg.IsNull() {
 		t.Error("SecurityGroup is null !")
 		t.Fail()
@@ -867,7 +864,7 @@ func TestSecurityGroup_NewSecurityGroup(t *testing.T) {
 
 func TestSecurityGroup_Replace(t *testing.T) {
 
-	sg := NewSecurityGroup()
+	sg, _ := NewSecurityGroup()
 	sg.Name = "securitygroup"
 
 	sgr := NewSecurityGroupRule()
@@ -883,32 +880,29 @@ func TestSecurityGroup_Replace(t *testing.T) {
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "back")
 
 	var sgc *SecurityGroup
-	sgcr, _ := sgc.Replace(sg)
-	if fmt.Sprintf("%p", sgcr) != "0x0" {
-		t.Error("Can't replace a nil pointer")
-		t.Fail()
-	}
+	err := sgc.Replace(sg)
+	require.NotNil(t, err)
 
-	sgc = NewSecurityGroup()
-	sgcr, _ = sgc.Replace(sg)
-
-	assert.Equal(t, sgc, sgcr)
+	sgc, _ = NewSecurityGroup()
+	err = sgc.Replace(sg)
+	require.Nil(t, err)
+	assert.Equal(t, sgc, sg)
 	var clob clonable.Clonable = sg
-	require.EqualValues(t, clob, sgcr)
+	require.EqualValues(t, clob, sgc)
 
-	areEqual := reflect.DeepEqual(&sg, sgcr.(*SecurityGroup))
+	areEqual := reflect.DeepEqual(&sg, sgc)
 	if areEqual {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
 
 	sg.Rules[0].Sources[0] = "found"
-	if strings.Contains(spew.Sdump(sgcr), "found") {
+	if strings.Contains(spew.Sdump(sgc), "found") {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
 
-	require.NotEqualValues(t, clob, sgcr)
+	require.NotEqualValues(t, clob, sg)
 }
 
 func TestSecurityGroup_Serialize(t *testing.T) {
@@ -920,7 +914,7 @@ func TestSecurityGroup_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	sg = NewSecurityGroup()
+	sg, _ = NewSecurityGroup()
 	sg.ID = "SecurityGroup ID"
 	sg.Name = "SecurityGroup Name"
 	sg.Network = "SecurityGroup Network"
@@ -967,7 +961,7 @@ func TestSecurityGroup_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	sg2 := NewSecurityGroup()
+	sg2, _ := NewSecurityGroup()
 	err = sg2.Deserialize(serial)
 	if err != nil {
 		t.Error(err)
@@ -984,7 +978,7 @@ func TestSecurityGroup_Serialize(t *testing.T) {
 
 func TestSecurityGroup_Deserialize(t *testing.T) {
 
-	sg := NewSecurityGroup()
+	sg, _ := NewSecurityGroup()
 	sg.ID = "SecurityGroup ID"
 	sg.Name = "SecurityGroup Name"
 	sg.Network = "SecurityGroup Network"
@@ -1037,7 +1031,8 @@ func TestSecurityGroup_Deserialize(t *testing.T) {
 		t.Error("Can't serialize nil pointer")
 		t.Fail()
 	}
-	sg2 = NewSecurityGroup()
+
+	sg2, _ = NewSecurityGroup()
 	err = sg2.Deserialize([]byte{})
 	if err == nil {
 		t.Error("Can't serialize empty serial")
@@ -1057,7 +1052,7 @@ func TestSecurityGroup_Deserialize(t *testing.T) {
 
 func TestSecurityGroup_RemoveRuleByIndexAgain(t *testing.T) {
 
-	sg := NewSecurityGroup()
+	sg, _ := NewSecurityGroup()
 	sg.Name = "securitygroup"
 
 	sg.Rules = append(sg.Rules, &SecurityGroupRule{Description: "Rule 1"})

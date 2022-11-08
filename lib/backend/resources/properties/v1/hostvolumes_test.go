@@ -53,11 +53,10 @@ func TestHostVolumes_Replace(t *testing.T) {
 
 	var hs *HostVolumes = nil
 	hs2 := NewHostVolumes()
-	result, err := hs.Replace(hs2)
+	err := hs.Replace(hs2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
 	hs = &HostVolumes{
 		VolumesByID: map[string]*HostVolume{
@@ -76,24 +75,25 @@ func TestHostVolumes_Replace(t *testing.T) {
 			"ID": "Devices",
 		},
 	}
-	result, _ = hs2.Replace(hs)
-	areEqual := reflect.DeepEqual(result, hs)
+	err = hs2.Replace(hs)
+	require.Nil(t, err)
+	areEqual := reflect.DeepEqual(hs2, hs)
 	if !areEqual {
 		t.Error("Replace does not restitute values")
 		t.Fail()
 	}
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := hs2.Replace(network)
-	if xerr == nil {
+	err = hs2.Replace(network)
+	if err == nil {
 		t.Error("HostVolumes.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *HostVolumes") {
-		t.Errorf("Expect error \"p is not a *HostVolumes\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *HostVolumes") {
+		t.Errorf("Expect error \"p is not a *HostVolumes\", has \"%s\"", err.Error())
 	}
 
 }

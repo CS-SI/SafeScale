@@ -28,7 +28,7 @@ import (
 
 func TestSubnet_NewSubnet(t *testing.T) {
 
-	s := NewSubnet()
+	s, _ := NewSubnet()
 	if !s.IsNull() {
 		t.Error("Subnet is null !")
 		t.Fail()
@@ -53,18 +53,16 @@ func TestSubnet_NewSubnet(t *testing.T) {
 }
 
 func TestSubnet_Replace(t *testing.T) {
-
 	var s *Subnet
-	replaced, err := s.Replace(NewSubnet())
+	ns, _ := NewSubnet()
+	err := s.Replace(ns)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, replaced)
-
 }
 
 func TestSubnet_Clone(t *testing.T) {
-	s := NewSubnet()
+	s, _ := NewSubnet()
 	s.ID = "Subnet ID"
 	s.Name = "Subnet Name"
 	s.Network = "Subnet Network"
@@ -72,7 +70,9 @@ func TestSubnet_Clone(t *testing.T) {
 	s.Domain = "Subnet Domain"
 	s.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
 	s.GatewayIDs = []string{"GatewayID1", "GatewayID2", "GatewayID3"}
-	s.VIP = NewVirtualIP()
+	var err error
+	s.VIP, err = NewVirtualIP()
+	require.Nil(t, err)
 	s.IPVersion = ipversion.IPv4
 	s.GWSecurityGroupID = "Subnet GWSecurityGroupID"
 	s.PublicIPSecurityGroupID = "Subnet PublicIPSecurityGroupID"
@@ -111,7 +111,7 @@ func TestSubnet_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	s = NewSubnet()
+	s, _ = NewSubnet()
 	s.ID = "Subnet ID"
 	s.Name = "Subnet Name"
 	s.Network = "Subnet Network"
@@ -133,7 +133,7 @@ func TestSubnet_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	s2 := NewSubnet()
+	s2, _ := NewSubnet()
 	err = s2.Deserialize(serial)
 	if err != nil {
 		t.Error(err)
@@ -144,11 +144,9 @@ func TestSubnet_Serialize(t *testing.T) {
 		t.Error("Serialize/Deserialize does not restitute values")
 		t.Fail()
 	}
-
 }
 
 func TestSubnet_Deserialize(t *testing.T) {
-
 	serial := []byte("{\"id\":\"Subnet ID\",\"name\":\"Subnet Name\",\"network\":\"Subnet Network\",\"mask\":\"Subnet CIDR\",\"domain\":\"Subnet Domain\",\"dns_servers\":[\"DNS1\",\"DNS2\",\"DNS3\"], \"gateway_id\":[\"GatewayID1\",\"GatewayID2\",\"GatewayID3\"],\"ip_version\":4,\"gw_security_group_id\":\"Subnet GWSecurityGroupID\",\"publicip_security_group_id\":\"Subnet PublicIPSecurityGroupID\",\"internal_security_group_id\":\"Subnet InternalSecurityGroupID\",\"default_ssh_port\":42,\"single_host_cidr_index\":14,\"tags\":{\"CreationDate\":\"2022-01-21T16:46:55+01:00\",\"ManagedBy\":\"safescale\"}}\"")
 	var s *Subnet
 	err := s.Deserialize(serial)
@@ -160,14 +158,16 @@ func TestSubnet_Deserialize(t *testing.T) {
 }
 
 func TestVirtualIP_Clone(t *testing.T) {
-
-	v := NewVirtualIP()
+	v, _ := NewVirtualIP()
 	v.ID = "VirtualIP ID"
 	v.Name = "VirtualIP Name"
 	v.SubnetID = "VirtualIP SubnetID"
 	v.PrivateIP = "VirtualIP PrivateIP"
 	v.PublicIP = "VirtualIP PublicIP"
-	v.Hosts = []*HostCore{NewHostCore(), NewHostCore(), NewHostCore()}
+	h1, _ := NewHostCore()
+	h2, _ := NewHostCore()
+	h3, _ := NewHostCore()
+	v.Hosts = []*HostCore{h1, h2, h3}
 	v.NetworkID = "VirtualIP NetworkID"
 
 	at, err := v.Clone()
@@ -199,7 +199,7 @@ func TestVirtualIP_Clone(t *testing.T) {
 
 func TestSubnet_GetName(t *testing.T) {
 
-	s := NewSubnet()
+	s, _ := NewSubnet()
 	s.Name = "Subnet Name"
 	name := s.GetName()
 	if name != s.Name {
@@ -211,31 +211,27 @@ func TestSubnet_GetName(t *testing.T) {
 
 func TestSubnet_GetID(t *testing.T) {
 
-	s := NewSubnet()
+	s, _ := NewSubnet()
 	s.ID = "Subnet ID"
 	id, _ := s.GetID()
 	if id != s.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()
 	}
-
 }
 
 func TestSubnet_GetCIDR(t *testing.T) {
-
-	s := NewSubnet()
+	s, _ := NewSubnet()
 	s.ID = "Subnet ID"
 	cidr := s.GetCIDR()
 	if cidr != s.CIDR {
 		t.Error("Wrong value restitution")
 		t.Fail()
 	}
-
 }
 
 func TestVirtualIP_IsNull(t *testing.T) {
-
-	v := NewVirtualIP()
+	v, _ := NewVirtualIP()
 	if !v.IsNull() {
 		t.Error("Virtual ip without ID or Name is null")
 		t.Fail()
@@ -251,17 +247,13 @@ func TestVirtualIP_IsNull(t *testing.T) {
 		t.Error("No, is not null")
 		t.Fail()
 	}
-
 }
 
 func TestVirtualIP_Replace(t *testing.T) {
-
 	var v *VirtualIP = nil
-	v2 := NewVirtualIP()
-	replaced, err := v.Replace(v2)
+	v2, _ := NewVirtualIP()
+	err := v.Replace(v2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, replaced)
-
 }

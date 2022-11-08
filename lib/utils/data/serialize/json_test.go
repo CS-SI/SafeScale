@@ -25,10 +25,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -53,18 +55,20 @@ func (f *LikeFeatures) IsNull() bool {
 }
 
 func (f LikeFeatures) Clone() (clonable.Clonable, error) {
-	return newLikeFeatures().Replace(&f)
+	nf := newLikeFeatures()
+	return nf, nf.Replace(&f)
 }
 
-func (f *LikeFeatures) Replace(p clonable.Clonable) (clonable.Clonable, error) {
-	if f == nil || p == nil {
-		return nil, fail.InvalidInstanceError()
+func (f *LikeFeatures) Replace(p clonable.Clonable) error {
+	if f == nil {
+		return fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*LikeFeatures)
-	if !ok {
-		return nil, fmt.Errorf("p is not a *LikeFeatures")
+	src, err := lang.Cast[*LikeFeatures](p)
+	if err != nil {
+		return err
 	}
+
 	f.Installed = make(map[string]string, len(src.Installed))
 	for k, v := range src.Installed {
 		f.Installed[k] = v
@@ -73,7 +77,7 @@ func (f *LikeFeatures) Replace(p clonable.Clonable) (clonable.Clonable, error) {
 	for k, v := range src.Disabled {
 		f.Disabled[k] = v
 	}
-	return f, nil
+	return nil
 }
 
 func TestJsonProperty_IsNull(t *testing.T) {
@@ -95,9 +99,9 @@ func (e *SomeClonable) IsNull() bool {
 func (e *SomeClonable) Clone() (clonable.Clonable, error) {
 	return &SomeClonable{value: e.value}, nil
 }
-func (e *SomeClonable) Replace(data clonable.Clonable) (clonable.Clonable, error) {
+func (e *SomeClonable) Replace(data clonable.Clonable) error {
 	e.value = data.(*SomeClonable).value
-	return e, nil
+	return nil
 }
 func (e *SomeClonable) GetValue() string {
 	return e.value
@@ -108,7 +112,7 @@ func TestJsonProperty_Replace(t *testing.T) {
 	var jp *jsonProperty
 	var data clonable.Clonable = nil
 
-	_, err := jp.Replace(data)
+	err := jp.Replace(data)
 	if err == nil {
 		t.FailNow()
 	} else {
@@ -124,7 +128,7 @@ func TestJsonPropertyRealReplace(t *testing.T) {
 	assert.NotNil(t, clusters)
 
 	err := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
@@ -224,7 +228,7 @@ func TestLockForReadDoesNotChange(t *testing.T) {
 	assert.NotNil(t, clusters)
 
 	err = clusters.Inspect("first", func(p clonable.Clonable) fail.Error {
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
@@ -242,7 +246,7 @@ func TestLockForWriteDoesChange(t *testing.T) {
 	assert.NotNil(t, clusters)
 
 	err := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
@@ -264,7 +268,7 @@ func TestLockForReadDoesLock(t *testing.T) {
 	assert.NotNil(t, clusters)
 
 	xerr := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
@@ -284,7 +288,7 @@ func TestLockForReadDoesLock(t *testing.T) {
 		oerr := clusters.Inspect("first", func(p clonable.Clonable) fail.Error {
 			fmt.Println("second there")
 			defer fmt.Println("end second there")
-			thing := clonable.(*LikeFeatures)
+			thing := p.(*LikeFeatures)
 			trump := thing.Installed["Loren"]
 			fmt.Printf("Watch, in goroutine: %s", trump)
 			return nil
@@ -297,7 +301,7 @@ func TestLockForReadDoesLock(t *testing.T) {
 		fmt.Println("first there")
 		defer fmt.Println("end first there")
 		time.Sleep(3 * time.Second)
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		gotcha := thing.Installed["Loren"]
 		fmt.Println(gotcha)
 		return nil
@@ -331,7 +335,7 @@ func TestWriteDeterministicLocks(t *testing.T) {
 	assert.NotNil(t, clusters)
 
 	xerr := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
@@ -351,7 +355,7 @@ func TestWriteDeterministicLocks(t *testing.T) {
 		oerr := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
 			fmt.Println("Writer")
 			defer fmt.Println("End Writer")
-			thing := clonable.(*LikeFeatures)
+			thing := p.(*LikeFeatures)
 			fmt.Println("Writing content")
 			thing.Installed["Loren"] = "Dolor sit"
 			time.Sleep(800 * time.Millisecond)
@@ -367,7 +371,7 @@ func TestWriteDeterministicLocks(t *testing.T) {
 		oerr := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
 			fmt.Println("Writer 2")
 			defer fmt.Println("End Writer 2")
-			thing := clonable.(*LikeFeatures)
+			thing := p.(*LikeFeatures)
 			time.Sleep(800 * time.Millisecond)
 			thing.Installed["Loren"] = "amet"
 			return nil
@@ -380,7 +384,7 @@ func TestWriteDeterministicLocks(t *testing.T) {
 	_ = clusters.Inspect("first", func(p clonable.Clonable) fail.Error {
 		fmt.Println("Reader")
 		defer fmt.Println("End Reader")
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		gotcha := thing.Installed["Loren"]
 		fmt.Printf("Rising tide: %s\n", gotcha)
 		return nil
@@ -414,7 +418,7 @@ func TestEternalReaderLocks(t *testing.T) {
 	assert.NotNil(t, clusters)
 
 	xerr := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
@@ -435,7 +439,7 @@ func TestEternalReaderLocks(t *testing.T) {
 			fmt.Println("Slow Reader")
 			defer fmt.Println("End slow Reader")
 			time.Sleep(500 * time.Millisecond)
-			thing := clonable.(*LikeFeatures)
+			thing := p.(*LikeFeatures)
 			fmt.Printf("Recovering content: %s", thing.Installed["Loren"])
 			return nil
 		})
@@ -449,7 +453,7 @@ func TestEternalReaderLocks(t *testing.T) {
 		oerr := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
 			fmt.Println("Writer 2")
 			defer fmt.Println("End Writer 2")
-			thing := clonable.(*LikeFeatures)
+			thing := p.(*LikeFeatures)
 			thing.Installed["Loren"] = "amet"
 			return nil
 		})
@@ -461,7 +465,7 @@ func TestEternalReaderLocks(t *testing.T) {
 	_ = clusters.Inspect("first", func(p clonable.Clonable) fail.Error {
 		fmt.Println("Reader")
 		defer fmt.Println("End Reader")
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		gotcha := thing.Installed["Loren"]
 		fmt.Printf("Rising tide: %s\n", gotcha)
 		return nil
@@ -495,7 +499,7 @@ func TestLockAndWriteLocks(t *testing.T) {
 	assert.NotNil(t, clusters)
 
 	xerr := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
@@ -515,7 +519,7 @@ func TestLockAndWriteLocks(t *testing.T) {
 		oerr := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
 			fmt.Println("Writer")
 			defer fmt.Println("End Writer")
-			thing := clonable.(*LikeFeatures)
+			thing := p.(*LikeFeatures)
 			fmt.Println("Writing content")
 			thing.Installed["Loren"] = "Dolor sit"
 			time.Sleep(800 * time.Millisecond)
@@ -531,7 +535,7 @@ func TestLockAndWriteLocks(t *testing.T) {
 		oerr := clusters.Inspect("first", func(p clonable.Clonable) fail.Error {
 			fmt.Println("Reader 2")
 			defer fmt.Println("End Reader 2")
-			thing := clonable.(*LikeFeatures)
+			thing := p.(*LikeFeatures)
 			gotcha := thing.Installed["Loren"]
 			fmt.Println(gotcha)
 			return nil
@@ -544,7 +548,7 @@ func TestLockAndWriteLocks(t *testing.T) {
 	_ = clusters.Inspect("first", func(p clonable.Clonable) fail.Error {
 		fmt.Println("Reader")
 		defer fmt.Println("End Reader")
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		gotcha := thing.Installed["Loren"]
 		fmt.Println(gotcha)
 		return nil
@@ -590,7 +594,7 @@ func TestNestedLocks(t *testing.T) {
 	assert.NotNil(t, clusters)
 
 	xerr := clusters.Alter("first", func(p clonable.Clonable) fail.Error {
-		thing := clonable.(*LikeFeatures)
+		thing := p.(*LikeFeatures)
 		thing.Installed["Loren"] = "Ipsum"
 		return nil
 	})
@@ -605,13 +609,13 @@ func TestNestedLocks(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		xerr = clusters.Inspect("first", func(p clonable.Clonable) fail.Error {
-			thing := clonable.(*LikeFeatures)
+			thing := p.(*LikeFeatures)
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got first lock")
 			time.Sleep(500 * time.Millisecond)
 
 			return clusters.Inspect("second", func(p clonable.Clonable) fail.Error {
-				other := clonable.(*LikeFeatures)
+				other := p.(*LikeFeatures)
 				other.Installed["elit"] = "In"
 				fmt.Println("Two locks here")
 				return nil
@@ -624,13 +628,13 @@ func TestNestedLocks(t *testing.T) {
 		defer wg.Done()
 		time.Sleep(100 * time.Millisecond)
 		oerr := clusters.Inspect("second", func(p clonable.Clonable) fail.Error {
-			thing := clonable.(*LikeFeatures)
+			thing := p.(*LikeFeatures)
 			thing.Installed["consectur"] = "adipiscing"
 			fmt.Println("Got second lock")
 			time.Sleep(500 * time.Millisecond)
 
 			return clusters.Inspect("first", func(p clonable.Clonable) fail.Error {
-				other := clonable.(*LikeFeatures)
+				other := p.(*LikeFeatures)
 				other.Installed["elit"] = "In"
 				fmt.Println("Two locks")
 				return nil

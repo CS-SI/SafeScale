@@ -62,16 +62,16 @@ func (o *options) Load(key string) (any, fail.Error) {
 }
 
 // Store sets the value of key in options
-func (o *options) Store(key string, value any) (any, fail.Error) {
+func (o *options) Store(key string, value any) fail.Error {
 	if valid.IsNull(o) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
 	if key == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
+		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
 	o.m.Store(key, value)
-	return value, nil
+	return nil
 }
 
 // StoreMany ...
@@ -107,7 +107,7 @@ func (o *options) Subset(keys ...string) (Options, fail.Error) {
 			}
 		}
 
-		_, xerr = out.Store(v, item)
+		xerr = out.Store(v, item)
 		if xerr != nil {
 			return nil, xerr
 		}

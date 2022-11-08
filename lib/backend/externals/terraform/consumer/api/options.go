@@ -32,7 +32,6 @@ func WithTarget(name string) options.Option {
 			}
 		}
 		targets = append(targets, name)
-		o.Store("targets", targets)
-		return nil
+		return o.Store("targets", targets)
 	}
 }

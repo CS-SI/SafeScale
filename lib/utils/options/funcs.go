@@ -83,8 +83,7 @@ func ValueOrSet[T any](opts Options, key string, value T) (T, bool, fail.Error) 
 
 // Set adds or changes value of key in options
 func Set[T any](opts Options, key string, value T) fail.Error {
-	_, xerr := opts.Store(key, value)
-	return xerr
+	return opts.Store(key, value)
 }
 
 // Add sets the key value if key is not in options, fails if key already in options

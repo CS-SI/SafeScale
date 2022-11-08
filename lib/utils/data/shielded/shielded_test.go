@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -43,9 +45,9 @@ func (e *SomeClonable) IsNull() bool {
 func (e *SomeClonable) Clone() (clonable.Clonable, error) {
 	return &SomeClonable{value: e.value}, nil
 }
-func (e *SomeClonable) Replace(data clonable.Clonable) (clonable.Clonable, error) {
+func (e *SomeClonable) Replace(data clonable.Clonable) error {
 	e.value = data.(*SomeClonable).value
-	return e, nil
+	return nil
 }
 func (e *SomeClonable) SetValue(value string) {
 	e.value = value
@@ -72,14 +74,15 @@ func Test_NewShileded(t *testing.T) {
 	require.Nil(t, err)
 
 	err = c.Inspect(func(p clonable.Clonable) fail.Error {
-
-		data, err := lang.Cast[*SomeClonable)
-		if !ok {
-			return fail.InconsistentError("expect SomeClonable data")
+		data, innerErr := lang.Cast[*SomeClonable](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
+
 		if data.GetValue() != "any" {
 			return fail.InconsistentError("expect SomeClonable:value \"any\"")
 		}
+
 		return nil
 	})
 	require.Nil(t, err)
@@ -231,10 +234,11 @@ func TestShielded_Alter(t *testing.T) {
 	require.EqualValues(t, derr, nil)
 
 	err = a.Alter(func(p clonable.Clonable) fail.Error {
-		v, err := lang.Cast[*SomeClonable)
-		if !ok {
-			return fail.InconsistentError("Expect SomeClonable data")
+		v, err := lang.Cast[*SomeClonable](p)
+		if err != nil {
+			return fail.Wrap(err)
 		}
+
 		v.SetValue("any 2")
 		return nil
 	})
@@ -332,7 +336,7 @@ func TestTakiTaki(t *testing.T) {
 		inerr := armored.Alter(func(p clonable.Clonable) fail.Error {
 			defer wg.Done()
 
-			take := clonable.(*datatests.StructWithoutPointers)
+			take := p.(*datatests.StructWithoutPointers)
 			time.Sleep(60 * time.Millisecond)
 			take.Rumba++
 			return nil
@@ -345,7 +349,7 @@ func TestTakiTaki(t *testing.T) {
 		defer wg.Done()
 
 		time.Sleep(80 * time.Millisecond)
-		take := clonable.(*datatests.StructWithoutPointers)
+		take := p.(*datatests.StructWithoutPointers)
 		take.Rumba++
 		return nil
 	})
@@ -356,7 +360,7 @@ func TestTakiTaki(t *testing.T) {
 	wg.Wait()
 
 	err = armored.Inspect(func(p clonable.Clonable) fail.Error {
-		assert.Equal(t, 11, clonable.(*datatests.StructWithoutPointers).Rumba)
+		assert.Equal(t, 11, p.(*datatests.StructWithoutPointers).Rumba)
 		return nil
 	})
 	if err != nil {
@@ -411,7 +415,7 @@ func TestCriminal(t *testing.T) {
 		inerr := armored.Inspect(func(p clonable.Clonable) fail.Error {
 			defer wg.Done()
 			time.Sleep(10 * time.Millisecond)
-			take := clonable.(*datatests.StructWithoutPointers)
+			take := p.(*datatests.StructWithoutPointers)
 			_ = take.Rumba
 			return nil
 		})
@@ -423,7 +427,7 @@ func TestCriminal(t *testing.T) {
 		inerr := armored.Inspect(func(p clonable.Clonable) fail.Error {
 			defer wg.Done()
 			time.Sleep(10 * time.Millisecond)
-			take := clonable.(*datatests.StructWithoutPointers)
+			take := p.(*datatests.StructWithoutPointers)
 			_ = take.Rumba
 			return nil
 		})
@@ -434,7 +438,7 @@ func TestCriminal(t *testing.T) {
 	err = armored.Alter(func(p clonable.Clonable) fail.Error {
 		defer wg.Done()
 		time.Sleep(5 * time.Millisecond)
-		take := clonable.(*datatests.StructWithoutPointers)
+		take := p.(*datatests.StructWithoutPointers)
 		take.Rumba++
 		time.Sleep(80 * time.Millisecond)
 		return nil
@@ -447,7 +451,7 @@ func TestCriminal(t *testing.T) {
 
 	// fmt.Println(a.Rumba)
 	err = armored.Inspect(func(p clonable.Clonable) fail.Error {
-		take := clonable.(*datatests.StructWithoutPointers).Rumba
+		take := p.(*datatests.StructWithoutPointers).Rumba
 		_ = take // Here take may be 9 or 10, depending on who enters the lock 1st, the 2 readers or the writer
 		return nil
 	})
@@ -508,8 +512,8 @@ func TestSerializeDeserialize(t *testing.T) {
 	assert.Nil(t, err)
 
 	err = gotForYou.Inspect(func(p clonable.Clonable) fail.Error {
-		take := clonable.(*datatests.StructWithoutPointers).Content
-		trumba := clonable.(*datatests.StructWithoutPointers).Rumba
+		take := p.(*datatests.StructWithoutPointers).Content
+		trumba := p.(*datatests.StructWithoutPointers).Rumba
 		assert.Equal(t, "Bailame como si fuera la ultima vez", take)
 		assert.Equal(t, 9, trumba)
 		return nil

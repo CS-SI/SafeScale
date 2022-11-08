@@ -146,23 +146,22 @@ func TestHostNetwork_Replace(t *testing.T) {
 
 	var hn *HostNetwork = nil
 	hn2 := NewHostNetwork()
-	result, err := hn.Replace(hn2)
+	err := hn.Replace(hn2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := hn2.Replace(network)
-	if xerr == nil {
+	err = hn2.Replace(network)
+	if err == nil {
 		t.Error("HostNetwork.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *HostNetwork") {
-		t.Errorf("Expect error \"p is not a *HostNetwork\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *HostNetwork") {
+		t.Errorf("Expect error \"p is not a *HostNetwork\", has \"%s\"", err.Error())
 	}
 
 }

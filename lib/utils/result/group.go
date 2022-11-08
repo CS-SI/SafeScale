@@ -25,29 +25,29 @@ import (
 //go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/utils/data/holder.results -o mocks/mock_resultgroup.go
 
 // ResultGroup ...
-type ResultGroup interface {
-	AddOne(string, Holder) fail.Error
+type ResultGroup[T any] interface {
+	AddOne(string, Holder[T]) fail.Error
 	Completed() (bool, fail.Error)
 	UncompletedKeys() ([]string, fail.Error)
 	ErrorMessages() (string, fail.Error)
 	Successful() (bool, fail.Error)
 	Keys() ([]string, fail.Error)
-	ResultOfKey(key string) (Holder, fail.Error)
+	ResultOfKey(key string) (Holder[T], fail.Error)
 }
 
 // ResultGroup contains the errors of the step for each host target
-type resultGroup struct {
-	data.Map[string, Holder]
+type resultGroup[T any] struct {
+	data.Map[string, Holder[T]]
 }
 
 // NewResultGroup returns a new instance of resultGroup
-func NewResultGroup() *resultGroup {
-	return &resultGroup{
-		Map: data.NewMap[string, Holder](),
+func NewResultGroup[T any]() *resultGroup[T] {
+	return &resultGroup[T]{
+		Map: data.NewMap[string, Holder[T]](),
 	}
 }
 
-func (rg *resultGroup) AddOne(key string, r Holder) fail.Error {
+func (rg *resultGroup[T]) AddOne(key string, r Holder[T]) fail.Error {
 	if valid.IsNull(rg) {
 		return fail.InvalidInstanceError()
 	}
@@ -57,7 +57,7 @@ func (rg *resultGroup) AddOne(key string, r Holder) fail.Error {
 }
 
 // ErrorMessages returns a string containing all the errors registered
-func (rg *resultGroup) ErrorMessages() (string, fail.Error) {
+func (rg *resultGroup[T]) ErrorMessages() (string, fail.Error) {
 	if valid.IsNull(rg) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -80,7 +80,7 @@ func (rg *resultGroup) ErrorMessages() (string, fail.Error) {
 }
 
 // UncompletedKeys returns an array of all keys that are marked as uncompleted
-func (rg *resultGroup) UncompletedKeys() ([]string, fail.Error) {
+func (rg *resultGroup[T]) UncompletedKeys() ([]string, fail.Error) {
 	if valid.IsNull(rg) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -100,7 +100,7 @@ func (rg *resultGroup) UncompletedKeys() ([]string, fail.Error) {
 }
 
 // Successful tells if all the resultGroup are successful
-func (rg *resultGroup) Successful() (bool, fail.Error) {
+func (rg *resultGroup[T]) Successful() (bool, fail.Error) {
 	if valid.IsNull(rg) {
 		return false, fail.InvalidInstanceError()
 	}
@@ -122,7 +122,7 @@ func (rg *resultGroup) Successful() (bool, fail.Error) {
 }
 
 // Completed tells if all the resultGroup are completed
-func (rg *resultGroup) Completed() (bool, fail.Error) {
+func (rg *resultGroup[T]) Completed() (bool, fail.Error) {
 	if valid.IsNull(rg) {
 		return false, fail.InvalidInstanceError()
 	}
@@ -145,7 +145,7 @@ func (rg *resultGroup) Completed() (bool, fail.Error) {
 }
 
 // ResultOfKey returns the holder corresponding to the key
-func (rg *resultGroup) ResultOfKey(key string) (Holder, fail.Error) {
+func (rg *resultGroup[T]) ResultOfKey(key string) (Holder[T], fail.Error) {
 	if valid.IsNull(rg) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -162,13 +162,14 @@ func (rg *resultGroup) ResultOfKey(key string) (Holder, fail.Error) {
 }
 
 // ErrorMessageOfKey ...
-func (rg *resultGroup) ErrorMessageOfKey(key string) (string, fail.Error) {
+func (rg *resultGroup[T]) ErrorMessageOfKey(key string) (string, fail.Error) {
 	if valid.IsNull(rg) {
 		return "", fail.InvalidInstanceError()
 	}
 	if key == "" {
 		return "", fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
+
 	if item, ok := rg.Map[key]; ok {
 		msg, _ := item.ErrorMessage()
 		return msg, nil

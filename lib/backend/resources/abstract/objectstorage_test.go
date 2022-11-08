@@ -26,7 +26,7 @@ import (
 
 func TestObjectStorageBucket_NewObjectStorageBucket(t *testing.T) {
 
-	n := NewObjectStorageBucket()
+	n, _ := NewObjectStorageBucket()
 	if !n.IsNull() {
 		t.Error("ObjectStorageBucket is null !")
 		t.Fail()
@@ -59,16 +59,14 @@ func TestObjectStorageBucket_Replace(t *testing.T) {
 
 	var o1 *ObjectStorageBucket
 	var o2 *ObjectStorageBucket
-	result, err := o1.Replace(o2)
+	err := o1.Replace(o2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
-
 }
 
 func TestObjectStorageBucket_Clone(t *testing.T) {
-	b := NewObjectStorageBucket()
+	b, _ := NewObjectStorageBucket()
 	b.Name = "host"
 
 	at, err := b.Clone()
@@ -102,7 +100,7 @@ func TestObjectStorageBucket_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	n = NewObjectStorageBucket()
+	n, _ = NewObjectStorageBucket()
 	n.ID = "ObjectStorageBucket ID"
 	n.Name = "ObjectStorageBucket Name"
 	n.Host = "ObjectStorageBucket Host"
@@ -114,7 +112,7 @@ func TestObjectStorageBucket_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	n2 := NewObjectStorageBucket()
+	n2, _ := NewObjectStorageBucket()
 	err = n2.Deserialize(serial)
 	if err != nil {
 		t.Error(err)
@@ -131,7 +129,7 @@ func TestObjectStorageBucket_Serialize(t *testing.T) {
 
 func TestObjectStorageBucket_Deserialize(t *testing.T) {
 
-	n := NewObjectStorageBucket()
+	n, _ := NewObjectStorageBucket()
 	n.ID = "ObjectStorageBucket ID"
 	n.Name = "ObjectStorageBucket Name"
 	n.Host = "ObjectStorageBucket Host"
@@ -161,15 +159,15 @@ func TestObjectStorageBucket_Deserialize(t *testing.T) {
 
 func TestObjectStorageBucket_GetName(t *testing.T) {
 
-	n := ObjectStorageBucket{}
+	n := &ObjectStorageBucket{}
 	name := n.GetName()
 	if name != "" {
 		t.Error("Can't read name when no name given")
 		t.Fail()
 	}
-	n = ObjectStorageBucket{
-		Name: "ObjectStorageBucket Name",
-	}
+
+	n = &ObjectStorageBucket{}
+	n.Name = "ObjectStorageBucket Name"
 	name = n.GetName()
 	if name != n.Name {
 		t.Error("Wrong value restitution")
@@ -180,16 +178,14 @@ func TestObjectStorageBucket_GetName(t *testing.T) {
 
 func TestObjectStorageBucket_GetID(t *testing.T) {
 
-	n := ObjectStorageBucket{}
+	n := &ObjectStorageBucket{}
 	id, _ := n.GetID()
 	if id != "" {
 		t.Error("Can't read id when no name given")
 		t.Fail()
 	}
-	n = ObjectStorageBucket{
-		ID:   "ObjectStorageBucket ID",
-		Name: "ObjectStorageBucket Name",
-	}
+	n, _ = NewObjectStorageBucket(WithName("ObjectStorageBucket Name"))
+	n.ID = "ObjectStorageBucket ID"
 	id, _ = n.GetID()
 	if id != n.ID {
 		t.Error("Wrong value restitution")

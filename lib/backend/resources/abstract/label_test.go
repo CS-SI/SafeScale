@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -35,12 +35,12 @@ type BrokenLabel struct {
 	DefaultValue string
 }
 
-func NewBrokenLabel() *BrokenLabel                                            { return &BrokenLabel{HasDefault: true} }
-func (t *BrokenLabel) IsNull() bool                                           { return false }
-func (t *BrokenLabel) Clone() (clonable.Clonable, error)                      { return t, nil }
-func (t *BrokenLabel) Replace(p clonable.Clonable) (clonable.Clonable, error) { return p, nil }
-func (t *BrokenLabel) Valid() bool                                            { return false }
-func (t BrokenLabel) OK() bool                                                { return true }
+func NewBrokenLabel() *BrokenLabel                       { return &BrokenLabel{HasDefault: true} }
+func (t *BrokenLabel) IsNull() bool                      { return false }
+func (t *BrokenLabel) Clone() (clonable.Clonable, error) { return t, nil }
+func (t *BrokenLabel) Replace(p clonable.Clonable) error { return nil }
+func (t *BrokenLabel) Valid() bool                       { return false }
+func (t BrokenLabel) OK() bool                           { return true }
 func (t *BrokenLabel) Serialize() ([]byte, fail.Error) {
 	return nil, fail.ConvertError(fmt.Errorf("I'm broken!"))
 }
@@ -53,7 +53,7 @@ func (t *BrokenLabel) IsTag() bool            { return false }
 
 func TestLabel_NewLabel(t *testing.T) {
 
-	s := NewLabel()
+	s, _ := NewLabel()
 	if !s.IsNull() {
 		t.Error("Label is null")
 		t.Fail()
@@ -81,7 +81,7 @@ func TestLabel_IsNull(t *testing.T) {
 		t.Error("Nil pointer Label must be null")
 		t.Fail()
 	}
-	s = NewLabel()
+	s, _ = NewLabel()
 	if !s.IsNull() {
 		t.Error("Label without ID or Name must be null")
 		t.Fail()
@@ -117,27 +117,23 @@ func TestLabel_IsNull(t *testing.T) {
 }
 
 func TestLabel_Replace(t *testing.T) {
-
 	var s *Label = nil
-	replaced, err := s.Replace(NewLabel())
+	nl, _ := NewLabel()
+	err := s.Replace(nl)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, replaced)
 
-	s = NewLabel()
-	replaced, err = s.Replace(nil)
-	require.Nil(t, replaced)
+	s, _ = NewLabel()
+	err = s.Replace(nil)
 	require.Contains(t, err.Error(), "invalid parameter: p")
 
-	replaced, err = s.Replace(NewBrokenLabel())
-	require.Nil(t, replaced)
+	err = s.Replace(NewBrokenLabel())
 	require.Contains(t, err.Error(), "p is not a *Label")
-
 }
 
 func TestLabel_Clone(t *testing.T) {
-	s := NewLabel()
+	s, _ := NewLabel()
 	s.ID = "Label ID"
 	s.Name = "Label Name"
 
@@ -172,7 +168,7 @@ func TestLabel_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	s = NewLabel()
+	s, _ = NewLabel()
 	s.ID = "Label ID"
 	s.Name = "Label Name"
 	serial, err = s.Serialize()
@@ -181,7 +177,7 @@ func TestLabel_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	s2 := NewLabel()
+	s2, _ := NewLabel()
 	err = s2.Deserialize(serial)
 	if err != nil {
 		t.Error(err)
@@ -196,7 +192,7 @@ func TestLabel_Serialize(t *testing.T) {
 }
 
 func TestLabel_Deserialize(t *testing.T) {
-
+	// FIXME: What will happen if Label evolves?
 	serial := []byte(`{"id": "Label ID","name":"Label Name"},"has_default":true,default_value":"toto"`)
 	var s *Label = nil
 	err := s.Deserialize(serial)
@@ -208,7 +204,7 @@ func TestLabel_Deserialize(t *testing.T) {
 }
 
 func TestLabel_GetName(t *testing.T) {
-	s := NewLabel()
+	s, _ := NewLabel()
 	s.Name = "Label Name"
 	name := s.GetName()
 	if name != s.Name {
@@ -224,7 +220,7 @@ func TestLabel_GetID(t *testing.T) {
 	require.EqualValues(t, id, "")
 	require.Contains(t, err.Error(), "invalid instance")
 
-	s = NewLabel()
+	s, _ = NewLabel()
 	s.ID = "Label ID"
 	id, _ = s.GetID()
 	if id != s.ID {
@@ -239,7 +235,7 @@ func TestLabel_IsTag(t *testing.T) {
 	b := s.IsTag()
 	require.False(t, b)
 
-	s = NewLabel()
+	s, _ = NewLabel()
 	s.HasDefault = true
 	b = s.IsTag()
 	require.True(t, b)
@@ -247,5 +243,4 @@ func TestLabel_IsTag(t *testing.T) {
 	s.HasDefault = false
 	b = s.IsTag()
 	require.False(t, b)
-
 }

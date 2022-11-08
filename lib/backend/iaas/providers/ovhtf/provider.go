@@ -327,7 +327,7 @@ next:
 		return nil, xerr
 	}
 
-	_, xerr = out.terraformerOptions.Store(iaasoptions.BuildOptionTerraformerConfiguration, terraformerConfig)
+	xerr = out.terraformerOptions.Store(iaasoptions.BuildOptionTerraformerConfiguration, terraformerConfig)
 	if xerr != nil {
 		return nil, xerr
 	}

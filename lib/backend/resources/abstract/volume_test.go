@@ -28,7 +28,7 @@ import (
 )
 
 func TestVolume_NewVolume(t *testing.T) {
-	v := NewVolume()
+	v, _ := NewVolume()
 	if !v.IsNull() {
 		t.Error("Volume is null !")
 		t.Fail()
@@ -54,15 +54,15 @@ func TestVolume_NewVolume(t *testing.T) {
 func TestVolume_Replace(t *testing.T) {
 
 	var v *Volume = nil
-	replaced, err := v.Replace(NewVolume())
+	r, _ := NewVolume()
+	err := v.Replace(r)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, replaced)
 }
 
 func TestVolume_Clone(t *testing.T) {
-	v := NewVolume()
+	v, _ := NewVolume()
 	v.ID = "Volume ID"
 	v.Name = "Volume Name"
 	v.Size = 42
@@ -101,7 +101,7 @@ func TestVolume_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	v := NewVolume()
+	v, _ := NewVolume()
 	v.ID = "Volume ID"
 	v.Name = "Volume Name"
 	v.Size = 42
@@ -114,7 +114,7 @@ func TestVolume_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	v2 = NewVolume()
+	v2, _ = NewVolume()
 	err = v2.Deserialize(serial)
 	if err != nil {
 		t.Error(err)
@@ -142,7 +142,7 @@ func TestVolume_Deserialize(t *testing.T) {
 
 func TestVolume_GetName(t *testing.T) {
 
-	v := NewVolume()
+	v, _ := NewVolume()
 	v.Name = "Volume Name"
 	name := v.GetName()
 	if name != v.Name {
@@ -154,7 +154,7 @@ func TestVolume_GetName(t *testing.T) {
 
 func TestVolume_GetID(t *testing.T) {
 
-	v := NewVolume()
+	v, _ := NewVolume()
 	v.ID = "Volume ID"
 	id, _ := v.GetID()
 	if id != v.ID {

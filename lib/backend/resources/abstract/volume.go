@@ -53,7 +53,7 @@ type Volume struct {
 
 // NewVolume ...
 func NewVolume(opts ...Option) (*Volume, fail.Error) {
-	c, xerr := New(opts...)
+	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}

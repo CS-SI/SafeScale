@@ -64,7 +64,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/eko/gocache/v2/cache"
 
 	// "github.com/CS-SI/SafeScale/v22/lib/utils/data/cache"
@@ -1082,15 +1082,15 @@ func (e *ServiceTest) WaitHostState(ctx context.Context, name string, state host
 	}
 
 	xerr = host.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		ahc, err := lang.Cast[*abstract.HostCore)
-		if !ok {
-			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		ahc, err := lang.Cast[*abstract.HostCore](p)
+		if err != nil {
+			return fail.Wrap(err)
 		}
 		ahc.LastState = state
 		return nil
 	})
 
-	return nil // fail.TimeoutError(errors.New("timeout"), timeout, "host has not start in time")
+	return nil // fail.TimeoutError(errors.newCore("timeout"), timeout, "host has not start in time")
 }
 
 func (e *ServiceTest) WaitVolumeState(context.Context, string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error) {
@@ -1398,9 +1398,9 @@ func (e *ServiceTest) EnableSecurityGroup(ctx context.Context, asg *abstract.Sec
 	}
 	return sg.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			sghV1, err := lang.Cast[*propertiesv1.SecurityGroupHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			sghV1, err := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			for hostId := range sghV1.ByID {
 				sghV1.ByID[hostId].Disabled = false
@@ -1430,9 +1430,9 @@ func (e *ServiceTest) DisableSecurityGroup(ctx context.Context, asg *abstract.Se
 	}
 	return sg.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			sghV1, err := lang.Cast[*propertiesv1.SecurityGroupHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			sghV1, err := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			for hostId := range sghV1.ByID {
 				sghV1.ByID[hostId].Disabled = true
@@ -1605,9 +1605,9 @@ func (e *ServiceTest) CreateNetwork(ctx context.Context, req abstract.NetworkReq
 
 		xerr = props.Alter(networkproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
 
-			networkDescriptionV1, err := lang.Cast[*propertiesv1.NetworkDescription)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.NetworkDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			networkDescriptionV1, err := lang.Cast[*propertiesv1.NetworkDescription](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			// networkDescriptionV1.Domain
 			networkDescriptionV1.Purpose = "Test"
@@ -1795,9 +1795,9 @@ func (e *ServiceTest) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 		*/
 
 		xerr = props.Alter(subnetproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
-			subnetDescriptionV1, err := lang.Cast[*propertiesv1.SubnetDescription)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			subnetDescriptionV1, err := lang.Cast[*propertiesv1.SubnetDescription](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			subnetDescriptionV1.Domain = req.Domain
 			subnetDescriptionV1.Purpose = "Test"
@@ -1821,9 +1821,9 @@ func (e *ServiceTest) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 	// Link subnet to network
 	xerr = network.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-			subnetsV1, err := lang.Cast[*propertiesv1.NetworkSubnets)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			subnetsV1, err := lang.Cast[*propertiesv1.NetworkSubnets](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			subnetsV1.ByName[req.Name] = req.Name
 			return nil
@@ -2173,11 +2173,10 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 	}
 
 	xerr = host.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-
-		xerr = props.Alter(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
-			hostSizingV2, err := lang.Cast[*propertiesv2.HostSizing)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		innerXErr := props.Alter(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
+			hostSizingV2, err := lang.Cast[*propertiesv2.HostSizing](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			hostSizingV2.AllocatedSize = &propertiesv2.HostEffectiveSizing{
 				Cores:     ahf.Sizing.Cores,
@@ -2200,14 +2199,14 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 			hostSizingV2.Template = request.TemplateRef
 			return nil
 		})
-		if xerr != nil {
-			return xerr
+		if innerXErr != nil {
+			return innerXErr
 		}
 
-		xerr = props.Alter(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-			network, err := lang.Cast[*propertiesv2.HostNetworking)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		innerXErr = props.Alter(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
+			network, err := lang.Cast[*propertiesv2.HostNetworking](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			network.DefaultSubnetID = ahf.Networking.DefaultSubnetID
 			network.PublicIPv4 = ahf.Networking.PublicIPv4
@@ -2220,15 +2219,16 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 			network.Single = request.Single
 			return nil
 		})
-		if xerr != nil {
-			return xerr
+		if innerXErr != nil {
+			return innerXErr
 		}
 
-		xerr = props.Alter(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
-			description, err := lang.Cast[*propertiesv1.HostDescription)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		innerXErr = props.Alter(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
+			description, err := lang.Cast[*propertiesv1.HostDescription](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
+
 			description.Created = ahf.Description.Created
 			description.Creator = ahf.Description.Creator
 			description.Updated = ahf.Description.Updated
@@ -2237,8 +2237,8 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 			description.Domain = "test-domain"
 			return nil
 		})
-		if xerr != nil {
-			return xerr
+		if innerXErr != nil {
+			return innerXErr
 		}
 
 		return nil
@@ -2306,17 +2306,16 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 	}
 
 	xerr = host.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-
-		ahc, err := lang.Cast[*abstract.HostCore)
-		if !ok {
-			return fail.InconsistentError("*abstract.HostCores' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		ahc, err := lang.Cast[*abstract.HostCore](p)
+		if err != nil {
+			return fail.Wrap(err)
 		}
-		ahf.Core = ahc
 
+		ahf.Core = ahc
 		xerr = props.Inspect(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
-			hostSizingV2, err := lang.Cast[*propertiesv2.HostSizing)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			hostSizingV2, err := lang.Cast[*propertiesv2.HostSizing](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			ahf.Sizing.Cores = hostSizingV2.AllocatedSize.Cores
 			ahf.Sizing.RAMSize = hostSizingV2.AllocatedSize.RAMSize
@@ -2333,9 +2332,9 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 		}
 
 		xerr = props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-			network, err := lang.Cast[*propertiesv2.HostNetworking)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			network, err := lang.Cast[*propertiesv2.HostNetworking](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			ahf.Networking.IsGateway = network.IsGateway
 			ahf.Networking.DefaultGatewayID = fmt.Sprintf("gw-%s", name)
@@ -2354,9 +2353,9 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 		}
 
 		xerr = props.Alter(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
-			description, err := lang.Cast[*propertiesv1.HostDescription)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			description, err := lang.Cast[*propertiesv1.HostDescription](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			ahf.Description.Created = description.Created
 			ahf.Description.Creator = description.Creator
@@ -2459,9 +2458,9 @@ func (e *ServiceTest) StopHost(ctx context.Context, params common.HostParameter,
 		return xerr
 	}
 	xerr = rhost.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		ahc, err := lang.Cast[*abstract.HostCore)
-		if !ok {
-			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		ahc, err := lang.Cast[*abstract.HostCore](p)
+		if err != nil {
+			return fail.Wrap(err)
 		}
 		ahc.LastState = hoststate.Stopped
 		return nil
@@ -2497,9 +2496,9 @@ func (e *ServiceTest) StartHost(ctx context.Context, params common.HostParameter
 		return xerr
 	}
 	return rhost.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		ahc, err := lang.Cast[*abstract.HostCore)
-		if !ok {
-			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		ahc, err := lang.Cast[*abstract.HostCore](p)
+		if err != nil {
+			return fail.Wrap(err)
 		}
 		ahc.LastState = hoststate.Started
 		return nil
@@ -2688,14 +2687,14 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			return aci, xerr
 		}
 		xerr = gw.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			_, err := lang.Cast[*abstract.HostCore)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			_, err := lang.Cast[*abstract.HostCore](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			innerXErr := props.Alter(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-				hnV2, err := lang.Cast[*propertiesv2.HostNetworking)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				hnV2, err := lang.Cast[*propertiesv2.HostNetworking](p)
+				if err != nil {
+					return fail.Wrap(err)
 				}
 				hnV2.PublicIPv4 = "192.168.11.11"
 				hnV2.PublicIPv6 = "::ffff:c0a8:b0b"
@@ -2746,15 +2745,15 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			return aci, xerr
 		}
 		xerr = gw.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			_, err := lang.Cast[*abstract.HostCore)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			_, err := lang.Cast[*abstract.HostCore](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 
 			innerXErr := props.Alter(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-				hnV2, err := lang.Cast[*propertiesv2.HostNetworking)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				hnV2, err := lang.Cast[*propertiesv2.HostNetworking](p)
+				if err != nil {
+					return fail.Wrap(err)
 				}
 				hnV2.PublicIPv4 = "192.168.11.12"
 				hnV2.PublicIPv6 = "::ffff:c0a8:b0c"
@@ -2798,9 +2797,9 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				return aci, xerr
 			}
 			xerr = rsubnet.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-				as, err := lang.Cast[*abstract.Subnet)
-				if !ok {
-					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				as, err := lang.Cast[*abstract.Subnet](p)
+				if err != nil {
+					return fail.Wrap(err)
 				}
 				as.GatewayIDs = []string{fmt.Sprintf("gw-%s", name), fmt.Sprintf("gw2-%s", name)}
 				return nil
@@ -2867,9 +2866,9 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				return aci, xerr
 			}
 			xerr = rsubnet.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-				as, err := lang.Cast[*abstract.Subnet)
-				if !ok {
-					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				as, err := lang.Cast[*abstract.Subnet](p)
+				if err != nil {
+					return fail.Wrap(err)
 				}
 				as.GatewayIDs = []string{fmt.Sprintf("gw-%s", name), fmt.Sprintf("gw2-%s", name)}
 				return nil
@@ -2930,12 +2929,9 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 		}
 		xerr = ocluster.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			xerr = props.Alter(clusterproperty.NetworkV3, func(p clonable.Clonable) fail.Error {
-
-				networkV3, err := lang.Cast[*propertiesv3.ClusterNetwork)
-				if !ok {
-					return fail.InconsistentError(
-						"'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-					)
+				networkV3, err := lang.Cast[*propertiesv3.ClusterNetwork](p)
+				if err != nil {
+					return fail.Wrap(err)
 				}
 				networkV3.NetworkID = request.NetworkID
 				networkV3.CreatedNetwork = true
@@ -2959,11 +2955,9 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			}
 
 			xerr = props.Alter(clusterproperty.DefaultsV3, func(p clonable.Clonable) fail.Error {
-				defaultsV3, err := lang.Cast[*propertiesv3.ClusterDefaults)
-				if !ok {
-					return fail.InconsistentError(
-						"'*propertiesv3.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-					)
+				defaultsV3, err := lang.Cast[*propertiesv3.ClusterDefaults](p)
+				if err != nil {
+					return fail.Wrap(err)
 				}
 				defaultsV3.NodeSizing = propertiesv2.HostSizingRequirements{
 					MinCores:    1,
@@ -2983,9 +2977,9 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			}
 
 			xerr = props.Alter(clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
-				stateV1, err := lang.Cast[*propertiesv1.ClusterState)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				stateV1, err := lang.Cast[*propertiesv1.ClusterState](p)
+				if err != nil {
+					return fail.Wrap(err)
 				}
 				stateV1.State = clusterstate.Nominal
 				return nil
@@ -2995,11 +2989,9 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			}
 
 			innerXErr := props.Alter(clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
-				nodesV3, err := lang.Cast[*propertiesv3.ClusterNodes)
-				if !ok {
-					return fail.InconsistentError(
-						"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-					)
+				nodesV3, err := lang.Cast[*propertiesv3.ClusterNodes](p)
+				if err != nil {
+					return fail.Wrap(err)
 				}
 				nodesV3.ByNumericalID = map[uint]*propertiesv3.ClusterNode{
 					0: {

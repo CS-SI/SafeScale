@@ -49,17 +49,16 @@ func TestClusterDefault_IsNull(t *testing.T) {
 func TestClusterDefault_Replace(t *testing.T) {
 	var sgs *ClusterDefaults = nil
 	sgs2 := newClusterDefaults()
-	result, err := sgs.Replace(sgs2)
+	err := sgs.Replace(sgs2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := sgs2.Replace(network)
+	xerr := sgs2.Replace(network)
 	if xerr == nil {
 		t.Error("ClusterDefaults.Replace(abstract.Network{}) expect an error")
 		t.FailNow()

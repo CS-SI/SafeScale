@@ -438,7 +438,7 @@ type SecurityGroup struct {
 
 // NewSecurityGroup ...
 func NewSecurityGroup(opts ...Option) (*SecurityGroup, fail.Error) {
-	c, xerr := New(opts...)
+	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}

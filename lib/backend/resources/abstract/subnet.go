@@ -73,7 +73,7 @@ type Subnet struct {
 
 // NewSubnet initializes a new instance of Subnet
 func NewSubnet(opts ...Option) (*Subnet, fail.Error) {
-	c, xerr := New(opts...)
+	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -210,7 +210,7 @@ type VirtualIP struct {
 
 // NewVirtualIP ...
 func NewVirtualIP(opts ...Option) (*VirtualIP, fail.Error) {
-	nc, err := New(opts...)
+	nc, err := newCore(opts...)
 	if err != nil {
 		return nil, err
 	}

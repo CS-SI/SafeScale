@@ -48,11 +48,10 @@ func TestClusterNodes_Replace(t *testing.T) {
 		PrivateLastIndex: 0,
 		PublicLastIndex:  0,
 	}
-	result, err := cn.Replace(cn2)
+	err := cn.Replace(cn2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
 	cn = &ClusterNodes{}
 	cn2 = &ClusterNodes{
@@ -104,35 +103,35 @@ func TestClusterNodes_Replace(t *testing.T) {
 	}
 
 	// Check for clusternode pointer transfert
-	result, _ = cn.Replace(cn2)
-	rcn := result.(*ClusterNodes)
-	areEqual := reflect.DeepEqual(cn2.Masters, rcn.Masters)
+	err = cn.Replace(cn2)
+	require.Nil(t, err)
+	areEqual := reflect.DeepEqual(cn2.Masters, cn.Masters)
 	if !areEqual {
 		t.Error("Replace does not return expected Masters")
 		t.Fail()
 	}
-	areEqual = reflect.DeepEqual(cn2.PublicNodes, rcn.PublicNodes)
+	areEqual = reflect.DeepEqual(cn2.PublicNodes, cn.PublicNodes)
 	if !areEqual {
 		t.Error("Replace does not return expected PublicNodes")
 		t.Fail()
 	}
-	areEqual = reflect.DeepEqual(cn2.PrivateNodes, rcn.PrivateNodes)
+	areEqual = reflect.DeepEqual(cn2.PrivateNodes, cn.PrivateNodes)
 	if !areEqual {
 		t.Error("Replace does not return expected PrivateNodes")
 		t.Fail()
 	}
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := cn.Replace(network)
-	if xerr == nil {
+	err = cn.Replace(network)
+	if err == nil {
 		t.Error("ClusterNodes.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *ClusterNodes") {
-		t.Errorf("Expect error \"p is not a *ClusterNodes\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *ClusterNodes") {
+		t.Errorf("Expect error \"p is not a *ClusterNodes\", has \"%s\"", err.Error())
 	}
 
 }

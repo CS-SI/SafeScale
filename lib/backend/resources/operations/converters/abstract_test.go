@@ -148,31 +148,28 @@ func Test_NetworkFromAbstractToProtocol(t *testing.T) {
 
 	an := &abstract.Network{
 		ID:         "Network ID",
-		Name:       "Network Name",
 		CIDR:       "Network CIDR",
 		DNSServers: []string{"DNS1", "DNS2", "DNS3"},
 		Imported:   false,
 	}
+	an.Name = "Network Name"
 	pn := NetworkFromAbstractToProtocol(an)
 
 	require.EqualValues(t, an.ID, pn.Id)
 	require.EqualValues(t, an.Name, pn.Name)
 	require.EqualValues(t, an.CIDR, pn.Cidr)
 	require.EqualValues(t, an.DNSServers, pn.DnsServers)
-
 }
 
 func Test_SubnetFromAbstractToProtocol(t *testing.T) {
 
 	as := &abstract.Subnet{
 		ID:                      "Subnet ID",
-		Name:                    "Subnet Name",
 		Network:                 "Subnet Network",
 		CIDR:                    "Subnet CIDR",
 		Domain:                  "Subnet Domain",
 		DNSServers:              []string{"DNS1", "DNS2", "DNS3"},
 		GatewayIDs:              []string{"GatewayID1", "GatewayID2", "GatewayID3"},
-		VIP:                     abstract.NewVirtualIP(),
 		IPVersion:               ipversion.IPv6,
 		State:                   subnetstate.Ready,
 		GWSecurityGroupID:       "Subnet GWSecurityGroupID",
@@ -181,6 +178,9 @@ func Test_SubnetFromAbstractToProtocol(t *testing.T) {
 		DefaultSSHPort:          42,
 		SingleHostCIDRIndex:     65,
 	}
+	as.Name = "Subnet Name"
+	as.VIP, _ = abstract.NewVirtualIP()
+
 	ps := SubnetFromAbstractToProtocol(as)
 
 	require.EqualValues(t, as.ID, ps.Id)
@@ -249,12 +249,16 @@ func Test_VirtualIPFromAbstractToProtocol(t *testing.T) {
 
 	avi := abstract.VirtualIP{
 		ID:        "VirtualIP ID",
-		Name:      "VirtualIP Name",
 		SubnetID:  "VirtualIP SubnetID",
 		PrivateIP: "VirtualIP PrivateIP",
 		PublicIP:  "VirtualIP PublicIP",
-		Hosts:     []*abstract.HostCore{abstract.NewHostCore(), abstract.NewHostCore(), abstract.NewHostCore()},
 	}
+	avi.Name = "VirtualIP Name"
+	h1, _ := abstract.NewHostCore()
+	h2, _ := abstract.NewHostCore()
+	h3, _ := abstract.NewHostCore()
+	avi.Hosts = []*abstract.HostCore{h1, h2, h3}
+
 	pvi := VirtualIPFromAbstractToProtocol(avi)
 
 	require.EqualValues(t, avi.ID, pvi.Id)
@@ -291,7 +295,7 @@ func Test_HostEffectiveSizingFromAbstractToPropertyV2(t *testing.T) {
 
 func Test_HostCoreFromAbstractToProtocol(t *testing.T) {
 
-	ahc := abstract.NewHostCore()
+	ahc, _ := abstract.NewHostCore()
 	ahc.ID = "HostCore ID"
 	ahc.Name = "HostCore Name"
 	ahc.PrivateKey = "HostCore PrivateKey"
@@ -309,9 +313,8 @@ func Test_HostCoreFromAbstractToProtocol(t *testing.T) {
 
 func Test_HostFullFromAbstractToProtocol(t *testing.T) {
 
-	ahf := abstract.NewHostFull(abstract.WithName("HostCore Name"))
+	ahf, _ := abstract.NewHostFull(abstract.WithName("HostCore Name"))
 	ahf.ID = "HostCore ID"
-	ahf.Name =
 	ahf.PrivateKey = "HostCore PrivateKey"
 	ahf.SSHPort = 42
 	ahf.Password = "HostCore Password"
@@ -371,12 +374,12 @@ func Test_HostCoreToHostFull(t *testing.T) {
 
 	ahc := abstract.HostCore{
 		ID:         "HostCore ID",
-		Name:       "HostCore Name",
 		PrivateKey: "HostCore PrivateKey",
 		SSHPort:    42,
 		Password:   "HostCore Password",
 		LastState:  hoststate.Any,
 	}
+	ahc.Name = "HostCore Name"
 
 	ahf := HostCoreToHostFull(ahc)
 
@@ -581,7 +584,6 @@ func Test_ClusterIdentityFromAbstractToProtocol(t *testing.T) {
 		t.Fail()
 	}
 	aci := abstract.Cluster{
-		Name:          "Cluster Name",
 		Flavor:        clusterflavor.K8S,
 		Complexity:    clustercomplexity.Small,
 		Keypair:       kp,
@@ -591,6 +593,8 @@ func Test_ClusterIdentityFromAbstractToProtocol(t *testing.T) {
 			"ManagedBy":    "safescale",
 		},
 	}
+	aci.Name = "Cluster Name"
+
 	pclr := ClusterListFromAbstractToProtocol([]abstract.Cluster{aci})
 
 	require.EqualValues(t, pclr.Clusters[0].Identity, ClusterIdentityFromAbstractToProtocol(aci))
@@ -600,7 +604,6 @@ func Test_SecurityGroupRulesFromAbstractToProtocol(t *testing.T) {
 
 	asg := abstract.SecurityGroup{
 		ID:          "SecurityGroup ID",
-		Name:        "SecurityGroup Name",
 		Network:     "SecurityGroup Network",
 		Description: "SecurityGroup Description",
 		Rules: abstract.SecurityGroupRules{
@@ -619,6 +622,7 @@ func Test_SecurityGroupRulesFromAbstractToProtocol(t *testing.T) {
 		DefaultForSubnet: "SecurityGroup DefaultForSubnet",
 		DefaultForHost:   "SecurityGroup DefaultForHost",
 	}
+	asg.Name = "SecurityGroup Name"
 
 	psgr := SecurityGroupFromAbstractToProtocol(asg)
 
@@ -629,7 +633,6 @@ func Test_SecurityGroupRulesFromAbstractToProtocol(t *testing.T) {
 
 	asg = abstract.SecurityGroup{
 		ID:          "SecurityGroup ID",
-		Name:        "SecurityGroup Name",
 		Network:     "SecurityGroup Network",
 		Description: "SecurityGroup Description",
 		Rules: abstract.SecurityGroupRules{
@@ -648,6 +651,7 @@ func Test_SecurityGroupRulesFromAbstractToProtocol(t *testing.T) {
 		DefaultForSubnet: "SecurityGroup DefaultForSubnet",
 		DefaultForHost:   "SecurityGroup DefaultForHost",
 	}
+	asg.Name = "SecurityGroup Name"
 
 	psgr = SecurityGroupFromAbstractToProtocol(asg)
 

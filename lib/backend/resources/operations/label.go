@@ -62,7 +62,8 @@ func NewLabel(scope scopeapi.Scope) (_ resources.Label, ferr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("scope")
 	}
 
-	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, labelKind, labelsFolderName, abstract.NewLabel())
+	nl, _ := abstract.NewLabel()
+	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, labelKind, labelsFolderName, nl)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -251,7 +252,7 @@ func (instance *label) Browse(ctx context.Context, callback func(*abstract.Label
 	defer tracer.Exiting()
 
 	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
-		at := abstract.NewLabel()
+		at, _ := abstract.NewLabel()
 		xerr := at.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -377,15 +378,16 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 		return fail.Wrap(err, "failed to generate uuid for %s", kind)
 	}
 
-	at := abstract.Label{
-		Name:         name,
-		ID:           uuid.String(),
-		HasDefault:   hasDefault,
-		DefaultValue: defaultValue,
+	at, xerr := abstract.NewLabel(abstract.WithName(name))
+	if xerr != nil {
+		return xerr
 	}
+	at.ID = uuid.String()
+	at.HasDefault = hasDefault
+	at.DefaultValue = defaultValue
 
 	// Sets err to possibly trigger defer calls
-	return instance.carry(ctx, &at)
+	return instance.carry(ctx, at)
 }
 
 // ToProtocol converts the label to protocol message LabelInspectResponse

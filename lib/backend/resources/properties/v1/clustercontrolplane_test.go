@@ -60,11 +60,10 @@ func TestClusterControlplane_Replace(t *testing.T) {
 			ID: "MyVirtualIP ID",
 		},
 	}
-	result, err := cc.Replace(cc2)
+	err := cc.Replace(cc2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
 	cc = &ClusterControlplane{
 		VirtualIP: &abstract.VirtualIP{
@@ -72,24 +71,24 @@ func TestClusterControlplane_Replace(t *testing.T) {
 		},
 	}
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := cc.Replace(network)
-	if xerr == nil {
+	err = cc.Replace(network)
+	if err == nil {
 		t.Error("ClusterControlplane.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *ClusterControlplane") {
-		t.Errorf("Expect error \"p is not a *ClusterControlplane\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *ClusterControlplane") {
+		t.Errorf("Expect error \"p is not a *ClusterControlplane\", has \"%s\"", err.Error())
 	}
 
 }
 
 func TestClusterControlplane_Clone(t *testing.T) {
-	vip := abstract.NewVirtualIP()
-	hc := abstract.NewHostCore()
+	vip, _ := abstract.NewVirtualIP()
+	hc, _ := abstract.NewHostCore()
 	hc.Name = "whatever"
 	vip.Hosts = append(vip.Hosts, hc)
 

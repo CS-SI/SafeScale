@@ -50,23 +50,22 @@ func TestSecurityGroupBond_Replace(t *testing.T) {
 
 	var sgb *SecurityGroupBond
 	sgb2 := NewSecurityGroupBond()
-	result, err := sgb.Replace(sgb2)
+	err := sgb.Replace(sgb2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := sgb2.Replace(network)
-	if xerr == nil {
+	err = sgb2.Replace(network)
+	if err == nil {
 		t.Error("SecurityGroupBond.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *SecurityGroupBond") {
-		t.Errorf("Expect error \"p is not a *SecurityGroupBond\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *SecurityGroupBond") {
+		t.Errorf("Expect error \"p is not a *SecurityGroupBond\", has \"%s\"", err.Error())
 	}
 
 }

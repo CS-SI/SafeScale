@@ -89,7 +89,7 @@ func (instance *stack) rpcGetHostByName(ctx context.Context, name string) (*serv
 
 	switch len(resp) {
 	case 0:
-		return nil, fail.NotFoundError("failed to find a Host named '%instance'", name)
+		return nil, fail.NotFoundError("failed to find a Host named '%s'", name)
 	default:
 	}
 
@@ -105,11 +105,11 @@ func (instance *stack) rpcGetHostByName(ctx context.Context, name string) (*serv
 	}
 	switch found {
 	case 0:
-		return nil, fail.NotFoundError("failed to find a Host named '%instance'", name)
+		return nil, fail.NotFoundError("failed to find a Host named '%s'", name)
 	case 1:
 		return srv, nil
 	}
-	return nil, fail.InconsistentError("found more than one Host named '%instance'", name)
+	return nil, fail.InconsistentError("found more than one Host named '%s'", name)
 }
 
 // rpcGetMetadataOfInstance returns the metadata associated with the instance

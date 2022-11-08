@@ -829,10 +829,11 @@ func TestCluster_StartStop(t *testing.T) {
 			t.Run(fmt.Sprintf("Start from state %s", tests[i].state.String()), func(t *testing.T) {
 				_ = cluster.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Alter(clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
-						stateV1, err := lang.Cast[*propertiesv1.ClusterState)
-						if !ok {
-							return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						stateV1, err := lang.Cast[*propertiesv1.ClusterState](p)
+						if err != nil {
+							return fail.Wrap(err)
 						}
+
 						stateV1.State = tests[i].state
 						return nil
 					})

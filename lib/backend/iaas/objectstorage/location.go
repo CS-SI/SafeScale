@@ -234,7 +234,7 @@ func (instance location) Configuration() (Config, fail.Error) {
 }
 
 func (instance location) estimateSize(prefix string) (int, error) {
-	containerSet := make(map[string]bool) // New empty set
+	containerSet := make(map[string]bool) // newCore empty set
 	currentPageSize := 10
 
 	for {

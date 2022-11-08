@@ -85,11 +85,11 @@ func TestHostdescription_Replace(t *testing.T) {
 
 	var hd *HostDescription = nil
 	var hd2 = NewHostDescription()
-	result, err := hd.Replace(hd2)
+	err := hd.Replace(hd2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
+
 	hd = &HostDescription{
 		Created: time.Now(),
 		Creator: "Hostdescription Creator",
@@ -106,24 +106,25 @@ func TestHostdescription_Replace(t *testing.T) {
 		Tenant:  "Hostdescription Tenant2",
 		Domain:  "Hostdescription Domain2",
 	}
-	result, _ = hd.Replace(hd2)
-	areEqual := reflect.DeepEqual(result, hd2)
+	err = hd.Replace(hd2)
+	require.Nil(t, err)
+	areEqual := reflect.DeepEqual(hd, hd2)
 	if !areEqual {
 		t.Error("Replace does not restitute values")
 		t.Fail()
 	}
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := hd2.Replace(network)
-	if xerr == nil {
+	err = hd2.Replace(network)
+	if err == nil {
 		t.Error("HostDescription.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *HostDescription") {
-		t.Errorf("HostDescription expect error \"p is not a *HostDescription\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *HostDescription") {
+		t.Errorf("HostDescription expect error \"p is not a *HostDescription\", has \"%s\"", err.Error())
 	}
 
 }

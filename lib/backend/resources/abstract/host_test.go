@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -225,7 +226,7 @@ func TestHostTemplate_OK(t *testing.T) {
 
 func TestHostCore_NewHostCore(t *testing.T) {
 
-	hc := NewHostCore()
+	hc, _ := NewHostCore()
 	if !hc.IsNull() {
 		t.Error("HostCore is null !")
 		t.Fail()
@@ -256,7 +257,7 @@ func TestHostCore_NewHostCore(t *testing.T) {
 }
 
 func TestHostCore_Replace(t *testing.T) {
-	hc1 := NewHostCore()
+	hc1, _ := NewHostCore()
 	hc1.ID = "HostCore ID"
 	hc1.Name = "HostCore Name"
 	hc1.PrivateKey = "HostCore PrivateKey"
@@ -265,15 +266,14 @@ func TestHostCore_Replace(t *testing.T) {
 	hc1.LastState = hoststate.Unknown
 
 	var hc2 *HostCore
-	replaced, err := hc2.Replace(hc1)
+	err := hc2.Replace(hc1)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, replaced)
 }
 
 func TestHostCore_ReverseReplace(t *testing.T) {
-	hc1 := NewHostCore()
+	hc1, _ := NewHostCore()
 	hc1.ID = "HostCore ID"
 	hc1.Name = "HostCore Name"
 	hc1.PrivateKey = "HostCore PrivateKey"
@@ -282,11 +282,10 @@ func TestHostCore_ReverseReplace(t *testing.T) {
 	hc1.LastState = hoststate.Unknown
 
 	var hc2 *HostCore
-	replaced, err := hc1.Replace(hc2)
+	err := hc1.Replace(hc2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, replaced)
 }
 
 func TestHostCore_Serialize(t *testing.T) {
@@ -298,7 +297,7 @@ func TestHostCore_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	hc := NewHostCore()
+	hc, _ := NewHostCore()
 	hc.ID = "HostCore ID"
 	hc.Name = "HostCore Name"
 	hc.PrivateKey = "HostCore PrivateKey"
@@ -312,7 +311,7 @@ func TestHostCore_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	hc2 := NewHostCore()
+	hc2, _ := NewHostCore()
 	err = hc2.Deserialize(serial)
 	if err != nil {
 		t.Error(err)
@@ -329,7 +328,7 @@ func TestHostCore_Serialize(t *testing.T) {
 
 func TestHostCore_Deserialize(t *testing.T) {
 
-	hc := NewHostCore()
+	hc, _ := NewHostCore()
 	hc.ID = "HostCore ID"
 	hc.Name = "HostCore Name"
 	hc.PrivateKey = "HostCore PrivateKey"
@@ -361,9 +360,7 @@ func TestHostCore_Deserialize(t *testing.T) {
 
 func TestHostCore_GetName(t *testing.T) {
 
-	hc := &HostCore{
-		Name: "HostCore Name",
-	}
+	hc, _ := NewHostCore(WithName("HostCore Name"))
 	name := hc.GetName()
 	if name != hc.Name {
 		t.Error("Wrong GetName value restitution")
@@ -398,7 +395,7 @@ func Test_NewHostNetworking(t *testing.T) {
 
 func Test_NewHostFull(t *testing.T) {
 
-	hf := NewHostFull()
+	hf, _ := NewHostFull()
 	if reflect.TypeOf(hf).String() != "*abstract.HostFull" {
 		t.Error("Expect new *abstract.HostFull")
 		t.Fail()
@@ -422,7 +419,7 @@ func TestHostFull_IsNull(t *testing.T) {
 		t.Fail()
 	}
 
-	hf = NewHostFull()
+	hf, _ = NewHostFull()
 	if !hf.IsNull() {
 		t.Error("empty *Hostfull is null")
 		t.Fail()
@@ -504,7 +501,7 @@ func TestHostFull_GetName_ThatPanics(t *testing.T) {
 }
 
 func TestHostFull_GetName(t *testing.T) {
-	hf := NewHostFull()
+	hf, _ := NewHostFull()
 	name := hf.GetName()
 	if name != "" {
 		t.Error("(empty) *Hostfull has no id")
@@ -536,7 +533,7 @@ func TestHostFull_SetName_ThatPanics(t *testing.T) {
 }
 
 func TestHostFull_SetName(t *testing.T) {
-	hf := NewHostFull()
+	hf, _ := NewHostFull()
 	hf.SetName("HostFullName")
 	name := hf.GetName()
 	if name != "HostFullName" {
@@ -800,9 +797,7 @@ func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 }
 
 func TestHostCore_Clone(t *testing.T) {
-	h := NewHostCore()
-	h.Name = "host"
-
+	h, _ := NewHostCore(WithName("host"))
 	at, err := h.Clone()
 	if err != nil {
 		t.Error(err)
@@ -812,6 +807,25 @@ func TestHostCore_Clone(t *testing.T) {
 	if !ok {
 		t.Fail()
 	}
+
+	assert.Equal(t, h, hc)
+	require.EqualValues(t, h, hc)
+
+	hc.Password = "changed password"
+
+	areEqual := reflect.DeepEqual(h, hc)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
+	require.NotEqualValues(t, h, hc)
+}
+
+func TestHostCore_CastedClone(t *testing.T) {
+	h, _ := NewHostCore(WithName("host"))
+
+	hc, err := clonable.CastedClone[*HostCore](h)
+	require.Nil(t, err)
 
 	assert.Equal(t, h, hc)
 	require.EqualValues(t, h, hc)

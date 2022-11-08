@@ -50,7 +50,7 @@ var (
 	allProviderProfiles = map[string]*providers.Profile{}
 )
 
-// // Register a service referenced by the provider name. Ex: "ovh", ovh.New()
+// // Register a service referenced by the provider name. Ex: "ovh", ovh.newCore()
 // // This function should be called by the init function of each provider to be registered in SafeScale
 // func Register(name string, provider providers.Provider) {
 // 	// if already registered, leave
@@ -63,7 +63,7 @@ var (
 // 	allProviderProfiles[name] = providers.NewProfile(provider.Capabilities())
 // }
 
-// Register a service referenced by the provider name. Ex: "ovh", ovh.New()
+// Register a service referenced by the provider name. Ex: "ovh", ovh.newCore()
 // This function should be called by the init function of each provider to be registered in SafeScale
 func Register(name string, profile *providers.Profile) {
 	// if already registered, leave

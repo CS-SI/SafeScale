@@ -54,23 +54,22 @@ func TestNetworkSingleHosts_IsNull(t *testing.T) {
 func TestNetworkSingleHosts_Replace(t *testing.T) {
 	var nsh *NetworkSingleHosts = nil
 	nsh2 := NewNetworkSingleHosts()
-	result, err := nsh.Replace(nsh2)
+	err := nsh.Replace(nsh2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := nsh2.Replace(network)
-	if xerr == nil {
+	err = nsh2.Replace(network)
+	if err == nil {
 		t.Error("NetworkSingleHosts.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *NetworkSingleHosts") {
-		t.Errorf("Expect error \"p is not a *NetworkSingleHosts\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *NetworkSingleHosts") {
+		t.Errorf("Expect error \"p is not a *NetworkSingleHosts\", has \"%s\"", err.Error())
 	}
 
 }

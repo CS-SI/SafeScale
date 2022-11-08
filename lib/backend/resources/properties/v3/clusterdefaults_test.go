@@ -54,17 +54,16 @@ func TestClusterDefaults_IsNull(t *testing.T) {
 func TestClusterDefaults_Replace(t *testing.T) {
 	var cd *ClusterDefaults
 	cd2 := newClusterDefaults()
-	result, err := cd.Replace(cd2)
+	err := cd.Replace(cd2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := cd2.Replace(network)
+	xerr := cd2.Replace(network)
 	if xerr == nil {
 		t.Error("ClusterDefaults.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
@@ -72,7 +71,6 @@ func TestClusterDefaults_Replace(t *testing.T) {
 	if !strings.Contains(xerr.Error(), "p is not a *ClusterDefaults") {
 		t.Errorf("Expect error \"p is not a *ClusterDefaults\", has \"%s\"", xerr.Error())
 	}
-
 }
 
 func TestClusterDefaults_Clone(t *testing.T) {

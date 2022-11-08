@@ -139,23 +139,18 @@ func Test_HostSizingRequirementsFromPropertyToProtocol(t *testing.T) {
 }
 
 func Test_ClusterControlplaneFromPropertyToProtocol(t *testing.T) {
-
-	ccp := ClusterControlplaneFromPropertyToProtocol(propertiesv1.ClusterControlplane{
-		VirtualIP: &abstract.VirtualIP{
-			ID:        "VIP ID",
-			Name:      "VIP Name",
-			SubnetID:  "VIP SubnetID",
-			PrivateIP: "VIP PrivateIP",
-			PublicIP:  "VIP PublicIP",
-			Hosts:     []*abstract.HostCore{},
-			NetworkID: "VIP NetworkID",
-		},
-	})
+	vip, _ := abstract.NewVirtualIP(abstract.WithName("VIP Name"))
+	vip.ID = "VIP ID"
+	vip.SubnetID = "VIP SubnetID"
+	vip.PrivateIP = "VIP PrivateIP"
+	vip.PublicIP = "VIP PublicIP"
+	vip.Hosts = []*abstract.HostCore{}
+	vip.NetworkID = "VIP NetworkID"
+	ccp := ClusterControlplaneFromPropertyToProtocol(propertiesv1.ClusterControlplane{VirtualIP: vip})
 	if reflect.TypeOf(ccp).String() != "*protocol.ClusterControlplane" {
 		t.Error("Expect type *protocol.ClusterControlplane")
 		t.Fail()
 	}
-
 }
 
 func Test_ClusterCompositeFromPropertyToProtocol(t *testing.T) {

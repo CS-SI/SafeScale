@@ -48,7 +48,6 @@ type (
 // DisableCrypt asks to disable encryption
 func DisableCrypt() options.Option {
 	return func(o options.Options) fail.Error {
-		_, xerr := o.Store(OptionDisableCrypt, false)
-		return xerr
+		return o.Store(OptionDisableCrypt, false)
 	}
 }

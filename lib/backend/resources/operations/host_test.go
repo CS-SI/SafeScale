@@ -44,7 +44,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
@@ -689,9 +688,9 @@ func TestHost_setSecurityGroups(t *testing.T) {
 
 		asubnet := &abstract.Subnet{}
 		xerr = subnet.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, err := lang.Cast[*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			as, err := lang.Cast[*abstract.Subnet](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			asubnet = as
 			return nil
@@ -943,9 +942,9 @@ func TestHost_Run(t *testing.T) {
 		require.Contains(t, xerr.Error(), "cannot run anything on 'MyHostTest', 'MyHostTest' is NOT started")
 
 		xerr = host.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			ahc, err := lang.Cast[*abstract.HostCore)
-			if !ok {
-				return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			ahc, err := lang.Cast[*abstract.HostCore](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			ahc.LastState = hoststate.Started
 			return nil
@@ -1008,9 +1007,9 @@ func TestHost_Push(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 
 		xerr = host.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			ahc, err := lang.Cast[*abstract.HostCore)
-			if !ok {
-				return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			ahc, err := lang.Cast[*abstract.HostCore](p)
+			if err != nil {
+				return fail.Wrap(err)
 			}
 			ahc.LastState = hoststate.Started
 			return nil
@@ -1888,7 +1887,6 @@ func TestHost_ToProtocol(t *testing.T) {
 }
 
 func TestHost_BindSecurityGroup(t *testing.T) {
-
 	ctx := context.Background()
 
 	task, err := concurrency.NewTaskWithContext(ctx)
@@ -1896,7 +1894,6 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 	require.Nil(t, err)
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
-
 		svc._setLogLevel(0)
 
 		req := abstract.HostRequest{
@@ -1978,20 +1975,13 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		xerr = host.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-				hsgV1, err := lang.Cast[*propertiesv1.HostSecurityGroups)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
+		xerr = host.InspectProperty(ctx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
+			v, ok := hsgV1.ByID["localhost.sg-test-name"]
+			require.True(t, ok)
+			require.EqualValues(t, reflect.TypeOf(v).String(), "*propertiesv1.SecurityGroupBond")
+			require.EqualValues(t, v.ID, "localhost.sg-test-name")
 
-				v, ok := hsgV1.ByID["localhost.sg-test-name"]
-				require.True(t, ok)
-				require.EqualValues(t, reflect.TypeOf(v).String(), "*propertiesv1.SecurityGroupBond")
-				require.EqualValues(t, v.ID, "localhost.sg-test-name")
-
-				return nil
-			})
+			return nil
 		})
 		require.Nil(t, xerr)
 
@@ -2030,20 +2020,13 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		xerr = host.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-				hsgV1, err := lang.Cast[*propertiesv1.HostSecurityGroups)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				_, ok = hsgV1.ByID["sg-test-name"]
-				require.False(t, ok)
+		xerr = host.InspectProperty(ctx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
+			_, ok = hsgV1.ByID["sg-test-name"]
+			require.False(t, ok)
 
-				return nil
-			})
+			return nil
 		})
 		require.Nil(t, xerr)
-
 	})
 	require.EqualValues(t, xerr, nil)
 

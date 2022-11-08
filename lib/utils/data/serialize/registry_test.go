@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 )
 
 type Item struct {
@@ -35,13 +37,15 @@ func (e Item) Clone() (clonable.Clonable, error) {
 	var v clonable.Clonable = &Item{value: e.value}
 	return v, nil
 }
-func (e Item) Replace(i clonable.Clonable) (clonable.Clonable, error) {
+
+func (e Item) Replace(i clonable.Clonable) error {
 	r, ok := i.(*Item)
 	if !ok {
-		return nil, fmt.Errorf("i is not a *Item")
+		return fmt.Errorf("i is not a *Item")
 	}
+
 	e.value = r.value
-	return e, nil
+	return nil
 }
 func (e Item) Value() string {
 	return e.value

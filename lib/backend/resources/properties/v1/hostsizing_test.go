@@ -92,23 +92,22 @@ func TestHostSizing_Replace(t *testing.T) {
 
 	var hs *HostSizing = nil
 	hs2 := NewHostSizing()
-	result, err := hs.Replace(hs2)
+	err := hs.Replace(hs2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
-	require.Nil(t, result)
 
-	network := abstract.NewNetwork()
+	network, _ := abstract.NewNetwork()
 	network.ID = "Network ID"
 	network.Name = "Network Name"
 
-	_, xerr := hs2.Replace(network)
-	if xerr == nil {
+	err = hs2.Replace(network)
+	if err == nil {
 		t.Error("HostSizing.Replace(abstract.Network{}) expect an error")
 		t.FailNow()
 	}
-	if !strings.Contains(xerr.Error(), "p is not a *HostSizing") {
-		t.Errorf("Expect error \"p is not a *HostSizing\", has \"%s\"", xerr.Error())
+	if !strings.Contains(err.Error(), "p is not a *HostSizing") {
+		t.Errorf("Expect error \"p is not a *HostSizing\", has \"%s\"", err.Error())
 	}
 
 }

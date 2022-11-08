@@ -132,7 +132,7 @@ func (instance bucket) InspectObject(ctx context.Context, objectName string) (_ 
 }
 
 func (instance bucket) estimateSize(path, prefix string) (int, error) {
-	itemSet := make(map[string]bool) // New empty set
+	itemSet := make(map[string]bool) // newCore empty set
 	currentPageSize := 10
 
 	for {
