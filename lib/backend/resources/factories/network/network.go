@@ -20,39 +20,39 @@ package network
 import (
 	"context"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // List returns a slice of *abstract.Network corresponding to managed networks
-func List(ctx context.Context, scope scopeapi.Scope) ([]*abstract.Network, fail.Error) {
+func List(ctx context.Context) ([]*abstract.Network, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
-	}
 
-	rn, xerr := New(scope)
+	myjob, xerr := jobapi.FromContext(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	var list []*abstract.Network
+	networkInstance, xerr := New(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
 
-	withDefaultNetwork, err := scope.Service().HasDefaultNetwork()
-	if err != nil {
-		return nil, err
+	withDefaultNetwork, xerr := myjob.Service().HasDefaultNetwork()
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Default network has no metadata, so we need to "simulate" them.
+	var list []*abstract.Network
 	if withDefaultNetwork {
 		var an *abstract.Network
-		an, xerr = scope.Service().DefaultNetwork(ctx)
+		an, xerr = myjob.Service().DefaultNetwork(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -60,7 +60,7 @@ func List(ctx context.Context, scope scopeapi.Scope) ([]*abstract.Network, fail.
 	}
 
 	// Recovers the list with metadata and add them to the list
-	xerr = rn.Browse(ctx, func(an *abstract.Network) fail.Error {
+	xerr = networkInstance.Browse(ctx, func(an *abstract.Network) fail.Error {
 		list = append(list, an)
 		return nil
 	})
@@ -73,11 +73,11 @@ func List(ctx context.Context, scope scopeapi.Scope) ([]*abstract.Network, fail.
 }
 
 // New creates an instance of resources.Network
-func New(scope scopeapi.Scope) (resources.Network, fail.Error) {
-	return operations.NewNetwork(scope)
+func New(ctx context.Context) (resources.Network, fail.Error) {
+	return operations.NewNetwork(ctx)
 }
 
 // Load loads the metadata of a network and returns an instance of resources.Network
-func Load(ctx context.Context, scope scopeapi.Scope, ref string) (resources.Network, fail.Error) {
-	return operations.LoadNetwork(ctx, scope, ref)
+func Load(ctx context.Context, ref string) (resources.Network, fail.Error) {
+	return operations.LoadNetwork(ctx, ref)
 }

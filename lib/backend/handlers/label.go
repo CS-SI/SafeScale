@@ -67,13 +67,13 @@ func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fa
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	browseInstance, xerr := labelfactory.New(handler.job.Scope())
+	browseInstance, xerr := labelfactory.New(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = browseInstance.Browse(task.Context(), func(label *abstract.Label) fail.Error {
-		labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), label.ID)
+		labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), label.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -119,7 +119,7 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
+	instance, xerr := labelfactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -157,7 +157,7 @@ func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.E
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
+	instance, xerr := labelfactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -194,7 +194,7 @@ func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue s
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var xerr fail.Error
-	instance, xerr = labelfactory.New(handler.job.Scope())
+	instance, xerr = labelfactory.New(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}

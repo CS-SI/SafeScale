@@ -19,7 +19,6 @@ package abstract
 import (
 	"time"
 
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -35,15 +34,9 @@ type (
 		Name string                   `json:"name"` // name of the abstract resource
 		Tags data.Map[string, string] `json:"tags,omitempty"`
 
-		scope            ScopeLimitedToAbstractUse
 		terraformSnippet string
 		terraformData    []byte
 		useTerraform     bool
-	}
-
-	ScopeLimitedToAbstractUse interface {
-		Resource(kind string, ref string) (clonable.Clonable, fail.Error)
-		AllResources() ([]terraformerapi.Resource, fail.Error)
 	}
 )
 
@@ -166,11 +159,21 @@ func (c *Core) TerraformSnippet() string {
 // 	return nil
 // }
 
-// AllResources returns the scope
-func (c *Core) AllResources() ([]terraformerapi.Resource, fail.Error) {
-	if valid.IsNull(c) {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	return c.scope.AllResources()
-}
+// // AllResources returns the scope
+// func (c *Core) AllResources(ctx context.Context) ([]terraformerapi.Resource, fail.Error) {
+// 	if valid.IsNull(c) {
+// 		return nil, fail.InvalidInstanceError()
+// 	}
+//
+// 	myjob, xerr := jobapi.FromContext(ctx)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	scope, err := lang.Cast[ScopeLimitedToAbstractUse](myjob.Scope())
+// 	if err != nil {
+// 		return nil, fail.Wrap(err)
+// 	}
+//
+// 	return scope.AllResources()
+// }

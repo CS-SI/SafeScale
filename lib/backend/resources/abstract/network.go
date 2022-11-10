@@ -83,6 +83,12 @@ func NewNetwork(opts ...Option) (*Network, fail.Error) {
 	return nn, nil
 }
 
+// NewEmptyNetwork returns a empty, unnamed Network instance
+func NewEmptyNetwork() *Network {
+	out, _ := NewNetwork()
+	return out
+}
+
 // IsNull ...
 // satisfies interface clonable.Clonable
 func (n *Network) IsNull() bool {

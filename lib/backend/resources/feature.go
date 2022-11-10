@@ -19,7 +19,6 @@ package resources
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -40,7 +39,6 @@ type Targetable interface {
 	InstalledFeatures(ctx context.Context) ([]string, fail.Error)                                          // returns a list of installed features
 	InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error)                         // returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 	RegisterFeature(ctx context.Context, feat Feature, requiredBy Feature, clusterContext bool) fail.Error // registers a feature on target in metadata
-	Scope() scopeapi.Scope                                                                                 // returns the scope of the target
 	TargetType() featuretargettype.Enum                                                                    // returns the type of the target
 }
 

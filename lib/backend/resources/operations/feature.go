@@ -60,9 +60,9 @@ type Feature struct {
 // error contains :
 //   - fail.ErrNotFound if no Feature is found by its name
 //   - fail.ErrSyntax if Feature found contains syntax error
-func NewFeature(ctx context.Context, scope scopeapi.Scope, name string) (_ resources.Feature, ferr fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+func NewFeature(ctx context.Context, name string) (_ resources.Feature, ferr fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -74,7 +74,7 @@ func NewFeature(ctx context.Context, scope scopeapi.Scope, name string) (_ resou
 	default:
 	}
 
-	featureFileInstance, xerr := LoadFeatureFile(ctx, scope, name, false)
+	featureFileInstance, xerr := LoadFeatureFile(ctx, name, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -83,16 +83,15 @@ func NewFeature(ctx context.Context, scope scopeapi.Scope, name string) (_ resou
 	featureInstance := &Feature{
 		file:     featureFileInstance,
 		machines: make(map[string]resources.Host),
-		scope:    scope,
 	}
 	return featureInstance, nil
 }
 
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
-func NewEmbeddedFeature(ctx context.Context, scope scopeapi.Scope, name string) (_ resources.Feature, ferr fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+func NewEmbeddedFeature(ctx context.Context, name string) (_ resources.Feature, ferr fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
@@ -104,15 +103,14 @@ func NewEmbeddedFeature(ctx context.Context, scope scopeapi.Scope, name string) 
 	default:
 	}
 
-	featureFileInstance, xerr := LoadFeatureFile(ctx, scope, name, true)
+	featureFileInstance, xerr := LoadFeatureFile(ctx, name, true)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	featureInstance := &Feature{
-		file:  featureFileInstance,
-		scope: scope,
+		file: featureFileInstance,
 	}
 
 	return featureInstance, nil
@@ -672,7 +670,7 @@ func (instance *Feature) installRequirements(ctx context.Context, t resources.Ta
 
 		targetIsCluster := t.TargetType() == featuretargettype.Cluster
 		for requirement := range requirements {
-			needed, xerr := NewFeature(ctx, instance.Scope(), requirement)
+			needed, xerr := NewFeature(ctx, requirement)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to find required Feature '%s'", requirement)
@@ -723,7 +721,7 @@ func registerOnSuccessfulHostsInCluster(ctx context.Context, scope scopeapi.Scop
 			}
 		}
 		for k := range successfulHosts {
-			host, xerr := LoadHost(ctx, scope, k)
+			host, xerr := LoadHost(ctx, k)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -755,7 +753,7 @@ func unregisterOnSuccessfulHostsInCluster(ctx context.Context, scope scopeapi.Sc
 			}
 		}
 		for k := range successfulHosts {
-			host, xerr := LoadHost(ctx, scope, k)
+			host, xerr := LoadHost(ctx, k)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -887,7 +885,7 @@ func filterEligibleFeatures(ctx context.Context, target resources.Targetable, fi
 
 	var out []resources.Feature
 	for _, v := range list {
-		entry, xerr := NewFeature(ctx, target.Scope(), v)
+		entry, xerr := NewFeature(ctx, v)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:

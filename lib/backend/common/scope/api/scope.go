@@ -18,19 +18,22 @@ package scopeapi
 
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // Scope ...
 type Scope interface {
-	IsNull() bool
+	AllResources() ([]terraformerapi.Resource, fail.Error)
+	ConsulKV() *consumer.KV
+	Description() string
 	ID() string
+	IsNull() bool
+	FSPath() string
+	KVPath() string
 	Organization() string
 	Project() string
 	Tenant() string
-	Description() string
-	KVPath() string
-	FSPath() string
 	Service() iaasapi.Service
-	ConsulKV() *consumer.KV
 }

@@ -14,20 +14,6 @@ func New(ctx context.Context, cancel context.CancelFunc, scope scopeapi.Scope) (
 	return internal.New(ctx, cancel, scope)
 }
 
-// FromContext returns the job instance carried by the context
-func FromContext(ctx context.Context) (jobapi.Job, fail.Error) {
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	jobInstance, ok := ctx.Value(jobapi.KeyForJobInContext).(jobapi.Job)
-	if !ok {
-		return nil, fail.InconsistentError("value in context must satisfy interface 'Job'")
-	}
-
-	return jobInstance, nil
-}
-
 // AbortByID asks the job identified by 'id' to abort
 func AbortByID(id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)

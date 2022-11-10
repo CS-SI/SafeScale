@@ -260,30 +260,30 @@ type ServiceTestMemory struct {
 
 type ServiceTestOptions struct {
 	mu                      *sync.RWMutex
-	candisablesecuritygroup bool                         // Set GetCapabilities().CanDisableSecurityGroup
-	enablecache             bool                         // Enable use cache
-	metadatakey             string                       // Response of .GetMetaData(). Used to cypher bucket data,
-	metadatakeyErr          fail.Error                   // Error of .GetMetaData()
-	timings                 *temporal.MutableTimings     // Response of .Timings()
-	timingsErr              fail.Error                   // Error of .Timings()
-	metadatabucket          abstract.ObjectStorageBucket // Response of .GetMetadataBucket()
-	metadatabucketErr       fail.Error                   // Error of .GetMetadataBucket()
-	listobjectsErr          fail.Error                   // Error of .ListObjects()
-	version                 string                       // Response of .Read(version)
-	versionErr              fail.Error                   // Error of .Read(version)
-	name                    string                       // Response of .GetName()
-	nameErr                 fail.Error                   // Error  of .GetName()
-	operatorusername        string                       //
-	operatorusernameErr     fail.Error                   //
-	providername            string                       // Response of .GetProviderName()
-	providernameErr         fail.Error                   // Error of .GetProviderName()
-	stackname               string                       // Response of .GetStackName()
-	stacknameErr            fail.Error                   // Error of .GetStackName()
-	defaultsgname           string                       // Response of .GetDefaultSecurityGroupName()
-	defaultsgnameErr        fail.Error                   // Error of .GetDefaultSecurityGroupName()
-	onsshcommand            func(string) string          // Emulated SSH command response
-	protocol                string                       // Response of .Protocol()
-	protocolErr             fail.Error                   // Error of .Protocol()
+	candisablesecuritygroup bool                     // Set GetCapabilities().CanDisableSecurityGroup
+	enablecache             bool                     // Enable use cache
+	metadatakey             string                   // Response of .GetMetaData(). Used to cypher bucket data,
+	metadatakeyErr          fail.Error               // Error of .GetMetaData()
+	timings                 *temporal.MutableTimings // Response of .Timings()
+	timingsErr              fail.Error               // Error of .Timings()
+	metadatabucket          abstract.Bucket          // Response of .GetMetadataBucket()
+	metadatabucketErr       fail.Error               // Error of .GetMetadataBucket()
+	listobjectsErr          fail.Error               // Error of .ListObjects()
+	version                 string                   // Response of .Read(version)
+	versionErr              fail.Error               // Error of .Read(version)
+	name                    string                   // Response of .GetName()
+	nameErr                 fail.Error               // Error  of .GetName()
+	operatorusername        string                   //
+	operatorusernameErr     fail.Error               //
+	providername            string                   // Response of .GetProviderName()
+	providernameErr         fail.Error               // Error of .GetProviderName()
+	stackname               string                   // Response of .GetStackName()
+	stacknameErr            fail.Error               // Error of .GetStackName()
+	defaultsgname           string                   // Response of .GetDefaultSecurityGroupName()
+	defaultsgnameErr        fail.Error               // Error of .GetDefaultSecurityGroupName()
+	onsshcommand            func(string) string      // Emulated SSH command response
+	protocol                string                   // Response of .Protocol()
+	protocolErr             fail.Error               // Error of .Protocol()
 }
 
 type ServiceOptionSetMap struct {
@@ -361,11 +361,11 @@ var ServiveOptionsSetMap = map[string]ServiceOptionSetMap{
 		},
 	},
 	"metadatabucket": {
-		strtype: "abstract.ObjectStorageBucket",
+		strtype: "abstract.Bucket",
 		setter: func(svc *ServiceTest, v interface{}) string {
-			if v, ok := v.(abstract.ObjectStorageBucket); ok {
+			if v, ok := v.(abstract.Bucket); ok {
 				svc.options.metadatabucket = v
-				return "ObjectStorageBucket{}"
+				return "Bucket{}"
 			}
 			return ""
 		},
@@ -625,7 +625,7 @@ func (e *ServiceTest) _reset() {
 	e.options.timingsErr = nil
 	e.options.metadatakey = "my-secret"
 	e.options.metadatakeyErr = nil
-	e.options.metadatabucket = abstract.ObjectStorageBucket{
+	e.options.metadatabucket = abstract.Bucket{
 		ID:         "ServiceTestBucket",
 		Name:       "ServiceTestBucket",
 		Host:       "localhost",
@@ -1022,7 +1022,7 @@ func (e *ServiceTest) GetProviderName() (string, fail.Error) {
 	}
 	return providername, nil
 }
-func (e *ServiceTest) GetMetadataBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
+func (e *ServiceTest) GetMetadataBucket(ctx context.Context) (abstract.Bucket, fail.Error) {
 
 	e.options.mu.RLock()
 	metadatabucketErr := e.options.metadatabucketErr
@@ -1031,7 +1031,7 @@ func (e *ServiceTest) GetMetadataBucket(ctx context.Context) (abstract.ObjectSto
 
 	if metadatabucketErr != nil {
 		e._warnf("ServiceTest::GetMetadataBucket forced error \"%s\"", metadatabucketErr.Error())
-		return abstract.ObjectStorageBucket{}, metadatabucketErr
+		return abstract.Bucket{}, metadatabucketErr
 	}
 	return metadatabucket, nil
 }
@@ -3399,9 +3399,9 @@ func (e *ServiceTest) FindBucket(ctx context.Context, name string) (bool, fail.E
 	return ok, nil
 }
 
-func (e *ServiceTest) InspectBucket(ctx context.Context, name string) (abstract.ObjectStorageBucket, fail.Error) {
+func (e *ServiceTest) InspectBucket(ctx context.Context, name string) (abstract.Bucket, fail.Error) {
 	e._logf("ServiceTest::InspectBucket { name: \"%s\"}", name)
-	aosb := abstract.ObjectStorageBucket{}
+	aosb := abstract.Bucket{}
 	if valid.IsNil(e) {
 		return aosb, fail.InvalidInstanceError()
 	}
@@ -3419,9 +3419,9 @@ func (e *ServiceTest) InspectBucket(ctx context.Context, name string) (abstract.
 	return aosb, nil
 }
 
-func (e *ServiceTest) CreateBucket(ctx context.Context, name string) (abstract.ObjectStorageBucket, fail.Error) {
+func (e *ServiceTest) CreateBucket(ctx context.Context, name string) (abstract.Bucket, fail.Error) {
 	e._logf("ServiceTest::CreateBucket { name: \"%s\"}", name)
-	b := abstract.ObjectStorageBucket{
+	b := abstract.Bucket{
 		ID:         name,
 		Name:       name,
 		Host:       "localhost",
@@ -3488,10 +3488,12 @@ func (e *ServiceTest) _CreateShare(ctx context.Context, data *ShareIdentity) (re
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
+
 	oshare, ok := share.(*Share)
 	if !ok {
 		return nil, fail.InconsistentError("*ressource.Share not castable to *operation.Share")
 	}
+
 	xerr := oshare.carry(ctx, data)
 	if xerr != nil {
 		return nil, xerr

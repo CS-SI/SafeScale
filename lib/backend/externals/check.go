@@ -23,7 +23,7 @@ import (
 
 	consul "github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/controller"
 	terraform "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/controller"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
+	tenantfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/tenant"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/env"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -31,7 +31,7 @@ import (
 // Check makes sure configuration is ok
 func Check(cmd *cobra.Command) (suffix string, ferr error) {
 	logrus.Infoln("Checking configuration")
-	_, xerr := factory.GetTenantNames()
+	_, xerr := tenantfactory.GetTenantNames()
 	if xerr != nil {
 		return "", xerr
 	}

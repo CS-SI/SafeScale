@@ -22,10 +22,9 @@ import (
 	"fmt"
 	"strings"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
@@ -60,15 +59,17 @@ type KongController struct {
 }
 
 // NewKongController creates a controller for Kong
-func NewKongController(ctx context.Context, scope scopeapi.Scope, subnet resources.Subnet, addressPrimaryGateway bool) (*KongController, fail.Error) {
+func NewKongController(ctx context.Context, subnet resources.Subnet, addressPrimaryGateway bool) (*KongController, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
-	}
 	if subnet == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("subnet")
+	}
+
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	addressedGateway, xerr := subnet.InspectGateway(ctx, addressPrimaryGateway)
@@ -92,7 +93,7 @@ func NewKongController(ctx context.Context, scope scopeapi.Scope, subnet resourc
 	if !present {
 		// try an active check and update InstalledFeatures if found
 		// Check if 'edgeproxy4subnet' feature is installed on host
-		featureInstance, xerr := NewFeature(ctx, scope, "edgeproxy4subnet")
+		featureInstance, xerr := NewFeature(ctx, "edgeproxy4subnet")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -139,7 +140,7 @@ func NewKongController(ctx context.Context, scope scopeapi.Scope, subnet resourc
 	ctrl := &KongController{
 		subnet:  subnet,
 		gateway: addressedGateway,
-		service: scope.Service(),
+		service: myjob.Service(),
 	}
 	ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)

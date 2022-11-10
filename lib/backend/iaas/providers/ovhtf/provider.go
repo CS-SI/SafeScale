@@ -30,8 +30,8 @@ import (
 
 	terraformer "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer"
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
@@ -311,10 +311,12 @@ next:
 	}
 
 	out := &provider{
-		MiniStack:        wrapped,
-		tenantParameters: params,
-		authOptions:      authOptions,
-		configOptions:    cfgOptions,
+		mu:                                 &sync.Mutex{},
+		MiniStack:                          wrapped,
+		tenantParameters:                   params,
+		authOptions:                        authOptions,
+		configOptions:                      cfgOptions,
+		terraformProviderDefinitionSnippet: "snippets/provider_ovh.tf",
 	}
 
 	terraformerConfig, xerr := options.ValueOrDefault(opts, iaasoptions.BuildOptionTerraformerConfiguration, terraformerapi.Configuration{})
@@ -460,5 +462,5 @@ func init() {
 		func() iaasapi.Provider { return &provider{} },
 		terraformProviders,
 	)
-	factory.Register(providerName, profile)
+	iaas.RegisterProviderProfile(providerName, profile)
 }

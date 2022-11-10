@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
@@ -55,12 +55,12 @@ type Network struct {
 }
 
 // NewNetwork creates an instance of Networking
-func NewNetwork(scope scopeapi.Scope) (resources.Network, fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+func NewNetwork(ctx context.Context) (resources.Network, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, networkKind, networksFolderName, &abstract.Network{})
+	coreInstance, xerr := metadata.NewCore(ctx, metadata.MethodObjectStorage, networkKind, networksFolderName, abstract.NewEmptyNetwork())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -73,12 +73,17 @@ func NewNetwork(scope scopeapi.Scope) (resources.Network, fail.Error) {
 }
 
 // LoadNetwork loads the metadata of a subnet
-func LoadNetwork(inctx context.Context, scope scopeapi.Scope, ref string) (resources.Network, fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterError("scope", "cannot be null value")
+func LoadNetwork(inctx context.Context, ref string) (resources.Network, fail.Error) {
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+	}
+
+	myjob, xerr := jobapi.FromContext(inctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -98,7 +103,7 @@ func LoadNetwork(inctx context.Context, scope scopeapi.Scope, ref string) (resou
 			var kt *Network
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := scope.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -112,7 +117,7 @@ func LoadNetwork(inctx context.Context, scope scopeapi.Scope, ref string) (resou
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(ctx, scope, ref) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(ctx, ref) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				switch xerr.(type) {
@@ -183,13 +188,13 @@ func LoadNetwork(inctx context.Context, scope scopeapi.Scope, ref string) (resou
 }
 
 // onNetworkCacheMiss is called when there is no instance in cache of Network 'ref'
-func onNetworkCacheMiss(ctx context.Context, scope scopeapi.Scope, ref string) (data.Identifiable, fail.Error) {
-	networkInstance, innerXErr := NewNetwork(scope)
+func onNetworkCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail.Error) {
+	networkInstance, innerXErr := NewNetwork(ctx)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	blank, innerXErr := NewNetwork(scope)
+	blank, innerXErr := NewNetwork(ctx)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -269,7 +274,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		defer close(chRes)
 
 		// Check if Network already exists and is managed by SafeScale
-		_, xerr := LoadNetwork(ctx, instance.Scope(), req.Name)
+		_, xerr := LoadNetwork(ctx, req.Name)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -327,7 +332,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && req.CleanOnFailure() && !valid.IsNull(abstractNetwork) {
-				derr := svc.DeleteNetwork(context.Background(), abstractNetwork.ID)
+				derr := svc.DeleteNetwork(jobapi.NewContextPropagatingJob(ctx), abstractNetwork.ID)
 				derr = debug.InjectPlannedFail(derr)
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
@@ -410,7 +415,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 
 	// Check if Network already exists and is managed by SafeScale
 	svc := instance.Service()
-	_, xerr := LoadNetwork(ctx, instance.Scope(), ref)
+	_, xerr := LoadNetwork(ctx, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -563,7 +568,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 						found = true
 						deleted := false
 						// the single subnet present is a subnet named like the Network, delete it first
-						subnetInstance, xerr := LoadSubnet(ctx, instance.Scope(), "", v)
+						subnetInstance, xerr := LoadSubnet(ctx, "", v)
 						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
 							switch xerr.(type) {
@@ -602,7 +607,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 					}
 
 					for k := range nsgV1.ByID {
-						sgInstance, propsXErr := LoadSecurityGroup(ctx, instance.Scope(), k)
+						sgInstance, propsXErr := LoadSecurityGroup(ctx, k)
 						if propsXErr != nil {
 							switch propsXErr.(type) {
 							case *fail.ErrNotFound:
@@ -811,7 +816,7 @@ func (instance *Network) InspectSubnet(ctx context.Context, ref string) (_ resou
 		return nil, fail.ConvertError(err)
 	}
 
-	sn, xerr := LoadSubnet(ctx, instance.Scope(), nid, ref)
+	sn, xerr := LoadSubnet(ctx, nid, ref)
 	return sn, xerr
 }
 

@@ -339,7 +339,7 @@ func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resource
 
 	var out []resources.Feature
 	for _, v := range list {
-		entry, xerr := NewFeature(ctx, instance.Scope(), v)
+		entry, xerr := NewFeature(ctx, v)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -395,7 +395,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
-		item, xerr := NewFeature(ctx, instance.Scope(), v)
+		item, xerr := NewFeature(ctx, v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -420,7 +420,7 @@ func (instance *Cluster) AddFeature(
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Scope(), name)
+	feat, xerr := NewFeature(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -441,7 +441,7 @@ func (instance *Cluster) CheckFeature(ctx context.Context, name string, vars dat
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Scope(), name)
+	feat, xerr := NewFeature(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -462,7 +462,7 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Scope(), name)
+	feat, xerr := NewFeature(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -880,7 +880,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 
 		if !disabled {
 			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
-			feat, xerr := NewFeature(ctx, instance.Scope(), "edgeproxy4subnet")
+			feat, xerr := NewFeature(ctx, "edgeproxy4subnet")
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{xerr}
@@ -983,7 +983,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 		if !disabled {
 			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'remotedesktop'", identity.Name)
 
-			feat, xerr := NewFeature(ctx, instance.Scope(), "remotedesktop")
+			feat, xerr := NewFeature(ctx, "remotedesktop")
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{xerr}
@@ -1072,7 +1072,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map[s
 			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'ansible'", identity.Name)
 
 			// 1st, Feature 'ansible'
-			feat, xerr := NewFeature(ctx, instance.Scope(), "ansible")
+			feat, xerr := NewFeature(ctx, "ansible")
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{xerr}
@@ -1098,7 +1098,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map[s
 			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'ansible' added successfully", identity.Name)
 
 			// 2nd, Feature 'ansible-for-cluster' (which does the necessary for a dynamic inventory)
-			feat, xerr = NewFeature(ctx, instance.Scope(), "ansible-for-cluster")
+			feat, xerr = NewFeature(ctx, "ansible-for-cluster")
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{xerr}
@@ -1169,7 +1169,7 @@ func (instance *Cluster) installDocker(inctx context.Context, host resources.Hos
 		}
 
 		// uses NewFeature() to let a chance to the user to use its own docker feature
-		feat, xerr := NewFeature(ctx, instance.Scope(), "docker")
+		feat, xerr := NewFeature(ctx, "docker")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}

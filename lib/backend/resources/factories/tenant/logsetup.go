@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package factory
+package tenant
 
 import (
 	"fmt"

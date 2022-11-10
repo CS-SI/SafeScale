@@ -32,7 +32,7 @@ type Bucket interface {
 	Core
 	metadata.Metadata
 
-	Browse(ctx context.Context, callback func(bucket *abstract.ObjectStorageBucket) fail.Error) fail.Error
+	Browse(ctx context.Context, callback func(bucket *abstract.Bucket) fail.Error) fail.Error
 	Create(ctx context.Context, name string) fail.Error
 	Delete(ctx context.Context) fail.Error
 	Mount(ctx context.Context, hostname string, path string) fail.Error

@@ -290,6 +290,12 @@ func NewSecurityGroupRule() *SecurityGroupRule {
 	}
 }
 
+// NewEmptySecurityGroup returns a empty, unnamed SecurityGroup instance
+func NewEmptySecurityGroup() *SecurityGroup {
+	out, _ := NewSecurityGroup()
+	return out
+}
+
 // Clone does a deep-copy of the SecurityGroup
 //
 // satisfies interface clonable.Clonable

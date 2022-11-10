@@ -130,7 +130,7 @@ func work(c *cobra.Command, args []string) {
 	// enable heartbeat
 	go heartbeat.RunHeartbeatService(":10102")
 
-	// Register reflection service on gRPC server.
+	// RegisterProviderProfile reflection service on gRPC server.
 	reflection.Register(s)
 
 	// Track goroutines

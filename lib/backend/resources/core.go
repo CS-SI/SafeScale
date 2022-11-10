@@ -17,7 +17,7 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -31,6 +31,6 @@ type Core interface {
 	metadata.Consistent
 
 	Kind() string
-	Scope() scopeapi.Scope
+	Job() jobapi.Job
 	Service() iaasapi.Service
 }

@@ -86,13 +86,13 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr f
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	browseInstance, xerr := volumefactory.New(handler.job.Scope())
+	browseInstance, xerr := volumefactory.New(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = browseInstance.Browse(ctx, func(volume *abstract.Volume) fail.Error {
-		volumeInstance, innerXErr := volumefactory.Load(handler.job.Context(), handler.job.Scope(), volume.ID)
+		volumeInstance, innerXErr := volumefactory.Load(handler.job.Context(), volume.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -131,7 +131,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Scope(), ref)
+	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -191,7 +191,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Scope(), ref)
+	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("volume", ref)
@@ -235,7 +235,7 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var xerr fail.Error
-	objv, xerr = volumefactory.New(handler.job.Scope())
+	objv, xerr = volumefactory.New(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -283,12 +283,12 @@ func (handler *volumeHandler) Attach(volumeRef string, hostRef string, path stri
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	ctx := handler.job.Context()
-	volumeInstance, xerr := volumefactory.Load(ctx, handler.job.Scope(), volumeRef)
+	volumeInstance, xerr := volumefactory.Load(ctx, volumeRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(ctx, handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(ctx, hostRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -324,7 +324,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error
 
 	ctx := handler.job.Context()
 	// Load volume data
-	volumeInstance, xerr := volumefactory.Load(ctx, handler.job.Scope(), volumeRef)
+	volumeInstance, xerr := volumefactory.Load(ctx, volumeRef)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
@@ -335,7 +335,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error
 	// mountPath := ""
 
 	// Load rh data
-	rh, xerr := hostfactory.Load(ctx, handler.job.Scope(), hostRef)
+	rh, xerr := hostfactory.Load(ctx, hostRef)
 	if xerr != nil {
 		return xerr
 	}

@@ -80,6 +80,11 @@ func (instance *Client) NewKV(opts ...Option) (*KV, fail.Error) {
 		return nil, xerr
 	}
 
+	// use a TTL of 10 seconds by default
+	if conf.ttl <= 0 {
+		conf.ttl = 10
+	}
+
 	prefix := strings.Trim(strings.TrimSpace(conf.prefix), "/")
 	if prefix == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("prefix")

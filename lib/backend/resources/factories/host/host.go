@@ -19,30 +19,31 @@ package host
 import (
 	"context"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // List returns a list of available hosts
-func List(ctx context.Context, scope scopeapi.Scope, all bool) (abstract.HostList, fail.Error) {
+func List(ctx context.Context, all bool) (abstract.HostList, fail.Error) {
 	var nullList abstract.HostList
 	if ctx == nil {
 		return nullList, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if valid.IsNull(scope) {
-		return nullList, fail.InvalidParameterCannotBeNilError("scope")
-	}
 
 	if all {
-		return scope.Service().ListHosts(ctx, all)
+		myjob, xerr := jobapi.FromContext(ctx)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		return myjob.Service().ListHosts(ctx, all)
 	}
 
-	hostSvc, xerr := New(scope)
+	hostSvc, xerr := New(ctx)
 	if xerr != nil {
 		return nullList, xerr
 	}
@@ -57,11 +58,11 @@ func List(ctx context.Context, scope scopeapi.Scope, all bool) (abstract.HostLis
 }
 
 // New creates an instance of resources.Host
-func New(scope scopeapi.Scope) (_ resources.Host, err fail.Error) {
-	return operations.NewHost(scope)
+func New(ctx context.Context) (_ resources.Host, err fail.Error) {
+	return operations.NewHost(ctx)
 }
 
 // Load loads the metadata of host and returns an instance of resources.Host
-func Load(ctx context.Context, scope scopeapi.Scope, ref string) (_ resources.Host, err fail.Error) {
-	return operations.LoadHost(ctx, scope, ref)
+func Load(ctx context.Context, ref string) (_ resources.Host, err fail.Error) {
+	return operations.LoadHost(ctx, ref)
 }

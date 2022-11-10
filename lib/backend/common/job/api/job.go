@@ -29,6 +29,7 @@ import (
 // Job is the interface of a daemon job
 type Job interface {
 	ID() string
+	IsNull() bool
 	Name() string
 	Scope() scopeapi.Scope
 	Context() context.Context
@@ -45,3 +46,38 @@ type Job interface {
 const (
 	KeyForJobInContext = "job"
 )
+
+// FromContext returns the job instance carried by the context
+func FromContext(ctx context.Context) (Job, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	value := ctx.Value(KeyForJobInContext)
+	if value == nil {
+		return nil, fail.InconsistentError("missing valid Job in context")
+	}
+
+	jobInstance, ok := value.(Job)
+	if !ok {
+		return nil, fail.InconsistentError("value in context must satisfy interface 'Job'")
+	}
+
+	if jobInstance == nil {
+		return nil, fail.InconsistentError("missing valid Job in context")
+	}
+
+	return jobInstance, nil
+}
+
+// NewContextPropagatingJob creates a new context from context.Background() and adds job value inside source context
+func NewContextPropagatingJob(srcctx context.Context) context.Context {
+	newctx := context.Background()
+
+	myjob, xerr := FromContext(srcctx)
+	if xerr == nil {
+		newctx = context.WithValue(newctx, KeyForJobInContext, myjob)
+	}
+
+	return newctx
+}

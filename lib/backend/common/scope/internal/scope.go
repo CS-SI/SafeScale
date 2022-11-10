@@ -21,15 +21,14 @@ import (
 	"strings"
 	"sync"
 
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/puzpuzpuz/xsync"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -45,8 +44,8 @@ type scope struct {
 	description    string
 	kvPath         string
 	fsPath         string
-	resourceByName xsync.MapOf[string, string]
-	resourceByID   xsync.MapOf[string, clonable.Clonable]
+	resourceByName *xsync.MapOf[string, string]
+	resourceByID   *xsync.MapOf[string, clonable.Clonable]
 	consulClient   *consumer.Client
 	consulKV       *consumer.KV
 	service        iaasapi.Service
@@ -86,12 +85,14 @@ func New(organization, project, tenant, description string) (*scope, fail.Error)
 	}
 
 	out := &scope{
-		organization: organization,
-		project:      project,
-		tenant:       tenant,
-		description:  description,
-		fsPath:       filepath.Join(organization, project, tenant),
-		kvPath:       strings.Join([]string{organization, project, tenant}, "/"),
+		organization:   organization,
+		project:        project,
+		tenant:         tenant,
+		description:    description,
+		fsPath:         filepath.Join(organization, project, tenant),
+		kvPath:         strings.Join([]string{organization, project, tenant}, "/"),
+		resourceByID:   xsync.NewMapOf[clonable.Clonable](),
+		resourceByName: xsync.NewMapOf[string](),
 	}
 
 	_, loaded := scopeList.LoadOrStore(out.kvPath, out)
@@ -115,7 +116,7 @@ func New(organization, project, tenant, description string) (*scope, fail.Error)
 
 // IsNull tells if the scope is considered as null value
 func (s *scope) IsNull() bool {
-	return s == nil || s.organization == "" || s.project == "" || s.tenant == ""
+	return s == nil || s.organization == "" || s.project == "" || s.tenant == "" || s.resourceByName == nil || s.resourceByID == nil
 }
 
 // ID returns the scope identifier (which is equal to KVPath())
@@ -197,52 +198,52 @@ func (s *scope) ConsulKV() *consumer.KV {
 	return s.consulKV
 }
 
-// Resource returns the resource corresponding to key (being an id or a name)
-func (s *scope) Resource(kind string, ref string) (clonable.Clonable, fail.Error) {
+// // Resource returns the resource corresponding to key (being an id or a name)
+// func (s *scope) Resource(kind string, ref string) (clonable.Clonable, fail.Error) {
+// 	if valid.IsNull(s) {
+// 		return nil, fail.InvalidInstanceError()
+// 	}
+// 	if ref = strings.TrimSpace(ref); ref == "" {
+// 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+// 	}
+//
+// 	index := kind + ":" + ref
+// 	id, found := s.resourceByName.Load(ref)
+// 	if found {
+// 		index = kind + ":" + id
+// 	}
+//
+// 	rsc, found := s.resourceByID.Load(index)
+// 	if found {
+// 		return rsc, nil
+// 	}
+//
+// 	return nil, fail.NotFoundError("failed to find resource identified by %s", ref)
+// }
+
+func (s *scope) AllResources() ([]terraformerapi.Resource, fail.Error) {
 	if valid.IsNull(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ref = strings.TrimSpace(ref); ref == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-	}
 
-	index := kind + ":" + ref
-	id, found := s.resourceByName.Load(ref)
-	if found {
-		index = kind + ":" + id
-	}
-
-	rsc, found := s.resourceByID.Load(index)
-	if found {
-		return rsc, nil
-	}
-
-	return nil, fail.NotFoundError("failed to find resource identified by %s", ref)
-}
-
-func (s *scope) AllResources() ([]*abstract.Core, fail.Error) {
-	if valid.IsNull(s) {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	var err error
-	list := make([]*abstract.Core, 0, s.resourceByID.Size())
+	ok := true
+	list := make([]terraformerapi.Resource, 0, s.resourceByID.Size())
 	s.resourceByID.Range(func(key string, value clonable.Clonable) bool {
-		if err != nil {
+		if !ok {
 			return false
 		}
 
-		var item *abstract.Core
-		item, err = lang.Cast[*abstract.Core](value)
-		if err != nil {
+		var item terraformerapi.Resource
+		item, ok = value.(terraformerapi.Resource)
+		if !ok {
 			return false
 		}
 
 		list = append(list, item)
 		return true
 	})
-	if err != nil {
-		return nil, fail.Wrap(err)
+	if !ok {
+		return nil, fail.NewError("failed to cast to 'terraformerapi.Resource'")
 	}
 
 	return list, nil

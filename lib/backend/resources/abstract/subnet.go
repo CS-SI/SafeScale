@@ -86,6 +86,12 @@ func NewSubnet(opts ...Option) (*Subnet, fail.Error) {
 	return sn, nil
 }
 
+// NewEmptySubnet returns a empty, unnamed Subnet instance
+func NewEmptySubnet() *Subnet {
+	out, _ := NewSubnet()
+	return out
+}
+
 // IsNull ...
 // satisfies interface clonable.Clonable
 func (s *Subnet) IsNull() bool {

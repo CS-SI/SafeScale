@@ -108,13 +108,7 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 		return nil, xerr
 	}
 
-	created, xerr := asg.AllResources()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	created = append(created, asg)
-	def, xerr := renderer.Assemble(created...)
+	def, xerr := renderer.Assemble(asg)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -153,13 +153,7 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		return nil, xerr
 	}
 
-	created, xerr := abstractSubnet.AllResources()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	created = append(created, abstractSubnet)
-	def, xerr := renderer.Assemble(created...)
+	def, xerr := renderer.Assemble(abstractSubnet)
 	if xerr != nil {
 		return nil, xerr
 	}

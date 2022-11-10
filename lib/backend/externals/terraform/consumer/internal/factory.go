@@ -51,6 +51,11 @@ func New(provider ProviderUsingTerraform, opts options.Options) (api.Terraformer
 		return nil, xerr
 	}
 
+	out.scope, xerr = options.Value[api.ScopeLimitedToTerraformerUse](opts, iaasoptions.OptionScope)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// out.workdir, xerr = options.Value[string](opts, ConfigOptionWorkDir)
 	// if xerr != nil {
 	// 	return nil, xerr

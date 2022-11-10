@@ -151,7 +151,7 @@ func TestBucket_IsNull(t *testing.T) {
 
 func TestBucket_Browse(t *testing.T) {
 
-	var callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error
+	var callback func(storageBucket *abstract.Bucket) fail.Error
 	ctx := context.Background()
 
 	task, err := concurrency.NewTaskWithContext(ctx)
@@ -166,7 +166,7 @@ func TestBucket_Browse(t *testing.T) {
 			}
 		}()
 		var bucket resources.Bucket
-		_ = bucket.Browse(ctx, func(storageBucket *abstract.ObjectStorageBucket) fail.Error {
+		_ = bucket.Browse(ctx, func(storageBucket *abstract.Bucket) fail.Error {
 			return nil
 		})
 	}()
@@ -181,7 +181,7 @@ func TestBucket_Browse(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(bucket).String(), "*operations.bucket")
 		require.False(t, bucket.IsNull())
 
-		xerr := bucket.Browse(nil, func(storageBucket *abstract.ObjectStorageBucket) fail.Error { // nolint
+		xerr := bucket.Browse(nil, func(storageBucket *abstract.Bucket) fail.Error { // nolint
 			return nil
 		})
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
@@ -189,8 +189,8 @@ func TestBucket_Browse(t *testing.T) {
 		xerr = bucket.Browse(ctx, callback)
 		require.Contains(t, xerr.Error(), "invalid parameter: callback")
 
-		xerr = bucket.Browse(ctx, func(storageBucket *abstract.ObjectStorageBucket) fail.Error {
-			require.EqualValues(t, reflect.TypeOf(storageBucket).String(), "*abstract.ObjectStorageBucket")
+		xerr = bucket.Browse(ctx, func(storageBucket *abstract.Bucket) fail.Error {
+			require.EqualValues(t, reflect.TypeOf(storageBucket).String(), "*abstract.Bucket")
 			return nil
 		})
 		require.Nil(t, xerr)

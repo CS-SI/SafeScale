@@ -21,6 +21,7 @@ import (
 	"net"
 	"reflect"
 
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/hashicorp/terraform-exec/tfexec"
@@ -129,13 +130,7 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 		return nil, xerr
 	}
 
-	created, xerr := abstractNetwork.AllResources()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	created = append(created, abstractNetwork)
-	def, xerr := renderer.Assemble(created...)
+	def, xerr := renderer.Assemble(abstractNetwork)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -149,7 +144,7 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && req.CleanOnFailure() {
-			logrus.WithContext(ctx).Infof("Cleaninng up on failure, deleting Network '%s'", req.Name)
+			logrus.WithContext(ctx).Infof("Cleaning up on failure, deleting Network '%s'", req.Name)
 			derr := renderer.Destroy(ctx, def)
 			if derr != nil {
 				logrus.WithContext(ctx).Errorf("failed to delete Network '%s': %v", req.Name, derr)
@@ -158,7 +153,7 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 		}
 	}()
 
-	abstractNetwork.ID, xerr = unmarshalOutput[string](outputs["id"])
+	abstractNetwork.ID, xerr = unmarshalOutput[string](outputs["network_"+req.Name+"_id"])
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to recover Network id")
 	}
@@ -226,7 +221,7 @@ func (p *provider) DesignNetwork(ctx context.Context, req abstract.NetworkReques
 	// defer func() {
 	// 	ferr = debug.InjectPlannedFail(ferr)
 	// 	if ferr != nil && req.CleanOnFailure() {
-	// 		logrus.WithContext(ctx).Infof("Cleaninng up on failure, deleting Network '%s'", req.Name)
+	// 		logrus.WithContext(ctx).Infof("Cleaning up on failure, deleting Network '%s'", req.Name)
 	// 		derr := summoner.Destroy(ctx)
 	// 		if derr != nil {
 	// 			logrus.WithContext(ctx).Errorf("failed to delete Network '%s': %v", req.Name, derr)
@@ -451,6 +446,7 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 	if xerr != nil {
 		return xerr
 	}
+
 	abstractNetwork.ID = existingNetwork.ID
 	abstractNetwork.DNSServers = existingNetwork.DNSServers
 
@@ -465,17 +461,12 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 		return xerr
 	}
 
-	created, xerr := abstractNetwork.AllResources()
+	def, xerr := renderer.Assemble(abstractNetwork)
 	if xerr != nil {
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(created...)
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = renderer.Destroy(ctx, def)
+	xerr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(abstractNetwork.GetName()))
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to delete network %s", an.ID)
 	}

@@ -265,7 +265,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequ
 	}
 	if len(in.GetSubnets()) > 0 {
 		for _, v := range in.GetSubnets() {
-			subnetInstance, xerr = subnetfactory.Load(ctx, job.Scope(), networkRef, v)
+			subnetInstance, xerr = subnetfactory.Load(ctx, networkRef, v)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -285,7 +285,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequ
 		}
 	}
 	if len(subnets) == 0 && networkRef != "" {
-		subnetInstance, xerr = subnetfactory.Load(ctx, job.Scope(), networkRef, networkRef)
+		subnetInstance, xerr = subnetfactory.Load(ctx, networkRef, networkRef)
 		if xerr != nil {
 			return nil, xerr
 		}

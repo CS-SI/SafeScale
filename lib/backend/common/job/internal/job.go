@@ -32,10 +32,9 @@ import (
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/versions"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
+	tenantfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/tenant"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -55,7 +54,7 @@ type job struct {
 	startTime time.Time
 }
 
-var JobList = xsync.MapOf[string, jobapi.Job]{}
+var JobList *xsync.MapOf[string, jobapi.Job]
 
 // New creates a new instance of struct Job
 func New(ctx context.Context, cancel context.CancelFunc, scope scopeapi.Scope) (_ *job, ferr fail.Error) { // nolint
@@ -130,14 +129,12 @@ func New(ctx context.Context, cancel context.CancelFunc, scope scopeapi.Scope) (
 	ctx = context.WithValue(ctx, jobapi.KeyForJobInContext, nj) // nolint
 	nj.ctx = ctx
 
-	providerProfile, xerr := factory.FindProviderProfileForTenant(scope.Tenant())
+	providerProfile, xerr := tenantfactory.FindProviderProfileForTenant(scope.Tenant())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	opts := []options.Option{
-		metadata.WithScope(scope),
-	}
+	opts := []options.Option{}
 	if providerProfile.Capabilities().UseTerraformer {
 		config, xerr := prepareTerraformerConfiguration(providerProfile, scope)
 		if xerr != nil {
@@ -147,17 +144,10 @@ func New(ctx context.Context, cancel context.CancelFunc, scope scopeapi.Scope) (
 		opts = append(opts, iaasoptions.WithTerraformer(config))
 	}
 
-	service, xerr := factory.UseService(opts...)
+	service, xerr := tenantfactory.UseService(ctx, opts...)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	// bucket, ierr := service.GetMetadataBucket(ctx)
-	// if ierr != nil {
-	// 	return nil, ierr
-	// }
-	//
-	// tenant = &operations.Tenant{Name: providerProfile.Name(), BucketName: bucket.GetName(), Service: service}
 
 	nj.service = service
 	xerr = register(nj)
@@ -327,4 +317,9 @@ func deregister(id string) fail.Error {
 
 	JobList.Delete(id)
 	return nil
+}
+
+func init() {
+	JobList = xsync.NewMapOf[jobapi.Job]()
+
 }

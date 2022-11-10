@@ -23,10 +23,10 @@ import (
 	"sync"
 	"sync/atomic"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -64,11 +64,15 @@ type Core struct {
 }
 
 // NewCore creates an instance of Core
-func NewCore(scope scopeapi.Scope, method string, kind string, path string, instance clonable.Clonable) (_ *Core, ferr fail.Error) {
+func NewCore(ctx context.Context, method string, kind string, path string, instance clonable.Clonable) (_ *Core, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if valid.IsNull(myjob) {
+		return nil, fail.InconsistentError("missing valid Job in context")
 	}
 	if kind == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("kind")
@@ -77,7 +81,7 @@ func NewCore(scope scopeapi.Scope, method string, kind string, path string, inst
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("path")
 	}
 
-	fld, xerr := NewFolder(UseMethod(method), WithScope(scope), WithPrefix(path))
+	fld, xerr := NewFolder(UseMethod(method), WithJob(myjob), WithPrefix(path))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -121,8 +125,8 @@ func (myself *Core) Service() iaasapi.Service {
 	return myself.folder.Service()
 }
 
-func (myself *Core) Scope() scopeapi.Scope {
-	return myself.folder.Scope()
+func (myself *Core) Job() jobapi.Job {
+	return myself.folder.Job()
 }
 
 // GetID returns the id of the data protected

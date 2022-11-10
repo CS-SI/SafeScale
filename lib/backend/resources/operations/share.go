@@ -23,7 +23,8 @@ import (
 	"strings"
 	"time"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/eko/gocache/v2/store"
 	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
@@ -38,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/system/nfs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -52,89 +52,18 @@ const (
 	sharesFolderName = "shares"
 )
 
-// ShareIdentity contains information about a Share
-type ShareIdentity struct {
-	HostID    string `json:"host_id"`    // contains the ID of the host serving the Share
-	HostName  string `json:"host_name"`  // contains the name of the host serving the Share
-	ShareID   string `json:"share_id"`   // contains the ID of the Share
-	ShareName string `json:"share_name"` // contains the name of the Share
-}
-
-// GetID returns the ID of the Share
-// satisfies interface data.Identifiable
-func (si ShareIdentity) GetID() (string, error) {
-	return si.ShareID, nil
-}
-
-// GetName returns the name of the Share
-// satisfies interface data.Identifiable
-func (si ShareIdentity) GetName() string {
-	return si.ShareName
-}
-
-// Serialize ...
-// satisfies interface data.Serializable
-func (si ShareIdentity) Serialize() ([]byte, fail.Error) {
-	r, err := json.Marshal(&si)
-	return r, fail.ConvertError(err)
-}
-
-// Deserialize ...
-// satisfies interface data.Serializable
-func (si *ShareIdentity) Deserialize(buf []byte) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
-	return fail.ConvertError(json.Unmarshal(buf, si))
-}
-
-// IsNull ...
-// satisfies interface clonable.Clonable
-func (si *ShareIdentity) IsNull() bool {
-	return si == nil || (si.HostID == "" && si.ShareID == "")
-}
-
-// Clone ...
-// satisfies interface clonable.Clonable
-func (si *ShareIdentity) Clone() (clonable.Clonable, error) {
-	if valid.IsNull(si) {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	newShareItem := *si
-	return &newShareItem, nil
-}
-
-// Replace ...
-// satisfies interface clonable.Clonable
-// may panic
-func (si *ShareIdentity) Replace(p clonable.Clonable) error {
-	if valid.IsNull(si) {
-		return fail.InvalidInstanceError()
-	}
-	if p == nil {
-		return fail.InvalidParameterCannotBeNilError("p")
-	}
-
-	src, err := lang.Cast[*ShareIdentity](p)
-	if err != nil {
-		return err
-	}
-
-	*si = *src
-	return nil
-}
-
-// Share contains information to maintain in Object Storage a list of shared folders
+// Share contains information to maintain a list of shared folders
 type Share struct {
 	*metadata.Core
 }
 
 // NewShare creates an instance of Share
-func NewShare(scope scopeapi.Scope) (resources.Share, fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+func NewShare(ctx context.Context) (resources.Share, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, shareKind, sharesFolderName, &ShareIdentity{})
+	coreInstance, xerr := metadata.NewCore(ctx, metadata.MethodObjectStorage, shareKind, sharesFolderName, abstract.NewEmptyShare())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -152,12 +81,17 @@ func NewShare(scope scopeapi.Scope) (resources.Share, fail.Error) {
 //	If error is fail.ErrNotFound return this error
 //	In case of any other error, abort the retry to propagate the error
 //	If retry times out, return fail.ErrTimeout
-func LoadShare(inctx context.Context, scope scopeapi.Scope, ref string) (resources.Share, fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+func LoadShare(inctx context.Context, ref string) (resources.Share, fail.Error) {
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if ref == "" {
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	myjob, xerr := jobapi.FromContext(inctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -177,7 +111,7 @@ func LoadShare(inctx context.Context, scope scopeapi.Scope, ref string) (resourc
 			var kt *Share
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := scope.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -191,7 +125,7 @@ func LoadShare(inctx context.Context, scope scopeapi.Scope, ref string) (resourc
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(ctx, scope, ref) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(ctx, ref) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -255,13 +189,13 @@ func LoadShare(inctx context.Context, scope scopeapi.Scope, ref string) (resourc
 }
 
 // onShareCacheMiss is called when there is no instance in cache of Share 'ref'
-func onShareCacheMiss(ctx context.Context, scope scopeapi.Scope, ref string) (data.Identifiable, fail.Error) {
-	shareInstance, xerr := NewShare(scope)
+func onShareCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail.Error) {
+	shareInstance, xerr := NewShare(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	blank, xerr := NewShare(scope)
+	blank, xerr := NewShare(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -327,14 +261,15 @@ func (instance *Share) Browse(ctx context.Context, callback func(string, string)
 	}
 
 	return instance.Core.BrowseFolder(ctx, func(buf []byte) fail.Error {
-		si := &ShareIdentity{}
+		si := abstract.NewEmptyShare()
 		xerr := si.Deserialize(buf)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 
-		return callback(si.HostName, si.ShareID)
+		shareID, _ := si.GetID()
+		return callback(si.HostName, shareID)
 	})
 }
 
@@ -510,7 +445,7 @@ func (instance *Share) Create(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := nfsServer.RemoveShare(context.Background(), sharePath); derr != nil {
+			if derr := nfsServer.RemoveShare(jobapi.NewContextPropagatingJob(ctx), sharePath); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Share '%s' from Host", sharePath))
 			}
 		}
@@ -551,7 +486,7 @@ func (instance *Share) Create(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := server.Alter(context.Background(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := server.Alter(jobapi.NewContextPropagatingJob(ctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(p clonable.Clonable) fail.Error {
 					serverSharesV1, innerErr := lang.Cast[*propertiesv1.HostShares](p)
 					if innerErr != nil {
@@ -575,14 +510,16 @@ func (instance *Share) Create(
 		return fail.ConvertError(err)
 	}
 
-	si := ShareIdentity{
-		HostID:    sid,
-		HostName:  server.GetName(),
-		ShareID:   hostShare.ID,
-		ShareName: hostShare.Name,
+	abstractShare, xerr := abstract.NewShare(abstract.WithName(hostShare.Name))
+	if xerr != nil {
+		return xerr
 	}
 
-	xerr = instance.carry(ctx, &si)
+	abstractShare.HostID = sid
+	abstractShare.HostName = server.GetName()
+	abstractShare.ID = hostShare.ID
+
+	xerr = instance.carry(ctx, abstractShare)
 	return xerr
 }
 
@@ -597,7 +534,7 @@ func (instance *Share) unsafeGetServer(ctx context.Context) (_ resources.Host, f
 
 	var hostID, hostName string
 	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		share, innerErr := lang.Cast[*ShareIdentity](p)
+		share, innerErr := lang.Cast[*abstract.Share](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -611,10 +548,10 @@ func (instance *Share) unsafeGetServer(ctx context.Context) (_ resources.Host, f
 		return nil, xerr
 	}
 
-	server, xerr := LoadHost(ctx, instance.Scope(), hostID)
+	server, xerr := LoadHost(ctx, hostID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		server, xerr = LoadHost(ctx, instance.Scope(), hostName)
+		server, xerr = LoadHost(ctx, hostName)
 	}
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -638,7 +575,7 @@ func (instance *Share) GetServer(ctx context.Context) (_ resources.Host, ferr fa
 
 	var hostID, hostName string
 	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		share, innerErr := lang.Cast[*ShareIdentity](p)
+		share, innerErr := lang.Cast[*abstract.Share](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -652,10 +589,10 @@ func (instance *Share) GetServer(ctx context.Context) (_ resources.Host, ferr fa
 		return nil, xerr
 	}
 
-	server, xerr := LoadHost(ctx, instance.Scope(), hostID)
+	server, xerr := LoadHost(ctx, hostID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		server, xerr = LoadHost(ctx, instance.Scope(), hostName)
+		server, xerr = LoadHost(ctx, hostName)
 	}
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -703,13 +640,13 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 
 	// Retrieve info about the Share
 	xerr = instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		si, innerErr := lang.Cast[*ShareIdentity](p)
+		abstractShare, innerErr := lang.Cast[*abstract.Share](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
 
-		shareName = si.ShareName
-		shareID = si.ShareID
+		shareName = abstractShare.GetName()
+		shareID, _ = abstractShare.GetID()
 		return nil
 	})
 	if xerr != nil {
@@ -867,7 +804,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := serverInstance.Alter(context.Background(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := serverInstance.Alter(jobapi.NewContextPropagatingJob(ctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(p clonable.Clonable) fail.Error {
 					hostSharesV1, innerErr := lang.Cast[*propertiesv1.HostShares](p)
 					if innerErr != nil {
@@ -890,7 +827,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 				return
 			}
 
-			derr = nfsClient.Unmount(context.Background(), instance.Service(), export)
+			derr = nfsClient.Unmount(jobapi.NewContextPropagatingJob(ctx), instance.Service(), export)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount trying to delete Share"))
 				return
@@ -979,13 +916,13 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 
 	// Retrieve info about the Share
 	xerr = instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		si, innerErr := lang.Cast[*ShareIdentity](p)
+		si, innerErr := lang.Cast[*abstract.Share](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
 
-		shareName = si.ShareName
-		shareID = si.ShareID
+		shareName = si.GetName()
+		shareID, _ = si.GetID()
 		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1118,13 +1055,13 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	// -- Retrieve info about the Share --
 	// Note: we do not use GetName() and ID() to avoid 2 consecutive instance.Inspect()
 	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		si, innerErr := lang.Cast[*ShareIdentity](p)
+		abstractShare, innerErr := lang.Cast[*abstract.Share](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
 
-		shareID = si.ShareID
-		shareName = si.ShareName
+		shareID, _ = abstractShare.GetID()
+		shareName = abstractShare.GetName()
 		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1192,7 +1129,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 				return xerr
 			}
 
-			xerr = nfsServer.RemoveShare(context.Background(), hostShare.Path)
+			xerr = nfsServer.RemoveShare(jobapi.NewContextPropagatingJob(ctx), hostShare.Path)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1259,7 +1196,7 @@ func (instance *Share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountLi
 	}
 
 	for k := range share.ClientsByName {
-		h, xerr := LoadHost(ctx, instance.Scope(), k)
+		h, xerr := LoadHost(ctx, k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.WithContext(ctx).Errorf(xerr.Error())

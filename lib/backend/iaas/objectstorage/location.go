@@ -79,9 +79,9 @@ type Location interface {
 	// FindBucket returns true of bucket exists in stowLocation
 	FindBucket(context.Context, string) (bool, fail.Error)
 	// InspectBucket returns info of the GetBucket
-	InspectBucket(context.Context, string) (*abstract.ObjectStorageBucket, fail.Error)
+	InspectBucket(context.Context, string) (*abstract.Bucket, fail.Error)
 	// CreateBucket creates a bucket
-	CreateBucket(context.Context, string) (*abstract.ObjectStorageBucket, fail.Error)
+	CreateBucket(context.Context, string) (*abstract.Bucket, fail.Error)
 	// DeleteBucket removes a bucket (need to be cleared before)
 	DeleteBucket(context.Context, string) fail.Error
 	// DownloadBucket downloads a bucket
@@ -339,7 +339,7 @@ func (instance location) FindBucket(ctx context.Context, bucketName string) (_ b
 }
 
 // InspectBucket ...
-func (instance location) InspectBucket(ctx context.Context, bucketName string) (_ *abstract.ObjectStorageBucket, ferr fail.Error) {
+func (instance location) InspectBucket(ctx context.Context, bucketName string) (_ *abstract.Bucket, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -356,7 +356,7 @@ func (instance location) InspectBucket(ctx context.Context, bucketName string) (
 		return nil, xerr
 	}
 
-	aosb, xerr := abstract.NewObjectStorageBucket(abstract.WithName(bucketName))
+	aosb, xerr := abstract.NewBucket(abstract.WithName(bucketName))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -400,7 +400,7 @@ func (instance *location) GetBucket(bucketName string) (_ bucket, ferr fail.Erro
 }
 
 // CreateBucket ...
-func (instance location) CreateBucket(ctx context.Context, bucketName string) (_ *abstract.ObjectStorageBucket, ferr fail.Error) {
+func (instance location) CreateBucket(ctx context.Context, bucketName string) (_ *abstract.Bucket, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -417,7 +417,7 @@ func (instance location) CreateBucket(ctx context.Context, bucketName string) (_
 		return nil, fail.Wrap(err, fmt.Sprintf("failure creating bucket '%s'", bucketName))
 	}
 
-	aosb, xerr := abstract.NewObjectStorageBucket(abstract.WithName(bucketName))
+	aosb, xerr := abstract.NewBucket(abstract.WithName(bucketName))
 	if xerr != nil {
 		return nil, xerr
 	}

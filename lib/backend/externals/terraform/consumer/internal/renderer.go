@@ -28,7 +28,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
@@ -36,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/hashicorp/terraform-exec/tfexec"
+	tfjson "github.com/hashicorp/terraform-json"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -60,15 +60,12 @@ type ProviderUsingTerraform interface {
 
 // renderer is an implementation of Terraformer interface
 type renderer struct {
-	mu       *sync.Mutex
-	executor *tfexec.Terraform
-	provider ProviderUsingTerraform
-	scope    scopeapi.Scope
-	opts     options.Options
-	config   api.Configuration
-	// workdir      string
-	// plugindir    string
-	// execpath     string
+	mu           *sync.Mutex
+	executor     *tfexec.Terraform
+	provider     ProviderUsingTerraform
+	scope        api.ScopeLimitedToTerraformerUse
+	opts         options.Options
+	config       api.Configuration
 	env          map[string]string // contains environment variables to set at each call
 	buildPath    string
 	lastFilename string
@@ -100,7 +97,7 @@ func (instance *renderer) AddOptions(opts ...options.Option) fail.Error {
 
 // IsNull tells if the instance must be considered as a null/zero value
 func (instance *renderer) IsNull() bool {
-	return instance == nil || instance.mu == nil || instance.opts == nil || instance.config.WorkDir == "" || instance.config.ExecPath == ""
+	return instance == nil || instance.mu == nil || instance.opts == nil || instance.config.WorkDir == "" || instance.config.ExecPath == "" || valid.IsNull(instance.scope)
 }
 
 // SetEnv sets/replaces an environment var content
@@ -126,51 +123,6 @@ func (instance *renderer) AddEnv(key, value string) fail.Error {
 
 	instance.env[key] = value
 	return nil
-}
-
-func (instance *renderer) RenderProviderDefinition() (_ string, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if valid.IsNull(instance) {
-		return "", fail.InvalidInstanceError()
-	}
-	if instance.closed {
-		return "", fail.NotAvailableError("renderer has been closed")
-	}
-	if instance.dirty {
-		return "", fail.InconsistentError("built more than once without Reset() in between")
-	}
-
-	instance.mu.Lock()
-	defer instance.mu.Unlock()
-
-	authOpts, xerr := instance.provider.AuthenticationOptions()
-	if xerr != nil {
-		return "", xerr
-	}
-
-	configOpts, xerr := instance.provider.ConfigurationOptions()
-	if xerr != nil {
-		return "", xerr
-	}
-
-	variables := data.NewMap[string, any]()
-	variables["Provider"] = map[string]any{
-		"Name":           instance.provider.(ProviderUsingTerraform).Name(),
-		"Authentication": authOpts,
-		"Configuration":  configOpts,
-	}
-	variables["Terraformer"] = map[string]any{
-		"Config": instance.config,
-	}
-
-	// render provider configuration
-	content, xerr := instance.RealizeSnippet(instance.provider.(ProviderUsingTerraform).EmbeddedFS(), instance.provider.(ProviderUsingTerraform).TerraformDefinitionSnippet(), variables)
-	if xerr != nil {
-		return "", xerr
-	}
-
-	return content, nil
 }
 
 // Assemble creates a main.tf file in the appropriate folder
@@ -213,21 +165,18 @@ func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fa
 		"Config": instance.config,
 	}
 
-	// render the resources
-	// localStateStorage, remoteStateStorage := 0, 0
-	// for _, r := range resources {
-	// 	if r.RemoteState() {
-	// 		remoteStateStorage++
-	// 	} else {
-	// 		localStateStorage++
-	// 	}
-	// }
-	// rscCount := len(resources)
-	// if remoteStateStorage != rscCount && localStateStorage != rscCount {
-	// 	return "", fail.InvalidRequestError("cannot mix resources with remote and local state storage")
-	// }
+	variables["ProviderDeclaration"], xerr = instance.RealizeSnippet(instance.provider.(ProviderUsingTerraform).EmbeddedFS(), instance.provider.(ProviderUsingTerraform).TerraformDefinitionSnippet(), variables)
+	if xerr != nil {
+		return "", xerr
+	}
 
-	resourceContent := data.NewSlice[string](len(resources))
+	allResources, xerr := instance.scope.AllResources()
+	if xerr != nil {
+		return "", xerr
+	}
+
+	allResources = append(resources, allResources...)
+	resourceContent := data.NewSlice[string](len(allResources))
 	for _, r := range resources {
 		lvars := variables.Clone()
 		// lvars.Merge(map[string]any{"Resource": r.ToMap()})
@@ -620,7 +569,13 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 	}
 	targets, err := lang.Cast[[]string](value)
 	if err != nil {
-		return fail.Wrap(err)
+		switch err.(type) {
+		case *fail.ErrNotFound:
+			// continue
+			debug.IgnoreError(err)
+		default:
+			return fail.Wrap(err)
+		}
 	}
 
 	tfOpts := []tfexec.DestroyOption{}
@@ -699,32 +654,32 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 // 	return nil
 // }
 
-// func (instance *renderer) State(ctx context.Context) (_ *tfjson.State, ferr fail.Error) {
-// 	if valid.IsNull(instance) {
-// 		return nil, fail.InvalidInstanceError()
-// 	}
-// 	if instance.closed {
-// 		return nil, fail.NotAvailableError("renderer is closed")
-// 	}
-// 	if !instance.dirty {
-// 		return nil, fail.InconsistentError("nothing has been built yet")
-// 	}
-//
-// 	instance.mu.Lock()
-// 	defer instance.mu.Unlock()
-//
-// 	state, err := instance.executor.Show(ctx)
-// 	if err != nil {
-// 		if strings.Contains(err.Error(), "Resource already managed") {
-// 			return nil, fail.DuplicateError()
-// 		}
-//
-// 		return nil, fail.Wrap(err, "failed to apply terraform")
-// 	}
-// 	logrus.Trace("terraform state show ran successfully.")
-//
-// 	return state, nil
-// }
+func (instance *renderer) State(ctx context.Context) (_ *tfjson.State, ferr fail.Error) {
+	if valid.IsNull(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if instance.closed {
+		return nil, fail.NotAvailableError("renderer is closed")
+	}
+	if !instance.dirty {
+		return nil, fail.InconsistentError("nothing has been built yet")
+	}
+
+	instance.mu.Lock()
+	defer instance.mu.Unlock()
+
+	state, err := instance.executor.Show(ctx)
+	if err != nil {
+		if strings.Contains(err.Error(), "Resource already managed") {
+			return nil, fail.DuplicateError()
+		}
+
+		return nil, fail.Wrap(err, "failed to apply terraform")
+	}
+	logrus.Trace("terraform state show ran successfully.")
+
+	return state, nil
+}
 
 // Reset cleans up instance to be reused
 func (instance *renderer) Reset() fail.Error {

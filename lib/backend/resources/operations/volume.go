@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
@@ -63,12 +63,12 @@ type volume struct {
 }
 
 // NewVolume creates an instance of Volume
-func NewVolume(scope scopeapi.Scope) (_ resources.Volume, ferr fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+func NewVolume(ctx context.Context) (_ resources.Volume, ferr fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, volumeKind, volumesFolderName, &abstract.Volume{})
+	coreInstance, xerr := metadata.NewCore(ctx, metadata.MethodObjectStorage, volumeKind, volumesFolderName, abstract.NewEmptyVolume())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -81,12 +81,17 @@ func NewVolume(scope scopeapi.Scope) (_ resources.Volume, ferr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(inctx context.Context, scope scopeapi.Scope, ref string) (resources.Volume, fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+func LoadVolume(inctx context.Context, ref string) (resources.Volume, fail.Error) {
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+	}
+
+	myjob, xerr := jobapi.FromContext(inctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -106,7 +111,7 @@ func LoadVolume(inctx context.Context, scope scopeapi.Scope, ref string) (resour
 			var kt *volume
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := scope.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -120,7 +125,7 @@ func LoadVolume(inctx context.Context, scope scopeapi.Scope, ref string) (resour
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, scope, ref) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, ref) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -184,13 +189,13 @@ func LoadVolume(inctx context.Context, scope scopeapi.Scope, ref string) (resour
 }
 
 // onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'
-func onVolumeCacheMiss(ctx context.Context, scope scopeapi.Scope, ref string) (data.Identifiable, fail.Error) {
-	volumeInstance, innerXErr := NewVolume(scope)
+func onVolumeCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail.Error) {
+	volumeInstance, innerXErr := NewVolume(ctx)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	blank, innerXErr := NewVolume(scope)
+	blank, innerXErr := NewVolume(ctx)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -427,7 +432,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	defer tracer.Exiting()
 
 	// Check if Volume exists and is managed by SafeScale
-	mdv, xerr := LoadVolume(ctx, instance.Scope(), req.Name)
+	mdv, xerr := LoadVolume(ctx, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -471,7 +476,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := instance.Service().DeleteVolume(context.Background(), av.ID); derr != nil {
+			if derr := instance.Service().DeleteVolume(jobapi.NewContextPropagatingJob(ctx), av.ID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete volume '%s'", ActionFromError(ferr), req.Name))
 			}
 		}
@@ -657,7 +662,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := svc.DeleteVolumeAttachment(context.Background(), targetID, vaID); derr != nil {
+			if derr := svc.DeleteVolumeAttachment(jobapi.NewContextPropagatingJob(ctx), targetID, vaID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 			}
 		}
@@ -736,7 +741,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				defer func() {
 					ferr = debug.InjectPlannedFail(ferr)
 					if ferr != nil {
-						if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
+						if derr := nfsServer.UnmountBlockDevice(jobapi.NewContextPropagatingJob(ctx), volumeUUID); derr != nil {
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
 						}
 					}
@@ -759,7 +764,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 		defer func() {
 			if innerXErr != nil && !doNotMount {
-				if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
+				if derr := nfsServer.UnmountBlockDevice(jobapi.NewContextPropagatingJob(ctx), volumeUUID); derr != nil {
 					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(innerXErr), volumeName, targetName))
 				}
 			}
@@ -790,11 +795,11 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			if !doNotMount {
-				if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
+				if derr := nfsServer.UnmountBlockDevice(jobapi.NewContextPropagatingJob(ctx), volumeUUID); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 				}
 			}
-			derr := host.Alter(context.Background(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := host.Alter(jobapi.NewContextPropagatingJob(ctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
 					hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
 					if innerErr != nil {
@@ -1067,7 +1072,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 			}
 
 			// Unmount block device ...
-			if innerXErr = nfsServer.UnmountBlockDevice(context.Background(), attachment.Device); innerXErr != nil {
+			if innerXErr = nfsServer.UnmountBlockDevice(jobapi.NewContextPropagatingJob(ctx), attachment.Device); innerXErr != nil {
 				return innerXErr
 			}
 		}
@@ -1153,7 +1158,7 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 	}
 
 	for k := range attachments.Hosts {
-		hostInstance, xerr := LoadHost(ctx, instance.Scope(), k)
+		hostInstance, xerr := LoadHost(ctx, k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr

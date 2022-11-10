@@ -62,8 +62,10 @@ func TestShareIdentity_Serialize(t *testing.T) {
 
 	require.EqualValues(t, share1.HostID, share2.HostID)
 	require.EqualValues(t, share1.HostName, share2.HostName)
+	share1ID, _ := share1.GetID()
+	share2ID, _ := share2.GetID()
 	require.EqualValues(t, share1.ShareID, share2.ShareID)
-	require.EqualValues(t, share1.ShareName, share2.ShareName)
+	require.EqualValues(t, share1.GetName(), share2.GetName())
 
 }
 

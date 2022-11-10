@@ -26,39 +26,39 @@ import (
 
 func TestObjectStorageBucket_NewObjectStorageBucket(t *testing.T) {
 
-	n, _ := NewObjectStorageBucket()
+	n, _ := NewBucket()
 	if !n.IsNull() {
-		t.Error("ObjectStorageBucket is null !")
+		t.Error("Bucket is null !")
 		t.Fail()
 	}
 	if n.IsConsistent() {
-		t.Error("ObjectStorageBucket is not consistent !")
+		t.Error("Bucket is not consistent !")
 		t.Fail()
 	}
 	if n.OK() {
-		t.Error("ObjectStorageBucket is not ok !")
+		t.Error("Bucket is not ok !")
 		t.Fail()
 	}
-	n.ID = "ObjectStorageBucket ID"
-	n.Name = "ObjectStorageBucket Name"
+	n.ID = "Bucket ID"
+	n.Name = "Bucket Name"
 	if n.IsNull() {
-		t.Error("ObjectStorageBucket is not null !")
+		t.Error("Bucket is not null !")
 		t.Fail()
 	}
 	if !n.IsConsistent() {
-		t.Error("ObjectStorageBucket is consistent !")
+		t.Error("Bucket is consistent !")
 		t.Fail()
 	}
 	if !n.OK() {
-		t.Error("ObjectStorageBucket is ok !")
+		t.Error("Bucket is ok !")
 		t.Fail()
 	}
 }
 
 func TestObjectStorageBucket_Replace(t *testing.T) {
 
-	var o1 *ObjectStorageBucket
-	var o2 *ObjectStorageBucket
+	var o1 *Bucket
+	var o2 *Bucket
 	err := o1.Replace(o2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
@@ -66,7 +66,7 @@ func TestObjectStorageBucket_Replace(t *testing.T) {
 }
 
 func TestObjectStorageBucket_Clone(t *testing.T) {
-	b, _ := NewObjectStorageBucket()
+	b, _ := NewBucket()
 	b.Name = "host"
 
 	at, err := b.Clone()
@@ -74,7 +74,7 @@ func TestObjectStorageBucket_Clone(t *testing.T) {
 		t.Error(err)
 	}
 
-	bc, ok := at.(*ObjectStorageBucket)
+	bc, ok := at.(*Bucket)
 	if !ok {
 		t.Fail()
 	}
@@ -93,18 +93,18 @@ func TestObjectStorageBucket_Clone(t *testing.T) {
 
 func TestObjectStorageBucket_Serialize(t *testing.T) {
 
-	var n *ObjectStorageBucket = nil
+	var n *Bucket = nil
 	_, err := n.Serialize()
 	if err == nil {
-		t.Error("Can't serialize nil ObjectStorageBucket")
+		t.Error("Can't serialize nil Bucket")
 		t.Fail()
 	}
 
-	n, _ = NewObjectStorageBucket()
-	n.ID = "ObjectStorageBucket ID"
-	n.Name = "ObjectStorageBucket Name"
-	n.Host = "ObjectStorageBucket Host"
-	n.MountPoint = "ObjectStorageBucket MountPoint"
+	n, _ = NewBucket()
+	n.ID = "Bucket ID"
+	n.Name = "Bucket Name"
+	n.Host = "Bucket Host"
+	n.MountPoint = "Bucket MountPoint"
 
 	serial, err := n.Serialize()
 	if err != nil {
@@ -112,7 +112,7 @@ func TestObjectStorageBucket_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	n2, _ := NewObjectStorageBucket()
+	n2, _ := NewBucket()
 	err = n2.Deserialize(serial)
 	if err != nil {
 		t.Error(err)
@@ -129,11 +129,11 @@ func TestObjectStorageBucket_Serialize(t *testing.T) {
 
 func TestObjectStorageBucket_Deserialize(t *testing.T) {
 
-	n, _ := NewObjectStorageBucket()
-	n.ID = "ObjectStorageBucket ID"
-	n.Name = "ObjectStorageBucket Name"
-	n.Host = "ObjectStorageBucket Host"
-	n.MountPoint = "ObjectStorageBucket MountPoint"
+	n, _ := NewBucket()
+	n.ID = "Bucket ID"
+	n.Name = "Bucket Name"
+	n.Host = "Bucket Host"
+	n.MountPoint = "Bucket MountPoint"
 
 	serial, err := n.Serialize()
 	if err != nil {
@@ -141,14 +141,14 @@ func TestObjectStorageBucket_Deserialize(t *testing.T) {
 		t.Fail()
 	}
 
-	var n2 *ObjectStorageBucket
+	var n2 *Bucket
 	err = n2.Deserialize(serial)
 	if err == nil {
-		t.Error("Can't deserialize nil ObjectStorageBucket")
+		t.Error("Can't deserialize nil Bucket")
 		t.Fail()
 	}
 
-	brokenSerial := []byte("\"id\":\"ObjectStorageBucket ID\",\"name\":\"ObjectStorageBucket Name\",\"host\":\"ObjectStorageBucket Host\",\"mountPoint\":\"ObjectStorageBucket MountPoint\"}")
+	brokenSerial := []byte("\"id\":\"Bucket ID\",\"name\":\"Bucket Name\",\"host\":\"Bucket Host\",\"mountPoint\":\"Bucket MountPoint\"}")
 	err = n.Deserialize(brokenSerial)
 	if err == nil {
 		t.Error("Can't deserialize broken serial, expect *fail.ErrUnqualified")
@@ -159,15 +159,15 @@ func TestObjectStorageBucket_Deserialize(t *testing.T) {
 
 func TestObjectStorageBucket_GetName(t *testing.T) {
 
-	n := &ObjectStorageBucket{}
+	n := &Bucket{}
 	name := n.GetName()
 	if name != "" {
 		t.Error("Can't read name when no name given")
 		t.Fail()
 	}
 
-	n = &ObjectStorageBucket{}
-	n.Name = "ObjectStorageBucket Name"
+	n = &Bucket{}
+	n.Name = "Bucket Name"
 	name = n.GetName()
 	if name != n.Name {
 		t.Error("Wrong value restitution")
@@ -178,14 +178,14 @@ func TestObjectStorageBucket_GetName(t *testing.T) {
 
 func TestObjectStorageBucket_GetID(t *testing.T) {
 
-	n := &ObjectStorageBucket{}
+	n := &Bucket{}
 	id, _ := n.GetID()
 	if id != "" {
 		t.Error("Can't read id when no name given")
 		t.Fail()
 	}
-	n, _ = NewObjectStorageBucket(WithName("ObjectStorageBucket Name"))
-	n.ID = "ObjectStorageBucket ID"
+	n, _ = NewBucket(WithName("Bucket Name"))
+	n.ID = "Bucket ID"
 	id, _ = n.GetID()
 	if id != n.ID {
 		t.Error("Wrong value restitution")

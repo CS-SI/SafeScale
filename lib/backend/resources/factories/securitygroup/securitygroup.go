@@ -19,28 +19,29 @@ package securitygroup
 import (
 	"context"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // List returns a list of available security groups
-func List(ctx context.Context, scope scopeapi.Scope, all bool) ([]*abstract.SecurityGroup, fail.Error) {
+func List(ctx context.Context, all bool) ([]*abstract.SecurityGroup, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
-	}
 
 	if all {
-		return scope.Service().ListSecurityGroups(ctx, "")
+		myjob, xerr := jobapi.FromContext(ctx)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		return myjob.Service().ListSecurityGroups(ctx, "")
 	}
 
-	sgInstance, xerr := New(scope)
+	sgInstance, xerr := New(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -54,11 +55,11 @@ func List(ctx context.Context, scope scopeapi.Scope, all bool) ([]*abstract.Secu
 }
 
 // New creates an instance of resources.SecurityGroup
-func New(scope scopeapi.Scope) (_ resources.SecurityGroup, ferr fail.Error) {
-	return operations.NewSecurityGroup(scope)
+func New(ctx context.Context) (_ resources.SecurityGroup, ferr fail.Error) {
+	return operations.NewSecurityGroup(ctx)
 }
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
-func Load(ctx context.Context, scope scopeapi.Scope, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
-	return operations.LoadSecurityGroup(ctx, scope, ref)
+func Load(ctx context.Context, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
+	return operations.LoadSecurityGroup(ctx, ref)
 }

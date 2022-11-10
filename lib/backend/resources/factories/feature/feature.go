@@ -19,24 +19,22 @@ package feature
 import (
 	"context"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func New(ctx context.Context, scope scopeapi.Scope, name string) (resources.Feature, fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+func New(ctx context.Context, name string) (resources.Feature, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	feat, xerr := operations.NewFeature(ctx, scope, name)
+	feat, xerr := operations.NewFeature(ctx, name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -46,7 +44,7 @@ func New(ctx context.Context, scope scopeapi.Scope, name string) (resources.Feat
 		}
 
 		// Failed to find a spec file on filesystem, trying with embedded ones
-		if feat, xerr = operations.NewEmbeddedFeature(ctx, scope, name); xerr != nil {
+		if feat, xerr = operations.NewEmbeddedFeature(ctx, name); xerr != nil {
 			return nil, xerr
 		}
 	}
@@ -55,6 +53,6 @@ func New(ctx context.Context, scope scopeapi.Scope, name string) (resources.Feat
 
 // NewEmbedded searches for an embedded feature called 'name' and initializes a new Feature object
 // with its content
-func NewEmbedded(ctx context.Context, scope scopeapi.Scope, name string) (resources.Feature, fail.Error) {
-	return operations.NewEmbeddedFeature(ctx, scope, name)
+func NewEmbedded(ctx context.Context, name string) (resources.Feature, fail.Error) {
+	return operations.NewEmbeddedFeature(ctx, name)
 }

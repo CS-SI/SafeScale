@@ -67,7 +67,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot install feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Scope(), name)
+	feat, xerr := NewFeature(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -128,7 +128,7 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 	tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(ctx, instance.Scope(), name)
+	feat, xerr := NewFeature(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -168,7 +168,7 @@ func (instance *Host) DeleteFeature(inctx context.Context, name string, vars dat
 		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot delete feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	feat, xerr := NewFeature(ctx, instance.Scope(), name)
+	feat, xerr := NewFeature(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -337,7 +337,7 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 	list, _ := instance.InstalledFeatures(ctx)
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
-		item, xerr := NewFeature(ctx, instance.Scope(), v)
+		item, xerr := NewFeature(ctx, v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return emptySlice, xerr

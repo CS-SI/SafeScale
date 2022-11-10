@@ -523,7 +523,7 @@ func (instance *Host) unsafeGetDefaultSubnet(ctx context.Context) (subnetInstanc
 				}
 
 				var inErr fail.Error
-				subnetInstance, inErr = LoadSubnet(ctx, instance.Scope(), "", networkV2.DefaultSubnetID)
+				subnetInstance, inErr = LoadSubnet(ctx, "", networkV2.DefaultSubnetID)
 				if inErr != nil {
 					return inErr
 				}
@@ -537,7 +537,7 @@ func (instance *Host) unsafeGetDefaultSubnet(ctx context.Context) (subnetInstanc
 			}
 
 			var inErr fail.Error
-			subnetInstance, inErr = LoadSubnet(ctx, instance.Scope(), "", hostNetworkV2.DefaultSubnetID)
+			subnetInstance, inErr = LoadSubnet(ctx, "", hostNetworkV2.DefaultSubnetID)
 			if inErr != nil {
 				return inErr
 			}

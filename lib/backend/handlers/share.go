@@ -98,12 +98,12 @@ func (handler *shareHandler) Create(
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	shareInstance, xerr := sharefactory.New(handler.job.Scope())
+	shareInstance, xerr := sharefactory.New(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostName)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostName)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -135,7 +135,7 @@ func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	shareInstance, xerr := sharefactory.Load(handler.job.Context(), handler.job.Scope(), name)
+	shareInstance, xerr := sharefactory.Load(handler.job.Context(), name)
 	if xerr != nil {
 		return xerr
 	}
@@ -164,8 +164,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	svc := handler.job.Scope()
-	objs, xerr := sharefactory.New(svc)
+	objs, xerr := sharefactory.New(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -185,7 +184,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	}
 
 	for _, serverID := range servers {
-		host, xerr := hostfactory.Load(handler.job.Context(), svc, serverID)
+		host, xerr := hostfactory.Load(handler.job.Context(), serverID)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -239,14 +238,13 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	// Retrieve info about the share
-	svc := handler.job.Scope()
 	ctx := handler.job.Context()
-	shareInstance, xerr := sharefactory.Load(ctx, svc, shareName)
+	shareInstance, xerr := sharefactory.Load(ctx, shareName)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	target, xerr := hostfactory.Load(ctx, svc, hostRef)
+	target, xerr := hostfactory.Load(ctx, hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -281,14 +279,13 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	svc := handler.job.Scope()
 	ctx := handler.job.Context()
-	objs, xerr := sharefactory.Load(ctx, svc, shareRef)
+	objs, xerr := sharefactory.Load(ctx, shareRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	target, xerr := hostfactory.Load(ctx, svc, hostRef)
+	target, xerr := hostfactory.Load(ctx, hostRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -321,5 +318,5 @@ func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, fe
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	return sharefactory.Load(handler.job.Context(), handler.job.Scope(), shareRef)
+	return sharefactory.Load(handler.job.Context(), shareRef)
 }

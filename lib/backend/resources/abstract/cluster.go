@@ -80,6 +80,12 @@ func NewCluster(opts ...Option) (*Cluster, fail.Error) {
 	return out, nil
 }
 
+// NewEmptyCluster returns a empty, unnamed Cluster instance
+func NewEmptyCluster() *Cluster {
+	out, _ := NewCluster()
+	return out
+}
+
 // IsNull ...
 func (instance *Cluster) IsNull() bool {
 	return instance == nil || instance.Core.IsNull()

@@ -115,7 +115,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	host, xerr := hostfactory.Load(ctx, handler.job.Scope(), hostRef)
+	host, xerr := hostfactory.Load(ctx, hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -192,7 +192,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 				}
 
 				var innerXErr fail.Error
-				subnetInstance, innerXErr = subnetfactory.Load(ctx, host.Scope(), "", subnetID)
+				subnetInstance, innerXErr = subnetfactory.Load(ctx, "", subnetID)
 				return innerXErr
 			})
 		})
@@ -363,7 +363,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
-	host, xerr := hostfactory.Load(ctx, handler.job.Scope(), hostRef)
+	host, xerr := hostfactory.Load(ctx, hostRef)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -576,7 +576,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		upload = true
 	}
 
-	host, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostName)
+	host, xerr := hostfactory.Load(handler.job.Context(), hostName)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}

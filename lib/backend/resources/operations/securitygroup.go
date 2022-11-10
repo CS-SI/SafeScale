@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
@@ -65,12 +65,12 @@ type SecurityGroup struct {
 }
 
 // NewSecurityGroup ...
-func NewSecurityGroup(scope scopeapi.Scope) (*SecurityGroup, fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+func NewSecurityGroup(ctx context.Context) (*SecurityGroup, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, securityGroupKind, securityGroupsFolderName, &abstract.SecurityGroup{})
+	coreInstance, xerr := metadata.NewCore(ctx, metadata.MethodObjectStorage, securityGroupKind, securityGroupsFolderName, abstract.NewEmptySecurityGroup())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -83,15 +83,20 @@ func NewSecurityGroup(scope scopeapi.Scope) (*SecurityGroup, fail.Error) {
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(inctx context.Context, scope scopeapi.Scope, ref string) (*SecurityGroup, fail.Error) {
+func LoadSecurityGroup(inctx context.Context, ref string) (*SecurityGroup, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if ref == "" {
 		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	myjob, xerr := jobapi.FromContext(inctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	type result struct {
@@ -108,7 +113,7 @@ func LoadSecurityGroup(inctx context.Context, scope scopeapi.Scope, ref string) 
 			var kt *SecurityGroup
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := scope.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -122,7 +127,7 @@ func LoadSecurityGroup(inctx context.Context, scope scopeapi.Scope, ref string) 
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSGCacheMiss(ctx, scope, ref) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSGCacheMiss(ctx, ref) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -186,13 +191,13 @@ func LoadSecurityGroup(inctx context.Context, scope scopeapi.Scope, ref string) 
 }
 
 // onSGCacheMiss is called when there is no instance in cache of Security Group 'ref'
-func onSGCacheMiss(ctx context.Context, scope scopeapi.Scope, ref string) (data.Identifiable, fail.Error) {
-	sgInstance, innerXErr := NewSecurityGroup(scope)
+func onSGCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail.Error) {
+	sgInstance, innerXErr := NewSecurityGroup(ctx)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	blank, innerXErr := NewSecurityGroup(scope)
+	blank, innerXErr := NewSecurityGroup(ctx)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -328,7 +333,7 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 
 		// Check if SecurityGroup exists and is managed by SafeScale
 		svc := instance.Service()
-		_, xerr := LoadSecurityGroup(ctx, instance.Scope(), name)
+		_, xerr := LoadSecurityGroup(ctx, name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -446,7 +451,7 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 			}
 
 			// so it's nil...
-			networkInstance, xerr := LoadNetwork(ctx, instance.Scope(), networkID)
+			networkInstance, xerr := LoadNetwork(ctx, networkID)
 			if xerr != nil {
 				chRes <- result{xerr}
 				return xerr
@@ -570,7 +575,7 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 				return fail.InvalidRequestError("cannot unbind from host a security group applied from subnet; use disable instead or remove from bound subnet")
 			}
 
-			hostInstance, xerr := LoadHost(ctx, instance.Scope(), v.ID)
+			hostInstance, xerr := LoadHost(ctx, v.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -669,7 +674,7 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 					return xerr
 				}
 			} else {
-				subnetInstance, xerr := LoadSubnet(ctx, instance.Scope(), "", v)
+				subnetInstance, xerr := LoadSubnet(ctx, "", v)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/eko/gocache/v2/store"
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
@@ -57,13 +57,12 @@ type label struct {
 var _ resources.Label = (*label)(nil)
 
 // NewLabel creates an instance of Label
-func NewLabel(scope scopeapi.Scope) (_ resources.Label, ferr fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+func NewLabel(ctx context.Context) (_ resources.Label, ferr fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	nl, _ := abstract.NewLabel()
-	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, labelKind, labelsFolderName, nl)
+	coreInstance, xerr := metadata.NewCore(ctx, metadata.MethodObjectStorage, labelKind, labelsFolderName, abstract.NewEmptyLabel())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -76,12 +75,17 @@ func NewLabel(scope scopeapi.Scope) (_ resources.Label, ferr fail.Error) {
 }
 
 // LoadLabel loads the metadata of a Label
-func LoadLabel(inctx context.Context, scope scopeapi.Scope, ref string) (resources.Label, fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+func LoadLabel(inctx context.Context, ref string) (resources.Label, fail.Error) {
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
+	}
+
+	myjob, xerr := jobapi.FromContext(inctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -101,7 +105,7 @@ func LoadLabel(inctx context.Context, scope scopeapi.Scope, ref string) (resourc
 			var kt *label
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := scope.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -115,7 +119,7 @@ func LoadLabel(inctx context.Context, scope scopeapi.Scope, ref string) (resourc
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onLabelCacheMiss(ctx, scope, ref) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onLabelCacheMiss(ctx, ref) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -178,13 +182,13 @@ func LoadLabel(inctx context.Context, scope scopeapi.Scope, ref string) (resourc
 }
 
 // onLabelCacheMiss is called when there is no instance in cache of Label 'ref'
-func onLabelCacheMiss(ctx context.Context, scope scopeapi.Scope, ref string) (data.Identifiable, fail.Error) {
-	labelInstance, innerXErr := NewLabel(scope)
+func onLabelCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail.Error) {
+	labelInstance, innerXErr := NewLabel(ctx)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
 
-	blank, innerXErr := NewLabel(scope)
+	blank, innerXErr := NewLabel(ctx)
 	if innerXErr != nil {
 		return nil, innerXErr
 	}
@@ -360,7 +364,7 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 	}
 
 	// Check if Label exists and is managed by SafeScale
-	_, xerr := LoadLabel(ctx, instance.Scope(), name)
+	_, xerr := LoadLabel(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -430,7 +434,7 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 	if withHosts {
 		hosts := make([]*protocol.LabelHostResponse, 0)
 		for k, v := range labelHostsV1.ByID {
-			hostInstance, xerr := LoadHost(ctx, instance.Scope(), k)
+			hostInstance, xerr := LoadHost(ctx, k)
 			if xerr != nil {
 				return nil, xerr
 			}

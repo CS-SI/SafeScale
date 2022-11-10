@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package factory
+package tenant
 
 import (
 	"context"
@@ -26,13 +26,14 @@ import (
 	"regexp"
 	"time"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
@@ -44,35 +45,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 )
-
-var (
-	// allProviders = map[string]Service{}
-	allProviderProfiles = map[string]*providers.Profile{}
-)
-
-// // Register a service referenced by the provider name. Ex: "ovh", ovh.newCore()
-// // This function should be called by the init function of each provider to be registered in SafeScale
-// func Register(name string, provider providers.Provider) {
-// 	// if already registered, leave
-// 	if _, ok := allProviders[name]; ok {
-// 		return
-// 	}
-// 	allProviders[name] = &service{
-// 		Provider: provider,
-// 	}
-// 	allProviderProfiles[name] = providers.NewProfile(provider.Capabilities())
-// }
-
-// Register a service referenced by the provider name. Ex: "ovh", ovh.newCore()
-// This function should be called by the init function of each provider to be registered in SafeScale
-func Register(name string, profile *providers.Profile) {
-	// if already registered, leave
-	if _, ok := allProviderProfiles[name]; ok {
-		return
-	}
-
-	allProviderProfiles[name] = profile
-}
 
 // GetTenantNames returns all known tenants names
 func GetTenantNames() (map[string]string, fail.Error) {
@@ -102,34 +74,29 @@ func FindProviderProfileForTenant(tenantName string) (*providers.Profile, fail.E
 			return nil, fail.NotFoundError("failed to find the profile of Provider used by Tenant '%s'", tenantName)
 		}
 
-		return findProfile(provider)
+		return iaas.FindProviderProfile(provider)
 	}
 
 	return nil, fail.NotFoundError("failed to find Tenant '%s'", tenantName)
 }
 
-// findProfile returns a Profile corresponding to provider name passed as parameter
-func findProfile(providerName string) (*providers.Profile, fail.Error) {
-	if providerName == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("providerName")
-	}
-
-	p, ok := allProviderProfiles[providerName]
-	if !ok {
-		return nil, fail.NotFoundError("failed to find a Profile for Provider '%s'", providerName)
-	}
-
-	return p, nil
-}
-
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(Options ...options.Option) (_ iaasapi.Service, ferr fail.Error) {
-	ctx := context.Background() // FIXME: Check context
+func UseService(ctx context.Context, opts ...options.Option) (_ iaasapi.Service, ferr fail.Error) {
 	defer fail.OnExitLogError(ctx, &ferr)
 	defer fail.OnPanic(&ferr)
 
-	opts, xerr := options.New(Options...)
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	opts = append(opts, iaasoptions.WithScope(myjob.Scope()))
+	o, xerr := options.New(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -140,12 +107,7 @@ func UseService(Options ...options.Option) (_ iaasapi.Service, ferr fail.Error) 
 		provider    string
 	)
 
-	scope, xerr := options.Value[scopeapi.Scope](opts, iaasoptions.OptionScope)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	tenantName := scope.Tenant()
+	tenantName := myjob.Scope().Tenant()
 	tenantInCfg, currentTenant := findParametersOfTenant(tenantName)
 	if tenantInCfg {
 		provider = findProviderFromTenantParameters(currentTenant)
@@ -153,7 +115,7 @@ func UseService(Options ...options.Option) (_ iaasapi.Service, ferr fail.Error) 
 			return NullService(), fail.NotFoundError("failed to find Provider used by Tenant '%s'; check its parameters", tenantName)
 		}
 
-		svcProviderProfile, xerr := findProfile(provider)
+		svcProviderProfile, xerr := iaas.FindProviderProfile(provider)
 		if xerr != nil {
 			return NullService(), fail.Wrap(xerr, "error initializing Tenant '%s' with Provider '%s'", tenantName, provider)
 		}
@@ -176,7 +138,7 @@ func UseService(Options ...options.Option) (_ iaasapi.Service, ferr fail.Error) 
 
 		// Initializes provider
 		var providerInstance iaasapi.Provider
-		providerInstance, xerr = svcProviderProfile.ReferenceInstance().Build(currentTenant, opts)
+		providerInstance, xerr = svcProviderProfile.ReferenceInstance().Build(currentTenant, o)
 		if xerr != nil {
 			return NullService(), fail.Wrap(xerr, "error initializing currentTenant '%s' on provider '%s'", tenantName, provider)
 		}
@@ -247,7 +209,7 @@ func UseService(Options ...options.Option) (_ iaasapi.Service, ferr fail.Error) 
 
 		// Initializes Metadata Object Storage (maybe different from the Object Storage)
 		var (
-			metadataBucket   *abstract.ObjectStorageBucket
+			metadataBucket   *abstract.Bucket
 			metadataCryptKey *crypt.Key
 		)
 		if tenantMetadataFound || tenantObjectStorageFound {

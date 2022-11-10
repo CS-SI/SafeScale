@@ -193,7 +193,7 @@ func (s *LabelListener) Inspect(inctx context.Context, in *protocol.LabelInspect
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
-	instance, xerr := labelfactory.Load(ctx, job.Scope(), ref)
+	instance, xerr := labelfactory.Load(ctx, ref)
 	if xerr != nil {
 		return nil, xerr
 	}

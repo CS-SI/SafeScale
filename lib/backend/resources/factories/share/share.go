@@ -19,18 +19,17 @@ package share
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // New creates an instance of resources.Share
-func New(scope scopeapi.Scope) (resources.Share, fail.Error) {
-	return operations.NewShare(scope)
+func New(ctx context.Context) (resources.Share, fail.Error) {
+	return operations.NewShare(ctx)
 }
 
 // Load loads the metadata of a share and returns an instance of resources.Share
-func Load(ctx context.Context, scope scopeapi.Scope, ref string) (resources.Share, fail.Error) {
-	return operations.LoadShare(ctx, scope, ref)
+func Load(ctx context.Context, ref string) (resources.Share, fail.Error) {
+	return operations.LoadShare(ctx, ref)
 }

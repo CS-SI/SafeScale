@@ -22,10 +22,10 @@ import (
 	"strings"
 	"time"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -44,24 +44,25 @@ import (
 type folder struct {
 	// path contains the base path where to read/write record in Object Storage
 	path     string
-	scope    scopeapi.Scope
+	job      jobapi.Job
 	service  iaasapi.Service
 	crypt    bool
 	cryptKey *crypt.Key
 }
 
 // NewFolder creates a new Metadata folder object, ready to help access the metadata inside it
-func NewFolder(svc iaasapi.Service, path string) (*folder, fail.Error) {
-	if svc == nil {
-		return &folder{}, fail.InvalidInstanceError()
+func NewFolder(job jobapi.Job, path string) (*folder, fail.Error) {
+	if job.IsNull() {
+		return &folder{}, fail.InvalidParameterCannotBeNilError("job")
 	}
 
 	f := &folder{
 		path:    strings.Trim(path, "/"),
-		service: svc,
+		job:     job,
+		service: job.Service(),
 	}
 
-	cryptKey, xerr := svc.GetMetadataKey()
+	cryptKey, xerr := f.service.GetMetadataKey()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
@@ -86,17 +87,17 @@ func (instance folder) Service() iaasapi.Service {
 	return instance.service
 }
 
-// Scope returns the scope of the folder
-func (instance *folder) Scope() scopeapi.Scope {
+// Job returns the job of the folder
+func (instance *folder) Job() jobapi.Job {
 	if valid.IsNull(instance) {
 		return nil
 	}
 
-	return instance.scope
+	return instance.job
 }
 
 // GetBucket returns the bucket used by the folder to store Object Storage
-func (instance folder) GetBucket(ctx context.Context) (*abstract.ObjectStorageBucket, fail.Error) {
+func (instance folder) GetBucket(ctx context.Context) (*abstract.Bucket, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -110,7 +111,7 @@ func (instance folder) GetBucket(ctx context.Context) (*abstract.ObjectStorageBu
 }
 
 // getBucket is the same as GetBucket without instance validation (for internal use)
-func (instance folder) getBucket(ctx context.Context) (*abstract.ObjectStorageBucket, fail.Error) {
+func (instance folder) getBucket(ctx context.Context) (*abstract.Bucket, fail.Error) {
 	bucket, xerr := instance.service.GetMetadataBucket(ctx)
 	if xerr != nil {
 		return nil, xerr

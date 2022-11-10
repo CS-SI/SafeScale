@@ -72,7 +72,7 @@ func (handler *securityGroupHandler) List(all bool) (_ []*abstract.SecurityGroup
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	return securitygroupfactory.List(handler.job.Context(), handler.job.Scope(), all)
+	return securitygroupfactory.List(handler.job.Context(), all)
 }
 
 // Create creates a new Security Group
@@ -95,12 +95,12 @@ func (handler *securityGroupHandler) Create(networkRef, sgName, description stri
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef)
+	networkInstance, xerr := networkfactory.Load(handler.job.Context(), networkRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.New(handler.job.Scope())
+	sgInstance, xerr := securitygroupfactory.New(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -138,7 +138,7 @@ func (handler *securityGroupHandler) Clear(sgRef string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -163,7 +163,7 @@ func (handler *securityGroupHandler) Reset(sgRef string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -188,7 +188,7 @@ func (handler *securityGroupHandler) Inspect(sgRef string) (_ resources.Security
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	return securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
+	return securitygroupfactory.Load(handler.job.Context(), sgRef)
 }
 
 // Delete a host
@@ -211,7 +211,7 @@ func (handler *securityGroupHandler) Delete(sgRef string, force bool) (ferr fail
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -242,7 +242,7 @@ func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.Securi
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), sgRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -278,7 +278,7 @@ func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), sgRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -344,7 +344,7 @@ func (handler *securityGroupHandler) Bonds(sgRef string, kind string) (_ []*prop
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), sgRef)
 	if xerr != nil {
 		return nil, nil, xerr
 	}

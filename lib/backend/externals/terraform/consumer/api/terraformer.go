@@ -55,6 +55,10 @@ type (
 
 	RequiredProviders data.Map[string, RequiredProvider]
 
+	ScopeLimitedToTerraformerUse interface {
+		AllResources() ([]Resource, fail.Error)
+	}
+
 	Configuration struct {
 		Release   string // contains the release of terraform wanted for the hcl file produced
 		WorkDir   string
@@ -64,7 +68,7 @@ type (
 			Server string
 			Prefix string // should contains "safescale/terraformstate/{Scope.Organization}/{Scope.Project}/{Scope.Tenant}
 		}
-		// Scope scopeapi.Scope
+		Scope ScopeLimitedToTerraformerUse
 		RequiredProviders
 	}
 

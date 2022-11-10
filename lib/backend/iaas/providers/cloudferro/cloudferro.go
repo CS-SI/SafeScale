@@ -22,13 +22,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
@@ -37,6 +36,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -358,5 +358,5 @@ func init() {
 		func() iaasapi.Provider { return &provider{} },
 		nil,
 	)
-	factory.Register("cloudferro", profile)
+	iaas.RegisterProviderProfile("cloudferro", profile)
 }

@@ -120,7 +120,11 @@ func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCrea
 		}
 	}
 
-	handler := handlers.NewNetworkHandler(job)
+	handler, xerr := handlers.NewNetworkHandler(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	networkInstance, xerr := handler.Create(networkReq, subnetReq, "", gwSizing)
 	if xerr != nil {
 		return nil, xerr
@@ -156,7 +160,11 @@ func (s *NetworkListener) List(inctx context.Context, in *protocol.NetworkListRe
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
-	handler := handlers.NewNetworkHandler(job)
+	handler, xerr := handlers.NewNetworkHandler(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	list, xerr := handler.List(in.GetAll())
 	if xerr != nil {
 		return nil, xerr
@@ -202,7 +210,11 @@ func (s *NetworkListener) Inspect(inctx context.Context, in *protocol.Reference)
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
-	handler := handlers.NewNetworkHandler(job)
+	handler, xerr := handlers.NewNetworkHandler(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	networkInstance, xerr := handler.Inspect(networkRef)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -253,6 +265,10 @@ func (s *NetworkListener) Delete(inctx context.Context, in *protocol.NetworkDele
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
-	handler := handlers.NewNetworkHandler(job)
+	handler, xerr := handlers.NewNetworkHandler(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	return empty, handler.Delete(networkRef, in.GetForce())
 }

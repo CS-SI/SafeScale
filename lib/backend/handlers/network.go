@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/sirupsen/logrus"
 )
@@ -52,8 +53,18 @@ type networkHandler struct {
 }
 
 // NewNetworkHandler returns an instance of *networkHandler that satisfies interface NetworkHandler
-func NewNetworkHandler(job jobapi.Job) NetworkHandler {
-	return &networkHandler{job}
+func NewNetworkHandler(ctx context.Context) (NetworkHandler, fail.Error) {
+	value := ctx.Value(jobapi.KeyForJobInContext)
+	if value == nil {
+		return nil, fail.InvalidRequestError("failed to get the job inside the context")
+	}
+
+	job, err := lang.Cast[jobapi.Job](value)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	return &networkHandler{job}, nil
 }
 
 // Create a new network
@@ -73,7 +84,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkReq.Name")
 	}
 
-	ctx, svc := handler.job.Context(), handler.job.Scope()
+	ctx := handler.job.Context()
 	tracer := debug.NewTracer(ctx, true, "('%s')", networkReq.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
@@ -92,7 +103,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 		return nil, fail.InvalidRequestError("requested CIDR '%s' intersects with default docker network '%s'", "172.17.0.0/16")
 	}
 
-	networkInstance, xerr := networkfactory.New(svc)
+	networkInstance, xerr := networkfactory.New(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -125,7 +136,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 			gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
 		}
 
-		subnetInstance, xerr := subnetfactory.New(svc)
+		subnetInstance, xerr := subnetfactory.New(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -168,7 +179,7 @@ func (handler *networkHandler) List(all bool) (_ []*abstract.Network, ferr fail.
 		return handler.job.Service().ListNetworks(handler.job.Context())
 	}
 
-	return networkfactory.List(handler.job.Context(), handler.job.Scope())
+	return networkfactory.List(handler.job.Context())
 }
 
 // Inspect returns infos on a network
@@ -192,7 +203,7 @@ func (handler *networkHandler) Inspect(networkRef string) (_ resources.Network, 
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	return networkfactory.Load(handler.job.Context(), handler.job.Scope(), networkRef)
+	return networkfactory.Load(handler.job.Context(), networkRef)
 }
 
 // Delete a network
@@ -215,12 +226,12 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 		logrus.Tracef("forcing network deletion")
 	}
 
-	ctx, svc := handler.job.Context(), handler.job.Scope()
+	ctx := handler.job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(ctx, svc, networkRef)
+	networkInstance, xerr := networkfactory.Load(ctx, networkRef)
 	if xerr != nil {
 		var abstractNetwork *abstract.Network
 		switch xerr.(type) {

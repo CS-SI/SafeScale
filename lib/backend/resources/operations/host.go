@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
@@ -94,14 +94,18 @@ type Host struct {
 }
 
 // NewHost ...
-func NewHost(scope scopeapi.Scope) (_ *Host, ferr fail.Error) {
+func NewHost(ctx context.Context) (_ *Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if scope == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("frame")
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if valid.IsNull(myjob) {
+		return nil, fail.InconsistentError("missing valid Job in context")
 	}
 
-	coreInstance, xerr := metadata.NewCore(scope, metadata.MethodObjectStorage, hostKind, hostsFolderName, &abstract.HostCore{})
+	coreInstance, xerr := metadata.NewCore(ctx, metadata.MethodObjectStorage, hostKind, hostsFolderName, abstract.NewEmptyHostFull())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -114,16 +118,21 @@ func NewHost(scope scopeapi.Scope) (_ *Host, ferr fail.Error) {
 }
 
 // LoadHost ...
-func LoadHost(inctx context.Context, scope scopeapi.Scope, ref string) (resources.Host, fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
-	}
+func LoadHost(inctx context.Context, ref string) (resources.Host, fail.Error) {
 	if ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
+
+	myjob, xerr := jobapi.FromContext(inctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if valid.IsNull(myjob) {
+		return nil, fail.InvalidParameterError("inctx", "missing valid Job")
+	}
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	type result struct {
 		a    resources.Host
@@ -139,7 +148,7 @@ func LoadHost(inctx context.Context, scope scopeapi.Scope, ref string) (resource
 			var kt *Host
 			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := scope.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -158,7 +167,7 @@ func LoadHost(inctx context.Context, scope scopeapi.Scope, ref string) (resource
 				}
 			}
 
-			anon, xerr := onHostCacheMiss(ctx, scope, ref)
+			anon, xerr := onHostCacheMiss(ctx, ref)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -231,7 +240,7 @@ func LoadHost(inctx context.Context, scope scopeapi.Scope, ref string) (resource
 // }
 
 // onHostCacheMiss is called when host 'ref' is not found in cache
-func onHostCacheMiss(inctx context.Context, scope scopeapi.Scope, ref string) (data.Identifiable, fail.Error) {
+func onHostCacheMiss(inctx context.Context, ref string) (data.Identifiable, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -245,7 +254,7 @@ func onHostCacheMiss(inctx context.Context, scope scopeapi.Scope, ref string) (d
 		ga, gerr := func() (_ data.Identifiable, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			hostInstance, innerXErr := NewHost(scope)
+			hostInstance, innerXErr := NewHost(ctx)
 			if innerXErr != nil {
 				return nil, innerXErr
 			}
@@ -358,7 +367,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
 			// Do not execute iff Host is single or is a gateway
 			if !hnV2.Single && !hnV2.IsGateway && hnV2.DefaultSubnetID != "" {
-				subnetInstance, xerr := LoadSubnet(ctx, instance.Scope(), "", hnV2.DefaultSubnetID)
+				subnetInstance, xerr := LoadSubnet(ctx, "", hnV2.DefaultSubnetID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -870,7 +879,7 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 		}
 
 		// Check if Host exists and is managed bySafeScale
-		_, xerr = LoadHost(ctx, instance.Scope(), hostReq.ResourceName)
+		_, xerr = LoadHost(ctx, hostReq.ResourceName)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -953,7 +962,7 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 			undoCreateSingleHostNetworking func() fail.Error
 		)
 		if hostReq.Single {
-			defaultSubnet, undoCreateSingleHostNetworking, xerr = createSingleHostNetworking(ctx, instance.Scope(), hostReq)
+			defaultSubnet, undoCreateSingleHostNetworking, xerr = createSingleHostNetworking(ctx, hostReq)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{nil, xerr}
@@ -991,7 +1000,7 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 		} else {
 			// By convention, default subnet is the first of the list
 			as := hostReq.Subnets[0]
-			defaultSubnet, xerr = LoadSubnet(ctx, instance.Scope(), "", as.ID)
+			defaultSubnet, xerr = LoadSubnet(ctx, "", as.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{nil, xerr}
@@ -1056,7 +1065,7 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && hostReq.CleanOnFailure() && ahf != nil && ahf.IsConsistent() {
-				derr := svc.DeleteHost(context.Background(), ahf.ID)
+				derr := svc.DeleteHost(jobapi.NewContextPropagatingJob(ctx), ahf.ID)
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Name))
 				}
@@ -1106,7 +1115,7 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && hostReq.CleanOnFailure() {
-				derr := instance.Core.Delete(context.Background())
+				derr := instance.Core.Delete(jobapi.NewContextPropagatingJob(ctx))
 				if derr != nil {
 					logrus.WithContext(ctx).Errorf("cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Name, derr)
 					_ = ferr.AddConsequence(derr)
@@ -1119,7 +1128,7 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 			if ferr != nil && ahf.IsConsistent() {
 				if ahf.LastState != hoststate.Deleted {
 					logrus.WithContext(context.Background()).Warnf("Marking instance '%s' as FAILED", ahf.GetName())
-					derr := instance.Alter(context.Background(), func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+					derr := instance.Alter(jobapi.NewContextPropagatingJob(ctx), func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 						ahc, innerErr := lang.Cast[*abstract.HostCore](p)
 						if innerErr != nil {
 							return fail.Wrap(innerErr)
@@ -1228,7 +1237,7 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 			return xerr
 		}
 		defer func() {
-			derr := instance.undoSetSecurityGroups(context.Background(), &ferr, hostReq.KeepOnFailure)
+			derr := instance.undoSetSecurityGroups(jobapi.NewContextPropagatingJob(ctx), &ferr, hostReq.KeepOnFailure)
 			if derr != nil {
 				logrus.WithContext(ctx).Warnf(derr.Error())
 			}
@@ -1316,7 +1325,7 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				instance.undoUpdateSubnets(context.Background(), hostReq, &ferr)
+				instance.undoUpdateSubnets(jobapi.NewContextPropagatingJob(ctx), hostReq, &ferr)
 			}
 		}()
 
@@ -1510,7 +1519,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 			// Apply Security Group for gateways in default Subnet
 			if req.IsGateway && defaultAbstractSubnet.GWSecurityGroupID != "" {
-				gwsg, innerXErr = LoadSecurityGroup(ctx, instance.Scope(), defaultAbstractSubnet.GWSecurityGroupID)
+				gwsg, innerXErr = LoadSecurityGroup(ctx, defaultAbstractSubnet.GWSecurityGroupID)
 				if innerXErr != nil {
 					return fail.Wrap(innerXErr, "failed to query Subnet '%s' Security Group '%s'", defaultSubnet.GetName(), defaultAbstractSubnet.GWSecurityGroupID)
 				}
@@ -1522,7 +1531,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 				defer func() {
 					if finnerXErr != nil && req.CleanOnFailure() {
-						derr := gwsg.UnbindFromHost(context.Background(), instance)
+						derr := gwsg.UnbindFromHost(jobapi.NewContextPropagatingJob(ctx), instance)
 						if derr != nil {
 							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), gwsg.GetName(), instance.GetName()))
 						}
@@ -1546,7 +1555,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 			// Apply Security Group for hosts with public IP in default Subnet
 			if (req.IsGateway || req.PublicIP) && defaultAbstractSubnet.PublicIPSecurityGroupID != "" {
-				pubipsg, innerXErr = LoadSecurityGroup(ctx, instance.Scope(), defaultAbstractSubnet.PublicIPSecurityGroupID)
+				pubipsg, innerXErr = LoadSecurityGroup(ctx, defaultAbstractSubnet.PublicIPSecurityGroupID)
 				if innerXErr != nil {
 					return fail.Wrap(innerXErr, "failed to query Subnet '%s' Security Group with ID %s", defaultSubnet.GetName(), defaultAbstractSubnet.PublicIPSecurityGroupID)
 				}
@@ -1558,7 +1567,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 				defer func() {
 					if finnerXErr != nil && req.CleanOnFailure() {
-						derr := pubipsg.UnbindFromHost(context.Background(), instance)
+						derr := pubipsg.UnbindFromHost(jobapi.NewContextPropagatingJob(ctx), instance)
 						if derr != nil {
 							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), pubipsg.GetName(), instance.GetName()))
 						}
@@ -1588,30 +1597,31 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 						derr error
 						errs []error
 					)
+					uncancellableContext := jobapi.NewContextPropagatingJob(ctx)
 					for _, v := range req.Subnets {
 						if v.ID == defaultSubnetID {
 							continue
 						}
 
-						subnetInstance, deeperXErr := LoadSubnet(context.Background(), instance.Scope(), "", v.ID)
+						subnetInstance, deeperXErr := LoadSubnet(uncancellableContext, "", v.ID)
 						if deeperXErr != nil {
 							_ = innerXErr.AddConsequence(deeperXErr)
 							continue
 						}
 
 						sgName := sg.GetName()
-						deeperXErr = subnetInstance.Review(context.Background(), func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+						deeperXErr = subnetInstance.Review(uncancellableContext, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
 							abstractSubnet, innerErr := lang.Cast[*abstract.Subnet](p)
 							if innerErr != nil {
 								return fail.Wrap(innerErr)
 							}
 
 							if abstractSubnet.InternalSecurityGroupID != "" {
-								sg, derr = LoadSecurityGroup(context.Background(), instance.Scope(), abstractSubnet.InternalSecurityGroupID)
+								sg, derr = LoadSecurityGroup(uncancellableContext, abstractSubnet.InternalSecurityGroupID)
 								if derr != nil {
 									errs = append(errs, derr)
 								} else {
-									derr = sg.UnbindFromHost(context.Background(), instance)
+									derr = sg.UnbindFromHost(uncancellableContext, instance)
 									if derr != nil {
 										errs = append(errs, derr)
 									}
@@ -1636,7 +1646,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					continue
 				}
 
-				otherSubnetInstance, innerXErr := LoadSubnet(ctx, instance.Scope(), "", v.ID)
+				otherSubnetInstance, innerXErr := LoadSubnet(ctx, "", v.ID)
 				innerXErr = debug.InjectPlannedFail(innerXErr)
 				if innerXErr != nil {
 					return innerXErr
@@ -1671,7 +1681,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				}
 
 				if otherAbstractSubnet.InternalSecurityGroupID != "" {
-					lansg, innerXErr = LoadSecurityGroup(ctx, instance.Scope(), otherAbstractSubnet.InternalSecurityGroupID)
+					lansg, innerXErr = LoadSecurityGroup(ctx, otherAbstractSubnet.InternalSecurityGroupID)
 					if innerXErr != nil {
 						return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", otherAbstractSubnet.Name, otherAbstractSubnet.InternalSecurityGroupID)
 					}
@@ -1746,7 +1756,7 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 
 				// unbind security groups
 				for _, v := range hsgV1.ByName {
-					if sg, opXErr = LoadSecurityGroup(ctx, instance.Scope(), v); opXErr != nil {
+					if sg, opXErr = LoadSecurityGroup(ctx, v); opXErr != nil {
 						errs = append(errs, opXErr)
 					} else {
 						opXErr = sg.UnbindFromHost(ctx, instance)
@@ -2108,7 +2118,7 @@ func (instance *Host) updateSubnets(ctx context.Context, req abstract.HostReques
 				}
 				hostName := instance.GetName()
 				for _, as := range req.Subnets {
-					subnetInstance, innerXErr := LoadSubnet(ctx, instance.Scope(), "", as.ID)
+					subnetInstance, innerXErr := LoadSubnet(ctx, "", as.ID)
 					if innerXErr != nil {
 						return innerXErr
 					}
@@ -2164,7 +2174,7 @@ func (instance *Host) undoUpdateSubnets(inctx context.Context, req abstract.Host
 
 				hostName := instance.GetName()
 				for _, as := range req.Subnets {
-					subnetInstance, innerXErr := LoadSubnet(ctx, instance.Scope(), "", as.ID)
+					subnetInstance, innerXErr := LoadSubnet(ctx, "", as.ID)
 					if innerXErr != nil {
 						return innerXErr
 					}
@@ -2375,9 +2385,14 @@ func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 }
 
 // createSingleHostNetwork creates Single-Host Network and Subnet
-func createSingleHostNetworking(ctx context.Context, scope scopeapi.Scope, singleHostRequest abstract.HostRequest) (_ resources.Subnet, _ func() fail.Error, ferr fail.Error) {
+func createSingleHostNetworking(ctx context.Context, singleHostRequest abstract.HostRequest) (_ resources.Subnet, _ func() fail.Error, ferr fail.Error) {
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
 	// Build network name
-	cfg, xerr := scope.Service().ConfigurationOptions()
+	cfg, xerr := myjob.Service().ConfigurationOptions()
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -2391,11 +2406,11 @@ func createSingleHostNetworking(ctx context.Context, scope scopeapi.Scope, singl
 	networkName := fmt.Sprintf("sfnet-%s", strings.TrimPrefix(bucketName, objectstorage.BucketNamePrefix+"-"))
 
 	// Create network if needed
-	networkInstance, xerr := LoadNetwork(ctx, scope, networkName)
+	networkInstance, xerr := LoadNetwork(ctx, networkName)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			networkInstance, xerr = NewNetwork(scope)
+			networkInstance, xerr = NewNetwork(ctx)
 			if xerr != nil {
 				return nil, nil, xerr
 			}
@@ -2423,7 +2438,7 @@ func createSingleHostNetworking(ctx context.Context, scope scopeapi.Scope, singl
 				switch xerr.(type) {
 				case *fail.ErrDuplicate, *fail.ErrNotAvailable:
 					// If these errors occurred, another goroutine is running to create the same Network, so wait for it
-					networkInstance, xerr = LoadNetwork(ctx, scope, networkName)
+					networkInstance, xerr = LoadNetwork(ctx, networkName)
 					if xerr != nil {
 						return nil, nil, xerr
 					}
@@ -2446,11 +2461,11 @@ func createSingleHostNetworking(ctx context.Context, scope scopeapi.Scope, singl
 		subnetRequest abstract.SubnetRequest
 		cidrIndex     uint
 	)
-	subnetInstance, xerr := LoadSubnet(ctx, scope, nid, singleHostRequest.ResourceName)
+	subnetInstance, xerr := LoadSubnet(ctx, nid, singleHostRequest.ResourceName)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			subnetInstance, xerr = NewSubnet(scope)
+			subnetInstance, xerr = NewSubnet(ctx)
 			if xerr != nil {
 				return nil, nil, xerr
 			}
@@ -2498,7 +2513,7 @@ func createSingleHostNetworking(ctx context.Context, scope scopeapi.Scope, singl
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && singleHostRequest.CleanOnFailure() {
-					derr := subnetInstance.Delete(context.Background())
+					derr := subnetInstance.Delete(jobapi.NewContextPropagatingJob(ctx))
 					if derr != nil {
 						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", singleHostRequest.ResourceName))
 					}
@@ -2528,11 +2543,11 @@ func createSingleHostNetworking(ctx context.Context, scope scopeapi.Scope, singl
 	undoFunc := func() fail.Error {
 		var errs []error
 		if singleHostRequest.CleanOnFailure() {
-			derr := subnetInstance.Delete(context.Background())
+			derr := subnetInstance.Delete(jobapi.NewContextPropagatingJob(ctx))
 			if derr != nil {
 				errs = append(errs, fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", singleHostRequest.ResourceName))
 			}
-			derr = FreeCIDRForSingleHost(context.Background(), networkInstance, cidrIndex)
+			derr = FreeCIDRForSingleHost(jobapi.NewContextPropagatingJob(ctx), networkInstance, cidrIndex)
 			if derr != nil {
 				errs = append(errs, fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot in Network '%s'", networkInstance.GetName()))
 			}
@@ -2614,7 +2629,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				if count > 0 {
 					// clients found, checks if these clients already exists...
 					for _, hostID := range hostShare.ClientsByID {
-						instance, innerErr := LoadHost(ctx, instance.Scope(), hostID)
+						instance, innerErr := LoadHost(ctx, hostID)
 						if innerErr != nil {
 							debug.IgnoreError(innerErr)
 							continue
@@ -2688,7 +2703,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 
 			for _, i := range hostMountsV1.RemoteMountsByPath {
 				// Retrieve Share data
-				shareInstance, loopErr := LoadShare(ctx, instance.Scope(), i.ShareID)
+				shareInstance, loopErr := LoadShare(ctx, i.ShareID)
 				if loopErr != nil {
 					switch loopErr.(type) {
 					case *fail.ErrNotFound:
@@ -2723,7 +2738,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		// Unmount() have to lock for write, and won't succeed while Host.properties.Reading() is running,
 		// leading to a deadlock)
 		for _, v := range mounts {
-			shareInstance, loopErr := LoadShare(ctx, instance.Scope(), v.ID)
+			shareInstance, loopErr := LoadShare(ctx, v.ID)
 			if loopErr != nil {
 				if _, ok := loopErr.(*fail.ErrNotFound); !ok { // nolint
 					return loopErr
@@ -2740,7 +2755,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 
 		// if Host exports shares, delete them
 		for _, v := range shares {
-			shareInstance, loopErr := LoadShare(ctx, instance.Scope(), v.Name)
+			shareInstance, loopErr := LoadShare(ctx, v.Name)
 			if loopErr != nil {
 				switch loopErr.(type) {
 				case *fail.ErrNotFound:
@@ -2778,7 +2793,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				var errs []error
 				for k := range hostNetworkV2.SubnetsByID {
 					if !hostNetworkV2.IsGateway && k != hostNetworkV2.DefaultSubnetID {
-						subnetInstance, loopErr := LoadSubnet(ctx, instance.Scope(), "", k)
+						subnetInstance, loopErr := LoadSubnet(ctx, "", k)
 						if loopErr != nil {
 							logrus.WithContext(ctx).Errorf(loopErr.Error())
 							errs = append(errs, loopErr)
@@ -2813,7 +2828,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 			// Unbind Security Groups from Host
 			var errs []error
 			for _, v := range hsgV1.ByID {
-				sgInstance, rerr := LoadSecurityGroup(ctx, instance.Scope(), v.ID)
+				sgInstance, rerr := LoadSecurityGroup(ctx, v.ID)
 				if rerr != nil {
 					switch rerr.(type) {
 					case *fail.ErrNotFound:
@@ -2856,7 +2871,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 			// Unbind Security Groups from Host
 			var errs []error
 			for k := range hlV1.ByID {
-				labelInstance, rerr := LoadLabel(ctx, instance.Scope(), k)
+				labelInstance, rerr := LoadLabel(ctx, k)
 				if rerr != nil {
 					switch rerr.(type) {
 					case *fail.ErrNotFound:
@@ -2980,7 +2995,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 
 	if single {
 		// delete its dedicated Subnet
-		singleSubnetInstance, xerr := LoadSubnet(ctx, instance.Scope(), "", singleSubnetID)
+		singleSubnetInstance, xerr := LoadSubnet(ctx, "", singleSubnetID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -3226,9 +3241,6 @@ func (instance *Host) GetShare(ctx context.Context, shareRef string) (_ *propert
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	// instance.RLock()
-	// defer instance.RUnlock()
 
 	var (
 		hostShare *propertiesv1.HostShare
@@ -3856,7 +3868,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 
 	labels := make([]*protocol.HostLabelResponse, 0, len(hostLabelsV1.ByID))
 	for k, v := range hostLabelsV1.ByID {
-		labelInstance, xerr := LoadLabel(ctx, instance.Scope(), k)
+		labelInstance, xerr := LoadLabel(ctx, k)
 		if xerr != nil {
 			return nil, xerr
 		}

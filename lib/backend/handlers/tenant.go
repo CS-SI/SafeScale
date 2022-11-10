@@ -529,7 +529,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 	}
 
 	hostName := scannedHostPrefix + template.Name
-	host, xerr := hostfactory.New(handler.job.Scope())
+	host, xerr := hostfactory.New(handler.job.Context())
 	if xerr != nil {
 		return xerr
 	}
@@ -549,7 +549,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		Image: defaultScanImage,
 	}
 
-	if _, xerr = host.Create(task.Context(), req, def); xerr != nil {
+	if _, xerr = host.Create(handler.job.Context(), req, def); xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': error creation", template.Name, hostName)
 	}
 
@@ -560,7 +560,9 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 
 	defer func() {
 		logrus.Infof("Deleting host '%s' with ID '%s'", hostName, hid)
-		if derr := host.Delete(context.Background()); derr != nil {
+		ctx := jobapi.NewContextPropagatingJob(handler.job.Context())
+		derr := host.Delete(ctx)
+		if derr != nil {
 			switch derr.(type) {
 			case *fail.ErrNotFound:
 				// missing Host is considered a successful deletion, continue
@@ -727,13 +729,13 @@ func (handler *tenantHandler) dumpImages(ctx context.Context) (ferr fail.Error) 
 
 func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr fail.Error) {
 	var xerr fail.Error
-	network, xerr = networkfactory.Load(handler.job.Context(), handler.job.Scope(), scanNetworkName)
+	network, xerr = networkfactory.Load(handler.job.Context(), scanNetworkName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
 
-		network, xerr = networkfactory.New(handler.job.Scope())
+		network, xerr = networkfactory.New(handler.job.Context())
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -749,15 +751,13 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr 
 	return network, xerr
 }
 
-func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.Subnet, ferr fail.Error) {
-	var xerr fail.Error
-	task := handler.job.Task()
-	subnet, xerr = subnetfactory.Load(handler.job.Context(), handler.job.Scope(), scanNetworkName, scanSubnetName)
+func (handler *tenantHandler) getScanSubnet(networkID string) (_ resources.Subnet, ferr fail.Error) {
+	subnet, xerr := subnetfactory.Load(handler.job.Context(), scanNetworkName, scanSubnetName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
-		subnet, xerr = subnetfactory.New(handler.job.Scope())
+		subnet, xerr = subnetfactory.New(handler.job.Context())
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -772,13 +772,13 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 		subnetHostSizing := abstract.HostSizingRequirements{
 			MinGPU: -1,
 		}
-		if xerr = subnet.Create(task.Context(), req, "", &subnetHostSizing); xerr != nil {
+		xerr = subnet.Create(handler.job.Context(), req, "", &subnetHostSizing)
+		if xerr != nil {
 			return nil, xerr
 		}
-
-		return subnet, xerr
 	}
-	return subnet, xerr
+
+	return subnet, nil
 }
 
 func createCPUInfo(output string) (_ *CPUInfo, ferr fail.Error) {

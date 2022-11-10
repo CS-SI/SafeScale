@@ -46,6 +46,12 @@ func NewLabel(opts ...Option) (*Label, fail.Error) {
 	return out, nil
 }
 
+// NewEmptyLabel returns a empty, unnamed Label instance
+func NewEmptyLabel() *Label {
+	out, _ := NewLabel()
+	return out
+}
+
 // IsNull ...
 // satisfies interface clonable.Clonable
 func (instance *Label) IsNull() bool {

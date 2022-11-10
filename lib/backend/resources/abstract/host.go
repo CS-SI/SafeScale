@@ -440,6 +440,12 @@ func NewHostFull(opts ...Option) (*HostFull, fail.Error) {
 	return hf, nil
 }
 
+// NewEmptyHostFull returns a empty, unnamed Cluster instance
+func NewEmptyHostFull() *HostFull {
+	out, _ := NewHostFull()
+	return out
+}
+
 // NewHostFullFromCore creates an instance of HostFull using Hostcore
 // FIXME: missing UT
 func NewHostFullFromCore(core *HostCore, opts ...Option) (*HostFull, fail.Error) {

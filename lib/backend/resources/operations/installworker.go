@@ -28,7 +28,7 @@ import (
 	txttmpl "text/template"
 	"time"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -106,7 +106,6 @@ type alterCommandCB func(string) string
 
 type worker struct {
 	mu        *sync.RWMutex
-	scope     scopeapi.Scope
 	feature   *Feature
 	target    resources.Targetable
 	method    installmethod.Enum
@@ -140,10 +139,7 @@ type worker struct {
 // newWorker ...
 // alterCmdCB is used to change the content of keys 'run' or 'package' before executing
 // the requested action. If not used, must be nil
-func newWorker(
-	ctx context.Context, f resources.Feature, target resources.Targetable, method installmethod.Enum,
-	action installaction.Enum, cb alterCommandCB,
-) (*worker, fail.Error) {
+func newWorker(ctx context.Context, f resources.Feature, target resources.Targetable, method installmethod.Enum, action installaction.Enum, cb alterCommandCB) (*worker, fail.Error) {
 	w := worker{
 		mu:        &sync.RWMutex{},
 		feature:   f.(*Feature),
@@ -160,14 +156,12 @@ func newWorker(
 		if !ok {
 			return nil, fail.InconsistentError("target should be a *Cluster")
 		}
-		w.scope = w.cluster.Scope()
 	case featuretargettype.Host:
 		var ok bool
 		w.host, ok = target.(*Host)
 		if !ok {
 			return nil, fail.InconsistentError("target should be a *Host")
 		}
-		w.scope = w.host.Scope()
 	default:
 		return nil, fail.InconsistentError("target should be either a *Cluster or a *Host, it's not: %v", target.TargetType())
 	}
@@ -362,7 +356,7 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 			return nil, xerr
 		}
 		for _, i := range masters {
-			hostInstance, xerr := LoadHost(ctx, w.cluster.Scope(), i)
+			hostInstance, xerr := LoadHost(ctx, i)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -414,7 +408,7 @@ func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.E
 			return nil, xerr
 		}
 		for _, i := range list {
-			hostInstance, xerr := LoadHost(ctx, w.cluster.Scope(), i)
+			hostInstance, xerr := LoadHost(ctx, i)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -434,7 +428,12 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		return w.availableGateway, nil
 	}
 
-	timings, xerr := w.scope.Service().Timings()
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	timings, xerr := myjob.Service().Timings()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -485,19 +484,19 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		found := true
 		var nilErrNotFound *fail.ErrNotFound = nil // nolint
 		var gw resources.Host
-		frame := w.cluster.Scope()
-		gw, xerr = LoadHost(ctx, frame, netCfg.GatewayID)
+		gw, xerr = LoadHost(ctx, netCfg.GatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil && xerr != nilErrNotFound {
 			if _, ok := xerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care of in previous line
 				return nil, xerr
 			}
+
 			found = false
 			debug.IgnoreError(xerr)
 		}
 
 		if !found {
-			gw, xerr = LoadHost(ctx, frame, netCfg.SecondaryGatewayID)
+			gw, xerr = LoadHost(ctx, netCfg.SecondaryGatewayID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, fail.Wrap(xerr, "failed to find an available gateway")
@@ -540,6 +539,11 @@ func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.H
 // identifyAllGateways returns a list of all the hosts acting as gateways and keep this list
 // during all the installation session
 func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host, ferr fail.Error) {
+	myjob, xerr := jobapi.FromContext(inctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -561,7 +565,7 @@ func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host,
 			rs   resources.Subnet
 		)
 
-		timings, xerr := w.scope.Service().Timings()
+		timings, xerr := myjob.Service().Timings()
 		if xerr != nil {
 			chRes <- result{nil, xerr}
 			return
@@ -574,7 +578,7 @@ func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host,
 				chRes <- result{nil, xerr}
 				return
 			}
-			rs, xerr = LoadSubnet(ctx, w.cluster.Scope(), "", netCfg.SubnetID)
+			rs, xerr = LoadSubnet(ctx, "", netCfg.SubnetID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{nil, xerr}
@@ -632,9 +636,7 @@ func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host,
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(
-	inctx context.Context, params data.Map[string, any], settings resources.FeatureSettings,
-) (_ resources.Results, ferr fail.Error) {
+func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], settings resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -850,9 +852,7 @@ type taskLaunchStepParameters struct {
 }
 
 // taskLaunchStep starts the step
-func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (
-	_ concurrency.TaskResult, ferr fail.Error,
-) {
+func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	if w == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -861,6 +861,11 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 
 	inctx := task.Context()
+	myjob, xerr := jobapi.FromContext(inctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -916,7 +921,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			return
 		}
 
-		timings, xerr := w.scope.Service().Timings()
+		timings, xerr := myjob.Service().Timings()
 		if xerr != nil {
 			chRes <- result{nil, xerr}
 			return
@@ -1270,14 +1275,14 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 			return
 		}
 
-		subnetInstance, xerr := LoadSubnet(ctx, w.scope, "", netprops.SubnetID)
+		subnetInstance, xerr := LoadSubnet(ctx, "", netprops.SubnetID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
 		}
 
-		primaryKongController, xerr := NewKongController(ctx, w.scope, subnetInstance, true)
+		primaryKongController, xerr := NewKongController(ctx, subnetInstance, true)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{fail.Wrap(xerr, "failed to apply reverse proxy rules")}
@@ -1286,7 +1291,7 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 
 		var secondaryKongController *KongController
 		if ok, _ := subnetInstance.HasVirtualIP(ctx); ok {
-			secondaryKongController, xerr = NewKongController(ctx, w.scope, subnetInstance, false)
+			secondaryKongController, xerr = NewKongController(ctx, subnetInstance, false)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{fail.Wrap(xerr, "failed to apply reverse proxy rules")}
@@ -1749,7 +1754,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 					return
 				}
 			} else {
-				rs, xerr = LoadSubnet(ctx, w.scope, netprops.NetworkID, netprops.SubnetID)
+				rs, xerr = LoadSubnet(ctx, netprops.NetworkID, netprops.SubnetID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					chRes <- result{xerr}

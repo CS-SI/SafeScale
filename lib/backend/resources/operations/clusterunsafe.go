@@ -430,7 +430,7 @@ func (instance *Cluster) unsafeFindAvailableMaster(inctx context.Context) (_ res
 				continue
 			}
 
-			master, xerr = LoadHost(ctx, instance.Scope(), v.ID)
+			master, xerr = LoadHost(ctx, v.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{nil, xerr}
@@ -621,7 +621,7 @@ func (instance *Cluster) unsafeFindAvailableNode(inctx context.Context) (node re
 		node = nil
 		found := false
 		for _, v := range list {
-			node, xerr = LoadHost(ctx, instance.Scope(), v.ID)
+			node, xerr = LoadHost(ctx, v.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{nil, xerr}

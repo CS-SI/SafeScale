@@ -26,27 +26,33 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-// ObjectStorageBucket abstracts an Objet Storage container (also known as bucket in some implementations)
-type ObjectStorageBucket struct {
+// Bucket abstracts an Objet Storage container (also known as bucket in some implementations)
+type Bucket struct {
 	*Core
 	ID         string `json:"id,omitempty"`
 	Host       string `json:"host,omitempty"`
 	MountPoint string `json:"mountPoint,omitempty"`
 }
 
-// NewObjectStorageBucket ...
-func NewObjectStorageBucket(opts ...Option) (*ObjectStorageBucket, fail.Error) {
+// NewBucket ...
+func NewBucket(opts ...Option) (*Bucket, fail.Error) {
 	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	out := &ObjectStorageBucket{Core: c}
+	out := &Bucket{Core: c}
 	return out, nil
 }
 
+// NewEmptyBucket returns a empty, unnamed Bucket instance
+func NewEmptyBucket() *Bucket {
+	out, _ := NewBucket()
+	return out
+}
+
 // IsConsistent tells if host struct is consistent
-func (instance ObjectStorageBucket) IsConsistent() bool {
+func (instance Bucket) IsConsistent() bool {
 	result := true
 	result = result && instance.ID != ""
 	result = result && instance.Name != ""
@@ -54,30 +60,30 @@ func (instance ObjectStorageBucket) IsConsistent() bool {
 }
 
 // OK ...
-func (instance ObjectStorageBucket) OK() bool {
+func (instance Bucket) OK() bool {
 	return instance.IsConsistent()
 }
 
-func (instance *ObjectStorageBucket) IsNull() bool {
+func (instance *Bucket) IsNull() bool {
 	return instance == nil || instance.Core.IsNull() || (instance.Name == "" && instance.ID == "")
 }
 
-// Clone does a deep-copy of the ObjectStorageBucket
+// Clone does a deep-copy of the Bucket
 //
 // satisfies interface clonable.Clonable
-func (instance *ObjectStorageBucket) Clone() (clonable.Clonable, error) {
+func (instance *Bucket) Clone() (clonable.Clonable, error) {
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newB, _ := NewObjectStorageBucket()
+	newB, _ := NewBucket()
 	return newB, newB.Replace(instance)
 }
 
 // Replace ...
 //
 // satisfies interface clonable.Clonable
-func (instance *ObjectStorageBucket) Replace(p clonable.Clonable) error {
+func (instance *Bucket) Replace(p clonable.Clonable) error {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -85,7 +91,7 @@ func (instance *ObjectStorageBucket) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := lang.Cast[*ObjectStorageBucket](p)
+	src, err := lang.Cast[*Bucket](p)
 	if err != nil {
 		return err
 	}
@@ -100,7 +106,7 @@ func (instance *ObjectStorageBucket) Replace(p clonable.Clonable) error {
 }
 
 // Serialize serializes Host 'instance' into bytes (output json code)
-func (instance *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
+func (instance *Bucket) Serialize() ([]byte, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -113,8 +119,8 @@ func (instance *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and instantiates an ObjectStorageItem
-func (instance *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
-	// Note: Do not validate with .IsNull(), instance may be a null value of ObjectStorageBucket when deserializing
+func (instance *Bucket) Deserialize(buf []byte) (ferr fail.Error) {
+	// Note: Do not validate with .IsNull(), instance may be a null value of Bucket when deserializing
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -140,13 +146,13 @@ func (instance *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
 
 // GetName name returns the name of the host
 // Satisfies interface data.Identifiable
-func (instance ObjectStorageBucket) GetName() string {
+func (instance Bucket) GetName() string {
 	return instance.Name
 }
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
-func (instance ObjectStorageBucket) GetID() (string, error) {
+func (instance Bucket) GetID() (string, error) {
 	return instance.ID, nil
 }
 

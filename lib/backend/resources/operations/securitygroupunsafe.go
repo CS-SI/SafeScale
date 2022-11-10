@@ -230,7 +230,7 @@ func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(inctx context.Cont
 		}
 
 		// -- update Security Groups in Network metadata
-		networkInstance, xerr := LoadNetwork(ctx, instance.Scope(), networkID)
+		networkInstance, xerr := LoadNetwork(ctx, networkID)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return

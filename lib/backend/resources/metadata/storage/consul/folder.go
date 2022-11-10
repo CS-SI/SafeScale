@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/sirupsen/logrus"
 
@@ -43,22 +43,22 @@ import (
 type folder struct {
 	// path contains the base path where to read/write record in Object Storage
 	path     string
-	scope    scopeapi.Scope
+	job      jobapi.Job
 	kv       *consumer.KV
 	crypt    bool
 	cryptKey *crypt.Key
 }
 
 // NewFolder creates a new Metadata folder object, ready to help access the metadata inside it
-func NewFolder(scope scopeapi.Scope, path string) (*folder, fail.Error) {
-	if valid.IsNull(scope) {
+func NewFolder(job jobapi.Job, path string) (*folder, fail.Error) {
+	if valid.IsNull(job) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	f := &folder{
-		path:  strings.Trim(path, "/"),
-		scope: scope,
-		kv:    scope.ConsulKV(),
+		path: strings.Trim(path, "/"),
+		job:  job,
+		kv:   job.Scope().ConsulKV(),
 	}
 
 	// FIXME: consul not yet able to crypt
@@ -79,7 +79,7 @@ func NewFolder(scope scopeapi.Scope, path string) (*folder, fail.Error) {
 
 // IsNull tells if the folder instance should be considered as a null value
 func (instance *folder) IsNull() bool {
-	return instance == nil || valid.IsNull(instance.scope)
+	return instance == nil || valid.IsNull(instance.job)
 }
 
 // Service returns the service used by the folder
@@ -88,16 +88,16 @@ func (instance folder) Service() iaasapi.Service {
 		return nil
 	}
 
-	return instance.scope.Service()
+	return instance.job.Service()
 }
 
-// Scope returns the scope of the folder
-func (instance *folder) Scope() scopeapi.Scope {
+// Job returns the job of the folder
+func (instance *folder) Job() jobapi.Job {
 	if valid.IsNull(instance) {
 		return nil
 	}
 
-	return instance.scope
+	return instance.job
 }
 
 // Prefix returns the base path of the folder

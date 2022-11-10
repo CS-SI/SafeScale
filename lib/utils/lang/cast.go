@@ -26,14 +26,14 @@ import (
 
 // Cast casts a variable to another type and validate
 func Cast[T any](in any) (T, error) {
-	var out T
+	empty := new(T)
 	if in == nil {
-		return out, fail.InconsistentError("invalid parameter 'in': cannot be nil")
+		return *empty, fail.InconsistentError("invalid parameter 'in': cannot be nil")
 	}
 
 	out, ok := in.(T)
 	if !ok {
-		return out, fail.InconsistentError("failed to cast, expected '%s', provided '%s'", reflect.TypeOf(out).String(), reflect.TypeOf(in).String())
+		return *empty, fail.InconsistentError("failed to cast, expected '%s', provided '%s'", reflect.TypeOf(empty).String(), reflect.TypeOf(in).String())
 	}
 
 	return out, nil

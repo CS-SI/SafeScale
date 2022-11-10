@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package factory
+package tenant
 
 import (
 	"context"
@@ -58,7 +58,7 @@ type service struct {
 	cacheManager *wrappedCache
 
 	//	metadataBucket objectstorage.GetBucket
-	metadataBucket *abstract.ObjectStorageBucket
+	metadataBucket *abstract.Bucket
 	metadataKey    *crypt.Key
 
 	whitelistTemplateREs []*regexp.Regexp
@@ -140,7 +140,7 @@ func (instance service) GetName() (string, fail.Error) {
 }
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket
-func (instance service) GetMetadataBucket(ctx context.Context) (*abstract.ObjectStorageBucket, fail.Error) {
+func (instance service) GetMetadataBucket(ctx context.Context) (*abstract.Bucket, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}

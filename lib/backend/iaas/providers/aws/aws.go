@@ -26,8 +26,8 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
@@ -403,5 +403,5 @@ func init() {
 		func() iaasapi.Provider { return &provider{} },
 		nil,
 	)
-	factory.Register("aws", profile)
+	iaas.RegisterProviderProfile("aws", profile)
 }

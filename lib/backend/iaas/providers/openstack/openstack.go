@@ -28,8 +28,8 @@ import (
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
@@ -355,5 +355,5 @@ func init() {
 		func() iaasapi.Provider { return &provider{} },
 		nil,
 	)
-	factory.Register("openstack", profile)
+	iaas.RegisterProviderProfile("openstack", profile)
 }

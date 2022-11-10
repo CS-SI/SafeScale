@@ -95,7 +95,7 @@ func (handler *hostHandler) Start(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -128,7 +128,7 @@ func (handler *hostHandler) Stop(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -160,7 +160,7 @@ func (handler *hostHandler) Reboot(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -190,7 +190,7 @@ func (handler *hostHandler) List(all bool) (_ abstract.HostList, ferr fail.Error
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	return hostfactory.List(handler.job.Context(), handler.job.Scope(), all)
+	return hostfactory.List(handler.job.Context(), all)
 }
 
 // Create creates a new host
@@ -211,7 +211,7 @@ func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.Hos
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.New(handler.job.Scope())
+	hostInstance, xerr := hostfactory.New(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -241,7 +241,7 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -298,7 +298,7 @@ func (handler *hostHandler) Status(ref string) (_ hoststate.Enum, ferr fail.Erro
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
 		return hoststate.Unknown, xerr
 	}
@@ -329,7 +329,7 @@ func (handler *hostHandler) Inspect(ref string) (_ resources.Host, ferr fail.Err
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -362,7 +362,7 @@ func (handler *hostHandler) Delete(ref string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), ref)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -398,12 +398,12 @@ func (handler *hostHandler) BindSecurityGroup(hostRef, sgRef string, enable reso
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -439,12 +439,12 @@ func (handler *hostHandler) UnbindSecurityGroup(hostRef, sgRef string) (ferr fai
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -475,12 +475,12 @@ func (handler *hostHandler) EnableSecurityGroup(hostRef, sgRef string) (ferr fai
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), sgRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -516,7 +516,7 @@ func (handler *hostHandler) DisableSecurityGroup(hostRef, sgRef string) (ferr fa
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -529,7 +529,7 @@ func (handler *hostHandler) DisableSecurityGroup(hostRef, sgRef string) (ferr fa
 		}
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Scope(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), sgRef)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -576,7 +576,7 @@ func (handler *hostHandler) ListSecurityGroups(hostRef string) (_ []*propertiesv
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -597,7 +597,7 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -611,7 +611,7 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 			}
 
 			for k := range hlV1.ByID {
-				labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), k)
+				labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), k)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -649,12 +649,12 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
 	if xerr != nil {
 		return nil, "", xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), labelRef)
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -709,12 +709,12 @@ func (handler *hostHandler) BindLabel(hostRef, labelRef, value string) (ferr fai
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), labelRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -749,12 +749,12 @@ func (handler *hostHandler) UnbindLabel(hostRef, labelRef string) (ferr fail.Err
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), labelRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -783,12 +783,12 @@ func (handler *hostHandler) UpdateLabel(hostRef, labelRef, value string) (ferr f
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), labelRef)
 	if xerr != nil {
 		return xerr
 	}
@@ -817,12 +817,12 @@ func (handler *hostHandler) ResetLabel(hostRef, labelRef string) (ferr fail.Erro
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Scope(), hostRef)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Scope(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), labelRef)
 	if xerr != nil {
 		return xerr
 	}

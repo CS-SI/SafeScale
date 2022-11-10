@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
@@ -89,7 +90,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		hostReq.PublicIP = true
 		hostReq.IsGateway = true
 
-		rgw, xerr := NewHost(instance.Scope())
+		rgw, xerr := NewHost(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			ar := result{nil, xerr}
@@ -136,7 +137,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 			if ferr != nil {
 				if hostReq.CleanOnFailure() {
 					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
-					derr := rgw.Delete(context.Background())
+					derr := rgw.Delete(jobapi.NewContextPropagatingJob(ctx))
 					if derr != nil {
 						msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 						switch derr.(type) {
@@ -154,7 +155,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 					}
 					_ = ferr.AddConsequence(derr)
 				} else {
-					xerr = rgw.Alter(context.Background(), func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+					xerr = rgw.Alter(jobapi.NewContextPropagatingJob(ctx), func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
 						as, innerErr := lang.Cast[*abstract.HostCore](p)
 						if innerErr != nil {
 							return fail.Wrap(innerErr)

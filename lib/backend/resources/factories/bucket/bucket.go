@@ -37,11 +37,11 @@ func List(ctx context.Context, scope scopeapi.Scope) ([]string, fail.Error) {
 }
 
 // New creates a bucket instance
-func New(scope scopeapi.Scope) (resources.Bucket, fail.Error) { // nolint
-	return operations.NewBucket(scope)
+func New(ctx context.Context) (resources.Bucket, fail.Error) { // nolint
+	return operations.NewBucket(ctx)
 }
 
 // Load initializes the bucket with metadata from provider
-func Load(ctx context.Context, scope scopeapi.Scope, name string) (resources.Bucket, fail.Error) { // nolint
-	return operations.LoadBucket(ctx, scope, name)
+func Load(ctx context.Context, name string) (resources.Bucket, fail.Error) { // nolint
+	return operations.LoadBucket(ctx, name)
 }

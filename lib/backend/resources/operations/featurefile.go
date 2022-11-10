@@ -27,10 +27,9 @@ import (
 	"sync"
 	"time"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/eko/gocache/v2/store"
 	"github.com/farmergreg/rfsnotify"
 	"github.com/sirupsen/logrus"
@@ -191,14 +190,18 @@ func (ff *FeatureFile) Specs() *viper.Viper {
 //   - nil: everything worked as expected
 //   - fail.ErrNotFound: no FeatureFile is found with the name
 //   - fail.ErrSyntax: FeatureFile contains syntax error
-func LoadFeatureFile(inctx context.Context, scope scopeapi.Scope, name string, embeddedOnly bool) (*FeatureFile, fail.Error) {
-	if valid.IsNull(scope) {
-		return nil, fail.InvalidParameterCannotBeNilError("scope")
+func LoadFeatureFile(inctx context.Context, name string, embeddedOnly bool) (*FeatureFile, fail.Error) {
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
+	myjob, xerr := jobapi.FromContext(inctx)
+	if xerr != nil {
+		return nil, xerr
+	}
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -216,7 +219,7 @@ func LoadFeatureFile(inctx context.Context, scope scopeapi.Scope, name string, e
 			var kt *FeatureFile
 			cachename := fmt.Sprintf("%T/%s", kt, name)
 
-			cache, xerr := scope.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().GetCache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -231,7 +234,7 @@ func LoadFeatureFile(inctx context.Context, scope scopeapi.Scope, name string, e
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onFeatureFileCacheMiss(scope, name, embeddedOnly) }
+			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onFeatureFileCacheMiss(ctx, name, embeddedOnly) }
 			anon, xerr := cacheMissLoader()
 			if xerr != nil {
 				return nil, xerr
@@ -288,7 +291,7 @@ func LoadFeatureFile(inctx context.Context, scope scopeapi.Scope, name string, e
 }
 
 // onFeatureFileCacheMiss is called when host 'ref' is not found in cache
-func onFeatureFileCacheMiss(_ scopeapi.Scope, name string, embeddedOnly bool) (data.Identifiable, fail.Error) {
+func onFeatureFileCacheMiss(ctx context.Context, name string, embeddedOnly bool) (data.Identifiable, fail.Error) {
 	var (
 		newInstance *FeatureFile
 		xerr        fail.Error

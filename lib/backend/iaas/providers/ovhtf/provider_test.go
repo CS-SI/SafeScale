@@ -23,15 +23,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
-	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/factory"
+	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/tests"
+	tenantfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/tenant"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 )
 
 func getTester() (*tests.ServiceTester, error) {
@@ -61,7 +61,7 @@ func getService() (iaasapi.Service, error) {
 		return nil, xerr
 	}
 
-	service, err := factory.UseService(metadata.WithScope(scope))
+	service, err := tenantfactory.UseService(context.Background(), iaasoptions.WithScope(scope))
 	if err != nil || service == nil {
 		return nil, fmt.Errorf("you must provide a VALID tenant [%v], check your environment variables and your Safescale configuration files", tenantName)
 	}

@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/davecgh/go-spew/spew"
@@ -75,7 +76,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		defer close(chRes)
 
 		// Check if Cluster exists in metadata; if yes, error
-		_, xerr := LoadCluster(ctx, instance.Scope(), req.Name)
+		_, xerr := LoadCluster(ctx, req.Name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -106,7 +107,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && req.CleanOnFailure() && !cleanFailure {
 				logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
-				if derr := instance.Core.Delete(context.Background()); derr != nil {
+				if derr := instance.Core.Delete(jobapi.NewContextPropagatingJob(ctx)); derr != nil {
 					logrus.WithContext(context.Background()).Errorf(
 						"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
 					)
@@ -162,7 +163,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 			if ferr != nil && req.CleanOnFailure() { // FIXME: subnetInstance nil
 				if subnetInstance != nil && networkInstance != nil {
 					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Subnet '%s'...", subnetInstance.GetName())
-					if derr := subnetInstance.Delete(context.Background()); derr != nil {
+					if derr := subnetInstance.Delete(jobapi.NewContextPropagatingJob(ctx)); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
 							// missing Subnet is considered as a successful deletion, continue
@@ -178,7 +179,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 							subnetInstance.GetName())
 						if req.NetworkID == "" {
 							logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
-							if derr := networkInstance.Delete(context.Background()); derr != nil {
+							if derr := networkInstance.Delete(jobapi.NewContextPropagatingJob(ctx)); derr != nil {
 								switch derr.(type) {
 								case *fail.ErrNotFound:
 									// missing Network is considered as a successful deletion, continue
@@ -223,7 +224,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 				var list []machineID
 
 				var nodemap map[uint]*propertiesv3.ClusterNode
-				derr := instance.Inspect(context.Background(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+				derr := instance.Inspect(jobapi.NewContextPropagatingJob(ctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Inspect(clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
 						nodesV3, err := lang.Cast[*propertiesv3.ClusterNodes](p)
 						if err != nil {
@@ -246,7 +247,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 
 				if len(list) > 0 {
 					tg, tgerr := concurrency.NewTaskGroupWithContext(
-						context.Background(), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
+						jobapi.NewContextPropagatingJob(ctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
 					)
 					if tgerr != nil {
 						cleanFailure = true
@@ -724,7 +725,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 		// Creates Network
 		var networkInstance resources.Network
 		if req.NetworkID != "" {
-			networkInstance, xerr = LoadNetwork(ctx, instance.Scope(), req.NetworkID)
+			networkInstance, xerr = LoadNetwork(ctx, req.NetworkID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				ar := result{nil, nil, fail.Wrap(xerr, "failed to use network %s to contain Cluster Subnet", req.NetworkID)}
@@ -742,7 +743,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && req.CleanOnFailure() {
-					if derr := networkInstance.Delete(context.Background()); derr != nil {
+					if derr := networkInstance.Delete(jobapi.NewContextPropagatingJob(ctx)); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
 							// missing Network is considered as a successful deletion, continue
@@ -754,7 +755,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				}
 			}()
 
-			networkInstance, xerr = NewNetwork(instance.Scope())
+			networkInstance, xerr = NewNetwork(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				ar := result{nil, nil, fail.Wrap(xerr, "failed to instantiate new Network")}
@@ -814,7 +815,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			KeepOnFailure:  false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
 		}
 
-		subnetInstance, xerr := NewSubnet(instance.Scope())
+		subnetInstance, xerr := NewSubnet(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{nil, nil, xerr}
@@ -824,7 +825,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && req.CleanOnFailure() {
-				if derr := subnetInstance.Delete(context.Background()); derr != nil {
+				if derr := subnetInstance.Delete(jobapi.NewContextPropagatingJob(ctx)); derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
 						// missing Subnet is considered as a successful deletion, continue
@@ -859,7 +860,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				}
 				subnetReq.CIDR = subIPNet.String()
 
-				newSubnetInstance, xerr := NewSubnet(instance.Scope()) // subnetInstance.Create CANNOT be reused
+				newSubnetInstance, xerr := NewSubnet(ctx) // subnetInstance.Create CANNOT be reused
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					ar := result{nil, nil, xerr}
@@ -1152,7 +1153,7 @@ func (instance *Cluster) createHostResources(
 		defer func() { // FIXME: OPP This needs review
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !keepOnFailure {
-				masters, merr := instance.unsafeListMasters(context.Background())
+				masters, merr := instance.unsafeListMasters(jobapi.NewContextPropagatingJob(ctx))
 				if merr != nil {
 					_ = ferr.AddConsequence(merr)
 					return
@@ -1163,7 +1164,7 @@ func (instance *Cluster) createHostResources(
 					list = append(list, machineID{ID: mach.ID, Name: mach.Name})
 				}
 
-				hosts, merr := instance.Service().ListHosts(context.Background(), false)
+				hosts, merr := instance.Service().ListHosts(jobapi.NewContextPropagatingJob(ctx), false)
 				if merr != nil {
 					_ = ferr.AddConsequence(merr)
 					return
@@ -1181,7 +1182,7 @@ func (instance *Cluster) createHostResources(
 
 				if len(list) > 0 {
 					tg, tgerr := concurrency.NewTaskGroupWithContext(
-						context.Background(), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
+						jobapi.NewContextPropagatingJob(ctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
 					)
 					if tgerr != nil {
 						_ = ferr.AddConsequence(tgerr)
@@ -1197,11 +1198,7 @@ func (instance *Cluster) createHostResources(
 								concurrency.AmendID(fmt.Sprintf("/host/%s/delete", captured.Name)),
 							)
 							if derr != nil {
-								_ = ferr.AddConsequence(
-									fail.Wrap(
-										derr, "cleaning up on failure, failed to delete master '%s'", captured.Name,
-									),
-								)
+								_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete master '%s'", captured.Name))
 								abErr := tg.AbortWithCause(derr)
 								if abErr != nil {
 									logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
@@ -1213,11 +1210,7 @@ func (instance *Cluster) createHostResources(
 					_, _, derr := tg.WaitGroupFor(timings.HostLongOperationTimeout())
 					derr = debug.InjectPlannedFail(derr)
 					if derr != nil {
-						_ = ferr.AddConsequence(
-							fail.Wrap(
-								derr, "cleaning up on failure, failed to wait for master deletions",
-							),
-						)
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to wait for master deletions"))
 					}
 				}
 			}
@@ -1251,7 +1244,7 @@ func (instance *Cluster) createHostResources(
 		defer func() { // FIXME: OPP, This needs review
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !keepOnFailure {
-				nlist, merr := instance.unsafeListNodes(context.Background())
+				nlist, merr := instance.unsafeListNodes(jobapi.NewContextPropagatingJob(ctx))
 				if merr != nil {
 					_ = ferr.AddConsequence(merr)
 					return
@@ -1280,7 +1273,7 @@ func (instance *Cluster) createHostResources(
 
 				if len(list) > 0 {
 					tg, tgerr := concurrency.NewTaskGroupWithContext(
-						context.Background(), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
+						jobapi.NewContextPropagatingJob(ctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
 					)
 					if tgerr != nil {
 						_ = ferr.AddConsequence(fail.Wrap(tgerr, "cleaning up on failure, failed to create TaskGroup"))
@@ -1296,11 +1289,7 @@ func (instance *Cluster) createHostResources(
 								concurrency.AmendID(fmt.Sprintf("/host/%s/delete", captured.Name)),
 							)
 							if derr != nil {
-								_ = ferr.AddConsequence(
-									fail.Wrap(
-										derr, "cleaning up on failure, failed to delete node '%s'", captured.Name,
-									),
-								)
+								_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete node '%s'", captured.Name))
 								abErr := tg.AbortWithCause(derr)
 								if abErr != nil {
 									logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
@@ -1568,7 +1557,7 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 		}
 
 		// -- refresh state of host --
-		hostInstance, xerr := LoadHost(ctx, instance.Scope(), id)
+		hostInstance, xerr := LoadHost(ctx, id)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
 			return
@@ -1641,7 +1630,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 		}
 
 		// -- refresh state of host --
-		hostInstance, xerr := LoadHost(ctx, instance.Scope(), id)
+		hostInstance, xerr := LoadHost(ctx, id)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
 			return
@@ -2060,7 +2049,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 			return xerr
 		}
 
-		subnet, xerr := LoadSubnet(ctx, instance.Scope(), "", netCfg.SubnetID)
+		subnet, xerr := LoadSubnet(ctx, "", netCfg.SubnetID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
@@ -2099,7 +2088,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 			hostReq.TemplateID = p.masterDef.Template
 		}
 
-		hostInstance, xerr := NewHost(instance.Scope())
+		hostInstance, xerr := NewHost(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
@@ -2308,7 +2297,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params conc
 		for i, master := range masters {
 			captured := i
 			capturedMaster := master
-			host, xerr := LoadHost(ctx, instance.Scope(), capturedMaster.ID)
+			host, xerr := LoadHost(ctx, capturedMaster.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				loadErrors = append(loadErrors, xerr)
@@ -2702,7 +2691,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			return ar.rErr
 		}
 
-		subnet, xerr := LoadSubnet(ctx, instance.Scope(), "", netCfg.SubnetID)
+		subnet, xerr := LoadSubnet(ctx, "", netCfg.SubnetID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			ar := result{nil, xerr}
@@ -2743,7 +2732,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			hostReq.TemplateID = p.nodeDef.Template
 		}
 
-		hostInstance, xerr := NewHost(instance.Scope())
+		hostInstance, xerr := NewHost(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
@@ -3078,7 +3067,7 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 		hostLabel := fmt.Sprintf("node #%d (%s)", p.index, p.node.Name)
 		logrus.WithContext(ctx).Debugf("[%s] starting configuration...", hostLabel)
 
-		hostInstance, xerr := LoadHost(ctx, instance.Scope(), p.node.ID)
+		hostInstance, xerr := LoadHost(ctx, p.node.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{nil, fail.Wrap(xerr, "failed to get metadata of node '%s'", p.node.Name)}
@@ -3158,7 +3147,7 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 
 		node := casted
 
-		hostInstance, xerr := LoadHost(ctx, instance.Scope(), node.ID)
+		hostInstance, xerr := LoadHost(ctx, node.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -3307,7 +3296,7 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 			nodeRef = p.node.ID
 		}
 
-		host, xerr := LoadHost(ctx, instance.Scope(), nodeRef)
+		host, xerr := LoadHost(ctx, nodeRef)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {

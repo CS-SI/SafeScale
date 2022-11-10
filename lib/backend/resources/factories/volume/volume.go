@@ -19,18 +19,17 @@ package volume
 import (
 	"context"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // New creates an instance of resources.Volume
-func New(scope scopeapi.Scope) (resources.Volume, fail.Error) {
-	return operations.NewVolume(scope)
+func New(ctx context.Context) (resources.Volume, fail.Error) {
+	return operations.NewVolume(ctx)
 }
 
 // Load loads the metadata of a volume and returns an instance of resources.Volume
-func Load(ctx context.Context, scope scopeapi.Scope, ref string) (resources.Volume, fail.Error) {
-	return operations.LoadVolume(ctx, scope, ref)
+func Load(ctx context.Context, ref string) (resources.Volume, fail.Error) {
+	return operations.LoadVolume(ctx, ref)
 }

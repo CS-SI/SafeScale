@@ -66,6 +66,12 @@ func NewVolume(opts ...Option) (*Volume, fail.Error) {
 	return nv, nil
 }
 
+// NewEmptyVolume returns a empty, unnamed Volume instance
+func NewEmptyVolume() *Volume {
+	out, _ := NewVolume()
+	return out
+}
+
 // IsNull ...
 // satisfies interface clonable.Clonable
 func (v *Volume) IsNull() bool {
@@ -147,6 +153,7 @@ func (v *Volume) GetID() (string, error) {
 	if v == nil {
 		return "", fmt.Errorf("invalid instance")
 	}
+
 	return v.ID, nil
 }
 

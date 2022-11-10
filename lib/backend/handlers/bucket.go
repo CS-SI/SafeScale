@@ -73,13 +73,13 @@ func (handler *bucketHandler) List(all bool) (_ []string, ferr fail.Error) {
 		return handler.job.Service().ListBuckets(handler.job.Context(), objectstorage.RootPath)
 	}
 
-	bucketBrowser, xerr := bucketfactory.New(handler.job.Scope())
+	bucketBrowser, xerr := bucketfactory.New(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	var bucketList []string
-	xerr = bucketBrowser.Browse(handler.job.Context(), func(bucket *abstract.ObjectStorageBucket) fail.Error {
+	xerr = bucketBrowser.Browse(handler.job.Context(), func(bucket *abstract.Bucket) fail.Error {
 		bucketList = append(bucketList, bucket.Name)
 		return nil
 	})
@@ -110,7 +110,7 @@ func (handler *bucketHandler) Create(name string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Scope(), name)
+	rb, xerr := bucketfactory.Load(handler.job.Context(), name)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
@@ -120,7 +120,7 @@ func (handler *bucketHandler) Create(name string) (ferr fail.Error) {
 		return fail.DuplicateError("bucket '%s' already exist", name)
 	}
 
-	rb, xerr = bucketfactory.New(handler.job.Scope())
+	rb, xerr = bucketfactory.New(handler.job.Context())
 	if xerr != nil {
 		return xerr
 	}
@@ -148,7 +148,7 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Scope(), name)
+	rb, xerr := bucketfactory.Load(handler.job.Context(), name)
 	if xerr != nil {
 		return xerr
 	}
@@ -264,7 +264,7 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, ferr fa
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	var xerr fail.Error
-	rb, xerr = bucketfactory.Load(handler.job.Context(), handler.job.Scope(), name)
+	rb, xerr = bucketfactory.Load(handler.job.Context(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -312,7 +312,7 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fai
 	}()
 
 	// Check bucket existence
-	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Scope(), bucketName)
+	rb, xerr := bucketfactory.Load(handler.job.Context(), bucketName)
 	if xerr != nil {
 		return xerr
 	}
@@ -351,7 +351,7 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (ferr fail.Er
 	}()
 
 	// Check bucket existence
-	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Scope(), bucketName)
+	rb, xerr := bucketfactory.Load(handler.job.Context(), bucketName)
 	if xerr != nil {
 		return xerr
 	}
