@@ -60,7 +60,7 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 	}
 
 	if state != hoststate.Started {
-		return invalid, "", "", fail.NewError("the machine is not started")
+		return invalid, "", "", fail.NewError("the machine is not started: %s", state.String())
 	}
 
 	timings, xerr := instance.Service().Timings()
@@ -229,6 +229,15 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
+	}
+
+	state, xerr := instance.ForceGetState(ctx)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if state != hoststate.Started {
+		return invalid, "", "", fail.NewError("the machine is not started: %s", state.String())
 	}
 
 	md5hash := ""
@@ -463,6 +472,15 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return xerr
+	}
+
+	state, xerr := instance.ForceGetState(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.NewError("the machine is not started: %s", state.String())
 	}
 
 	hostName := instance.GetName()
