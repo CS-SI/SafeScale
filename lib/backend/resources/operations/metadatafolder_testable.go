@@ -393,8 +393,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 					if app.Release {
 						if !bytes.Equal(data, newtarget.Bytes()) {
 							_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
-							// innerErr := fail.NewError("remote content is different from local reference: %s, %s", string(data), newtarget.String())
-							innerErr := fail.NewError("remote content is different from local reference")
+							innerErr := fail.NewError("remote content is different from local reference: %s, %s", string(data), newtarget.String())
 							logrus.WithContext(ctx).Warnf(innerErr.Error())
 							return innerErr
 						}
