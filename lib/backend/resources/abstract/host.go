@@ -447,7 +447,10 @@ func (hf *HostFull) GetName() string {
 }
 
 // SetName is a setter to initialize field 'Name'
-func (hf *HostFull) SetName(name string) *HostFull { // FIXME: OPP Good lord, hiding errors again...
+func (hf *HostFull) SetName(name string) *HostFull {
+	if hf == nil {
+		panic("invalid instance")
+	}
 	if hf != nil && hf.Core != nil {
 		hf.Core.SetName(name)
 	}

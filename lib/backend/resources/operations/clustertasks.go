@@ -831,7 +831,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			xerr = subnetInstance.Create(ctx, subnetReq, "", gatewaysDef, map[string]string{
 				"type":      "gateway",
 				"clusterID": cluID,
-			}) // FIXME: OPP Here we need extra too
+			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -864,7 +864,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 					if subXErr := subnetInstance.Create(ctx, subnetReq, "", gatewaysDef, map[string]string{
 						"type":      "gateway",
 						"clusterID": cluID,
-					}); subXErr != nil { // FIXME: OPP Here we need extra too
+					}); subXErr != nil {
 						ar := result{nil, nil, fail.Wrap(
 							subXErr, "failed to create Subnet '%s' (with CIDR %s) in Network '%s' (with CIDR %s)",
 							subnetReq.Name, subnetReq.CIDR, req.NetworkID, req.CIDR,
@@ -2519,7 +2519,6 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 				ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/create/node/%s", oldKey, hostReq.ResourceName)) // nolint
 			}
 
-			// FIXME: OPP Keep track ?? what a joke !!
 			// -- First creates node in metadata, to keep track of its tried creation, in case of failure --
 			var nodeIdx uint
 			xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
