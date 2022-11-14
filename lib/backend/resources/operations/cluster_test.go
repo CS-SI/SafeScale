@@ -205,12 +205,12 @@ func TestCluster_IsNull(t *testing.T) {
 
 func TestCluster_Create(t *testing.T) {
 
-	//if true {
-	//t.Skip("BROKEN TEST")
+	// if true {
+	// t.Skip("BROKEN TEST")
 	// Race detected
-	//- (fixed) service_test.go
-	//- (partial fixed) installworker.go
-	//}
+	// - (fixed) service_test.go
+	// - (partial fixed) installworker.go
+	// }
 
 	if runtime.GOOS == "windows" {
 		t.Skip()
@@ -332,7 +332,7 @@ func TestCluster_Create(t *testing.T) {
 				"GWSecurityGroupID":       {},
 				"InternalSecurityGroupID": {},
 			},
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		// Off-Gateway
@@ -359,7 +359,7 @@ func TestCluster_Create(t *testing.T) {
 				"GWSecurityGroupID":       {},
 				"InternalSecurityGroupID": {},
 			},
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		svc._setLogLevel(2)
@@ -856,7 +856,7 @@ func TestCluster_AddNodes(t *testing.T) {
 		Image:       "HostSizingRequirements Image",
 		Template:    "HostSizingRequirements Template",
 	}
-	_, xerr := ocluster.AddNodes(ctx, 1, hsizing, make(data.Map), false)
+	_, xerr := ocluster.AddNodes(ctx, "ClusterName", 1, hsizing, make(data.Map), false)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -876,14 +876,14 @@ func TestCluster_AddNodes(t *testing.T) {
 			t.FailNow()
 		}
 
-		_, xerr = cluster.AddNodes(nil, 1, hsizing, make(data.Map), false)
+		_, xerr = cluster.AddNodes(nil, "ClusterName", 1, hsizing, make(data.Map), false)
 		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
 
-		_, xerr = cluster.AddNodes(ctx, 0, hsizing, make(data.Map), false)
+		_, xerr = cluster.AddNodes(ctx, "ClusterName", 0, hsizing, make(data.Map), false)
 		require.Contains(t, xerr.Error(), "must be an int > 0")
 
 		svc._setLogLevel(2)
-		hosts, xerr := cluster.AddNodes(ctx, 1, hsizing, make(data.Map), false)
+		hosts, xerr := cluster.AddNodes(ctx, "ClusterName", 1, hsizing, make(data.Map), false)
 		require.Nil(t, xerr)
 		require.EqualValues(t, len(hosts), 1)
 		id, _ := hosts[0].GetID()

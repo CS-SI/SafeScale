@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/app"
 	datadef "github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -47,8 +48,8 @@ type MetadataFolder struct {
 	cryptKey *crypt.Key
 }
 
-// folderDecoderCallback is the prototype of the function that will decode data read from Metadata
-type folderDecoderCallback func([]byte) fail.Error
+// FolderDecoderCallback is the prototype of the function that will decode data read from Metadata
+type FolderDecoderCallback func([]byte) fail.Error
 
 // NewMetadataFolder creates a new Metadata MetadataFolder object, ready to help access the metadata inside it
 func NewMetadataFolder(svc iaas.Service, path string) (MetadataFolder, fail.Error) {
@@ -229,7 +230,7 @@ func (instance MetadataFolder) Read(ctx context.Context, path string, name strin
 			if iErr != nil {
 				return iErr
 			}
-			iErr = instance.service.ReadObject(ctx, bucket.Name, instance.absolutePath(path, name), &buffer, 0, 0)
+			_, iErr = instance.service.ReadObject(ctx, bucket.Name, instance.absolutePath(path, name), &buffer, 0, 0)
 			if iErr != nil {
 				switch iErr.(type) {
 				case *fail.ErrNotFound:
@@ -239,6 +240,7 @@ func (instance MetadataFolder) Read(ctx context.Context, path string, name strin
 					return iErr
 				}
 			}
+
 			goodBuffer = buffer
 			return nil
 		},
@@ -376,18 +378,22 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 					innerIterations++
 
 					var target bytes.Buffer
+					var newtarget bytes.Buffer
+					var anErr fail.Error
 					// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
-					if innerErr := instance.service.ReadObject(ctx, bucketName, absolutePath, &target, 0, int64(source.Len())); innerErr != nil {
+					if newtarget, anErr = instance.service.ReadObject(ctx, bucketName, absolutePath, &target, 0, int64(source.Len())); anErr != nil {
 						_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
-						logrus.WithContext(ctx).Warnf(innerErr.Error())
-						return innerErr
+						logrus.WithContext(ctx).Warnf(anErr.Error())
+						return anErr
 					}
 
-					if !bytes.Equal(data, target.Bytes()) {
-						_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
-						innerErr := fail.NewError("remote content is different from local reference")
-						logrus.WithContext(ctx).Warnf(innerErr.Error())
-						return innerErr
+					if app.Release {
+						if !bytes.Equal(data, newtarget.Bytes()) {
+							_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
+							innerErr := fail.NewError("remote content is different from local reference: %s, %s", string(data), newtarget.String())
+							logrus.WithContext(ctx).Warnf(innerErr.Error())
+							return innerErr
+						}
 					}
 
 					return nil
@@ -446,7 +452,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'callback' on each entry
-func (instance MetadataFolder) Browse(ctx context.Context, path string, callback folderDecoderCallback) fail.Error {
+func (instance MetadataFolder) Browse(ctx context.Context, path string, callback FolderDecoderCallback) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -475,7 +481,7 @@ func (instance MetadataFolder) Browse(ctx context.Context, path string, callback
 			continue
 		}
 		var buffer bytes.Buffer
-		xerr = instance.service.ReadObject(ctx, metadataBucket.Name, i, &buffer, 0, 0)
+		_, xerr = instance.service.ReadObject(ctx, metadataBucket.Name, i, &buffer, 0, 0)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			_ = instance.service.InvalidateObject(ctx, metadataBucket.Name, i)

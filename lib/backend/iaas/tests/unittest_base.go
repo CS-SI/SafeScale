@@ -221,7 +221,7 @@ func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, 
 			IsGateway:    true,
 		}
 
-		gateway, _, err = tester.Service.CreateHost(context.Background(), gwRequest)
+		gateway, _, err = tester.Service.CreateHost(context.Background(), gwRequest, nil)
 		require.Nil(t, err)
 		subnet.GatewayIDs = []string{gateway.Core.ID}
 	}
@@ -251,7 +251,7 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, subnet *abstr
 		Password:       "",
 		DiskSize:       0,
 	}
-	return tester.Service.CreateHost(context.Background(), hostRequest)
+	return tester.Service.CreateHost(context.Background(), hostRequest, nil)
 }
 
 // CreateGW creates a test GW
@@ -272,7 +272,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fai
 		ResourceName: "gw-" + subnet.Name,
 		IsGateway:    true,
 	}
-	gw, _, xerr := tester.Service.CreateHost(context.Background(), gwRequest)
+	gw, _, xerr := tester.Service.CreateHost(context.Background(), gwRequest, nil)
 	if xerr != nil {
 		return xerr
 	}

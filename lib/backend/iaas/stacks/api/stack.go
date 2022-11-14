@@ -114,7 +114,7 @@ type Stack interface {
 	DeleteVIP(context.Context, *abstract.VirtualIP) fail.Error
 
 	// CreateHost creates a host that fulfills the request
-	CreateHost(ctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error)
+	CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (*abstract.HostFull, *userdata.Content, fail.Error)
 	// ClearHostStartupScript clears the Startup Script of the Host (if the stack can do it)
 	ClearHostStartupScript(context.Context, stacks.HostParameter) fail.Error
 

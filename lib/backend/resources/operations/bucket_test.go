@@ -392,7 +392,7 @@ func TestBucket_Mount(t *testing.T) {
 			// DefaultRouteIP: request.DefaultRouteIP,
 			// DiskSize:       request.DiskSize,
 			TemplateID: "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		svc._setLogLevel(1)

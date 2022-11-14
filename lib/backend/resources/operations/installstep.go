@@ -448,7 +448,6 @@ type runOnHostParameters struct {
 func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var ok bool
 	if params == nil {
 		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")
 	}
@@ -477,7 +476,6 @@ func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{})
 func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var ok bool
 	if params == nil {
 		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")
 	}
@@ -516,6 +514,17 @@ func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ step
 		filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.GetName(), strings.ToLower(is.Action.String()), is.Name)
 		rfcItem := Item{
 			Remote: filename,
+		}
+
+		var does bool
+		does, xerr = p.Host.Exists(ctx)
+		if xerr != nil {
+			chRes <- result{stepResult{err: xerr}, xerr}
+			return
+		}
+		if !does {
+			logrus.WithContext(ctx).Errorf("Disaster: trying to install things on non-existing host")
+			chRes <- result{stepResult{success: true, complete: true, err: nil, retcode: 0, output: ""}, nil}
 		}
 
 		xerr = rfcItem.UploadString(ctx, command, p.Host)

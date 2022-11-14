@@ -217,7 +217,7 @@ func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.Hos
 		return nil, xerr
 	}
 
-	_, xerr = hostInstance.Create(handler.job.Context(), req, sizing)
+	_, xerr = hostInstance.Create(handler.job.Context(), req, sizing, nil)
 	if xerr != nil {
 		return nil, xerr
 	}

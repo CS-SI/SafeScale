@@ -507,9 +507,7 @@ func (s stack) WaitHostReady(
 }
 
 // CreateHost creates a host
-func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
-	ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error,
-) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -673,12 +671,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 			if request.Preemptible {
 				server, innerXErr = s.buildAwsSpotMachine( // FIXME: Disk size
 					ctx, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
-					string(userDataPhase1), publicIP, *template,
+					string(userDataPhase1), publicIP, *template, extra,
 				)
 			} else {
 				server, innerXErr = s.buildAwsMachine( // FIXME: Disk size
 					ctx, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
-					string(userDataPhase1), publicIP, *template,
+					string(userDataPhase1), publicIP, *template, extra,
 				)
 			}
 			if innerXErr != nil {
@@ -766,6 +764,7 @@ func (s stack) buildAwsSpotMachine(
 	data string,
 	publicIP bool,
 	template abstract.HostTemplate,
+	extra interface{},
 ) (*abstract.HostCore, fail.Error) {
 	resp, xerr := s.rpcDescribeSpotPriceHistory(ctx, aws.String(zone), aws.String(template.ID))
 	if xerr != nil {
@@ -807,11 +806,12 @@ func (s stack) buildAwsMachine(
 	data string,
 	publicIP bool,
 	template abstract.HostTemplate,
+	extra interface{},
 ) (*abstract.HostCore, fail.Error) {
 
 	instance, xerr := s.rpcCreateInstance(ctx,
 		aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageID), diskSize,
-		aws.String(keypairName), aws.Bool(publicIP), []byte(data),
+		aws.String(keypairName), aws.Bool(publicIP), []byte(data), extra,
 	)
 	if xerr != nil {
 		return nil, xerr

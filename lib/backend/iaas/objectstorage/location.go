@@ -104,7 +104,7 @@ type Location interface {
 	// HasObject ...
 	HasObject(context.Context, string, string) (bool, fail.Error)
 	// ReadObject ...
-	ReadObject(context.Context, string, string, io.Writer, int64, int64) fail.Error
+	ReadObject(context.Context, string, string, io.Writer, int64, int64) (bytes.Buffer, fail.Error)
 	// WriteMultiPartObject ...
 	WriteMultiPartObject(
 		context.Context, string, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata,
@@ -661,7 +661,7 @@ func (instance location) DownloadBucket(ctx context.Context, bucketName, decrypt
 		name = strings.TrimPrefix(name, path)
 
 		var buffer bytes.Buffer
-		ierr := instance.ReadObject(ctx, bucketName, path+name, &buffer, 0, 0)
+		_, ierr := instance.ReadObject(ctx, bucketName, path+name, &buffer, 0, 0)
 		if ierr != nil {
 			return ierr
 		}
@@ -802,47 +802,50 @@ func (instance location) HasObject(ctx context.Context, bucketName string, objec
 }
 
 // ReadObject reads the content of an object and put it in an io.Writer
-func (instance location) ReadObject(
-	ctx context.Context, bucketName string, objectName string, writer io.Writer, from int64, to int64,
-) (ferr fail.Error) {
+func (instance location) ReadObject(ctx context.Context, bucketName string, objectName string, writer io.Writer, from int64, to int64) (i bytes.Buffer, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
+		return bytes.Buffer{}, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("bucketName")
+		return bytes.Buffer{}, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 	if objectName == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("objectName")
+		return bytes.Buffer{}, fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
 	has, err := instance.HasObject(ctx, bucketName, objectName)
 	if err != nil {
-		return err
+		return bytes.Buffer{}, err
 	}
 
 	if !has {
-		return fail.NotFoundError("object '%s' not found in bucket '%s'", objectName, bucketName)
+		return bytes.Buffer{}, fail.NotFoundError("object '%s' not found in bucket '%s'", objectName, bucketName)
 	}
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
-		return err
+		return bytes.Buffer{}, err
 	}
 
 	objectName = strings.Trim(objectName, "/")
 	o, err := newObject(&b, objectName)
 	if err != nil {
-		return err
+		return bytes.Buffer{}, err
 	}
 
-	if err = o.Read(ctx, writer, from, to); err != nil {
-		return err
+	var buffer bytes.Buffer
+	muw := io.MultiWriter(writer, &buffer)
+
+	if err = o.Read(ctx, muw, from, to); err != nil {
+		return bytes.Buffer{}, err
 	}
 
-	return nil
+	// logrus.Warnf("Nice: we recovered %s", buffer.String())
+
+	return buffer, nil
 }
 
 // WriteObject writes the content of reader in the Object

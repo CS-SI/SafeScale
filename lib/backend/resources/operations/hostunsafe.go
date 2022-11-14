@@ -240,17 +240,10 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	var (
 		stdout, stderr string
 	)
+
+	var finalProfile api.Connector
+
 	retcode := -1
-	sshCfg, xerr := instance.GetSSHConfig(ctx)
-	if xerr != nil {
-		return retcode, stdout, stderr, xerr
-	}
-
-	sshProfile, xerr := sshfactory.NewConnector(sshCfg)
-	if xerr != nil {
-		return retcode, stdout, stderr, xerr
-	}
-
 	timeout = temporal.MaxTimeout(4*(time.Duration(uploadSize)*time.Second/(64*1024)+30*time.Second), timeout)
 
 	xerr = retry.WhileUnsuccessful(
@@ -261,6 +254,17 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 			default:
 			}
 
+			sshCfg, xerr := instance.GetSSHConfig(ctx)
+			if xerr != nil {
+				return xerr
+			}
+
+			sshProfile, xerr := sshfactory.NewConnector(sshCfg)
+			if xerr != nil {
+				return xerr
+			}
+
+			finalProfile = sshProfile
 			uploadTime := time.Duration(uploadSize)*time.Second/(64*1024) + 30*time.Second
 
 			copyCtx, cancel := context.WithTimeout(ctx, uploadTime)
@@ -356,7 +360,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		iretcode, istdout, istderr, innerXerr := run(ctx, sshProfile, cmd, outputs.COLLECT, timeout)
+		iretcode, istdout, istderr, innerXerr := run(ctx, finalProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {
 			innerXerr.Annotate("retcode", iretcode)

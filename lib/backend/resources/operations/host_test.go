@@ -118,7 +118,7 @@ func Test_LoadHost(t *testing.T) {
 			// DefaultRouteIP: request.DefaultRouteIP,
 			// DiskSize:       request.DiskSize,
 			TemplateID: "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		svc._setLogLevel(2)
@@ -210,7 +210,7 @@ func TestHost_Browse(t *testing.T) {
 			// DefaultRouteIP: request.DefaultRouteIP,
 			// DiskSize:       request.DiskSize,
 			TemplateID: "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, err := LoadHost(ctx, svc, "localhost")
@@ -278,7 +278,7 @@ func TestHost_ForceGetState(t *testing.T) {
 			// DefaultRouteIP: request.DefaultRouteIP,
 			// DiskSize:       request.DiskSize,
 			TemplateID: "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, err := LoadHost(ctx, svc, "localhost")
@@ -311,7 +311,7 @@ func TestHost_ForceGetState(t *testing.T) {
 			// DefaultRouteIP: request.DefaultRouteIP,
 			// DiskSize:       request.DiskSize,
 			TemplateID: "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, err = LoadHost(ctx, svc, "localhost")
@@ -354,7 +354,7 @@ func TestHost_Unsafereload(t *testing.T) {
 			// DefaultRouteIP: request.DefaultRouteIP,
 			// DiskSize:       request.DiskSize,
 			TemplateID: "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		networkReq := abstract.NetworkRequest{
@@ -425,7 +425,7 @@ func TestHost_Reload(t *testing.T) {
 			// DefaultRouteIP: request.DefaultRouteIP,
 			// DiskSize:       request.DiskSize,
 			TemplateID: "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		_, xerr = svc.CreateNetwork(ctx, abstract.NetworkRequest{
@@ -485,7 +485,7 @@ func TestHost_GetState(t *testing.T) {
 			// DefaultRouteIP: request.DefaultRouteIP,
 			// DiskSize:       request.DiskSize,
 			TemplateID: "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, err := LoadHost(ctx, svc, "localhost")
@@ -688,7 +688,7 @@ func TestHost_setSecurityGroups(t *testing.T) {
 			// SecurityGroupIDs map[string]struct{} // List of Security Groups to attach to Host (using map as dict)
 		}
 
-		_, _, xerr = svc.CreateHost(ctx, hostReq)
+		_, _, xerr = svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -765,7 +765,7 @@ func TestHost_thePhaseDoesSomething(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -805,7 +805,7 @@ func TestHost_WaitSSHReady(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -843,7 +843,7 @@ func TestHost_Delete(t *testing.T) {
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -882,7 +882,7 @@ func TestHost_Run(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -949,7 +949,7 @@ func TestHost_Push(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1028,7 +1028,7 @@ func TestHost_StartStop(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1086,7 +1086,7 @@ func TestHost_Reboot(t *testing.T) {
 		// FIXME: can't work without cache
 		svc._updateOption("enablecache", true)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1140,7 +1140,7 @@ func TestHost_Resize(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1189,7 +1189,7 @@ func TestHost_GetPublicIP(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1226,7 +1226,7 @@ func TestHost_GetPrivateIP(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1271,7 +1271,7 @@ func TestHost_GetPrivateIPOnSubnet(t *testing.T) {
 			TemplateID: "TemplateID",
 		}
 
-		_, _, xerr = svc.CreateHost(ctx, req)
+		_, _, xerr = svc.CreateHost(ctx, req, nil)
 		require.Nil(t, xerr)
 
 		networkReq := abstract.NetworkRequest{
@@ -1336,7 +1336,7 @@ func TestHost_GetAccessIP(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1373,7 +1373,7 @@ func TestHost_GetShares(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1410,7 +1410,7 @@ func TestHost_GetMounts(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1444,7 +1444,7 @@ func TestHost_IsClusterMember(t *testing.T) {
 
 	xerr := NewServiceTest(t, func(svc *ServiceTest) {
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1479,7 +1479,7 @@ func TestHost_IsGateway(t *testing.T) {
 			TemplateID:     "TemplateID",
 			IsGateway:      true,
 		}
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1506,7 +1506,7 @@ func TestHost_IsGateway(t *testing.T) {
 			TemplateID:     "TemplateID",
 			IsGateway:      false,
 		}
-		_, _, xerr = svc.CreateHost(ctx, hostReq)
+		_, _, xerr = svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr = LoadHost(ctx, svc, "MyHostTest")
@@ -1539,7 +1539,7 @@ func TestHost_IsSingle(t *testing.T) {
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
 		}
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1564,7 +1564,7 @@ func TestHost_IsSingle(t *testing.T) {
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
 		}
-		_, _, xerr = svc.CreateHost(ctx, hostReq)
+		_, _, xerr = svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		networkReq := abstract.NetworkRequest{
@@ -1627,7 +1627,7 @@ func TestHost_PushStringToFile(t *testing.T) {
 		svc._updateOption("enablecache", true)
 		svc._setLogLevel(0)
 
-		_, _, xerr := svc.CreateHost(ctx, hostReq)
+		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1667,7 +1667,7 @@ func TestHost_GetDefaultSubnet(t *testing.T) {
 			// DefaultRouteIP: request.DefaultRouteIP,
 			// DiskSize:       request.DiskSize,
 			TemplateID: "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -1730,7 +1730,7 @@ func TestHost_ToProtocol(t *testing.T) {
 			TemplateID: "TemplateID",
 		}
 
-		_, _, xerr := svc.CreateHost(ctx, req)
+		_, _, xerr := svc.CreateHost(ctx, req, nil)
 		require.Nil(t, xerr)
 
 		networkReq := abstract.NetworkRequest{
@@ -1796,7 +1796,7 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 			TemplateID: "TemplateID",
 		}
 
-		_, _, xerr := svc.CreateHost(ctx, req)
+		_, _, xerr := svc.CreateHost(ctx, req, nil)
 		require.Nil(t, xerr)
 
 		networkReq := abstract.NetworkRequest{

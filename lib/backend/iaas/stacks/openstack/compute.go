@@ -664,7 +664,7 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (*abstract.Ho
 }
 
 // CreateHost creates a new host
-func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
 	if valid.IsNil(s) {
 		return nil, nil, fail.InvalidInstanceError()
@@ -760,6 +760,16 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 	ahc := abstract.NewHostCore()
 	ahc.PrivateKey = userData.FirstPrivateKey
 	ahc.Password = request.Password
+
+	if extra != nil {
+		into, ok := extra.(map[string]string)
+		if !ok {
+			return nil, nil, fail.InvalidParameterError("extra", "must be a map[string]string")
+		}
+		for k, v := range into {
+			ahc.Tags[k] = v
+		}
+	}
 
 	// --- query provider for host creation ---
 

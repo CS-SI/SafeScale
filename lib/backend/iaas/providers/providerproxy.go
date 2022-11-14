@@ -502,10 +502,10 @@ func (s ProviderProxy) DeleteVIP(ctx context.Context, ip *abstract.VirtualIP) (f
 	return xerr
 }
 
-func (s ProviderProxy) CreateHost(ctx context.Context, request abstract.HostRequest) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
+func (s ProviderProxy) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	host, content, xerr := s.Provider.CreateHost(ctx, request)
+	host, content, xerr := s.Provider.CreateHost(ctx, request, extra)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}

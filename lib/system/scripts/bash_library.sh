@@ -82,6 +82,7 @@ function sfKillApt(){
   sudo pkill -9 dpkg || true
   sudo rm -f /var/{lib/{dpkg,apt/lists},cache/apt/archives}/{lock,lock-frontend}
 }
+export -f sfKillApt
 
 # sfWaitForApt waits an already running apt-like command to finish
 function sfWaitForApt() {

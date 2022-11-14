@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5" // nolint
 	"encoding/hex"
@@ -1934,11 +1935,11 @@ func (e *ServiceTest) CreateHostWithKeyPair(ctx context.Context, request abstrac
 		// DefaultGateway: request.DefaultGateway,
 		TemplateID: request.TemplateID,
 	}
-	hf, udc, xerr := e.CreateHost(ctx, hostReq)
+	hf, udc, xerr := e.CreateHost(ctx, hostReq, nil)
 	return hf, udc, kp, xerr
 }
 
-func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error) {
+func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (*abstract.HostFull, *userdata.Content, fail.Error) {
 
 	if valid.IsNil(request) {
 		return nil, nil, fail.InvalidParameterCannotBeNilError("request")
@@ -2105,7 +2106,7 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 			TemplateID:  request.TemplateID,
 			TemplateRef: "",
 			IsGateway:   true,
-		})
+		}, nil)
 		_, _, xerr = e.CreateHost(ctx, abstract.HostRequest{
 			ResourceName: fmt.Sprintf("gw2-%s", name),
 			HostName:     fmt.Sprintf("gw2-%s", name),
@@ -2122,7 +2123,7 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 			TemplateID:  request.TemplateID,
 			TemplateRef: "",
 			IsGateway:   true,
-		})
+		}, nil)
 	}
 
 	xerr = host.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2619,7 +2620,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				"GWSecurityGroupID":       {},
 				"InternalSecurityGroupID": {},
 			},
-		})
+		}, nil)
 		if xerr != nil {
 			return aci, xerr
 		}
@@ -2677,7 +2678,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				"GWSecurityGroupID":       {},
 				"InternalSecurityGroupID": {},
 			},
-		})
+		}, nil)
 		if xerr != nil {
 			return aci, xerr
 		}
@@ -2779,7 +2780,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 					"GWSecurityGroupID":       {},
 					"InternalSecurityGroupID": {},
 				},
-			})
+			}, nil)
 			if xerr != nil {
 				return aci, xerr
 			}
@@ -2848,7 +2849,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 					"GWSecurityGroupID":       {},
 					"InternalSecurityGroupID": {},
 				},
-			})
+			}, nil)
 			if xerr != nil {
 				return aci, xerr
 			}
@@ -3485,7 +3486,7 @@ func (e *ServiceTest) HasObject(ctx context.Context, bucketname string, path str
 	}
 	return has, nil
 }
-func (e *ServiceTest) ReadObject(ctx context.Context, bucketname string, path string, buffer io.Writer, offset int64, length int64) (ferr fail.Error) { // nolint
+func (e *ServiceTest) ReadObject(ctx context.Context, bucketname string, path string, buffer io.Writer, offset int64, length int64) (writer bytes.Buffer, ferr fail.Error) { // nolint
 
 	defer fail.OnPanic(&ferr)
 
@@ -3498,11 +3499,11 @@ func (e *ServiceTest) ReadObject(ctx context.Context, bucketname string, path st
 	case "version":
 		e._logf("ServiceTest::ReadObject { bucketname: \"%s\", path: \"%s\", value: \"%s\"}\n", bucketname, path, version)
 		if versionErr != nil {
-			return versionErr
+			return bytes.Buffer{}, versionErr
 		}
 		_, err := buffer.Write([]byte(version))
 		if err != nil {
-			return fail.Wrap(err)
+			return bytes.Buffer{}, fail.Wrap(err)
 		}
 		length = int64(len(version)) // nolint
 	default:
@@ -3516,15 +3517,15 @@ func (e *ServiceTest) ReadObject(ctx context.Context, bucketname string, path st
 			e._logf("ServiceTest::ReadObject { bucketname: \"%s\", path: \"%s\", value: %s }\n", bucketname, path, dataValue)
 			_, err := buffer.Write([]byte(val))
 			if err != nil {
-				return fail.Wrap(err)
+				return bytes.Buffer{}, fail.Wrap(err)
 			}
 			length = int64(len(val)) // nolint
 		} else {
 			e._warnf("ServiceTest::ReadObject { bucketname: \"%s\", path: \"%s\", value: ?} not found !\n", bucketname, path)
-			return fail.NotFoundError("path \"" + path + "\" not found")
+			return bytes.Buffer{}, fail.NotFoundError("path \"" + path + "\" not found")
 		}
 	}
-	return nil
+	return bytes.Buffer{}, nil
 }
 func (e *ServiceTest) WriteMultiPartObject(context.Context, string, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
 	e._warnf("ServiceTest::WriteObject (not implemented)")

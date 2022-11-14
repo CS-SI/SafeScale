@@ -960,7 +960,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 		return outerr
 	}
 
-	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
@@ -972,6 +972,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 			return nil
 		})
 	})
+	return xerr
 }
 
 // Stop stops the Cluster
@@ -1305,7 +1306,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 			continue
 		}
 		if v.ToBeDeleted {
-			_, xerr = instance.taskDeleteNodeWithCtx(ctx, taskDeleteNodeParameters{node: v.Content.(*propertiesv3.ClusterNode), clusterName: cluName})
+			_, xerr = instance.taskDeleteNodeWithCtx(cleanupContextFrom(ctx), taskDeleteNodeParameters{node: v.Content.(*propertiesv3.ClusterNode), clusterName: cluName})
 			debug.IgnoreError2(ctx, xerr)
 			continue
 		}
@@ -1321,7 +1322,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 			for _, v := range nodes {
 				v := v
 				egDeletion.Go(func() error {
-					_, err := instance.taskDeleteNode(cleanupContextFrom(ctx), taskDeleteNodeParameters{node: v, clusterName: cluName})
+					_, err := instance.taskDeleteNodeWithCtx(cleanupContextFrom(ctx), taskDeleteNodeParameters{node: v, clusterName: cluName})
 					return err
 				})
 			}
@@ -1483,7 +1484,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 		return xerr
 	}
 
-	xerr = instance.deleteNode(ctx, node, selectedMaster.(*Host))
+	xerr = instance.deleteNode(cleanupContextFrom(ctx), node, selectedMaster.(*Host))
 	if xerr != nil {
 		return xerr
 	}
@@ -1878,13 +1879,19 @@ func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (hostIn
 }
 
 // deleteMaster deletes the master specified by its ID
-func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) (ferr fail.Error) {
+func (instance *Cluster) deleteMaster(ctx context.Context, host string) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	var master *propertiesv3.ClusterNode
-	xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	if valid.IsNil(host) {
+		return fail.InvalidParameterCannotBeNilError("host")
+	}
+
+	// FIXME: Bad idea, the first thing to go must be the resource, then the metadata; if not we can have zombie instances without metadata (it happened)
+	// which means that the code doing the "restore" never worked
+
+	xerr := instance.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			// Removes master from Cluster properties
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -1892,19 +1899,14 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			hid, err := host.GetID()
-			if err != nil {
-				return fail.ConvertError(err)
-			}
+			hid := host
 
 			numericalID, found := nodesV3.MasterByID[hid]
 			if !found {
-				return abstract.ResourceNotFoundError("master", host.GetName())
+				return abstract.ResourceNotFoundError("master", host)
 			}
 
-			master = nodesV3.ByNumericalID[numericalID]
 			delete(nodesV3.ByNumericalID, numericalID)
-			delete(nodesV3.MasterByName, host.GetName())
 			delete(nodesV3.MasterByID, hid)
 			if found, indexInSlice := containsClusterNode(nodesV3.Masters, numericalID); found {
 				length := len(nodesV3.Masters)
@@ -1922,47 +1924,17 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 		return xerr
 	}
 
-	// Starting from here, restore master in Cluster properties if exiting with error
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			derr := instance.Alter(cleanupContextFrom(ctx), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
+	svc := instance.Service()
 
-					nodesV3.Masters = append(nodesV3.Masters, master.NumericalID)
-					nodesV3.MasterByName[master.Name] = master.NumericalID
-					nodesV3.MasterByID[master.ID] = master.NumericalID
-					nodesV3.ByNumericalID[master.NumericalID] = master
-					return nil
-				})
-			})
-			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to restore master '%s' in Cluster metadata", ActionFromError(ferr), master.Name))
-			}
-		}
-	}()
-
-	hid, _ := host.GetID()
-
-	// Finally delete host
-	xerr = host.Delete(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
+	lh, xerr := LoadHost(ctx, svc, host)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// master seems already deleted, so consider it as a success
-			logrus.WithContext(ctx).Tracef("master not found, deletion considered successful")
-			debug.IgnoreError2(ctx, xerr)
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
-	delete(instance.machines, hid)
+	xerr = lh.Delete(ctx)
+	if xerr != nil {
+		return xerr
+	}
 
 	return nil
 }
@@ -1988,6 +1960,9 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 			if nodeRef == "" {
 				nodeRef = node.Name
 			}
+
+			// FIXME: Bad idea, the first thing to go must be the resource, then the metadata; if not we can have zombie instances without metadata (it happened)
+			// which means that the code doing the "restore" never worked
 
 			// Identify the node to delete and remove it preventively from metadata
 			xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2017,35 +1992,6 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 				return result{xerr}, xerr
 			}
 
-			// Starting from here, restore node in Cluster metadata if exiting with error
-			defer func() {
-				ferr = debug.InjectPlannedFail(ferr)
-				if ferr != nil {
-					derr := instance.Alter(cleanupContextFrom(ctx), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-						return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-							nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-							if !ok {
-								return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-							}
-
-							nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, node.NumericalID)
-							if node.Name != "" {
-								nodesV3.PrivateNodeByName[node.Name] = node.NumericalID
-							}
-							if node.ID != "" {
-								nodesV3.PrivateNodeByID[node.ID] = node.NumericalID
-							}
-							nodesV3.ByNumericalID[node.NumericalID] = node
-							return nil
-						})
-					})
-					if derr != nil {
-						logrus.WithContext(cleanupContextFrom(ctx)).Errorf("failed to restore node ownership in Cluster")
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to restore node ownership in Cluster metadata", ActionFromError(ferr)))
-					}
-				}
-			}()
-
 			// Deletes node
 			hostInstance, xerr := LoadHost(ctx, instance.Service(), nodeRef)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -2053,45 +1999,46 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// Host already deleted, consider as a success, continue
+					return result{nil}, nil // nolint
 				default:
 					return result{xerr}, xerr
 				}
-			} else {
-				// host still exists, leave it from Cluster, if master is not null
-				if master != nil && !valid.IsNil(master) {
-					xerr = instance.leaveNodesFromList(ctx, []resources.Host{hostInstance}, master)
+			}
+
+			// host still exists, leave it from Cluster, if master is not null
+			if master != nil && !valid.IsNil(master) {
+				xerr = instance.leaveNodesFromList(ctx, []resources.Host{hostInstance}, master)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return result{xerr}, xerr
+				}
+
+				makers := instance.localCache.makers
+				incrementExpVar("cluster.cache.hit")
+				if makers.UnconfigureNode != nil {
+					xerr = makers.UnconfigureNode(instance, hostInstance, master)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						return result{xerr}, xerr
 					}
-
-					makers := instance.localCache.makers
-					incrementExpVar("cluster.cache.hit")
-					if makers.UnconfigureNode != nil {
-						xerr = makers.UnconfigureNode(instance, hostInstance, master)
-						xerr = debug.InjectPlannedFail(xerr)
-						if xerr != nil {
-							return result{xerr}, xerr
-						}
-					}
 				}
-
-				hid, _ := hostInstance.GetID()
-
-				// Finally delete host
-				xerr = hostInstance.Delete(ctx)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					switch xerr.(type) {
-					case *fail.ErrNotFound:
-						// Host seems already deleted, so it's a success
-					default:
-						return result{xerr}, xerr
-					}
-				}
-
-				delete(instance.machines, hid)
 			}
+
+			hid, _ := hostInstance.GetID()
+
+			// Finally delete host
+			xerr = hostInstance.Delete(cleanupContextFrom(ctx))
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// Host seems already deleted, so it's a success
+				default:
+					return result{xerr}, xerr
+				}
+			}
+
+			delete(instance.machines, hid)
 
 			return result{nil}, nil // nolint
 		}() // nolint
@@ -2130,7 +2077,7 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Erro
 
 	clusterName := instance.GetName()
 
-	xerr := instance.delete(ctx, clusterName)
+	xerr := instance.delete(cleanupContextFrom(ctx), clusterName)
 	if xerr != nil {
 		return xerr
 	}
@@ -2241,7 +2188,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 						foundSomething = true
 
 						egKill.Go(func() error {
-							_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: n, clusterName: cluName})
+							_, err := instance.taskDeleteNodeWithCtx(cleanupContextFrom(ctx), taskDeleteNodeParameters{node: n, clusterName: cluName})
 							return err
 						})
 					}
@@ -2253,7 +2200,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 						foundSomething = true
 
 						egKill.Go(func() error {
-							_, err := instance.taskDeleteMaster(ctx, taskDeleteNodeParameters{node: n, clusterName: cluName})
+							_, err := instance.taskDeleteMaster(cleanupContextFrom(ctx), taskDeleteNodeParameters{node: n, clusterName: cluName})
 							return err
 						})
 					}
@@ -2298,7 +2245,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 				for _, v := range all {
 					v := v
 					egKill.Go(func() error {
-						_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: v, clusterName: cluName})
+						_, err := instance.taskDeleteNodeWithCtx(cleanupContextFrom(ctx), taskDeleteNodeParameters{node: v, clusterName: cluName})
 						return err
 					})
 				}
@@ -2344,7 +2291,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 						default:
 						}
 
-						innerXErr := subnetInstance.Delete(ctx)
+						innerXErr := subnetInstance.Delete(cleanupContextFrom(ctx))
 						if innerXErr != nil {
 							switch innerXErr.(type) {
 							case *fail.ErrNotAvailable, *fail.ErrNotFound:
@@ -2391,7 +2338,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 						default:
 						}
 
-						innerXErr := networkInstance.Delete(ctx)
+						innerXErr := networkInstance.Delete(cleanupContextFrom(ctx))
 						if innerXErr != nil {
 							switch innerXErr.(type) {
 							case *fail.ErrNotFound, *fail.ErrInvalidRequest:
@@ -2427,7 +2374,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 			}
 
 			// --- Delete metadata ---
-			xerr = instance.MetadataCore.Delete(ctx)
+			xerr = instance.MetadataCore.Delete(cleanupContextFrom(ctx))
 			if xerr != nil {
 				return result{xerr}, xerr
 			}
@@ -3268,7 +3215,7 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 		for _, v := range removedNodes {
 			v := v
 			tg.Go(func() error {
-				_, err := instance.taskDeleteNode(ctx, taskDeleteNodeParameters{node: v, master: selectedMaster.(*Host), clusterName: cluName})
+				_, err := instance.taskDeleteNodeWithCtx(cleanupContextFrom(ctx), taskDeleteNodeParameters{node: v, master: selectedMaster.(*Host), clusterName: cluName})
 				return err
 			})
 		}

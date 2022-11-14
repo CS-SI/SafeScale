@@ -40,6 +40,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -108,6 +109,7 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 		return []string{}, xerr
 	}
 	return out, nil
@@ -176,6 +178,7 @@ func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v da
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 		return xerr
 	}
 
@@ -263,7 +266,7 @@ func (instance *Cluster) RegisterFeature(
 		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
 	}
 
-	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -289,6 +292,10 @@ func (instance *Cluster) RegisterFeature(
 			return nil
 		})
 	})
+	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+	}
+	return xerr
 }
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
@@ -306,7 +313,7 @@ func (instance *Cluster) UnregisterFeature(inctx context.Context, feat string) (
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -320,6 +327,10 @@ func (instance *Cluster) UnregisterFeature(inctx context.Context, feat string) (
 			return nil
 		})
 	})
+	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+	}
+	return xerr
 }
 
 // ListEligibleFeatures returns a slice of features eligible to Cluster
@@ -846,6 +857,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 			})
 		})
 		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			chRes <- result{xerr}
 			return
 		}
@@ -870,6 +882,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			chRes <- result{xerr}
 			return
 		}
@@ -912,6 +925,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				chRes <- result{xerr}
 				return
 			}
@@ -969,6 +983,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 			})
 		})
 		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			chRes <- result{xerr}
 			return
 		}
@@ -992,6 +1007,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			chRes <- result{xerr}
 			return
 		}
@@ -1045,6 +1061,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				chRes <- result{xerr}
 				return
 			}
@@ -1100,6 +1117,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			chRes <- result{xerr}
 			return
 		}
@@ -1169,6 +1187,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				chRes <- result{xerr}
 				return
 			}
@@ -1216,6 +1235,7 @@ func (instance *Cluster) installDocker(
 			})
 		})
 		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			chRes <- result{xerr}
 			return
 		}
@@ -1276,6 +1296,7 @@ func (instance *Cluster) installDocker(
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			chRes <- result{xerr}
 			return
 		}

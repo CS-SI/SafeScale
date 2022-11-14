@@ -776,7 +776,7 @@ func (s stack) addPublicIPs(ctx context.Context, primaryNIC osc.Nic, otherNICs [
 }
 
 // CreateHost creates a host that fulfills the request
-func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (ahf *abstract.HostFull, udc *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -1006,15 +1006,27 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ah
 	if xerr = s.addGPUs(ctx, &request, *template, vm.VmId); xerr != nil {
 		return nil, nil, xerr
 	}
+
+	into := map[string]string{
+		"name":             request.ResourceName,
+		"ManagedBy":        "safescale",
+		"DeclaredInBucket": s.configurationOptions.MetadataBucket,
+		"CreationDate":     time.Now().Format(time.RFC3339),
+		"Template":         vm.VmType,
+		"Image":            vm.ImageId,
+	}
+	if extra != nil {
+		theSame, ok := extra.(map[string]string)
+		if !ok {
+			return nil, nil, fail.InvalidParameterError("extra", "must be a map[string]string")
+		}
+		for k, v := range theSame {
+			into[k] = v
+		}
+	}
+
 	_, xerr = s.rpcCreateTags(ctx,
-		vm.VmId, map[string]string{
-			"name":             request.ResourceName,
-			"ManagedBy":        "safescale",
-			"DeclaredInBucket": s.configurationOptions.MetadataBucket,
-			"CreationDate":     time.Now().Format(time.RFC3339),
-			"Template":         vm.VmType,
-			"Image":            vm.ImageId,
-		},
+		vm.VmId, into,
 	)
 	if xerr != nil {
 		return nil, nil, xerr

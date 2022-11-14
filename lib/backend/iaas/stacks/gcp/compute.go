@@ -180,7 +180,7 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 }
 
 // CreateHost creates a host meeting the requirements specified by request
-func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -317,7 +317,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 			}
 
 			var innerXErr fail.Error
-			ahf, innerXErr = s.buildGcpMachine(ctx, request.ResourceName, an, defaultSubnet, *template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs)
+			ahf, innerXErr = s.buildGcpMachine(ctx, request.ResourceName, an, defaultSubnet, *template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs, extra)
 			if innerXErr != nil {
 				captured := normalizeError(innerXErr)
 				switch captured.(type) {
@@ -456,8 +456,9 @@ func (s stack) buildGcpMachine(
 	userData string,
 	isPublic bool,
 	securityGroups map[string]struct{},
+	extra interface{},
 ) (*abstract.HostFull, fail.Error) {
-	resp, xerr := s.rpcCreateInstance(ctx, instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(diskSize), userData, isPublic, securityGroups)
+	resp, xerr := s.rpcCreateInstance(ctx, instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(diskSize), userData, isPublic, securityGroups, extra)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -468,6 +469,15 @@ func (s stack) buildGcpMachine(
 	}
 
 	ahf.Core.Tags["Image"] = imageURL
+	if extra != nil {
+		into, ok := extra.(map[string]string)
+		if !ok {
+			return nil, fail.InvalidParameterError("extra", "must be a map[string]string")
+		}
+		for k, v := range into {
+			ahf.Core.Tags[k] = v
+		}
+	}
 
 	return ahf, nil
 }

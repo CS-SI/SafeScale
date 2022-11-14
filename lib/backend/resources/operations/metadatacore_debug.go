@@ -295,8 +295,10 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 	case res := <-chRes:
 		return res.rErr
 	case <-ctx.Done():
+		<-chRes
 		return fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		<-chRes
 		return fail.ConvertError(inctx.Err())
 	}
 }
@@ -349,8 +351,10 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 	case res := <-chRes:
 		return res.rErr
 	case <-ctx.Done():
+		<-chRes
 		return fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		<-chRes
 		return fail.ConvertError(inctx.Err())
 	}
 }
@@ -465,8 +469,10 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 	case res := <-chRes:
 		return res.rErr
 	case <-ctx.Done():
+		<-chRes
 		return fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		<-chRes
 		return fail.ConvertError(inctx.Err())
 	}
 }
@@ -600,13 +606,12 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 
 // Read gets the data from Object Storage
 func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Error) {
-
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	myself.RLock()
-	defer myself.RUnlock()
+	myself.Lock()
+	defer myself.Unlock()
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -707,13 +712,12 @@ func (myself *MetadataCore) Read(inctx context.Context, ref string) (_ fail.Erro
 
 // ReadByID reads a metadata identified by ID from Object Storage
 func (myself *MetadataCore) ReadByID(inctx context.Context, id string) (_ fail.Error) {
-
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
 
-	myself.RLock()
-	defer myself.RUnlock()
+	myself.Lock()
+	defer myself.Unlock()
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -1046,7 +1050,6 @@ func (myself *MetadataCore) write(inctx context.Context) fail.Error {
 
 // Reload reloads the content from the Object Storage
 func (myself *MetadataCore) Reload(inctx context.Context) (ferr fail.Error) {
-
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -1100,26 +1103,26 @@ func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 				return xerr
 			}
 
-			if myself.loaded && !myself.committed {
-				name, ok := myself.name.Load().(string)
-				if ok {
-					return fail.InconsistentError("cannot unsafeReload a not committed data with name %s and kind %s", name, myself.kind)
-				}
-				return fail.InconsistentError("cannot unsafeReload a not committed data without name and kind %s", myself.kind)
-			}
-
 			if myself.kindSplittedStore {
-				id, ok := myself.id.Load().(string)
-				if !ok {
-					return fail.InconsistentError("field 'id' is not set with string")
-				}
-
 				xerr = retry.WhileUnsuccessful(
 					func() error {
 						select {
 						case <-ctx.Done():
 							return retry.StopRetryError(ctx.Err())
 						default:
+						}
+
+						id, ok := myself.id.Load().(string)
+						if !ok {
+							return fail.InconsistentError("field 'id' is not set with string")
+						}
+
+						if myself.loaded && !myself.committed {
+							name, ok := myself.name.Load().(string)
+							if ok {
+								return fail.InconsistentError("cannot unsafeReload a not committed data with name %s and kind %s", name, myself.kind)
+							}
+							return fail.InconsistentError("cannot unsafeReload a not committed data without name and kind %s", myself.kind)
 						}
 
 						if innerXErr := myself.readByID(ctx, id); innerXErr != nil {
@@ -1141,28 +1144,36 @@ func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 				if xerr != nil {
 					switch xerr.(type) {
 					case *retry.ErrTimeout:
-						return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", myself.kind, id)
+						return fail.Wrap(fail.RootCause(xerr), "failed to unsafeReload (kind %s) %s", myself.kind, myself.id)
 					case *retry.ErrStopRetry:
-						return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", myself.kind, id)
+						return fail.Wrap(fail.RootCause(xerr), "failed to unsafeReload (kind %s) %s", myself.kind, myself.id)
 					default:
-						return fail.Wrap(xerr, "failed to read %s by id %s", myself.kind, myself.id)
+						return fail.Wrap(xerr, "failed to unsafeReload (kind %s) %s", myself.kind, myself.id)
 					}
 				}
 			} else {
-				name, ok := myself.name.Load().(string)
-				if !ok {
-					return fail.InconsistentError("field 'name' is not set with string")
-				}
-				if name == "" {
-					return fail.InconsistentError("field 'name' cannot be empty")
-				}
-
 				xerr = retry.WhileUnsuccessful(
 					func() error {
 						select {
 						case <-ctx.Done():
 							return retry.StopRetryError(ctx.Err())
 						default:
+						}
+
+						name, ok := myself.name.Load().(string)
+						if !ok {
+							return fail.InconsistentError("field 'name' is not set with string")
+						}
+						if name == "" {
+							return fail.InconsistentError("field 'name' cannot be empty")
+						}
+
+						if myself.loaded && !myself.committed {
+							name, ok := myself.name.Load().(string)
+							if ok {
+								return fail.InconsistentError("cannot unsafeReload a not committed data with name %s and kind %s", name, myself.kind)
+							}
+							return fail.InconsistentError("cannot unsafeReload a not committed data without name and kind %s", myself.kind)
 						}
 
 						if innerXErr := myself.readByName(ctx, name); innerXErr != nil {
@@ -1184,11 +1195,11 @@ func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 				if xerr != nil {
 					switch xerr.(type) {
 					case *retry.ErrTimeout:
-						return fail.Wrap(fail.RootCause(xerr), "failed (timeout) to read %s '%s'", myself.kind, name)
+						return fail.Wrap(fail.RootCause(xerr), "failed (timeout) to unsafeReload (kind %s) %s", myself.kind, myself.name)
 					case *retry.ErrStopRetry:
-						return fail.Wrap(fail.RootCause(xerr), "failed to read %s '%s'", myself.kind, name)
+						return fail.Wrap(fail.RootCause(xerr), "failed to  to unsafeReload (kind %s) %s", myself.kind, myself.name)
 					default:
-						return fail.Wrap(xerr, "failed to read %s '%s'", myself.kind, name)
+						return fail.Wrap(xerr, "failed to  to unsafeReload (kind %s) %s", myself.kind, myself.name)
 					}
 				}
 			}
@@ -1212,7 +1223,6 @@ func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 
 // BrowseFolder walks through MetadataFolder and executes a callback for each entry
 func (myself *MetadataCore) BrowseFolder(inctx context.Context, callback func(buf []byte) fail.Error) (_ fail.Error) {
-
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -1259,7 +1269,6 @@ func (myself *MetadataCore) BrowseFolder(inctx context.Context, callback func(bu
 
 // Delete deletes the metadata
 func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
-
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -1392,7 +1401,6 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 }
 
 func (myself *MetadataCore) Sdump(inctx context.Context) (string, fail.Error) {
-
 	if valid.IsNil(myself) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -1508,7 +1516,6 @@ func (myself *MetadataCore) unsafeSerialize(inctx context.Context) ([]byte, fail
 
 // Deserialize reads json code and reinstantiates
 func (myself *MetadataCore) Deserialize(inctx context.Context, buf []byte) fail.Error {
-
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
