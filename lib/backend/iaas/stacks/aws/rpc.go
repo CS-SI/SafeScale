@@ -1612,7 +1612,7 @@ func (s stack) rpcRequestSpotInstance(ctx context.Context, price, zone, subnetID
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
+func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte, extra interface{}) (_ *ec2.Instance, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return nil, xerr
 	}
@@ -1698,6 +1698,45 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 		}()
 	}
 
+	datags := []*ec2.Tag{
+		{
+			Key:   awsTagNameLabel,
+			Value: name,
+		},
+		{
+			Key:   aws.String("ManagedBy"),
+			Value: aws.String("safescale"),
+		},
+		{
+			Key:   aws.String("DeclaredInBucket"),
+			Value: aws.String(s.Config.MetadataBucket),
+		},
+		{
+			Key:   aws.String("Image"),
+			Value: imageID,
+		},
+		{
+			Key:   aws.String("Template"),
+			Value: templateID,
+		},
+		{
+			Key:   aws.String("CreationDate"),
+			Value: aws.String(time.Now().Format(time.RFC3339)),
+		},
+	}
+	if extra != nil {
+		into, ok := extra.(map[string]string)
+		if !ok {
+			return nil, fail.InvalidParameterError("extra", "must be a map[string]string")
+		}
+		for k, v := range into {
+			datags = append(datags, &ec2.Tag{
+				Key:   aws.String(k),
+				Value: aws.String(v),
+			})
+		}
+	}
+
 	// Request now the creation and start of new instance with the previously created interface
 	req := ec2.RunInstancesInput{
 		ImageId:      imageID,
@@ -1718,32 +1757,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 		TagSpecifications: []*ec2.TagSpecification{
 			{
 				ResourceType: aws.String("instance"),
-				Tags: []*ec2.Tag{
-					{
-						Key:   awsTagNameLabel,
-						Value: name,
-					},
-					{
-						Key:   aws.String("ManagedBy"),
-						Value: aws.String("safescale"),
-					},
-					{
-						Key:   aws.String("DeclaredInBucket"),
-						Value: aws.String(s.Config.MetadataBucket),
-					},
-					{
-						Key:   aws.String("Image"),
-						Value: imageID,
-					},
-					{
-						Key:   aws.String("Template"),
-						Value: templateID,
-					},
-					{
-						Key:   aws.String("CreationDate"),
-						Value: aws.String(time.Now().Format(time.RFC3339)),
-					},
-				},
+				Tags:         datags,
 			},
 		},
 		UserData: aws.String(base64.StdEncoding.EncodeToString(userdata)),

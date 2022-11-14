@@ -1090,7 +1090,7 @@ func (instance service) CreateHostWithKeyPair(inctx context.Context, request abs
 			// DefaultGateway: request.DefaultGateway,
 			TemplateID: request.TemplateID,
 		}
-		host, userData, rerr := instance.CreateHost(ctx, hostReq)
+		host, userData, rerr := instance.CreateHost(ctx, hostReq, nil)
 		if rerr != nil {
 			chRes <- result{nil, nil, nil, rerr}
 			return

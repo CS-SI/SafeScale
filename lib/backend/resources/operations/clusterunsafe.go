@@ -31,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 )
@@ -123,7 +124,7 @@ func (instance *Cluster) unsafeGetState(inctx context.Context) (_ clusterstate.E
 				return
 			}
 
-			chRes <- result{state, instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 					stateV1, ok := clonable.(*propertiesv1.ClusterState)
 					if !ok {
@@ -133,7 +134,13 @@ func (instance *Cluster) unsafeGetState(inctx context.Context) (_ clusterstate.E
 					stateV1.State = state
 					return nil
 				})
-			})}
+			})
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+			}
+
+			chRes <- result{state, xerr}
+
 			return
 		}
 
@@ -150,6 +157,7 @@ func (instance *Cluster) unsafeGetState(inctx context.Context) (_ clusterstate.E
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			chRes <- result{clusterstate.Unknown, xerr}
 			return
 		}
@@ -205,6 +213,7 @@ func (instance *Cluster) unsafeListMasters(inctx context.Context) (_ resources.I
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				return result{emptyList, xerr}, xerr
 			}
 
@@ -266,6 +275,7 @@ func (instance *Cluster) unsafeListMasterIDs(inctx context.Context) (_ data.Inde
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				return result{emptyList, xerr}, xerr
 			}
 
@@ -325,6 +335,7 @@ func (instance *Cluster) unsafeListMasterIPs(inctx context.Context) (_ data.Inde
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				return result{emptyList, xerr}, xerr
 			}
 
@@ -378,6 +389,7 @@ func (instance *Cluster) unsafeListNodeIPs(inctx context.Context) (_ data.Indexe
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				return result{emptyList, xerr}, xerr
 			}
 			return result{outlist, nil}, nil
@@ -506,6 +518,7 @@ func (instance *Cluster) unsafeListNodes(inctx context.Context) (_ resources.Ind
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				return result{emptyList, xerr}, xerr
 			}
 
@@ -568,6 +581,7 @@ func (instance *Cluster) unsafeListNodeIDs(inctx context.Context) (_ data.Indexe
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				return result{emptyList, xerr}, xerr
 			}
 

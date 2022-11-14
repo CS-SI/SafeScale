@@ -811,9 +811,7 @@ func (instance *Host) GetView(ctx context.Context) (*abstract.HostCore, *seriali
 // If the metadata is already carrying a Host, returns fail.ErrNotAvailable
 // In case of error occurring after Host resource creation, 'instance' still contains ID of the Host created. This can be used to
 // defer Host deletion in case of error
-func (instance *Host) Create(
-	inctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements,
-) (_ *userdata.Content, ferr fail.Error) {
+func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements, extra interface{}) (_ *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
@@ -841,7 +839,7 @@ func (instance *Host) Create(
 	go func() {
 		defer close(chRes)
 
-		a, err := instance.implCreate(ctx, hostReq, hostDef)
+		a, err := instance.implCreate(ctx, hostReq, hostDef, extra)
 		chRes <- result{
 			ct:  a,
 			err: err,
@@ -862,7 +860,7 @@ func (instance *Host) Create(
 }
 
 func (instance *Host) implCreate(
-	ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements,
+	ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements, extra interface{},
 ) (_ *userdata.Content, _ fail.Error) {
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -1080,7 +1078,7 @@ func (instance *Host) implCreate(
 				ar := result{nil, fail.ConvertError(err)}
 				return ar, ar.err
 			}
-			ahf, userdataContent, xerr = svc.CreateHost(ctx, hostReq)
+			ahf, userdataContent, xerr = svc.CreateHost(ctx, hostReq, extra)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
@@ -1449,8 +1447,8 @@ func (instance *Host) implCreate(
 						return nil
 					})
 					if rerr != nil {
-						chRes <- result{userdataContent, rerr}
-						return
+						ar := result{userdataContent, rerr}
+						return ar, ar.err
 					}
 				}
 			}
@@ -3066,7 +3064,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					default:
 					}
 
-					state, stateErr := svc.GetHostState(ctx, hid)
+					state, stateErr := svc.GetTrueHostState(ctx, hid)
 					if stateErr != nil {
 						switch stateErr.(type) {
 						case *fail.ErrNotFound:

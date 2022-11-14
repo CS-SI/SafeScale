@@ -104,7 +104,7 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 		return nil, xerr
 	}
 
-	xerr = subnetInstance.Create(handler.job.Context(), req, gwName, &sizing)
+	xerr = subnetInstance.Create(handler.job.Context(), req, gwName, &sizing, nil)
 	if xerr != nil {
 		return nil, xerr
 	}

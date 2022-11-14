@@ -434,6 +434,9 @@ func (hf *HostFull) GetID() (string, error) {
 	if hf == nil {
 		return "", fmt.Errorf("invalid instance")
 	}
+	if hf.Core == nil {
+		return "", fmt.Errorf("invalid instance")
+	}
 	return hf.Core.ID, nil
 }
 
@@ -445,6 +448,9 @@ func (hf *HostFull) GetName() string {
 
 // SetName is a setter to initialize field 'Name'
 func (hf *HostFull) SetName(name string) *HostFull {
+	if hf == nil {
+		panic("invalid instance")
+	}
 	if hf != nil && hf.Core != nil {
 		hf.Core.SetName(name)
 	}

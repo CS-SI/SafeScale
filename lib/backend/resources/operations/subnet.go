@@ -453,7 +453,7 @@ func (instance *Subnet) Carry(ctx context.Context, clonable data.Clonable) (ferr
 }
 
 // Create creates a Subnet
-func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (ferr fail.Error) {
+func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, extra interface{}) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
@@ -1564,17 +1564,17 @@ func (instance *Subnet) GetDefaultRouteIP(ctx context.Context) (ip string, ferr 
 }
 
 // GetEndpointIP returns the internet (public) IP to reach the Subnet
-func (instance *Subnet) GetEndpointIP(ctx context.Context) (ip string, ferr fail.Error) {
+func (instance *Subnet) GetEndpointIP(ctx context.Context) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	ip = ""
 	if valid.IsNil(instance) {
-		return ip, fail.InvalidInstanceError()
+		return "", fail.InvalidInstanceError()
 	}
 
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
+	var ip string
 	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -1617,9 +1617,6 @@ func (instance *Subnet) GetVirtualIP(ctx context.Context) (vip *abstract.Virtual
 		return nil, fail.InvalidInstanceError()
 	}
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
 	return instance.unsafeGetVirtualIP(ctx)
 }
 
@@ -1631,9 +1628,6 @@ func (instance *Subnet) GetCIDR(ctx context.Context) (cidr string, ferr fail.Err
 		return "", fail.InvalidInstanceError()
 	}
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
 	return instance.unsafeGetCIDR(ctx)
 }
 
@@ -1644,9 +1638,6 @@ func (instance *Subnet) GetState(ctx context.Context) (state subnetstate.Enum, f
 	if valid.IsNil(instance) {
 		return subnetstate.Unknown, fail.InvalidInstanceError()
 	}
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
 
 	return instance.unsafeGetState(ctx)
 }
@@ -2061,9 +2052,6 @@ func (instance *Subnet) InspectGatewaySecurityGroup(ctx context.Context) (_ reso
 
 	var sgInstance resources.SecurityGroup
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
 	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -2087,9 +2075,6 @@ func (instance *Subnet) InspectInternalSecurityGroup(ctx context.Context) (_ res
 
 	var sg resources.SecurityGroup
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
 	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -2112,9 +2097,6 @@ func (instance *Subnet) InspectPublicIPSecurityGroup(ctx context.Context) (_ res
 	}
 
 	var sg resources.SecurityGroup
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
 
 	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)

@@ -90,7 +90,11 @@ func (instance *Subnet) taskCreateGateway(inctx context.Context, params interfac
 				return ar, ar.rErr
 			}
 
-			userData, createXErr := rgw.Create(ctx, hostReq, hostSizing) // createXErr is tested later
+			cluID, _ := instance.GetID()
+			userData, createXErr := rgw.Create(ctx, hostReq, hostSizing, map[string]string{
+				"type":      "gateway",
+				"clusterID": cluID,
+			}) // createXErr is tested later
 
 			// Set link to Subnet before testing if Host has been successfully created;
 			// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
@@ -127,6 +131,8 @@ func (instance *Subnet) taskCreateGateway(inctx context.Context, params interfac
 				if ferr != nil {
 					if !hostReq.KeepOnFailure {
 						logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
+						hid, _ := rgw.GetID()
+
 						derr := rgw.Delete(cleanupContextFrom(ctx))
 						if derr != nil {
 							msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
@@ -144,7 +150,13 @@ func (instance *Subnet) taskCreateGateway(inctx context.Context, params interfac
 							logrus.WithContext(ctx).Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
 						}
 						_ = ferr.AddConsequence(derr)
+
+						if hid != "" {
+							_ = svc.DeleteHost(cleanupContextFrom(ctx), hid)
+						}
 					} else {
+						hid, _ := rgw.GetID()
+
 						xerr = rgw.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 							as, ok := clonable.(*abstract.HostCore)
 							if !ok {
@@ -157,6 +169,10 @@ func (instance *Subnet) taskCreateGateway(inctx context.Context, params interfac
 						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
 							logrus.WithContext(ctx).Warnf("error marking host '%s' in failed state: %v", hostReq.ResourceName, xerr)
+						}
+
+						if hid != "" {
+							_ = svc.DeleteHost(cleanupContextFrom(ctx), hid)
 						}
 					}
 				}

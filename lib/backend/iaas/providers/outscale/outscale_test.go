@@ -215,7 +215,7 @@ func Test_VMWithGPU(t *testing.T) {
 		Password:    "",
 		DiskSize:    50,
 		Preemptible: false,
-	})
+	}, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, h)
 	hid, _ := h.GetID()

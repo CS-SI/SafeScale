@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
@@ -53,16 +54,14 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
-	/*
-		state, xerr := instance.GetState(ctx)
-		if xerr != nil {
-			return invalid, "", "", xerr
-		}
+	state, xerr := instance.ForceGetState(ctx)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
 
-		if state != hoststate.Started {
-			return invalid, "", "", fail.NewError("the machine is not started")
-		}
-	*/
+	if state != hoststate.Started {
+		return invalid, "", "", fail.NewError("the machine is not started: %s", state.String())
+	}
 
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
@@ -115,13 +114,13 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 // - *fail.ErrNotAvailable: execution with 409 or 404 errors
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
-func run(ctx context.Context, sshProfile api.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func run(ctx context.Context, sshProfile2 api.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
 		timeout = temporal.HostLongOperationTimeout()
 	}
 
-	cfg, xerr := sshProfile.Config()
+	cfg, xerr := sshProfile2.Config()
 	if xerr != nil {
 		return 0, "", "", xerr
 	}
@@ -140,6 +139,12 @@ func run(ctx context.Context, sshProfile api.Connector, cmd string, outs outputs
 			case <-ctx.Done():
 				return retry.StopRetryError(ctx.Err())
 			default:
+			}
+
+			// recreate the profile every retry
+			sshProfile, xerr := sshfactory.NewConnector(cfg)
+			if xerr != nil {
+				return xerr
 			}
 
 			iterations++
@@ -226,6 +231,15 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		return invalid, "", "", xerr
 	}
 
+	state, xerr := instance.ForceGetState(ctx)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if state != hoststate.Started {
+		return invalid, "", "", fail.NewError("the machine is not started: %s", state.String())
+	}
+
 	md5hash := ""
 	uploadSize := 0
 	if source != "" {
@@ -240,17 +254,10 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	var (
 		stdout, stderr string
 	)
+
+	var finalProfile api.Connector
+
 	retcode := -1
-	sshCfg, xerr := instance.GetSSHConfig(ctx)
-	if xerr != nil {
-		return retcode, stdout, stderr, xerr
-	}
-
-	sshProfile, xerr := sshfactory.NewConnector(sshCfg)
-	if xerr != nil {
-		return retcode, stdout, stderr, xerr
-	}
-
 	timeout = temporal.MaxTimeout(4*(time.Duration(uploadSize)*time.Second/(64*1024)+30*time.Second), timeout)
 
 	xerr = retry.WhileUnsuccessful(
@@ -261,6 +268,17 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 			default:
 			}
 
+			sshCfg, xerr := instance.GetSSHConfig(ctx)
+			if xerr != nil {
+				return xerr
+			}
+
+			sshProfile, xerr := sshfactory.NewConnector(sshCfg)
+			if xerr != nil {
+				return xerr
+			}
+
+			finalProfile = sshProfile
 			uploadTime := time.Duration(uploadSize)*time.Second/(64*1024) + 30*time.Second
 
 			copyCtx, cancel := context.WithTimeout(ctx, uploadTime)
@@ -356,7 +374,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		iretcode, istdout, istderr, innerXerr := run(ctx, sshProfile, cmd, outputs.COLLECT, timeout)
+		iretcode, istdout, istderr, innerXerr := run(ctx, finalProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {
 			innerXerr.Annotate("retcode", iretcode)
@@ -454,6 +472,15 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return xerr
+	}
+
+	state, xerr := instance.ForceGetState(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.NewError("the machine is not started: %s", state.String())
 	}
 
 	hostName := instance.GetName()

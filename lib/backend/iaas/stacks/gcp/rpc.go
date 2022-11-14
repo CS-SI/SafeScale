@@ -1215,7 +1215,7 @@ func (s stack) rpcListInstances(ctx context.Context) ([]*compute.Instance, fail.
 	return out, nil
 }
 
-func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, ferr fail.Error) {
+func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}, extra interface{}) (_ *compute.Instance, ferr fail.Error) {
 	var xerr fail.Error
 	var tags []string
 	for k := range sgs {
@@ -1244,6 +1244,45 @@ func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, 
 	managedTag := "safescale"
 	bucketName := s.Config.MetadataBucket
 	now := time.Now().Format(time.RFC3339)
+
+	ili := []*compute.MetadataItems{
+		{
+			Key:   "startup-script",
+			Value: &userdata,
+		},
+		{
+			Key:   "ManagedBy",
+			Value: &managedTag,
+		},
+		{
+			Key:   "DeclaredInBucket",
+			Value: &bucketName,
+		},
+		{
+			Key:   "Image",
+			Value: &imageURL,
+		},
+		{
+			Key:   "Template",
+			Value: &templateName,
+		},
+		{
+			Key:   "CreationDate",
+			Value: &now,
+		},
+	}
+	if extra != nil {
+		into, ok := extra.(map[string]string)
+		if !ok {
+			return nil, fail.InvalidParameterError("extra", "must be a map[string]string")
+		}
+		for k, v := range into {
+			ili = append(ili, &compute.MetadataItems{
+				Key:   k,
+				Value: &v,
+			})
+		}
+	}
 
 	request := compute.Instance{
 		Name:         name,
@@ -1282,32 +1321,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, 
 			},
 		},
 		Metadata: &compute.Metadata{
-			Items: []*compute.MetadataItems{
-				{
-					Key:   "startup-script",
-					Value: &userdata,
-				},
-				{
-					Key:   "ManagedBy",
-					Value: &managedTag,
-				},
-				{
-					Key:   "DeclaredInBucket",
-					Value: &bucketName,
-				},
-				{
-					Key:   "Image",
-					Value: &imageURL,
-				},
-				{
-					Key:   "Template",
-					Value: &templateName,
-				},
-				{
-					Key:   "CreationDate",
-					Value: &now,
-				},
-			},
+			Items: ili,
 		},
 	}
 	if hasPublicIP {

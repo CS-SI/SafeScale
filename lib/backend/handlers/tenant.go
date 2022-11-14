@@ -520,7 +520,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		Image: defaultScanImage,
 	}
 
-	if _, xerr = host.Create(handler.job.Context(), req, def); xerr != nil {
+	if _, xerr = host.Create(handler.job.Context(), req, def, nil); xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': error creation", template.Name, hostName)
 	}
 
@@ -746,7 +746,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 		subnetHostSizing := abstract.HostSizingRequirements{
 			MinGPU: -1,
 		}
-		if xerr = subnet.Create(handler.job.Context(), req, "", &subnetHostSizing); xerr != nil {
+		if xerr = subnet.Create(handler.job.Context(), req, "", &subnetHostSizing, nil); xerr != nil {
 			return nil, xerr
 		}
 

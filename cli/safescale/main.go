@@ -63,7 +63,7 @@ func cleanup(clientSession *client.Session, onAbort *uint32) {
 	text, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("failed to read the input : ", err.Error())
-		text = "y"
+		os.Exit(1)
 	}
 	if strings.TrimRight(text, "\n") == "y" {
 		err = clientSession.JobManager.Stop(utils.GetUUID(), temporal.ExecutionTimeout())

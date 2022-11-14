@@ -370,22 +370,6 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
-	host, xerr := hostfactory.Load(ctx, handler.job.Service(), hostRef)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	// retrieve sshCfg config to perform some commands
-	sshConfig, xerr := host.GetSSHConfig(ctx)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	sshProfile, xerr := sshfactory.NewConnector(sshConfig)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
 	timings, xerr := handler.job.Service().Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
@@ -393,6 +377,22 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
+			host, xerr := hostfactory.Load(ctx, handler.job.Service(), hostRef)
+			if xerr != nil {
+				return xerr
+			}
+
+			// retrieve sshCfg config to perform some commands
+			sshConfig, xerr := host.GetSSHConfig(ctx)
+			if xerr != nil {
+				return xerr
+			}
+
+			sshProfile, xerr := sshfactory.NewConnector(sshConfig)
+			if xerr != nil {
+				return xerr
+			}
+
 			isAborted, err := handler.job.Aborted()
 			if err != nil {
 				return err
@@ -414,9 +414,9 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				if t.Err != nil {
-					logrus.WithContext(handler.job.Context()).Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...", host.GetName(), t.Err.Error())
+					logrus.WithContext(handler.job.Context()).Debugf("Remote SSH service on host '%s' isn't ready (%s), retrying...", hostRef, t.Err.Error())
 				} else {
-					logrus.WithContext(handler.job.Context()).Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.GetName())
+					logrus.WithContext(handler.job.Context()).Debugf("Remote SSH service on host '%s' isn't ready, retrying...", hostRef)
 				}
 			}
 		},

@@ -162,7 +162,7 @@ func (l locationcache) getLock(s string, s2 string) *sync.RWMutex {
 	return mu
 }
 
-func (l locationcache) ReadObject(inctx context.Context, s string, s2 string, writer io.Writer, i int64, i2 int64) fail.Error {
+func (l locationcache) ReadObject(inctx context.Context, s string, s2 string, writer io.Writer, i int64, i2 int64) (bytes.Buffer, fail.Error) {
 	mu := l.getLock(s, s2)
 	mu.RLock()
 	defer mu.RUnlock()
@@ -178,27 +178,27 @@ func (l locationcache) ReadObject(inctx context.Context, s string, s2 string, wr
 		buf, _ := ct.([]byte) // nolint
 		_, err = rewriter.Write(buf)
 		if err != nil {
-			return fail.ConvertError(err)
+			return bytes.Buffer{}, fail.ConvertError(err)
 		}
 
 		incrementExpVar("metadata.cache.hits")
 
-		return nil
+		return bytes.Buffer{}, nil
 	}
 
 	incrementExpVar("readobject")
 	incrementExpVar("metadata.reads")
 
-	xerr := l.inner.ReadObject(ctx, s, s2, rewriter, i, i2)
+	wr, xerr := l.inner.ReadObject(ctx, s, s2, rewriter, i, i2)
 	if xerr != nil {
-		return xerr
+		return bytes.Buffer{}, xerr
 	}
 
 	// now we have stuff for our cache in buffer2
 	_ = l.cacheManager.Set(ctx, fmt.Sprintf("%s:%s", s, s2), buffer2.Bytes(), nil)
 	time.Sleep(10 * time.Millisecond)
 
-	return nil
+	return wr, nil
 }
 
 func (l locationcache) WriteMultiPartObject(ctx context.Context, s string, s2 string, reader io.Reader, i int64, i2 int, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {

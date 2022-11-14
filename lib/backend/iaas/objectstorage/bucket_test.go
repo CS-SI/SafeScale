@@ -188,7 +188,7 @@ func TestLocation_CreateBucket(t *testing.T) {
 		SecretKey:    "password",
 	}
 	loc, err := NewLocation(cfg)
-	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.location")
+	require.EqualValues(t, reflect.TypeOf(loc).String(), "*objectstorage.locationcache")
 	require.Nil(t, err)
 
 	if there, err := loc.FindBucket(context.Background(), "boo"); err == nil {

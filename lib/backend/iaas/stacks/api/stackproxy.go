@@ -430,10 +430,10 @@ func (s StackProxy) DeleteVIP(ctx context.Context, ip *abstract.VirtualIP) (ferr
 	return xerr
 }
 
-func (s StackProxy) CreateHost(ctx context.Context, request abstract.HostRequest) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
+func (s StackProxy) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	host, content, xerr := s.FullStack.CreateHost(ctx, request)
+	host, content, xerr := s.FullStack.CreateHost(ctx, request, extra)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}

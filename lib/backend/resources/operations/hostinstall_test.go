@@ -51,7 +51,7 @@ func TestHost_AddFeature(t *testing.T) {
 			DefaultRouteIP: "127.0.0.1",
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -105,7 +105,7 @@ func TestHost_CheckFeature(t *testing.T) {
 			DefaultRouteIP: "127.0.0.1",
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -159,7 +159,7 @@ func TestHost_DeleteFeature(t *testing.T) {
 			DefaultRouteIP: "127.0.0.1",
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -213,7 +213,7 @@ func TestHost_TargetType(t *testing.T) {
 			DefaultRouteIP: "127.0.0.1",
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -252,7 +252,7 @@ func TestHost_InstallMethods(t *testing.T) {
 			DefaultRouteIP: "127.0.0.1",
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -295,7 +295,7 @@ func TestHost_RegisterFeature(t *testing.T) {
 			DefaultRouteIP: "127.0.0.1",
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -346,7 +346,7 @@ func TestHost_ListEligibleFeatures(t *testing.T) {
 			DefaultRouteIP: "127.0.0.1",
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -394,7 +394,7 @@ func TestHost_ListInstalledFeatures(t *testing.T) {
 			DefaultRouteIP: "127.0.0.1",
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -444,7 +444,7 @@ func TestHost_InstalledFeatures(t *testing.T) {
 			DefaultRouteIP: "127.0.0.1",
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
@@ -493,7 +493,7 @@ func TestHost_IsFeatureInstalled(t *testing.T) {
 			DefaultRouteIP: "127.0.0.1",
 			DiskSize:       64,
 			TemplateID:     "TemplateID",
-		})
+		}, nil)
 		require.Nil(t, xerr)
 
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")

@@ -132,8 +132,8 @@ func (instance *Subnet) unsafeGetVirtualIP(ctx context.Context) (vip *abstract.V
 
 // unsafeGetCIDR returns the CIDR of the network
 // Intended to be used when instance is notoriously not nil (because previously checked)
-func (instance *Subnet) unsafeGetCIDR(ctx context.Context) (cidr string, ferr fail.Error) {
-	cidr = ""
+func (instance *Subnet) unsafeGetCIDR(ctx context.Context) (_ string, ferr fail.Error) {
+	var cidr string
 	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -148,7 +148,8 @@ func (instance *Subnet) unsafeGetCIDR(ctx context.Context) (cidr string, ferr fa
 
 // unsafeGetState returns the state of the network
 // Intended to be used when rs is notoriously not null (because previously checked)
-func (instance *Subnet) unsafeGetState(ctx context.Context) (state subnetstate.Enum, ferr fail.Error) {
+func (instance *Subnet) unsafeGetState(ctx context.Context) (_ subnetstate.Enum, ferr fail.Error) {
+	var state subnetstate.Enum
 	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
