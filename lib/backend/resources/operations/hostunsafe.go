@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
@@ -53,16 +54,14 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
-	/*
-		state, xerr := instance.GetState(ctx)
-		if xerr != nil {
-			return invalid, "", "", xerr
-		}
+	state, xerr := instance.ForceGetState(ctx)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
 
-		if state != hoststate.Started {
-			return invalid, "", "", fail.NewError("the machine is not started")
-		}
-	*/
+	if state != hoststate.Started {
+		return invalid, "", "", fail.NewError("the machine is not started")
+	}
 
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
@@ -115,13 +114,13 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 // - *fail.ErrNotAvailable: execution with 409 or 404 errors
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
-func run(ctx context.Context, sshProfile api.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func run(ctx context.Context, sshProfile2 api.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
 		timeout = temporal.HostLongOperationTimeout()
 	}
 
-	cfg, xerr := sshProfile.Config()
+	cfg, xerr := sshProfile2.Config()
 	if xerr != nil {
 		return 0, "", "", xerr
 	}
@@ -140,6 +139,12 @@ func run(ctx context.Context, sshProfile api.Connector, cmd string, outs outputs
 			case <-ctx.Done():
 				return retry.StopRetryError(ctx.Err())
 			default:
+			}
+
+			// recreate the profile every retry
+			sshProfile, xerr := sshfactory.NewConnector(cfg)
+			if xerr != nil {
+				return xerr
 			}
 
 			iterations++

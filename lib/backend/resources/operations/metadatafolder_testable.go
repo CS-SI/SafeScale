@@ -1,5 +1,5 @@
-//go:build !testable
-// +build !testable
+//go:build testable
+// +build testable
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -391,7 +391,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 					}
 
 					if app.Release {
-						if !bytes.Equal(data, newtarget.Bytes()) && !bytes.Equal(data, target.Bytes()) {
+						if !bytes.Equal(data, newtarget.Bytes()) {
 							_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
 							// innerErr := fail.NewError("remote content is different from local reference: %s, %s", string(data), newtarget.String())
 							innerErr := fail.NewError("remote content is different from local reference")
