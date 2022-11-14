@@ -353,7 +353,6 @@ func TestBucket_Delete(t *testing.T) {
 
 }
 
-/*
 func TestBucket_Mount(t *testing.T) {
 
 	ctx := context.Background()
@@ -403,7 +402,6 @@ func TestBucket_Mount(t *testing.T) {
 	})
 	require.Nil(t, err)
 }
-*/
 
 // func TestBucket_Unmount(t *testing.T) {}
 

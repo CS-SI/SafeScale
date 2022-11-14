@@ -388,7 +388,7 @@ func (instance MetadataFolder) Write(ctx context.Context, path string, name stri
 					}
 
 					if app.Release {
-						if !bytes.Equal(data, newtarget.Bytes()) {
+						if !bytes.Equal(data, newtarget.Bytes()) && !bytes.Equal(data, target.Bytes()) {
 							_ = instance.service.InvalidateObject(ctx, bucketName, absolutePath)
 							// innerErr := fail.NewError("remote content is different from local reference: %s, %s", string(data), newtarget.String())
 							innerErr := fail.NewError("remote content is different from local reference")
