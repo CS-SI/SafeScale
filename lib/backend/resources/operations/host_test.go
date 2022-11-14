@@ -82,6 +82,7 @@ func Test_NewHost(t *testing.T) {
 
 }
 
+/*
 func Test_LoadHost(t *testing.T) {
 
 	var svc iaas.Service
@@ -132,6 +133,7 @@ func Test_LoadHost(t *testing.T) {
 	require.Nil(t, xerr)
 
 }
+*/
 
 func TestHost_GetOperatorUsernameFromCfg(t *testing.T) {
 
