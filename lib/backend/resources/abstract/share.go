@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	shareKind = "share"
-	// nasFolderName is the technical name of the container used to store nas info
+	ShareKind = "share"
+
 	sharesFolderName = "shares"
 )
 
@@ -43,6 +43,7 @@ type Share struct {
 
 // NewShare creates a new instance of Share
 func NewShare(opts ...Option) (*Share, fail.Error) {
+	opts = append(opts, withKind(ShareKind))
 	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr

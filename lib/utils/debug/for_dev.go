@@ -23,6 +23,6 @@ package debug
 func IgnoreError(err error) {
 	if err != nil { // nolint
 		// logrus.Debugf("ignoring error [%s]", err)
-		// logrus.Debugf("ignoring error stack: %s", string(debug.Stack()))
+		// logrus.Debugf("ignoring error stack: %s", string(debug.StackDriver()))
 	}
 }

@@ -103,7 +103,7 @@ func LoadNetwork(inctx context.Context, ref string) (resources.Network, fail.Err
 			var kt *Network
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -532,11 +532,10 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 			return
 		}
 
-		// instance.lock.Lock()
-		// defer instance.lock.Unlock()
-
+		var abstractNetwork *abstract.Network
 		xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			abstractNetwork, innerErr := lang.Cast[*abstract.Network](p)
+			var innerErr error
+			abstractNetwork, innerErr = lang.Cast[*abstract.Network](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -720,8 +719,8 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 			chRes <- result{xerr}
 			return
 		}
-		chRes <- result{nil}
 
+		chRes <- result{nil}
 	}()
 	select {
 	case res := <-chRes:

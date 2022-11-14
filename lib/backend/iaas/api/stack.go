@@ -179,8 +179,8 @@ type Stack interface {
 }
 
 //
-// // Stack is the interface that MUST actually implement all the providers; don't do it, and we can encounter runtime panics
-// type Stack interface {
-// 	Stack
+// // StackDriver is the interface that MUST actually implement all the providers; don't do it, and we can encounter runtime panics
+// type StackDriver interface {
+// 	StackDriver
 // 	ReservedForProviderUse
 // }

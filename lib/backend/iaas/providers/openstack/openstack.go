@@ -225,9 +225,6 @@ func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Err
 	if valid.IsNull(p) {
 		return iaasoptions.Authentication{}, fail.InvalidInstanceError()
 	}
-	if p.Stack == nil {
-		return iaasoptions.Authentication{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).AuthenticationOptions()
 }
@@ -236,9 +233,6 @@ func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Err
 func (p *provider) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 	if valid.IsNull(p) {
 		return iaasoptions.Configuration{}, fail.InvalidInstanceError()
-	}
-	if p.Stack == nil {
-		return iaasoptions.Configuration{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	opts, xerr := p.Stack.(providers.StackReservedForProviderUse).ConfigurationOptions()
@@ -261,9 +255,6 @@ func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Hos
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if p.Stack == nil {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).ListTemplates(ctx, all)
 }
@@ -274,9 +265,6 @@ func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image,
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if p.Stack == nil {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).ListImages(ctx, all)
 }
@@ -286,14 +274,11 @@ func (p *provider) GetName() (string, fail.Error) {
 	return "openstack", nil
 }
 
-// GetStack returns the stack object used by the provider
+// StackDriver returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p *provider) GetStack() (iaasapi.Stack, fail.Error) {
+func (p *provider) StackDriver() (iaasapi.Stack, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
-	}
-	if p.Stack == nil {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	return p.Stack, nil

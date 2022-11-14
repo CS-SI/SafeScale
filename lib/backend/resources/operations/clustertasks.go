@@ -710,7 +710,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 
 		// After Stein, no failover
 		{
-			st, xerr := svc.GetProviderName()
+			st, xerr := svc.ProviderName()
 			if xerr != nil {
 				return xerr
 			}

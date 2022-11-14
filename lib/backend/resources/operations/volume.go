@@ -111,7 +111,7 @@ func LoadVolume(inctx context.Context, ref string) (resources.Volume, fail.Error
 			var kt *volume
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -357,12 +357,7 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 	// defer instance.lock.Unlock()
 
 	// check if volume can be deleted (must not be attached)
-	xerr := instance.InspectProperty(ctx, volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
-		volumeAttachmentsV1, innerErr := lang.Cast[*propertiesv1.VolumeAttachments](p)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
-		}
-
+	xerr := metadata.InspectProperty(ctx, instance, volumeproperty.AttachedV1, func(volumeAttachmentsV1 *propertiesv1.VolumeAttachments) fail.Error {
 		nbAttach := uint(len(volumeAttachmentsV1.Hosts))
 		if nbAttach > 0 {
 			list := make([]string, 0, len(volumeAttachmentsV1.Hosts))

@@ -109,7 +109,7 @@ func LoadBucket(inctx context.Context, name string) (resources.Bucket, fail.Erro
 			var kt *bucket
 			cachename := fmt.Sprintf("%T/%s", kt, name)
 
-			cache, xerr := myjob.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -447,19 +447,12 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	bun := instance.GetName()
 
 	// -- check Bucket is not still mounted
-	xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(bucketproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			mountsV1, err := lang.Cast[*propertiesv1.BucketMounts](p)
-			if err != nil {
-				return fail.Wrap(err)
-			}
+	xerr := metadata.InspectProperty(ctx, instance, bucketproperty.MountsV1, func(mountsV1 *propertiesv1.BucketMounts) fail.Error {
+		if len(mountsV1.ByHostID) > 0 {
+			return fail.NotAvailableError("still mounted on some Hosts")
+		}
 
-			if len(mountsV1.ByHostID) > 0 {
-				return fail.NotAvailableError("still mounted on some Hosts")
-			}
-
-			return nil
-		})
+		return nil
 	})
 	if xerr != nil {
 		return xerr
@@ -471,13 +464,6 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 		if strings.Contains(xerr.Error(), objectstorage.NotFound) {
 			return fail.NotFoundError("failed to find Bucket '%s'", bun)
 		}
-		return xerr
-	}
-
-	// -- delete metadata
-	xerr = instance.Core.Delete(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
 		return xerr
 	}
 

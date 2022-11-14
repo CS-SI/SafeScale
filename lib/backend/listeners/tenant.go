@@ -84,7 +84,7 @@ func (s *TenantListener) List(inctx context.Context, in *googleprotobuf.Empty) (
 // 		return nil, fail.NotFoundError("no tenant set")
 // 	}
 //
-// 	prvName, xerr := currentTenant.Service.GetProviderName()
+// 	prvName, xerr := currentTenant.Service.ProviderName()
 // 	if xerr != nil {
 // 		return nil, xerr
 // 	}

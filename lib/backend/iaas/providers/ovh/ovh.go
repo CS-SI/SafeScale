@@ -281,9 +281,6 @@ func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Err
 	if valid.IsNull(p) {
 		return iaasoptions.Authentication{}, fail.InvalidInstanceError()
 	}
-	if valid.IsNull(p.Stack) {
-		return iaasoptions.Authentication{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).AuthenticationOptions()
 }
@@ -292,9 +289,6 @@ func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Err
 func (p *provider) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 	if valid.IsNull(p) {
 		return iaasoptions.Configuration{}, fail.InvalidInstanceError()
-	}
-	if valid.IsNull(p.Stack) {
-		return iaasoptions.Configuration{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	opts, xerr := p.Stack.(providers.StackReservedForProviderUse).ConfigurationOptions()
@@ -314,9 +308,6 @@ func (p *provider) ConfigurationOptions() (iaasoptions.Configuration, fail.Error
 func (p *provider) InspectTemplate(ctx context.Context, id string) (*abstract.HostTemplate, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
-	}
-	if valid.IsNull(p.Stack) {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	tpl, xerr := p.Stack.InspectTemplate(ctx, id)
@@ -339,9 +330,6 @@ func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image,
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if valid.IsNull(p.Stack) {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).ListImages(ctx, all)
 }
@@ -350,9 +338,6 @@ func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image,
 func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
-	}
-	if valid.IsNull(p.Stack) {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	allTemplates, xerr := p.Stack.(providers.StackReservedForProviderUse).ListTemplates(ctx, false)
@@ -447,9 +432,6 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if valid.IsNull(p.Stack) {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 
 	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
 	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
@@ -464,14 +446,11 @@ func (p *provider) GetName() (string, fail.Error) {
 	return "ovh", nil
 }
 
-// GetStack returns the stack object used by the provider
+// StackDriver returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p *provider) GetStack() (iaasapi.Stack, fail.Error) {
+func (p *provider) StackDriver() (iaasapi.Stack, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
-	}
-	if valid.IsNull(p.Stack) {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	return p.Stack, nil
@@ -495,9 +474,6 @@ func (p *provider) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, h
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
 	}
-	if valid.IsNull(p.Stack) {
-		return fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 	if vip == nil {
 		return fail.InvalidParameterCannotBeNilError("vip")
 	}
@@ -513,9 +489,6 @@ func (p *provider) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualI
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
 	}
-	if valid.IsNull(p.Stack) {
-		return fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 	if vip == nil {
 		return fail.InvalidParameterCannotBeNilError("vip")
 	}
@@ -530,9 +503,6 @@ func (p *provider) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualI
 func (p *provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
-	}
-	if valid.IsNull(p.Stack) {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	var emptySlice []*regexp.Regexp

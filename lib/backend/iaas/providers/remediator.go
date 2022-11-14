@@ -80,10 +80,10 @@ func (s Remediator) GetName() (_ string, ferr fail.Error) {
 	return name, nil
 }
 
-func (s Remediator) GetStack() (_ iaasapi.Stack, ferr fail.Error) {
+func (s Remediator) StackDriver() (_ iaasapi.Stack, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	aStack, xerr := s.Provider.GetStack()
+	aStack, xerr := s.Provider.StackDriver()
 	return aStack, xerr
 }
 

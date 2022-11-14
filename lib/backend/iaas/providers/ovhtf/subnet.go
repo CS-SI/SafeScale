@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	createSubnetResourceSnippetPath = "snippets/resource_subnet_create.tf"
-	createRouterResourceSnippetPath = "snippets/resource_router_create.tf"
+	designSubnetResourceSnippetPath = "snippets/resource_subnet_design.tf"
+	designRouterResourceSnippetPath = "snippets/resource_router_design.tf"
 )
 
 // type subnetResource struct {
@@ -102,7 +102,7 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		return nil, fail.ConvertError(err)
 	}
 
-	abstractSubnet, xerr := abstract.NewSubnet(abstract.WithName(req.Name), abstract.UseTerraformSnippet(createSubnetResourceSnippetPath))
+	abstractSubnet, xerr := abstract.NewSubnet(abstract.WithName(req.Name), abstract.UseTerraformSnippet(designSubnetResourceSnippetPath))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -407,3 +407,11 @@ func (p *provider) DeleteSubnet(ctx context.Context, id string) fail.Error {
 // 		NormalizeError,
 // 	)
 // }
+
+func (p *provider) ConsolidateSubnetSnippet(as *abstract.Subnet) {
+	if valid.IsNil(p) || as == nil {
+		return
+	}
+
+	_ = as.AddOptions(abstract.UseTerraformSnippet(designSubnetResourceSnippetPath))
+}

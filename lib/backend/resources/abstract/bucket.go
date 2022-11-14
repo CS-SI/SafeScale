@@ -26,6 +26,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
+const BucketKind = "bucket"
+
 // Bucket abstracts an Objet Storage container (also known as bucket in some implementations)
 type Bucket struct {
 	*Core
@@ -36,6 +38,7 @@ type Bucket struct {
 
 // NewBucket ...
 func NewBucket(opts ...Option) (*Bucket, fail.Error) {
+	opts = append(opts, withKind(BucketKind))
 	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr

@@ -50,19 +50,24 @@ type folder struct {
 }
 
 // NewFolder creates a new Metadata folder object, ready to help access the metadata inside it
-func NewFolder(job jobapi.Job, path string) (*folder, fail.Error) {
-	if valid.IsNull(job) {
-		return nil, fail.InvalidInstanceError()
+func NewFolder(ctx context.Context, path string) (*folder, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	f := &folder{
 		path: strings.Trim(path, "/"),
-		job:  job,
-		kv:   job.Scope().ConsulKV(),
+		job:  myjob,
+		kv:   myjob.Scope().ConsulKV(),
 	}
 
 	// FIXME: consul not yet able to crypt
-	// cryptKey, xerr := svc.GetMetadataKey()
+	// cryptKey, xerr := svc.MetadataKey()
 	// xerr = debug.InjectPlannedFail(xerr)
 	// if xerr != nil {
 	// 	if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {

@@ -28,12 +28,11 @@ import (
 
 // Core represents a virtual network
 type (
-	Option func(*Core) fail.Error
-
 	Core struct {
 		Name string                   `json:"name"` // name of the abstract resource
 		Tags data.Map[string, string] `json:"tags,omitempty"`
 
+		kind             string
 		terraformSnippet string
 		terraformData    []byte
 		useTerraform     bool
@@ -53,40 +52,25 @@ func newCore(opts ...Option) (*Core, fail.Error) {
 	c.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	c.Tags["ManagedBy"] = "safescale"
 
+	return c, c.AddOptions(opts...)
+}
+
+// AddOptions is used to add options on Core after creation
+func (c *Core) AddOptions(opts ...Option) fail.Error {
+	if c == nil {
+		return fail.InvalidInstanceError()
+	}
+
 	for _, v := range opts {
 		if v != nil {
 			xerr := v(c)
 			if xerr != nil {
-				return nil, xerr
+				return xerr
 			}
 		}
 	}
-	return c, nil
-}
 
-// WithName defines the name of the resource (otherwise will be set to "unnamed")
-func WithName(name string) Option {
-	return func(c *Core) fail.Error {
-		if name == "" {
-			c.Name = Unnamed
-		} else {
-			c.Name = name
-		}
-		return nil
-	}
-}
-
-// UseTerraformSnippet allows to attach a snippet to the abstract resource
-func UseTerraformSnippet(snippet string) Option {
-	return func(c *Core) fail.Error {
-		if snippet == "" {
-			return fail.InvalidParameterCannotBeEmptyStringError("snippet")
-		}
-
-		c.terraformSnippet = snippet
-		c.useTerraform = true
-		return nil
-	}
+	return nil
 }
 
 // IsNull ...
@@ -159,8 +143,8 @@ func (c *Core) TerraformSnippet() string {
 // 	return nil
 // }
 
-// // AllResources returns the scope
-// func (c *Core) AllResources(ctx context.Context) ([]terraformerapi.Resource, fail.Error) {
+// // AllAbstracts returns the scope
+// func (c *Core) AllAbstracts(ctx context.Context) ([]terraformerapi.Resource, fail.Error) {
 // 	if valid.IsNull(c) {
 // 		return nil, fail.InvalidInstanceError()
 // 	}
@@ -175,5 +159,21 @@ func (c *Core) TerraformSnippet() string {
 // 		return nil, fail.Wrap(err)
 // 	}
 //
-// 	return scope.AllResources()
+// 	return scope.AllAbstracts()
 // }
+
+func (c *Core) GetName() string {
+	if valid.IsNull(c) {
+		return ""
+	}
+
+	return c.Name
+}
+
+func (c *Core) Kind() string {
+	if valid.IsNull(c) {
+		return ""
+	}
+
+	return c.kind
+}

@@ -246,9 +246,6 @@ func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Err
 	if valid.IsNil(p) {
 		return iaasoptions.Authentication{}, fail.InvalidInstanceError()
 	}
-	if p.Stack == nil {
-		return iaasoptions.Authentication{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).AuthenticationOptions()
 }
@@ -257,9 +254,6 @@ func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Err
 func (p *provider) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 	if valid.IsNil(p) {
 		return iaasoptions.Configuration{}, fail.InvalidInstanceError()
-	}
-	if p.Stack == nil {
-		return iaasoptions.Configuration{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).ConfigurationOptions()
@@ -270,14 +264,11 @@ func (p *provider) GetName() (string, fail.Error) {
 	return "outscale", nil
 }
 
-// GetStack returns the stack object used by the provider
+// StackDriver returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p *provider) GetStack() (iaasapi.Stack, fail.Error) {
+func (p *provider) StackDriver() (iaasapi.Stack, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
-	}
-	if p.Stack == nil {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	return p.Stack, nil
@@ -302,9 +293,6 @@ func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image,
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if p.Stack == nil {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).ListImages(ctx, all)
 }
@@ -313,9 +301,6 @@ func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image,
 func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
-	}
-	if p.Stack == nil {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).ListTemplates(ctx, all)
@@ -352,9 +337,6 @@ func (p *provider) HasDefaultNetwork() (bool, fail.Error) {
 	if valid.IsNil(p) {
 		return false, fail.InvalidInstanceError()
 	}
-	if p.Stack == nil {
-		return false, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).HasDefaultNetwork()
 }
@@ -363,9 +345,6 @@ func (p *provider) HasDefaultNetwork() (bool, fail.Error) {
 func (p *provider) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
-	}
-	if p.Stack == nil {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).DefaultNetwork(ctx)

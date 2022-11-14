@@ -25,15 +25,17 @@ import (
 
 // Scope ...
 type Scope interface {
-	AllResources() ([]terraformerapi.Resource, fail.Error)
 	ConsulKV() *consumer.KV
 	Description() string
 	ID() string
+	IsLoaded() bool
 	IsNull() bool
 	FSPath() string
 	KVPath() string
 	Organization() string
 	Project() string
-	Tenant() string
+	RegisterResource(terraformerapi.Resource) fail.Error
 	Service() iaasapi.Service
+	Tenant() string
+	UnregisterResource(terraformerapi.Resource) fail.Error
 }

@@ -35,7 +35,7 @@ func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image,
 	}
 
 	return nil, fail.NotImplementedError()
-	// return p.Stack.(providers.StackReservedForProviderUse).ListImages(ctx, all)
+	// return p.StackDriver.(providers.StackReservedForProviderUse).ListImages(ctx, all)
 }
 
 func (p *provider) InspectImage(ctx context.Context, id string) (*abstract.Image, fail.Error) {

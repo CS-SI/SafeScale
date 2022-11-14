@@ -28,6 +28,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
+const VolumeKind = "volume"
+
 // VolumeRequest represents a volume request
 type VolumeRequest struct {
 	Name          string           `json:"name,omitempty"`
@@ -44,15 +46,15 @@ func (vr VolumeRequest) CleanOnFailure() bool {
 // Volume represents a block volume
 type Volume struct {
 	*Core
-	ID    string            `json:"id,omitempty"`
-	Size  int               `json:"size,omitempty"`
-	Speed volumespeed.Enum  `json:"speed"`
-	State volumestate.Enum  `json:"state"`
-	Tags  map[string]string `json:"tags,omitempty"`
+	ID    string           `json:"id,omitempty"`
+	Size  int              `json:"size,omitempty"`
+	Speed volumespeed.Enum `json:"speed"`
+	State volumestate.Enum `json:"state"`
 }
 
 // NewVolume ...
 func NewVolume(opts ...Option) (*Volume, fail.Error) {
+	opts = append(opts, withKind(VolumeKind))
 	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr

@@ -26,6 +26,8 @@ import (
 	"regexp"
 	"time"
 
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
@@ -95,7 +97,12 @@ func UseService(ctx context.Context, opts ...options.Option) (_ iaasapi.Service,
 		return nil, xerr
 	}
 
-	opts = append(opts, iaasoptions.WithScope(myjob.Scope()))
+	castedScope, err := lang.Cast[terraformerapi.ScopeLimitedToTerraformerUse](myjob.Scope())
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	opts = append(opts, iaasoptions.WithScope(castedScope))
 	o, xerr := options.New(opts...)
 	if xerr != nil {
 		return nil, xerr

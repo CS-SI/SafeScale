@@ -105,7 +105,7 @@ func LoadLabel(inctx context.Context, ref string) (resources.Label, fail.Error) 
 			var kt *label
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -291,19 +291,12 @@ func (instance *label) Delete(inctx context.Context) fail.Error {
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-					lhV1, innerErr := lang.Cast[*propertiesv1.LabelHosts](p)
-					if innerErr != nil {
-						return fail.Wrap(innerErr)
-					}
+			xerr := metadata.InspectProperty(ctx, instance, labelproperty.HostsV1, func(lhV1 *propertiesv1.LabelHosts) fail.Error {
+				if len(lhV1.ByID) > 0 {
+					return fail.NotAvailableError("'%s' still bound to Hosts", instance.GetName())
+				}
 
-					if len(lhV1.ByID) > 0 {
-						return fail.NotAvailableError("'%s' still bound to Hosts", instance.GetName())
-					}
-
-					return nil
-				})
+				return nil
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {

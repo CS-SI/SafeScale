@@ -48,8 +48,8 @@ type Provider interface {
 	// ConfigurationOptions returns configuration options
 	ConfigurationOptions() (iaasoptions.Configuration, fail.Error)
 
-	GetName() (string, fail.Error) // GetName returns the tenant name
-	GetStack() (Stack, fail.Error) // Returns the stack object used by the Provider. Use with caution
+	GetName() (string, fail.Error)    // GetName returns the tenant name
+	StackDriver() (Stack, fail.Error) // Returns the stack object used by the Provider. Use with caution
 
 	GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error)
 

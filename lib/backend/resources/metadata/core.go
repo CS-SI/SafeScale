@@ -23,10 +23,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/sirupsen/logrus"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -37,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -67,12 +68,8 @@ type Core struct {
 func NewCore(ctx context.Context, method string, kind string, path string, instance clonable.Clonable) (_ *Core, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	myjob, xerr := jobapi.FromContext(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if valid.IsNull(myjob) {
-		return nil, fail.InconsistentError("missing valid Job in context")
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if kind == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("kind")
@@ -81,7 +78,7 @@ func NewCore(ctx context.Context, method string, kind string, path string, insta
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("path")
 	}
 
-	fld, xerr := NewFolder(UseMethod(method), WithJob(myjob), WithPrefix(path))
+	fld, xerr := NewFolder(ctx, UseMethod(method), WithPrefix(path))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -454,7 +451,23 @@ func (myself *Core) AlterProperty(ctx context.Context, property string, callback
 // - fail.ErrInvalidInstance
 // - fail.ErrInvalidParameter
 // - fail.ErrNotAvailable if the Core instance already carries a data
-func (myself *Core) Carry(inctx context.Context, clonable clonable.Clonable) (_ fail.Error) {
+func (myself *Core) Carry(inctx context.Context, abstractResource clonable.Clonable) (_ fail.Error) {
+	if myself == nil {
+		return fail.InvalidInstanceError()
+	}
+	if !valid.IsNil(myself) && myself.IsTaken() {
+		return fail.InvalidRequestError("cannot carry, already carries something")
+	}
+	if abstractResource == nil {
+		return fail.InvalidParameterCannotBeNilError("abstractResource")
+	}
+	if myself.shielded == nil {
+		return fail.InvalidInstanceContentError("myself.shielded", "cannot be nil")
+	}
+	if myself.loaded {
+		return fail.NotAvailableError("already carrying a value")
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -471,27 +484,12 @@ func (myself *Core) Carry(inctx context.Context, clonable clonable.Clonable) (_ 
 			defer fail.OnPanic(&ferr)
 			var xerr fail.Error
 
-			if myself == nil {
-				return fail.InvalidInstanceError()
-			}
-			if !valid.IsNil(myself) && myself.IsTaken() {
-				return fail.InvalidRequestError("cannot carry, already carries something")
-			}
-			if clonable == nil {
-				return fail.InvalidParameterCannotBeNilError("clonable")
-			}
-			if myself.shielded == nil {
-				return fail.InvalidInstanceContentError("myself.shielded", "cannot be nil")
-			}
-			if myself.loaded {
-				return fail.NotAvailableError("already carrying a value")
-			}
-
 			var cerr error
-			myself.shielded, cerr = shielded.NewShielded(clonable)
+			myself.shielded, cerr = shielded.NewShielded(abstractResource)
 			if cerr != nil {
 				return fail.Wrap(cerr)
 			}
+
 			myself.loaded = true
 
 			xerr = myself.updateIdentity()
@@ -506,6 +504,28 @@ func (myself *Core) Carry(inctx context.Context, clonable clonable.Clonable) (_ 
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
+			}
+
+			// Registers the abstract in scope
+			myjob, xerr := jobapi.FromContext(inctx)
+			if xerr != nil {
+				return xerr
+			}
+
+			tfResource, err := lang.Cast[terraformerapi.Resource](abstractResource)
+			if err != nil {
+				return fail.Wrap(err)
+			}
+
+			xerr = myjob.Scope().RegisterResource(tfResource)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrDuplicate:
+					debug.IgnoreError(xerr)
+					// continue
+				default:
+					return xerr
+				}
 			}
 
 			return nil
@@ -564,6 +584,16 @@ func (myself *Core) updateIdentity() fail.Error {
 
 // Read gets the data from Object Storage
 func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
+	if myself == nil {
+		return fail.InvalidInstanceError()
+	}
+	if ref = strings.TrimSpace(ref); ref == "" {
+		return fail.InvalidParameterError("ref", "cannot be empty string")
+	}
+	if myself.loaded {
+		return fail.NotAvailableError("metadata is already carrying a value")
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -579,16 +609,6 @@ func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 			var xerr fail.Error
-
-			if myself == nil {
-				return fail.InvalidInstanceError()
-			}
-			if ref = strings.TrimSpace(ref); ref == "" {
-				return fail.InvalidParameterError("ref", "cannot be empty string")
-			}
-			if myself.loaded {
-				return fail.NotAvailableError("metadata is already carrying a value")
-			}
 
 			if !myself.kindSplittedStore {
 				xerr = myself.folder.Lookup(ctx, "", ref)
@@ -652,7 +672,35 @@ func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 			myself.loaded = true
 			myself.committed = true
 
-			return myself.updateIdentity()
+			xerr = myself.updateIdentity()
+			if xerr != nil {
+				return xerr
+			}
+
+			return myself.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+				myjob, innerXErr := jobapi.FromContext(ctx)
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				tfResource, err := lang.Cast[terraformerapi.Resource](p)
+				if err != nil {
+					return fail.Wrap(err)
+				}
+
+				innerXErr = myjob.Scope().RegisterResource(tfResource)
+				if innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrDuplicate:
+						debug.IgnoreError(innerXErr)
+						//continue
+					default:
+						return innerXErr
+					}
+				}
+
+				return nil
+			})
 		}()
 		chRes <- result{gerr}
 	}()
@@ -808,27 +856,29 @@ func (myself *Core) readByID(inctx context.Context, id string) fail.Error {
 				default:
 				}
 
-				werr := myself.folder.Read(ctx, path, id, func(buf []byte) fail.Error {
-					select {
-					case <-ctx.Done():
-						return retry.StopRetryError(ctx.Err())
-					default:
-					}
-
-					if innerXErr := myself.unsafeDeserialize(ctx, buf); innerXErr != nil {
-						switch innerXErr.(type) {
-						case *fail.ErrNotAvailable:
-							return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
-						case *fail.ErrSyntax:
-							return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
-						case *fail.ErrInconsistent, *fail.ErrInvalidParameter, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
-							return retry.StopRetryError(innerXErr)
+				werr := myself.folder.Read(
+					ctx, path, id,
+					func(buf []byte) fail.Error {
+						select {
+						case <-ctx.Done():
+							return retry.StopRetryError(ctx.Err())
 						default:
-							return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
 						}
-					}
-					return nil
-				})
+
+						if innerXErr := myself.unsafeDeserialize(ctx, buf); innerXErr != nil {
+							switch innerXErr.(type) {
+							case *fail.ErrNotAvailable:
+								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+							case *fail.ErrSyntax:
+								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+							case *fail.ErrInconsistent, *fail.ErrInvalidParameter, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
+								return retry.StopRetryError(innerXErr)
+							default:
+								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+							}
+						}
+						return nil
+					})
 				if werr != nil {
 					switch werr.Cause().(type) {
 					case *fail.ErrNotFound:
@@ -840,7 +890,8 @@ func (myself *Core) readByID(inctx context.Context, id string) fail.Error {
 				return nil
 			},
 				timings.SmallDelay(),
-				timings.ContextTimeout())
+				timings.ContextTimeout(),
+			)
 
 			if rerr != nil {
 				return fail.ConvertError(rerr.Cause())
@@ -884,37 +935,42 @@ func (myself *Core) readByName(inctx context.Context, name string) fail.Error {
 				return xerr
 			}
 
-			rerr := retry.WhileUnsuccessful(func() error {
-				select {
-				case <-ctx.Done():
-					return retry.StopRetryError(ctx.Err())
-				default:
-				}
-				werr := myself.folder.Read(ctx, path, name, func(buf []byte) fail.Error {
+			rerr := retry.WhileUnsuccessful(
+				func() error {
 					select {
 					case <-ctx.Done():
 						return retry.StopRetryError(ctx.Err())
 					default:
 					}
+					werr := myself.folder.Read(
+						ctx, path, name,
+						func(buf []byte) fail.Error {
+							select {
+							case <-ctx.Done():
+								return retry.StopRetryError(ctx.Err())
+							default:
+							}
 
-					if innerXErr := myself.unsafeDeserialize(ctx, buf); innerXErr != nil {
-						return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", myself.kind, name)
+							if innerXErr := myself.unsafeDeserialize(ctx, buf); innerXErr != nil {
+								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", myself.kind, name)
+							}
+
+							return nil
+						},
+					)
+					if werr != nil {
+						switch werr.Cause().(type) {
+						case *fail.ErrNotFound:
+							return retry.StopRetryError(werr, "quit trying")
+						default:
+							return werr
+						}
 					}
 					return nil
-				})
-				if werr != nil {
-					switch werr.Cause().(type) {
-					case *fail.ErrNotFound:
-						return retry.StopRetryError(werr, "quit trying")
-					default:
-						return werr
-					}
-				}
-				return nil
-			},
+				},
 				timings.SmallDelay(),
-				timings.ContextTimeout())
-
+				timings.ContextTimeout(),
+			)
 			if rerr != nil {
 				return fail.ConvertError(rerr.Cause())
 			}
@@ -1238,6 +1294,25 @@ func (myself *Core) Delete(inctx context.Context) (_ fail.Error) {
 				idFound, nameFound bool
 				errors             []error
 			)
+
+			// First remove entry from scope registered abstracts
+			innerXErr := myself.shielded.Inspect(func(p clonable.Clonable) fail.Error {
+				abstractResource, innerErr := lang.Cast[terraformerapi.Resource](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				// Registers the abstract in scope
+				myjob, xerr := jobapi.FromContext(inctx)
+				if xerr != nil {
+					return xerr
+				}
+
+				return myjob.Scope().UnregisterResource(abstractResource)
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
 
 			// Checks entries exist in Object Storage
 			if myself.kindSplittedStore {

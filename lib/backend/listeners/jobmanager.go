@@ -19,6 +19,8 @@ package listeners
 import (
 	"context"
 
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
@@ -64,6 +66,15 @@ func prepareJob(ctx context.Context, in scopeFromProtocol, description string) (
 		return nil, xerr
 	}
 
+	if j.Service().Capabilities().UseTerraformer {
+		castedScope, err := lang.Cast[terraformerapi.ScopeLimitedToTerraformerUse](scopeHolder)
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
+		if !castedScope.IsLoaded() {
+			xerr = castedScope.LoadAbstracts(j.Context())
+		}
+	}
 	return j, nil
 }
 

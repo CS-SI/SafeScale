@@ -266,8 +266,8 @@ type ServiceTestOptions struct {
 	metadatakeyErr          fail.Error               // Error of .GetMetaData()
 	timings                 *temporal.MutableTimings // Response of .Timings()
 	timingsErr              fail.Error               // Error of .Timings()
-	metadatabucket          abstract.Bucket          // Response of .GetMetadataBucket()
-	metadatabucketErr       fail.Error               // Error of .GetMetadataBucket()
+	metadatabucket          abstract.Bucket          // Response of .MetadataBucket()
+	metadatabucketErr       fail.Error               // Error of .MetadataBucket()
 	listobjectsErr          fail.Error               // Error of .ListObjects()
 	version                 string                   // Response of .Read(version)
 	versionErr              fail.Error               // Error of .Read(version)
@@ -275,8 +275,8 @@ type ServiceTestOptions struct {
 	nameErr                 fail.Error               // Error  of .GetName()
 	operatorusername        string                   //
 	operatorusernameErr     fail.Error               //
-	providername            string                   // Response of .GetProviderName()
-	providernameErr         fail.Error               // Error of .GetProviderName()
+	providername            string                   // Response of .ProviderName()
+	providernameErr         fail.Error               // Error of .ProviderName()
 	stackname               string                   // Response of .GetStackName()
 	stacknameErr            fail.Error               // Error of .GetStackName()
 	defaultsgname           string                   // Response of .GetDefaultSecurityGroupName()
@@ -641,7 +641,7 @@ func (e *ServiceTest) _reset() {
 	e.options.operatorusernameErr = nil
 	e.options.providername = "MyServiceTest-Provider"
 	e.options.providernameErr = nil
-	e.options.stackname = "MyServiceTest-Stack"
+	e.options.stackname = "MyServiceTest-StackDriver"
 	e.options.stacknameErr = nil
 	e.options.defaultsgname = "MyServiceTest-SecurityGroup"
 	e.options.defaultsgnameErr = nil
@@ -1017,7 +1017,7 @@ func (e *ServiceTest) GetProviderName() (string, fail.Error) {
 	e.options.mu.RUnlock()
 
 	if providernameErr != nil {
-		e._warnf("ServiceTest::GetProviderName forced error \"%s\"", providernameErr.Error())
+		e._warnf("ServiceTest::ProviderName forced error \"%s\"", providernameErr.Error())
 		return "", providernameErr
 	}
 	return providername, nil
@@ -1030,7 +1030,7 @@ func (e *ServiceTest) GetMetadataBucket(ctx context.Context) (abstract.Bucket, f
 	e.options.mu.RUnlock()
 
 	if metadatabucketErr != nil {
-		e._warnf("ServiceTest::GetMetadataBucket forced error \"%s\"", metadatabucketErr.Error())
+		e._warnf("ServiceTest::MetadataBucket forced error \"%s\"", metadatabucketErr.Error())
 		return abstract.Bucket{}, metadatabucketErr
 	}
 	return metadatabucket, nil
@@ -1104,14 +1104,14 @@ func (e *ServiceTest) GetCache(ctx context.Context) (cache.CacheInterface, fail.
 	enablecache := e.options.enablecache
 	e.options.mu.RUnlock()
 
-	e._logf("ServiceTest::GetCache { enabled: %t }", enablecache)
+	e._logf("ServiceTest::Cache { enabled: %t }", enablecache)
 	if e.options.enablecache {
 		return e.internals.cache, nil
 	}
 	return e.internals.nocache, nil
 }
 
-// api.Stack
+// api.StackDriver
 func (e *ServiceTest) GetStackName() (string, fail.Error) {
 
 	e.options.mu.RLock()
@@ -3334,7 +3334,7 @@ func (e *ServiceTest) GetStack() (api.Stack, fail.Error) {
 	e.Name = stackname
 
 	if stacknameErr != nil {
-		e._warnf("ServiceTest::GetStack forced error \"%s\"\n", stacknameErr.Error())
+		e._warnf("ServiceTest::StackDriver forced error \"%s\"\n", stacknameErr.Error())
 		return e, stacknameErr
 	}
 	return stacks.Remediator{Name: e.options.stackname}, nil
@@ -3633,7 +3633,7 @@ func (e *ServiceTest) GetMetadataKey() (*crypt.Key, fail.Error) {
 	e.options.mu.RUnlock()
 
 	if metadatakeyErr != nil {
-		e._warnf("ServiceTest::GetMetadataKey forced error \"%s\"", metadatakeyErr.Error())
+		e._warnf("ServiceTest::MetadataKey forced error \"%s\"", metadatakeyErr.Error())
 		return nil, metadatakeyErr
 	}
 	key, err := crypt.NewEncryptionKey([]byte(metadatakey))

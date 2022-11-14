@@ -97,14 +97,6 @@ type Host struct {
 func NewHost(ctx context.Context) (_ *Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	myjob, xerr := jobapi.FromContext(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if valid.IsNull(myjob) {
-		return nil, fail.InconsistentError("missing valid Job in context")
-	}
-
 	coreInstance, xerr := metadata.NewCore(ctx, metadata.MethodObjectStorage, hostKind, hostsFolderName, abstract.NewEmptyHostFull())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -148,7 +140,7 @@ func LoadHost(inctx context.Context, ref string) (resources.Host, fail.Error) {
 			var kt *Host
 			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -197,6 +189,7 @@ func LoadHost(inctx context.Context, ref string) (resources.Host, fail.Error) {
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
+
 				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 
 				if val, xerr := cache.Get(ctx, refcache); xerr == nil {
@@ -210,7 +203,6 @@ func LoadHost(inctx context.Context, ref string) (resources.Host, fail.Error) {
 				} else {
 					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
-
 			}
 
 			return hostInstance, nil
@@ -228,10 +220,10 @@ func LoadHost(inctx context.Context, ref string) (resources.Host, fail.Error) {
 }
 
 // VPL: not used...
-// func Stack() []byte {
+// func StackDriver() []byte {
 // 	buf := make([]byte, 1024)
 // 	for {
-// 		n := runtime.Stack(buf, false)
+// 		n := runtime.StackDriver(buf, false)
 // 		if n < len(buf) {
 // 			return buf[:n]
 // 		}
@@ -651,7 +643,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	cache, xerr := instance.Service().GetCache(ctx)
+	cache, xerr := instance.Service().Cache(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -1249,7 +1241,7 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 
 		// Fix for Stein
 		{
-			st, xerr := svc.GetProviderName()
+			st, xerr := svc.ProviderName()
 			if xerr != nil {
 				return xerr
 			}
@@ -1666,7 +1658,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 				// Fix for Stein
 				{
-					st, xerr := svc.GetProviderName()
+					st, xerr := svc.ProviderName()
 					if xerr != nil {
 						return xerr
 					}
@@ -2608,7 +2600,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	cache, xerr := instance.Service().GetCache(ctx)
+	cache, xerr := instance.Service().Cache(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -2692,7 +2684,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		single         bool
 		singleSubnetID string
 	)
-	xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		// If Host has mounted shares, unmounts them before anything else
 		var mounts []*propertiesv1.HostShare
 		innerXErr := props.Inspect(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {

@@ -325,9 +325,6 @@ func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Err
 	if valid.IsNull(p) {
 		return iaasoptions.Authentication{}, fail.InvalidInstanceError()
 	}
-	if valid.IsNull(p.Stack) {
-		return iaasoptions.Authentication{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
-	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).AuthenticationOptions()
 }
@@ -336,9 +333,6 @@ func (p *provider) AuthenticationOptions() (iaasoptions.Authentication, fail.Err
 func (p *provider) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 	if valid.IsNull(p) {
 		return iaasoptions.Configuration{}, fail.InvalidInstanceError()
-	}
-	if valid.IsNull(p.Stack) {
-		return iaasoptions.Configuration{}, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	opts, xerr := p.Stack.(providers.StackReservedForProviderUse).ConfigurationOptions()
@@ -359,14 +353,11 @@ func (p *provider) GetName() (string, fail.Error) {
 	return "flexibleengine", nil
 }
 
-// GetStack returns the stack object used by the provider
+// StackDriver returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p *provider) GetStack() (iaasapi.Stack, fail.Error) {
+func (p *provider) StackDriver() (iaasapi.Stack, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
-	}
-	if valid.IsNull(p.Stack) {
-		return nil, fail.InvalidInstanceContentError("p.Stack", "cannot be nil")
 	}
 
 	return p.Stack, nil

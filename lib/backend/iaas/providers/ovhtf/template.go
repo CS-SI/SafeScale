@@ -35,7 +35,7 @@ func (p *provider) InspectTemplate(ctx context.Context, id string) (*abstract.Ho
 	return nil, fail.NotImplementedError()
 
 	/*
-		tpl, xerr := p.Stack.InspectTemplate(ctx, id)
+		tpl, xerr := p.StackDriver.InspectTemplate(ctx, id)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -61,7 +61,7 @@ func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Hos
 	return nil, fail.NotImplementedError()
 
 	/*
-		allTemplates, xerr := p.Stack.(providers.StackReservedForProviderUse).ListTemplates(ctx, false)
+		allTemplates, xerr := p.StackDriver.(providers.StackReservedForProviderUse).ListTemplates(ctx, false)
 		if xerr != nil {
 			return nil, xerr
 		}

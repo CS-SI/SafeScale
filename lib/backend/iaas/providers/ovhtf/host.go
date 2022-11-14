@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 func (p *provider) CreateHost(ctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error) {
@@ -90,4 +91,12 @@ func (p *provider) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.
 func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
 	// TODO implement me
 	panic("implement me")
+}
+
+func (p *provider) ConsolidateHostSnippet(ahc *abstract.HostCore) {
+	if valid.IsNil(p) || ahc == nil {
+		return
+	}
+
+	_ = ahc.AddOptions(abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
 }

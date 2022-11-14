@@ -285,7 +285,7 @@ func LoadCluster(inctx context.Context, name string) (_ resources.Cluster, ferr 
 		var kt *Cluster
 		cachename := fmt.Sprintf("%T/%s", kt, name)
 
-		cache, xerr := myjob.Service().GetCache(ctx)
+		cache, xerr := myjob.Service().Cache(ctx)
 		if xerr != nil {
 			chRes <- result{nil, xerr}
 			return
@@ -2228,7 +2228,7 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 			nodes, masters []uint
 		)
 		// Mark the Cluster as Removed and get nodes from properties
-		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			// Updates Cluster state to mark Cluster as Removing
 			innerXErr := props.Alter(clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
 				stateV1, innerErr := lang.Cast[*propertiesv1.ClusterState](p)

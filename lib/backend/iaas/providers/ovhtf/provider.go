@@ -123,7 +123,7 @@ func (p provider) GetStackName() (string, fail.Error) {
 
 // IsNull returns true if the instance is considered as a null value
 func (p *provider) IsNull() bool {
-	return p == nil // || p.Stack == nil
+	return p == nil // || p.StackDriver == nil
 }
 
 // Build builds a new instance of Ovh using configuration parameters
@@ -347,10 +347,10 @@ func (p provider) GetName() (string, fail.Error) {
 	return p.Name(), nil
 }
 
-// GetStack returns the stack object used by the provider
+// Stack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() (iaasapi.Stack, fail.Error) {
-	return nil, nil //p.Stack, nil
+func (p provider) StackDriver() (iaasapi.Stack, fail.Error) {
+	return nil, nil //p.StackDriver, nil
 }
 
 func (p provider) TenantParameters() (map[string]interface{}, fail.Error) {

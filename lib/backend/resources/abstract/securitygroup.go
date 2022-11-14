@@ -31,6 +31,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
+const SecurityGroupKind = "sg"
+
 // SecurityGroupRule represents a rule of a SecurityGroup
 type SecurityGroupRule struct {
 	IDs         []string                        `json:"ids"`                   // ids of the rule (an abstracted rule may be split to several provider rules)
@@ -290,12 +292,6 @@ func NewSecurityGroupRule() *SecurityGroupRule {
 	}
 }
 
-// NewEmptySecurityGroup returns a empty, unnamed SecurityGroup instance
-func NewEmptySecurityGroup() *SecurityGroup {
-	out, _ := NewSecurityGroup()
-	return out
-}
-
 // Clone does a deep-copy of the SecurityGroup
 //
 // satisfies interface clonable.Clonable
@@ -444,6 +440,7 @@ type SecurityGroup struct {
 
 // NewSecurityGroup ...
 func NewSecurityGroup(opts ...Option) (*SecurityGroup, fail.Error) {
+	opts = append(opts, withKind(SecurityGroupKind))
 	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr
@@ -459,6 +456,12 @@ func NewSecurityGroup(opts ...Option) (*SecurityGroup, fail.Error) {
 		DefaultForHost:   "",
 	}
 	return asg, nil
+}
+
+// NewEmptySecurityGroup returns a empty, unnamed SecurityGroup instance
+func NewEmptySecurityGroup() *SecurityGroup {
+	out, _ := NewSecurityGroup()
+	return out
 }
 
 // IsNull tells if the SecurityGroup is a null value

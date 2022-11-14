@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	createSecurityGroupResourceSnippet = "resource_sg_create.tf"
+	designSecurityGroupResourceSnippetPath = "resource_sg_design.tf"
 )
 
 // type securityGroupResource struct {
@@ -222,4 +222,12 @@ func (p *provider) DisableSecurityGroup(ctx context.Context, group *abstract.Sec
 func (p *provider) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, s string, s2 string) fail.Error {
 	// TODO implement me
 	panic("implement me")
+}
+
+func (p *provider) ConsolidateSecurityGroupSnippet(asg *abstract.SecurityGroup) {
+	if valid.IsNil(p) || asg == nil {
+		return
+	}
+
+	_ = asg.AddOptions(abstract.UseTerraformSnippet(designSecurityGroupResourceSnippetPath))
 }

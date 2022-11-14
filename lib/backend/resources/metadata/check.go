@@ -41,10 +41,19 @@ const (
 )
 
 // CheckVersion checks if the content of /version in metadata bucket is equal to MetadataVersion
-func CheckVersion(ctx context.Context, job jobapi.Job, method string) (string, fail.Error) {
+func CheckVersion(ctx context.Context, method string) (string, fail.Error) {
+	if ctx == nil {
+		return "", fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return "", xerr
+	}
+
 	// Read file /version in metadata
 	var currentMetadataVersion string
-	folder, xerr := NewFolder(UseMethod(method), WithJob(job))
+	folder, xerr := NewFolder(ctx, UseMethod(method))
 	if xerr != nil {
 		return "", xerr
 	}
@@ -67,7 +76,7 @@ func CheckVersion(ctx context.Context, job jobapi.Job, method string) (string, f
 		currentMetadataVersion = FirstMetadataVersion
 	}
 
-	svcName, xerr := job.Service().GetName()
+	svcName, xerr := myjob.Service().GetName()
 	if xerr != nil {
 		return currentMetadataVersion, xerr
 	}

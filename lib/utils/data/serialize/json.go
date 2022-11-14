@@ -202,7 +202,7 @@ func (x *JSONProperties) Inspect(key string, inspector func(p clonable.Clonable)
 	}
 
 	x.RLock()
-	clone, err := clonable.CastedClone[jsonProperty](item)
+	clone, err := clonable.CastedClone[*jsonProperty](item)
 	x.RUnlock() // nolint
 	if err != nil {
 		return fail.Wrap(err)

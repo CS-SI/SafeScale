@@ -35,9 +35,6 @@ func New(provider ProviderUsingTerraform, opts options.Options) (api.Terraformer
 	if valid.IsNull(provider) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if _, ok := provider.(ProviderUsingTerraform); !ok {
-		return nil, fail.InconsistentError("missing methods in 'provider' to be used by Terraformer")
-	}
 
 	out := &renderer{
 		provider: provider,

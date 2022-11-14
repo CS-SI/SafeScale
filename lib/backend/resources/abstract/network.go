@@ -28,6 +28,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
+const NetworkKind = "network"
+
 // NetworkRequest represents network requirements to create a network/VPC where CIDR contains a non-routable network
 // like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
 type NetworkRequest struct {
@@ -51,13 +53,10 @@ type SubNetwork struct { // DEPRECATED: deprecated
 // Network represents a virtual network
 type Network struct {
 	*Core
-	ID string `json:"id"` // ID for the network (from provider)
-	// Name       string                   `json:"name"`                  // name of the network
-	CIDR       string   `json:"mask"`                  // network in CIDR notation (if it has a meaning...)
-	DNSServers []string `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
-	Imported   bool     `json:"imported,omitempty"`    // tells if the Network has been imported (making it not deletable by SafeScale)
-	// Tags       data.Map[string, string] `json:"tags,omitempty"`
-
+	ID                 string         `json:"id"`                             // ID for the network (from provider)
+	CIDR               string         `json:"mask"`                           // network in CIDR notation (if it has a meaning...)
+	DNSServers         []string       `json:"dns_servers,omitempty"`          // list of dns servers to be used inside the Network/VPC
+	Imported           bool           `json:"imported,omitempty"`             // tells if the Network has been imported (making it not deletable by SafeScale)
 	Domain             string         `json:"domain,omitempty"`               // DEPRECATED: contains the domain used to define host FQDN
 	GatewayID          string         `json:"gateway_id,omitempty"`           // DEPRECATED: contains the id of the host acting as primary gateway for the network
 	SecondaryGatewayID string         `json:"secondary_gateway_id,omitempty"` // DEPRECATED: contains the id of the host acting as secondary gateway for the network
@@ -68,6 +67,7 @@ type Network struct {
 
 // NewNetwork initializes a new instance of Network
 func NewNetwork(opts ...Option) (*Network, fail.Error) {
+	opts = append(opts, withKind(NetworkKind))
 	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr

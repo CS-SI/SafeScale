@@ -17,9 +17,9 @@
 package metadata
 
 import (
+	"context"
 	"strings"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage"
@@ -27,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage/consul"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 const (
@@ -36,7 +35,6 @@ const (
 
 	OptionUseMethodKey     = "method"
 	OptionWithPrefixKey    = "prefix"
-	OptionWithJobKey       = "job"
 	OptionWithoutReloadKey = "no_reload"
 )
 
@@ -80,17 +78,6 @@ func WithPrefix(prefix string) options.Option {
 	}
 }
 
-// WithJob allows to attach the corresponding scope
-func WithJob(job jobapi.Job) options.Option {
-	return func(o options.Options) fail.Error {
-		if valid.IsNull(job) {
-			return fail.InvalidParameterError("job", "cannot be null value of 'jpbapi.Job'")
-		}
-
-		return o.Store(OptionWithJobKey, job)
-	}
-}
-
 // func WithConsul(kv *consumer.KV) Option {
 // 	return func(c *config) fail.Error {
 // 		if valid.IsNull(kv) {
@@ -110,18 +97,17 @@ func WithoutReload() func(options.Options) fail.Error {
 }
 
 // NewFolder creates a Folder corresponding to the method wanted
-func NewFolder(opts ...options.Option) (storage.Folder, fail.Error) {
+func NewFolder(ctx context.Context, opts ...options.Option) (storage.Folder, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
 	o, xerr := options.New(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	method, xerr := options.Value[string](o, OptionUseMethodKey)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	job, xerr := options.Value[jobapi.Job](o, OptionWithJobKey)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -134,13 +120,10 @@ func NewFolder(opts ...options.Option) (storage.Folder, fail.Error) {
 	if prefix == "" {
 		return nil, fail.InvalidRequestError("invalid use of empty 'prefix'")
 	}
-	if valid.IsNull(job) {
-		return nil, fail.InvalidRequestError("cannot create new folder using Consul KV without a valid job")
-	}
 
 	switch method {
 	case MethodObjectStorage:
-		return bucket.NewFolder(job, prefix)
+		return bucket.NewFolder(ctx, prefix)
 	case MethodConsul:
 		// consulClient, xerr := consumer.NewClient(consumer.WithAddress("localhost:" + global.Settings.Backend.Consul.HttpPort))
 		// if xerr != nil {
@@ -152,7 +135,7 @@ func NewFolder(opts ...options.Option) (storage.Folder, fail.Error) {
 		// 	consumer.WithPrefix(cfg.prefix),
 		// }
 		// kv, xerr := consulClient.NewKV(opts...)
-		return consul.NewFolder(job, prefix)
+		return consul.NewFolder(ctx, prefix)
 
 	default:
 		return nil, fail.InvalidRequestError("method", "method '%s' is unsupported", method)

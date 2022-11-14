@@ -28,12 +28,13 @@ import (
 
 type (
 	Resource interface {
+		Kind() string
+		GetID() (string, error)
+		GetName() string
 		TerraformSnippet() string
 		// ToMap() map[string]any
 		// String() string
 	}
-
-	// State = bool
 
 	Terraformer interface {
 		Apply(ctx context.Context, def string) (map[string]tfexec.OutputMeta, fail.Error)
@@ -56,7 +57,9 @@ type (
 	RequiredProviders data.Map[string, RequiredProvider]
 
 	ScopeLimitedToTerraformerUse interface {
-		AllResources() ([]Resource, fail.Error)
+		IsLoaded() bool
+		LoadAbstracts(ctx context.Context) fail.Error
+		AllAbstracts() ([]Resource, fail.Error)
 	}
 
 	Configuration struct {
@@ -71,8 +74,4 @@ type (
 		Scope ScopeLimitedToTerraformerUse
 		RequiredProviders
 	}
-
-	// AbstractForTerraformer interface {
-	// 	AllResources() ([]Resource, fail.Error)
-	// }
 )

@@ -55,7 +55,7 @@ type Tenant struct {
 // 				return nil
 // 			}
 //
-// 			bucket, xerr := service.GetMetadataBucket(ctx)
+// 			bucket, xerr := service.MetadataBucket(ctx)
 // 			if xerr != nil {
 // 				debug.IgnoreError(xerr)
 // 				return nil
@@ -82,7 +82,7 @@ type Tenant struct {
 // 		return xerr
 // 	}
 //
-// 	bucket, xerr := service.GetMetadataBucket(ctx)
+// 	bucket, xerr := service.MetadataBucket(ctx)
 // 	if xerr != nil {
 // 		return xerr
 // 	}

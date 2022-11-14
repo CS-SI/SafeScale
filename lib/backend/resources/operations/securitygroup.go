@@ -113,7 +113,7 @@ func LoadSecurityGroup(inctx context.Context, ref string) (*SecurityGroup, fail.
 			var kt *SecurityGroup
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}

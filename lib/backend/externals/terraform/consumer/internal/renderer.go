@@ -45,18 +45,17 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-// ProviderUsingTerraform ...
-type ProviderUsingTerraform interface {
-	iaasapi.Provider
+type (
+	// ProviderUsingTerraform ...
+	ProviderUsingTerraform interface {
+		iaasapi.Provider
 
-	// AuthenticationOptions() iaasoptions.Authentication
-	// ConfigurationOptions() iaasoptions.Configuration
-	TerraformDefinitionSnippet() string
-	// Terraformer() (terraformerapi.Terraformer, data.Map[string, any], fail.Error)
-	TerraformerOptions() options.Options
-	Name() string
-	EmbeddedFS() embed.FS
-}
+		TerraformDefinitionSnippet() string
+		TerraformerOptions() options.Options
+		Name() string
+		EmbeddedFS() embed.FS // returns the embed.FS containing snippets
+	}
+)
 
 // renderer is an implementation of Terraformer interface
 type renderer struct {
@@ -155,9 +154,14 @@ func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fa
 		return "", xerr
 	}
 
+	providerSuperset, err := lang.Cast[ProviderUsingTerraform](instance.provider)
+	if err != nil {
+		return "", fail.Wrap(err)
+	}
+
 	variables := data.NewMap[string, any]()
 	variables["Provider"] = map[string]any{
-		"Name":           instance.provider.(ProviderUsingTerraform).Name(),
+		"Name":           providerSuperset.Name(),
 		"Authentication": authOpts,
 		"Configuration":  configOpts,
 	}
@@ -165,23 +169,24 @@ func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fa
 		"Config": instance.config,
 	}
 
-	variables["ProviderDeclaration"], xerr = instance.RealizeSnippet(instance.provider.(ProviderUsingTerraform).EmbeddedFS(), instance.provider.(ProviderUsingTerraform).TerraformDefinitionSnippet(), variables)
+	embeddedFS := providerSuperset.EmbeddedFS()
+	variables["ProviderDeclaration"], xerr = instance.RealizeSnippet(embeddedFS, providerSuperset.TerraformDefinitionSnippet(), variables)
 	if xerr != nil {
 		return "", xerr
 	}
 
-	allResources, xerr := instance.scope.AllResources()
+	allAbstracts, xerr := instance.scope.AllAbstracts()
 	if xerr != nil {
 		return "", xerr
 	}
 
-	allResources = append(resources, allResources...)
-	resourceContent := data.NewSlice[string](len(allResources))
-	for _, r := range resources {
+	allAbstracts = append(resources, allAbstracts...)
+	resourceContent := data.NewSlice[string](len(allAbstracts))
+	for _, r := range allAbstracts {
 		lvars := variables.Clone()
 		// lvars.Merge(map[string]any{"Resource": r.ToMap()})
 		lvars.Merge(map[string]any{"Resource": r})
-		content, xerr := instance.RealizeSnippet(instance.provider.(ProviderUsingTerraform).EmbeddedFS(), r.TerraformSnippet(), lvars)
+		content, xerr := instance.RealizeSnippet(embeddedFS, r.TerraformSnippet(), lvars)
 		if xerr != nil {
 			return "", xerr
 		}
@@ -227,6 +232,10 @@ func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fa
 
 // RealizeSnippet generates a file from box template with variables updated
 func (instance *renderer) RealizeSnippet(efs embed.FS, filename string, vars map[string]any) (string, fail.Error) {
+	if filename == "" {
+		return "", fail.InvalidParameterCannotBeEmptyStringError("filename")
+	}
+
 	tmplString, err := efs.ReadFile(filename)
 	err = debug.InjectPlannedError(err)
 	if err != nil {

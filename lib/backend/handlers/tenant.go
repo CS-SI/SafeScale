@@ -262,12 +262,12 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return nil, err
 	}
 
-	provName, err := svc.GetProviderName()
+	provName, err := svc.ProviderName()
 	if err != nil {
 		return nil, err
 	}
 
-	bucket, err := svc.GetMetadataBucket(ctx)
+	bucket, err := svc.MetadataBucket(ctx)
 	if err != nil {
 		return nil, err
 	}

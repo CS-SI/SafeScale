@@ -21,6 +21,11 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+)
+
+const (
+	designVolumeResourceSnippetPath = "snippets/resource_volume_design.tf"
 )
 
 func (p *provider) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
@@ -61,4 +66,12 @@ func (p *provider) ListVolumeAttachments(ctx context.Context, serverID string) (
 func (p *provider) DeleteVolumeAttachment(ctx context.Context, serverID, id string) fail.Error {
 	// TODO implement me
 	panic("implement me")
+}
+
+func (p *provider) ConsolidateVolumeGroupSnippet(av *abstract.Volume) {
+	if valid.IsNil(p) || av == nil {
+		return
+	}
+
+	_ = av.AddOptions(abstract.UseTerraformSnippet(designVolumeResourceSnippetPath))
 }

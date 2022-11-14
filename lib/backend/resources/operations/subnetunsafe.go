@@ -1205,7 +1205,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 
 				// Fix for Stein
 				{
-					st, xerr := svc.GetProviderName()
+					st, xerr := svc.ProviderName()
 					if xerr != nil {
 						return xerr
 					}
@@ -1286,7 +1286,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 
 				// Fix for Stein
 				{
-					st, xerr := svc.GetProviderName()
+					st, xerr := svc.ProviderName()
 					if xerr != nil {
 						return xerr
 					}

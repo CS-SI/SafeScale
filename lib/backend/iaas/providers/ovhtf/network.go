@@ -600,3 +600,11 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 // 		NormalizeError,
 // 	)
 // }
+
+func (p *provider) ConsolidateNetworkSnippet(an *abstract.Network) {
+	if valid.IsNil(p) || an == nil {
+		return
+	}
+
+	_ = an.AddOptions(abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
+}

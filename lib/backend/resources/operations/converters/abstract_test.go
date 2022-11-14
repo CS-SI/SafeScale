@@ -588,9 +588,11 @@ func Test_ClusterIdentityFromAbstractToProtocol(t *testing.T) {
 		Complexity:    clustercomplexity.Small,
 		Keypair:       kp,
 		AdminPassword: "Password",
-		Tags: map[string]string{
-			"CreationDate": time.Now().Format(time.RFC3339),
-			"ManagedBy":    "safescale",
+		Core: &abstract.Core{
+			Tags: map[string]string{
+				"CreationDate": time.Now().Format(time.RFC3339),
+				"ManagedBy":    "safescale",
+			},
 		},
 	}
 	aci.Name = "Cluster Name"

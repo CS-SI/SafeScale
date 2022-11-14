@@ -117,8 +117,8 @@ func (instance *service) IsNull() bool {
 	return instance == nil || instance.Provider == nil
 }
 
-// GetProviderName ...
-func (instance service) GetProviderName() (string, fail.Error) {
+// ProviderName ...
+func (instance service) ProviderName() (string, fail.Error) {
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -139,8 +139,8 @@ func (instance service) GetName() (string, fail.Error) {
 	return instance.tenantName, nil
 }
 
-// GetMetadataBucket returns the bucket instance describing metadata bucket
-func (instance service) GetMetadataBucket(ctx context.Context) (*abstract.Bucket, fail.Error) {
+// MetadataBucket returns the bucket instance describing metadata bucket
+func (instance *service) MetadataBucket(ctx context.Context) (*abstract.Bucket, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -148,8 +148,8 @@ func (instance service) GetMetadataBucket(ctx context.Context) (*abstract.Bucket
 	return instance.metadataBucket, nil
 }
 
-// GetMetadataKey returns the key used to crypt data in metadata bucket
-func (instance service) GetMetadataKey() (*crypt.Key, fail.Error) {
+// MetadataKey returns the key used to crypt data in metadata bucket
+func (instance *service) MetadataKey() (*crypt.Key, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -157,6 +157,14 @@ func (instance service) GetMetadataKey() (*crypt.Key, fail.Error) {
 		return nil, fail.NotFoundError("no crypt key defined for metadata content")
 	}
 	return instance.metadataKey, nil
+}
+
+// ProviderDriver returns the provider used by service
+func (instance service) ProviderDriver() (iaasapi.Provider, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+	return instance.Provider, nil
 }
 
 // ChangeProvider allows changing provider interface of service object (mainly for test purposes)
@@ -1205,7 +1213,7 @@ func (instance service) InspectHostByName(inctx context.Context, name string) (*
 	}
 }
 
-func (instance service) GetCache(inctx context.Context) (cache.CacheInterface, fail.Error) {
+func (instance service) Cache(inctx context.Context) (cache.CacheInterface, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}

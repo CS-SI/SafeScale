@@ -621,7 +621,7 @@ func (s Remediator) DeleteVolumeAttachment(ctx context.Context, serverID, id str
 // func (s Remediator) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
 // 	defer fail.OnPanic(&ferr)
 //
-// 	xerr := s.Stack.Migrate(ctx, operation, params)
+// 	xerr := s.StackDriver.Migrate(ctx, operation, params)
 // 	if xerr != nil {
 // 		xerr.WithContext(ctx)
 // 	}

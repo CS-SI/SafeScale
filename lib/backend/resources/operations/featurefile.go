@@ -219,7 +219,7 @@ func LoadFeatureFile(inctx context.Context, name string, embeddedOnly bool) (*Fe
 			var kt *FeatureFile
 			cachename := fmt.Sprintf("%T/%s", kt, name)
 
-			cache, xerr := myjob.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}

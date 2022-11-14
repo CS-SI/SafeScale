@@ -29,6 +29,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
+const SubnetKind = "subnet"
+
 // SubnetRequest represents requirements to create a subnet where Mask is defined in CIDR notation
 // like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
 type SubnetRequest struct {
@@ -53,8 +55,7 @@ func (sr SubnetRequest) CleanOnFailure() bool {
 type Subnet struct {
 	*Core
 
-	ID string `json:"id"` // ID of the subnet (from provider)
-	// Name                    string            `json:"name"`                                 // Name of the subnet
+	ID                      string           `json:"id"`                                   // ID of the subnet (from provider)
 	Network                 string           `json:"network"`                              // parent Network of the subnet
 	CIDR                    string           `json:"mask"`                                 // ip network in CIDR notation
 	Domain                  string           `json:"domain,omitempty"`                     // contains the domain used to define host FQDN
@@ -68,11 +69,11 @@ type Subnet struct {
 	InternalSecurityGroupID string           `json:"internal_security_group_id,omitempty"` // contains the ID of the security group for internal access of hosts
 	DefaultSSHPort          uint32           `json:"default_ssh_port,omitempty"`           // contains the port to use for SSH by default on gateways in the Subnet
 	SingleHostCIDRIndex     uint             `json:"single_host_cidr_index,omitempty"`     // if > 0, contains the index of the CIDR in the single Host Network
-	// Tags                    map[string]string `json:"tags,omitempty"`
 }
 
 // NewSubnet initializes a new instance of Subnet
 func NewSubnet(opts ...Option) (*Subnet, fail.Error) {
+	opts = append(opts, withKind(SubnetKind))
 	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr

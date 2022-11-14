@@ -169,7 +169,7 @@ func LoadSubnet(inctx context.Context, networkRef, subnetRef string) (*Subnet, f
 			var kt *Subnet
 			cachesubnetRef := fmt.Sprintf("%T/%s", kt, subnetRef)
 
-			cache, xerr := myjob.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -1235,14 +1235,16 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			return
 		}
 
+		var abstractSubnet *abstract.Subnet
 		xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			as, innerErr := lang.Cast[*abstract.Subnet](p)
+			var innerErr error
+			abstractSubnet, innerErr = lang.Cast[*abstract.Subnet](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
 
 			// 1st delete gateway(s)
-			gwIDs, innerXErr := instance.deleteGateways(ctx, as)
+			gwIDs, innerXErr := instance.deleteGateways(ctx, abstractSubnet)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1259,8 +1261,8 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			}
 
 			// 2nd delete VIP if needed
-			if as.VIP != nil {
-				if innerXErr := svc.DeleteVIP(ctx, as.VIP); innerXErr != nil {
+			if abstractSubnet.VIP != nil {
+				if innerXErr := svc.DeleteVIP(ctx, abstractSubnet.VIP); innerXErr != nil {
 					return fail.Wrap(innerXErr, "failed to delete VIP for gateways")
 				}
 			}
@@ -1279,47 +1281,44 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			}
 
 			// 4st free CIDR index if the Subnet has been created for a single Host
-			if as.SingleHostCIDRIndex > 0 {
+			if abstractSubnet.SingleHostCIDRIndex > 0 {
 				// networkInstance, innerXErr := instance.unsafeInspectNetwork()
-				networkInstance, innerXErr := LoadNetwork(ctx, as.Network)
+				networkInstance, innerXErr := LoadNetwork(ctx, abstractSubnet.Network)
 				if innerXErr != nil {
 					return innerXErr
 				}
 
-				innerXErr = FreeCIDRForSingleHost(ctx, networkInstance, as.SingleHostCIDRIndex)
+				innerXErr = FreeCIDRForSingleHost(ctx, networkInstance, abstractSubnet.SingleHostCIDRIndex)
 				if innerXErr != nil {
 					return innerXErr
 				}
 			}
 
 			// finally delete Subnet
-			logrus.WithContext(ctx).Debugf("Deleting Subnet '%s'...", as.Name)
-			if innerXErr = instance.deleteSubnetThenWaitCompletion(ctx, as.ID); innerXErr != nil {
+			logrus.WithContext(ctx).Debugf("Deleting Subnet '%s'...", abstractSubnet.Name)
+			if innerXErr = instance.deleteSubnetThenWaitCompletion(ctx, abstractSubnet.ID); innerXErr != nil {
 				return innerXErr
 			}
 
 			// Delete Subnet's own Security Groups
-			innerXErr = instance.deleteSecurityGroups(ctx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
+			innerXErr = instance.deleteSecurityGroups(ctx, [3]string{abstractSubnet.GWSecurityGroupID, abstractSubnet.InternalSecurityGroupID, abstractSubnet.PublicIPSecurityGroupID})
 			return innerXErr
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			ar := result{xerr}
-			chRes <- ar
+			chRes <- result{xerr}
 			return
 		}
 
 		// Remove metadata
 		xerr = instance.Core.Delete(ctx)
 		if xerr != nil {
-			ar := result{xerr}
-			chRes <- ar
+			chRes <- result{xerr}
 			return
 		}
 
 		logrus.WithContext(ctx).Infof("Subnet '%s' successfully deleted.", subnetName)
-		ar := result{nil}
-		chRes <- ar
+		chRes <- result{nil}
 		return
 	}() // nolint
 	select {

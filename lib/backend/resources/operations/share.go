@@ -111,7 +111,7 @@ func LoadShare(inctx context.Context, ref string) (resources.Share, fail.Error) 
 			var kt *Share
 			cacheref := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().GetCache(ctx)
+			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -1087,58 +1087,47 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidRequestError(fmt.Sprintf("cannot delete share on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	xerr = objserver.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.SharesV1, func(p clonable.Clonable) fail.Error {
-			hostSharesV1, innerErr := lang.Cast[*propertiesv1.HostShares](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
+	xerr = metadata.AlterProperty(ctx, objserver, hostproperty.SharesV1, func(hostSharesV1 *propertiesv1.HostShares) fail.Error {
+		_, ok := hostSharesV1.ByID[shareID]
+		if !ok {
+			return fail.NotFoundError("failed to find Share '%s' in Host '%s' metadata", shareName, objserver.GetName())
+		}
 
-			_, ok := hostSharesV1.ByID[shareID]
-			if !ok {
-				return fail.NotFoundError("failed to find Share '%s' in Host '%s' metadata", shareName, objserver.GetName())
+		hostShare = hostSharesV1.ByID[shareID]
+		if len(hostShare.ClientsByName) > 0 {
+			var list []string
+			for k := range hostShare.ClientsByName {
+				list = append(list, "'"+k+"'")
 			}
+			return fail.InvalidRequestError("still used by: %s", strings.Join(list, ","))
+		}
 
-			hostShare, innerErr = clonable.CastedClone[*propertiesv1.HostShare](hostSharesV1.ByID[shareID])
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
+		sshConfig, xerr := objserver.GetSSHConfig(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 
-			if len(hostShare.ClientsByName) > 0 {
-				var list []string
-				for k := range hostShare.ClientsByName {
-					list = append(list, "'"+k+"'")
-				}
-				return fail.InvalidRequestError("still used by: %s", strings.Join(list, ","))
-			}
+		sshProfile, xerr := sshfactory.NewConnector(sshConfig)
+		if xerr != nil {
+			return xerr
+		}
 
-			sshConfig, xerr := objserver.GetSSHConfig(ctx)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
+		nfsServer, xerr := nfs.NewServer(instance.Service(), sshProfile)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 
-			sshProfile, xerr := sshfactory.NewConnector(sshConfig)
-			if xerr != nil {
-				return xerr
-			}
+		xerr = nfsServer.RemoveShare(jobapi.NewContextPropagatingJob(ctx), hostShare.Path)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 
-			nfsServer, xerr := nfs.NewServer(instance.Service(), sshProfile)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-
-			xerr = nfsServer.RemoveShare(jobapi.NewContextPropagatingJob(ctx), hostShare.Path)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-
-			delete(hostSharesV1.ByID, shareID)
-			delete(hostSharesV1.ByName, shareName)
-			return nil
-		})
+		delete(hostSharesV1.ByID, shareID)
+		delete(hostSharesV1.ByName, shareName)
+		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

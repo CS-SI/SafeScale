@@ -29,6 +29,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
+const ClusterKind = "cluster"
+
 // ClusterRequest defines what kind of Cluster is wanted
 type ClusterRequest struct {
 	Name                    string                 // contains the name of the cluster wanted
@@ -62,11 +64,11 @@ type Cluster struct {
 	Complexity    clustercomplexity.Enum `json:"complexity"`     // Complexity is the mode of cluster
 	Keypair       *KeyPair               `json:"keypair"`        // Keypair contains the key-pair used inside the Cluster
 	AdminPassword string                 `json:"admin_password"` // contains the password of the cladm account
-	Tags          map[string]string      `json:"tags,omitempty"`
 }
 
 // NewCluster ...
 func NewCluster(opts ...Option) (*Cluster, fail.Error) {
+	opts = append(opts, withKind(ClusterKind))
 	c, xerr := newCore(opts...)
 	if xerr != nil {
 		return nil, xerr

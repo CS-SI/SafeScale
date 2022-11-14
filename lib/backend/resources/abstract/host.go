@@ -32,6 +32,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
+const HostKind = "host"
+
 // KeyPair represents a SSH key pair
 type KeyPair struct {
 	ID         string `json:"id,omitempty"`
@@ -213,6 +215,25 @@ func (hse *HostEffectiveSizing) IsNull() bool {
 	return hse == nil || hse.Cores == 0
 }
 
+func (hse *HostEffectiveSizing) Clone() (clonable.Clonable, error) {
+	nhse := &HostEffectiveSizing{}
+	return nhse, nhse.Replace(hse)
+}
+
+func (hse *HostEffectiveSizing) Replace(p clonable.Clonable) error {
+	if hse == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostEffectiveSizing](p)
+	if err != nil {
+		return err
+	}
+
+	*hse = *src
+	return nil
+}
+
 // HostTemplate ...
 type HostTemplate struct {
 	Cores     int     `json:"cores,omitempty"`
@@ -239,16 +260,16 @@ type HostCore struct {
 	*Core
 	ID string `json:"id,omitempty"`
 	// Name              string            `json:"name,omitempty"`
-	PrivateKey        string            `json:"private_key,omitempty"`
-	SSHPort           uint32            `json:"ssh_port,omitempty"`
-	Password          string            `json:"password,omitempty"`
-	LastState         hoststate.Enum    `json:"last_state"`         // Do not enable "omitempty", if state is "stopped", int value is 0, recognize as "not set" value during Serialize
-	ProvisioningState hoststate.Enum    `json:"provisioning_state"` // Do not enable "omitempty", if state is "stopped", int value is 0, recognize as "not set" value during Serialize
-	Tags              map[string]string `json:"tags,omitempty"`
+	PrivateKey        string         `json:"private_key,omitempty"`
+	SSHPort           uint32         `json:"ssh_port,omitempty"`
+	Password          string         `json:"password,omitempty"`
+	LastState         hoststate.Enum `json:"last_state"`         // Do not enable "omitempty", if state is "stopped", int value is 0, recognize as "not set" value during Serialize
+	ProvisioningState hoststate.Enum `json:"provisioning_state"` // Do not enable "omitempty", if state is "stopped", int value is 0, recognize as "not set" value during Serialize
 }
 
 // NewHostCore ...
 func NewHostCore(opts ...Option) (*HostCore, fail.Error) {
+	opts = append(opts, withKind(HostKind))
 	c, err := newCore(opts...)
 	if err != nil {
 		return nil, err
@@ -404,6 +425,46 @@ func NewHostNetworking() *HostNetworking {
 	}
 }
 
+func (hn *HostNetworking) IsNull() bool {
+	return hn == nil
+}
+
+func (hn *HostNetworking) Clone() (clonable.Clonable, error) {
+	nhn := &HostNetworking{}
+	return nhn, nhn.Replace(hn)
+}
+
+func (hn *HostNetworking) Replace(p clonable.Clonable) error {
+	if hn == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostNetworking](p)
+	if err != nil {
+		return err
+	}
+
+	*hn = *src
+	hn.SubnetsByID = make(map[string]string, len(src.SubnetsByID))
+	for k, v := range src.SubnetsByID {
+		hn.SubnetsByID[k] = v
+	}
+	hn.SubnetsByName = make(map[string]string, len(src.SubnetsByName))
+	for k, v := range src.SubnetsByName {
+		hn.SubnetsByName[k] = v
+	}
+	hn.IPv4Addresses = make(map[string]string, len(src.IPv4Addresses))
+	for k, v := range src.IPv4Addresses {
+		hn.IPv4Addresses[k] = v
+	}
+	hn.IPv6Addresses = make(map[string]string, len(src.IPv6Addresses))
+	for k, v := range src.IPv6Addresses {
+		hn.IPv6Addresses[k] = v
+	}
+
+	return nil
+}
+
 // HostDescription contains description information for the host
 type HostDescription struct {
 	Created time.Time `json:"created,omitempty"`  // tells when the host has been created
@@ -411,6 +472,29 @@ type HostDescription struct {
 	Updated time.Time `json:"modified,omitempty"` // tells the last time the host has been modified
 	Purpose string    `json:"purpose,omitempty"`  // contains a description of the use of a host
 	Tenant  string    `json:"tenant"`             // contains the tenant name used to create the host
+}
+
+func (hd *HostDescription) IsNull() bool {
+	return hd == nil || hd.Tenant == ""
+}
+
+func (hd *HostDescription) Clone() (clonable.Clonable, error) {
+	nhd := &HostDescription{}
+	return nhd, nhd.Replace(hd)
+}
+
+func (hd *HostDescription) Replace(p clonable.Clonable) error {
+	if hd == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostDescription](p)
+	if err != nil {
+		return err
+	}
+
+	*hd = *src
+	return nil
 }
 
 // HostFull groups information about host coming from provider
@@ -430,8 +514,7 @@ func NewHostFull(opts ...Option) (*HostFull, fail.Error) {
 	}
 
 	hf := &HostFull{
-		HostCore: hc,
-
+		HostCore:     hc,
 		Sizing:       NewHostEffectiveSizing(),
 		Networking:   NewHostNetworking(),
 		Description:  &HostDescription{},
@@ -502,6 +585,53 @@ func (hf *HostFull) SetName(name string) *HostFull {
 		hf.HostCore.SetName(name)
 	}
 	return hf
+}
+
+// Clone does a deep-copy of the Host
+// satisfies interface clonable.Clonable
+func (hf *HostFull) Clone() (clonable.Clonable, error) {
+	if hf == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	nhf, xerr := NewHostFullFromCore(hf.HostCore)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var err error
+	nhf.Description, err = lang.Cast[*HostDescription](hf.Description)
+	if err != nil {
+		return nil, err
+	}
+
+	nhf.Sizing, err = lang.Cast[*HostEffectiveSizing](hf.Sizing)
+	if err != nil {
+		return nil, err
+	}
+
+	nhf.Networking, err = lang.Cast[*HostNetworking](hf.Networking)
+	if err != nil {
+		return nil, err
+	}
+
+	return nhf, nhf.Replace(hf)
+}
+
+// Replace ...
+// satisfies interface clonable.Clonable
+func (hf *HostFull) Replace(p clonable.Clonable) error {
+	if hf == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*HostFull](p)
+	if err != nil {
+		return err
+	}
+
+	*hf = *src
+	return nil
 }
 
 // HostList contains a list of HostFull
