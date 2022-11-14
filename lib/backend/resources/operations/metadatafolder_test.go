@@ -1,3 +1,6 @@
+//go:build testable
+// +build testable
+
 package operations
 
 import (

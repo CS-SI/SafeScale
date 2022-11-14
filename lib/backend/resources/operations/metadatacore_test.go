@@ -4,14 +4,20 @@
 package operations
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"reflect"
+	"sync"
+	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/mocks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/gojuno/minimock/v3"
 	"github.com/stretchr/testify/require"
 )
 
