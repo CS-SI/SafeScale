@@ -54,6 +54,9 @@ var (
 		PrivateVirtualIP: true,
 	}
 	dnsServers = []string{"100.125.0.41", "100.126.0.41"}
+
+	_ iaasapi.Provider                    = (*provider)(nil) // Verify that *provider implements iaas.Provider (at compile time)
+	_ providers.ReservedForTerraformerUse = (*provider)(nil)
 )
 
 type gpuCfg struct {
@@ -440,6 +443,21 @@ func (p provider) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.E
 	}
 
 	return nil, fail.NotFoundError("this provider has no default network")
+}
+
+func (p *provider) ConsolidateNetworkSnippet(_ *abstract.Network) {
+}
+
+func (p *provider) ConsolidateSubnetSnippet(_ *abstract.Subnet) {
+}
+
+func (p *provider) ConsolidateSecurityGroupSnippet(_ *abstract.SecurityGroup) {
+}
+
+func (p *provider) ConsolidateHostSnippet(_ *abstract.HostCore) {
+}
+
+func (p *provider) ConsolidateVolumeSnippet(_ *abstract.Volume) {
 }
 
 func init() {

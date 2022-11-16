@@ -393,11 +393,10 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", networkLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	var existingNetwork *abstract.Network
 	if an.ID != "" {
-		existingNetwork, xerr = p.InspectNetwork(ctx, an.ID)
+		an, xerr = p.InspectNetwork(ctx, an.ID)
 	} else if an.Name != "" {
-		existingNetwork, xerr = p.InspectNetworkByName(ctx, an.Name)
+		an, xerr = p.InspectNetworkByName(ctx, an.Name)
 	}
 	if xerr != nil {
 		return xerr
@@ -442,13 +441,10 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 		return nil
 	*/
 
-	abstractNetwork, xerr := abstract.NewNetwork(abstract.WithName(existingNetwork.Name), abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
+	xerr = an.AddOptions(abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
 	if xerr != nil {
 		return xerr
 	}
-
-	abstractNetwork.ID = existingNetwork.ID
-	abstractNetwork.DNSServers = existingNetwork.DNSServers
 
 	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
 	if xerr != nil {
@@ -461,12 +457,12 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(abstractNetwork)
+	def, xerr := renderer.Assemble(an)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(abstractNetwork.GetName()))
+	xerr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(an.GetName()))
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to delete network %s", an.ID)
 	}

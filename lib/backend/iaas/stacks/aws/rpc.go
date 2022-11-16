@@ -1716,11 +1716,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 			if ferr != nil {
 				derr := s.rpcDisassociateAddress(context.Background(), attachID)
 				if derr != nil {
-					_ = ferr.AddConsequence(
-						fail.Wrap(
-							derr, "cleaning up on failure, failed to detach Elastic IP from network interface",
-						),
-					)
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to detach Elastic IP from network interface"))
 				}
 			}
 		}()

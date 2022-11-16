@@ -7,6 +7,6 @@ resource "openstack_blockstorage_volume_v2" "{{ .Resource.Name }}" {
     tenant_id   = "{{ .Provider.Authentication.TenantID }}"
 }
 
-output "id" {
+output "volume_{{ .Resource.Name }}_id" {
     value = "${openstack_blockstorage_volume_v2.{{ .Resource.Name }}.id}"
 }

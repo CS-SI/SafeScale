@@ -53,6 +53,9 @@ var (
 		PrivateVirtualIP: false,
 		Layer3Networking: false,
 	}
+
+	_ iaasapi.Provider                    = (*provider)(nil) // Verify that *provider implements iaas.Provider (at compile time)
+	_ providers.ReservedForTerraformerUse = (*provider)(nil)
 )
 
 // provider is integration of outscale IaaS API
@@ -348,6 +351,21 @@ func (p *provider) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.
 	}
 
 	return p.Stack.(providers.StackReservedForProviderUse).DefaultNetwork(ctx)
+}
+
+func (p *provider) ConsolidateNetworkSnippet(_ *abstract.Network) {
+}
+
+func (p *provider) ConsolidateSubnetSnippet(_ *abstract.Subnet) {
+}
+
+func (p *provider) ConsolidateSecurityGroupSnippet(_ *abstract.SecurityGroup) {
+}
+
+func (p *provider) ConsolidateHostSnippet(_ *abstract.HostCore) {
+}
+
+func (p *provider) ConsolidateVolumeSnippet(_ *abstract.Volume) {
 }
 
 func init() {

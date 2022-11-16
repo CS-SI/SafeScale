@@ -47,47 +47,52 @@ const (
 	ovhDefaultImage = "Ubuntu 20.04"
 )
 
-type gpuCfg struct {
-	GPUNumber int
-	GPUType   string
-}
+type (
+	gpuCfg struct {
+		GPUNumber int
+		GPUType   string
+	}
 
-var gpuMap = map[string]gpuCfg{
-	"g2-15": {
-		GPUNumber: 1,
-		GPUType:   "NVIDIA 1070",
-	},
-	"g2-30": {
-		GPUNumber: 1,
-		GPUType:   "NVIDIA 1070",
-	},
-	"g3-120": {
-		GPUNumber: 3,
-		GPUType:   "NVIDIA 1080 TI",
-	},
-	"g3-30": {
-		GPUNumber: 1,
-		GPUType:   "NVIDIA 1080 TI",
-	},
-}
+	// provider is the provider implementation of the OVH provider
+	provider struct {
+		iaasapi.Stack
+
+		ExternalNetworkID string
+
+		tenantParameters map[string]interface{}
+	}
+)
 
 var (
+	gpuMap = map[string]gpuCfg{
+		"g2-15": {
+			GPUNumber: 1,
+			GPUType:   "NVIDIA 1070",
+		},
+		"g2-30": {
+			GPUNumber: 1,
+			GPUType:   "NVIDIA 1070",
+		},
+		"g3-120": {
+			GPUNumber: 3,
+			GPUType:   "NVIDIA 1080 TI",
+		},
+		"g3-30": {
+			GPUNumber: 1,
+			GPUType:   "NVIDIA 1080 TI",
+		},
+	}
+
 	capabilities = iaasapi.Capabilities{
 		PrivateVirtualIP: true,
 	}
 	identityEndpoint = "https://auth.cloud.ovh.net/v3"
 	externalNetwork  = "Ext-Net"
 	dnsServers       = []string{"213.186.33.99", "1.1.1.1"}
+
+	_ iaasapi.Provider                    = (*provider)(nil) // Verify that *provider implements iaas.Provider (at compile time)
+	_ providers.ReservedForTerraformerUse = (*provider)(nil)
 )
-
-// provider is the provider implementation of the OVH provider
-type provider struct {
-	iaasapi.Stack
-
-	ExternalNetworkID string
-
-	tenantParameters map[string]interface{}
-}
 
 // IsNull returns true if the instance is considered as a null value
 func (p *provider) IsNull() bool {
@@ -537,6 +542,21 @@ func (p *provider) HasDefaultNetwork() (bool, fail.Error) {
 // DefaultNetwork returns the *abstract.Network corresponding to the default network
 func (p *provider) DefaultNetwork(_ context.Context) (*abstract.Network, fail.Error) {
 	return nil, fail.NotFoundError("this provider has no default network")
+}
+
+func (p *provider) ConsolidateNetworkSnippet(_ *abstract.Network) {
+}
+
+func (p *provider) ConsolidateSubnetSnippet(_ *abstract.Subnet) {
+}
+
+func (p *provider) ConsolidateSecurityGroupSnippet(_ *abstract.SecurityGroup) {
+}
+
+func (p *provider) ConsolidateHostSnippet(_ *abstract.HostCore) {
+}
+
+func (p *provider) ConsolidateVolumeSnippet(_ *abstract.Volume) {
 }
 
 func init() {

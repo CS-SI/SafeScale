@@ -53,8 +53,8 @@ type (
 		ConsolidateSubnetSnippet(*abstract.Subnet)               // configures if needed Terraform Snippet to use for abstract.Subnet in parameter
 		ConsolidateSecurityGroupSnippet(*abstract.SecurityGroup) // configures if needed Terraform Snippet to use for abstract.SecurityGroup in parameter
 		ConsolidateHostSnippet(*abstract.HostCore)               // configures if needed Terraform Snippet to use for abstract.Host in parameter
-		ConsolidateLabelSnippet(*abstract.Label)                 // configures if needed Terraform Snippet to use for abstract.Label in parameter
-		ConsolidateVolumeSnippet(*abstract.Volume)               // configures if needed Terraform Snippet to use for abstract.Volume
+		// ConsolidateLabelSnippet(*abstract.Label)                 // configures if needed Terraform Snippet to use for abstract.Label in parameter
+		ConsolidateVolumeSnippet(*abstract.Volume) // configures if needed Terraform Snippet to use for abstract.Volume
 	}
 
 	// scope contains information about context of the Job
@@ -385,7 +385,7 @@ func (s *scope) loadLogHelper(kind string, xerr *fail.Error, count *int) func() 
 			logrus.Errorf("Failed to load existing %s in Scope '%s': %s", kind, s.String(), (*xerr).Error())
 		} else {
 			if *count > 0 {
-				logrus.Debugf("Successfully loaded %d existing Networks in Scope '%s'", *count, s.String())
+				logrus.Debugf("Successfully loaded %d existing %s in Scope '%s'", *count, kind, s.String())
 			} else {
 				logrus.Debugf("No existing %s found", kind)
 			}
@@ -500,7 +500,7 @@ func (s *scope) loadLabels(ctx context.Context, provider providerUsingTerraform)
 	}
 
 	return browser.Browse(ctx, func(al *abstract.Label) fail.Error {
-		provider.ConsolidateLabelSnippet(al)
+		// provider.ConsolidateLabelSnippet(al)
 		casted, innerErr := lang.Cast[terraformerapi.Resource](al)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)

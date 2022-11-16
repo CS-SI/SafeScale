@@ -226,7 +226,12 @@ func (myself *Core) Inspect(inctx context.Context, callback AnyResourceCallback,
 
 	noReload, xerr := options.Value[bool](o, OptionWithoutReloadKey)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return xerr
+		}
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -1228,6 +1233,12 @@ func (myself *Core) BrowseFolder(inctx context.Context, callback func(buf []byte
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
+	if inctx == nil {
+		return fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if callback == nil {
+		return fail.InvalidParameterCannotBeNilError("callback")
+	}
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -1244,10 +1255,6 @@ func (myself *Core) BrowseFolder(inctx context.Context, callback func(buf []byte
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			if callback == nil {
-				return fail.InvalidParameterError("callback", "cannot be nil")
-			}
-
 			if myself.kindSplittedStore {
 				return myself.folder.Browse(ctx, byIDFolderName, func(buf []byte) fail.Error {
 					return callback(buf)
@@ -1255,6 +1262,50 @@ func (myself *Core) BrowseFolder(inctx context.Context, callback func(buf []byte
 			}
 			return myself.folder.Browse(ctx, "", func(buf []byte) fail.Error {
 				return callback(buf)
+			})
+		}()
+		chRes <- result{gerr}
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
+	}
+}
+
+// LookupByName tells if an entry exists by name in the folder
+func (myself *Core) LookupByName(inctx context.Context, name string) (_ fail.Error) {
+	if valid.IsNil(myself) {
+		return fail.InvalidInstanceError()
+	}
+	if inctx == nil {
+		return fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if name == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("name")
+	}
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	myself.RLock()
+	defer myself.RUnlock()
+
+	type result struct {
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+
+		gerr := func() (ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+
+			return myself.folder.Read(ctx, byNameFolderName, name, func(buf []byte) fail.Error {
+				return nil
 			})
 		}()
 		chRes <- result{gerr}

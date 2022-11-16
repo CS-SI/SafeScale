@@ -21,6 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
@@ -148,21 +149,23 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (s stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (ferr fail.Error) {
+	if valid.IsNull(s) {
 		return fail.InvalidInstanceError()
 	}
-	if valid.IsNil(asg) {
-		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
+	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
 	}
-
-	var xerr fail.Error
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
 		if xerr != nil {
 			return xerr
 		}
 	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.huaweicloud"), "(%s)", sgLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
 	// delete security group rules
 	for _, v := range asg.Rules {

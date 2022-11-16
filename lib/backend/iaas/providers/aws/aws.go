@@ -48,6 +48,9 @@ var (
 	}
 
 	dnsServers = []string{}
+
+	_ iaasapi.Provider                    = (*provider)(nil) // Verify that *provider implements iaas.Provider (at compile time)
+	_ providers.ReservedForTerraformerUse = (*provider)(nil)
 )
 
 // provider is the provider implementation of the Aws provider
@@ -380,6 +383,21 @@ func (p *provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error)
 	}
 
 	return out, nil
+}
+
+func (p *provider) ConsolidateNetworkSnippet(_ *abstract.Network) {
+}
+
+func (p *provider) ConsolidateSubnetSnippet(_ *abstract.Subnet) {
+}
+
+func (p *provider) ConsolidateSecurityGroupSnippet(_ *abstract.SecurityGroup) {
+}
+
+func (p *provider) ConsolidateHostSnippet(_ *abstract.HostCore) {
+}
+
+func (p *provider) ConsolidateVolumeSnippet(_ *abstract.Volume) {
 }
 
 func init() {

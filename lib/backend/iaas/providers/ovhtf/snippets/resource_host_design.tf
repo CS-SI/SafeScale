@@ -10,7 +10,7 @@ resource "openstack_networking_port_v2" "{{ .Resource.Name }}" {
     }
 }
 
-output "port_id" {
+output "port_{{ .Resource.Name}}_id" {
     value = "${openstack_networking_port_v2.{{ .Resource.Name }}.id}"
 }
 
@@ -27,6 +27,6 @@ resource "openstack_compute_instance_v2" "{{ .Resource.Name }}" {
     }
 }
 
-output "host_id" {
+output "host_{{ .Resource.Name }}_id" {
     value = "${openstack_compute_instance_v2.{{ .Resource.Name }}.id}"
 }

@@ -190,10 +190,10 @@ func (s Remediator) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.Secu
 	return groups, xerr
 }
 
-func (s Remediator) DeleteSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
+func (s Remediator) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Stack.DeleteSecurityGroup(ctx, group)
+	xerr := s.Stack.DeleteSecurityGroup(ctx, sgParam)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}

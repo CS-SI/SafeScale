@@ -1009,6 +1009,7 @@ func (s stack) rpcListImages(ctx context.Context) ([]*compute.Image, fail.Error)
 					if err != nil {
 						return err
 					}
+
 					if resp != nil {
 						if resp.HTTPStatusCode != 200 {
 							logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
@@ -1056,6 +1057,7 @@ func (s stack) rpcGetImageByID(ctx context.Context, id string) (*compute.Image, 
 					if err != nil {
 						return err
 					}
+
 					if resp != nil {
 						if resp.HTTPStatusCode != 200 {
 							logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
@@ -1100,9 +1102,7 @@ func (s stack) rpcListMachineTypes(ctx context.Context) ([]*compute.MachineType,
 		var zero []*compute.MachineType
 		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
-				resp, err = s.ComputeService.MachineTypes.List(
-					s.GcpConfig.ProjectID, s.GcpConfig.Zone,
-				).PageToken(token).Do()
+				resp, err = s.ComputeService.MachineTypes.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
 				if err != nil {
 					return err
 				}
@@ -1147,6 +1147,7 @@ func (s stack) rpcGetMachineType(ctx context.Context, id string) (*compute.Machi
 			if err != nil {
 				return err
 			}
+
 			if resp != nil {
 				if resp.HTTPStatusCode != 200 {
 					logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
@@ -1179,12 +1180,11 @@ func (s stack) rpcListInstances(ctx context.Context) ([]*compute.Instance, fail.
 		var zero []*compute.Instance
 		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
-				resp, err = s.ComputeService.Instances.List(
-					s.GcpConfig.ProjectID, s.GcpConfig.Zone,
-				).PageToken(token).Do()
+				resp, err = s.ComputeService.Instances.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
 				if err != nil {
 					return err
 				}
+
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
@@ -1367,9 +1367,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, 
 	var resp *compute.Instance
 	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.ComputeService.Instances.Get(
-				s.GcpConfig.ProjectID, s.GcpConfig.Zone, name,
-			).IfNoneMatch(etag).Do()
+			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, name).IfNoneMatch(etag).Do()
 			if err != nil {
 				return err
 			}
@@ -1576,9 +1574,7 @@ func (s stack) rpcResetStartupScriptOfInstance(ctx context.Context, id string) f
 
 		xerr = stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
-				op, err := s.ComputeService.Instances.SetMetadata(
-					s.GcpConfig.ProjectID, s.GcpConfig.Zone, resp.Name, newMetadata,
-				).Do()
+				op, err := s.ComputeService.Instances.SetMetadata(s.GcpConfig.ProjectID, s.GcpConfig.Zone, resp.Name, newMetadata).Do()
 				if op != nil {
 					if op.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", op.HTTPStatusCode)
@@ -1620,6 +1616,7 @@ func (s stack) rpcCreateExternalAddress(ctx context.Context, name string, global
 				if err != nil {
 					return err
 				}
+
 				if op != nil {
 					if op.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", op.HTTPStatusCode)
@@ -1636,6 +1633,7 @@ func (s stack) rpcCreateExternalAddress(ctx context.Context, name string, global
 				if err != nil {
 					return err
 				}
+
 				if op != nil {
 					if op.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", op.HTTPStatusCode)
@@ -1670,6 +1668,7 @@ func (s stack) rpcCreateExternalAddress(ctx context.Context, name string, global
 				if err != nil {
 					return err
 				}
+
 				if resp != nil {
 					if resp.HTTPStatusCode != 200 {
 						logrus.WithContext(ctx).Tracef("received http error code %d", resp.HTTPStatusCode)
@@ -2483,9 +2482,7 @@ func (s stack) rpcCreateDiskAttachment(ctx context.Context, diskRef, hostRef str
 	zero := ""
 	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			op, err = s.ComputeService.Instances.AttachDisk(
-				s.GcpConfig.ProjectID, s.GcpConfig.Zone, instance.Name, &request,
-			).Do()
+			op, err = s.ComputeService.Instances.AttachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, instance.Name, &request).Do()
 			if err != nil {
 				return err
 			}
@@ -2534,9 +2531,7 @@ func (s stack) rpcDeleteDiskAttachment(ctx context.Context, vaID string) fail.Er
 	var op *compute.Operation
 	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			op, err = s.ComputeService.Instances.DetachDisk(
-				s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverName, diskName,
-			).Do()
+			op, err = s.ComputeService.Instances.DetachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverName, diskName).Do()
 			if err != nil {
 				return err
 			}

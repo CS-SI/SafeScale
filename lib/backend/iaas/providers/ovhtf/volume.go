@@ -68,7 +68,7 @@ func (p *provider) DeleteVolumeAttachment(ctx context.Context, serverID, id stri
 	panic("implement me")
 }
 
-func (p *provider) ConsolidateVolumeGroupSnippet(av *abstract.Volume) {
+func (p *provider) ConsolidateVolumeSnippet(av *abstract.Volume) {
 	if valid.IsNil(p) || av == nil {
 		return
 	}

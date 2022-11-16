@@ -6,6 +6,6 @@ resource "openstack_compute_volume_attach_v2" "{{ .Resource.Name }}" {
     tenant_id   = "{{ .Provider.Authentication.TenantID }}"
 }
 
-output "id" {
+output "volume_attach_{{ .Username.Name }}_id" {
     value = "${openstack_compute_volume_attach_v2.{{ .Resource.Name }}.id}"
 }

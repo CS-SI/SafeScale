@@ -19,8 +19,9 @@ package template
 import (
 	txttmpl "text/template"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	sprig "github.com/Masterminds/sprig/v3"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // Parse returns a text template with default funcs declared

@@ -21,7 +21,6 @@ import (
 	"regexp"
 	"time"
 
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
@@ -30,10 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 )
-
-type ReservedForTerraformerUse interface {
-	TerraformRenderer(iaasapi.Provider) (terraformerapi.Terraformer, fail.Error)
-}
 
 // Remediator encapsulates Provider interface to catch panic, to prevent panic from halting the app
 type Remediator struct {
@@ -252,10 +247,10 @@ func (s Remediator) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.Secu
 	return groups, xerr
 }
 
-func (s Remediator) DeleteSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
+func (s Remediator) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Provider.DeleteSecurityGroup(ctx, group)
+	xerr := s.Provider.DeleteSecurityGroup(ctx, sgParam)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
@@ -680,10 +675,35 @@ func (s Remediator) DeleteVolumeAttachment(ctx context.Context, serverID, id str
 	return xerr
 }
 
-func (s Remediator) TerraformerRenderer() (terraformerapi.Terraformer, fail.Error) {
-	caps := s.Provider.Capabilities()
-	if caps.UseTerraformer {
-		return s.Provider.(ReservedForTerraformerUse).TerraformRenderer(s)
-	}
-	return nil, fail.InvalidRequestError("the provider does not use terraform")
+// func (s Remediator) TerraformerRenderer() (terraformerapi.Terraformer, fail.Error) {
+// 	caps := s.Provider.Capabilities()
+// 	if caps.UseTerraformer {
+// 		return s.Provider.(ReservedForTerraformerUse).TerraformRenderer(s)
+// 	}
+//
+// 	return nil, fail.InvalidRequestError("the provider does not use terraform")
+// }
+
+func (s Remediator) ConsolidateNetworkSnippet(p *abstract.Network) {
+	s.Provider.(ReservedForTerraformerUse).ConsolidateNetworkSnippet(p)
+}
+
+func (s Remediator) ConsolidateSubnetSnippet(p *abstract.Subnet) {
+	s.Provider.(ReservedForTerraformerUse).ConsolidateSubnetSnippet(p)
+}
+
+func (s Remediator) ConsolidateSecurityGroupSnippet(p *abstract.SecurityGroup) {
+	s.Provider.(ReservedForTerraformerUse).ConsolidateSecurityGroupSnippet(p)
+}
+
+// func (s Remediator) ConsolidateLabelSnippet(p *abstract.Label) {
+// 	s.Provider.(ReservedForTerraformerUse).ConsolidateLabelSnippet(p)
+// }
+
+func (s Remediator) ConsolidateHostSnippet(p *abstract.HostCore) {
+	s.Provider.(ReservedForTerraformerUse).ConsolidateHostSnippet(p)
+}
+
+func (s Remediator) ConsolidateVolumeSnippet(p *abstract.Volume) {
+	s.Provider.(ReservedForTerraformerUse).ConsolidateVolumeSnippet(p)
 }

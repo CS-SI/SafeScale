@@ -48,6 +48,9 @@ var (
 	cloudferroIdentityEndpoint = "https://cf2.cloudferro.com:5000/v3"
 	cloudferroDefaultImage     = "Ubuntu 20.04"
 	cloudferroDNSServers       = []string{"185.48.234.234", "185.48.234.238"}
+
+	_ iaasapi.Provider                    = (*provider)(nil) // Verify that *provider implements iaas.Provider (at compile time)
+	_ providers.ReservedForTerraformerUse = (*provider)(nil)
 )
 
 // provider is the implementation of the CloudFerro provider
@@ -335,6 +338,21 @@ func (p *provider) HasDefaultNetwork() (bool, fail.Error) {
 // DefaultNetwork returns the *abstract.Network corresponding to the default network
 func (p *provider) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
 	return nil, fail.NotFoundError("this provider has no default network")
+}
+
+func (p *provider) ConsolidateNetworkSnippet(_ *abstract.Network) {
+}
+
+func (p *provider) ConsolidateSubnetSnippet(_ *abstract.Subnet) {
+}
+
+func (p *provider) ConsolidateSecurityGroupSnippet(_ *abstract.SecurityGroup) {
+}
+
+func (p *provider) ConsolidateHostSnippet(_ *abstract.HostCore) {
+}
+
+func (p *provider) ConsolidateVolumeSnippet(_ *abstract.Volume) {
 }
 
 func init() {

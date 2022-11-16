@@ -70,7 +70,7 @@ type Stack interface {
 	// ClearSecurityGroup removes rules from group
 	ClearSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
 	// DeleteSecurityGroup deletes a security group and all its rules
-	DeleteSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error
+	DeleteSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) fail.Error
 	// AddRuleToSecurityGroup adds a rule to an existing security group
 	AddRuleToSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group

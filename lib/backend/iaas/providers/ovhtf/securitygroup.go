@@ -21,9 +21,11 @@ import (
 	"fmt"
 
 	terraformer "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer"
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -69,8 +71,10 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup"), "('%s')", name).WithStopwatch().Entering().Exiting()
 
 	asg, xerr := p.InspectSecurityGroup(ctx, name)
 	if xerr != nil {
@@ -180,8 +184,17 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 }
 
 func (p *provider) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	// TODO implement me
-	panic("implement me")
+	if valid.IsNull(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+	_, sgLabel, xerr := iaasapi.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup"), "(%s)", sgLabel).WithStopwatch().Entering().Exiting()
+
+	return p.MiniStack.InspectSecurityGroup(ctx, sgParam)
 }
 
 func (p *provider) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
@@ -189,9 +202,55 @@ func (p *provider) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.Secur
 	panic("implement me")
 }
 
-func (p *provider) DeleteSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) fail.Error {
-	// TODO implement me
-	panic("implement me")
+func (p *provider) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) fail.Error {
+	if valid.IsNull(p) {
+		return fail.InvalidInstanceError()
+	}
+	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup"), "(%s)", sgLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	asg, xerr = p.InspectSecurityGroup(ctx, asg)
+	if xerr != nil {
+		return xerr
+	}
+
+	// Make sure the Snippet data is here...
+	xerr = asg.AddOptions(abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
+	if xerr != nil {
+		return xerr
+	}
+
+	// Instanciates terraform renderer
+	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
+	if xerr != nil {
+		return xerr
+	}
+	defer func() { _ = renderer.Close() }()
+
+	// Sets env vars necessary for OVH provider
+	xerr = renderer.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
+	if xerr != nil {
+		return xerr
+	}
+
+	// Creates the terraform definition file
+	def, xerr := renderer.Assemble(asg)
+	if xerr != nil {
+		return xerr
+	}
+
+	// Instruct terraform to destroy the Security Group
+	xerr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(asg.GetName()))
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to delete network %s", asg.ID)
+	}
+
+	return nil
 }
 
 func (p *provider) AddRuleToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {

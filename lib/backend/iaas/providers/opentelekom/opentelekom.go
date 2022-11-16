@@ -51,6 +51,9 @@ const (
 var (
 	capabilities = iaasapi.Capabilities{PrivateVirtualIP: true}
 	dnsServers   = []string{"1.1.1.1"}
+
+	_ iaasapi.Provider                    = (*provider)(nil) // Verify that *provider implements iaas.Provider (at compile time)
+	_ providers.ReservedForTerraformerUse = (*provider)(nil)
 )
 
 // provider is the providerementation of the OpenTelekom provider
@@ -358,6 +361,21 @@ func (p provider) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.E
 	}
 
 	return nil, fail.NotFoundError("this provider has no default network")
+}
+
+func (p *provider) ConsolidateNetworkSnippet(_ *abstract.Network) {
+}
+
+func (p *provider) ConsolidateSubnetSnippet(_ *abstract.Subnet) {
+}
+
+func (p *provider) ConsolidateSecurityGroupSnippet(_ *abstract.SecurityGroup) {
+}
+
+func (p *provider) ConsolidateHostSnippet(_ *abstract.HostCore) {
+}
+
+func (p *provider) ConsolidateVolumeSnippet(_ *abstract.Volume) {
 }
 
 // init registers the opentelekom provider

@@ -21,6 +21,7 @@ import (
 	"net"
 
 	terraformer "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -166,14 +167,14 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && req.CleanOnFailure() {
 			logrus.WithContext(ctx).Infof("cleaning up on failure, deleting Subnet '%s'", req.Name)
-			derr := renderer.Destroy(ctx, def)
+			derr := renderer.Destroy(ctx, def, api.WithTarget(req.Name))
 			if derr != nil {
 				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()
 
-	abstractSubnet.ID, xerr = unmarshalOutput[string](outputs["subnet_id"])
+	abstractSubnet.ID, xerr = unmarshalOutput[string](outputs["subnet_"+req.Name+"_id"])
 	if xerr != nil {
 		return nil, xerr
 	}

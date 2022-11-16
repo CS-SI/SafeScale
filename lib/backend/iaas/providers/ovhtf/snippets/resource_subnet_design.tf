@@ -1,14 +1,14 @@
 resource "openstack_networking_subnet_v2" "{{ .Resource.Name }}" {
     provider                = openstack.ovh
     name                    = "{{ .Resource.Name }}"
-    network_id              = "{{ .Resource.NetworkID }}"
+    network_id              = "{{ .Resource.Network }}"
     cidr                    = "{{ .Resource.CIDR }}"
-    ip_version              = "{{ .Resource.IPVersion }}"
+    ip_version              = {{ eq .Resource.IPVersion 6 | ternary 6 4 }}
     region                  = "{{ .Provider.Authentication.Region }}"
     enable_dhcp             = true
 }
 
-output "subnet_id" {
+output "subnet_{{ .Resource.Name }}_id" {
     value = "${openstack_networking_subnet_v2.{{ .Resource.Name }}.id}"
 }
 
@@ -26,7 +26,7 @@ resource "openstack_networking_router_interface_v2" "router_interface_1" {
     subnet_id = "${openstack_networking_subnet_v2.{{ .Resource.Name }}.id}"
 }
 
-output "router_id" {
+output "router_{{ .Resource.Name }}_id" {
     value = "${openstack_networking_router_v2.{{ .Resource.Name }}.id}"
 }
 {{- end }}

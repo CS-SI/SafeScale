@@ -7,7 +7,7 @@ resource "openstack_networking_secgroup_v2" "{{ .Resource.Name }}" {
     delete_default_rules    = true
 }
 
-output "id" {
+output "sg_{{ .Resource.Name }}_id" {
     value                   = ["${openstack_networking_secgroup_v2.{{ .Resource.Name }}.id}"]
 }
 
@@ -25,7 +25,7 @@ resource "openstack_networking_secgroup_rule_v2" "{{ .Resource.Name }}-rule-{{ $
     security_group_id       = ${openstack_networking_secgroup_v2.{{ .Resource.Name }}.id}
 }
 
-output "rule_{{ $k }}_id" {
+output "sg_{{ .Resource.Name }}_rule_{{ $k }}_id" {
     value = "${openstack_networking_secgroup_rule_v2.{{ .Resource.Name }}-rule-{{ $k }}.id}"]
 }
 {{ -end }}

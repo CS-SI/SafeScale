@@ -557,6 +557,7 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 	if err != nil {
 		return fail.Wrap(err, "failed to init terraform executor")
 	}
+
 	logrus.Trace("terraform init ran successfully.")
 
 	// output, err := executor.Validate(ctx)
@@ -567,6 +568,7 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 	// logrus.Trace("terraform validate ran successfully.")
 
 	// If targets are passed as options, we need to narrow the destruct to these targets only
+	targets := []string{}
 	value, xerr := o.Load(api.OptionTargets)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -575,15 +577,16 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 		default:
 			return xerr
 		}
-	}
-	targets, err := lang.Cast[[]string](value)
-	if err != nil {
-		switch err.(type) {
-		case *fail.ErrNotFound:
-			// continue
-			debug.IgnoreError(err)
-		default:
-			return fail.Wrap(err)
+	} else {
+		targets, err = lang.Cast[[]string](value)
+		if err != nil {
+			switch err.(type) {
+			case *fail.ErrNotFound:
+				// continue
+				debug.IgnoreError(err)
+			default:
+				return fail.Wrap(err)
+			}
 		}
 	}
 

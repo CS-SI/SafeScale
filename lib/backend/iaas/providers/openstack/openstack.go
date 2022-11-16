@@ -51,6 +51,9 @@ var (
 		PrivateVirtualIP: true,
 	}
 	dnsServers = []string{"8.8.8.8", "1.1.1.1"}
+
+	_ iaasapi.Provider                    = (*provider)(nil) // Verify that *provider implements iaas.Provider (at compile time)
+	_ providers.ReservedForTerraformerUse = (*provider)(nil)
 )
 
 // provider is the implementation of the openstack provider respecting provider interface
@@ -331,6 +334,21 @@ func (p provider) HasDefaultNetwork() (bool, fail.Error) {
 // DefaultNetwork returns the *abstract.Network corresponding to the default network
 func (p provider) DefaultNetwork(context.Context) (*abstract.Network, fail.Error) {
 	return nil, fail.NotFoundError("this provider has no default network")
+}
+
+func (p *provider) ConsolidateNetworkSnippet(_ *abstract.Network) {
+}
+
+func (p *provider) ConsolidateSubnetSnippet(_ *abstract.Subnet) {
+}
+
+func (p *provider) ConsolidateSecurityGroupSnippet(_ *abstract.SecurityGroup) {
+}
+
+func (p *provider) ConsolidateHostSnippet(_ *abstract.HostCore) {
+}
+
+func (p *provider) ConsolidateVolumeSnippet(_ *abstract.Volume) {
 }
 
 // init registers the openstack provider

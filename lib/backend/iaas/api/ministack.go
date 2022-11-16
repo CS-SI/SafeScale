@@ -62,8 +62,8 @@ type MiniStack interface {
 	ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error)
 	// // CreateSecurityGroup creates a security group
 	// CreateSecurityGroup(ctx context.Context, networkRef, name, description string, rules abstract.SecurityGroupRules) (*abstract.SecurityGroup, fail.Error)
-	// // InspectSecurityGroup returns information about a security group
-	// InspectSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
+	// InspectSecurityGroup returns information about a security group
+	InspectSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
 	// // ClearSecurityGroup removes rules from group
 	// ClearSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
 	// // DeleteSecurityGroup deletes a security group and all its rules

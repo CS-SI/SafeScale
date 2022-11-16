@@ -716,19 +716,45 @@ func wouldOverlap(allSubnets []*abstract.Subnet, subnet net.IPNet) fail.Error {
 }
 
 // checkUnicity checks if the Subnet name is not already used
+// FIXME: optimization opportunity: use scope resource list to prevent remote read?
 func (instance *Subnet) checkUnicity(ctx context.Context, req abstract.SubnetRequest) fail.Error {
 	_, xerr := LoadSubnet(ctx, req.NetworkID, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return nil
+			// Check if a subnet with this name already exist globally
+			xerr = instance.LookupByName(ctx, req.Name)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					myjob, xerr := jobapi.FromContext(ctx)
+					if xerr != nil {
+						return xerr
+					}
+
+					_, xerr = myjob.Service().InspectSubnetByName(ctx, req.NetworkID, req.Name)
+					if xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							return nil
+						default:
+							return fail.DuplicateError("found a Subnet named '%s' (not managed by SafeScale)", req.Name)
+						}
+					}
+
+					return nil
+				default:
+					return xerr
+				}
+			}
+
 		default:
 			return xerr
 		}
 	}
 
-	return fail.DuplicateError("Subnet '%s' already exists", req.Name)
+	return fail.DuplicateError("found an existing Subnet named '%s'", req.Name)
 }
 
 // validateNetwork verifies the Network exists and make sure req.Network field is an ID

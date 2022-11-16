@@ -40,7 +40,7 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*ab
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.aws")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcDescribeSecurityGroups(ctx, aws.String(networkRef), nil)
@@ -69,7 +69,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.aws"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	network, xerr := s.InspectNetwork(ctx, networkRef)
@@ -217,13 +217,18 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (s stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (ferr fail.Error) {
+	if valid.IsNull(s) {
 		return fail.InvalidInstanceError()
 	}
-	if valid.IsNil(asg) {
-		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
+	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return xerr
 	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.aws"), "(%s)", sgLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	if !asg.IsConsistent() {
 		var xerr fail.Error
 		asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
@@ -231,9 +236,6 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGr
 			return xerr
 		}
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	return s.rpcDeleteSecurityGroup(ctx, aws.String(asg.ID))
 }
@@ -248,7 +250,7 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Securit
 		return nil, xerr
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.aws"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if asg.ID != "" {
@@ -358,7 +360,7 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityG
 		}
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.aws"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.aws"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcDescribeSecurityGroupByID(ctx, aws.String(asg.ID))
@@ -398,7 +400,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam iaasapi.Secur
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.aws"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	ingressPermissions, egressPermissions, xerr := s.fromAbstractSecurityGroupRules(*asg, abstract.SecurityGroupRules{rule})
@@ -449,7 +451,7 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam iaasapi.
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, '%s')", asg.ID, rule.Description).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.aws"), "(%s, '%s')", asg.ID, rule.Description).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	ingressPermissions, egressPermissions, xerr := s.fromAbstractSecurityGroupRules(*asg, abstract.SecurityGroupRules{rule})
@@ -465,20 +467,20 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam iaasapi.
 }
 
 // deleteRules deletes the rules from the security group
-func (s stack) deleteRules(ctx context.Context, asg *abstract.SecurityGroup, ingress, egress []*ec2.IpPermission) fail.Error {
+func (instance stack) deleteRules(ctx context.Context, asg *abstract.SecurityGroup, ingress, egress []*ec2.IpPermission) fail.Error {
 	// Add permissions to the security group
 	if len(ingress) > 0 {
-		if xerr := s.rpcRevokeSecurityGroupIngress(ctx, aws.String(asg.ID), ingress); xerr != nil {
+		if xerr := instance.rpcRevokeSecurityGroupIngress(ctx, aws.String(asg.ID), ingress); xerr != nil {
 			return fail.Wrap(xerr, "failed to delete ingress rules from Security Group '%s'", asg.Name)
 		}
 	}
 
 	if len(egress) > 0 {
-		xerr := s.rpcRevokeSecurityGroupEgress(ctx, aws.String(asg.ID), egress)
+		xerr := instance.rpcRevokeSecurityGroupEgress(ctx, aws.String(asg.ID), egress)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				// consider a missing rule(s) as a successful deletion
+				// consider a missing rule(instance) as a successful deletion
 				debug.IgnoreError(xerr)
 			default:
 				return fail.Wrap(xerr, "failed to delete egress rules from Security Group '%s'", asg.Name)
@@ -490,12 +492,12 @@ func (s stack) deleteRules(ctx context.Context, asg *abstract.SecurityGroup, ing
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to Hosts by provider
-func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
-	if valid.IsNull(s) {
+func (instance stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
+	if valid.IsNull(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	opts, err := s.ConfigurationOptions()
+	opts, err := instance.ConfigurationOptions()
 	if err != nil {
 		return "", err
 	}
@@ -505,12 +507,12 @@ func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Er
 
 // EnableSecurityGroup enables a Security Group
 // Does actually nothing for openstack
-func (s stack) EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
+func (instance stack) EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
 	return fail.NotAvailableError("aws cannot enable a Security Group")
 }
 
 // DisableSecurityGroup disables a Security Group
 // Does actually nothing for openstack
-func (s stack) DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
+func (instance stack) DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
 	return fail.NotAvailableError("aws cannot disable a Security Group")
 }

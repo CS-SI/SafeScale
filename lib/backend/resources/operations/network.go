@@ -291,7 +291,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 			return xerr
 		}
 
-		// Verify if the subnet already exist and in this case is not managed by SafeScale
+		// Verify if the network already exist and in this case is not managed by SafeScale
 		_, xerr = svc.InspectNetworkByName(ctx, req.Name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {

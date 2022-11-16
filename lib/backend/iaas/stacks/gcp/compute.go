@@ -195,9 +195,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 	hostMustHavePublicIP := request.PublicIP || request.Single
 
 	if len(subnets) == 0 {
-		return nil, nil, fail.InvalidRequestError(
-			"the host %s must be on at least one network (even if public)", resourceName,
-		)
+		return nil, nil, fail.InvalidRequestError("the host %s must be on at least one network (even if public)", resourceName)
 	}
 
 	// If no key pair is supplied create one
@@ -475,7 +473,6 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.Hos
 			"must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field",
 		)
 	}
-
 	ahfid, err := ahf.GetID()
 	if err != nil {
 		return fail.ConvertError(err)
@@ -775,8 +772,6 @@ func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gr
 
 // StartHost starts the host identified by id
 func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostParam).Entering().Exiting()
-
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -784,6 +779,8 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) f
 	if xerr != nil {
 		return xerr
 	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostParam).Entering().Exiting()
 
 	return s.rpcStartInstance(ctx, ahf.ID)
 }
@@ -810,11 +807,11 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 
 // GetHostState returns the host identified by id
 func (s stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter) (hoststate.Enum, fail.Error) {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-
 	if valid.IsNil(s) {
 		return hoststate.Error, fail.InvalidInstanceError()
 	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
 	host, xerr := s.InspectHost(ctx, hostParam)
 	if xerr != nil {
@@ -870,8 +867,6 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 
 // BindSecurityGroupToHost ...
 func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) (ferr fail.Error) {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -889,6 +884,8 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 		}
 	}
 
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+
 	ahfid, err := ahf.GetID()
 	if err != nil {
 		return fail.ConvertError(err)
@@ -904,12 +901,9 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 
 // UnbindSecurityGroupFromHost unbinds a Security Group from a Host
 func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) (ferr fail.Error) {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return xerr
@@ -921,6 +915,8 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.
 	if xerr != nil {
 		return xerr
 	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
 	ahfid, err := ahf.GetID()
 	if err != nil {

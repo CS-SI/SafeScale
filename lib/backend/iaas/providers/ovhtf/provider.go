@@ -98,6 +98,9 @@ var (
 
 	//go:embed snippets
 	snippets embed.FS // contains embedded files used by the provider for any purpose
+
+	_ iaasapi.Provider                    = (*provider)(nil) // Verify that *provider implements iaas.Provider (at compile time)
+	_ providers.ReservedForTerraformerUse = (*provider)(nil)
 )
 
 // provider is the provider implementation of the OVH provider
