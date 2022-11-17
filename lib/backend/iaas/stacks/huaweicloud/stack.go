@@ -645,7 +645,7 @@ func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gr
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -665,7 +665,7 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) f
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -685,7 +685,7 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -714,7 +714,7 @@ func (s stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, 
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	_ /*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	_ /*ahf*/, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -734,7 +734,7 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, hostLabel, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -836,7 +836,7 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -871,7 +871,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -902,7 +902,7 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.
 	if xerr != nil {
 		return xerr
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}

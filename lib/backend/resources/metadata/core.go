@@ -65,7 +65,7 @@ type Core struct {
 }
 
 // NewCore creates an instance of Core
-func NewCore(ctx context.Context, method string, kind string, path string, instance clonable.Clonable) (_ *Core, ferr fail.Error) {
+func NewCore(ctx context.Context, method string, kind string, path string, abstractRsc clonable.Clonable) (_ *Core, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -90,7 +90,7 @@ func NewCore(ctx context.Context, method string, kind string, path string, insta
 		return nil, err
 	}
 
-	protected, cerr := shielded.NewShielded(instance)
+	protected, cerr := shielded.NewShielded(abstractRsc)
 	if cerr != nil {
 		return nil, fail.Wrap(cerr)
 	}
@@ -113,27 +113,27 @@ func NewCore(ctx context.Context, method string, kind string, path string, insta
 }
 
 // IsNull returns true if the Core instance represents the null value for Core
-func (myself *Core) IsNull() bool {
-	return myself == nil || myself.kind == ""
+func (instance *Core) IsNull() bool {
+	return instance == nil || instance.kind == ""
 }
 
 // Service returns the iaasapi.Service used to create/load the persistent object
-func (myself *Core) Service() iaasapi.Service {
-	return myself.folder.Service()
+func (instance *Core) Service() iaasapi.Service {
+	return instance.folder.Service()
 }
 
-func (myself *Core) Job() jobapi.Job {
-	return myself.folder.Job()
+func (instance *Core) Job() jobapi.Job {
+	return instance.folder.Job()
 }
 
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
-func (myself *Core) GetID() (string, error) {
-	if valid.IsNull(myself) {
+func (instance *Core) GetID() (string, error) {
+	if valid.IsNull(instance) {
 		return "--invalid--", fail.InvalidInstanceError()
 	}
 
-	val, xerr := myself.getID()
+	val, xerr := instance.getID()
 	if xerr != nil {
 		return "--invalid--", xerr
 	}
@@ -141,12 +141,12 @@ func (myself *Core) GetID() (string, error) {
 	return val, nil
 }
 
-func (myself *Core) getID() (string, fail.Error) {
-	if myself == nil {
+func (instance *Core) getID() (string, fail.Error) {
+	if instance == nil {
 		return "", fail.InvalidInstanceError()
 	}
 
-	id, ok := myself.id.Load().(string) // nolint
+	id, ok := instance.id.Load().(string) // nolint
 	if !ok {
 		return "", fail.InvalidInstanceError()
 	}
@@ -156,13 +156,13 @@ func (myself *Core) getID() (string, fail.Error) {
 
 // GetName returns the name of the data protected
 // satisfies interface data.Identifiable
-func (myself *Core) GetName() string {
-	if valid.IsNull(myself) {
+func (instance *Core) GetName() string {
+	if valid.IsNull(instance) {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return "--invalid--"
 	}
 
-	name, xerr := myself.getName()
+	name, xerr := instance.getName()
 	if xerr != nil {
 		logrus.Error(xerr.Error())
 		return "--invalid--"
@@ -171,12 +171,12 @@ func (myself *Core) GetName() string {
 	return name
 }
 
-func (myself *Core) getName() (string, fail.Error) {
-	if myself == nil {
+func (instance *Core) getName() (string, fail.Error) {
+	if instance == nil {
 		return "", fail.InvalidInstanceError()
 	}
 
-	name, ok := myself.name.Load().(string) // nolint
+	name, ok := instance.name.Load().(string) // nolint
 	if !ok {
 		return "", fail.InvalidInstanceError()
 	}
@@ -184,12 +184,12 @@ func (myself *Core) getName() (string, fail.Error) {
 	return name, nil
 }
 
-func (myself *Core) IsTaken() bool {
-	if valid.IsNull(myself) {
+func (instance *Core) IsTaken() bool {
+	if valid.IsNull(instance) {
 		return false
 	}
 
-	taken, ok := myself.taken.Load().(bool)
+	taken, ok := instance.taken.Load().(bool)
 	if !ok {
 		return false
 	}
@@ -198,25 +198,25 @@ func (myself *Core) IsTaken() bool {
 }
 
 // Kind returns the kind of object served
-func (myself *Core) Kind() string {
-	if valid.IsNull(myself) {
+func (instance *Core) Kind() string {
+	if valid.IsNull(instance) {
 		logrus.Errorf(fail.InconsistentError("invalid call of Core.Kind() from null value").Error())
 		return "-- invalid --"
 	}
 
-	return myself.kind
+	return instance.kind
 }
 
 // Inspect protects the data for shared read
-func (myself *Core) Inspect(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
-	if valid.IsNil(myself) {
+func (instance *Core) Inspect(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
-	if myself.properties == nil {
-		return fail.InvalidInstanceContentError("myself.properties", "cannot be nil")
+	if instance.properties == nil {
+		return fail.InvalidInstanceContentError("instance.properties", "cannot be nil")
 	}
 
 	o, xerr := options.New(opts...)
@@ -247,7 +247,7 @@ func (myself *Core) Inspect(inctx context.Context, callback AnyResourceCallback,
 			defer fail.OnPanic(&ferr)
 			var xerr fail.Error
 
-			timings, xerr := myself.Service().Timings()
+			timings, xerr := instance.Service().Timings()
 			if xerr != nil {
 				return xerr
 			}
@@ -262,9 +262,9 @@ func (myself *Core) Inspect(inctx context.Context, callback AnyResourceCallback,
 						default:
 						}
 
-						myself.Lock()
-						xerr = myself.unsafeReload(ctx)
-						myself.Unlock() // nolint
+						instance.Lock()
+						xerr = instance.unsafeReload(ctx)
+						instance.Unlock() // nolint
 						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
 							return fail.Wrap(xerr, "failed to reload metadata")
@@ -281,8 +281,8 @@ func (myself *Core) Inspect(inctx context.Context, callback AnyResourceCallback,
 				}
 			}
 
-			myself.RLock()
-			defer myself.RUnlock()
+			instance.RLock()
+			defer instance.RUnlock()
 
 			xerr = retry.WhileUnsuccessfulWithLimitedRetries(
 				func() error {
@@ -292,8 +292,8 @@ func (myself *Core) Inspect(inctx context.Context, callback AnyResourceCallback,
 					default:
 					}
 
-					return myself.shielded.Inspect(func(p clonable.Clonable) fail.Error {
-						return callback(p, myself.properties)
+					return instance.shielded.Inspect(func(p clonable.Clonable) fail.Error {
+						return callback(p, instance.properties)
 					})
 				},
 				timings.SmallDelay(),
@@ -318,8 +318,8 @@ func (myself *Core) Inspect(inctx context.Context, callback AnyResourceCallback,
 }
 
 // InspectProperty allows to inspect directly a single property
-func (myself *Core) InspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-	return myself.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+func (instance *Core) InspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
+	return instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(property, callback)
 	}, opts...)
 }
@@ -327,14 +327,14 @@ func (myself *Core) InspectProperty(ctx context.Context, property string, callba
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change through time).
-func (myself *Core) Review(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
+func (instance *Core) Review(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
 	opts = append(opts, WithoutReload())
-	return myself.Inspect(inctx, callback, opts...)
+	return instance.Inspect(inctx, callback, opts...)
 }
 
 // ReviewProperty allows to review directly a single property
-func (myself *Core) ReviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-	return myself.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+func (instance *Core) ReviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
+	return instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(property, callback)
 	}, opts...)
 }
@@ -342,22 +342,22 @@ func (myself *Core) ReviewProperty(ctx context.Context, property string, callbac
 // Alter protects the data for exclusive write
 // Valid options are :
 // - WithoutReload() = disable reloading from metadata storage
-func (myself *Core) Alter(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
-	if valid.IsNil(myself) {
+func (instance *Core) Alter(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
-	if myself.shielded == nil {
-		return fail.InvalidInstanceContentError("myself.shielded", "cannot be nil")
+	if instance.shielded == nil {
+		return fail.InvalidInstanceContentError("instance.shielded", "cannot be nil")
 	}
-	if name, err := myself.getName(); err != nil {
+	if name, err := instance.getName(); err != nil {
 		return fail.InconsistentError("uninitialized metadata should not be altered")
 	} else if name == "" {
 		return fail.InconsistentError("uninitialized metadata should not be altered")
 	}
-	if id, err := myself.getID(); err != nil {
+	if id, err := instance.getID(); err != nil {
 		return fail.InconsistentError("uninitialized metadata should not be altered")
 	} else if id == "" {
 		return fail.InconsistentError("uninitialized metadata should not be altered")
@@ -370,14 +370,19 @@ func (myself *Core) Alter(inctx context.Context, callback AnyResourceCallback, o
 
 	noReload, xerr := options.Value[bool](o, OptionWithoutReloadKey)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return xerr
+		}
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.Lock()
-	defer myself.Unlock()
+	instance.Lock()
+	defer instance.Unlock()
 
 	type result struct {
 		rErr fail.Error
@@ -390,8 +395,8 @@ func (myself *Core) Alter(inctx context.Context, callback AnyResourceCallback, o
 			var xerr fail.Error
 
 			// Make sure myself.properties is populated
-			if myself.properties == nil {
-				myself.properties, xerr = serialize.NewJSONProperties("resources." + myself.kind)
+			if instance.properties == nil {
+				instance.properties, xerr = serialize.NewJSONProperties("resources." + instance.kind)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -400,15 +405,15 @@ func (myself *Core) Alter(inctx context.Context, callback AnyResourceCallback, o
 
 			// Reload reloads data from object storage to be sure to have the last revision
 			if !noReload {
-				xerr = myself.unsafeReload(ctx)
+				xerr = instance.unsafeReload(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return fail.Wrap(xerr, "failed to unsafeReload metadata")
 				}
 			}
 
-			xerr = myself.shielded.Alter(func(p clonable.Clonable) fail.Error {
-				return callback(p, myself.properties)
+			xerr = instance.shielded.Alter(func(p clonable.Clonable) fail.Error {
+				return callback(p, instance.properties)
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -420,9 +425,9 @@ func (myself *Core) Alter(inctx context.Context, callback AnyResourceCallback, o
 				}
 			}
 
-			myself.committed = false
+			instance.committed = false
 
-			xerr = myself.write(ctx)
+			xerr = instance.write(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -443,8 +448,8 @@ func (myself *Core) Alter(inctx context.Context, callback AnyResourceCallback, o
 }
 
 // AlterProperty allows to alter directly a single property
-func (myself *Core) AlterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-	return myself.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+func (instance *Core) AlterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
+	return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(property, callback)
 	}, opts...)
 }
@@ -456,28 +461,28 @@ func (myself *Core) AlterProperty(ctx context.Context, property string, callback
 // - fail.ErrInvalidInstance
 // - fail.ErrInvalidParameter
 // - fail.ErrNotAvailable if the Core instance already carries a data
-func (myself *Core) Carry(inctx context.Context, abstractResource clonable.Clonable) (_ fail.Error) {
-	if myself == nil {
+func (instance *Core) Carry(inctx context.Context, abstractResource clonable.Clonable) (_ fail.Error) {
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(myself) && myself.IsTaken() {
+	if !valid.IsNil(instance) && instance.IsTaken() {
 		return fail.InvalidRequestError("cannot carry, already carries something")
 	}
 	if abstractResource == nil {
 		return fail.InvalidParameterCannotBeNilError("abstractResource")
 	}
-	if myself.shielded == nil {
-		return fail.InvalidInstanceContentError("myself.shielded", "cannot be nil")
+	if instance.shielded == nil {
+		return fail.InvalidInstanceContentError("instance.shielded", "cannot be nil")
 	}
-	if myself.loaded {
+	if instance.loaded {
 		return fail.NotAvailableError("already carrying a value")
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.Lock()
-	defer myself.Unlock()
+	instance.Lock()
+	defer instance.Unlock()
 
 	type result struct {
 		rErr fail.Error
@@ -490,22 +495,22 @@ func (myself *Core) Carry(inctx context.Context, abstractResource clonable.Clona
 			var xerr fail.Error
 
 			var cerr error
-			myself.shielded, cerr = shielded.NewShielded(abstractResource)
+			instance.shielded, cerr = shielded.NewShielded(abstractResource)
 			if cerr != nil {
 				return fail.Wrap(cerr)
 			}
 
-			myself.loaded = true
+			instance.loaded = true
 
-			xerr = myself.updateIdentity()
+			xerr = instance.updateIdentity()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 
-			myself.committed = false
+			instance.committed = false
 
-			xerr = myself.write(ctx)
+			xerr = instance.write(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -548,9 +553,9 @@ func (myself *Core) Carry(inctx context.Context, abstractResource clonable.Clona
 }
 
 // updateIdentity updates instance cached identity
-func (myself *Core) updateIdentity() fail.Error {
-	if myself.loaded {
-		issue := myself.shielded.Alter(func(p clonable.Clonable) fail.Error {
+func (instance *Core) updateIdentity() fail.Error {
+	if instance.loaded {
+		issue := instance.shielded.Alter(func(p clonable.Clonable) fail.Error {
 			ident, err := lang.Cast[data.Identifiable](p)
 			if err != nil {
 				return fail.InconsistentError("'data.Identifiable' expected, '%s' provided", reflect.TypeOf(p).String())
@@ -561,19 +566,19 @@ func (myself *Core) updateIdentity() fail.Error {
 				return fail.ConvertError(err)
 			}
 
-			if loaded, ok := myself.id.Load().(string); ok {
+			if loaded, ok := instance.id.Load().(string); ok {
 				if idd == loaded {
 					return nil
 				}
 			}
 
-			if myself.kindSplittedStore {
-				myself.id.Store(idd)
+			if instance.kindSplittedStore {
+				instance.id.Store(idd)
 			} else {
-				myself.id.Store(ident.GetName())
+				instance.id.Store(ident.GetName())
 			}
-			myself.name.Store(ident.GetName())
-			myself.taken.Store(true)
+			instance.name.Store(ident.GetName())
+			instance.taken.Store(true)
 
 			return nil
 		})
@@ -588,22 +593,22 @@ func (myself *Core) updateIdentity() fail.Error {
 }
 
 // Read gets the data from Object Storage
-func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
-	if myself == nil {
+func (instance *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
-	if myself.loaded {
+	if instance.loaded {
 		return fail.NotAvailableError("metadata is already carrying a value")
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.RLock()
-	defer myself.RUnlock()
+	instance.RLock()
+	defer instance.RUnlock()
 
 	type result struct {
 		rErr fail.Error
@@ -615,18 +620,18 @@ func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 			defer fail.OnPanic(&ferr)
 			var xerr fail.Error
 
-			if !myself.kindSplittedStore {
-				xerr = myself.folder.Lookup(ctx, "", ref)
+			if !instance.kindSplittedStore {
+				xerr = instance.folder.Lookup(ctx, "", ref)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
-						return fail.NotFoundError("%s was NOT found in the bucket", myself.folder.AbsolutePath("", ref))
+						return fail.NotFoundError("%s was NOT found in the bucket", instance.folder.AbsolutePath("", ref))
 					default:
 						return xerr
 					}
 				}
 
-				xerr = myself.readByName(ctx, ref)
+				xerr = instance.readByName(ctx, ref)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -635,7 +640,7 @@ func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 				goto commit
 			}
 
-			xerr = myself.folder.Lookup(ctx, byNameFolderName, ref)
+			xerr = instance.folder.Lookup(ctx, byNameFolderName, ref)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -644,7 +649,7 @@ func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 					return xerr
 				}
 			} else {
-				xerr := myself.readByName(ctx, ref)
+				xerr := instance.readByName(ctx, ref)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -653,7 +658,7 @@ func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 				goto commit
 			}
 
-			xerr = myself.folder.Lookup(ctx, byIDFolderName, ref)
+			xerr = instance.folder.Lookup(ctx, byIDFolderName, ref)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -662,7 +667,7 @@ func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 					return xerr
 				}
 			} else {
-				xerr := myself.readByID(ctx, ref)
+				xerr := instance.readByID(ctx, ref)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -671,18 +676,18 @@ func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 				goto commit
 			}
 
-			return fail.NotFoundError("neither %s nor %s were found in the bucket", myself.folder.AbsolutePath(byNameFolderName, ref), myself.folder.AbsolutePath(byIDFolderName, ref))
+			return fail.NotFoundError("neither %s nor %s were found in the bucket", instance.folder.AbsolutePath(byNameFolderName, ref), instance.folder.AbsolutePath(byIDFolderName, ref))
 
 		commit:
-			myself.loaded = true
-			myself.committed = true
+			instance.loaded = true
+			instance.committed = true
 
-			xerr = myself.updateIdentity()
+			xerr = instance.updateIdentity()
 			if xerr != nil {
 				return xerr
 			}
 
-			return myself.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			return instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
 				myjob, innerXErr := jobapi.FromContext(ctx)
 				if innerXErr != nil {
 					return innerXErr
@@ -721,12 +726,12 @@ func (myself *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 }
 
 // ReadByID reads a metadata identified by ID from Object Storage
-func (myself *Core) ReadByID(inctx context.Context, id string) (_ fail.Error) {
+func (instance *Core) ReadByID(inctx context.Context, id string) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.RLock()
-	defer myself.RUnlock()
+	instance.RLock()
+	defer instance.RUnlock()
 
 	type result struct {
 		rErr fail.Error
@@ -737,22 +742,22 @@ func (myself *Core) ReadByID(inctx context.Context, id string) (_ fail.Error) {
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			if myself == nil {
+			if instance == nil {
 				return fail.InvalidInstanceError()
 			}
 			if id = strings.TrimSpace(id); id == "" {
 				return fail.InvalidParameterError("id", "cannot be empty string")
 			}
-			if myself.loaded {
+			if instance.loaded {
 				return fail.NotAvailableError("metadata is already carrying a value")
 			}
 
-			timings, xerr := myself.Service().Timings()
+			timings, xerr := instance.Service().Timings()
 			if xerr != nil {
 				return xerr
 			}
 
-			if myself.kindSplittedStore {
+			if instance.kindSplittedStore {
 				xerr = retry.WhileUnsuccessful(
 					func() error {
 						select {
@@ -761,7 +766,7 @@ func (myself *Core) ReadByID(inctx context.Context, id string) (_ fail.Error) {
 						default:
 						}
 
-						if innerXErr := myself.readByID(ctx, id); innerXErr != nil {
+						if innerXErr := instance.readByID(ctx, id); innerXErr != nil {
 							switch innerXErr.(type) {
 							case *fail.ErrNotFound: // If not found, stop immediately
 								return retry.StopRetryError(innerXErr)
@@ -785,7 +790,7 @@ func (myself *Core) ReadByID(inctx context.Context, id string) (_ fail.Error) {
 						default:
 						}
 
-						if innerXErr := myself.readByName(ctx, id); innerXErr != nil {
+						if innerXErr := instance.readByName(ctx, id); innerXErr != nil {
 							switch innerXErr.(type) {
 							case *fail.ErrNotFound: // If not found, stop immediately
 								return retry.StopRetryError(innerXErr)
@@ -805,18 +810,18 @@ func (myself *Core) ReadByID(inctx context.Context, id string) (_ fail.Error) {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *retry.ErrTimeout:
-					return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", myself.kind, id)
+					return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", instance.kind, id)
 				case *retry.ErrStopRetry:
-					return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", myself.kind, id)
+					return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", instance.kind, id)
 				default:
-					return fail.Wrap(xerr, "failed to read %s by id %s", myself.kind, id)
+					return fail.Wrap(xerr, "failed to read %s by id %s", instance.kind, id)
 				}
 			}
 
-			myself.loaded = true
-			myself.committed = true
+			instance.loaded = true
+			instance.committed = true
 
-			return myself.updateIdentity()
+			return instance.updateIdentity()
 		}()
 		chRes <- result{gerr}
 	}()
@@ -831,7 +836,7 @@ func (myself *Core) ReadByID(inctx context.Context, id string) (_ fail.Error) {
 }
 
 // readByID reads a metadata identified by ID from Object Storage
-func (myself *Core) readByID(inctx context.Context, id string) fail.Error {
+func (instance *Core) readByID(inctx context.Context, id string) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -845,11 +850,11 @@ func (myself *Core) readByID(inctx context.Context, id string) fail.Error {
 			defer fail.OnPanic(&ferr)
 
 			var path string
-			if myself.kindSplittedStore {
+			if instance.kindSplittedStore {
 				path = byIDFolderName
 			}
 
-			timings, xerr := myself.Service().Timings()
+			timings, xerr := instance.Service().Timings()
 			if xerr != nil {
 				return xerr
 			}
@@ -861,7 +866,7 @@ func (myself *Core) readByID(inctx context.Context, id string) fail.Error {
 				default:
 				}
 
-				werr := myself.folder.Read(
+				werr := instance.folder.Read(
 					ctx, path, id,
 					func(buf []byte) fail.Error {
 						select {
@@ -870,16 +875,16 @@ func (myself *Core) readByID(inctx context.Context, id string) fail.Error {
 						default:
 						}
 
-						if innerXErr := myself.unsafeDeserialize(ctx, buf); innerXErr != nil {
+						if innerXErr := instance.unsafeDeserialize(ctx, buf); innerXErr != nil {
 							switch innerXErr.(type) {
 							case *fail.ErrNotAvailable:
-								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", instance.kind)
 							case *fail.ErrSyntax:
-								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", instance.kind)
 							case *fail.ErrInconsistent, *fail.ErrInvalidParameter, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
 								return retry.StopRetryError(innerXErr)
 							default:
-								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", myself.kind)
+								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", instance.kind)
 							}
 						}
 						return nil
@@ -917,7 +922,7 @@ func (myself *Core) readByID(inctx context.Context, id string) fail.Error {
 }
 
 // readByName reads a metadata identified by name
-func (myself *Core) readByName(inctx context.Context, name string) fail.Error {
+func (instance *Core) readByName(inctx context.Context, name string) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -931,11 +936,11 @@ func (myself *Core) readByName(inctx context.Context, name string) fail.Error {
 			defer fail.OnPanic(&ferr)
 
 			var path string
-			if myself.kindSplittedStore {
+			if instance.kindSplittedStore {
 				path = byNameFolderName
 			}
 
-			timings, xerr := myself.Service().Timings()
+			timings, xerr := instance.Service().Timings()
 			if xerr != nil {
 				return xerr
 			}
@@ -947,7 +952,7 @@ func (myself *Core) readByName(inctx context.Context, name string) fail.Error {
 						return retry.StopRetryError(ctx.Err())
 					default:
 					}
-					werr := myself.folder.Read(
+					werr := instance.folder.Read(
 						ctx, path, name,
 						func(buf []byte) fail.Error {
 							select {
@@ -956,8 +961,8 @@ func (myself *Core) readByName(inctx context.Context, name string) fail.Error {
 							default:
 							}
 
-							if innerXErr := myself.unsafeDeserialize(ctx, buf); innerXErr != nil {
-								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", myself.kind, name)
+							if innerXErr := instance.unsafeDeserialize(ctx, buf); innerXErr != nil {
+								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", instance.kind, name)
 							}
 
 							return nil
@@ -995,7 +1000,7 @@ func (myself *Core) readByName(inctx context.Context, name string) fail.Error {
 }
 
 // write updates the metadata corresponding to the host in the Object Storage
-func (myself *Core) write(inctx context.Context) fail.Error {
+func (instance *Core) write(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1008,45 +1013,45 @@ func (myself *Core) write(inctx context.Context) fail.Error {
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			if !myself.committed {
-				jsoned, xerr := myself.unsafeSerialize(ctx)
+			if !instance.committed {
+				jsoned, xerr := instance.unsafeSerialize(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
 
-				name, ok := myself.name.Load().(string)
+				name, ok := instance.name.Load().(string)
 				if !ok {
 					return fail.InconsistentError("field 'name' is not set with string")
 				}
 
-				if myself.kindSplittedStore {
-					xerr = myself.folder.Write(ctx, byNameFolderName, name, jsoned)
+				if instance.kindSplittedStore {
+					xerr = instance.folder.Write(ctx, byNameFolderName, name, jsoned)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						return xerr
 					}
 
-					id, ok := myself.id.Load().(string)
+					id, ok := instance.id.Load().(string)
 					if !ok {
 						return fail.InconsistentError("field 'id' is not set with string")
 					}
 
-					xerr = myself.folder.Write(ctx, byIDFolderName, id, jsoned)
+					xerr = instance.folder.Write(ctx, byIDFolderName, id, jsoned)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						return xerr
 					}
 				} else {
-					xerr = myself.folder.Write(ctx, "", name, jsoned)
+					xerr = instance.folder.Write(ctx, "", name, jsoned)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						return xerr
 					}
 				}
 
-				myself.loaded = true
-				myself.committed = true
+				instance.loaded = true
+				instance.committed = true
 			}
 			return nil
 		}()
@@ -1063,16 +1068,16 @@ func (myself *Core) write(inctx context.Context) fail.Error {
 }
 
 // Reload reloads the content from the Object Storage
-func (myself *Core) Reload(inctx context.Context) (ferr fail.Error) {
-	if valid.IsNil(myself) {
+func (instance *Core) Reload(inctx context.Context) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.Lock()
-	defer myself.Unlock()
+	instance.Lock()
+	defer instance.Unlock()
 
 	type result struct {
 		rErr fail.Error
@@ -1083,7 +1088,7 @@ func (myself *Core) Reload(inctx context.Context) (ferr fail.Error) {
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			return myself.unsafeReload(ctx)
+			return instance.unsafeReload(ctx)
 		}()
 		chRes <- result{gerr}
 	}()
@@ -1099,7 +1104,7 @@ func (myself *Core) Reload(inctx context.Context) (ferr fail.Error) {
 
 // unsafeReload loads the content from the Object Storage
 // Note: must be called after locking the instance
-func (myself *Core) unsafeReload(inctx context.Context) fail.Error {
+func (instance *Core) unsafeReload(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1112,21 +1117,21 @@ func (myself *Core) unsafeReload(inctx context.Context) fail.Error {
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			timings, xerr := myself.Service().Timings()
+			timings, xerr := instance.Service().Timings()
 			if xerr != nil {
 				return xerr
 			}
 
-			if myself.loaded && !myself.committed {
-				name, ok := myself.name.Load().(string)
+			if instance.loaded && !instance.committed {
+				name, ok := instance.name.Load().(string)
 				if ok {
 					return fail.InconsistentError("cannot unsafeReload a not committed data with name %s", name)
 				}
 				return fail.InconsistentError("cannot unsafeReload a not committed data")
 			}
 
-			if myself.kindSplittedStore {
-				id, ok := myself.id.Load().(string)
+			if instance.kindSplittedStore {
+				id, ok := instance.id.Load().(string)
 				if !ok {
 					return fail.InconsistentError("field 'id' is not set with string")
 				}
@@ -1139,7 +1144,7 @@ func (myself *Core) unsafeReload(inctx context.Context) fail.Error {
 						default:
 						}
 
-						innerXErr := myself.readByID(ctx, id)
+						innerXErr := instance.readByID(ctx, id)
 						if innerXErr != nil {
 							switch innerXErr.(type) {
 							case *fail.ErrNotFound: // If not found, stop immediately
@@ -1159,15 +1164,15 @@ func (myself *Core) unsafeReload(inctx context.Context) fail.Error {
 				if xerr != nil {
 					switch xerr.(type) {
 					case *retry.ErrTimeout:
-						return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", myself.kind, id)
+						return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", instance.kind, id)
 					case *retry.ErrStopRetry:
-						return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", myself.kind, id)
+						return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", instance.kind, id)
 					default:
-						return fail.Wrap(xerr, "failed to read %s by id %s", myself.kind, myself.id)
+						return fail.Wrap(xerr, "failed to read %s by id %s", instance.kind, instance.id)
 					}
 				}
 			} else {
-				name, ok := myself.name.Load().(string)
+				name, ok := instance.name.Load().(string)
 				if !ok {
 					return fail.InconsistentError("field 'name' is not set with string")
 				}
@@ -1183,7 +1188,7 @@ func (myself *Core) unsafeReload(inctx context.Context) fail.Error {
 						default:
 						}
 
-						if innerXErr := myself.readByName(ctx, name); innerXErr != nil {
+						if innerXErr := instance.readByName(ctx, name); innerXErr != nil {
 							switch innerXErr.(type) {
 							case *fail.ErrNotFound: // If not found, stop immediately
 								return retry.StopRetryError(innerXErr)
@@ -1202,17 +1207,17 @@ func (myself *Core) unsafeReload(inctx context.Context) fail.Error {
 				if xerr != nil {
 					switch xerr.(type) {
 					case *retry.ErrTimeout:
-						return fail.Wrap(fail.RootCause(xerr), "failed (timeout) to read %s '%s'", myself.kind, name)
+						return fail.Wrap(fail.RootCause(xerr), "failed (timeout) to read %s '%s'", instance.kind, name)
 					case *retry.ErrStopRetry:
-						return fail.Wrap(fail.RootCause(xerr), "failed to read %s '%s'", myself.kind, name)
+						return fail.Wrap(fail.RootCause(xerr), "failed to read %s '%s'", instance.kind, name)
 					default:
-						return fail.Wrap(xerr, "failed to read %s '%s'", myself.kind, name)
+						return fail.Wrap(xerr, "failed to read %s '%s'", instance.kind, name)
 					}
 				}
 			}
 
-			myself.loaded = true
-			myself.committed = true
+			instance.loaded = true
+			instance.committed = true
 
 			return nil
 		}()
@@ -1229,8 +1234,8 @@ func (myself *Core) unsafeReload(inctx context.Context) fail.Error {
 }
 
 // BrowseFolder walks through folder and executes a callback for each entry
-func (myself *Core) BrowseFolder(inctx context.Context, callback func(buf []byte) fail.Error) (_ fail.Error) {
-	if valid.IsNil(myself) {
+func (instance *Core) BrowseFolder(inctx context.Context, callback func(buf []byte) fail.Error) (_ fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if inctx == nil {
@@ -1243,8 +1248,8 @@ func (myself *Core) BrowseFolder(inctx context.Context, callback func(buf []byte
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.RLock()
-	defer myself.RUnlock()
+	instance.RLock()
+	defer instance.RUnlock()
 
 	type result struct {
 		rErr fail.Error
@@ -1255,12 +1260,12 @@ func (myself *Core) BrowseFolder(inctx context.Context, callback func(buf []byte
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			if myself.kindSplittedStore {
-				return myself.folder.Browse(ctx, byIDFolderName, func(buf []byte) fail.Error {
+			if instance.kindSplittedStore {
+				return instance.folder.Browse(ctx, byIDFolderName, func(buf []byte) fail.Error {
 					return callback(buf)
 				})
 			}
-			return myself.folder.Browse(ctx, "", func(buf []byte) fail.Error {
+			return instance.folder.Browse(ctx, "", func(buf []byte) fail.Error {
 				return callback(buf)
 			})
 		}()
@@ -1277,8 +1282,8 @@ func (myself *Core) BrowseFolder(inctx context.Context, callback func(buf []byte
 }
 
 // LookupByName tells if an entry exists by name in the folder
-func (myself *Core) LookupByName(inctx context.Context, name string) (_ fail.Error) {
-	if valid.IsNil(myself) {
+func (instance *Core) LookupByName(inctx context.Context, name string) (_ fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if inctx == nil {
@@ -1291,8 +1296,8 @@ func (myself *Core) LookupByName(inctx context.Context, name string) (_ fail.Err
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.RLock()
-	defer myself.RUnlock()
+	instance.RLock()
+	defer instance.RUnlock()
 
 	type result struct {
 		rErr fail.Error
@@ -1304,7 +1309,7 @@ func (myself *Core) LookupByName(inctx context.Context, name string) (_ fail.Err
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			return myself.folder.Lookup(ctx, byNameFolderName, name)
+			return instance.folder.Lookup(ctx, byNameFolderName, name)
 		}()
 		chRes <- result{gerr}
 	}()
@@ -1319,16 +1324,16 @@ func (myself *Core) LookupByName(inctx context.Context, name string) (_ fail.Err
 }
 
 // Delete deletes the metadata
-func (myself *Core) Delete(inctx context.Context) (_ fail.Error) {
-	if valid.IsNil(myself) {
+func (instance *Core) Delete(inctx context.Context) (_ fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.Lock()
-	defer myself.Unlock()
+	instance.Lock()
+	defer instance.Unlock()
 
 	type result struct {
 		rErr fail.Error
@@ -1345,7 +1350,7 @@ func (myself *Core) Delete(inctx context.Context) (_ fail.Error) {
 			)
 
 			// First remove entry from scope registered abstracts
-			innerXErr := myself.shielded.Inspect(func(p clonable.Clonable) fail.Error {
+			innerXErr := instance.shielded.Inspect(func(p clonable.Clonable) fail.Error {
 				abstractResource, innerErr := lang.Cast[terraformerapi.Resource](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
@@ -1364,14 +1369,14 @@ func (myself *Core) Delete(inctx context.Context) (_ fail.Error) {
 			}
 
 			// Checks entries exist in Object Storage
-			if myself.kindSplittedStore {
-				id, ok := myself.id.Load().(string)
+			if instance.kindSplittedStore {
+				id, ok := instance.id.Load().(string)
 				if !ok {
 					return fail.InconsistentError("field 'id' is not set with string")
 				}
 
 				var xerr fail.Error
-				xerr = myself.folder.Lookup(ctx, byIDFolderName, id)
+				xerr = instance.folder.Lookup(ctx, byIDFolderName, id)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -1385,7 +1390,7 @@ func (myself *Core) Delete(inctx context.Context) (_ fail.Error) {
 					idFound = true
 				}
 
-				name, ok := myself.name.Load().(string)
+				name, ok := instance.name.Load().(string)
 				if !ok {
 					return fail.InconsistentError("field 'name' is not set with string")
 				}
@@ -1393,7 +1398,7 @@ func (myself *Core) Delete(inctx context.Context) (_ fail.Error) {
 					return fail.InconsistentError("field 'name' cannot be empty")
 				}
 
-				xerr = myself.folder.Lookup(ctx, byNameFolderName, name)
+				xerr = instance.folder.Lookup(ctx, byNameFolderName, name)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -1409,27 +1414,27 @@ func (myself *Core) Delete(inctx context.Context) (_ fail.Error) {
 
 				// Deletes entries found
 				if idFound {
-					xerr = myself.folder.Delete(ctx, byIDFolderName, id)
+					xerr = instance.folder.Delete(ctx, byIDFolderName, id)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						errors = append(errors, xerr)
 					}
 				}
 				if nameFound {
-					xerr = myself.folder.Delete(ctx, byNameFolderName, name)
+					xerr = instance.folder.Delete(ctx, byNameFolderName, name)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						errors = append(errors, xerr)
 					}
 				}
 			} else {
-				name, ok := myself.name.Load().(string)
+				name, ok := instance.name.Load().(string)
 				if !ok {
 					return fail.InconsistentError("field 'name' is not set with string")
 				}
 
 				var xerr fail.Error
-				xerr = myself.folder.Lookup(ctx, "", name)
+				xerr = instance.folder.Lookup(ctx, "", name)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -1443,7 +1448,7 @@ func (myself *Core) Delete(inctx context.Context) (_ fail.Error) {
 					nameFound = true
 				}
 				if nameFound {
-					xerr = myself.folder.Delete(ctx, "", name)
+					xerr = instance.folder.Delete(ctx, "", name)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						errors = append(errors, xerr)
@@ -1455,8 +1460,8 @@ func (myself *Core) Delete(inctx context.Context) (_ fail.Error) {
 				return fail.NewErrorList(errors)
 			}
 
-			myself.loaded = false
-			myself.committed = false
+			instance.loaded = false
+			instance.committed = false
 
 			return nil
 		}()
@@ -1472,16 +1477,16 @@ func (myself *Core) Delete(inctx context.Context) (_ fail.Error) {
 	}
 }
 
-func (myself *Core) String(inctx context.Context) (string, fail.Error) {
-	if valid.IsNil(myself) {
+func (instance *Core) String(inctx context.Context) (string, fail.Error) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.RLock()
-	defer myself.RUnlock()
+	instance.RLock()
+	defer instance.RUnlock()
 
 	type result struct {
 		rTr  string
@@ -1493,12 +1498,12 @@ func (myself *Core) String(inctx context.Context) (string, fail.Error) {
 		dump, gerr := func() (_ string, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			dumped, err := myself.shielded.String()
+			dumped, err := instance.shielded.String()
 			if err != nil {
 				return "", fail.ConvertError(err)
 			}
 
-			props, err := myself.properties.String()
+			props, err := instance.properties.String()
 			if err != nil {
 				return "", fail.ConvertError(err)
 			}
@@ -1519,7 +1524,7 @@ func (myself *Core) String(inctx context.Context) (string, fail.Error) {
 
 // unsafeSerialize serializes instance into bytes (output json code)
 // Note: must be called after locking the instance
-func (myself *Core) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) {
+func (instance *Core) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1540,7 +1545,7 @@ func (myself *Core) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) 
 			)
 
 			var xerr fail.Error
-			shieldedJSONed, xerr = myself.shielded.Serialize()
+			shieldedJSONed, xerr = instance.shielded.Serialize()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -1552,8 +1557,8 @@ func (myself *Core) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) 
 				return nil, fail.NewErrorWithCause(err, "*Core.Serialize(): Unmarshalling JSONed shielded into map failed!")
 			}
 
-			if myself.properties.Count() > 0 {
-				propsJSONed, xerr := myself.properties.Serialize()
+			if instance.properties.Count() > 0 {
+				propsJSONed, xerr := instance.properties.Serialize()
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return nil, xerr
@@ -1589,16 +1594,16 @@ func (myself *Core) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) 
 }
 
 // Deserialize reads json code and reinstantiates
-func (myself *Core) Deserialize(inctx context.Context, buf []byte) fail.Error {
-	if valid.IsNil(myself) {
+func (instance *Core) Deserialize(inctx context.Context, buf []byte) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	myself.Lock()
-	defer myself.Unlock()
+	instance.Lock()
+	defer instance.Unlock()
 
 	type result struct {
 		rErr fail.Error
@@ -1609,7 +1614,7 @@ func (myself *Core) Deserialize(inctx context.Context, buf []byte) fail.Error {
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			return myself.unsafeDeserialize(ctx, buf)
+			return instance.unsafeDeserialize(ctx, buf)
 		}()
 		chRes <- result{gerr}
 	}()
@@ -1625,7 +1630,7 @@ func (myself *Core) Deserialize(inctx context.Context, buf []byte) fail.Error {
 
 // unsafeDeserialize reads json code and instantiates a Core
 // Note: must be called after locking the instance
-func (myself *Core) unsafeDeserialize(inctx context.Context, buf []byte) fail.Error {
+func (instance *Core) unsafeDeserialize(inctx context.Context, buf []byte) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1638,9 +1643,9 @@ func (myself *Core) unsafeDeserialize(inctx context.Context, buf []byte) fail.Er
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			if myself.properties == nil {
+			if instance.properties == nil {
 				var xerr fail.Error
-				myself.properties, xerr = serialize.NewJSONProperties("resources." + myself.kind)
+				instance.properties, xerr = serialize.NewJSONProperties("resources." + instance.kind)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -1673,7 +1678,7 @@ func (myself *Core) unsafeDeserialize(inctx context.Context, buf []byte) fail.Er
 				return fail.SyntaxErrorWithCause(err, nil, "failed to marshal Core to JSON")
 			}
 
-			xerr := myself.shielded.Deserialize(jsoned)
+			xerr := instance.shielded.Deserialize(jsoned)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "deserializing Core failed")
@@ -1686,7 +1691,7 @@ func (myself *Core) unsafeDeserialize(inctx context.Context, buf []byte) fail.Er
 					return fail.SyntaxErrorWithCause(err, nil, "failed to marshal properties to JSON")
 				}
 
-				xerr = myself.properties.Deserialize(jsoned)
+				xerr = instance.properties.Deserialize(jsoned)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return fail.Wrap(xerr, "failed to unsafeDeserialize properties")

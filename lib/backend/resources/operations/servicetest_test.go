@@ -1262,7 +1262,7 @@ func (e *ServiceTest) CreateSecurityGroup(ctx context.Context, networkRef string
 	return asg, nil
 }
 func (e *ServiceTest) InspectSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := iaasapi.Validate1Parameter(sgParam)
 	if xerr != nil {
 		return abstract.NewSecurityGroup(), xerr
 	}
@@ -1447,7 +1447,7 @@ func (e *ServiceTest) BindSecurityGroupToHost(ctx context.Context, sgParam stack
 	defer fail.OnPanic(&ferr)
 
 	// Load host
-	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := iaasapi.Validate1Parameter(ctx, hostParam)
 	if xerr != nil {
 		e._warn("ServiceTest::BindSecurityGroupToHost { sg: ?, host: ? }")
 		return xerr
@@ -1502,7 +1502,7 @@ func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam s
 	defer fail.OnPanic(&ferr)
 
 	// Load host
-	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := iaasapi.Validate1Parameter(ctx, hostParam)
 	if xerr != nil {
 		e._warn("ServiceTest::UnbindSecurityGroupFromHost { sg: ?, host: ? }")
 		return xerr
@@ -2262,7 +2262,7 @@ func (e *ServiceTest) InspectHost(ctx context.Context, params common.HostParamet
 		return abstract.NewHostFull(), fail.InvalidInstanceError()
 	}
 	var xerr fail.Error
-	ahf, _, xerr := stacks.ValidateHostParameter(ctx, params)
+	ahf, _, xerr := iaasapi.Validate1Parameter(ctx, params)
 
 	if xerr != nil {
 		e._error("ServiceTest::InspectHost (error)")
@@ -2410,7 +2410,7 @@ func (e *ServiceTest) ListHosts(ctx context.Context, details bool) (abstract.Hos
 
 func (e *ServiceTest) DeleteHost(ctx context.Context, params common.HostParameter) fail.Error {
 
-	ahf, _, xerr := stacks.ValidateHostParameter(ctx, params)
+	ahf, _, xerr := iaasapi.Validate1Parameter(ctx, params)
 	if xerr != nil {
 		e._warn("ServiceTest::DeleteHost { name: ? }")
 		return xerr
@@ -2437,7 +2437,7 @@ func (e *ServiceTest) DeleteHost(ctx context.Context, params common.HostParamete
 
 func (e *ServiceTest) StopHost(ctx context.Context, params common.HostParameter, gracefully bool) fail.Error {
 
-	ahf, _, xerr := stacks.ValidateHostParameter(ctx, params)
+	ahf, _, xerr := iaasapi.Validate1Parameter(ctx, params)
 	if xerr != nil {
 		e._warn("ServiceTest::StopHost { name: ? } (emulated)")
 		return xerr
@@ -2474,7 +2474,7 @@ func (e *ServiceTest) StopHost(ctx context.Context, params common.HostParameter,
 
 func (e *ServiceTest) StartHost(ctx context.Context, params common.HostParameter) fail.Error {
 
-	ahf, _, xerr := stacks.ValidateHostParameter(ctx, params)
+	ahf, _, xerr := iaasapi.Validate1Parameter(ctx, params)
 	if xerr != nil {
 		e._warn("ServiceTest::StartHost { name: ? } (emulated)")
 		return xerr

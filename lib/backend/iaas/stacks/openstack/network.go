@@ -291,7 +291,7 @@ func (instance stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.Ne
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	an, networkLabel, xerr := iaasapi.ValidateNetworkParameter(networkParam)
+	an, networkLabel, xerr := iaasapi.ValidateHostParameter(networkParam)
 	if xerr != nil {
 		return xerr
 	}

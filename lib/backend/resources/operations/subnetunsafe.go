@@ -464,12 +464,13 @@ func (instance *Subnet) createPublicIPSecurityGroup(ctx context.Context, network
 
 // Starting from here, delete the Security Group if exiting with error
 func (instance *Subnet) undoCreateSecurityGroup(ctx context.Context, errorPtr *fail.Error, keepOnFailure bool, sg resources.SecurityGroup) fail.Error {
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
 	if errorPtr == nil {
 		return fail.NewError("trying to undo an action based on the content of a nil fail.Error; undo cannot be run")
 	}
-	if ctx != context.Background() {
-		return fail.InvalidParameterError("ctx", "has to be context.Background()")
-	}
+
 	if *errorPtr != nil && !keepOnFailure {
 		sgName := sg.GetName()
 		if derr := sg.Delete(ctx, true); derr != nil {

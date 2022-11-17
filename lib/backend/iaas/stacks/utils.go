@@ -17,65 +17,15 @@
 package stacks
 
 import (
-	"context"
 	"fmt"
 	"os"
 
 	uuid "github.com/gofrs/uuid"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
-
-//FIXME: useless ctx parameter
-// ValidateHostParameter validates host parameter that can be a string as ID or an *abstract.HostCore
-func ValidateHostParameter(_ context.Context, hostParam iaasapi.HostParameter) (ahf *abstract.HostFull, hostLabel string, ferr fail.Error) {
-	ahf = nil
-	switch hostParam := hostParam.(type) {
-	case string:
-		if hostParam == "" {
-			return nil, "", fail.InvalidParameterCannotBeEmptyStringError("hostParam")
-		}
-		ahf.ID = hostParam
-		hostLabel = hostParam
-
-	case *abstract.HostCore:
-		if valid.IsNil(hostParam) {
-			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostCore null value")
-		}
-		ahf.HostCore = hostParam
-		if ahf.Name != "" {
-			hostLabel = "'" + ahf.Name + "'"
-		} else {
-			hostLabel = ahf.ID
-		}
-
-	case *abstract.HostFull:
-		if valid.IsNil(hostParam) {
-			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostFull null value")
-		}
-		ahf = hostParam
-		if ahf.Name != "" {
-			hostLabel = "'" + ahf.Name + "'"
-		} else {
-			hostLabel = ahf.ID
-		}
-
-	default:
-		return nil, "", fail.InvalidParameterError("hostParam", "valid types are non-empty string, *abstract.HostCore or *abstract.HostFull")
-	}
-
-	if hostLabel == "" {
-		return nil, "", fail.InvalidParameterError("hostParam", "at least one of fields 'ID' or 'Name' must not be empty string")
-	}
-	// if ahf.ID == "" {
-	// 	return nil, "", fail.InvalidParameterError("hostParam", "field ID cannot be empty string")
-	// }
-	return ahf, hostLabel, nil
-}
 
 // ProvideCredentialsIfNeeded ...
 func ProvideCredentialsIfNeeded(request *abstract.HostRequest) (ferr fail.Error) {

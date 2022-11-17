@@ -30,7 +30,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -106,7 +105,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 
 	task := handler.job.Task()
 	ctx := handler.job.Context()
-	_, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	_, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}

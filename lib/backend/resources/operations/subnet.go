@@ -557,8 +557,8 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 
 // undoBindInternalSecurityGroupToGateway does what its name says
 func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host, keepOnFailure bool, xerr *fail.Error) fail.Error {
-	if ctx != context.Background() {
-		return fail.InvalidParameterError("ctx", "has to be context.Background()")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	if xerr != nil && *xerr != nil && keepOnFailure {

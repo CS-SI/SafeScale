@@ -891,7 +891,7 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1247,7 +1247,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 		return fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return xerr
 	}
