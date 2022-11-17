@@ -58,14 +58,14 @@ const (
 	// networksFolderName is the technical name of the container used to store networks info
 	subnetsFolderName = "subnets"
 
-	subnetInternalSecurityGroupNamePattern        = "safescale-sg_subnet_internals.%s.%s"
+	subnetInternalSecurityGroupNamePattern        = "safescale-sg_subnet_internals_%s_%s"
 	subnetInternalSecurityGroupDescriptionPattern = "SG for internal access in Subnet %s of Network %s"
-	subnetGWSecurityGroupNamePattern              = "safescale-sg_subnet_gateways.%s.%s"
+	subnetGWSecurityGroupNamePattern              = "safescale-sg_subnet_gateways_%s_%s"
 	subnetGWSecurityGroupDescriptionPattern       = "SG for gateways in Subnet %s of Network %s"
-	subnetPublicIPSecurityGroupNamePattern        = "safescale-sg_subnet_publicip.%s.%s"
+	subnetPublicIPSecurityGroupNamePattern        = "safescale-sg_subnet_publicip_%s_%s"
 	subnetPublicIPSecurityGroupDescriptionPattern = "SG for hosts with public IP in Subnet %s of Network %s"
 
-	virtualIPNamePattern = "safescale-vip_gateways_subnet.%s.%s"
+	virtualIPNamePattern = "safescale-vip_gateways_subnet_%s_%s"
 )
 
 // Subnet links Object Storage MetadataFolder and Subnet
