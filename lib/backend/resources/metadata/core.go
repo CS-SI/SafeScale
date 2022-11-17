@@ -1304,9 +1304,7 @@ func (myself *Core) LookupByName(inctx context.Context, name string) (_ fail.Err
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			return myself.folder.Read(ctx, byNameFolderName, name, func(buf []byte) fail.Error {
-				return nil
-			})
+			return myself.folder.Lookup(ctx, byNameFolderName, name)
 		}()
 		chRes <- result{gerr}
 	}()

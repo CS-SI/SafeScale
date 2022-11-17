@@ -122,7 +122,8 @@ func executeScript(
 		}
 
 		defer func() {
-			if derr := utils.LazyRemove(f.Name()); derr != nil {
+			derr := utils.LazyRemove(f.Name())
+			if derr != nil {
 				logrus.WithContext(ctx).Debugf("Error deleting file: %v", derr)
 			}
 		}()

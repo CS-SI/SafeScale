@@ -3,7 +3,7 @@ resource "openstack_networking_secgroup_v2" "{{ .Resource.Name }}" {
     name                    = "{{ .Resource.Name }}"
     region                  = "{{ .Provider.Authentication.Region }}"
     description             = "{{ .Resource.Description }}"
-    tenant_id               = "{{ or .Provider.Authentication.TenantId .Provider.Authentication.TenantName }}"
+    tenant_id               = "{{ .Provider.Authentication.TenantID }}"
     delete_default_rules    = true
 }
 
@@ -28,4 +28,4 @@ resource "openstack_networking_secgroup_rule_v2" "{{ .Resource.Name }}-rule-{{ $
 output "sg_{{ .Resource.Name }}_rule_{{ $k }}_id" {
     value = "${openstack_networking_secgroup_rule_v2.{{ .Resource.Name }}-rule-{{ $k }}.id}"]
 }
-{{ -end }}
+{{ end }}

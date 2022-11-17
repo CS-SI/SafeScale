@@ -268,9 +268,6 @@ func (instance *volume) GetSpeed(ctx context.Context) (_ volumespeed.Enum, ferr 
 		return 0, fail.InvalidInstanceError()
 	}
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
 	return instance.unsafeGetSpeed(ctx)
 }
 
@@ -281,9 +278,6 @@ func (instance *volume) GetSize(ctx context.Context) (_ int, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
 
 	return instance.unsafeGetSize(ctx)
 }
@@ -352,9 +346,6 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume")).Entering()
 	defer tracer.Exiting()
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	// check if volume can be deleted (must not be attached)
 	xerr := metadata.InspectProperty(ctx, instance, volumeproperty.AttachedV1, func(volumeAttachmentsV1 *propertiesv1.VolumeAttachments) fail.Error {
@@ -657,7 +648,8 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := svc.DeleteVolumeAttachment(jobapi.NewContextPropagatingJob(ctx), targetID, vaID); derr != nil {
+			derr := svc.DeleteVolumeAttachment(jobapi.NewContextPropagatingJob(ctx), targetID, vaID)
+			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 			}
 		}
@@ -1129,9 +1121,6 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
 
 	volumeID, err := instance.GetID()
 	if err != nil {

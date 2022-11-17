@@ -171,7 +171,8 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 	}
 
 	defer func() {
-		if derr := utils.LazyRemove(f.Name()); derr != nil {
+		derr := utils.LazyRemove(f.Name())
+		if derr != nil {
 			logrus.WithContext(ctx).Warnf("Error deleting file: %v", derr)
 		}
 	}()

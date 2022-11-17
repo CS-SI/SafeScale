@@ -444,7 +444,8 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}
 
 	defer func() {
-		if derr := subnet.Delete(context.Background()); derr != nil {
+		derr := subnet.Delete(context.Background())
+		if derr != nil {
 			logrus.Warnf("Error deleting subnet '%s'", snid)
 			_ = ferr.AddConsequence(derr)
 		}

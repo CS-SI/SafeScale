@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	designSecurityGroupResourceSnippetPath = "resource_sg_design.tf"
+	designSecurityGroupResourceSnippetPath = "snippets/resource_sg_design.tf"
 )
 
 // type securityGroupResource struct {
@@ -93,7 +93,7 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 	}
 
 	// create security group on provider side
-	asg, xerr = abstract.NewSecurityGroup(abstract.WithName(name))
+	asg, xerr = abstract.NewSecurityGroup(abstract.WithName(name), abstract.UseTerraformSnippet(designSecurityGroupResourceSnippetPath))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -128,7 +128,7 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 	}
 
 	for k, v := range rules {
-		id, xerr := unmarshalOutput[string](outputs[fmt.Sprintf("rule_%d_id", k)])
+		id, xerr := unmarshalOutput[string](outputs[fmt.Sprintf("sg_%s_rule_%d_id", asg.Name, k)])
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -160,7 +160,8 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 	// defer func() {
 	// 	ferr = debug.InjectPlannedFail(ferr)
 	// 	if ferr != nil {
-	// 		if derr := s.DeleteSecurityGroup(context.Background(), asg); derr != nil {
+	// 		derr := s.DeleteSecurityGroup(context.Background(), asg)
+	// 		if derr != nil {
 	// 			_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete security group"))
 	// 		}
 	// 	}

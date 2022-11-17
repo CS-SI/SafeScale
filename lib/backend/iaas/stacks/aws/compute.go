@@ -733,7 +733,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 		if ferr != nil && request.CleanOnFailure() {
 			if ahf.IsConsistent() {
 				logrus.WithContext(ctx).Infof("Reset, deleting host '%s'", ahf.Name)
-				if derr := s.DeleteHost(context.Background(), ahf.ID); derr != nil {
+				derr := s.DeleteHost(context.Background(), ahf.ID)
+				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 					logrus.WithContext(ctx).Warnf("Error deleting host in cleanup: %v", derr)
 				}

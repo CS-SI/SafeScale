@@ -32,7 +32,6 @@ import (
 
 const (
 	designSubnetResourceSnippetPath = "snippets/resource_subnet_design.tf"
-	designRouterResourceSnippetPath = "snippets/resource_router_design.tf"
 )
 
 // type subnetResource struct {

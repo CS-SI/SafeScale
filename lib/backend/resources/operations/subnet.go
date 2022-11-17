@@ -491,7 +491,8 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && req.CleanOnFailure() {
-			if derr := instance.deleteSubnetThenWaitCompletion(context.Background(), snid); derr != nil {
+			derr := instance.deleteSubnetThenWaitCompletion(context.Background(), snid)
+			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 			} else {
 				logrus.WithContext(ctx).Infof("the subnet '%s' should be gone by now", snid)
@@ -1322,13 +1323,13 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 
 			// finally delete Subnet
 			logrus.WithContext(ctx).Debugf("Deleting Subnet '%s'...", abstractSubnet.Name)
-			if innerXErr = instance.deleteSubnetThenWaitCompletion(ctx, abstractSubnet.ID); innerXErr != nil {
+			innerXErr = instance.deleteSubnetThenWaitCompletion(ctx, abstractSubnet.ID)
+			if innerXErr != nil {
 				return innerXErr
 			}
 
 			// Delete Subnet's own Security Groups
-			innerXErr = instance.deleteSecurityGroups(ctx, [3]string{abstractSubnet.GWSecurityGroupID, abstractSubnet.InternalSecurityGroupID, abstractSubnet.PublicIPSecurityGroupID})
-			return innerXErr
+			return instance.deleteSecurityGroups(ctx, [3]string{abstractSubnet.GWSecurityGroupID, abstractSubnet.InternalSecurityGroupID, abstractSubnet.PublicIPSecurityGroupID})
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {

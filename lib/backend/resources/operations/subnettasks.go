@@ -137,7 +137,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 			if ferr != nil {
 				if hostReq.CleanOnFailure() {
 					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
-					derr := rgw.Delete(jobapi.NewContextPropagatingJob(ctx))
+					derr := rgw.Delete(jobapi.NewContextPropagatingJob(inctx))
 					if derr != nil {
 						msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 						switch derr.(type) {
@@ -155,7 +155,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 					}
 					_ = ferr.AddConsequence(derr)
 				} else {
-					xerr = rgw.Alter(jobapi.NewContextPropagatingJob(ctx), func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+					xerr = rgw.Alter(jobapi.NewContextPropagatingJob(inctx), func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
 						as, innerErr := lang.Cast[*abstract.HostCore](p)
 						if innerErr != nil {
 							return fail.Wrap(innerErr)

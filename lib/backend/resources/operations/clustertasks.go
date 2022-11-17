@@ -107,7 +107,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && req.CleanOnFailure() && !cleanFailure {
 				logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
-				if derr := instance.Core.Delete(jobapi.NewContextPropagatingJob(ctx)); derr != nil {
+				if derr := instance.Core.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
 					logrus.WithContext(context.Background()).Errorf(
 						"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
 					)
@@ -163,7 +163,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 			if ferr != nil && req.CleanOnFailure() { // FIXME: subnetInstance nil
 				if subnetInstance != nil && networkInstance != nil {
 					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Subnet '%s'...", subnetInstance.GetName())
-					if derr := subnetInstance.Delete(jobapi.NewContextPropagatingJob(ctx)); derr != nil {
+					if derr := subnetInstance.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
 							// missing Subnet is considered as a successful deletion, continue
@@ -179,7 +179,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 							subnetInstance.GetName())
 						if req.NetworkID == "" {
 							logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
-							if derr := networkInstance.Delete(jobapi.NewContextPropagatingJob(ctx)); derr != nil {
+							if derr := networkInstance.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
 								switch derr.(type) {
 								case *fail.ErrNotFound:
 									// missing Network is considered as a successful deletion, continue
@@ -224,7 +224,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 				var list []machineID
 
 				var nodemap map[uint]*propertiesv3.ClusterNode
-				derr := instance.Inspect(jobapi.NewContextPropagatingJob(ctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+				derr := instance.Inspect(jobapi.NewContextPropagatingJob(inctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Inspect(clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
 						nodesV3, err := lang.Cast[*propertiesv3.ClusterNodes](p)
 						if err != nil {
@@ -247,7 +247,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 
 				if len(list) > 0 {
 					tg, tgerr := concurrency.NewTaskGroupWithContext(
-						jobapi.NewContextPropagatingJob(ctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
+						jobapi.NewContextPropagatingJob(inctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
 					)
 					if tgerr != nil {
 						cleanFailure = true
@@ -743,7 +743,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && req.CleanOnFailure() {
-					if derr := networkInstance.Delete(jobapi.NewContextPropagatingJob(ctx)); derr != nil {
+					if derr := networkInstance.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
 							// missing Network is considered as a successful deletion, continue
@@ -825,7 +825,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && req.CleanOnFailure() {
-				if derr := subnetInstance.Delete(jobapi.NewContextPropagatingJob(ctx)); derr != nil {
+				if derr := subnetInstance.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
 						// missing Subnet is considered as a successful deletion, continue
@@ -1153,7 +1153,7 @@ func (instance *Cluster) createHostResources(
 		defer func() { // FIXME: OPP This needs review
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !keepOnFailure {
-				masters, merr := instance.unsafeListMasters(jobapi.NewContextPropagatingJob(ctx))
+				masters, merr := instance.unsafeListMasters(jobapi.NewContextPropagatingJob(inctx))
 				if merr != nil {
 					_ = ferr.AddConsequence(merr)
 					return
@@ -1164,7 +1164,7 @@ func (instance *Cluster) createHostResources(
 					list = append(list, machineID{ID: mach.ID, Name: mach.Name})
 				}
 
-				hosts, merr := instance.Service().ListHosts(jobapi.NewContextPropagatingJob(ctx), false)
+				hosts, merr := instance.Service().ListHosts(jobapi.NewContextPropagatingJob(inctx), false)
 				if merr != nil {
 					_ = ferr.AddConsequence(merr)
 					return
@@ -1182,7 +1182,7 @@ func (instance *Cluster) createHostResources(
 
 				if len(list) > 0 {
 					tg, tgerr := concurrency.NewTaskGroupWithContext(
-						jobapi.NewContextPropagatingJob(ctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
+						jobapi.NewContextPropagatingJob(inctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
 					)
 					if tgerr != nil {
 						_ = ferr.AddConsequence(tgerr)
@@ -1244,7 +1244,7 @@ func (instance *Cluster) createHostResources(
 		defer func() { // FIXME: OPP, This needs review
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !keepOnFailure {
-				nlist, merr := instance.unsafeListNodes(jobapi.NewContextPropagatingJob(ctx))
+				nlist, merr := instance.unsafeListNodes(jobapi.NewContextPropagatingJob(inctx))
 				if merr != nil {
 					_ = ferr.AddConsequence(merr)
 					return
@@ -1273,7 +1273,7 @@ func (instance *Cluster) createHostResources(
 
 				if len(list) > 0 {
 					tg, tgerr := concurrency.NewTaskGroupWithContext(
-						jobapi.NewContextPropagatingJob(ctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
+						jobapi.NewContextPropagatingJob(inctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
 					)
 					if tgerr != nil {
 						_ = ferr.AddConsequence(fail.Wrap(tgerr, "cleaning up on failure, failed to create TaskGroup"))

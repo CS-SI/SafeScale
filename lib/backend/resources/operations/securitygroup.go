@@ -297,10 +297,8 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance.Core) {
-		if instance.Core.IsTaken() {
-			return fail.InconsistentError("already carrying information")
-		}
+	if !valid.IsNil(instance.Core) && instance.Core.IsTaken() {
+		return fail.InconsistentError("already carrying information")
 	}
 	if inctx == nil {
 		return fail.InvalidParameterCannotBeNilError("inctx")

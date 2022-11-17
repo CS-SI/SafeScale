@@ -445,7 +445,8 @@ func (instance *Share) Create(
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := nfsServer.RemoveShare(jobapi.NewContextPropagatingJob(ctx), sharePath); derr != nil {
+			derr := nfsServer.RemoveShare(jobapi.NewContextPropagatingJob(ctx), sharePath)
+			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Share '%s' from Host", sharePath))
 			}
 		}

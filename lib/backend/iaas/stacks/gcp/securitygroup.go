@@ -84,7 +84,8 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 		if ferr != nil {
 			for _, v := range asg.Rules {
 				for _, r := range v.IDs {
-					if derr := s.rpcDeleteFirewallRuleByID(context.Background(), r); derr != nil {
+					derr := s.rpcDeleteFirewallRuleByID(context.Background(), r)
+					if derr != nil {
 						switch ferr.(type) {
 						case *fail.ErrNotFound:
 							// rule not found, considered as a removal success

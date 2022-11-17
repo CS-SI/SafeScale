@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // Job is the interface of a daemon job
@@ -63,7 +64,7 @@ func FromContext(ctx context.Context) (Job, fail.Error) {
 		return nil, fail.InconsistentError("value in context must satisfy interface 'Job'")
 	}
 
-	if jobInstance == nil {
+	if valid.IsNull(jobInstance) {
 		return nil, fail.InconsistentError("missing valid Job in context")
 	}
 

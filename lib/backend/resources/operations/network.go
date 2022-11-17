@@ -332,7 +332,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && req.CleanOnFailure() && !valid.IsNull(abstractNetwork) {
-				derr := svc.DeleteNetwork(jobapi.NewContextPropagatingJob(ctx), abstractNetwork.ID)
+				derr := svc.DeleteNetwork(jobapi.NewContextPropagatingJob(inctx), abstractNetwork.ID)
 				derr = debug.InjectPlannedFail(derr)
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))

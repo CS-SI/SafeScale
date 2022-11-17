@@ -480,13 +480,16 @@ func (instance *renderer) Apply(ctx context.Context, def string) (_ map[string]t
 			switch rerr.(type) {
 			case *exec.ExitError:
 				if strings.Contains(err.Error(), "Your query returned no results") {
-					return nil, fail.NotFoundError()
+					return nil, fail.NotFoundError(err.Error())
 				}
 				if strings.Contains(err.Error(), "Your query returned more than one result") {
-					return nil, fail.DuplicateError()
+					return nil, fail.DuplicateError(err.Error())
 				}
 				if strings.Contains(err.Error(), "Incorrect attribute value type") {
 					return nil, fail.SyntaxError(err.Error())
+				}
+				if strings.Contains(err.Error(), "overlaps with another subnet") {
+					return nil, fail.DuplicateError("requested CIDR overlaps with existing Subnet")
 				}
 			default:
 			}

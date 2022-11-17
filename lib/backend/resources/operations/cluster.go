@@ -2068,7 +2068,7 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := instance.AlterProperty(jobapi.NewContextPropagatingJob(ctx), clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
+				derr := instance.AlterProperty(jobapi.NewContextPropagatingJob(inctx), clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
 					nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
@@ -2208,7 +2208,7 @@ func (instance *Cluster) delete(inctx context.Context) (_ fail.Error) {
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := instance.AlterProperty(jobapi.NewContextPropagatingJob(ctx), clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
+				derr := instance.AlterProperty(jobapi.NewContextPropagatingJob(inctx), clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
 					stateV1, innerErr := lang.Cast[*propertiesv1.ClusterState](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)

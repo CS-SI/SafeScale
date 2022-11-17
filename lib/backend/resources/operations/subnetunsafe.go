@@ -228,7 +228,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(inctx context.Context, networ
 			return xerr
 		}
 		defer func() {
-			derr := instance.undoCreateSecurityGroup(jobapi.NewContextPropagatingJob(ctx), &ferr, keepOnFailure, subnetGWSG)
+			derr := instance.undoCreateSecurityGroup(jobapi.NewContextPropagatingJob(inctx), &ferr, keepOnFailure, subnetGWSG)
 			if derr != nil {
 				logrus.WithContext(ctx).Warnf(derr.Error())
 			}
@@ -241,7 +241,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(inctx context.Context, networ
 			return xerr
 		}
 		defer func() {
-			derr := instance.undoCreateSecurityGroup(jobapi.NewContextPropagatingJob(ctx), &ferr, keepOnFailure, subnetPublicIPSG)
+			derr := instance.undoCreateSecurityGroup(jobapi.NewContextPropagatingJob(inctx), &ferr, keepOnFailure, subnetPublicIPSG)
 			if derr != nil {
 				logrus.WithContext(ctx).Warnf(derr.Error())
 			}
@@ -254,7 +254,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(inctx context.Context, networ
 			return xerr
 		}
 		defer func() {
-			derr := instance.undoCreateSecurityGroup(jobapi.NewContextPropagatingJob(ctx), &ferr, keepOnFailure, subnetInternalSG)
+			derr := instance.undoCreateSecurityGroup(jobapi.NewContextPropagatingJob(inctx), &ferr, keepOnFailure, subnetInternalSG)
 			if derr != nil {
 				logrus.WithContext(ctx).Warnf(derr.Error())
 			}
@@ -269,7 +269,7 @@ func (instance *Subnet) unsafeCreateSecurityGroups(inctx context.Context, networ
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && !keepOnFailure {
-				if derr := subnetGWSG.UnbindFromSubnet(jobapi.NewContextPropagatingJob(ctx), instance); derr != nil {
+				if derr := subnetGWSG.UnbindFromSubnet(jobapi.NewContextPropagatingJob(inctx), instance); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateways from Subnet", ActionFromError(ferr)))
 				}
 			}
@@ -619,7 +619,8 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && abstractSubnet != nil && req.CleanOnFailure() {
-				if derr := instance.deleteSubnetThenWaitCompletion(jobapi.NewContextPropagatingJob(ctx), abstractSubnet.ID); derr != nil {
+				derr := instance.deleteSubnetThenWaitCompletion(jobapi.NewContextPropagatingJob(inctx), abstractSubnet.ID)
+				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 				}
 			}
@@ -637,7 +638,8 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && req.CleanOnFailure() {
-				if derr := instance.Core.Delete(jobapi.NewContextPropagatingJob(ctx)); derr != nil {
+				derr := instance.Core.Delete(jobapi.NewContextPropagatingJob(inctx))
+				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet metadata", ActionFromError(ferr)))
 				}
 			}
@@ -668,7 +670,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 				b, _ := subnetInternalSG.GetID()
 				c, _ := subnetPublicIPSG.GetID()
 
-				derr := instance.deleteSecurityGroups(jobapi.NewContextPropagatingJob(ctx), [3]string{a, b, c})
+				derr := instance.deleteSecurityGroups(jobapi.NewContextPropagatingJob(inctx), [3]string{a, b, c})
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Groups"))
 				}
@@ -707,7 +709,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && abstractSubnet != nil && abstractSubnet.VIP != nil && req.CleanOnFailure() {
-					if derr := svc.DeleteVIP(jobapi.NewContextPropagatingJob(ctx), abstractSubnet.VIP); derr != nil {
+					if derr := svc.DeleteVIP(jobapi.NewContextPropagatingJob(inctx), abstractSubnet.VIP); derr != nil {
 						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete VIP", ActionFromError(ferr)))
 					}
 				}
@@ -802,7 +804,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil && req.CleanOnFailure() {
-				derr := networkInstance.Alter(jobapi.NewContextPropagatingJob(ctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+				derr := networkInstance.Alter(jobapi.NewContextPropagatingJob(inctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Alter(networkproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
 						nsV1, innerErr := lang.Cast[*propertiesv1.NetworkSubnets](p)
 						if innerErr != nil {
@@ -1181,7 +1183,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 					ferr = debug.InjectPlannedFail(ferr)
 					if ferr != nil && req.CleanOnFailure() {
 						logrus.WithContext(ctx).Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
-						derr := primaryGateway.RelaxedDeleteHost(jobapi.NewContextPropagatingJob(ctx))
+						derr := primaryGateway.RelaxedDeleteHost(jobapi.NewContextPropagatingJob(inctx))
 						derr = debug.InjectPlannedFail(derr)
 						if derr != nil {
 							switch derr.(type) {
@@ -1194,7 +1196,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 							logrus.WithContext(ctx).Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
 						}
 						if req.HA {
-							if derr := instance.unbindHostFromVIP(jobapi.NewContextPropagatingJob(ctx), as.VIP, primaryGateway); derr != nil {
+							if derr := instance.unbindHostFromVIP(jobapi.NewContextPropagatingJob(inctx), as.VIP, primaryGateway); derr != nil {
 								_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))
 							}
 						}
@@ -1228,7 +1230,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 				}
 
 				defer func() {
-					derr := instance.undoBindInternalSecurityGroupToGateway(jobapi.NewContextPropagatingJob(ctx), primaryGateway, req.KeepOnFailure, &ferr)
+					derr := instance.undoBindInternalSecurityGroupToGateway(jobapi.NewContextPropagatingJob(inctx), primaryGateway, req.KeepOnFailure, &ferr)
 					if derr != nil {
 						logrus.WithContext(ctx).Warnf(derr.Error())
 					}
@@ -1318,7 +1320,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 				defer func() {
 					ferr = debug.InjectPlannedFail(ferr)
 					if ferr != nil && req.CleanOnFailure() {
-						derr := secondaryGateway.RelaxedDeleteHost(jobapi.NewContextPropagatingJob(ctx))
+						derr := secondaryGateway.RelaxedDeleteHost(jobapi.NewContextPropagatingJob(inctx))
 						derr = debug.InjectPlannedFail(derr)
 						if derr != nil {
 							switch derr.(type) {
@@ -1328,7 +1330,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 							}
 							_ = ferr.AddConsequence(derr)
 						}
-						derr = instance.unbindHostFromVIP(jobapi.NewContextPropagatingJob(ctx), as.VIP, secondaryGateway)
+						derr = instance.unbindHostFromVIP(jobapi.NewContextPropagatingJob(inctx), as.VIP, secondaryGateway)
 						derr = debug.InjectPlannedFail(derr)
 						if derr != nil {
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", ActionFromError(ferr)))
@@ -1337,7 +1339,7 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 				}()
 
 				defer func() {
-					derr := instance.undoBindInternalSecurityGroupToGateway(jobapi.NewContextPropagatingJob(ctx), secondaryGateway, req.KeepOnFailure, &ferr)
+					derr := instance.undoBindInternalSecurityGroupToGateway(jobapi.NewContextPropagatingJob(inctx), secondaryGateway, req.KeepOnFailure, &ferr)
 					if derr != nil {
 						logrus.Warn(derr.Error())
 					}

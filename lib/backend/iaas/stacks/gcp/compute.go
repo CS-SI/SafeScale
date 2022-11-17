@@ -325,7 +325,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 				if innerXErr != nil {
 					if ahf.IsConsistent() {
 						logrus.WithContext(ctx).Debugf("Reset up on failure, deleting host '%s'", ahf.GetName())
-						if derr := s.DeleteHost(context.Background(), ahf); derr != nil {
+						derr := s.DeleteHost(context.Background(), ahf)
+						if derr != nil {
 							msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", ahf.GetName())
 							_ = innerXErr.AddConsequence(fail.Wrap(derr, msg))
 						} else {

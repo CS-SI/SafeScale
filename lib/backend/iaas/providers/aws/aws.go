@@ -154,9 +154,9 @@ func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaas
 	}
 
 	username, _ := identityCfg["Username"].(string) // nolint
-	if username == "" {
-		return &provider{}, fail.SyntaxError("field 'Username' is missing or invalid")
-	}
+	// if username == "" {
+	// 	return &provider{}, fail.SyntaxError("field 'Username' is missing or invalid")
+	// }
 	password, _ := identityCfg["Password"].(string) // nolint
 
 	accessKeyID, _ := identityCfg["AccessKeyID"].(string)

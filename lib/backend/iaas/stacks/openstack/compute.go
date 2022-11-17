@@ -782,7 +782,8 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 		if ferr != nil {
 			if ahc.IsConsistent() {
 				logrus.WithContext(ctx).Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
-				if derr := instance.DeleteHost(context.Background(), ahc.ID); derr != nil {
+				derr := instance.DeleteHost(context.Background(), ahc.ID)
+				if derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
 						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
@@ -823,7 +824,8 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 			// Starting from here, delete created ports if exiting with error
 			defer func() {
 				if innerXErr != nil {
-					if derr := instance.deletePortsInSlice(context.Background(), createdPorts); derr != nil {
+					derr := instance.deletePortsInSlice(context.Background(), createdPorts)
+					if derr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
 					}
 				}
@@ -857,11 +859,13 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 				if innerXErr != nil {
 					if ahc.IsConsistent() {
 						logrus.WithContext(ctx).Debugf("deleting unresponsive server '%s'...", request.ResourceName)
-						if derr := instance.DeleteHost(context.Background(), ahc.ID); derr != nil {
+						derr := instance.DeleteHost(context.Background(), ahc.ID)
+						if derr != nil {
 							logrus.WithContext(ctx).Debugf(derr.Error())
 							_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName))
 							return
 						}
+
 						logrus.WithContext(ctx).Debugf("unresponsive server '%s' deleted", request.ResourceName)
 					}
 				}
@@ -945,7 +949,8 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
 				logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
-				if derr := instance.rpcDeleteFloatingIP(context.Background(), ip.ID); derr != nil {
+				derr := instance.rpcDeleteFloatingIP(context.Background(), ip.ID)
+				if derr != nil {
 					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
 					_ = ferr.AddConsequence(derr)
 					logrus.Error(derr.Error())
