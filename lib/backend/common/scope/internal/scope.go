@@ -77,6 +77,16 @@ type (
 
 // Load returns an existing scope from scope list
 func Load(organization, project, tenant string) (*scope, fail.Error) {
+	if organization == "" {
+		organization = global.DefaultOrganization
+	}
+	if project == "" {
+		project = global.DefaultProject
+	}
+	if tenant == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("tenant")
+	}
+
 	kvPath := buildKVPath(organization, project, tenant)
 	entry, loaded := scopeList.Load(kvPath)
 	if !loaded {

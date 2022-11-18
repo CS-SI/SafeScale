@@ -113,3 +113,7 @@ lib/backend/iaas/userdata/version.go
 *.swp
 
 git-hooks-env
+
+lib/protocol/javascript/safescale_grpc_web_pb.js
+
+lib/protocol/javascript/safescale_pb.js

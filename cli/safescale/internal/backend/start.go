@@ -25,7 +25,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/common"
@@ -274,12 +273,11 @@ func buildGRPCWebServer(grpcServer *grpc.Server) (*grpcweb.Mux, fail.Error) {
 
 	// VPL: still need to figure out why I would want to use WebSockets...
 	// if *useWebsockets {
-	// 	logrus.Println("using websockets")
-	// 	options = append(
-	// 		options,
-	// 		grpcweb.WithWebsockets(true),
-	// 		grpcweb.WithWebsocketOriginFunc(makeWebsocketOriginFunc(allowedOrigins)),
-	// 	)
+	logrus.Println("using websockets")
+	options = append(options,
+		improbablegrpcweb.WithWebsockets(true),
+	// grpcweb.WithWebsocketOriginFunc(makeWebsocketOriginFunc(allowedOrigins)),
+	)
 	// 	if *websocketPingInterval >= time.Second {
 	// 		logrus.Infof("websocket keepalive pinging enabled, the timeout interval is %s", websocketPingInterval.String())
 	// 	}
@@ -287,11 +285,11 @@ func buildGRPCWebServer(grpcServer *grpc.Server) (*grpcweb.Mux, fail.Error) {
 	// 		options = append(options, grpcweb.WithWebsocketsMessageReadLimit(*websocketReadLimit))
 	// 	}
 	//
-	// 	options = append(
-	// 		options,
-	// 		grpcweb.WithWebsocketPingInterval(*websocketPingInterval),
-	// 	)
-	//
+	options = append(
+		options,
+		improbablegrpcweb.WithWebsocketPingInterval(5*time.Second),
+	)
+
 	// 	var compressionMode websocket.CompressionMode
 	// 	switch *websocketCompressionMode {
 	// 	case "no_context_takeover":
@@ -316,110 +314,3 @@ func buildGRPCWebServer(grpcServer *grpc.Server) (*grpcweb.Mux, fail.Error) {
 
 	return grpcweb.NewHandler(grpcServer, options...)
 }
-
-var consulLauncher sync.Once
-
-// VPL: moved in lib/externals/consul/server.go
-// func startConsulAgent(ctx context.Context) (ferr fail.Error) {
-// 	ferr = nil
-// 	consulLauncher.Do(func() {
-// 		// creates configuration if not present
-// 		consulRootDir := global.Settings.Folders.ShareDir + "consul"
-// 		consulEtcDir := consulRootDir + "/etc"
-// 		// FIXME: decide what file name to use
-// 		consulConfigFile := consulEtcDir + "/config.?"
-// 		st, err := os.Stat(consulConfigFile)
-// 		if err != nil {
-// 			if errors.Is(err, os.ErrNotExist) {
-// 				content := `
-// bootstrap = true
-// ui_config {
-//   enabled = true
-// }
-// data_dir = data
-// log_level = "INFO"
-// addresses {
-//   http = "0.0.0.0"
-// }
-// connect {
-//   enabled = false
-// }`
-// 				file, err := os.Create(consulConfigFile)
-// 				if err != nil {
-// 					ferr = fail.Wrap(err, "failed to create consul configuration file")
-// 					return
-// 				}
-//
-// 				_, err = file.WriteString(content)
-// 				if err != nil {
-// 					ferr = fail.Wrap(err, "failed to write content of consul configuration file")
-// 					return
-// 				}
-//
-// 				err = file.Close()
-// 				if err != nil {
-// 					ferr = fail.Wrap(err, "failed to close consul configuration file")
-// 					return
-// 				}
-// 			} else {
-// 				ferr = fail.Wrap(err)
-// 				return
-// 			}
-// 		} else if st.IsDir() {
-// 			ferr = fail.NotAvailableError("'%s' is a directory; should be a file", consulConfigFile)
-// 			return
-// 		}
-//
-// 		// Starts consul agent
-// 		args := []string{"agent", "-config-dir=etc", "-server", "-datacenter=safescale"}
-// 		attr := &os.ProcAttr{
-// 			Sys: &syscall.SysProcAttr{
-// 				Chroot: global.Settings.Folders.ShareDir + "consul",
-// 			},
-// 		}
-// 		proc, err := os.StartProcess(global.Settings.Backend.Consul.ExecPath, args, attr)
-// 		if err != nil {
-// 			ferr = fail.Wrap(err, "failed to start consul server")
-// 			return
-// 		}
-//
-// 		var doneCh chan any
-//
-// 		waitConsulExitFunc := func(process *os.Process) {
-// 			ps, err := process.Wait()
-// 			if err != nil {
-// 				ferr = fail.Wrap(err)
-// 				doneCh <- ferr
-// 				return
-// 			}
-//
-// 			ws, ok := ps.Sys().(syscall.WaitStatus)
-// 			if ok {
-// 				doneCh <- ws
-// 				return
-// 			}
-//
-// 			doneCh <- ps.Sys()
-// 		}
-//
-// 		waitConsulExitFunc(proc)
-//
-// 		select {
-// 		case <-ctx.Done():
-// 			proc.Signal(os.Interrupt)
-// 			return
-// 		case val := <-doneCh:
-// 			switch casted := val.(type) {
-// 			case int:
-// 				logrus.Debugf("consul ends with status '%d'", casted)
-// 			case *os.ProcessState:
-// 				ferr = fail.NewError("consul exit with an unhandled state of type '%s': %v", reflect.TypeOf(casted).String(), casted)
-// 			default:
-// 				ferr = fail.NewError("consul exit with an unexpected state of type '%s': %v", reflect.TypeOf(val).String(), val)
-// 			}
-// 			return
-// 		}
-// 	})
-//
-// 	return ferr
-// }
