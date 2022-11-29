@@ -1,3 +1,6 @@
+//go:build ignored
+// +build ignored
+
 /*
 * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
 *
