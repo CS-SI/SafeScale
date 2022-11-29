@@ -1573,7 +1573,6 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 				}
 			}
 
-			var listMasters []StdResult
 			var theMasters []*Host
 			masterChan := make(chan StdResult, p.count)
 
@@ -1605,7 +1604,6 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 						continue
 					}
 				}
-				listMasters = append(listMasters, v)
 				theMasters = append(theMasters, v.Content.(*Host))
 				if theID, err := v.Content.(*Host).GetID(); err == nil {
 					instance.masters = append(instance.masters, theID)
@@ -2281,7 +2279,6 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 				}
 			}
 
-			var listNodes []StdResult
 			nodesChan := make(chan StdResult, p.count)
 
 			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), timeout, nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
@@ -2313,7 +2310,6 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 					debug.IgnoreError2(ctx, xerr)
 					continue
 				}
-				listNodes = append(listNodes, v)
 				lino = append(lino, v.Content.(*propertiesv3.ClusterNode))
 			}
 

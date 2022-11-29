@@ -411,10 +411,10 @@ func LoadCluster(inctx context.Context, svc iaas.Service, name string, options .
 			chRes <- result{nil, fail.NewError("bad cast")}
 			return
 		}
-		for k, _ := range gotta.PrivateNodeByID {
+		for k := range gotta.PrivateNodeByID {
 			clusterInstance.nodes = append(clusterInstance.nodes, k)
 		}
-		for k, _ := range gotta.MasterByID {
+		for k := range gotta.MasterByID {
 			clusterInstance.masters = append(clusterInstance.masters, k)
 		}
 
@@ -518,10 +518,10 @@ func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (d
 			chRes <- result{nil, fail.NewError("bad cast")}
 			return
 		}
-		for k, _ := range gotta.PrivateNodeByID {
+		for k := range gotta.PrivateNodeByID {
 			clusterInstance.nodes = append(clusterInstance.nodes, k)
 		}
-		for k, _ := range gotta.MasterByID {
+		for k := range gotta.MasterByID {
 			clusterInstance.masters = append(clusterInstance.masters, k)
 		}
 
