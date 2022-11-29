@@ -25,7 +25,7 @@ func main() {
 
 	cacheManager := cache.New(ristrettoStore)
 	ctx := context.TODO() // nolint
-	err = cacheManager.Set(ctx, "my-key", "my-value", &store.Options{Cost: 2, Expiration: 15 * time.Minute})
+	err = cacheManager.Set(ctx, "my-key", "my-value", &store.Options{Cost: 2, Expiration: 12 * time.Minute})
 	if err != nil {
 		panic(err)
 	}

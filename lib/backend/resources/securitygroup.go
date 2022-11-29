@@ -52,6 +52,7 @@ type SecurityGroup interface {
 	data.Identifiable
 	Consistent
 
+	GetName() string
 	AddRule(context.Context, *abstract.SecurityGroupRule) fail.Error                                               // returns true if the host is member of a cluster
 	AddRules(context.Context, abstract.SecurityGroupRules) fail.Error                                              // returns true if the host is member of a cluster
 	BindToHost(context.Context, Host, SecurityGroupActivation, SecurityGroupMark) fail.Error                       // binds a security group to a host

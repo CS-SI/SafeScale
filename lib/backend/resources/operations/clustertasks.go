@@ -46,11 +46,9 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -89,6 +87,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 				return nil, ar.rErr
 			}
 
+			// this is the real constructor of the cluster, the one that populates the cluster with meaningful data
 			// Create first metadata of Cluster after initialization
 			xerr = instance.firstLight(ctx, req)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -104,6 +103,8 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 				if ferr != nil && !req.KeepOnFailure && !cleanFailure {
 					logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
 					if instance.MetadataCore != nil {
+						theID, _ := instance.GetID()
+
 						if derr := instance.MetadataCore.Delete(cleanupContextFrom(ctx)); derr != nil {
 							logrus.WithContext(cleanupContextFrom(ctx)).Errorf(
 								"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
@@ -113,6 +114,14 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 							logrus.WithContext(ctx).Debugf(
 								"Cleaning up on %s, successfully deleted metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
 							)
+						}
+
+						if ka, err := instance.Service().GetCache(ctx); err == nil {
+							if ka != nil {
+								if theID != "" {
+									_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+								}
+							}
 						}
 					}
 				}
@@ -201,45 +210,42 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 				return nil, xerr
 			}
 
-			// FIXME: At some point clusterIdentity has to change...
+			gws, xerr := instance.trueListGateways(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			for _, agw := range gws {
+				instance.gateways = append(instance.gateways, agw.Core.ID)
+			}
 
 			// Starting from here, exiting with error deletes hosts if req.keepOnFailure is false
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !req.KeepOnFailure {
 					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Hosts...")
-					var list []machineID
 
-					var nodemap map[uint]*propertiesv3.ClusterNode
-					derr := instance.Inspect(cleanupContextFrom(ctx), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-						return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-							nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-							if !ok {
-								return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-							}
-
-							nodemap = nodesV3.ByNumericalID
-							return nil
-						})
-					})
+					var toDelete []*abstract.HostFull
+					masters, derr := instance.trueListMasters(cleanupContextFrom(ctx))
 					if derr != nil {
-						cleanFailure = true
-						derr = fail.Wrap(derr, callstack.WhereIsThis())
 						_ = ferr.AddConsequence(derr)
-						return
+					} else {
+						toDelete = append(toDelete, masters...)
+					}
+					nodes, derr := instance.trueListNodes(cleanupContextFrom(ctx))
+					if derr != nil {
+						_ = ferr.AddConsequence(derr)
+					} else {
+						toDelete = append(toDelete, nodes...)
 					}
 
-					for _, v := range nodemap {
-						list = append(list, machineID{ID: v.ID, Name: v.Name})
-					}
-
-					if len(list) > 0 {
+					if len(toDelete) > 0 {
 						clean := new(errgroup.Group)
-						for _, v := range list {
+						for _, v := range toDelete {
 							captured := v
-							if captured.ID != "" {
+							if captured.Core.ID != "" {
 								clean.Go(func() error {
-									_, err := instance.taskDeleteNodeOnFailure(cleanupContextFrom(ctx), taskDeleteNodeOnFailureParameters{ID: captured.ID, Name: captured.Name, KeepOnFailure: req.KeepOnFailure, Timeout: 2 * time.Minute, clusterName: req.Name})
+									_, err := instance.taskDeleteNodeOnFailure(cleanupContextFrom(ctx), taskDeleteNodeOnFailureParameters{ID: captured.Core.ID, Name: captured.Core.Name, KeepOnFailure: req.KeepOnFailure, Timeout: 2 * time.Minute, clusterName: req.Name})
 									return err
 								})
 							}
@@ -249,8 +255,6 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 							cleanFailure = true
 							return
 						}
-					} else {
-						logrus.WithContext(ctx).Warningf("relying on metadata here was a mistake...")
 					}
 				}
 			}()
@@ -311,7 +315,6 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 		<-chRes // wait cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -336,12 +339,15 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 				return xerr
 			}
 
+			// FIXME: OPP This is the true cluster constructor
 			// Initializes instance
 			ci := abstract.NewClusterIdentity()
 			ci.Name = req.Name
 			ci.Flavor = req.Flavor
 			ci.Complexity = req.Complexity
 			ci.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
+
+			*instance.cluID = *ci
 
 			xerr := instance.carry(ctx, ci)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -453,6 +459,8 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 				}
 				aci.AdminPassword = cladmPassword
 
+				*instance.cluID = *aci
+
 				// Links maker based on Flavor
 				return instance.bootstrap(aci.Flavor)
 			})
@@ -468,9 +476,9 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 	case res := <-chRes:
 		return res.rErr
 	case <-ctx.Done():
+		<-chRes
 		return fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return fail.ConvertError(inctx.Err())
 	}
@@ -517,9 +525,9 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 					}
 				}
 			}
-			makers := instance.localCache.makers
+			makers, _ := instance.getMaker(ctx)
 			if imageQuery == "" && makers.DefaultImage != nil {
-				imageQuery = makers.DefaultImage(instance)
+				imageQuery = makers.DefaultImage(ctx, instance)
 			}
 			if imageQuery == "" {
 				imageQuery = consts.DEFAULTOS
@@ -533,7 +541,7 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 
 			// Determine getGateway sizing
 			if makers.DefaultGatewaySizing != nil {
-				gatewaysDefault = complementSizingRequirements(nil, makers.DefaultGatewaySizing(instance))
+				gatewaysDefault = complementSizingRequirements(nil, makers.DefaultGatewaySizing(ctx, instance))
 			} else {
 				gatewaysDefault = &abstract.HostSizingRequirements{
 					MinCores:    2,
@@ -571,7 +579,7 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 
 			// Determine master sizing
 			if makers.DefaultMasterSizing != nil {
-				mastersDefault = complementSizingRequirements(nil, makers.DefaultMasterSizing(instance))
+				mastersDefault = complementSizingRequirements(nil, makers.DefaultMasterSizing(ctx, instance))
 			} else {
 				mastersDefault = &abstract.HostSizingRequirements{
 					MinCores:    4,
@@ -603,7 +611,7 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 
 			// Determine node sizing
 			if makers.DefaultNodeSizing != nil {
-				nodesDefault = complementSizingRequirements(nil, makers.DefaultNodeSizing(instance))
+				nodesDefault = complementSizingRequirements(nil, makers.DefaultNodeSizing(ctx, instance))
 			} else {
 				nodesDefault = &abstract.HostSizingRequirements{
 					MinCores:    4,
@@ -662,9 +670,9 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 	case res := <-chRes:
 		return res.aa, res.ab, res.ac, res.rErr
 	case <-ctx.Done():
+		<-chRes
 		return nil, nil, nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, nil, nil, fail.ConvertError(inctx.Err())
 	}
@@ -957,7 +965,6 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 		<-chRes // wait for cleanup
 		return nil, nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes // wait for cleanup
 		return nil, nil, fail.ConvertError(inctx.Err())
 	}
@@ -1028,12 +1035,12 @@ func (instance *Cluster) createHostResources(
 
 			eg := new(errgroup.Group)
 			eg.Go(func() error {
-				_, xerr := instance.taskInstallGateway(ctx, taskInstallGatewayParameters{host: primaryGateway, variables: parameters, clusterName: cluReq.Name})
+				_, xerr := instance.taskInstallGateway(ctx, taskInstallGatewayParameters{host: primaryGateway, variables: parameters, clusterName: cluReq.Name, request: cluReq})
 				return xerr
 			})
 			if haveSecondaryGateway {
 				eg.Go(func() error {
-					_, xerr := instance.taskInstallGateway(ctx, taskInstallGatewayParameters{host: secondaryGateway, variables: parameters, clusterName: cluReq.Name})
+					_, xerr := instance.taskInstallGateway(ctx, taskInstallGatewayParameters{host: secondaryGateway, variables: parameters, clusterName: cluReq.Name, request: cluReq})
 					return xerr
 				})
 			}
@@ -1054,7 +1061,7 @@ func (instance *Cluster) createHostResources(
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !keepOnFailure {
-					masters, merr := instance.unsafeListMasters(cleanupContextFrom(ctx))
+					masters, merr := instance.trueListMasters(cleanupContextFrom(ctx))
 					if merr != nil {
 						_ = ferr.AddConsequence(merr)
 						return
@@ -1062,7 +1069,7 @@ func (instance *Cluster) createHostResources(
 
 					var list []machineID
 					for _, mach := range masters {
-						list = append(list, machineID{ID: mach.ID, Name: mach.Name})
+						list = append(list, machineID{ID: mach.Core.ID, Name: mach.Core.Name})
 					}
 
 					hosts, merr := instance.Service().ListHosts(cleanupContextFrom(ctx), false)
@@ -1104,72 +1111,34 @@ func (instance *Cluster) createHostResources(
 				}
 			}()
 
-			// Step 3: start gateway configuration (needs MasterIPs so masters must be installed first)
-			// Configure gateway(s) and waits for the result
-
-			// Step 4: configure masters (if masters created successfully and gateways configured successfully)
-
-			// Step 5: awaits nodes creation
-
-			// Step 6: Starts nodes configuration, if all masters and nodes have been created and gateway has been configured with success
-
-			waitForMasters := make(chan struct{})
-			waitForBoth := make(chan struct{})
 			egMas := new(errgroup.Group)
 			egMas.Go(func() error {
-				defer func() {
-					close(waitForMasters)
-				}()
-				_, xerr := instance.taskCreateMasters(ctx, taskCreateMastersParameters{
+				masters, xerr := instance.taskCreateMasters(ctx, taskCreateMastersParameters{
 					count:         masterCount,
 					mastersDef:    mastersDef,
 					keepOnFailure: keepOnFailure,
 					clusterName:   cluReq.Name,
+					request:       cluReq,
 				})
 				if xerr != nil {
 					return xerr
 				}
-				return nil
-			})
-			egMas.Go(func() error {
-				<-waitForMasters
-				defer func() {
-					if !haveSecondaryGateway {
-						close(waitForBoth)
-					}
-				}()
-				_, xerr := instance.taskConfigureGateway(ctx, taskConfigureGatewayParameters{cluReq.Name, primaryGateway})
-				if xerr != nil {
-					return xerr
-				}
-				return nil
-			})
-			if haveSecondaryGateway {
-				egMas.Go(func() error {
-					<-waitForMasters
-					defer func() {
-						close(waitForBoth)
-					}()
-					_, xerr := instance.taskConfigureGateway(ctx, taskConfigureGatewayParameters{cluReq.Name, secondaryGateway})
-					if xerr != nil {
-						return xerr
-					}
-					return nil
+
+				_, xerr = instance.taskConfigureMasters(ctx, taskConfigureMastersParameters{
+					clusterName: cluReq.Name,
+					variables:   parameters,
+					masters:     masters.([]*Host),
+					request:     cluReq,
 				})
-			}
-			egMas.Go(func() error {
-				<-waitForMasters
-				<-waitForBoth
-				_, xerr := instance.taskConfigureMasters(ctx, taskConfigureMastersParameters{cluReq.Name, parameters})
 				return xerr
 			})
-
 			xerr = fail.ConvertError(egMas.Wait())
 			if xerr != nil {
 				return result{xerr}, xerr
 			}
 
 			// Starting from here, if exiting with error, delete nodes
+			// FIXME: OPP, another mistake
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !keepOnFailure {
@@ -1180,32 +1149,14 @@ func (instance *Cluster) createHostResources(
 						}
 					}()
 
-					nlist, derr := instance.unsafeListNodes(cleanupContextFrom(ctx))
+					nlist, derr := instance.trueListNodes(cleanupContextFrom(ctx))
 					if derr != nil {
 						return
 					}
 
 					var list []machineID
 					for _, mach := range nlist {
-						list = append(list, machineID{ID: mach.ID, Name: mach.Name})
-					}
-
-					hosts, derr := instance.Service().ListHosts(cleanupContextFrom(ctx), false)
-					if derr != nil {
-						return
-					}
-
-					for _, invol := range hosts {
-						theName := invol.GetName()
-						theID, _ := invol.GetID()
-						iname := cluReq.Name
-						if strings.Contains(theName, "node") {
-							if len(iname) > 0 {
-								if strings.Contains(theName, iname) {
-									list = append(list, machineID{ID: theID, Name: invol.GetName()})
-								}
-							}
-						}
+						list = append(list, machineID{ID: mach.Core.ID, Name: mach.Core.Name})
 					}
 
 					if len(list) > 0 {
@@ -1226,18 +1177,25 @@ func (instance *Cluster) createHostResources(
 
 			egNod := new(errgroup.Group)
 			egNod.Go(func() error {
-				_, xerr := instance.taskCreateNodes(ctx, taskCreateNodesParameters{
+				nops, xerr := instance.taskCreateNodes(ctx, taskCreateNodesParameters{
 					count:         cluReq.InitialNodeCount,
 					public:        false,
 					nodesDef:      nodesDef,
 					keepOnFailure: keepOnFailure,
 					clusterName:   cluReq.Name,
+					request:       cluReq,
 				})
 				if xerr != nil {
 					return xerr
 				}
 
-				_, xerr = instance.taskConfigureNodes(ctx, taskConfigureNodesParameters{variables: parameters, clusterName: cluReq.Name})
+				nodes, _ := nops.([]*propertiesv3.ClusterNode) // nolint
+				_, xerr = instance.taskConfigureNodes(ctx, taskConfigureNodesParameters{
+					variables:   parameters,
+					clusterName: cluReq.Name,
+					nodes:       nodes,
+					request:     cluReq,
+				})
 				if xerr != nil {
 					return xerr
 				}
@@ -1247,6 +1205,27 @@ func (instance *Cluster) createHostResources(
 			xerr = fail.ConvertError(egNod.Wait())
 			if xerr != nil {
 				return result{xerr}, xerr
+			}
+
+			if _, ok := cluReq.DisabledDefaultFeatures["docker"]; !ok {
+				xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+						featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+						if !ok {
+							return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						}
+
+						featuresV1.Installed["docker"] = &propertiesv1.ClusterInstalledFeature{
+							Name: "docker",
+						}
+						return nil
+					})
+				})
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+					return result{xerr}, xerr
+				}
 			}
 
 			return result{nil}, nil
@@ -1260,7 +1239,6 @@ func (instance *Cluster) createHostResources(
 		<-chRes // wait for cleanup
 		return fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes // wait for cleanup
 		return fail.ConvertError(inctx.Err())
 	}
@@ -1378,8 +1356,7 @@ func (instance *Cluster) taskStartHost(inctx context.Context, params interface{}
 				return result{nil, xerr}, xerr
 			}
 
-			_, xerr = hostInstance.ForceGetState(ctx)
-			return result{nil, xerr}, xerr
+			return result{nil, nil}, nil
 		}()
 		chRes <- gres
 	}()
@@ -1387,9 +1364,9 @@ func (instance *Cluster) taskStartHost(inctx context.Context, params interface{}
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -1438,14 +1415,7 @@ func (instance *Cluster) taskStopHost(inctx context.Context, params interface{})
 				}
 			}
 
-			// -- refresh state of host --
-			hostInstance, xerr := LoadHost(ctx, svc, id)
-			if xerr != nil {
-				return result{nil, xerr}, xerr
-			}
-
-			_, xerr = hostInstance.ForceGetState(ctx)
-			return result{nil, xerr}, xerr
+			return result{nil, nil}, nil
 		}()
 		chRes <- gres
 	}()
@@ -1453,9 +1423,9 @@ func (instance *Cluster) taskStopHost(inctx context.Context, params interface{})
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -1466,6 +1436,7 @@ type taskInstallGatewayParameters struct {
 	host        resources.Host
 	variables   data.Map
 	clusterName string
+	request     abstract.ClusterRequest
 }
 
 // taskInstallGateway installs necessary components on one gateway
@@ -1496,11 +1467,7 @@ func (instance *Cluster) taskInstallGateway(inctx context.Context, params interf
 				return result{nil, xerr}, xerr
 			}
 
-			variables, _ := data.FromMap(p.variables)
 			hostLabel := p.host.GetName()
-
-			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
-			defer tracer.Exiting()
 
 			if oldKey := ctx.Value("ID"); oldKey != nil {
 				ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/install/gateway/%s", oldKey, hostLabel)) // nolint
@@ -1519,15 +1486,8 @@ func (instance *Cluster) taskInstallGateway(inctx context.Context, params interf
 				return result{nil, xerr}, xerr
 			}
 
-			// Installs docker and docker-compose on gateway
-			xerr = instance.installDocker(ctx, p.host, hostLabel, variables)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return result{nil, xerr}, xerr
-			}
-
 			// Installs dependencies as defined by Cluster Flavor (if it exists)
-			xerr = instance.installNodeRequirements(ctx, clusternodetype.Gateway, p.host, hostLabel)
+			xerr = instance.installNodeRequirements(ctx, clusternodetype.Gateway, p.host, hostLabel, p.request)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return result{nil, xerr}, xerr
@@ -1542,81 +1502,9 @@ func (instance *Cluster) taskInstallGateway(inctx context.Context, params interf
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
-		<-chRes
-		return nil, fail.ConvertError(inctx.Err())
-	}
-
-}
-
-type taskConfigureGatewayParameters struct {
-	clusterName string
-	Host        resources.Host
-}
-
-// taskConfigureGateway prepares one gateway
-func (instance *Cluster) taskConfigureGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
-	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  interface{}
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		gres, _ := func() (_ result, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-			// validate and convert parameters
-			p, ok := params.(taskConfigureGatewayParameters)
-			if !ok {
-				xerr := fail.InvalidParameterError("params", "must be a 'taskConfigureGatewayParameters'")
-				return result{nil, xerr}, xerr
-			}
-			if p.Host == nil {
-				xerr := fail.InvalidParameterCannotBeNilError("params.Host")
-				return result{nil, xerr}, xerr
-			}
-
-			hostLabel := p.Host.GetName()
-
-			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
-			defer tracer.Exiting()
-
-			if oldKey := ctx.Value("ID"); oldKey != nil {
-				ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/gateway/%s", oldKey, hostLabel)) // nolint
-			}
-
-			logrus.WithContext(ctx).Debugf("starting configuration")
-
-			makers := instance.localCache.makers
-			if makers.ConfigureGateway != nil {
-				xerr := makers.ConfigureGateway(instance)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return result{nil, xerr}, xerr
-				}
-			}
-
-			logrus.WithContext(ctx).Debugf("[%s] configuration successful in [%s].", hostLabel, tracer.Stopwatch().String())
-			return result{nil, nil}, nil
-		}()
-		chRes <- gres
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -1628,6 +1516,7 @@ type taskCreateMastersParameters struct {
 	mastersDef    abstract.HostSizingRequirements
 	keepOnFailure bool
 	clusterName   string
+	request       abstract.ClusterRequest
 }
 
 // taskCreateMasters creates masters
@@ -1648,9 +1537,6 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 		defer close(chRes)
 		gres, _ := func() (_ result, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
-
-			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
-			defer tracer.Exiting()
 
 			// Convert and validate parameters
 			p, ok := params.(taskCreateMastersParameters)
@@ -1688,6 +1574,7 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 			}
 
 			var listMasters []StdResult
+			var theMasters []*Host
 			masterChan := make(chan StdResult, p.count)
 
 			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), timeout, masterChan, instance.taskCreateMaster, taskCreateMasterParameters{
@@ -1695,6 +1582,7 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 				timeout:       timings.HostCreationTimeout(),
 				keepOnFailure: p.keepOnFailure,
 				clusterName:   p.clusterName,
+				request:       p.request,
 			})
 			if err != nil {
 				close(masterChan)
@@ -1708,16 +1596,24 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 				}
 				if v.ToBeDeleted {
 					if aho, ok := v.Content.(*Host); ok {
+						hid, _ := aho.GetID()
 						xerr = aho.Delete(cleanupContextFrom(ctx))
+						debug.IgnoreError2(ctx, xerr)
+
+						xerr = svc.DeleteHost(cleanupContextFrom(ctx), hid)
 						debug.IgnoreError2(ctx, xerr)
 						continue
 					}
 				}
 				listMasters = append(listMasters, v)
+				theMasters = append(theMasters, v.Content.(*Host))
+				if theID, err := v.Content.(*Host).GetID(); err == nil {
+					instance.masters = append(instance.masters, theID)
+				}
 			}
 
-			logrus.WithContext(ctx).Debugf("Masters creation successful: %v", listMasters)
-			return result{listMasters, nil}, nil
+			logrus.WithContext(ctx).Debugf("Masters creation successful: %v", theMasters)
+			return result{theMasters, nil}, nil
 		}()
 		chRes <- gres
 	}()
@@ -1725,9 +1621,9 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -1738,6 +1634,7 @@ type taskCreateMasterParameters struct {
 	timeout       time.Duration
 	keepOnFailure bool
 	clusterName   string
+	request       abstract.ClusterRequest
 }
 
 // taskCreateMaster creates one master
@@ -1752,7 +1649,7 @@ func (instance *Cluster) taskCreateMaster(inctx context.Context, params interfac
 	defer cancel()
 
 	type result struct {
-		rTr  interface{}
+		rTr  *Host
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -1812,9 +1709,6 @@ func (instance *Cluster) taskCreateMaster(inctx context.Context, params interfac
 				ar := result{nil, fail.Wrap(xerr, "[%s] creation failed", fmt.Sprintf("master #%d", nodeIdx))}
 				return ar, ar.rErr
 			}
-
-			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).Entering()
-			defer tracer.Exiting()
 
 			hostLabel := fmt.Sprintf("master %s", hostReq.ResourceName)
 			logrus.WithContext(ctx).Debugf("[%s] starting master Host creation...", hostLabel)
@@ -1986,7 +1880,7 @@ func (instance *Cluster) taskCreateMaster(inctx context.Context, params interfac
 
 			hostLabel = fmt.Sprintf("master (%s)", hostReq.ResourceName)
 
-			xerr = instance.installNodeRequirements(ctx, clusternodetype.Master, hostInstance, hostLabel)
+			xerr = instance.installNodeRequirements(ctx, clusternodetype.Master, hostInstance, hostLabel, p.request)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return result{nil, xerr}, xerr
@@ -2001,10 +1895,9 @@ func (instance *Cluster) taskCreateMaster(inctx context.Context, params interfac
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		<-chRes // wait for clean
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -2032,6 +1925,8 @@ func withTimeout(xerr fail.Error) bool {
 type taskConfigureMastersParameters struct {
 	clusterName string
 	variables   data.Map
+	masters     []*Host
+	request     abstract.ClusterRequest
 }
 
 // taskConfigureMasters configure masters
@@ -2059,34 +1954,22 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params inte
 				return result{nil, xerr}, xerr
 			}
 			variables, _ := data.FromMap(p.variables)
-			tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-			defer tracer.Exiting()
 
 			iname := p.clusterName
 			logrus.WithContext(ctx).Debugf("[Cluster %s] Configuring masters...", iname)
 
-			masters, xerr := instance.unsafeListMasters(ctx)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return result{nil, xerr}, xerr
-			}
-			if len(masters) == 0 {
-				ar := result{nil, fail.NewError("[Cluster %s] master list cannot be empty.", iname)}
-				return ar, ar.rErr
-			}
-
-			for _, master := range masters {
-				if master.ID == "" {
-					ar := result{nil, fail.InvalidParameterError("masters", "cannot contain items with empty ID")}
-					return ar, ar.rErr
-				}
-			}
+			masters := p.masters
 
 			tgm := new(errgroup.Group)
 			for _, master := range masters {
 				capturedMaster := master
 				tgm.Go(func() error {
-					host, xerr := LoadHost(ctx, instance.Service(), capturedMaster.ID)
+					id, err := capturedMaster.GetID()
+					if err != nil {
+						return err
+					}
+
+					host, xerr := LoadHost(ctx, instance.Service(), id)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
@@ -2101,6 +1984,7 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params inte
 						Host:        host,
 						variables:   variables,
 						clusterName: p.clusterName,
+						request:     p.request,
 					})
 					if xerr != nil {
 						switch xerr.(type) {
@@ -2114,7 +1998,7 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params inte
 				})
 			}
 
-			xerr = fail.ConvertError(tgm.Wait())
+			xerr := fail.ConvertError(tgm.Wait())
 			if xerr != nil {
 				return result{nil, xerr}, xerr
 			}
@@ -2128,9 +2012,9 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params inte
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -2141,6 +2025,7 @@ type taskConfigureMasterParameters struct {
 	Host        resources.Host
 	variables   data.Map
 	clusterName string
+	request     abstract.ClusterRequest
 }
 
 // taskConfigureMaster configures one master
@@ -2151,9 +2036,6 @@ func (instance *Cluster) taskConfigureMaster(inctx context.Context, params inter
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	type result struct {
 		rTr  interface{}
@@ -2177,10 +2059,6 @@ func (instance *Cluster) taskConfigureMaster(inctx context.Context, params inter
 				return ar, ar.rErr
 			}
 
-			variables, _ := data.FromMap(p.variables)
-
-			started := time.Now()
-
 			if oldKey := ctx.Value("ID"); oldKey != nil {
 				ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/master/%s", oldKey, p.Host.GetName())) // nolint
 			}
@@ -2195,28 +2073,6 @@ func (instance *Cluster) taskConfigureMaster(inctx context.Context, params inter
 				return result{nil, nil}, nil
 			}
 
-			// install docker feature (including docker-compose)
-			hostLabel := fmt.Sprintf("master (%s)", p.Host.GetName())
-			xerr = instance.installDocker(ctx, p.Host, hostLabel, variables)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return result{nil, xerr}, xerr
-			}
-
-			// Configure master for flavor
-			makers := instance.localCache.makers
-			if makers.ConfigureMaster != nil {
-				xerr = makers.ConfigureMaster(instance, p.Host)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					ar := result{nil, fail.Wrap(xerr, "failed to configure master '%s'", p.Host.GetName())}
-					return ar, ar.rErr
-				}
-
-				logrus.WithContext(ctx).Debugf("[%s] configuration successful in [%s].", hostLabel, temporal.FormatDuration(time.Since(started)))
-				return result{nil, nil}, nil
-			}
-
 			// Not finding a callback isn't an error, so return nil in this case
 			return result{nil, nil}, nil
 		}()
@@ -2226,9 +2082,9 @@ func (instance *Cluster) taskConfigureMaster(inctx context.Context, params inter
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -2240,6 +2096,7 @@ type taskCreateNodesParameters struct {
 	public        bool
 	nodesDef      abstract.HostSizingRequirements
 	keepOnFailure bool
+	request       abstract.ClusterRequest
 }
 
 func drainChannel(dch chan struct{}) {
@@ -2374,7 +2231,7 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 	defer cancel()
 
 	type result struct {
-		rTr  interface{}
+		rTr  []*propertiesv3.ClusterNode
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -2393,9 +2250,6 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 				return ar, ar.rErr
 			}
 
-			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
-			defer tracer.Exiting()
-
 			timings, xerr := instance.Service().Timings()
 			if xerr != nil {
 				return result{nil, xerr}, xerr
@@ -2405,7 +2259,19 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 
 			timeout := time.Duration(p.count) * timings.HostCreationTimeout()
 
+			// another tweak for Stein
 			winSize := 8
+			st, xerr := instance.Service().GetProviderName()
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
+			if st != "ovh" {
+				winSize = int((8 * p.count) / 10)
+				if winSize < 8 {
+					winSize = 8
+				}
+			}
+
 			svc := instance.Service()
 			if cfg, xerr := svc.GetConfigurationOptions(ctx); xerr == nil {
 				if aval, ok := cfg.Get("ConcurrentMachineCreationLimit"); ok {
@@ -2423,26 +2289,36 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 				timeout:       timings.HostOperationTimeout(),
 				keepOnFailure: p.keepOnFailure,
 				clusterName:   p.clusterName,
+				request:       p.request,
 			})
 			if err != nil {
 				return result{nil, fail.ConvertError(err)}, fail.ConvertError(err)
 			}
 
 			close(nodesChan)
+			var lino []*propertiesv3.ClusterNode
 			for v := range nodesChan {
 				if v.Err != nil {
 					continue
 				}
 				if v.ToBeDeleted {
-					_, xerr = instance.taskDeleteNodeWithCtx(ctx, taskDeleteNodeParameters{node: v.Content.(*propertiesv3.ClusterNode), clusterName: p.clusterName})
+					crucial, ok := v.Content.(*propertiesv3.ClusterNode)
+					if !ok {
+						continue
+					}
+					_, xerr = instance.taskDeleteNodeWithCtx(cleanupContextFrom(ctx), taskDeleteNodeParameters{node: v.Content.(*propertiesv3.ClusterNode), clusterName: p.clusterName})
+					debug.IgnoreError2(ctx, xerr)
+
+					xerr = svc.DeleteHost(cleanupContextFrom(ctx), crucial.ID)
 					debug.IgnoreError2(ctx, xerr)
 					continue
 				}
 				listNodes = append(listNodes, v)
+				lino = append(lino, v.Content.(*propertiesv3.ClusterNode))
 			}
 
 			logrus.WithContext(ctx).Debugf("%d node%s creation successful.", p.count, strprocess.Plural(p.count))
-			return result{listNodes, nil}, nil
+			return result{lino, nil}, nil
 		}()
 		chRes <- gres
 	}()
@@ -2451,9 +2327,9 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -2465,6 +2341,7 @@ type taskCreateNodeParameters struct {
 	nodeDef       abstract.HostSizingRequirements
 	timeout       time.Duration // Not used currently
 	keepOnFailure bool
+	request       abstract.ClusterRequest
 }
 
 func cleanupContextFrom(inctx context.Context) context.Context {
@@ -2488,8 +2365,10 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	// FIXME: OPP perhaps we should return something Identifiable, that's what really need
+
 	type result struct {
-		rTr  interface{}
+		rTr  *propertiesv3.ClusterNode
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -2548,9 +2427,6 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 				ar := result{nil, fail.Wrap(xerr, "[%s] creation failed", fmt.Sprintf("node %s", hostReq.ResourceName))}
 				return ar, ar.rErr
 			}
-
-			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
-			defer tracer.Exiting()
 
 			hostLabel := fmt.Sprintf("node %s", hostReq.ResourceName)
 
@@ -2669,7 +2545,7 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 				return result{nil, xerr}, xerr
 			}
 
-			logrus.WithContext(ctx).Debugf(tracer.TraceMessage("[%s] Host updating cluster metadata...", hostLabel))
+			logrus.WithContext(ctx).Debugf("[%s] Host updating cluster metadata...", hostLabel)
 
 			// -- update cluster metadata --
 			var node *propertiesv3.ClusterNode
@@ -2771,9 +2647,9 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 				}
 			}()
 
-			logrus.WithContext(ctx).Debugf(tracer.TraceMessage("[%s] Host installing node requirements...", hostLabel))
+			logrus.WithContext(ctx).Debugf("[%s] Host installing node requirements...", hostLabel)
 
-			xerr = instance.installNodeRequirements(ctx, clusternodetype.Node, hostInstance, hostLabel)
+			xerr = instance.installNodeRequirements(ctx, clusternodetype.Node, hostInstance, hostLabel, p.request)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return result{nil, xerr}, xerr
@@ -2791,16 +2667,16 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
-
 }
 
 type taskConfigureNodesParameters struct {
 	variables   data.Map
 	clusterName string
+	nodes       []*propertiesv3.ClusterNode
+	request     abstract.ClusterRequest
 }
 
 // taskConfigureNodes configures nodes
@@ -2828,22 +2704,9 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interf
 			defer fail.OnPanic(&ferr)
 			clusterName := p.clusterName
 
-			tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-			defer tracer.Exiting()
-
-			list, err := instance.unsafeListNodes(ctx)
-			err = debug.InjectPlannedFail(err)
-			if err != nil {
-				return result{nil, err}, err
-			}
-			if len(list) == 0 {
-				ar := result{nil, fail.NewError("[Cluster %s] node list cannot be empty.", clusterName)}
-				return ar, ar.rErr
-			}
-
 			logrus.WithContext(ctx).Debugf("[Cluster %s] configuring nodes...", clusterName)
 
-			for _, node := range list {
+			for _, node := range p.nodes {
 				if node.ID == "" {
 					ar := result{nil, fail.InvalidParameterError("list", "cannot contain items with empty ID")}
 					return ar, ar.rErr
@@ -2855,15 +2718,16 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interf
 				what interface{}
 			}
 
-			resCh := make(chan cfgRes, len(list))
+			resCh := make(chan cfgRes, len(p.nodes))
 			eg := new(errgroup.Group)
-			for _, node := range list {
+			for _, node := range p.nodes {
 				capturedNode := node
 				eg.Go(func() error {
 					tr, xerr := instance.taskConfigureNode(ctx, taskConfigureNodeParameters{
 						node:        capturedNode,
 						variables:   variables,
 						clusterName: p.clusterName,
+						request:     p.request,
 					})
 					if xerr != nil {
 						switch xerr.(type) {
@@ -2902,9 +2766,9 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interf
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -2914,6 +2778,7 @@ type taskConfigureNodeParameters struct {
 	node        *propertiesv3.ClusterNode
 	variables   data.Map
 	clusterName string
+	request     abstract.ClusterRequest
 }
 
 // taskConfigureNode configure one node
@@ -2944,10 +2809,6 @@ func (instance *Cluster) taskConfigureNode(inctx context.Context, params interfa
 				ar := result{nil, fail.InvalidParameterCannotBeNilError("params.Node")}
 				return ar, ar.rErr
 			}
-			variables, _ := data.FromMap(p.variables)
-
-			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%s)", p.node.Name).WithStopwatch().Entering()
-			defer tracer.Exiting()
 
 			if oldKey := ctx.Value("ID"); oldKey != nil {
 				ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/node/%s", oldKey, p.node.Name)) // nolint
@@ -2976,20 +2837,13 @@ func (instance *Cluster) taskConfigureNode(inctx context.Context, params interfa
 				return result{nil, nil}, nil
 			}
 
-			// Docker and docker-compose installation is mandatory on all nodes
-			xerr = instance.installDocker(ctx, hostInstance, hostLabel, variables)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return result{nil, xerr}, xerr
-			}
-
 			// Now configures node specifically for Cluster flavor
-			makers := instance.localCache.makers
+			makers, _ := instance.getMaker(ctx)
 			if makers.ConfigureNode == nil {
 				return result{nil, nil}, nil
 			}
 
-			xerr = makers.ConfigureNode(instance, hostInstance)
+			xerr = makers.ConfigureNode(ctx, instance, hostInstance)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				logrus.WithContext(ctx).Error(xerr.Error())
@@ -3005,9 +2859,9 @@ func (instance *Cluster) taskConfigureNode(inctx context.Context, params interfa
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -3093,11 +2947,9 @@ func (instance *Cluster) taskDeleteNodeOnFailure(inctx context.Context, params i
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-time.After(casted.Timeout):
-		cancel()
 		<-chRes
 		return nil, fail.TimeoutError(fmt.Errorf("timeout trying to delete node on failure"), casted.Timeout)
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -3181,9 +3033,9 @@ func (instance *Cluster) taskDeleteNodeWithCtx(inctx context.Context, params int
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -3257,9 +3109,9 @@ func (instance *Cluster) taskDeleteMaster(inctx context.Context, params interfac
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -3306,9 +3158,9 @@ func (instance *Cluster) taskUpdateClusterInventoryMaster(inctx context.Context,
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
@@ -3425,9 +3277,9 @@ func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, par
 	case res := <-chRes:
 		return res.rErr
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		cancel()
 		<-chRes
 		return fail.ConvertError(inctx.Err())
 	}

@@ -1024,10 +1024,6 @@ func (e *ServiceTest) GetMetadataBucket(ctx context.Context) (abstract.ObjectSto
 	return metadatabucket, nil
 }
 
-func (e *ServiceTest) ListHostsByName(ctx context.Context, value bool) (map[string]*abstract.HostFull, fail.Error) {
-	e._survey("ServiceTest::ListHostsByName (not implemented)")
-	return map[string]*abstract.HostFull{}, nil
-}
 func (e *ServiceTest) ListTemplatesBySizing(context.Context, abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error) {
 	e._survey("ServiceTest::ListTemplatesBySizing (not implemented)")
 	return []*abstract.HostTemplate{}, nil
@@ -2461,10 +2457,7 @@ func (e *ServiceTest) RebootHost(context.Context, stacks.HostParameter) fail.Err
 	e._survey("ServiceTest::RebootHost (not implemented)")
 	return nil
 }
-func (e *ServiceTest) ResizeHost(context.Context, stacks.HostParameter, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	e._survey("ServiceTest::ResizeHost (not implemented)")
-	return nil, nil
-}
+
 func (e *ServiceTest) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	e._survey("ServiceTest::WaitHostReady (not implemented)")
 	return nil, nil

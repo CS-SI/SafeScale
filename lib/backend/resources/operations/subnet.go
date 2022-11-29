@@ -22,7 +22,6 @@ import (
 	"net"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
@@ -68,12 +67,6 @@ const (
 // Subnet links Object Storage MetadataFolder and Subnet
 type Subnet struct {
 	*MetadataCore
-
-	localCache struct {
-		sync.RWMutex
-		gateways [2]*Host
-		// parentNetwork resources.Network
-	}
 }
 
 // ListSubnets returns a list of available subnets
@@ -129,6 +122,7 @@ func NewSubnet(svc iaas.Service) (_ *Subnet, ferr fail.Error) {
 	instance := &Subnet{
 		MetadataCore: coreInstance,
 	}
+
 	return instance, nil
 }
 
@@ -286,20 +280,19 @@ func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef s
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, subnetInstance.GetName()), subnetInstance, &store.Options{Expiration: 1 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, subnetInstance.GetName()), subnetInstance, &store.Options{Expiration: 12 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 				hid, err := subnetInstance.GetID()
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), subnetInstance, &store.Options{Expiration: 1 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), subnetInstance, &store.Options{Expiration: 12 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(100 * time.Millisecond) // consolidate cache.Set
 
 				if val, xerr := cache.Get(ctx, cachesubnetRef); xerr == nil {
 					casted, ok := val.(*Subnet)
@@ -309,7 +302,7 @@ func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef s
 						logrus.WithContext(ctx).Warnf("wrong type of resources.Subnet")
 					}
 				} else {
-					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("subnet cache response (%s): %v", cachesubnetRef, xerr)
 				}
 			}
 
@@ -338,79 +331,7 @@ func onSubnetCacheMiss(ctx context.Context, svc iaas.Service, subnetID string) (
 		return nil, innerXErr
 	}
 
-	xerr := subnetInstance.updateCachedInformation(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	return subnetInstance, nil
-}
-
-// updateCachedInformation updates the information cached in instance because will be frequently used and will not be changed over time
-func (instance *Subnet) updateCachedInformation(ctx context.Context) fail.Error {
-	instance.localCache.Lock()
-	defer instance.localCache.Unlock()
-
-	var primaryGatewayID, secondaryGatewayID string
-	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		if len(as.GatewayIDs) > 0 {
-			primaryGatewayID = as.GatewayIDs[0]
-		}
-		if len(as.GatewayIDs) > 1 {
-			secondaryGatewayID = as.GatewayIDs[1]
-		}
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if primaryGatewayID != "" {
-		hostInstance, xerr := LoadHost(ctx, instance.Service(), primaryGatewayID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				debug.IgnoreError2(ctx, xerr)
-				// Network metadata can be missing if it's the default Network, so continue
-			default:
-				return xerr
-			}
-		} else {
-			var ok bool
-			instance.localCache.gateways[0], ok = hostInstance.(*Host)
-			if !ok {
-				return fail.NewError("hostInstance should be a *Host")
-			}
-		}
-	}
-
-	if secondaryGatewayID != "" {
-		hostInstance, xerr := LoadHost(ctx, instance.Service(), secondaryGatewayID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				debug.IgnoreError2(ctx, xerr)
-				// Network metadata can be missing if it's the default Network, so continue
-			default:
-				return xerr
-			}
-		} else {
-			var ok bool
-			instance.localCache.gateways[1], ok = hostInstance.(*Host)
-			if !ok {
-				return fail.InconsistentError("hostInstance should be a *Host")
-			}
-		}
-	}
-
-	return nil
 }
 
 // IsNull tells if the instance is a null value
@@ -419,7 +340,13 @@ func (instance *Subnet) IsNull() bool {
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
-func (instance *Subnet) Exists(ctx context.Context) (bool, fail.Error) {
+func (instance *Subnet) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if valid.IsNil(instance) {
+		return false, fail.InvalidInstanceError()
+	}
+
 	theID, err := instance.GetID()
 	if err != nil {
 		return false, fail.ConvertError(err)
@@ -498,20 +425,6 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		}
 	}()
 
-	// FIXME: What about host metadata itself ?
-
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			if instance != nil {
-				derr := instance.unsafeUpdateSubnetStatus(cleanupContextFrom(ctx), subnetstate.Error)
-				if derr != nil {
-					_ = ferr.AddConsequence(derr)
-				}
-			}
-		}
-	}()
-
 	// --- Create the gateway(s) ---
 	xerr = instance.unsafeCreateGateways(ctx, req, gwname, gwSizing, nil)
 	if xerr != nil {
@@ -529,8 +442,6 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 
 // CreateSecurityGroups ...
 func (instance *Subnet) CreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool, defaultSSHPort int32) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 	return instance.unsafeCreateSecurityGroups(ctx, networkInstance, keepOnFailure, defaultSSHPort)
 }
 
@@ -1017,10 +928,33 @@ func (instance *Subnet) InspectGateway(ctx context.Context, primary bool) (_ res
 		return nil, fail.InvalidInstanceError()
 	}
 
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
+	var gws []string
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
 
-	return instance.unsafeInspectGateway(ctx, primary)
+		gws = as.GatewayIDs
+
+		return nil
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if len(gws) == 0 {
+		return nil, fail.NotFoundError("no gw found")
+	}
+
+	if primary {
+		return LoadHost(ctx, instance.Service(), gws[0])
+	} else {
+		if len(gws) < 2 {
+			return nil, fail.NotFoundError("no 2nd gateway")
+		}
+		return LoadHost(ctx, instance.Service(), gws[1])
+	}
 }
 
 // GetGatewayPublicIP returns the Public IP of a particular gateway
@@ -1323,11 +1257,21 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 				return ar, ar.rErr
 			}
 
+			theID, _ := instance.GetID()
+
 			// Remove metadata
 			xerr = instance.MetadataCore.Delete(ctx)
 			if xerr != nil {
 				ar := result{xerr}
 				return ar, ar.rErr
+			}
+
+			if ka, err := instance.Service().GetCache(ctx); err == nil {
+				if ka != nil {
+					if theID != "" {
+						_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+					}
+				}
 			}
 
 			logrus.WithContext(ctx).Infof("Subnet '%s' successfully deleted.", subnetName)
@@ -1603,9 +1547,6 @@ func (instance *Subnet) HasVirtualIP(ctx context.Context) (bool, fail.Error) {
 		return false, fail.InvalidInstanceError()
 	}
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
 	return instance.unsafeHasVirtualIP(ctx)
 }
 
@@ -1651,39 +1592,24 @@ func (instance *Subnet) ToProtocol(ctx context.Context) (_ *protocol.Subnet, fer
 	}
 
 	var (
-		gw  resources.Host
 		vip *abstract.VirtualIP
 	)
 
 	// Get primary gateway ID
-	var xerr fail.Error
-	gw, xerr = instance.unsafeInspectGateway(ctx, true)
-	xerr = debug.InjectPlannedFail(xerr)
+	var gwIDs []string
+
+	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		gwIDs = as.GatewayIDs
+
+		return nil
+	})
 	if xerr != nil {
 		return nil, xerr
-	}
-
-	primaryGatewayID, err := gw.GetID()
-	if err != nil {
-		return nil, fail.ConvertError(err)
-	}
-
-	// Get secondary gateway id if such a gateway exists
-	gwIDs := []string{primaryGatewayID}
-
-	gw, xerr = instance.unsafeInspectGateway(ctx, false)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
-			return nil, xerr
-		}
-	} else {
-		sgid, err := gw.GetID()
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
-
-		gwIDs = append(gwIDs, sgid)
 	}
 
 	snid, err := instance.GetID()

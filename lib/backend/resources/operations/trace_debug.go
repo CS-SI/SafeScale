@@ -1,3 +1,6 @@
+//go:build debug
+// +build debug
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -14,17 +17,19 @@
  * limitations under the License.
  */
 
-package data
+package operations
 
-//go:generate minimock -o mocks/mock_named.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data.Named
+import (
+	"context"
+	"time"
 
-// Named proposes methods to identify a struct
-type Named interface {
-	GetName() string // GetName Returns the name of the instance
-}
+	"github.com/sirupsen/logrus"
+)
 
-//go:generate minimock -o mocks/mock_identifyable.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data.Identifiable
-
-type Identifiable interface {
-	GetID() (string, error) // GetID Returns the ID of the instance
+func elapsed(what string) func() { // nolint
+	start := time.Now()
+	logrus.WithContext(context.Background()).Debugf("starting %s", what)
+	return func() {
+		logrus.WithContext(context.Background()).Debugf("%s took %v\n", what, time.Since(start))
+	}
 }

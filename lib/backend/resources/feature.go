@@ -34,6 +34,7 @@ import (
 type Targetable interface {
 	data.Identifiable
 
+	GetName() string
 	ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error                                // adds parameters corresponding to the Target in preparation of feature installation
 	UnregisterFeature(ctx context.Context, feat string) fail.Error                                         // unregisters a Feature from Target in metadata
 	InstalledFeatures(ctx context.Context) ([]string, fail.Error)                                          // returns a list of installed features
@@ -45,9 +46,9 @@ type Targetable interface {
 
 // Feature defines the interface of feature
 type Feature interface {
-	data.Clonable
 	data.Identifiable
 
+	GetName() string
 	Add(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)    // installs the feature on the target
 	Applicable(ctx context.Context, tg Targetable) (bool, fail.Error)                               // tells if the feature is installable on the target
 	Check(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // check if feature is installed on target

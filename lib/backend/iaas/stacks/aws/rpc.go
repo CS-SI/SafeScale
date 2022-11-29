@@ -1730,6 +1730,8 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 			return nil, fail.InvalidParameterError("extra", "must be a map[string]string")
 		}
 		for k, v := range into {
+			k := k
+			v := v
 			datags = append(datags, &ec2.Tag{
 				Key:   aws.String(k),
 				Value: aws.String(v),

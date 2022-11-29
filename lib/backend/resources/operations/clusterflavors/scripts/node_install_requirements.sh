@@ -21,6 +21,9 @@ LOGFILE=/opt/safescale/var/log/node_install_requirements.log
 exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
 
+# shellcheck disable=SC1009
+# shellcheck disable=SC1073
+# shellcheck disable=SC1054
 {{ .reserved_BashLibrary }}
 
 #### Installs and configure common tools for any kind of nodes ####

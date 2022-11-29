@@ -62,7 +62,7 @@ type Service interface {
 	GetMetadataKey() (*crypt.Key, fail.Error)
 	GetCache(context.Context) (cache.CacheInterface, fail.Error)
 	InspectSecurityGroupByName(ctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error)
-	ListHostsByName(context.Context, bool) (map[string]*abstract.HostFull, fail.Error)
+	ListHostsWithTags(context.Context, []string, map[string]string) ([]*abstract.HostFull, fail.Error)
 	ListTemplatesBySizing(context.Context, abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
 	ObjectStorageConfiguration(ctx context.Context) (objectstorage.Config, fail.Error)
 	SearchImage(context.Context, string) (*abstract.Image, fail.Error)
@@ -1109,8 +1109,8 @@ func (instance service) CreateHostWithKeyPair(inctx context.Context, request abs
 
 }
 
-// ListHostsByName list hosts by name
-func (instance service) ListHostsByName(inctx context.Context, details bool) (map[string]*abstract.HostFull, fail.Error) {
+// ListHostsWithTags list hosts with tags
+func (instance service) ListHostsWithTags(inctx context.Context, labels []string, details map[string]string) ([]*abstract.HostFull, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1119,24 +1119,57 @@ func (instance service) ListHostsByName(inctx context.Context, details bool) (ma
 	defer cancel()
 
 	type result struct {
-		rTr  map[string]*abstract.HostFull
+		rTr  []*abstract.HostFull
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
 
-		hosts, err := instance.ListHosts(ctx, details)
+		var varhosts []*abstract.HostFull
+
+		hosts, err := instance.ListHosts(ctx, true)
 		if err != nil {
 			chRes <- result{nil, err}
 			return
 		}
-		hostMap := make(map[string]*abstract.HostFull)
-		for _, host := range hosts {
-			hostMap[host.Core.Name] = host
-		}
-		chRes <- result{hostMap, nil}
 
+		if len(labels) > 0 {
+			for _, host := range hosts {
+				there := true
+				for _, k := range labels {
+					_, ok := host.Core.Tags[k]
+					if !ok {
+						there = false
+						break
+					}
+				}
+				if there {
+					varhosts = append(varhosts, host)
+				}
+			}
+		}
+
+		for _, host := range hosts {
+			there := true
+			for k, v := range details {
+				av, ok := host.Core.Tags[k]
+				if ok {
+					if av != v {
+						there = false
+						break
+					}
+				} else {
+					there = false
+					break
+				}
+			}
+			if there {
+				varhosts = append(varhosts, host)
+			}
+		}
+
+		chRes <- result{varhosts, nil}
 	}()
 	select {
 	case res := <-chRes:

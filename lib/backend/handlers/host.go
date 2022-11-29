@@ -30,14 +30,12 @@ import (
 	labelfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/label"
 	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/securitygroup"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/sirupsen/logrus"
 )
 
 //go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/backend/handlers.HostHandler -o mocks/mock_host.go
@@ -53,7 +51,6 @@ type HostHandler interface {
 	List(bool) (abstract.HostList, fail.Error)
 	ListSecurityGroups(string) ([]*propertiesv1.SecurityGroupBond, fail.Error)
 	Reboot(string) fail.Error
-	Resize(string, abstract.HostSizingRequirements) (resources.Host, fail.Error)
 	Start(string) fail.Error
 	Status(string) (hoststate.Enum, fail.Error)
 	Stop(string) fail.Error
@@ -225,60 +222,6 @@ func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.Hos
 	return hostInstance, nil
 }
 
-// Resize a Host
-func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequirements) (_ resources.Host, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
-	if handler == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	reduce := false
-	xerr = hostInstance.Inspect(handler.job.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
-			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			reduce = reduce || (sizing.MinCores < hostSizingV2.RequestedSize.MinCores)
-			reduce = reduce || (sizing.MinRAMSize < hostSizingV2.RequestedSize.MinRAMSize)
-			reduce = reduce || (sizing.MinGPU < hostSizingV2.RequestedSize.MinGPU)
-			reduce = reduce || (sizing.MinCPUFreq < hostSizingV2.RequestedSize.MinCPUFreq)
-			reduce = reduce || (sizing.MinDiskSize < hostSizingV2.RequestedSize.MinDiskSize)
-			return nil
-		})
-	})
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if reduce {
-		logrus.WithContext(handler.job.Context()).Warn("Asking for less resource... is not going to happen")
-	}
-
-	xerr = hostInstance.Resize(handler.job.Context(), sizing)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return hostInstance, nil
-}
-
 // Status returns the status of a host (running or stopped mainly)
 func (handler *hostHandler) Status(ref string) (_ hoststate.Enum, ferr fail.Error) {
 	defer func() {
@@ -331,11 +274,6 @@ func (handler *hostHandler) Inspect(ref string) (_ resources.Host, ferr fail.Err
 	}
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	_, xerr = hostInstance.ForceGetState(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}

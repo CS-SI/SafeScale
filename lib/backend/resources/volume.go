@@ -35,6 +35,7 @@ type Volume interface {
 	data.Identifiable
 	Consistent
 
+	GetName() string
 	Attach(ctx context.Context, host Host, path, format string, doNotFormat, doNotMount bool) fail.Error // attaches a volume to a host
 	Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) fail.Error                   // walks through all the metadata objects in network
 	Create(ctx context.Context, req abstract.VolumeRequest) fail.Error                                   // creates a volume

@@ -136,8 +136,6 @@ type Stack interface {
 	StartHost(context.Context, stacks.HostParameter) fail.Error
 	// RebootHost reboots a host
 	RebootHost(context.Context, stacks.HostParameter) fail.Error
-	// ResizeHost resizes a host
-	ResizeHost(context.Context, stacks.HostParameter, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error)
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
 	WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error)
 	// BindSecurityGroupToHost attaches a security group to a host

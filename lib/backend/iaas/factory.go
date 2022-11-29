@@ -152,9 +152,9 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		}
 
 		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
-			NumCounters: 1000,
-			MaxCost:     100,
-			BufferItems: 1024,
+			NumCounters: 1024,
+			MaxCost:     10000000,
+			BufferItems: 128,
 		})
 		if err != nil {
 			return nil, fail.ConvertError(err)
@@ -163,7 +163,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		newS := &service{
 			Provider:     providerInstance,
 			tenantName:   tenantName,
-			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 1 * time.Minute}))),
+			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 12 * time.Minute}))),
 		}
 
 		if beta := os.Getenv("SAFESCALE_CACHE"); beta != "" {

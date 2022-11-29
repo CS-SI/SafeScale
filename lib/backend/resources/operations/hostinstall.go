@@ -57,7 +57,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 
 	targetName := instance.GetName()
 
-	state, xerr := instance.GetState(ctx)
+	state, xerr := instance.ForceGetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -158,7 +158,7 @@ func (instance *Host) DeleteFeature(inctx context.Context, name string, vars dat
 
 	targetName := instance.GetName()
 
-	state, xerr := instance.GetState(ctx)
+	state, xerr := instance.ForceGetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -216,13 +216,8 @@ func (instance *Host) InstallMethods(ctx context.Context) (map[uint8]installmeth
 	}
 
 	out := make(map[uint8]installmethod.Enum)
-	instance.localCache.RLock()
-	defer instance.localCache.RUnlock()
-	instance.localCache.installMethods.Range(func(k, v interface{}) bool {
-		var ok bool
-		out[k.(uint8)], ok = v.(installmethod.Enum)
-		return ok
-	})
+	out[0] = installmethod.Bash
+	out[1] = installmethod.None
 	return out, nil
 }
 
@@ -380,6 +375,7 @@ func (instance *Host) InstalledFeatures(ctx context.Context) ([]string, fail.Err
 // satisfies interface install.Targetable
 func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+	defer elapsed("ComplementFeatureParameters")()
 
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()

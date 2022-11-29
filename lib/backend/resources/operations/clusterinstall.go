@@ -30,9 +30,11 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusternodetype"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/system"
@@ -76,15 +78,21 @@ func (instance *Cluster) InstallMethods(ctx context.Context) (map[uint8]installm
 		return nil, fail.InvalidInstanceError()
 	}
 
-	out := make(map[uint8]installmethod.Enum)
-
 	incrementExpVar("cluster.cache.hit")
-	instance.localCache.installMethods.Range(func(k, v interface{}) bool {
-		var ok bool
-		out[k.(uint8)], ok = v.(installmethod.Enum)
-		return ok
-	})
-	return out, nil
+
+	theFlavor, xerr := instance.unsafeGetFlavor(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	res := make(map[uint8]installmethod.Enum)
+	res[0] = installmethod.Bash
+	res[1] = installmethod.None
+	if theFlavor == clusterflavor.K8S {
+		res[2] = installmethod.Helm
+	}
+
+	return res, nil
 }
 
 // InstalledFeatures returns a list of installed features
@@ -94,7 +102,7 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.
 	}
 
 	var out []string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -116,11 +124,20 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.
 }
 
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
-// satisfies interface resources.Targetable
-func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v data.Map) fail.Error {
+func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v data.Map) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	defer elapsed("ComplementFeatureParameters")()
+
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
+
+	defer func() {
+		if ferr != nil {
+			// FIXME: OPP Remove this later
+			logrus.WithContext(inctx).Errorf("Unexpected error: %s", ferr)
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -182,71 +199,49 @@ func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v da
 		return xerr
 	}
 
+	if len(instance.masterIPs) == 0 {
+		mips, xerr := instance.unsafeListMasterIPs(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+		instance.masterIPs = mips
+	}
+
 	if controlPlaneV1.VirtualIP != nil && controlPlaneV1.VirtualIP.PrivateIP != "" {
 		v["ClusterControlplaneUsesVIP"] = true
 		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 	} else {
 		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
-		master, xerr := instance.unsafeFindAvailableMaster(ctx)
+		for _, k := range instance.masterIPs {
+			v["ClusterControlplaneEndpointIP"] = k
+			v["ClusterControlplaneUsesVIP"] = false
+			break
+		}
+	}
+
+	if len(instance.masterIPs) > 0 {
+		v["ClusterMasterIPs"] = instance.masterIPs
+	} else {
+		val, xerr := instance.newunsafeListMasterIPs(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
+		v["ClusterMasterIPs"] = val
+		instance.masterIPs = val
+	}
 
-		v["ClusterControlplaneEndpointIP"], xerr = master.GetPrivateIP(ctx)
+	if len(instance.nodeIPs) > 0 {
+		v["ClusterNodeIPs"] = instance.nodeIPs
+	} else {
+		val, xerr := instance.newunsafeListNodeIPs(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
-
-		v["ClusterControlplaneUsesVIP"] = false
-	}
-	v["ClusterMasters"], xerr = instance.unsafeListMasters(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	list := make([]string, 0, len(v["ClusterMasters"].(resources.IndexedListOfClusterNodes)))
-	for _, v := range v["ClusterMasters"].(resources.IndexedListOfClusterNodes) {
-		list = append(list, v.Name)
-	}
-	v["ClusterMasterNames"] = list
-
-	list = make([]string, 0, len(v["ClusterMasters"].(resources.IndexedListOfClusterNodes)))
-	for _, v := range v["ClusterMasters"].(resources.IndexedListOfClusterNodes) {
-		list = append(list, v.ID)
-	}
-	v["ClusterMasterIDs"] = list
-
-	v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	v["ClusterNodes"], xerr = instance.unsafeListNodes(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	list = make([]string, 0, len(v["ClusterNodes"].(resources.IndexedListOfClusterNodes)))
-	for _, v := range v["ClusterNodes"].(resources.IndexedListOfClusterNodes) {
-		list = append(list, v.Name)
-	}
-	v["ClusterNodeNames"] = list
-
-	list = make([]string, 0, len(v["ClusterNodes"].(resources.IndexedListOfClusterNodes)))
-	for _, v := range v["ClusterNodes"].(resources.IndexedListOfClusterNodes) {
-		list = append(list, v.ID)
-	}
-	v["ClusterNodeIDs"] = list
-
-	v["ClusterNodeIPs"], xerr = instance.unsafeListNodeIPs(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+		v["ClusterNodeIPs"] = val
+		instance.nodeIPs = val
 	}
 
 	return nil
@@ -623,7 +618,7 @@ func (instance *Cluster) ExecuteScript(
 
 // installNodeRequirements ...
 func (instance *Cluster) installNodeRequirements(
-	inctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string,
+	inctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string, pars abstract.ClusterRequest,
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -636,6 +631,10 @@ func (instance *Cluster) installNodeRequirements(
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
+
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/feature/install/requirements/%s", oldKey, hostLabel)) // nolint
+		}
 
 		netCfg, xerr := instance.GetNetworkConfig(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -780,12 +779,6 @@ func (instance *Cluster) installNodeRequirements(
 
 		params["ClusterName"] = identity.Name
 		params["DNSServerIPs"] = dnsServers
-		params["MasterIPs"], xerr = instance.unsafeListMasterIPs(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
 
 		params["ClusterAdminUsername"] = "cladm"
 		params["ClusterAdminPassword"] = identity.AdminPassword
@@ -808,6 +801,40 @@ func (instance *Cluster) installNodeRequirements(
 			return
 		}
 
+		// if docker is not disabled then is installed by default
+		if _, ok := pars.DisabledDefaultFeatures["docker"]; !ok {
+			retcode, stdout, stderr, xerr = instance.ExecuteScript(ctx, "node_install_docker.sh", params, host)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{fail.Wrap(xerr, "system docker installation failed")}
+				return
+			}
+			if retcode != 0 {
+				xerr = fail.ExecutionError(nil, "failed to install common docker dependencies")
+				xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+				chRes <- result{xerr}
+				return
+			}
+
+			xerr = host.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+					featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					featuresV1.Installed["docker"] = &propertiesv1.HostInstalledFeature{}
+					return nil
+				})
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				chRes <- result{xerr}
+				return
+			}
+		}
+
 		logrus.WithContext(ctx).Debugf("system dependencies installation successful.")
 		chRes <- result{nil}
 
@@ -824,7 +851,7 @@ func (instance *Cluster) installNodeRequirements(
 }
 
 // installReverseProxy installs reverseproxy
-func (instance *Cluster) installReverseProxy(inctx context.Context, params data.Map) (ferr fail.Error) {
+func (instance *Cluster) installReverseProxy(inctx context.Context, params data.Map, req abstract.ClusterRequest) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -837,6 +864,10 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 	go func() {
 		defer close(chRes)
 
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/feature/install/reverseproxy/%s", oldKey, instance.GetName())) // nolint
+		}
+
 		identity, xerr := instance.unsafeGetIdentity(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -844,48 +875,16 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 			return
 		}
 
-		dockerDisabled := false
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				_, dockerDisabled = featuresV1.Disabled["docker"]
-				return nil
-			})
-		})
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-			chRes <- result{xerr}
-			return
+		disabled := false
+		if _, ok := req.DisabledDefaultFeatures["docker"]; ok {
+			disabled = true
 		}
 
-		if dockerDisabled {
-			chRes <- result{nil}
-			return
+		if _, ok := req.DisabledDefaultFeatures["reverseproxy"]; ok {
+			disabled = true
 		}
 
 		clusterName := identity.Name
-		disabled := false
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				_, disabled = featuresV1.Disabled["reverseproxy"]
-				return nil
-			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-			chRes <- result{xerr}
-			return
-		}
 
 		if !disabled {
 			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
@@ -937,7 +936,6 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 
 		logrus.WithContext(ctx).Infof("[Cluster %s] reverseproxy (feature 'edgeproxy4subnet' not installed because disabled", clusterName)
 		chRes <- result{nil}
-
 	}()
 	select {
 	case res := <-chRes:
@@ -950,7 +948,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 }
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the Cluster
-func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data.Map) (ferr fail.Error) {
+func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data.Map, req abstract.ClusterRequest) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -963,6 +961,10 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 	go func() {
 		defer close(chRes)
 
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/feature/install/remotedesktop/%s", oldKey, instance.GetName())) // nolint
+		}
+
 		identity, xerr := instance.unsafeGetIdentity(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -970,46 +972,13 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 			return
 		}
 
-		dockerDisabled := false
-		xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				_, dockerDisabled = featuresV1.Disabled["docker"]
-				return nil
-			})
-		})
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-			chRes <- result{xerr}
-			return
-		}
-
-		if dockerDisabled {
-			chRes <- result{nil}
-			return
-		}
-
 		disabled := false
-		xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
+		if _, ok := req.DisabledDefaultFeatures["docker"]; ok {
+			disabled = true
+		}
 
-				_, disabled = featuresV1.Disabled["remotedesktop"]
-				return nil
-			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-			chRes <- result{xerr}
-			return
+		if _, ok := req.DisabledDefaultFeatures["remotedesktop"]; ok {
+			disabled = true
 		}
 
 		if !disabled {
@@ -1095,6 +1064,10 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
+
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/feature/install/ansible/%s", oldKey, instance.GetName())) // nolint
+		}
 
 		identity, xerr := instance.unsafeGetIdentity(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1209,7 +1182,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 
 // installDocker installs docker and docker-compose
 func (instance *Cluster) installDocker(
-	inctx context.Context, host resources.Host, hostLabel string, params data.Map,
+	inctx context.Context, host resources.Host, hostLabel string, params data.Map, pars abstract.ClusterRequest,
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -1223,24 +1196,11 @@ func (instance *Cluster) installDocker(
 	go func() {
 		defer close(chRes)
 
-		dockerDisabled := false
-		xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				_, dockerDisabled = featuresV1.Disabled["docker"]
-				return nil
-			})
-		})
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-			chRes <- result{xerr}
-			return
+		if oldKey := ctx.Value("ID"); oldKey != nil {
+			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/feature/install/docker/%s", oldKey, hostLabel)) // nolint
 		}
 
-		if dockerDisabled {
+		if _, ok := pars.DisabledDefaultFeatures["docker"]; ok {
 			chRes <- result{nil}
 			return
 		}

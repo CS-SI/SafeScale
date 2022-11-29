@@ -34,6 +34,7 @@ type Network interface {
 	data.Identifiable
 	Consistent
 
+	GetName() string
 	AbandonSubnet(ctx context.Context, subnetID string) fail.Error                      // used to detach a Subnet from the Network
 	AdoptSubnet(ctx context.Context, subnet Subnet) fail.Error                          // used to attach a Subnet to the Network
 	Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) fail.Error // call the callback for each entry of the metadata folder of Networks

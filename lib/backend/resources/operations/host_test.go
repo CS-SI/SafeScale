@@ -82,7 +82,6 @@ func Test_NewHost(t *testing.T) {
 
 }
 
-/*
 func Test_LoadHost(t *testing.T) {
 
 	var svc iaas.Service
@@ -104,7 +103,7 @@ func Test_LoadHost(t *testing.T) {
 
 		host, err = LoadHost(ctx, svc, "localhost")
 		require.Nil(t, host)
-		require.Contains(t, err.Error(), "neither hosts/byName/localhost nor hosts/byID/localhost were found in the bucket")
+		require.Contains(t, err.Error(), "localhost' not found")
 
 		svc._reset()
 
@@ -133,7 +132,6 @@ func Test_LoadHost(t *testing.T) {
 	require.Nil(t, xerr)
 
 }
-*/
 
 func TestHost_GetOperatorUsernameFromCfg(t *testing.T) {
 
@@ -1122,55 +1120,6 @@ func TestHost_Reboot(t *testing.T) {
 
 }
 
-func TestHost_Resize(t *testing.T) {
-
-	ctx := context.Background()
-
-	hostReq := abstract.HostRequest{
-		ResourceName:   "MyHostTest",
-		HostName:       "MyHostTest",
-		ImageID:        "ImageID",
-		PublicIP:       false,
-		Single:         true,
-		Subnets:        []*abstract.Subnet{},
-		DefaultRouteIP: "127.0.0.1",
-		DiskSize:       64,
-		TemplateID:     "TemplateID",
-	}
-
-	xerr := NewServiceTest(t, func(svc *ServiceTest) {
-
-		svc._setLogLevel(0)
-
-		_, _, xerr := svc.CreateHost(ctx, hostReq, nil)
-		require.Nil(t, xerr)
-
-		host, xerr := LoadHost(ctx, svc, "MyHostTest")
-		require.Nil(t, xerr)
-		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-
-		svc._setLogLevel(2)
-
-		xerr = host.Resize(ctx, abstract.HostSizingRequirements{
-			MinCores:    3,
-			MaxCores:    3,
-			MinRAMSize:  0,
-			MaxRAMSize:  8192,
-			MinDiskSize: 0,
-			MaxDiskSize: 1024,
-			MinGPU:      1,
-			MinCPUFreq:  4033,
-			Replaceable: true,
-			Image:       "Image1",
-			Template:    "Template1",
-		})
-		require.Contains(t, xerr.Error(), "Host.Resize() not yet implemented")
-
-	})
-	require.Nil(t, xerr)
-
-}
-
 func TestHost_GetPublicIP(t *testing.T) {
 
 	ctx := context.Background()
@@ -1636,7 +1585,7 @@ func TestHost_PushStringToFile(t *testing.T) {
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
 
-		xerr = host.PushStringToFile(ctx, "data content", "/tmp/pushtest")
+		xerr = host.PushStringToFileWithOwnership(ctx, "data content", "/tmp/pushtest", "", "")
 		require.Contains(t, xerr.Error(), "cannot push anything on 'MyHostTest', 'MyHostTest' is NOT started: Stopped")
 
 		xerr = host.Start(ctx)
@@ -1644,7 +1593,7 @@ func TestHost_PushStringToFile(t *testing.T) {
 
 		svc._setLogLevel(2)
 
-		xerr = host.PushStringToFile(ctx, "data content", "/tmp/pushtest")
+		xerr = host.PushStringToFileWithOwnership(ctx, "data content", "/tmp/pushtest", "", "")
 		require.Nil(t, xerr)
 
 	})

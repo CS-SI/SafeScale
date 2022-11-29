@@ -37,6 +37,7 @@ type Subnet interface {
 	data.Identifiable
 	Consistent
 
+	GetName() string
 	DetachHost(ctx context.Context, hostID string) fail.Error                                                                                       // unlinks host ID from subnet
 	AttachHost(context.Context, Host) fail.Error                                                                                                    // links Host to the Subnet
 	BindSecurityGroup(context.Context, SecurityGroup, SecurityGroupActivation) fail.Error                                                           // binds a Security Group to the Subnet

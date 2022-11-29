@@ -1,3 +1,6 @@
+//go:build !debug
+// +build !debug
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -16,18 +19,6 @@
 
 package operations
 
-var (
-	// Trace contains what to trace during debug log
-	Trace = struct {
-		Cluster bool
-		Host    bool
-		Network bool
-		Share   bool
-		Tenant  bool
-		Volume  bool
-		Feature struct {
-			Action bool
-			Step   bool
-		}
-	}{}
-)
+func elapsed(what string) func() { // nolint
+	return func() {}
+}

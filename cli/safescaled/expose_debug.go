@@ -59,6 +59,7 @@ func expose() {
 	expvar.NewInt("cluster.cache.hit")
 	expvar.NewInt("newhost.cache.hit")
 	expvar.NewInt("newhost.cache.read")
+	expvar.NewInt("host.inspections")
 
 	exportstats.NewStatCount("stats")
 	http.Handle("/debug/metrics", metric.Handler(metric.Exposed))

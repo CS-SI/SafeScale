@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"context"
+	"expvar"
 	"fmt"
 	"strings"
 	"time"
@@ -26,8 +27,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
 	"github.com/sirupsen/logrus"
+	"github.com/zserge/metric"
 
-	"github.com/gophercloud/gophercloud"
 	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
@@ -453,11 +454,27 @@ func toHostState(status string) hoststate.Enum {
 	}
 }
 
+func incrementExpVar(name string) {
+	// increase counter
+	ts := expvar.Get(name)
+	if ts != nil {
+		switch casted := ts.(type) {
+		case *expvar.Int:
+			casted.Add(1)
+		case metric.Metric:
+			casted.Add(1)
+		}
+	}
+}
+
 // InspectHost gathers host information from provider
 func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
+
+	incrementExpVar("host.inspections")
+
 	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
@@ -610,59 +627,6 @@ func (s stack) complementHost(ctx context.Context, hostCore *abstract.HostCore, 
 	return host, nil
 }
 
-// InspectHostByName returns the host using the name passed as parameter
-func (s stack) InspectHostByName(ctx context.Context, name string) (*abstract.HostFull, fail.Error) {
-	if valid.IsNil(s) {
-		return nil, fail.InvalidInstanceError()
-	}
-	if name == "" {
-		return nil, fail.InvalidParameterError("name", "cannot be empty string")
-	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
-
-	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
-	r := servers.GetResult{}
-	xerr := stacks.RetryableRemoteCall(ctx,
-		func() error {
-			_, r.Err = s.ComputeClient.Get(
-				s.ComputeClient.ServiceURL("servers?name="+name), &r.Body, &gophercloud.RequestOpts{
-					OkCodes: []int{200, 203},
-				},
-			)
-			return r.Err
-		},
-		NormalizeError,
-	)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
-	if found && len(serverList) > 0 {
-		for _, anon := range serverList {
-			entry, ok := anon.(map[string]interface{})
-			if !ok {
-				return nil, fail.InconsistentError("anon should be a map[string]interface{}")
-			}
-			if entry["name"].(string) == name {
-				host := abstract.NewHostCore()
-				host.ID, ok = entry["id"].(string)
-				if !ok {
-					return nil, fail.InconsistentError("entry[id] should be a string")
-				}
-				host.Name = name
-				hostFull, xerr := s.InspectHost(ctx, host)
-				if xerr != nil {
-					return nil, fail.Wrap(xerr, "failed to inspect host '%s'", name)
-				}
-				return hostFull, nil
-			}
-		}
-	}
-	return nil, abstract.ResourceNotFoundError("host", name)
-}
-
 // CreateHost creates a new host
 func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
@@ -767,6 +731,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 			return nil, nil, fail.InvalidParameterError("extra", "must be a map[string]string")
 		}
 		for k, v := range into {
+			k, v := k, v
 			ahc.Tags[k] = v
 		}
 	}
@@ -915,6 +880,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 					}
 					return innerXErr
 				}
+			}
+
+			innerXErr = s.rpcSetMetadataOfInstance(ctx, server.ID, ahc.Tags)
+			if innerXErr != nil {
+				return innerXErr
 			}
 
 			finalServer = server
@@ -1717,26 +1687,6 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) f
 	return nil
 }
 
-// rpcGetServer returns
-func (s stack) rpcGetServer(ctx context.Context, id string) (_ *servers.Server, ferr fail.Error) {
-	if id == "" {
-		return &servers.Server{}, fail.InvalidParameterCannotBeEmptyStringError("id")
-	}
-
-	var resp *servers.Server
-	xerr := stacks.RetryableRemoteCall(ctx,
-		func() (err error) {
-			resp, err = servers.Get(s.ComputeClient, id).Extract()
-			return err
-		},
-		NormalizeError,
-	)
-	if xerr != nil {
-		return &servers.Server{}, xerr
-	}
-	return resp, nil
-}
-
 // StopHost stops the host identified by id
 func (s stack) StopHost(ctx context.Context, hostParam stacks.HostParameter, gracefully bool) fail.Error {
 	if valid.IsNil(s) {
@@ -1799,24 +1749,6 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) fa
 		},
 		NormalizeError,
 	)
-}
-
-// ResizeHost ...
-func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	if valid.IsNil(s) {
-		return nil, fail.InvalidInstanceError()
-	}
-	_ /*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
-
-	// TODO: RESIZE Call this
-	// servers.Resize()
-
-	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // BindSecurityGroupToHost binds a security group to a host

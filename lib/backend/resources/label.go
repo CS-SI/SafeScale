@@ -32,6 +32,7 @@ type Label interface {
 	Metadata
 	data.Identifiable
 
+	GetName() string
 	BindToHost(ctx context.Context, hostInstance Host, value string) fail.Error                  // instructs Label to be bound to Host with overrided value (if not a Tag)
 	Browse(ctx context.Context, callback func(*abstract.Label) fail.Error) fail.Error            // walks through all the metadata objects in labels
 	Create(ctx context.Context, name string, hasDefault bool, defaultValue string) fail.Error    // creates a Label

@@ -336,51 +336,6 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 	return hostInstance.ToProtocol(ctx)
 }
 
-// Resize a host
-func (s *HostListener) Resize(inctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, err error) {
-	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot resize host")
-	defer fail.OnPanic(&err)
-
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
-	if inctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("inctx")
-	}
-
-	name := in.GetName()
-	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/host/%s/resize", name))
-	if xerr != nil {
-		return nil, xerr
-	}
-	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
-	sizing := abstract.HostSizingRequirements{
-		MinCores:    int(in.GetCpuCount()),
-		MinRAMSize:  in.GetRam(),
-		MinDiskSize: int(in.GetDisk()),
-		MinGPU:      int(in.GetGpuCount()),
-		MinCPUFreq:  in.GetCpuFreq(),
-	}
-
-	handler := handlers.NewHostHandler(job)
-	hostInstance, xerr := handler.Resize(name, sizing)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return hostInstance.ToProtocol(ctx)
-}
-
 // Status returns the status of a host (running or stopped mainly)
 func (s *HostListener) Status(inctx context.Context, in *protocol.Reference) (ht *protocol.HostStatus, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)

@@ -1277,6 +1277,8 @@ func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, 
 			return nil, fail.InvalidParameterError("extra", "must be a map[string]string")
 		}
 		for k, v := range into {
+			k := k
+			v := v
 			ili = append(ili, &compute.MetadataItems{
 				Key:   k,
 				Value: &v,

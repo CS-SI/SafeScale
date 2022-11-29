@@ -140,20 +140,20 @@ func LoadVolume(inctx context.Context, svc iaas.Service, ref string, options ...
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, volumeInstance.GetName()), volumeInstance, &store.Options{Expiration: 1 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, volumeInstance.GetName()), volumeInstance, &store.Options{Expiration: 12 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 				hid, err := volumeInstance.GetID()
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), volumeInstance, &store.Options{Expiration: 1 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), volumeInstance, &store.Options{Expiration: 12 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 
 				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
 					casted, ok := val.(resources.Volume)
@@ -163,7 +163,7 @@ func LoadVolume(inctx context.Context, svc iaas.Service, ref string, options ...
 						logrus.WithContext(ctx).Warnf("wrong type of resources.Volume")
 					}
 				} else {
-					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("volume cache response (%s): %v", cacheref, xerr)
 				}
 			}
 
@@ -210,7 +210,13 @@ func (instance *volume) IsNull() bool {
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
-func (instance *volume) Exists(ctx context.Context) (bool, fail.Error) {
+func (instance *volume) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if valid.IsNil(instance) {
+		return false, fail.InvalidInstanceError()
+	}
+
 	theID, err := instance.GetID()
 	if err != nil {
 		return false, fail.ConvertError(err)
@@ -407,8 +413,23 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
+	theID, _ := instance.GetID()
+
 	// remove metadata
-	return instance.MetadataCore.Delete(ctx)
+	xerr = instance.MetadataCore.Delete(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if ka, err := instance.Service().GetCache(ctx); err == nil {
+		if ka != nil {
+			if theID != "" {
+				_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+			}
+		}
+	}
+
+	return nil
 }
 
 // Create a volume
@@ -580,7 +601,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	}
 
 	var state hoststate.Enum
-	state, xerr = host.GetState(ctx)
+	state, xerr = host.ForceGetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -956,7 +977,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 
 	targetName := host.GetName()
 
-	state, xerr := host.GetState(ctx)
+	state, xerr := host.ForceGetState(ctx)
 	if xerr != nil {
 		return xerr
 	}

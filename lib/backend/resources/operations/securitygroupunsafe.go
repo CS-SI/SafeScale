@@ -18,6 +18,7 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -173,11 +174,21 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 			return
 		}
 
+		theID, _ := instance.GetID()
+
 		// delete Security Group metadata
 		xerr = instance.MetadataCore.Delete(ctx)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
+		}
+
+		if ka, err := instance.Service().GetCache(ctx); err == nil {
+			if ka != nil {
+				if theID != "" {
+					_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+				}
+			}
 		}
 
 		// delete Security Groups in Network metadata if the current operation is not to remove this Network (otherwise may deadlock)

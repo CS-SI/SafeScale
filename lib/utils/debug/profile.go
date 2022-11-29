@@ -66,7 +66,10 @@ func Profile(what string) func() {
 			if err != nil {
 				logrus.WithContext(ctx).Fatalf("Failed to create profile file '%s'", filename)
 			}
-			_ = pprof.StartCPUProfile(cpufile)
+			err = pprof.StartCPUProfile(cpufile)
+			if err != nil {
+				logrus.WithContext(ctx).Fatalf("Failed to start profile")
+			}
 			logrus.WithContext(ctx).Infof("CPU profiling enabled")
 			profileCPU = true
 		case "mem", "memory", "ram":

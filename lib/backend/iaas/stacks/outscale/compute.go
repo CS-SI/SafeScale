@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"expvar"
 	"fmt"
 	"sort"
 	"strconv"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
+	"github.com/zserge/metric"
 
 	"github.com/outscale/osc-sdk-go/osc"
 
@@ -923,8 +925,24 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	}
 
 	var vm osc.Vm
+
+	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
+			logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Host '%s'", request.HostName)
+			if vm.VmId != "" {
+				if derr := s.DeleteHost(context.Background(), vm.VmId); derr != nil {
+					msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", request.HostName)
+					logrus.WithContext(ctx).Errorf(strprocess.Capitalize(msg))
+					return
+				}
+			}
+			logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleted Host '%s' successfully.", request.HostName)
+		}
+	}()
+
 	xerr = retry.WhileUnsuccessful(
-		func() (ferr error) {
+		func() error {
 			select {
 			case <-ctx.Done():
 				return retry.StopRetryError(ctx.Err())
@@ -949,13 +967,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 
 			// Delete instance if created to be in good shape to retry in case of error
 			defer func() {
-				ferr = debug.InjectPlannedError(ferr)
-				if ferr != nil {
+				if innerXErr != nil {
 					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Host '%s'", request.HostName)
 					if derr := s.DeleteHost(context.Background(), vm.VmId); derr != nil {
 						msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", request.HostName)
 						logrus.WithContext(ctx).Errorf(strprocess.Capitalize(msg))
-						ferr = fail.AddConsequence(ferr, fail.Wrap(derr, msg))
 						return
 					}
 					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleted Host '%s' successfully.", request.HostName)
@@ -1021,6 +1037,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 			return nil, nil, fail.InvalidParameterError("extra", "must be a map[string]string")
 		}
 		for k, v := range theSame {
+			k, v := k, v
 			into[k] = v
 		}
 	}
@@ -1147,11 +1164,27 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 	return lastErr
 }
 
+func incrementExpVar(name string) {
+	// increase counter
+	ts := expvar.Get(name)
+	if ts != nil {
+		switch casted := ts.(type) {
+		case *expvar.Int:
+			casted.Add(1)
+		case metric.Metric:
+			casted.Add(1)
+		}
+	}
+}
+
 // InspectHost returns the host identified by id or updates content of a *abstract.Host
 func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (ahf *abstract.HostFull, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
+
+	incrementExpVar("host.inspections")
+
 	var hostLabel string
 	var xerr fail.Error
 	ahf, hostLabel, xerr = stacks.ValidateHostParameter(ctx, hostParam)
@@ -1254,6 +1287,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList
 
 	var hosts abstract.HostList
 	for _, vm := range resp { // nolint
+		now := time.Now()
 		if hostState(vm.State) == hoststate.Terminated {
 			continue
 		}
@@ -1272,11 +1306,18 @@ func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList
 			if xerr != nil {
 				return emptyList, xerr
 			}
+
 			if tag, ok := tags["name"]; ok {
 				ahf.Core.Name = tag
 			}
+
+			// refresh tags
+			for k, v := range tags {
+				ahf.Core.Tags[k] = v
+			}
 		}
 		hosts = append(hosts, ahf)
+		logrus.WithContext(ctx).Debugf("Loading the host took %s", time.Since(now))
 	}
 	return hosts, nil
 }
@@ -1341,31 +1382,6 @@ func (s stack) perfFromFreq(freq float32) int {
 		}
 	}
 	return 1
-}
-
-// ResizeHost Resize host
-func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, sizing abstract.HostSizingRequirements) (ahf *abstract.HostFull, ferr fail.Error) {
-	if valid.IsNil(s) {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %v)",
-		hostRef, sizing).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
-	perf := s.perfFromFreq(sizing.MinCPUFreq)
-	t := gpuTemplateName(0, sizing.MaxCores, int(sizing.MaxRAMSize), perf, 0, "")
-
-	if xerr := s.rpcUpdateVMType(ctx, ahf.Core.ID, t); xerr != nil {
-		return nil, xerr
-	}
-
-	return s.InspectHost(ctx, ahf.Core.ID)
 }
 
 // BindSecurityGroupToHost ...

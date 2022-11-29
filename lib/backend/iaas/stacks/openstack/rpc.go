@@ -521,6 +521,26 @@ func (s stack) rpcUpdatePort(ctx context.Context, id string, options ports.Updat
 	)
 }
 
+// rpcGetServer returns
+func (s stack) rpcGetServer(ctx context.Context, id string) (_ *servers.Server, ferr fail.Error) {
+	if id == "" {
+		return &servers.Server{}, fail.InvalidParameterCannotBeEmptyStringError("id")
+	}
+
+	var resp *servers.Server
+	xerr := stacks.RetryableRemoteCall(ctx,
+		func() (err error) {
+			resp, err = servers.Get(s.ComputeClient, id).Extract()
+			return err
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return &servers.Server{}, xerr
+	}
+	return resp, nil
+}
+
 // rpcGetPort returns port information from its ID
 func (s stack) rpcGetPort(ctx context.Context, id string) (port *ports.Port, ferr fail.Error) {
 	if id == "" {

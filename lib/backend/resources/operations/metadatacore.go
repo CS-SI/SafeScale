@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -59,6 +60,8 @@ type MetadataCore struct {
 
 	kind   string
 	folder MetadataFolder
+
+	lastUpdate time.Time
 
 	loaded            bool
 	committed         bool
@@ -553,12 +556,16 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 				}
 			}
 
+			named, ok := clonable.(data.Named)
+			if !ok {
+				return fail.InconsistentError("expected Identifiable and Named")
+			}
 			if myself.kindSplittedStore {
 				myself.id.Store(idd)
 			} else {
-				myself.id.Store(ident.GetName())
+				myself.id.Store(named.GetName())
 			}
-			myself.name.Store(ident.GetName())
+			myself.name.Store(named.GetName())
 			myself.taken.Store(true)
 
 			return nil
@@ -1252,8 +1259,8 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 		rErr fail.Error
 	}
 	chRes := make(chan result)
-	defer close(chRes)
 	go func() {
+		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 

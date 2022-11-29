@@ -248,6 +248,7 @@ func (w *worker) CanProceed(inctx context.Context, s resources.FeatureSettings) 
 // identifyAvailableMaster finds a master available, and keep track of it
 // for all the life of the action (prevent to request too often)
 func (w *worker) identifyAvailableMaster(ctx context.Context) (_ resources.Host, ferr fail.Error) {
+	defer elapsed("identifyAvailableMaster")()
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
@@ -264,6 +265,7 @@ func (w *worker) identifyAvailableMaster(ctx context.Context) (_ resources.Host,
 
 // identifyAvailableNode finds a node available and will use this one during all the installation session
 func (w *worker) identifyAvailableNode(ctx context.Context) (_ resources.Host, ferr fail.Error) {
+	defer elapsed("identifyAvailableNode")()
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
@@ -281,6 +283,7 @@ func (w *worker) identifyAvailableNode(ctx context.Context) (_ resources.Host, f
 // identifyConcernedMasters returns a list of all the hosts acting as masters and keep this list
 // during all the installation session
 func (w *worker) identifyConcernedMasters(ctx context.Context) ([]resources.Host, fail.Error) {
+	defer elapsed("identifyConcernedMasters")()
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
@@ -349,19 +352,18 @@ func (w *worker) extractHostsFailingCheck(ctx context.Context, hosts []resources
 // identifyAllMasters returns a list of all the hosts acting as masters and keep this list
 // during all the installation session
 func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail.Error) {
+	defer elapsed("identifyAllMasters")()
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
 
-	if w.allMasters == nil || len(w.allMasters) == 0 {
+	if len(w.allMasters) == 0 {
 		w.allMasters = []resources.Host{}
-		masters, xerr := w.cluster.unsafeListMasterIDs(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
+		masters := w.cluster.masters
+
 		for _, i := range masters {
-			hostInstance, xerr := LoadHost(ctx, w.cluster.Service(), i)
+			i := i
+			hostInstance, xerr := w.loadHost(ctx, i)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -376,6 +378,7 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 // identifyConcernedNodes returns a list of all the hosts acting nodes and keep this list
 // during all the installation session
 func (w *worker) identifyConcernedNodes(ctx context.Context) ([]resources.Host, fail.Error) {
+	defer elapsed("identifyConcernedNodes")()
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
@@ -401,19 +404,18 @@ func (w *worker) identifyConcernedNodes(ctx context.Context) ([]resources.Host, 
 // identifyAllNodes returns a list of all the hosts acting as public of private nodes and keep this list
 // during all the installation session
 func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.Error) {
+	defer elapsed("identifyAllNodes")()
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
 
 	if w.allNodes == nil {
 		var allHosts []resources.Host
-		list, xerr := w.cluster.unsafeListNodeIDs(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
+		list := w.cluster.nodes
+
 		for _, i := range list {
-			hostInstance, xerr := LoadHost(ctx, w.cluster.Service(), i)
+			i := i
+			hostInstance, xerr := w.loadHost(ctx, i)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -426,9 +428,28 @@ func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.E
 	return w.allNodes, nil
 }
 
+func (w *worker) loadHost(ctx context.Context, id string) (resources.Host, fail.Error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	hostInstance, ok := w.machines[id]
+	if ok {
+		return hostInstance, nil
+	}
+
+	hostInstance, xerr := LoadHost(ctx, w.service, id)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	w.machines[id] = hostInstance
+	return hostInstance, nil
+}
+
 // identifyAvailableGateway finds a gateway available, and keep track of it
 // for all the life of the action (prevent to request too often)
 func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, fail.Error) {
+	defer elapsed("identifyAvailableGateway")()
 	if w.availableGateway != nil {
 		return w.availableGateway, nil
 	}
@@ -484,8 +505,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		found := true
 		var nilErrNotFound *fail.ErrNotFound = nil // nolint
 		var gw resources.Host
-		svc := w.cluster.Service()
-		gw, xerr = LoadHost(ctx, svc, netCfg.GatewayID)
+		gw, xerr = w.loadHost(ctx, netCfg.GatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil && xerr != nilErrNotFound {
 			if _, ok := xerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care of in previous line
@@ -496,7 +516,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		}
 
 		if !found {
-			gw, xerr = LoadHost(ctx, svc, netCfg.SecondaryGatewayID)
+			gw, xerr = w.loadHost(ctx, netCfg.SecondaryGatewayID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, fail.Wrap(xerr, "failed to find an available gateway")
@@ -517,6 +537,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 // identifyConcernedGateways returns a list of all the hosts acting as gateway that can accept the action
 // and keep this list during all the installation session
 func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.Host, ferr fail.Error) {
+	defer elapsed("identifyConcernedGateways")()
 	var hosts []resources.Host
 
 	var xerr fail.Error
@@ -539,6 +560,7 @@ func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.H
 // identifyAllGateways returns a list of all the hosts acting as gateways and keep this list
 // during all the installation session
 func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host, ferr fail.Error) {
+	defer elapsed("identifyAllGateways")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -746,6 +768,11 @@ func (w *worker) Proceed(
 			var hostsList []resources.Host
 			if w.target.TargetType() == featuretargettype.Host {
 				hostsList, xerr = w.identifyHosts(ctx, map[string]string{"hosts": "1"})
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					chRes <- result{nil, xerr}
+					return
+				}
 			} else {
 				stepT := stepTargets{}
 				anon, ok := stepMap[yamlTargetsKeyword]
@@ -769,11 +796,11 @@ func (w *worker) Proceed(
 				}
 
 				hostsList, xerr = w.identifyHosts(ctx, stepT)
-			}
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				chRes <- result{nil, xerr}
-				return
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					chRes <- result{nil, xerr}
+					return
+				}
 			}
 
 			if len(hostsList) == 0 {
@@ -806,8 +833,10 @@ func (w *worker) Proceed(
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 
@@ -1024,8 +1053,10 @@ func (w *worker) taskLaunchStep(inctx context.Context, p taskLaunchStepParameter
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 }
@@ -1175,7 +1206,6 @@ func (w *worker) validateClusterSizing(inctx context.Context) (ferr fail.Error) 
 
 // parseClusterSizingRequest returns count, cpu and ram components of request
 func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, fail.Error) {
-	_ = request
 	return 0, 0, 0.0, fail.NotImplementedError("parseClusterSizingRequest() not yet implemented") // FIXME: Technical debt
 }
 
@@ -1451,6 +1481,7 @@ func taskApplyProxyRule(inctx context.Context, params interface{}) (
 
 // identifyHosts identifies hosts concerned based on 'targets' and returns a list of hosts
 func (w *worker) identifyHosts(inctx context.Context, targets stepTargets) ([]resources.Host, fail.Error) {
+	defer elapsed("identifyHosts")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1484,7 +1515,7 @@ func (w *worker) identifyHosts(inctx context.Context, targets stepTargets) ([]re
 
 		switch masterT {
 		case "1":
-			hostInstance, xerr := w.identifyAvailableMaster(ctx)
+			hostInstance, xerr := w.identifyAvailableMaster(ctx) // nolint
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{nil, xerr}

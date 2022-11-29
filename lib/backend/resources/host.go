@@ -41,6 +41,7 @@ type Host interface {
 	Targetable
 	Consistent
 
+	GetName() string
 	BindLabel(ctx context.Context, labelInstance Label, value string) fail.Error
 	BindSecurityGroup(ctx context.Context, sg SecurityGroup, enable SecurityGroupActivation) fail.Error                                                   // Binds a security group to host
 	Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) fail.Error                                                                  // ...
@@ -71,11 +72,9 @@ type Host interface {
 	ListLabels(ctx context.Context) (list map[string]string, err fail.Error)
 	Pull(ctx context.Context, target, source string, timeout time.Duration) (int, string, string, fail.Error)              // downloads a file from host
 	Push(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error) // uploads a file to host
-	PushStringToFile(ctx context.Context, content string, filename string) fail.Error                                      // creates a file 'filename' on remote 'host' with the content 'content'
 	PushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) fail.Error     // creates a file 'filename' on remote 'host' with the content 'content' and apply ownership to it
 	Reboot(ctx context.Context, soft bool) fail.Error                                                                      // reboots the host
 	ResetLabel(ctx context.Context, labelInstance Label) fail.Error
-	Resize(ctx context.Context, hostSize abstract.HostSizingRequirements) fail.Error                                                             // resize the host (probably not yet implemented on some providers if not all)
 	Run(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) // tries to execute command 'cmd' on the host
 	Start(ctx context.Context) fail.Error                                                                                                        // starts the host
 	Stop(ctx context.Context) fail.Error                                                                                                         // stops the host

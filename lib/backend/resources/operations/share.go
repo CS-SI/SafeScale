@@ -204,20 +204,20 @@ func LoadShare(inctx context.Context, svc iaas.Service, ref string, options ...d
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, shareInstance.GetName()), shareInstance, &store.Options{Expiration: 1 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, shareInstance.GetName()), shareInstance, &store.Options{Expiration: 12 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 				hid, err := shareInstance.GetID()
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), shareInstance, &store.Options{Expiration: 1 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), shareInstance, &store.Options{Expiration: 12 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 
 				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
 					casted, ok := val.(resources.Share)
@@ -227,7 +227,7 @@ func LoadShare(inctx context.Context, svc iaas.Service, ref string, options ...d
 						logrus.WithContext(ctx).Warnf("wrong type of resources.Share")
 					}
 				} else {
-					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("share cache response (%s): %v", cacheref, xerr)
 				}
 			}
 
@@ -359,7 +359,7 @@ func (instance *Share) Create(
 
 	targetName := server.GetName()
 
-	state, xerr := server.GetState(ctx)
+	state, xerr := server.ForceGetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -684,7 +684,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, spath s
 
 	targetName = target.GetName()
 
-	state, xerr := target.GetState(ctx)
+	state, xerr := target.ForceGetState(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -964,7 +964,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (ferr
 
 	targetName := target.GetName()
 
-	state, xerr := target.GetState(ctx)
+	state, xerr := target.ForceGetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -1137,7 +1137,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	targetName := objserver.GetName()
 
 	var state hoststate.Enum
-	state, xerr = objserver.GetState(ctx)
+	state, xerr = objserver.ForceGetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -1208,8 +1208,23 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
+	theID, _ := instance.GetID()
+
 	// Remove Share metadata
-	return instance.MetadataCore.Delete(ctx)
+	xerr = instance.MetadataCore.Delete(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if ka, err := instance.Service().GetCache(ctx); err == nil {
+		if ka != nil {
+			if theID != "" {
+				_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+			}
+		}
+	}
+
+	return nil
 }
 
 func sanitize(in string) (string, fail.Error) {
