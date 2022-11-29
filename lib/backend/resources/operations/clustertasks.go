@@ -1564,6 +1564,16 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 			timeout := time.Duration(p.count) * timings.HostCreationTimeout() // FIXME: OPP This became the timeout for the whole cluster creation....
 
 			winSize := 8
+			st, xerr := instance.Service().GetProviderName()
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
+			if st != "ovh" {
+				winSize = int((8 * p.count) / 10)
+				if winSize < 8 {
+					winSize = 8
+				}
+			}
 			svc := instance.Service()
 			if cfg, xerr := svc.GetConfigurationOptions(ctx); xerr == nil {
 				if aval, ok := cfg.Get("ConcurrentMachineCreationLimit"); ok {

@@ -1415,6 +1415,16 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 	}
 
 	winSize := 8
+	st, xerr := instance.Service().GetProviderName()
+	if xerr != nil {
+		return nil, xerr
+	}
+	if st != "ovh" {
+		winSize = int((8 * count) / 10)
+		if winSize < 8 {
+			winSize = 8
+		}
+	}
 	if cfg, xerr := svc.GetConfigurationOptions(ctx); xerr == nil {
 		if aval, ok := cfg.Get("ConcurrentMachineCreationLimit"); ok {
 			if val, ok := aval.(int); ok {
