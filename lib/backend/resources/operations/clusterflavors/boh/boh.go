@@ -54,14 +54,14 @@ func minimumRequiredServers(ctx context.Context, clusterIdentity abstract.Cluste
 	// custom configuration
 	switch clusterIdentity.Complexity {
 	case clustercomplexity.Small:
-		privateNodeCount = 3
-		masterNodeCount = 3
+		privateNodeCount = 1
+		masterNodeCount = 1
 	case clustercomplexity.Normal:
-		privateNodeCount = 11
-		masterNodeCount = 7
+		privateNodeCount = 3
+		masterNodeCount = 2
 	case clustercomplexity.Large:
-		privateNodeCount = 39
-		masterNodeCount = 25
+		privateNodeCount = 7
+		masterNodeCount = 3
 	}
 	return masterNodeCount, privateNodeCount, 0, nil
 }
