@@ -280,7 +280,7 @@ func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef s
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, subnetInstance.GetName()), subnetInstance, &store.Options{Expiration: 12 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, subnetInstance.GetName()), subnetInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
@@ -288,7 +288,7 @@ func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef s
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), subnetInstance, &store.Options{Expiration: 12 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), subnetInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}

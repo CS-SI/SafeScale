@@ -172,17 +172,17 @@ func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...da
 					return nil, fail.ConvertError(err)
 				}
 
-				err = cache.Set(ctx, refcache, hostInstance, &store.Options{Expiration: 12 * time.Minute})
+				err = cache.Set(ctx, refcache, hostInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
 
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hostInstance.GetName()), hostInstance, &store.Options{Expiration: 12 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hostInstance.GetName()), hostInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
 
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), hostInstance, &store.Options{Expiration: 12 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), hostInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
@@ -631,7 +631,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 
 		thing, err := cache.Get(ctx, hid)
 		if err != nil || thing == nil { // usually notfound
-			err = cache.Set(ctx, hid, instance, &store.Options{Expiration: 12 * time.Minute})
+			err = cache.Set(ctx, hid, instance, &store.Options{Expiration: 120 * time.Minute})
 			if err != nil {
 				return fail.ConvertError(err)
 			}

@@ -140,7 +140,7 @@ func LoadVolume(inctx context.Context, svc iaas.Service, ref string, options ...
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, volumeInstance.GetName()), volumeInstance, &store.Options{Expiration: 12 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, volumeInstance.GetName()), volumeInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
@@ -149,7 +149,7 @@ func LoadVolume(inctx context.Context, svc iaas.Service, ref string, options ...
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), volumeInstance, &store.Options{Expiration: 12 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), volumeInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}

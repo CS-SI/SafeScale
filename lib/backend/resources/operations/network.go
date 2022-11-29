@@ -129,7 +129,7 @@ func LoadNetwork(inctx context.Context, svc iaas.Service, ref string, options ..
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, networkInstance.GetName()), networkInstance, &store.Options{Expiration: 12 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, networkInstance.GetName()), networkInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
@@ -138,7 +138,7 @@ func LoadNetwork(inctx context.Context, svc iaas.Service, ref string, options ..
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), networkInstance, &store.Options{Expiration: 12 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), networkInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}

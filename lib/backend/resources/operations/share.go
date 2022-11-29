@@ -204,7 +204,7 @@ func LoadShare(inctx context.Context, svc iaas.Service, ref string, options ...d
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, shareInstance.GetName()), shareInstance, &store.Options{Expiration: 12 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, shareInstance.GetName()), shareInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
@@ -213,7 +213,7 @@ func LoadShare(inctx context.Context, svc iaas.Service, ref string, options ...d
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), shareInstance, &store.Options{Expiration: 12 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), shareInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}

@@ -153,7 +153,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 
 		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
 			NumCounters: 1024,
-			MaxCost:     10000000,
+			MaxCost:     50000000,
 			BufferItems: 128,
 		})
 		if err != nil {
@@ -163,22 +163,12 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		newS := &service{
 			Provider:     providerInstance,
 			tenantName:   tenantName,
-			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 12 * time.Minute}))),
+			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 120 * time.Minute}))),
 		}
 
-		if beta := os.Getenv("SAFESCALE_CACHE"); beta != "" {
+		if beta := os.Getenv("SAFESCALE_CACHE"); beta != "disabled" {
 			logrus.WithContext(ctx).Infof("Created a cache in: %p", newS.cacheManager)
 		}
-
-		// allRegions, xerr := newS.ListRegions()
-		// if xerr != nil {
-		// 	switch xerr.(type) {
-		// 	case *fail.ErrNotFound:
-		// 		break
-		// 	default:
-		// 		return NullService(), xerr
-		// 	}
-		// }
 
 		authOpts, xerr := providerInstance.GetAuthenticationOptions(ctx)
 		if xerr != nil {

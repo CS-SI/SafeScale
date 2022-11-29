@@ -331,7 +331,7 @@ func LoadCluster(inctx context.Context, svc iaas.Service, name string, options .
 		}
 
 		if cache != nil {
-			err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, clusterInstance.GetName()), clusterInstance, &store.Options{Expiration: 12 * time.Minute})
+			err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, clusterInstance.GetName()), clusterInstance, &store.Options{Expiration: 120 * time.Minute})
 			if err != nil {
 				chRes <- result{nil, fail.ConvertError(err)}
 				return
@@ -341,7 +341,7 @@ func LoadCluster(inctx context.Context, svc iaas.Service, name string, options .
 				chRes <- result{nil, fail.ConvertError(err)}
 				return
 			}
-			err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), clusterInstance, &store.Options{Expiration: 12 * time.Minute})
+			err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), clusterInstance, &store.Options{Expiration: 120 * time.Minute})
 			if err != nil {
 				chRes <- result{nil, fail.ConvertError(err)}
 				return

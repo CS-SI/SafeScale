@@ -136,7 +136,7 @@ func LoadBucket(inctx context.Context, svc iaas.Service, name string) (resources
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, b.GetName()), b, &store.Options{Expiration: 12 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, b.GetName()), b, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
@@ -145,7 +145,7 @@ func LoadBucket(inctx context.Context, svc iaas.Service, name string) (resources
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), b, &store.Options{Expiration: 12 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), b, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}

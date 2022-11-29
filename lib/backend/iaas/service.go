@@ -1272,7 +1272,8 @@ func (instance service) GetCache(inctx context.Context) (cache.CacheInterface, f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	if beta := os.Getenv("SAFESCALE_CACHE"); beta != "" {
+	// Enable cache by default, too many consistency errors otherwise
+	if beta := os.Getenv("SAFESCALE_CACHE"); beta != "disabled" {
 		return instance.cacheManager, nil
 	}
 
