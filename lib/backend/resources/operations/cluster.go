@@ -3154,7 +3154,7 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-		return emptySlice, nil
+		return emptySlice, xerr
 	}
 
 	defer func() {
