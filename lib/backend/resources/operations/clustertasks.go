@@ -384,6 +384,10 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 						// VPL: For now, always disable addition of feature proxycache
 						featuresV1.Disabled["proxycache"] = struct{}{}
 						// ENDVPL
+
+						// FIXME: Also disable remotedesktop by default
+						// featuresV1.Disabled["remotedesktop"] = struct{}{}
+
 						for k := range req.DisabledDefaultFeatures {
 							featuresV1.Disabled[k] = struct{}{}
 						}
