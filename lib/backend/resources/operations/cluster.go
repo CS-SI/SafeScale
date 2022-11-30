@@ -955,6 +955,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 		return xerr
 	}
 
@@ -1021,6 +1022,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 		return xerr
 	}
 
@@ -1082,7 +1084,9 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 				return nil
 			})
 		})
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			_ = outerr.AddConsequence(xerr)
 		}
 		return outerr
@@ -1101,7 +1105,12 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 			return nil
 		})
 	})
-	return xerr
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+		return xerr
+	}
+	return nil
 }
 
 // Stop stops the Cluster
@@ -1193,6 +1202,7 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 		return xerr
 	}
 
@@ -1875,6 +1885,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host string) (ferr fa
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 		return xerr
 	}
 
@@ -1940,6 +1951,7 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				return result{xerr}, xerr
 			}
 
@@ -2123,6 +2135,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				return result{xerr}, xerr
 			}
 
@@ -2184,6 +2197,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				return result{xerr}, xerr
 			}
 
@@ -2929,6 +2943,7 @@ func (instance *Cluster) buildHostname(ctx context.Context, core string, nodeTyp
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 		return "", xerr
 	}
 	return instance.GetName() + "-" + core + "-" + strconv.Itoa(index), nil
@@ -3138,6 +3153,7 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 		return emptySlice, nil
 	}
 
