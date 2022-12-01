@@ -156,7 +156,8 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 			return nil, xerr
 		}
 
-		_, err := networkInstance.GetID()
+		var err error
+		networkID, err = networkInstance.GetID()
 		if err != nil {
 			return nil, fail.ConvertError(err)
 		}
