@@ -288,7 +288,7 @@ func (w *worker) identifyConcernedMasters(ctx context.Context) ([]resources.Host
 		return []resources.Host{}, nil
 	}
 
-	if w.concernedMasters == nil {
+	if len(w.concernedMasters) == 0 {
 		hosts, xerr := w.identifyAllMasters(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -301,8 +301,15 @@ func (w *worker) identifyConcernedMasters(ctx context.Context) ([]resources.Host
 			return nil, xerr
 		}
 
-		w.concernedMasters = concernedHosts
+		for _, v := range concernedHosts {
+			if does, xerr := v.Exists(ctx); xerr == nil {
+				if does {
+					w.concernedMasters = append(w.concernedMasters, v)
+				}
+			}
+		}
 	}
+
 	return w.concernedMasters, nil
 }
 
@@ -359,8 +366,11 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 
 	if len(w.allMasters) == 0 {
 		w.allMasters = []resources.Host{}
-		masters := w.cluster.masters
-
+		masters, xerr := w.cluster.unsafeListMasterIDs(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
 		for _, i := range masters {
 			i := i
 			hostInstance, xerr := w.loadHost(ctx, i)
@@ -369,7 +379,11 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 				return nil, xerr
 			}
 
-			w.allMasters = append(w.allMasters, hostInstance)
+			if does, xerr := hostInstance.Exists(ctx); xerr == nil {
+				if does {
+					w.allMasters = append(w.allMasters, hostInstance)
+				}
+			}
 		}
 	}
 	return w.allMasters, nil
@@ -383,7 +397,7 @@ func (w *worker) identifyConcernedNodes(ctx context.Context) ([]resources.Host, 
 		return []resources.Host{}, nil
 	}
 
-	if w.concernedNodes == nil {
+	if len(w.concernedNodes) == 0 {
 		hosts, xerr := w.identifyAllNodes(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -396,7 +410,13 @@ func (w *worker) identifyConcernedNodes(ctx context.Context) ([]resources.Host, 
 			return nil, xerr
 		}
 
-		w.concernedNodes = concernedHosts
+		for _, v := range concernedHosts {
+			if does, xerr := v.Exists(ctx); xerr == nil {
+				if does {
+					w.concernedNodes = append(w.concernedNodes, v)
+				}
+			}
+		}
 	}
 	return w.concernedNodes, nil
 }
@@ -409,9 +429,13 @@ func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.E
 		return []resources.Host{}, nil
 	}
 
-	if w.allNodes == nil {
+	if len(w.allNodes) == 0 {
 		var allHosts []resources.Host
-		list := w.cluster.nodes
+		list, xerr := w.cluster.unsafeListNodeIDs(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
 
 		for _, i := range list {
 			i := i
@@ -421,7 +445,11 @@ func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.E
 				return nil, xerr
 			}
 
-			allHosts = append(allHosts, hostInstance)
+			if does, xerr := hostInstance.Exists(ctx); xerr == nil {
+				if does {
+					allHosts = append(allHosts, hostInstance)
+				}
+			}
 		}
 		w.allNodes = allHosts
 	}
@@ -553,7 +581,14 @@ func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.H
 		return nil, xerr
 	}
 
-	w.concernedGateways = concernedHosts
+	for _, v := range concernedHosts {
+		if does, xerr := v.Exists(ctx); xerr == nil {
+			if does {
+				w.concernedGateways = append(w.concernedGateways, v)
+			}
+		}
+	}
+
 	return w.concernedGateways, nil
 }
 
@@ -767,12 +802,21 @@ func (w *worker) Proceed(
 			// Determine list of hosts concerned by the step
 			var hostsList []resources.Host
 			if w.target.TargetType() == featuretargettype.Host {
-				hostsList, xerr = w.identifyHosts(ctx, map[string]string{"hosts": "1"})
+				var tmpList []resources.Host
+				tmpList, xerr = w.identifyHosts(ctx, map[string]string{"hosts": "1"})
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					chRes <- result{nil, xerr}
 					return
 				}
+				for _, fl := range tmpList {
+					if does, xerr := fl.Exists(ctx); xerr == nil {
+						if does {
+							hostsList = append(hostsList, fl)
+						}
+					}
+				}
+
 			} else {
 				stepT := stepTargets{}
 				anon, ok := stepMap[yamlTargetsKeyword]
@@ -795,11 +839,19 @@ func (w *worker) Proceed(
 					return
 				}
 
-				hostsList, xerr = w.identifyHosts(ctx, stepT)
+				var tmpList []resources.Host
+				tmpList, xerr = w.identifyHosts(ctx, stepT)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					chRes <- result{nil, xerr}
 					return
+				}
+				for _, fl := range tmpList {
+					if does, xerr := fl.Exists(ctx); xerr == nil {
+						if does {
+							hostsList = append(hostsList, fl)
+						}
+					}
 				}
 			}
 
@@ -1849,97 +1901,6 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 			}
 		}
 
-		// VPL: for the future ? For now, targets == gateways only supported...
-		// hosts, xerr := w.identifyHosts(targets)
-		// if xerr != nil {
-		// 	return fail.Wrap(xerr, "failed to apply proxy rules: %s")
-		// }
-		//
-		// 	if _, ok = targets["masters"]; ok {
-		// 	}
-		//
-		// 	if _, ok = targets["nodes"]; ok {
-		// 	}
-		//
-		// 	for _, h := range hosts {
-		// 		if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
-		// 			return xerr
-		// 		}
-		// 		primaryGatewayVariables["ShortHostname"] = h.GetName()
-		// 		domain := ""
-		// 		xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
-		// 			return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-		// 				hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
-		// 				if !ok {
-		// 					return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		// 				}
-		// 				domain = hostDescriptionV1.Domain
-		// 				if domain != "" {
-		// 					domain = "." + domain
-		// 				}
-		// 				return nil
-		// 			})
-		// 		})
-		// 		if xerr != nil {
-		// 			return xerr
-		// 		}
-		//
-		// 		primaryGatewayVariables["Hostname"] = h.GetName() + domain
-		//
-		// 		tP, xerr := w.feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
-		// 			"ctrl": primaryKongController,
-		// 			"rule": rule,
-		// 			"vars": &primaryGatewayVariables,
-		// 		})
-		// 		if xerr != nil {
-		// 			return fail.Wrap(xerr, "failed to apply proxy rules")
-		// 		}
-		//
-		// 		var errS fail.Error
-		// 		if secondaryKongController != nil {
-		// 			if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
-		// 				return xerr
-		// 			}
-		// 			secondaryGatewayVariables["ShortHostname"] = h.GetName()
-		// 			domain = ""
-		// 			xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
-		// 				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-		// 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
-		// 					if !ok {
-		// 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		// 					}
-		// 					domain = hostDescriptionV1.Domain
-		// 					if domain != "" {
-		// 						domain = "." + domain
-		// 					}
-		// 					return nil
-		// 				})
-		// 			})
-		// 			if xerr != nil {
-		// 				return xerr
-		// 			}
-		// 			secondaryGatewayVariables["Hostname"] = h.GetName() + domain
-		//
-		// 			tS, errOp := w.feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
-		// 				"ctrl": secondaryKongController,
-		// 				"rule": rule,
-		// 				"vars": &secondaryGatewayVariables,
-		// 			})
-		// 			if errOp == nil {
-		// 				_, errOp = tS.Wait()
-		// 			}
-		// 			errS = errOp
-		// 		}
-		//
-		// 		_, errP := tP.Wait()
-		// 		if errP != nil {
-		// 			return errP
-		// 		}
-		// 		if errS != nil {
-		// 			return errS
-		// 		}
-		// 	}
-		// }
 		chRes <- result{nil}
 
 	}()
