@@ -6,6 +6,18 @@ resource "openstack_networking_subnet_v2" "{{ .Resource.Name }}" {
     ip_version              = {{ eq .Resource.IPVersion 6 | ternary 6 4 }}
     region                  = "{{ .Provider.Authentication.Region }}"
     enable_dhcp             = true
+
+    tags = {
+{{ for $t, $v := range .Resource.Tags }}
+        {{ $t }} = "{{ $v }}"
+{{ end }}
+    }
+
+    lifecycle {
+{{- if not .Extra.MarkedForDestroy }}
+        prevent_destroy = true
+{{ end }}
+    }
 }
 
 output "subnet_{{ .Resource.Name }}_id" {
@@ -19,11 +31,35 @@ resource "openstack_networking_router_v2" "{{ .Resource.Name }}" {
     external_network_id     = "{{ .Provider.Configuration.ProviderNetworkID }}"
     tenant_id               = "{{ .Provider.Authentication.TenantID }}"
     region                  = "{{ .Provider.Authentication.Region }}"
+
+    tags = {
+{{ for $t, $v := range .Resource.Tags }}
+        {{ $t }} = "{{ $v }}"
+{{ end }}
+    }
+
+    lifecycle {
+{{- if not .Extra.MarkedForDestroy }}
+        prevent_destroy = true
+{{ end }}
+    }
 }
 
 resource "openstack_networking_router_interface_v2" "router_interface_1" {
     router_id = "${openstack_networking_router_v2.{{ .Resource.Name }}.id}"
     subnet_id = "${openstack_networking_subnet_v2.{{ .Resource.Name }}.id}"
+
+    tags = {
+{{ for $t, $v := range .Resource.Tags }}
+        {{ $t }} = "{{ $v }}"
+{{ end }}
+    }
+
+    lifecycle {
+{{- if not .Extra.MarkedForDestroy }}
+        prevent_destroy = true
+{{ end }}
+    }
 }
 
 output "router_{{ .Resource.Name }}_id" {

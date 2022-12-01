@@ -18,9 +18,10 @@ package openstack
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 
 	"github.com/sirupsen/logrus"
 
@@ -38,6 +39,9 @@ import (
 )
 
 func (instance *stack) rpcGetHostByID(ctx context.Context, id string) (*servers.Server, fail.Error) {
+	if instance.ComputeClient == nil {
+		return nil, fail.InvalidInstanceContentError("instance.ComputeClient", "cannot be nil")
+	}
 	if id == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
@@ -307,6 +311,9 @@ func (instance *stack) rpcCreateServer(ctx context.Context, name string, network
 	if xerr != nil {
 		return &servers.Server{}, xerr
 	}
+	if server == nil || server.ID == "" {
+		return nil, fail.NewError("invalid server")
+	}
 
 	return server, nil
 }
@@ -557,8 +564,7 @@ func (instance *stack) rpcDeleteFloatingIP(ctx context.Context, id string) fail.
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	return stacks.RetryableRemoteCall(
-		ctx,
+	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return floatingips.Delete(instance.ComputeClient, id).ExtractErr()
 		},

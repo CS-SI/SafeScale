@@ -83,5 +83,6 @@ type Configuration struct {
 
 	Safe bool
 
-	Timings *temporal.MutableTimings
+	Timings                        *temporal.MutableTimings
+	ConcurrentMachineCreationLimit int
 }

@@ -21,7 +21,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostShare describes a filesystem exported from the host
@@ -70,7 +69,7 @@ func (hs *HostShare) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*HostShare](p)
+	src, err := clonable.Cast[*HostShare](p)
 	if err != nil {
 		return err
 	}
@@ -126,7 +125,7 @@ func (hs *HostShares) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*HostShares](p)
+	src, err := clonable.Cast[*HostShares](p)
 	if err != nil {
 		return err
 	}

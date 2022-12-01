@@ -23,10 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/davecgh/go-spew/spew"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -36,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
@@ -242,20 +240,20 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map[string, any], s resources.FeatureSettings) (_ resources.UnitResults, ferr fail.Error) {
+func (is *step) Run(inctx context.Context, hosts []resources.Host, v data.Map[string, any], s resources.FeatureSettings) (_ resources.UnitResults, ferr fail.Error) {
 	outcomes := &unitResults{}
 
 	select {
-	case <-task.Context().Done():
-		return outcomes, fail.AbortedError(task.Context().Err())
+	case <-inctx.Done():
+		return outcomes, fail.AbortedError(inctx.Err())
 	default:
 	}
 
 	if is.Serial || s.Serialize {
-		return is.loopSeriallyOnHosts(task.Context(), hosts, v)
+		return is.loopSeriallyOnHosts(inctx, hosts, v)
 	}
 
-	return is.loopConcurrentlyOnHosts(task.Context(), hosts, v)
+	return is.loopConcurrentlyOnHosts(inctx, hosts, v)
 }
 
 func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host, v data.Map[string, any]) (_ resources.UnitResults, ferr fail.Error) {
@@ -266,6 +264,8 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 	outcomes := &unitResults{}
 
 	for _, h := range hosts {
+		h := h
+
 		select {
 		case <-ctx.Done():
 			return nil, fail.AbortedError(ctx.Err())
@@ -279,36 +279,28 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 			return nil, xerr
 		}
 
-		subtask, xerr := concurrency.NewTaskWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
+		outcome, xerr := is.taskRunOnHost(ctx, runOnHostParameters{Host: h, Variables: clonedV})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		outcome, xerr := is.taskRunOnHost(subtask, runOnHostParameters{Host: h, Variables: clonedV})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		if outcome != nil {
-			outcomes.AddOne(h.GetName(), outcome.(resources.UnitResult))
-		}
+		outcomes.AddOne(h.GetName(), outcome)
 
 		if !outcomes.Successful() {
 			if is.Worker.action == installaction.Check { // Checks can fail and it's ok
 				tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present",
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
-					temporal.FormatDuration(time.Since(is.Worker.startTime)))
+					temporal.FormatDuration(time.Since(is.Worker.GetStartTime())))
 			} else { // other steps are expected to succeed
 				tracer.Trace("%s(%s):step(%s)@%s failed in %s: %s",
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
-					temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
+					temporal.FormatDuration(time.Since(is.Worker.GetStartTime())), outcomes.ErrorMessages())
 			}
 		} else {
 			tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
 				is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
-				temporal.FormatDuration(time.Since(is.Worker.startTime)))
+				temporal.FormatDuration(time.Since(is.Worker.GetStartTime())))
 		}
 	}
 
@@ -327,66 +319,50 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 		ra   resources.UnitResults
 		rErr fail.Error
 	}
+
+	type partResult struct {
+		who  string
+		what stepResult
+		err  fail.Error
+	}
+
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
+		blue := make(chan partResult, len(hosts))
 
-		tg, xerr := concurrency.NewTaskGroupWithContext(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		var taskErr fail.Error
-		subtasks := map[string]concurrency.Task{}
+		tg := new(errgroup.Group)
 		for _, h := range hosts {
-			subtask, taskErr := tg.Start(is.taskRunOnHostWithLoop, runOnHostParameters{Host: h, Variables: v})
-			taskErr = debug.InjectPlannedFail(taskErr)
-			if taskErr != nil {
-				abErr := tg.AbortWithCause(taskErr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+			h := h
+			tg.Go(func() error {
+				moctx, lord := context.WithCancel(ctx)
+				defer lord()
+				tr, err := is.taskRunOnHostWithLoop(moctx, runOnHostParameters{Host: h, Variables: v})
+				hid, _ := h.GetID()
+				blue <- partResult{who: hid, what: tr, err: err}
+				if err != nil {
+					return err
 				}
-				break
-			}
-			subtasks[h.GetName()] = subtask
+				return nil
+			})
 		}
 
-		tgr, xerr := tg.WaitGroup()
+		xerr := fail.ConvertError(tg.Wait())
 		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			if len(subtasks) != len(hosts) {
-				logrus.WithContext(ctx).Warnf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
-			}
-			logrus.WithContext(ctx).Errorf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
-			if taskErr != nil {
-				_ = taskErr.AddConsequence(xerr)
-			} else {
-				taskErr = xerr
-			}
+		outcomes := &unitResults{}
+		close(blue)
+		for ur := range blue {
+			outcomes.AddOne(ur.who, ur.what)
 		}
 
-		wrongs, outcomes, cerr := is.collectOutcomes(subtasks, tgr)
-		if cerr != nil {
-			if wrongs == 0 && len(subtasks) == len(hosts) {
-				inconsistency := fail.InconsistentError("CRITICAL problem: there is a discrepancy between WaitGroup and its individual results: %w", cerr)
-				inconsistency.Annotate("wrongs", wrongs).Annotate("outcomes", outcomes)
-				chRes <- result{nil, inconsistency}
-				return
-			}
-
-			if taskErr != nil {
-				_ = taskErr.AddConsequence(cerr)
-				chRes <- result{nil, taskErr}
-				return
-			}
-			chRes <- result{nil, cerr}
+		if xerr != nil {
+			chRes <- result{outcomes, xerr}
 			return
 		}
 
-		chRes <- result{outcomes, taskErr}
-
+		chRes <- result{outcomes, nil}
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.ra, res.rErr
@@ -443,19 +419,12 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 
 	clonedV["ShortHostname"] = host.GetName()
 	domain := ""
-	xerr = host.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
-			hostDescriptionV1, innerErr := lang.Cast[*propertiesv1.HostDescription](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			domain = hostDescriptionV1.Domain
-			if domain != "" {
-				domain = "." + domain
-			}
-			return nil
-		})
+	xerr = metadata.InspectProperty(ctx, host, hostproperty.DescriptionV1, func(hostDescriptionV1 *propertiesv1.HostDescription) fail.Error {
+		domain = hostDescriptionV1.Domain
+		if domain != "" {
+			domain = "." + domain
+		}
+		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -496,80 +465,51 @@ type runOnHostParameters struct {
 	Variables data.Map[string, any]
 }
 
-func (is *step) taskRunOnHostWithLoop(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	var res concurrency.TaskResult
 
-	var ok bool
 	if params == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("params")
+		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")
 	}
 	p, ok := params.(runOnHostParameters)
 	if !ok {
-		return nil, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+		return stepResult{}, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
 	}
 
-	inctx := task.Context()
 	cv, xerr := is.initLoopTurnForHost(inctx, p.Host, p.Variables)
 	if xerr != nil {
-		return nil, xerr
+		return stepResult{}, xerr
 	}
 
-	res, xerr = is.taskRunOnHost(task, runOnHostParameters{
+	res, xerr := is.taskRunOnHost(inctx, runOnHostParameters{
 		Host:      p.Host,
 		Variables: cv,
 	})
+
 	if xerr != nil {
-		return nil, xerr
+		return stepResult{}, xerr
 	}
+
 	return res, nil
 }
 
 // taskRunOnHost ...
-// Respects interface concurrency.TaskFunc
-// func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
-func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	var res concurrency.TaskResult
 
-	var ok bool
 	if params == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("params")
+		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")
 	}
 	p, ok := params.(runOnHostParameters)
 	if !ok {
-		return nil, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+		return stepResult{}, fail.InvalidParameterError("params", "must be of type 'runOnHostParameters'")
 	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	defer func() {
-		if res != nil {
-			if sres, ok := res.(stepResult); ok {
-				if !sres.Completed() || !sres.Successful() || sres.Error() != nil {
-					dur := spew.Sdump(res)
-					if !strings.Contains(dur, "check_") {
-						logrus.WithContext(ctx).Debugf("task result: %s", spew.Sdump(res))
-					}
-				}
-			}
-		}
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			logrus.WithContext(ctx).Debugf("task error: %v", ferr)
-		}
-	}()
-
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  stepResult
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -597,6 +537,17 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			Remote: filename,
 		}
 
+		var does bool
+		does, xerr = p.Host.Exists(ctx)
+		if xerr != nil {
+			chRes <- result{stepResult{err: xerr}, xerr}
+			return
+		}
+		if !does {
+			logrus.WithContext(ctx).Errorf("Disaster: trying to install things on non-existing host")
+			chRes <- result{stepResult{success: true, completed: true, err: nil, retcode: 0, output: ""}, nil}
+		}
+
 		xerr = rfcItem.UploadString(ctx, command, p.Host)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -621,7 +572,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		svc := p.Host.Service()
 		timings, xerr := svc.Timings()
 		if xerr != nil {
-			chRes <- result{nil, xerr}
+			chRes <- result{stepResult{}, xerr}
 			return
 		}
 
@@ -629,7 +580,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		for {
 			select {
 			case <-ctx.Done():
-				chRes <- result{nil, fail.ConvertError(ctx.Err())}
+				chRes <- result{stepResult{}, fail.ConvertError(ctx.Err())}
 				return
 			default:
 			}
@@ -678,15 +629,15 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		}
 
 		chRes <- result{stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil}
-
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return stepResult{}, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return stepResult{}, fail.ConvertError(inctx.Err())
 	}
 }
 

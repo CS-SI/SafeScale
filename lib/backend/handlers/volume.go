@@ -19,12 +19,9 @@ package handlers
 import (
 	"strings"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumeproperty"
@@ -32,11 +29,13 @@ import (
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
 	volumefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/volume"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 //go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/backend/handlers.VolumeHandler -o mocks/mock_volume.go
@@ -144,7 +143,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 
 	xerr = volumeInstance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
-			volumeAttachmentsV1, innerErr := lang.Cast[*propertiesv1.VolumeAttachments](p)
+			volumeAttachmentsV1, innerErr := clonable.Cast[*propertiesv1.VolumeAttachments](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

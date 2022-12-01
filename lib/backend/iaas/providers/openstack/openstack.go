@@ -111,6 +111,11 @@ func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaas
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 
+	machineCreationLimit := 8
+	if _, ok := compute["ConcurrentMachineCreationLimit"].(string); ok {
+		machineCreationLimit, _ = strconv.Atoi(compute["ConcurrentMachineCreationLimit"].(string))
+	}
+
 	customDNS, _ := compute["DNS"].(string) // nolint
 	if customDNS != "" {
 		if strings.Contains(customDNS, ",") {
@@ -146,7 +151,7 @@ func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaas
 	}
 	params["Safe"] = isSafe
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	authOptions := iaasoptions.Authentication{
 		IdentityEndpoint: identityEndpoint,
@@ -193,9 +198,10 @@ next:
 			"standard":   volumespeed.Cold,
 			"performant": volumespeed.Hdd,
 		},
-		MaxLifeTime: maxLifeTime,
-		Timings:     timings,
-		Safe:        isSafe,
+		MaxLifeTime:                    maxLifeTime,
+		Timings:                        timings,
+		Safe:                           isSafe,
+		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)

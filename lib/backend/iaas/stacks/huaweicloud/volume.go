@@ -55,24 +55,24 @@ func toVolumeState(status string) volumestate.Enum {
 	}
 }
 
-func (s *stack) getVolumeType(speed volumespeed.Enum) string {
-	for t, s := range s.cfgOpts.VolumeSpeeds {
+func (instance *stack) getVolumeType(speed volumespeed.Enum) string {
+	for t, s := range instance.cfgOpts.VolumeSpeeds {
 		if s == speed {
 			return t
 		}
 	}
 	switch speed {
 	case volumespeed.Ssd:
-		return s.getVolumeType(volumespeed.Hdd)
+		return instance.getVolumeType(volumespeed.Hdd)
 	case volumespeed.Hdd:
-		return s.getVolumeType(volumespeed.Cold)
+		return instance.getVolumeType(volumespeed.Cold)
 	default:
 		return ""
 	}
 }
 
-func (s *stack) getVolumeSpeed(vType string) volumespeed.Enum {
-	speed, ok := s.cfgOpts.VolumeSpeeds[vType]
+func (instance *stack) getVolumeSpeed(vType string) volumespeed.Enum {
+	speed, ok := instance.cfgOpts.VolumeSpeeds[vType]
 	if ok {
 		return speed
 	}
@@ -81,17 +81,17 @@ func (s *stack) getVolumeSpeed(vType string) volumespeed.Enum {
 }
 
 // CreateVolume creates a block volume
-func (s *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	volume, xerr := s.InspectVolume(ctx, request.Name)
+	volume, xerr := instance.InspectVolume(ctx, request.Name)
 	if xerr == nil && volume != nil {
 		return nil, fail.DuplicateError("volume '%s' already exists", request.Name)
 	}
 
-	az, xerr := s.SelectedAvailabilityZone(ctx)
+	az, xerr := instance.SelectedAvailabilityZone(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -99,12 +99,12 @@ func (s *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest
 		AvailabilityZone: az,
 		Name:             request.Name,
 		Size:             request.Size,
-		VolumeType:       strings.ToUpper(s.getVolumeType(request.Speed)),
+		VolumeType:       strings.ToUpper(instance.getVolumeType(request.Speed)),
 	}
 	var vol *volumes.Volume
 	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			vol, innerErr = volumes.Create(s.VolumeClient, opts).Extract()
+			vol, innerErr = volumes.Create(instance.VolumeClient, opts).Extract()
 			return normalizeError(innerErr)
 		},
 		normalizeError,
@@ -116,14 +116,14 @@ func (s *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest
 	v, _ := abstract.NewVolume(abstract.WithName(request.Name))
 	v.ID = vol.ID
 	v.Size = vol.Size
-	v.Speed = s.getVolumeSpeed(vol.VolumeType)
+	v.Speed = instance.getVolumeSpeed(vol.VolumeType)
 	v.State = toVolumeState(vol.Status)
 	return v, nil
 }
 
 // InspectVolume returns the volume identified by id
-func (s *stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
@@ -133,7 +133,7 @@ func (s *stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume,
 	var vol *volumes.Volume
 	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			vol, innerErr = volumes.Get(s.VolumeClient, id).Extract()
+			vol, innerErr = volumes.Get(instance.VolumeClient, id).Extract()
 			return normalizeError(innerErr)
 		},
 		normalizeError,
@@ -154,21 +154,21 @@ func (s *stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume,
 
 	av.ID = vol.ID
 	av.Size = vol.Size
-	av.Speed = s.getVolumeSpeed(vol.VolumeType)
+	av.Speed = instance.getVolumeSpeed(vol.VolumeType)
 	av.State = toVolumeState(vol.Status)
 	return av, nil
 }
 
 // ListVolumes lists volumes
-func (s *stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	var vs []*abstract.Volume
 	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			innerErr := volumes.List(s.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+			innerErr := volumes.List(instance.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumes.ExtractVolumes(page)
 				if err != nil {
 					logrus.WithContext(ctx).Errorf("Error listing volumes: volume extraction: %+v", err)
@@ -182,7 +182,7 @@ func (s *stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error
 
 					av.ID = vol.ID
 					av.Size = vol.Size
-					av.Speed = s.getVolumeSpeed(vol.VolumeType)
+					av.Speed = instance.getVolumeSpeed(vol.VolumeType)
 					av.State = toVolumeState(vol.Status)
 					vs = append(vs, av)
 				}

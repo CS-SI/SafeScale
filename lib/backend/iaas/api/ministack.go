@@ -68,8 +68,8 @@ type MiniStack interface {
 	// ClearSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
 	// // DeleteSecurityGroup deletes a security group and all its rules
 	// DeleteSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error
-	// // AddRuleToSecurityGroup adds a rule to an existing security group
-	// AddRuleToSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+	// // AddRulesToSecurityGroup adds a rule to an existing security group
+	// AddRulesToSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 	// DeleteRuleFromSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// // GetDefaultSecurityGroupName returns the name of the default security group automatically bound to new host

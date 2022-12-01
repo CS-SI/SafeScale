@@ -22,11 +22,11 @@ import (
 	"strings"
 	"time"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -46,7 +46,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -178,6 +177,7 @@ func LoadVolume(inctx context.Context, ref string) (resources.Volume, fail.Error
 		}()
 		chRes <- result{ga, gerr}
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -241,10 +241,8 @@ func (instance *volume) carry(ctx context.Context, clonable clonable.Clonable) (
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if !valid.IsNil(instance) {
-		if instance.Core.IsTaken() {
-			return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
-		}
+	if !valid.IsNil(instance) && instance.Core.IsTaken() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -292,7 +290,7 @@ func (instance *volume) GetAttachments(ctx context.Context) (_ *propertiesv1.Vol
 	var vaV1 *propertiesv1.VolumeAttachments
 	xerr := instance.InspectProperty(ctx, volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
 		var innerErr error
-		vaV1, innerErr = lang.Cast[*propertiesv1.VolumeAttachments](p)
+		vaV1, innerErr = clonable.Cast[*propertiesv1.VolumeAttachments](p)
 		return fail.Wrap(innerErr)
 	})
 	xerr = debug.InjectPlannedFail(xerr)
@@ -423,7 +421,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return fail.Wrap(xerr, "failed to check if Volume '%s' already exists", req.Name)
 		}
@@ -435,16 +433,18 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 		if !exists {
 			return fail.DuplicateError("there is already a Volume named '%s', but no longer exists, is a metadata mistake", req.Name)
 		}
+
 		return fail.DuplicateError("there is already a Volume named '%s'", req.Name)
 	}
 
 	// Check if host exists but is not managed by SafeScale
-	_, xerr = instance.Service().InspectVolume(ctx, req.Name)
+	svc := instance.Service()
+	_, xerr = svc.InspectVolume(ctx, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return fail.Wrap(xerr, "failed to check if Volume name '%s' is already used", req.Name)
 		}
@@ -452,7 +452,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 		return fail.DuplicateError("found an existing Volume named '%s' (but not managed by SafeScale)", req.Name)
 	}
 
-	av, xerr := instance.Service().CreateVolume(ctx, req)
+	av, xerr := svc.CreateVolume(ctx, req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -462,18 +462,13 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := instance.Service().DeleteVolume(jobapi.NewContextPropagatingJob(ctx), av.ID); derr != nil {
+			if derr := svc.DeleteVolume(cleanupContextFrom(ctx), av.ID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete volume '%s'", ActionFromError(ferr), req.Name))
 			}
 		}
 	}()
 
-	xerr = instance.carry(ctx, av)
-	if xerr != nil {
-		return xerr
-	}
-
-	return nil
+	return instance.carry(ctx, av)
 }
 
 // Attach a volume to a host
@@ -518,7 +513,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 	// -- proceed some checks on volume --
 	xerr = instance.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		av, innerErr := lang.Cast[*abstract.Volume](p)
+		av, innerErr := clonable.Cast[*abstract.Volume](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -527,7 +522,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		volumeName = av.Name
 
 		return props.Inspect(volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
-			volumeAttachedV1, innerErr := lang.Cast[*propertiesv1.VolumeAttachments](p)
+			volumeAttachedV1, innerErr := clonable.Cast[*propertiesv1.VolumeAttachments](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -571,13 +566,13 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	// -- proceed some checks on target server --
 	xerr = host.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
-			hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
+			hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
 
 			return props.Inspect(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-				hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
+				hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -648,7 +643,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := svc.DeleteVolumeAttachment(jobapi.NewContextPropagatingJob(ctx), targetID, vaID)
+			derr := svc.DeleteVolumeAttachment(cleanupContextFrom(ctx), targetID, vaID)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 			}
@@ -695,7 +690,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	// -- updates target properties --
 	xerr = host.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		innerXErr := props.Alter(hostproperty.VolumesV1, func(p clonable.Clonable) (ferr fail.Error) {
-			hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
+			hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -728,7 +723,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				defer func() {
 					ferr = debug.InjectPlannedFail(ferr)
 					if ferr != nil {
-						if derr := nfsServer.UnmountBlockDevice(jobapi.NewContextPropagatingJob(ctx), volumeUUID); derr != nil {
+						if derr := nfsServer.UnmountBlockDevice(cleanupContextFrom(ctx), volumeUUID); derr != nil {
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
 						}
 					}
@@ -751,14 +746,14 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 		defer func() {
 			if innerXErr != nil && !doNotMount {
-				if derr := nfsServer.UnmountBlockDevice(jobapi.NewContextPropagatingJob(ctx), volumeUUID); derr != nil {
+				if derr := nfsServer.UnmountBlockDevice(cleanupContextFrom(ctx), volumeUUID); derr != nil {
 					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(innerXErr), volumeName, targetName))
 				}
 			}
 		}()
 
 		return props.Alter(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
+			hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -782,13 +777,13 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			if !doNotMount {
-				if derr := nfsServer.UnmountBlockDevice(jobapi.NewContextPropagatingJob(ctx), volumeUUID); derr != nil {
+				if derr := nfsServer.UnmountBlockDevice(cleanupContextFrom(ctx), volumeUUID); derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 				}
 			}
-			derr := host.Alter(jobapi.NewContextPropagatingJob(ctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := host.Alter(cleanupContextFrom(ctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
-					hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
+					hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -800,10 +795,10 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 					return nil
 				})
 				if innerXErr != nil {
-					logrus.Warnf("Failed to set host '%s' metadata about volumes", volumeName)
+					logrus.WithContext(cleanupContextFrom(ctx)).Warnf("Failed to set host '%s' metadata about volumes", volumeName)
 				}
 				return props.Alter(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-					hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
+					hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -821,7 +816,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 	// Updates volume properties
 	xerr = instance.AlterProperty(ctx, volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
-		volumeAttachedV1, innerErr := lang.Cast[*propertiesv1.VolumeAttachments](p)
+		volumeAttachedV1, innerErr := clonable.Cast[*propertiesv1.VolumeAttachments](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -939,7 +934,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 
 	// -- retrieves volume data --
 	xerr = instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		volume, innerErr := lang.Cast[*abstract.Volume](p)
+		volume, innerErr := clonable.Cast[*abstract.Volume](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -964,7 +959,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		)
 
 		innerXErr := props.Inspect(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
-			hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
+			hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -985,7 +980,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		// Obtain mounts information
 		notMounted := false
 		innerXErr = props.Inspect(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
+			hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -1025,7 +1020,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		// Check if volume (or a subdir in volume) is shared
 		if !notMounted {
 			innerXErr = props.Inspect(hostproperty.SharesV1, func(p clonable.Clonable) fail.Error {
-				hostSharesV1, innerErr := lang.Cast[*propertiesv1.HostShares](p)
+				hostSharesV1, innerErr := clonable.Cast[*propertiesv1.HostShares](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -1071,7 +1066,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 
 		// ... then update host property propertiesv1.VolumesV1...
 		innerXErr = props.Alter(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
-			hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
+			hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -1089,7 +1084,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 		// ... update host property propertiesv1.MountsV1 ...
 		if !notMounted {
 			innerXErr = props.Alter(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-				hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
+				hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -1105,7 +1100,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 
 		// ... and finish with update of volume property propertiesv1.VolumeAttachments
 		return instance.AlterProperty(ctx, volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
-			volumeAttachedV1, innerErr := lang.Cast[*propertiesv1.VolumeAttachments](p)
+			volumeAttachedV1, innerErr := clonable.Cast[*propertiesv1.VolumeAttachments](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

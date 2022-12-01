@@ -23,11 +23,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/sirupsen/logrus"
 
 	"google.golang.org/api/compute/v1"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -181,7 +181,7 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 }
 
 // CreateHost creates a host meeting the requirements specified by request
-func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, nil, fail.InvalidInstanceError()
 	}
@@ -308,8 +308,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (_ 
 	// Retry creation until success, for 10 minutes
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			var innerXErr fail.Error
-			ahf, innerXErr = s.buildGcpMachine(ctx, request.ResourceName, an, defaultSubnet, *template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs)
+			ahf, innerXErr = s.buildGcpMachine(ctx, request.ResourceName, an, defaultSubnet, *template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs, extra)
 			if innerXErr != nil {
 				captured := normalizeError(innerXErr)
 				switch captured.(type) {
@@ -402,6 +408,12 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostComplete, innerErr := s.InspectHost(ctx, ahf)
 			if innerErr != nil {
 				return innerErr
@@ -443,8 +455,9 @@ func (s stack) buildGcpMachine(
 	userData string,
 	isPublic bool,
 	securityGroups map[string]struct{},
+	extra interface{},
 ) (*abstract.HostFull, fail.Error) {
-	resp, xerr := s.rpcCreateInstance(ctx, instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(diskSize), userData, isPublic, securityGroups)
+	resp, xerr := s.rpcCreateInstance(ctx, instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(diskSize), userData, isPublic, securityGroups, extra)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -456,11 +469,23 @@ func (s stack) buildGcpMachine(
 	}
 
 	ahf.Tags["Image"] = imageURL
+	if extra != nil {
+		into, ok := extra.(map[string]string)
+		if !ok {
+			return nil, fail.InvalidParameterError("extra", "must be a map[string]string")
+		}
+		for k, v := range into {
+			ahf.Tags[k] = v
+		}
+	}
+
 	return ahf, nil
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
 func (s stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostParameter) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -481,7 +506,6 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.Hos
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
 	defer tracer.Exiting()
-	defer fail.OnPanic(&ferr)
 
 	return s.rpcResetStartupScriptOfInstance(ctx, ahfid)
 }
@@ -492,6 +516,8 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool,
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
 func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -506,7 +532,6 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
 	defer tracer.Exiting()
-	defer fail.OnPanic(&ferr)
 
 	var (
 		tryByName = true
@@ -590,15 +615,13 @@ func (s stack) complementHost(ctx context.Context, host *abstract.HostFull, inst
 			continue
 		}
 
-		resourceNetworks = append(
-			resourceNetworks, IPInSubnet{
-				Subnet:   sn.Subnet,
-				Name:     psg.Name,
-				ID:       strconv.FormatUint(psg.Id, 10),
-				IP:       sn.IP,
-				PublicIP: sn.PublicIP,
-			},
-		)
+		resourceNetworks = append(resourceNetworks, IPInSubnet{
+			Subnet:   sn.Subnet,
+			Name:     psg.Name,
+			ID:       strconv.FormatUint(psg.Id, 10),
+			IP:       sn.IP,
+			PublicIP: sn.PublicIP,
+		})
 	}
 
 	ip4BySubnetID := make(map[string]string)
@@ -677,7 +700,8 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 		return xerr
 	}
 
-	if xerr := s.rpcDeleteInstance(ctx, ahf.ID); xerr != nil {
+	xerr = s.rpcDeleteInstance(ctx, ahf.ID)
+	if xerr != nil {
 		return xerr
 	}
 

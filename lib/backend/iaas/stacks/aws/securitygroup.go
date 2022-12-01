@@ -381,8 +381,8 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityG
 	return s.InspectSecurityGroup(ctx, asg)
 }
 
-// AddRuleToSecurityGroup adds a rule to a security group
-func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+// AddRulesToSecurityGroup adds rules to a security group
+func (s stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -396,21 +396,23 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam iaasapi.Secur
 			return asg, xerr
 		}
 	}
-	if rule == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("rule")
+	if rules == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("rules")
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.aws"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	ingressPermissions, egressPermissions, xerr := s.fromAbstractSecurityGroupRules(*asg, abstract.SecurityGroupRules{rule})
-	if xerr != nil {
-		return asg, xerr
-	}
+	for k, currentRule := range rules {
+		ingressPermissions, egressPermissions, xerr := s.fromAbstractSecurityGroupRules(*asg, abstract.SecurityGroupRules{currentRule})
+		if xerr != nil {
+			return asg, xerr
+		}
 
-	// Add permissions to the security group
-	if xerr = s.addRules(ctx, asg, ingressPermissions, egressPermissions); xerr != nil {
-		return asg, xerr
+		// Add permissions to the security group
+		if xerr = s.addRules(ctx, asg, ingressPermissions, egressPermissions); xerr != nil {
+			return asg, fail.Wrap(xerr, "failed to ass rule #%d", k)
+		}
 	}
 
 	return s.InspectSecurityGroup(ctx, asg)
@@ -431,13 +433,13 @@ func (s stack) addRules(ctx context.Context, asg *abstract.SecurityGroup, ingres
 	return nil
 }
 
-// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
+// DeleteRulesFromSecurityGroup deletes rules from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -447,20 +449,19 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam iaasapi.
 			return asg, xerr
 		}
 	}
-	if rule == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("rule")
-	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.aws"), "(%s, '%s')", asg.ID, rule.Description).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.aws"), "(%s, <rules>')", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	ingressPermissions, egressPermissions, xerr := s.fromAbstractSecurityGroupRules(*asg, abstract.SecurityGroupRules{rule})
-	if xerr != nil {
-		return asg, xerr
-	}
+	for k, currentRule := range rules {
+		ingressPermissions, egressPermissions, xerr := s.fromAbstractSecurityGroupRules(*asg, abstract.SecurityGroupRules{currentRule})
+		if xerr != nil {
+			return asg, xerr
+		}
 
-	if xerr = s.deleteRules(ctx, asg, ingressPermissions, egressPermissions); xerr != nil {
-		return asg, xerr
+		if xerr = s.deleteRules(ctx, asg, ingressPermissions, egressPermissions); xerr != nil {
+			return asg, fail.Wrap(xerr, "failed to delete rule #%d", k)
+		}
 	}
 
 	return s.InspectSecurityGroup(ctx, asg)
@@ -470,7 +471,8 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam iaasapi.
 func (instance stack) deleteRules(ctx context.Context, asg *abstract.SecurityGroup, ingress, egress []*ec2.IpPermission) fail.Error {
 	// Add permissions to the security group
 	if len(ingress) > 0 {
-		if xerr := instance.rpcRevokeSecurityGroupIngress(ctx, aws.String(asg.ID), ingress); xerr != nil {
+		xerr := instance.rpcRevokeSecurityGroupIngress(ctx, aws.String(asg.ID), ingress)
+		if xerr != nil {
 			return fail.Wrap(xerr, "failed to delete ingress rules from Security Group '%s'", asg.Name)
 		}
 	}
@@ -481,7 +483,7 @@ func (instance stack) deleteRules(ctx context.Context, asg *abstract.SecurityGro
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a missing rule(instance) as a successful deletion
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 			default:
 				return fail.Wrap(xerr, "failed to delete egress rules from Security Group '%s'", asg.Name)
 			}

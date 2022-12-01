@@ -26,19 +26,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestClusterIdentity_Clone(t *testing.T) {
+func TestCluster_Clone(t *testing.T) {
 	c, _ := NewCluster()
 	c.Name = "cluster"
 
-	cloned, err := c.Clone()
-	if err != nil {
-		t.Error(err)
-	}
-
-	cc, ok := cloned.(*Cluster)
-	if !ok {
-		t.Fail()
-	}
+	cc, err := clonable.CastedClone[*Cluster](c)
+	require.Nil(t, err)
 
 	assert.Equal(t, c, cc)
 	require.EqualValues(t, c, cc)
@@ -52,7 +45,7 @@ func TestClusterIdentity_Clone(t *testing.T) {
 	require.NotEqualValues(t, c, cc)
 }
 
-func TestClusterIdentity_OK(t *testing.T) {
+func TestCluster_OK(t *testing.T) {
 
 	c, _ := NewCluster()
 	if c.OK() {
@@ -77,7 +70,7 @@ func TestClusterIdentity_OK(t *testing.T) {
 
 }
 
-func TestClusterIdentity_Serialize(t *testing.T) {
+func TestCluster_Serialize(t *testing.T) {
 
 	// Serialize empty clusterIdentity
 	c1, _ := NewCluster()
@@ -129,7 +122,7 @@ func TestClusterIdentity_Serialize(t *testing.T) {
 	}
 }
 
-func TestClusterIdentity_Deserialize(t *testing.T) {
+func TestCluster_Deserialize(t *testing.T) {
 
 	// Serialize empty clusterIdentity
 	var err error
@@ -190,7 +183,7 @@ func TestClusterIdentity_Deserialize(t *testing.T) {
 
 }
 
-func TestClusterIdentity_Replace(t *testing.T) {
+func TestCluster_Replace(t *testing.T) {
 
 	var emptyCluster *Cluster
 	var emptyData clonable.Clonable = nil
@@ -220,7 +213,7 @@ func TestClusterIdentity_Replace(t *testing.T) {
 	network.Name = "Network Name"
 
 	derr := cluster.Replace(network)
-	require.Contains(t, derr.Error(), "p is not a *Cluster")
+	require.Contains(t, derr.Error(), "failed to cast")
 
 	// Filled cluster, filled data
 	cluster2, _ := NewCluster()

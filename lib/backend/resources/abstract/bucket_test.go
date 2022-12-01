@@ -20,42 +20,44 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestObjectStorageBucket_NewObjectStorageBucket(t *testing.T) {
-
+func TestBucket_NewBucket(t *testing.T) {
 	n, _ := NewBucket()
 	if !n.IsNull() {
-		t.Error("Bucket is null !")
+		t.Error("Bucket is not null!")
 		t.Fail()
 	}
 	if n.IsConsistent() {
-		t.Error("Bucket is not consistent !")
+		t.Error("Bucket is consistent!")
 		t.Fail()
 	}
 	if n.OK() {
-		t.Error("Bucket is not ok !")
+		t.Error("Bucket is ok!")
 		t.Fail()
 	}
+
 	n.ID = "Bucket ID"
 	n.Name = "Bucket Name"
 	if n.IsNull() {
-		t.Error("Bucket is not null !")
+		t.Error("Bucket is null!")
 		t.Fail()
 	}
 	if !n.IsConsistent() {
-		t.Error("Bucket is consistent !")
+		t.Error("Bucket is not consistent!")
 		t.Fail()
 	}
 	if !n.OK() {
-		t.Error("Bucket is ok !")
+		t.Error("Bucket is not ok!")
 		t.Fail()
 	}
 }
 
-func TestObjectStorageBucket_Replace(t *testing.T) {
+func TestBucket_Replace(t *testing.T) {
 
 	var o1 *Bucket
 	var o2 *Bucket
@@ -65,20 +67,12 @@ func TestObjectStorageBucket_Replace(t *testing.T) {
 	}
 }
 
-func TestObjectStorageBucket_Clone(t *testing.T) {
+func TestBucket_Clone(t *testing.T) {
 	b, _ := NewBucket()
 	b.Name = "host"
 
-	at, err := b.Clone()
-	if err != nil {
-		t.Error(err)
-	}
-
-	bc, ok := at.(*Bucket)
-	if !ok {
-		t.Fail()
-	}
-
+	bc, err := clonable.CastedClone[*Bucket](b)
+	require.Nil(t, err)
 	assert.Equal(t, b, bc)
 	require.EqualValues(t, b, bc)
 	bc.MountPoint = "/mountpoint"
@@ -91,7 +85,7 @@ func TestObjectStorageBucket_Clone(t *testing.T) {
 	require.NotEqualValues(t, b, bc)
 }
 
-func TestObjectStorageBucket_Serialize(t *testing.T) {
+func TestBucket_Serialize(t *testing.T) {
 
 	var n *Bucket = nil
 	_, err := n.Serialize()
@@ -127,7 +121,7 @@ func TestObjectStorageBucket_Serialize(t *testing.T) {
 
 }
 
-func TestObjectStorageBucket_Deserialize(t *testing.T) {
+func TestBucket_Deserialize(t *testing.T) {
 
 	n, _ := NewBucket()
 	n.ID = "Bucket ID"
@@ -157,16 +151,15 @@ func TestObjectStorageBucket_Deserialize(t *testing.T) {
 
 }
 
-func TestObjectStorageBucket_GetName(t *testing.T) {
-
-	n := &Bucket{}
+func TestBucket_GetName(t *testing.T) {
+	n, _ := NewBucket()
 	name := n.GetName()
-	if name != "" {
+	if name != "" && name != Unnamed {
 		t.Error("Can't read name when no name given")
 		t.Fail()
 	}
 
-	n = &Bucket{}
+	n, _ = NewBucket()
 	n.Name = "Bucket Name"
 	name = n.GetName()
 	if name != n.Name {
@@ -174,10 +167,17 @@ func TestObjectStorageBucket_GetName(t *testing.T) {
 		t.Fail()
 	}
 
+	var xerr fail.Error
+	n, xerr = NewBucket(WithName("bucket Name"))
+	require.Nil(t, xerr)
+	name = n.GetName()
+	if name != n.Name {
+		t.Error("Wrong value restitution")
+		t.Fail()
+	}
 }
 
 func TestObjectStorageBucket_GetID(t *testing.T) {
-
 	n := &Bucket{}
 	id, _ := n.GetID()
 	if id != "" {
@@ -191,7 +191,6 @@ func TestObjectStorageBucket_GetID(t *testing.T) {
 		t.Error("Wrong value restitution")
 		t.Fail()
 	}
-
 }
 
 func TestObjectStorageItemMetadata_Clone(t *testing.T) {
@@ -217,7 +216,6 @@ func TestObjectStorageItemMetadata_Clone(t *testing.T) {
 }
 
 func TestObjectStorageItem_GetName(t *testing.T) {
-
 	osi := ObjectStorageItem{
 		BucketName: "ObjectStorageItem BucketName",
 		ItemID:     "ObjectStorageItem ItemID",

@@ -90,6 +90,10 @@ uptime > /opt/safescale/var/state/user_data.netsec.done
 rm -f /opt/safescale/var/state/user_data.netsec.done
 
 function reset_fw() {
+  {{- if .WithoutFirewall }}
+  return 0
+  {{- end }}
+
   is_network_reachable || failure 206 "reset_fw(): failure resetting firewall because network is not reachable"
 
   case $LINUX_KIND in
@@ -142,6 +146,14 @@ function reset_fw() {
     ;;
   esac
 
+  {{- if .DefaultFirewall }}
+  firewall-cmd --add-service={ssh,dhcpv6-client,dns,mdns} || failure 221 "reset_fw(): firewall-offline-cmd failed with $? adding services"
+  firewall-cmd --runtime-to-permanent || failure 221 "reset_fw(): firewall-offline-cmd failed with $? making permanent"
+  sudo sed -i 's/^LogDenied=.*$/LogDenied=all/g' /etc/firewalld/firewalld.conf
+  sudo systemctl restart firewalld.service
+  return 0
+  {{- end }}
+
   # Clear interfaces attached to zones
   for zone in public trusted; do
     for nic in $(firewall-offline-cmd --zone=$zone --list-interfaces || true); do
@@ -153,6 +165,7 @@ function reset_fw() {
   [[ ! -z ${PU_IF} ]] && {
     firewall-offline-cmd --zone=public --add-interface=${PU_IF} || failure 221 "reset_fw(): firewall-offline-cmd failed with $? adding interfaces"
   }
+
   {{- if or .PublicIP .IsGateway }}
   [[ -z ${PU_IF} ]] && {
     firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || failure 222 "reset_fw(): firewall-offline-cmd failed with $? adding sources"
@@ -162,12 +175,25 @@ function reset_fw() {
   # Sets the default target of packets coming from public interface to DROP
   firewall-offline-cmd --zone=public --set-target=DROP || failure 223 "reset_fw(): firewall-offline-cmd failed with $? dropping public zone"
 
-  # Attach LAN interfaces to zone trusted
+  # Enable masquerade
+  # firewall-offline-cmd --zone=public --add-masquerade
+
+  {{- if or .PublicIP .IsGateway }}
+  # Attach LAN interfaces to zone public, adding to trusted zone results in all ports visible from internet using nmap
   [[ ! -z ${PR_IFs} ]] && {
     for i in ${PR_IFs}; do
       firewall-offline-cmd --zone=trusted --add-interface=${PR_IFs} || failure 224 "reset_fw(): firewall-offline-cmd failed with $? adding ${PR_IFs} to trusted"
     done
   }
+  {{- else }}
+  # Other machines can trust internal network...
+  [[ ! -z ${PR_IFs} ]] && {
+      for i in ${PR_IFs}; do
+        firewall-offline-cmd --zone=trusted --add-interface=${PR_IFs} || failure 224 "reset_fw(): firewall-offline-cmd failed with $? adding ${PR_IFs} to trusted"
+      done
+    }
+  {{- end }}
+
   # Attach lo interface to zone trusted
   firewall-offline-cmd --zone=trusted --add-interface=lo || failure 225 "reset_fw(): firewall-offline-cmd failed with $? adding lo to trusted"
 
@@ -196,6 +222,9 @@ function reset_fw() {
       failure 229 "reset_fw(): saving rules with firewall-cmd failed with $sop"
     fi
   fi
+
+  # Log dropped packets
+  sudo sed -i 's/^LogDenied=.*$/LogDenied=all/g' /etc/firewalld/firewalld.conf
 
   # Save current fw settings as permanent
   sfFirewallReload || (echo "reloading firewall failed with $?" && return 1)

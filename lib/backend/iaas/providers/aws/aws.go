@@ -159,19 +159,22 @@ func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaas
 	// }
 	password, _ := identityCfg["Password"].(string) // nolint
 
-	accessKeyID, _ := identityCfg["AccessKeyID"].(string)
-	if accessKeyID == "" {
+	accessKeyID, ok := identityCfg["AccessKeyID"].(string)
+	if !ok || accessKeyID == "" {
 		return &provider{}, fail.SyntaxError("field 'AccessKeyID' in section 'identity' not found in tenants.toml")
 	}
 
-	secretAccessKey, _ := identityCfg["SecretAccessKey"].(string) // nolint
-	if secretAccessKey == "" {
+	secretAccessKey, ok := identityCfg["SecretAccessKey"].(string) // nolint
+	if !ok || secretAccessKey == "" {
 		return &provider{}, fail.SyntaxError("no secret access key provided in tenants.toml")
 	}
 
 	identityEndpoint, _ := identityCfg["IdentityEndpoint"].(string) // nolint
 	if identityEndpoint == "" {
-		identityEndpoint = "https://iam.amazonaws.com"
+		identityEndpoint, ok = identityCfg["auth_uri"].(string) // DEPRECATED: deprecated, kept until next release
+		if !ok || identityEndpoint == "" {
+			identityEndpoint = "https://iam.amazonaws.com"
+		}
 	}
 
 	projectName, _ := computeCfg["ProjectName"].(string)   // nolint
@@ -181,6 +184,11 @@ func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaas
 	maxLifeTime := 0
 	if _, ok := computeCfg["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
+	}
+
+	machineCreationLimit := 8
+	if _, ok = computeCfg["ConcurrentMachineCreationLimit"].(string); ok {
+		machineCreationLimit, _ = strconv.Atoi(computeCfg["ConcurrentMachineCreationLimit"].(string))
 	}
 
 	operatorUsername, ok := computeCfg["OperatorUsername"].(string) // nolint
@@ -194,7 +202,7 @@ func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaas
 	}
 	params["Safe"] = isSafe
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	authOptions := iaasoptions.Authentication{
 		IdentityEndpoint: identityEndpoint,
@@ -262,10 +270,11 @@ next:
 		UseNATService:      false,
 		ProviderName:       providerName,
 		// BuildSubnets:     false, // FIXME: AWS by default don't build subnetworks
-		DefaultSecurityGroupName: "default",
-		MaxLifeTime:              maxLifeTime,
-		Timings:                  timings,
-		Safe:                     isSafe,
+		DefaultSecurityGroupName:       "default",
+		MaxLifeTime:                    maxLifeTime,
+		Timings:                        timings,
+		Safe:                           isSafe,
+		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
 	awsStack, err := aws.New(authOptions, awsConf, cfgOptions)

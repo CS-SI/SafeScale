@@ -1,7 +1,7 @@
 package huaweicloud
 
 import (
-	"encoding/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"os"
 	"testing"
 

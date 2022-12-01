@@ -55,7 +55,7 @@ import (
 )
 
 // ListRegions ...
-func (instance stack) ListRegions(ctx context.Context) (list []string, ferr fail.Error) {
+func (instance *stack) ListRegions(ctx context.Context) (list []string, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -90,7 +90,7 @@ func (instance stack) ListRegions(ctx context.Context) (list []string, ferr fail
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (instance stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool, ferr fail.Error) {
+func (instance *stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	var emptyMap map[string]bool
@@ -126,7 +126,7 @@ func (instance stack) ListAvailabilityZones(ctx context.Context) (list map[strin
 		}
 	}
 
-	// VPL: what'instance the point if there ios
+	// VPL: what's the point if there ios
 	if len(azList) == 0 {
 		logrus.WithContext(ctx).Warnf("no Availability Zones detected !")
 	}
@@ -135,7 +135,7 @@ func (instance stack) ListAvailabilityZones(ctx context.Context) (list map[strin
 }
 
 // ListImages lists available OS images
-func (instance stack) ListImages(ctx context.Context, _ bool) (imgList []*abstract.Image, ferr fail.Error) {
+func (instance *stack) ListImages(ctx context.Context, _ bool) (imgList []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -154,7 +154,7 @@ func (instance stack) ListImages(ctx context.Context, _ bool) (imgList []*abstra
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := images.List(instance.ComputeClient, opts)
 
-	// Define an anonymous function to be executed on each page'instance iteration
+	// Define an anonymous function to be executed on each page's iteration
 	imgList = []*abstract.Image{}
 	err := pager.EachPage(
 		func(page pagination.Page) (bool, error) {
@@ -176,7 +176,7 @@ func (instance stack) ListImages(ctx context.Context, _ bool) (imgList []*abstra
 }
 
 // InspectImage returns the Image referenced by id
-func (instance stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
+func (instance *stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -208,7 +208,7 @@ func (instance stack) InspectImage(ctx context.Context, id string) (_ *abstract.
 }
 
 // InspectTemplate returns the Template referenced by id
-func (instance stack) InspectTemplate(ctx context.Context, id string) (template *abstract.HostTemplate, ferr fail.Error) {
+func (instance *stack) InspectTemplate(ctx context.Context, id string) (template *abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -243,7 +243,7 @@ func (instance stack) InspectTemplate(ctx context.Context, id string) (template 
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (instance stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTemplate, fail.Error) {
+func (instance *stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -298,7 +298,7 @@ func (instance stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.Ho
 
 // CreateKeyPair TODO: replace with code to create KeyPair on provider side if it exists
 // creates and import a key pair
-func (instance stack) CreateKeyPair(ctx context.Context, name string) (*abstract.KeyPair, fail.Error) {
+func (instance *stack) CreateKeyPair(ctx context.Context, name string) (*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -314,7 +314,7 @@ func (instance stack) CreateKeyPair(ctx context.Context, name string) (*abstract
 
 // InspectKeyPair TODO: replace with openstack code to get keypair (if it exits)
 // returns the key pair identified by id
-func (instance stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair, fail.Error) {
+func (instance *stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -339,7 +339,7 @@ func (instance stack) InspectKeyPair(ctx context.Context, id string) (*abstract.
 
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
-func (instance stack) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fail.Error) {
+func (instance *stack) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -380,7 +380,7 @@ func (instance stack) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fa
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (instance stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
+func (instance *stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -403,7 +403,7 @@ func (instance stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 }
 
 // toHostSize converts flavor attributes returned by OpenStack driver into abstract.HostEffectiveSizing
-func (instance stack) toHostSize(ctx context.Context, flavor map[string]interface{}) (ahes *abstract.HostEffectiveSizing, ferr fail.Error) {
+func (instance *stack) toHostSize(ctx context.Context, flavor map[string]interface{}) (ahes *abstract.HostEffectiveSizing, ferr fail.Error) {
 	hostSizing := abstract.NewHostEffectiveSizing()
 	if i, ok := flavor["id"]; ok {
 		fid, ok := i.(string)
@@ -446,13 +446,15 @@ func toHostState(status string) hoststate.Enum {
 		return hoststate.Stopping
 	case "stopped", "shutoff":
 		return hoststate.Stopped
+	case "":
+		return hoststate.Unknown
 	default:
 		return hoststate.Error
 	}
 }
 
 // InspectHost gathers host information from provider
-func (instance stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (*abstract.HostFull, fail.Error) {
+func (instance *stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -476,9 +478,9 @@ func (instance stack) InspectHost(ctx context.Context, hostParam iaasapi.HostPar
 				ahf.ID = server.ID
 				ahf.Name = server.Name
 				ahf.LastState = hoststate.Error
-				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong, it is not a ErrNotAvailable, it'instance a 404
+				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME: This is wrong, it is not a ErrNotAvailable, it's a 404
 			}
-			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong, it is not a ErrNotAvailable, it'instance a 404
+			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME: This is wrong, it is not a ErrNotAvailable, it's a 404
 		default:
 			return nil, xerr
 		}
@@ -505,7 +507,7 @@ func (instance stack) InspectHost(ctx context.Context, hostParam iaasapi.HostPar
 }
 
 // complementHost complements Host data with content of server parameter
-func (instance stack) complementHost(ctx context.Context, hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (_ *abstract.HostFull, ferr fail.Error) {
+func (instance *stack) complementHost(ctx context.Context, hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// Updates intrinsic data of host if needed
@@ -518,7 +520,7 @@ func (instance stack) complementHost(ctx context.Context, hostCore *abstract.Hos
 
 	state := toHostState(server.Status)
 	if state == hoststate.Error || state == hoststate.Starting {
-		logrus.WithContext(ctx).Warnf("[TRACE] Unexpected host'instance last state: %v", state)
+		logrus.WithContext(ctx).Warnf("[TRACE] Unexpected host's last state: %v", state)
 	}
 
 	host, xerr := abstract.NewHostFull(abstract.WithName(hostCore.Name))
@@ -612,7 +614,7 @@ func (instance stack) complementHost(ctx context.Context, hostCore *abstract.Hos
 }
 
 // InspectHostByName returns the host using the name passed as parameter
-func (instance stack) InspectHostByName(ctx context.Context, name string) (*abstract.HostFull, fail.Error) {
+func (instance *stack) InspectHostByName(ctx context.Context, name string) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -673,7 +675,7 @@ func (instance stack) InspectHostByName(ctx context.Context, name string) (*abst
 }
 
 // CreateHost creates a new host
-func (instance stack) CreateHost(ctx context.Context, request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
 	if valid.IsNil(instance) {
 		return nil, nil, fail.InvalidInstanceError()
@@ -686,9 +688,7 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if len(request.Subnets) == 0 && !request.PublicIP {
-		return nil, nil, abstract.ResourceInvalidRequestError(
-			"host creation", "cannot create a host without --public flag and without attached Network/Subnet",
-		)
+		return nil, nil, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without --public flag and without attached Network/Subnet")
 	}
 
 	// The Default Networking is the first of the provided list, by convention
@@ -774,23 +774,34 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 	ahc.PrivateKey = userData.FirstPrivateKey
 	ahc.Password = request.Password
 
+	if extra != nil {
+		into, ok := extra.(map[string]string)
+		if !ok {
+			return nil, nil, fail.InvalidParameterError("extra", "must be a map[string]string")
+		}
+		for k, v := range into {
+			ahc.Tags[k] = v
+		}
+	}
+
 	// --- query provider for host creation ---
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
+			cleanCtx := cleanupContextFrom(ctx)
 			if ahc.IsConsistent() {
-				logrus.WithContext(ctx).Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
+				logrus.WithContext(cleanCtx).Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
 				derr := instance.DeleteHost(context.Background(), ahc.ID)
 				if derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
-						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
+						logrus.WithContext(cleanCtx).Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
 					case *fail.ErrTimeout:
-						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
+						logrus.WithContext(cleanCtx).Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
 					default:
-						logrus.WithContext(ctx).Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
+						logrus.WithContext(cleanCtx).Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
 					}
 					_ = fail.AddConsequence(ferr, derr)
 				}
@@ -802,14 +813,33 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 
 	// Retry creation until success, for 10 minutes
 	var (
-		server       *servers.Server
-		hostNets     []servers.Network
-		hostPorts    []ports.Port
-		createdPorts []string
+		finalServer    *servers.Server
+		finalHostNets  []servers.Network
+		finalHostPorts []ports.Port
 	)
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
+			var hostNets []servers.Network
+			var hostPorts []ports.Port
+			var createdPorts []string
+
+			var server *servers.Server
 			var innerXErr fail.Error
+
+			// Starting from here, delete created ports if exiting with error
+			defer func() {
+				if innerXErr != nil {
+					if derr := instance.deletePortsInSlice(cleanupContextFrom(ctx), createdPorts); derr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
+					}
+				}
+			}()
 
 			hostNets, hostPorts, createdPorts, innerXErr = instance.identifyOpenstackSubnetsAndPorts(ctx, request, defaultSubnet)
 			if innerXErr != nil {
@@ -821,12 +851,19 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 				}
 			}
 
-			// Starting from here, delete created ports if exiting with error
+			// Starting from here, delete host if exiting with error
 			defer func() {
 				if innerXErr != nil {
-					derr := instance.deletePortsInSlice(context.Background(), createdPorts)
-					if derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
+					cleanCtx := cleanupContextFrom(ctx)
+					if server != nil && server.ID != "" {
+						logrus.WithContext(cleanCtx).Debugf("deleting unresponsive server '%s'...", request.ResourceName)
+						derr := instance.DeleteHost(cleanCtx, server.ID)
+						if derr != nil {
+							logrus.WithContext(cleanCtx).Debugf(derr.Error())
+							_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName))
+							return
+						}
+						logrus.WithContext(cleanCtx).Debugf("unresponsive server '%s' deleted", request.ResourceName)
 					}
 				}
 			}()
@@ -836,64 +873,41 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
 					return fail.Wrap(fail.Cause(innerXErr), "stopping retries")
-				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it'instance going to fail anyway
+				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 					return retry.StopRetryError(innerXErr)
+				default:
+					return innerXErr
 				}
-				if server != nil && server.ID != "" {
-					if rerr := instance.DeleteHost(ctx, server.ID); rerr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(rerr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName))
-					}
-				}
-				return innerXErr
-			}
-			if server == nil || server.ID == "" { // TODO: this should be a validation method
-				innerXErr = fail.NewError("failed to create server")
-				return innerXErr
 			}
 
 			ahc.ID = server.ID
 			ahc.Name = request.ResourceName
 
-			// Starting from here, delete host if exiting with error
-			defer func() {
-				if innerXErr != nil {
-					if ahc.IsConsistent() {
-						logrus.WithContext(ctx).Debugf("deleting unresponsive server '%s'...", request.ResourceName)
-						derr := instance.DeleteHost(context.Background(), ahc.ID)
-						if derr != nil {
-							logrus.WithContext(ctx).Debugf(derr.Error())
-							_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName))
-							return
-						}
-
-						logrus.WithContext(ctx).Debugf("unresponsive server '%s' deleted", request.ResourceName)
-					}
-				}
-			}()
-
 			creationZone, innerXErr := instance.GetAvailabilityZoneOfServer(ctx, ahc.ID)
 			if innerXErr != nil {
 				logrus.WithContext(ctx).Tracef("Host '%s' successfully created but cannot confirm AZ: %s", ahc.Name, innerXErr)
 			} else {
-				logrus.WithContext(ctx).Tracef("Host '%s' successfully created in requested AZ '%s'", ahc.Name, creationZone)
+				logrus.WithContext(ctx).Tracef("Host '%s' (%s) successfully created in requested AZ '%s'", ahc.Name, ahc.ID, creationZone)
 				if creationZone != azone && azone != "" {
 					logrus.WithContext(ctx).Warnf("Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'", ahc.Name, azone, creationZone)
 				}
 			}
 
-			// Wait that host is ready, not just that the build is started
-			timings, innerXErr := instance.Timings()
-			if innerXErr != nil {
-				return innerXErr
+			if hs := toHostState(server.Status); hs == hoststate.Error || hs == hoststate.Failed {
+				if server != nil {
+					_ = instance.DeleteHost(cleanupContextFrom(ctx), server.ID)
+				}
+				return fail.NewError("host creation of %s failed, wrong status %s", request.ResourceName, hs.String())
 			}
 
-			timeout := timings.HostOperationTimeout()
+			// Wait that host is ready, not just that the build is started
+			timeout := 2 * timings.HostOperationTimeout()
 			server, innerXErr = instance.WaitHostState(ctx, ahc, hoststate.Started, timeout)
 			if innerXErr != nil {
-				logrus.WithContext(ctx).Errorf(
-					"failed to reach server '%s' after %s; deleting it and trying again", request.ResourceName,
-					temporal.FormatDuration(timeout),
-				)
+				logrus.WithContext(ctx).Errorf("failed to reach server '%s' after %s; deleting it and trying again", request.ResourceName, temporal.FormatDuration(timeout))
+				if server != nil {
+					_ = instance.DeleteHost(cleanupContextFrom(ctx), server.ID)
+				}
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
@@ -901,6 +915,10 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 					return innerXErr
 				}
 			}
+
+			finalServer = server
+			finalHostNets = hostNets
+			finalHostPorts = hostPorts
 
 			return nil
 		},
@@ -911,14 +929,14 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
 			return nil, nil, fail.Wrap(fail.Cause(xerr), "timeout")
-		case *retry.ErrStopRetry, *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it'instance going to fail anyway
+		case *retry.ErrStopRetry, *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 			return nil, nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		default:
 			cause := fail.Cause(xerr)
 			if _, ok := cause.(*fail.ErrNotAvailable); ok {
-				if server != nil {
-					ahc.ID = server.ID
-					ahc.Name = server.Name
+				if finalServer != nil {
+					ahc.ID = finalServer.ID
+					ahc.Name = finalServer.Name
 					ahc.LastState = hoststate.Error
 				}
 			}
@@ -926,7 +944,11 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 		}
 	}
 
-	newHost, xerr := instance.complementHost(ctx, ahc, *server, hostNets, hostPorts)
+	if finalServer == nil {
+		return nil, nil, fail.NewError("invalid server")
+	}
+
+	newHost, xerr := instance.complementHost(ctx, ahc, *finalServer, finalHostNets, finalHostPorts)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -940,23 +962,24 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 	if instance.cfgOpts.UseFloatingIP && request.PublicIP {
 		// Create the floating IP
 		var ip *floatingips.FloatingIP
-		if ip, xerr = instance.rpcCreateFloatingIP(ctx); xerr != nil {
+		ip, xerr = instance.rpcCreateFloatingIP(ctx)
+		if xerr != nil {
 			return nil, nil, xerr
 		}
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil {
-				logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
-				derr := instance.rpcDeleteFloatingIP(context.Background(), ip.ID)
+			if ferr != nil && ip != nil {
+				cleanupCtx := cleanupContextFrom(ctx)
+				logrus.WithContext(cleanupCtx).Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
+				derr := instance.rpcDeleteFloatingIP(cleanupCtx, ip.ID)
 				if derr != nil {
 					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
 					_ = ferr.AddConsequence(derr)
-					logrus.Error(derr.Error())
 					return
 				}
-				logrus.WithContext(ctx).Debugf("Cleaning up on failure, floating ip '%s' successfully deleted", ip.ID)
+				logrus.WithContext(cleanupCtx).Debugf("Cleaning up on failure, floating ip '%s' successfully deleted", ip.ID)
 			}
 		}()
 
@@ -979,19 +1002,20 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 		userData.PublicIP = ip.IP
 	}
 
-	logrus.Infoln(msgSuccess)
+	logrus.WithContext(ctx).Infoln(msgSuccess)
 	return newHost, userData, nil
 }
 
 // deletePortsInSlice deletes ports listed in slice
-func (instance stack) deletePortsInSlice(ctx context.Context, ports []string) fail.Error {
+func (instance *stack) deletePortsInSlice(ctx context.Context, ports []string) fail.Error {
 	var errors []error
 	for _, v := range ports {
-		if rerr := instance.rpcDeletePort(ctx, v); rerr != nil {
+		rerr := instance.rpcDeletePort(ctx, v)
+		if rerr != nil {
 			switch rerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a not found port as a successful deletion
-				debug.IgnoreError(rerr)
+				debug.IgnoreErrorWithContext(ctx, rerr)
 			default:
 				errors = append(errors, fail.Wrap(rerr, "failed to delete port %s", v))
 			}
@@ -1000,16 +1024,17 @@ func (instance stack) deletePortsInSlice(ctx context.Context, ports []string) fa
 	if len(errors) > 0 {
 		return fail.NewErrorList(errors)
 	}
+
 	return nil
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
 // Does nothing for OpenStack, userdata cannot be updated
-func (instance stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
 	return nil
 }
 
-func (instance stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG bool, enabledPort bool, net string, machine string) fail.Error {
+func (instance *stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG bool, enabledPort bool, net string, machine string) fail.Error {
 	// list ports to be able to remove them
 	req := ports.ListOpts{
 		NetworkID:   net,
@@ -1020,7 +1045,7 @@ func (instance stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG b
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -1034,7 +1059,7 @@ func (instance stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG b
 			if check {
 				_, xerr = instance.rpcRemoveSGFromPort(ctx, p.ID)
 				if xerr != nil {
-					debug.IgnoreError(xerr)
+					debug.IgnoreErrorWithContext(ctx, xerr)
 					collected = append(collected, xerr)
 				} else {
 					goodEnough = true
@@ -1052,7 +1077,7 @@ func (instance stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG b
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -1064,7 +1089,7 @@ func (instance stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG b
 		if check {
 			_, xerr = instance.rpcChangePortSecurity(ctx, p.ID, enabledPort)
 			if xerr != nil {
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 				collected = append(collected, xerr)
 			} else {
 				goodEnough = true
@@ -1079,12 +1104,12 @@ func (instance stack) ChangeSecurityGroupSecurity(ctx context.Context, cleanSG b
 	return nil
 }
 
-func (instance stack) GetMetadataOfInstance(ctx context.Context, id string) (map[string]string, fail.Error) {
+func (instance *stack) GetMetadataOfInstance(ctx context.Context, id string) (map[string]string, fail.Error) {
 	return instance.rpcGetMetadataOfInstance(ctx, id)
 }
 
 // identifyOpenstackSubnetsAndPorts ...
-func (instance stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) { // nolint
+func (instance *stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) { // nolint
 	nets = []servers.Network{}
 	netPorts = []ports.Port{}
 	createdPorts = []string{}
@@ -1093,14 +1118,14 @@ func (instance stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, requ
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := instance.deletePortsInSlice(context.Background(), createdPorts); derr != nil {
+			derr := instance.deletePortsInSlice(cleanupContextFrom(ctx), createdPorts)
+			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
 			}
 		}
 	}()
 
-	// If floating IPs are not used and host is public
-	// then add provider external network to host networks
+	// If floating IPs are not used and host is public then add provider external network to host networks
 	// Note: order is important: at least at OVH, public network has to be
 	//       the first network attached to, otherwise public interface is not UP...
 	if !instance.cfgOpts.UseFloatingIP && request.PublicIP {
@@ -1117,8 +1142,8 @@ func (instance stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, requ
 			return nets, netPorts, createdPorts, fail.Wrap(xerr, "failed to create port on external network '%s'", instance.cfgOpts.ProviderNetwork)
 		}
 
-		// FIXME: OPP Use this only for Stein disaster, so it HAS to be OVH
-		if !instance.cfgOpts.Safe && instance.cfgOpts.ProviderName == "ovh" {
+		// FIXME: OPP workaround for Stein disaster, so we have to make sure it is OVH
+		if !instance.cfgOpts.Safe && instance.cfgOpts.ProviderName != "ovh" {
 			port, xerr = instance.rpcChangePortSecurity(ctx, port.ID, false)
 			if xerr != nil {
 				return nets, netPorts, createdPorts, fail.Wrap(xerr, "failed to disable port on external network '%s'", instance.cfgOpts.ProviderNetwork)
@@ -1164,7 +1189,7 @@ func (instance stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, requ
 }
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
-func (instance stack) GetAvailabilityZoneOfServer(ctx context.Context, serverID string) (string, fail.Error) {
+func (instance *stack) GetAvailabilityZoneOfServer(ctx context.Context, serverID string) (string, fail.Error) {
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -1207,7 +1232,7 @@ func (instance stack) GetAvailabilityZoneOfServer(ctx context.Context, serverID 
 }
 
 // SelectedAvailabilityZone returns the selected availability zone
-func (instance stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error) {
+func (instance *stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error) {
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -1237,7 +1262,7 @@ func (instance stack) SelectedAvailabilityZone(ctx context.Context) (string, fai
 
 // WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (instance stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+func (instance *stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1273,7 +1298,7 @@ func (instance stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostP
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (instance stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
+func (instance *stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1293,6 +1318,12 @@ func (instance stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostP
 
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			if ahf.ID != "" {
 				server, innerErr = instance.rpcGetHostByID(ctx, ahf.ID)
 			} else {
@@ -1341,11 +1372,7 @@ func (instance stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostP
 			case hoststate.Starting, hoststate.Stopping:
 				return fail.NewError("host '%s' not ready yet", hostLabel)
 			default:
-				return retry.StopRetryError(
-					fail.NewError(
-						"host status of '%s' is in state '%s'", hostLabel, lastState.String(),
-					),
-				)
+				return retry.StopRetryError(fail.NewError("host status of '%s' is in state '%s'", hostLabel, lastState.String()))
 			}
 		},
 		timings.SmallDelay(),
@@ -1375,22 +1402,35 @@ func (instance stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostP
 
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
-func (instance stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter) (hoststate.Enum, fail.Error) {
+func (instance *stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter) (hoststate.Enum, fail.Error) {
 	if valid.IsNil(instance) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
+	}
+	ahf, _, xerr := iaasapi.ValidateHostParameter(hostParam)
+	if xerr != nil {
+		return hoststate.Unknown, xerr
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
-	host, xerr := instance.InspectHost(ctx, hostParam)
-	if xerr != nil {
-		return hoststate.Error, xerr
+	var (
+		server *servers.Server
+		err    error
+	)
+	if ahf.ID != "" {
+		server, err = instance.rpcGetHostByID(ctx, ahf.ID)
+	} else {
+		server, err = instance.rpcGetHostByName(ctx, ahf.Name)
 	}
-	return host.CurrentState, nil
+	if err != nil {
+		return hoststate.Unknown, fail.Wrap(err)
+	}
+
+	return toHostState(server.Status), nil
 }
 
 // ListHosts lists all hosts
-func (instance stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
+func (instance *stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
 	var emptyList abstract.HostList
 	if valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
@@ -1438,7 +1478,7 @@ func (instance stack) ListHosts(ctx context.Context, details bool) (abstract.Hos
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to a host
-func (instance stack) getFloatingIP(ctx context.Context, hostID string) (*floatingips.FloatingIP, fail.Error) {
+func (instance *stack) getFloatingIP(ctx context.Context, hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
@@ -1476,7 +1516,7 @@ func (instance stack) getFloatingIP(ctx context.Context, hostID string) (*floati
 }
 
 // DeleteHost deletes the host identified by id
-func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1487,6 +1527,8 @@ func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostPara
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
+	// machineName, machineID := ahf.Name, ahf.ID
+
 	// Detach floating IP
 	if instance.cfgOpts.UseFloatingIP {
 		fip, xerr := instance.getFloatingIP(ctx, ahf.ID)
@@ -1494,7 +1536,7 @@ func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostPara
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 			default:
 				return fail.Wrap(xerr, "failed to find floating ip of host '%s'", hostRef)
 			}
@@ -1520,7 +1562,7 @@ func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostPara
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -1534,7 +1576,14 @@ func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostPara
 	// Try to remove host for 3 minutes
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			if innerXErr := instance.rpcDeleteServer(ctx, ahf.ID); innerXErr != nil {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
+			innerXErr := instance.rpcDeleteServer(ctx, ahf.ID)
+			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrTimeout:
 					return fail.Wrap(innerXErr, "failed to submit Host '%s' deletion", hostRef)
@@ -1549,8 +1598,14 @@ func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostPara
 			// If check succeeds but state is Error, retry the deletion.
 			// If check fails and error is not 'not found', retry
 			var state = hoststate.Unknown
-			innerXErr := retry.WhileUnsuccessful(
+			innerXErr = retry.WhileUnsuccessful(
 				func() error {
+					select {
+					case <-ctx.Done():
+						return retry.StopRetryError(ctx.Err())
+					default:
+					}
+
 					server, gerr := instance.rpcGetServer(ctx, ahf.ID)
 					if gerr != nil {
 						switch gerr.(type) { // nolint
@@ -1592,21 +1647,21 @@ func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostPara
 		case *retry.ErrTimeout:
 			cause := fail.Cause(xerr)
 			if _, ok := cause.(*fail.ErrNotFound); ok {
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 			} else {
 				return fail.ConvertError(cause)
 			}
 		case *retry.ErrStopRetry:
 			cause := fail.Cause(xerr)
 			if _, ok := cause.(*fail.ErrNotFound); ok {
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 			} else {
 				return fail.ConvertError(cause)
 			}
 		case *fail.ErrNotFound:
 			// if host disappeared (rpcListPorts succeeded and host was still there at this moment), consider the error as a successful deletion;
 			// leave a chance to remove ports
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -1619,7 +1674,7 @@ func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostPara
 			switch rerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a not found port as a successful deletion
-				debug.IgnoreError(rerr)
+				debug.IgnoreErrorWithContext(ctx, rerr)
 			default:
 				errors = append(errors, fail.Wrap(rerr, "failed to delete port %s (%s)", v.ID, v.Description))
 			}
@@ -1633,7 +1688,7 @@ func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostPara
 }
 
 // rpcGetServer returns
-func (instance stack) rpcGetServer(ctx context.Context, id string) (_ *servers.Server, ferr fail.Error) {
+func (instance *stack) rpcGetServer(ctx context.Context, id string) (_ *servers.Server, ferr fail.Error) {
 	if id == "" {
 		return &servers.Server{}, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
@@ -1653,7 +1708,7 @@ func (instance stack) rpcGetServer(ctx context.Context, id string) (_ *servers.S
 }
 
 // StopHost stops the host identified by id
-func (instance stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gracefully bool) fail.Error {
+func (instance *stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gracefully bool) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1673,7 +1728,7 @@ func (instance stack) StopHost(ctx context.Context, hostParam iaasapi.HostParame
 }
 
 // RebootHost reboots unconditionally the host identified by id
-func (instance stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1684,17 +1739,12 @@ func (instance stack) RebootHost(ctx context.Context, hostParam iaasapi.HostPara
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
+	// Only hard reboot actually solves problems
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			innerErr := servers.Reboot(
 				instance.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.SoftReboot},
 			).ExtractErr()
-			if innerErr != nil {
-				innerErr = servers.Reboot(
-					instance.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.HardReboot},
-				).ExtractErr()
-			}
 			return innerErr
 		},
 		NormalizeError,
@@ -1702,7 +1752,7 @@ func (instance stack) RebootHost(ctx context.Context, hostParam iaasapi.HostPara
 }
 
 // StartHost starts the host identified by id
-func (instance stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1722,7 +1772,7 @@ func (instance stack) StartHost(ctx context.Context, hostParam iaasapi.HostParam
 }
 
 // ResizeHost ...
-func (instance stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1733,9 +1783,6 @@ func (instance stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostPara
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	// TODO: RESIZE Resize IPAddress HERE
-	logrus.Warn("Trying to resize a Host...") // FIXME: OPP This should trigger a build failure
-
 	// TODO: RESIZE Call this
 	// servers.Resize()
 
@@ -1744,7 +1791,7 @@ func (instance stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostPara
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to IPAddress, returns *fail.ErrDuplicate
-func (instance stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1768,12 +1815,13 @@ func (instance stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasa
 			req := ports.ListOpts{
 				DeviceID: ahf.ID,
 			}
+
 			portList, xerr := instance.rpcListPorts(ctx, req)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// continue
-					debug.IgnoreError(xerr)
+					debug.IgnoreErrorWithContext(ctx, xerr)
 				default:
 					return xerr
 				}
@@ -1784,17 +1832,17 @@ func (instance stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasa
 				_, xerr = instance.rpcChangePortSecurity(ctx, p.ID, true)
 				if xerr != nil {
 					if strings.Contains(xerr.Error(), "policy") {
-						debug.IgnoreError(xerr)
+						debug.IgnoreErrorWithContext(ctx, xerr)
 					} else {
 						return xerr
 					}
 				}
 			}
 
-			// Fix for Stein
-			if instance.cfgOpts.ProviderName == "ovh" {
-				return nil
-			}
+			// // Fix for Stein
+			// if instance.cfgOpts.ProviderName == "ovh" {
+			// 	return nil
+			// }
 
 			return secgroups.AddServer(instance.ComputeClient, ahf.ID, asg.ID).ExtractErr()
 		},
@@ -1803,7 +1851,7 @@ func (instance stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasa
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (instance stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}

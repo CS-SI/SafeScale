@@ -18,27 +18,28 @@ package huaweicloud
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/url"
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // NormalizeError translates gophercloud or openstack error to SafeScale error
 func NormalizeError(err error) fail.Error {
 	if err != nil {
-		tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), " Normalizing error").Entering()
+		tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.huawreicloud"), " Normalizing error").Entering()
 		defer tracer.Exiting()
 
 		switch e := err.(type) {
@@ -215,7 +216,7 @@ func reduceOpenstackError(errorName string, in []byte) (ferr fail.Error) {
 	}()
 	defer fail.OnPanic(&ferr)
 
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), ": Normalizing error").Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.huaweicloud"), ": Normalizing error").Entering()
 	defer tracer.Exiting()
 
 	fn, ok := errorFuncMap[errorName]
@@ -323,11 +324,11 @@ func reduceHuaweiAPIErrors(errcode int, code string, body map[string]interface{}
 	case "APIGW.0501", "APIGW.0502":
 		return fail.ForbiddenError("Quotas exceeded")
 	case "APIGW.0601", "APIGW.0605", "APIGW.0606", "APIGW.0608", "APIGW.0609", "APIGW.0611", "APIGW.0613", "APIGW.0705":
-		return fail.UnknownError("External error, contact your cloud provider")
+		return fail.UnknownError("Internal error, contact your Cloud Provider")
 	case "APIGW.0610":
 		return fail.NotAvailableError("Backend service in timeout or not available")
 	case "APIGW.0602", "APIGW.0607", "APIGW.0612":
-		return fail.InvalidRequestError("Invalid request")
+		return fail.InvalidRequestError("invalid request")
 	default:
 		return fail.UnknownError("unhandled error received from provider: %d, %s", errcode, code)
 	}

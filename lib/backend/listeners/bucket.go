@@ -84,10 +84,10 @@ func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketReques
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "can't be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	bucketName := in.GetName()
@@ -120,10 +120,10 @@ func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketReques
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "can't be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	bucketName := in.GetName()
@@ -152,10 +152,10 @@ func (s *BucketListener) Download(inctx context.Context, in *protocol.BucketRequ
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "can't be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	bucketName := in.GetName()
@@ -183,10 +183,10 @@ func (s *BucketListener) Download(inctx context.Context, in *protocol.BucketRequ
 	return empty, nil
 }
 
-// Download a bucket
+// Clear empties a Bucket
 func (s *BucketListener) Clear(inctx context.Context, in *protocol.BucketRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot download bucket")
+	defer fail.OnExitWrapError(inctx, &err, "cannot clear bucket")
 
 	empty = &googleprotobuf.Empty{}
 
@@ -194,10 +194,10 @@ func (s *BucketListener) Clear(inctx context.Context, in *protocol.BucketRequest
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "can't be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	bucketName := in.GetName()
@@ -205,7 +205,7 @@ func (s *BucketListener) Clear(inctx context.Context, in *protocol.BucketRequest
 		return empty, fail.InvalidParameterError("bucket name", "cannot be empty")
 	}
 
-	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/bucket/%s/upload", bucketName))
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/bucket/%s/clear", bucketName))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -234,10 +234,10 @@ func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketReque
 		return nil, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "can't be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	bucketName := in.GetName()
@@ -276,10 +276,10 @@ func (s *BucketListener) Mount(inctx context.Context, in *protocol.BucketMountRe
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "can't be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	bucketName := in.GetBucket()
@@ -308,10 +308,10 @@ func (s *BucketListener) Unmount(inctx context.Context, in *protocol.BucketMount
 		return empty, fail.InvalidInstanceError()
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "can't be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	bucketName := in.GetBucket()

@@ -45,13 +45,12 @@ func (s *SSHListener) Run(inctx context.Context, in *protocol.SshCommandRequest)
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	hostRef := in.GetHost().GetName()
 	if hostRef == "" {
 		hostRef = in.GetHost().GetId()
@@ -95,19 +94,17 @@ func (s *SSHListener) Copy(inctx context.Context, in *protocol.SshCopyCommandReq
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
-	var hostRef string
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 
 	source := in.Source
 	dest := in.Destination
 
-	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/ssh/%s", hostRef))
+	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/ssh/copy/%s/%s", source, dest))
 	if xerr != nil {
 		return nil, xerr
 	}

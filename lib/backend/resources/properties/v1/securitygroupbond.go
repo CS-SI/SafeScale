@@ -19,7 +19,6 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // SecurityGroupBond stores information about a resource bound to the SecurityGroup
@@ -57,7 +56,7 @@ func (sgb *SecurityGroupBond) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*SecurityGroupBond](p)
+	src, err := clonable.Cast[*SecurityGroupBond](p)
 	if err != nil {
 		return err
 	}

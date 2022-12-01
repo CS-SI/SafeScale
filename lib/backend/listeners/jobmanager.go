@@ -19,17 +19,17 @@ package listeners
 import (
 	"context"
 
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 type scopeFromProtocol interface {
@@ -78,31 +78,10 @@ func prepareJob(ctx context.Context, in scopeFromProtocol, description string) (
 	return j, nil
 }
 
-// // PrepareJobWithoutService creates a new job without service instanciation (for example to be used with metadata upgrade)
-// func PrepareJobWithoutService(ctx context.Context, scope backend.JobScope) (_ backend.Job, ferr fail.Error) {
-// 	defer fail.OnPanic(&ferr)
-//
-// 	if ctx == nil {
-// 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-// 	}
-//
-// 	newctx, cancel := context.WithCancel(ctx)
-//
-// 	job, xerr := backend.NewJob(newctx, cancel, scope)
-// 	if xerr != nil {
-// 		return nil, xerr
-// 	}
-//
-// 	return job, nil
-// }
-
 // JobManagerListener service server gRPC
 type JobManagerListener struct {
 	protocol.UnimplementedJobServiceServer
 }
-
-// // VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
-// func (s *JobManagerListener) mustEmbedUnimplementedJobServiceServer() {}
 
 // Stop specified process
 func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *emptypb.Empty, ferr error) {

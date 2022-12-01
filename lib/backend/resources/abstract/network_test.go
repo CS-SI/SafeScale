@@ -76,7 +76,7 @@ func TestNetwork_Clone(t *testing.T) {
 	n.Imported = false
 
 	n2, err := clonable.CastedClone[*Network](n)
-	require.NotNil(t, err)
+	require.Nil(t, err)
 	assert.Equal(t, n, n2)
 	areEqual := reflect.DeepEqual(n, n2)
 	if !areEqual {

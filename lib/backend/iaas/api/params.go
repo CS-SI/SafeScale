@@ -39,12 +39,13 @@ type (
 
 // ValidateNetworkParameter validates host parameter that can be a string as ID or an *abstract.Network
 func ValidateNetworkParameter(networkParam NetworkParameter) (an *abstract.Network, networkLabel string, ferr fail.Error) {
-	an = nil
 	switch networkParam := networkParam.(type) {
 	case string:
 		if networkParam == "" {
 			return nil, "", fail.InvalidParameterCannotBeEmptyStringError("networkParam")
 		}
+
+		an, _ = abstract.NewNetwork()
 		an.ID = networkParam
 		networkLabel = networkParam
 	case *abstract.Network:
@@ -70,17 +71,19 @@ func ValidateNetworkParameter(networkParam NetworkParameter) (an *abstract.Netwo
 	if networkLabel == "" {
 		return nil, "", fail.InvalidParameterError("networkParam", "at least one of fields 'ID' or 'Name' must not be empty string")
 	}
+
 	return an, networkLabel, nil
 }
 
 // ValidateSubnetParameter validates Subnet parameter that can be a string as ID or an *abstract.Subnet
 func ValidateSubnetParameter(subnetParam SubnetParameter) (as *abstract.Subnet, subnetLabel string, ferr fail.Error) {
-	as = nil
 	switch subnetParam := subnetParam.(type) {
 	case string:
 		if subnetParam == "" {
 			return nil, "", fail.InvalidParameterCannotBeEmptyStringError("networkParam")
 		}
+
+		as, _ = abstract.NewSubnet()
 		as.ID = subnetParam
 		subnetLabel = subnetParam
 
@@ -108,18 +111,19 @@ func ValidateSubnetParameter(subnetParam SubnetParameter) (as *abstract.Subnet, 
 	if subnetLabel == "" {
 		return nil, "", fail.InvalidParameterError("networkParam", "at least one of fields 'ID' or 'Name' must not be empty string")
 	}
+
 	return as, subnetLabel, nil
 }
 
 // ValidateHostParameter validates host parameter that can be a string as ID or an *abstract.HostCore
 func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hostLabel string, ferr fail.Error) {
-	ahf = nil
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
 			return nil, "", fail.InvalidParameterCannotBeEmptyStringError("hostParam")
 		}
 
+		ahf, _ = abstract.NewHostFull()
 		ahf.ID = hostParam
 		hostLabel = hostParam
 	case *abstract.HostCore:
@@ -127,6 +131,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostCore null value")
 		}
 
+		ahf, _ = abstract.NewHostFull()
 		ahf.HostCore = hostParam
 		if ahf.Name != "" {
 			hostLabel = "'" + ahf.Name + "'"
@@ -134,7 +139,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 			hostLabel = ahf.ID
 		}
 	case *abstract.HostFull:
-		if valid.IsNil(hostParam) {
+		if valid.IsNull(hostParam) {
 			return nil, "", fail.InvalidParameterError("hostParam", "cannot be *abstract.HostFull null value")
 		}
 
@@ -147,6 +152,7 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 	default:
 		return nil, "", fail.InvalidParameterError("hostParam", "valid types are non-empty string, *abstract.HostCore or *abstract.HostFull")
 	}
+
 	if hostLabel == "" {
 		return nil, "", fail.InvalidParameterError("hostParam", "at least one of fields 'ID' or 'Name' must not be empty string")
 	}
@@ -156,12 +162,13 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 
 // ValidateSecurityGroupParameter validates securitygroup parameter that can be a string as ID or an *abstract.SecurityGroup
 func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstract.SecurityGroup, sgLabel string, _ fail.Error) {
-	asg, _ = abstract.NewSecurityGroup()
 	switch sgParam := sgParam.(type) {
 	case string:
 		if sgParam == "" {
 			return asg, "", fail.InvalidParameterCannotBeEmptyStringError("sgaram")
 		}
+
+		asg, _ = abstract.NewSecurityGroup()
 		asg.ID = sgParam
 		sgLabel = asg.ID
 	case *abstract.SecurityGroup:
@@ -176,7 +183,12 @@ func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstra
 			sgLabel = asg.ID
 		}
 	default:
-		return asg, "", fail.InvalidParameterError("sgParam", "valid types are non-empty string or *abstract.SecurityGroup")
+		return nil, "", fail.InvalidParameterError("sgParam", "valid types are non-empty string or *abstract.SecurityGroup")
 	}
+
+	if sgLabel == "" {
+		return nil, "", fail.InvalidParameterError("sgParam", "at least one of fields 'ID' or 'Name' must not be empty string")
+	}
+
 	return asg, sgLabel, nil
 }

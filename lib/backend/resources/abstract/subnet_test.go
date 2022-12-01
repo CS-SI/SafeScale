@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,11 +31,11 @@ func TestSubnet_NewSubnet(t *testing.T) {
 
 	s, _ := NewSubnet()
 	if !s.IsNull() {
-		t.Error("Subnet is null !")
+		t.Error("Subnet is expected to be null!")
 		t.Fail()
 	}
 	if s.OK() {
-		t.Error("Subnet is not ok !")
+		t.Error("Subnet is expected not to be ok!")
 		t.Fail()
 	}
 	s.ID = "Subnet ID"
@@ -42,11 +43,11 @@ func TestSubnet_NewSubnet(t *testing.T) {
 	s.Network = "Subnet Network"
 	s.CIDR = "Subnet CIDR"
 	if s.IsNull() {
-		t.Error("Subnet is not null !")
+		t.Error("Subnet is expected to be not null!")
 		t.Fail()
 	}
 	if !s.OK() {
-		t.Error("Subnet is ok !")
+		t.Error("Subnet is expected to be ok!")
 		t.Fail()
 	}
 
@@ -70,9 +71,11 @@ func TestSubnet_Clone(t *testing.T) {
 	s.Domain = "Subnet Domain"
 	s.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
 	s.GatewayIDs = []string{"GatewayID1", "GatewayID2", "GatewayID3"}
+
 	var err error
-	s.VIP, err = NewVirtualIP()
+	s.VIP, err = NewVirtualIP(WithName("vip"))
 	require.Nil(t, err)
+
 	s.IPVersion = ipversion.IPv4
 	s.GWSecurityGroupID = "Subnet GWSecurityGroupID"
 	s.PublicIPSecurityGroupID = "Subnet PublicIPSecurityGroupID"
@@ -80,15 +83,8 @@ func TestSubnet_Clone(t *testing.T) {
 	s.DefaultSSHPort = 42
 	s.SingleHostCIDRIndex = 14
 
-	at, err := s.Clone()
-	if err != nil {
-		t.Error(err)
-	}
-
-	sc, ok := at.(*Subnet)
-	if !ok {
-		t.Fail()
-	}
+	sc, err := clonable.CastedClone[*Subnet](s)
+	require.Nil(t, err)
 
 	assert.Equal(t, s, sc)
 	require.EqualValues(t, s, sc)
@@ -158,27 +154,19 @@ func TestSubnet_Deserialize(t *testing.T) {
 }
 
 func TestVirtualIP_Clone(t *testing.T) {
-	v, _ := NewVirtualIP()
+	v, _ := NewVirtualIP(WithName("VirtualIP Name"))
 	v.ID = "VirtualIP ID"
-	v.Name = "VirtualIP Name"
 	v.SubnetID = "VirtualIP SubnetID"
 	v.PrivateIP = "VirtualIP PrivateIP"
 	v.PublicIP = "VirtualIP PublicIP"
-	h1, _ := NewHostCore()
-	h2, _ := NewHostCore()
-	h3, _ := NewHostCore()
-	v.Hosts = []*HostCore{h1, h2, h3}
 	v.NetworkID = "VirtualIP NetworkID"
+	h1, _ := NewHostCore(WithName("h1"))
+	h2, _ := NewHostCore(WithName("h2"))
+	h3, _ := NewHostCore(WithName("h3"))
+	v.Hosts = []*HostCore{h1, h2, h3}
 
-	at, err := v.Clone()
-	if err != nil {
-		t.Error(err)
-	}
-
-	v2, ok := at.(*VirtualIP)
-	if !ok {
-		t.Fail()
-	}
+	v2, err := clonable.CastedClone[*VirtualIP](v)
+	require.Nil(t, err)
 
 	areEqual := reflect.DeepEqual(v, v2)
 	if !areEqual {
@@ -233,18 +221,18 @@ func TestSubnet_GetCIDR(t *testing.T) {
 func TestVirtualIP_IsNull(t *testing.T) {
 	v, _ := NewVirtualIP()
 	if !v.IsNull() {
-		t.Error("Virtual ip without ID or Name is null")
+		t.Error("Virtual IP is expected to be null!")
 		t.Fail()
 	}
 	v.ID = "VirtualIP ID"
 	if v.IsNull() {
-		t.Error("No, is not null")
+		t.Error("VirtualIP is expected to be not null!")
 		t.Fail()
 	}
 	v.ID = ""
 	v.Name = "VirtualIP Name"
 	if v.IsNull() {
-		t.Error("No, is not null")
+		t.Error("VirtualIP is expected to be not null!")
 		t.Fail()
 	}
 }

@@ -21,7 +21,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/sirupsen/logrus"
+
+	// Gophercloud OpenStack API
+	"github.com/gophercloud/gophercloud"
+	gcos "github.com/gophercloud/gophercloud/openstack"
 	volumesv2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
@@ -32,12 +36,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
-	"github.com/sirupsen/logrus"
 
-	// Gophercloud OpenStack API
-	"github.com/gophercloud/gophercloud"
-	gcos "github.com/gophercloud/gophercloud/openstack"
-
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -252,7 +252,7 @@ func New(auth iaasoptions.Authentication, cfg iaasoptions.Configuration) (*stack
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return nil, xerr
 		}
@@ -309,12 +309,12 @@ func New(auth iaasoptions.Authentication, cfg iaasoptions.Configuration) (*stack
 }
 
 // ListRegions ...
-func (s stack) ListRegions(ctx context.Context) (list []string, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListRegions(ctx context.Context) (list []string, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var allPages pagination.Page
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -322,7 +322,7 @@ func (s stack) ListRegions(ctx context.Context) (list []string, ferr fail.Error)
 			listOpts := regions.ListOpts{
 				// ParentRegionID: "RegionOne",
 			}
-			allPages, innerErr = regions.List(s.IdentityClient, listOpts).AllPages()
+			allPages, innerErr = regions.List(instance.IdentityClient, listOpts).AllPages()
 			return innerErr
 		},
 		NormalizeError,
@@ -344,22 +344,25 @@ func (s stack) ListRegions(ctx context.Context) (list []string, ferr fail.Error)
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstract.HostTemplate, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectTemplate(ctx context.Context, id string) (template *abstract.HostTemplate, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
+	}
+	if instance.ComputeClient == nil {
+		return nil, fail.InvalidInstanceContentError("instance.ComputeClient", "cannot be nil")
 	}
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Try to get template
 	var flv *flavors.Flavor
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			flv, innerErr = flavors.Get(s.ComputeClient, id).Extract()
+			flv, innerErr = flavors.Get(instance.ComputeClient, id).Extract()
 			return innerErr
 		},
 		NormalizeError,
@@ -378,33 +381,36 @@ func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstra
 }
 
 // CreateKeyPair creates and import a key pair
-func (s stack) CreateKeyPair(ctx context.Context, name string) (*abstract.KeyPair, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) CreateKeyPair(ctx context.Context, name string) (*abstract.KeyPair, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return abstract.NewKeyPair(name)
 }
 
 // InspectKeyPair returns the key pair identified by id
-func (s stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
+	}
+	if instance.ComputeClient == nil {
+		return nil, fail.InvalidInstanceContentError("instance.ComputeClient", "cannot be nil")
 	}
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	kp, err := keypairs.Get(s.ComputeClient, id, nil).Extract()
+	kp, err := keypairs.Get(instance.ComputeClient, id, nil).Extract()
 	if err != nil {
 		return nil, fail.Wrap(err, "error getting keypair")
 	}
@@ -418,17 +424,20 @@ func (s stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair
 
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
-func (s stack) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
+	if instance.ComputeClient == nil {
+		return nil, fail.InvalidInstanceContentError("instance.ComputeClient", "cannot be nil")
+	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var kpList []*abstract.KeyPair
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return keypairs.List(s.ComputeClient, nil).EachPage(
+			return keypairs.List(instance.ComputeClient, nil).EachPage(
 				func(page pagination.Page) (bool, error) {
 					list, err := keypairs.ExtractKeyPairs(page)
 					if err != nil {
@@ -458,19 +467,22 @@ func (s stack) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fail.Erro
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
+	}
+	if instance.ComputeClient == nil {
+		return fail.InvalidInstanceContentError("instance.ComputeClient", "cannot be nil")
 	}
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return keypairs.Delete(s.ComputeClient, id, nil).ExtractErr()
+			return keypairs.Delete(instance.ComputeClient, id, nil).ExtractErr()
 		},
 		NormalizeError,
 	)
@@ -481,8 +493,8 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s stack) AddPublicIPToVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) AddPublicIPToVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -490,8 +502,8 @@ func (s stack) AddPublicIPToVIP(ctx context.Context, vip *abstract.VirtualIP) fa
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -504,7 +516,7 @@ func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostI
 	var vipPort *ports.Port
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			vipPort, innerErr = ports.Get(s.NetworkClient, vip.ID).Extract()
+			vipPort, innerErr = ports.Get(instance.NetworkClient, vip.ID).Extract()
 			return innerErr
 		},
 		NormalizeError,
@@ -512,7 +524,7 @@ func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostI
 	if xerr != nil {
 		return xerr
 	}
-	hostPorts, xerr := s.rpcListPorts(ctx, ports.ListOpts{
+	hostPorts, xerr := instance.rpcListPorts(ctx, ports.ListOpts{
 		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
@@ -528,7 +540,7 @@ func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostI
 		p.AllowedAddressPairs = append(p.AllowedAddressPairs, addressPair)
 		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
-				_, innerErr := ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &p.AllowedAddressPairs}).Extract()
+				_, innerErr := ports.Update(instance.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &p.AllowedAddressPairs}).Extract()
 				return innerErr
 			},
 			NormalizeError,
@@ -541,9 +553,12 @@ func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostI
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
+	}
+	if instance.ComputeClient == nil {
+		return fail.InvalidInstanceContentError("instance.ComputeClient", "cannot be nil")
 	}
 	if vip == nil {
 		return fail.InvalidParameterCannotBeNilError("vip")
@@ -555,7 +570,7 @@ func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, h
 	var vipPort *ports.Port
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			vipPort, innerErr = ports.Get(s.NetworkClient, vip.ID).Extract()
+			vipPort, innerErr = ports.Get(instance.NetworkClient, vip.ID).Extract()
 			return innerErr
 		},
 		NormalizeError,
@@ -563,7 +578,7 @@ func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, h
 	if xerr != nil {
 		return xerr
 	}
-	hostPorts, xerr := s.rpcListPorts(ctx, ports.ListOpts{
+	hostPorts, xerr := instance.rpcListPorts(ctx, ports.ListOpts{
 		DeviceID:  hostID,
 		NetworkID: vip.NetworkID,
 	})
@@ -579,7 +594,7 @@ func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, h
 		}
 		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
-				_, innerErr := ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &newAllowedAddressPairs}).Extract()
+				_, innerErr := ports.Update(instance.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &newAllowedAddressPairs}).Extract()
 				return innerErr
 			},
 			NormalizeError,
@@ -592,23 +607,26 @@ func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, h
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
+	}
+	if instance.NetworkClient == nil {
+		return fail.InvalidInstanceContentError("instance.NetworkClient", "cannot be nil")
 	}
 	if vip == nil {
 		return fail.InvalidParameterCannotBeNilError("vip")
 	}
 
 	for _, v := range vip.Hosts {
-		xerr := s.UnbindHostFromVIP(ctx, vip, v.ID)
+		xerr := instance.UnbindHostFromVIP(ctx, vip, v.ID)
 		if xerr != nil {
 			return xerr
 		}
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return ports.Delete(s.NetworkClient, vip.ID).ExtractErr()
+			return ports.Delete(instance.NetworkClient, vip.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
@@ -616,33 +634,46 @@ func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Erro
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
 // Does nothing for OpenStack, userdata cannot be updated
-func (s stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
 	return nil
 }
 
-func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
+func (instance *stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
 	return nil
 }
 
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
-func (s stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter) (hoststate.Enum, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter) (hoststate.Enum, fail.Error) {
+	if valid.IsNil(instance) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
-
-	host, xerr := s.InspectHost(ctx, hostParam)
+	ahf, _, xerr := iaasapi.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return hoststate.Error, xerr
+		return hoststate.Unknown, xerr
 	}
-	return host.CurrentState, nil
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+
+	var (
+		server *servers.Server
+		err    error
+	)
+	if ahf.ID != "" {
+		server, err = instance.rpcGetHostByID(ctx, ahf.ID)
+	} else {
+		server, err = instance.rpcGetHostByName(ctx, ahf.Name)
+	}
+	if err != nil {
+		return hoststate.Unknown, fail.Wrap(err)
+	}
+
+	return toHostState(server.Status), nil
 }
 
 // StopHost stops the host identified by id
-func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gracefully bool) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gracefully bool) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
@@ -650,19 +681,19 @@ func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gr
 		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return startstop.Stop(s.ComputeClient, ahf.ID).ExtractErr()
+			return startstop.Stop(instance.ComputeClient, ahf.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
 }
 
 // StartHost starts the host identified by id
-func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
@@ -670,19 +701,19 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) f
 		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return startstop.Start(s.ComputeClient, ahf.ID).ExtractErr()
+			return startstop.Start(instance.ComputeClient, ahf.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
 }
 
 // RebootHost reboots unconditionally the host identified by id
-func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
@@ -690,18 +721,14 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			innerErr := servers.Reboot(
-				s.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.SoftReboot},
-			).ExtractErr()
+			innerErr := servers.Reboot(instance.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
 			if innerErr != nil {
-				innerErr = servers.Reboot(
-					s.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.HardReboot},
-				).ExtractErr()
+				innerErr = servers.Reboot(instance.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.HardReboot}).ExtractErr()
 			}
 			return innerErr
 		},
@@ -710,8 +737,8 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 }
 
 // ResizeHost ...
-func (s stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	_ /*ahf*/, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
@@ -719,7 +746,7 @@ func (s stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, 
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	logrus.WithContext(ctx).Debugf("Trying to resize a Host...")
 	// servers.Resize()
@@ -729,8 +756,8 @@ func (s stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, 
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -739,20 +766,26 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
 		state.String(), timeout).WithStopwatch().Entering().Exiting()
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			if ahf.ID != "" {
-				server, innerErr = s.rpcGetHostByID(ctx, ahf.ID)
+				server, innerErr = instance.rpcGetHostByID(ctx, ahf.ID)
 			} else {
-				server, innerErr = s.rpcGetHostByName(ctx, ahf.Name)
+				server, innerErr = instance.rpcGetHostByName(ctx, ahf.Name)
 			}
 
 			if innerErr != nil {
@@ -831,8 +864,8 @@ func (s stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParamete
 
 // WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -841,7 +874,7 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 		return nil, xerr
 	}
 
-	server, xerr := s.WaitHostState(ctx, hostParam, hoststate.Started, timeout)
+	server, xerr := instance.WaitHostState(ctx, hostParam, hoststate.Started, timeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -857,7 +890,7 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 		}
 	}
 
-	ahf, xerr = s.complementHost(ctx, ahf.HostCore, server)
+	ahf, xerr = instance.complementHost(ctx, ahf.HostCore, server)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -867,8 +900,8 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to Host, returns *fail.ErrDuplicate
-func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	ahf, _, xerr := iaasapi.ValidateHostParameter(hostParam)
@@ -880,22 +913,22 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 	if xerr != nil {
 		return xerr
 	}
-	asg, xerr = s.InspectSecurityGroup(ctx, asg)
+	asg, xerr = instance.InspectSecurityGroup(ctx, asg)
 	if xerr != nil {
 		return xerr
 	}
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return secgroups.AddServer(s.ComputeClient, ahf.ID, asg.ID).ExtractErr()
+			return secgroups.AddServer(instance.ComputeClient, ahf.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -909,17 +942,17 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return secgroups.RemoveServer(s.ComputeClient, ahf.ID, asg.ID).ExtractErr()
+			return secgroups.RemoveServer(instance.ComputeClient, ahf.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
+func (instance *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
@@ -928,7 +961,7 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -936,9 +969,15 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	timeout := timings.OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
-					return volumesv2.Delete(s.VolumeClient, id, nil).ExtractErr()
+					return volumesv2.Delete(instance.VolumeClient, id, nil).ExtractErr()
 				},
 				NormalizeError,
 			)
@@ -970,8 +1009,8 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if request.Name = strings.TrimSpace(request.Name); request.Name == "" {
@@ -984,7 +1023,7 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 	var va *volumeattach.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			va, innerErr = volumeattach.Create(s.ComputeClient, request.HostID, volumeattach.CreateOpts{
+			va, innerErr = volumeattach.Create(instance.ComputeClient, request.HostID, volumeattach.CreateOpts{
 				VolumeID: request.VolumeID,
 			}).Extract()
 			return innerErr
@@ -998,8 +1037,8 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by id
-func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -1014,7 +1053,7 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string)
 	var va *volumeattach.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			va, innerErr = volumeattach.Get(s.ComputeClient, serverID, id).Extract()
+			va, innerErr = volumeattach.Get(instance.ComputeClient, serverID, id).Extract()
 			return innerErr
 		},
 		NormalizeError,
@@ -1031,8 +1070,8 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string)
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -1045,7 +1084,7 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*a
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			vs = []*abstract.VolumeAttachment{} // If call fails, need to reset volume list to prevent duplicates
-			return volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
+			return volumeattach.List(instance.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumeattach.ExtractVolumeAttachments(page)
 				if err != nil {
 					return false, err
@@ -1071,8 +1110,8 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*a
 }
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
-func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -1086,13 +1125,13 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return volumeattach.Delete(s.ComputeClient, serverID, vaID).ExtractErr()
+			return volumeattach.Delete(instance.ComputeClient, serverID, vaID).ExtractErr()
 		},
 		NormalizeError,
 	)
 }
 
-func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error {
+func (instance *stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error {
 	if operation == "networklayers" {
 		abstractSubnet, ok := params["layer"].(*abstract.Subnet)
 		if !ok {
@@ -1107,55 +1146,55 @@ func (s stack) Migrate(ctx context.Context, operation string, params map[string]
 }
 
 // IsNull ...
-func (s *stack) IsNull() bool {
-	return s == nil || s.Driver == nil
+func (instance *stack) IsNull() bool {
+	return instance == nil || instance.Driver == nil
 }
 
 // GetStackName returns the name of the stack
-func (s stack) GetStackName() (string, fail.Error) {
+func (instance *stack) GetStackName() (string, fail.Error) {
 	return "huaweicloud", nil
 }
 
 // initVPC initializes the instance of the Networking/VPC if one is defined in tenant
-func (s *stack) initVPC(ctx context.Context) fail.Error {
-	if s.cfgOpts.DefaultNetworkName != "" {
-		an, xerr := s.InspectNetworkByName(ctx, s.cfgOpts.DefaultNetworkName)
+func (instance *stack) initVPC(ctx context.Context) fail.Error {
+	if instance.cfgOpts.DefaultNetworkName != "" {
+		an, xerr := instance.InspectNetworkByName(ctx, instance.cfgOpts.DefaultNetworkName)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// FIXME: error or automatic DefaultNetwork creation ?
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 			default:
 				return xerr
 			}
 		} else {
-			s.vpc = an
+			instance.vpc = an
 		}
 	}
 	return nil
 }
 
 // Timings returns the instance containing current timeout settings
-func (s *stack) Timings() (temporal.Timings, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) Timings() (temporal.Timings, fail.Error) {
+	if valid.IsNil(instance) {
 		return temporal.NewTimings(), fail.InvalidInstanceError()
 	}
-	if s.MutableTimings == nil {
-		s.MutableTimings = temporal.NewTimings()
+	if instance.MutableTimings == nil {
+		instance.MutableTimings = temporal.NewTimings()
 	}
-	return s.MutableTimings, nil
+	return instance.MutableTimings, nil
 }
 
-func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+func (instance *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
 	if kind != abstract.HostResource {
 		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
 	}
 
-	xerr := s.rpcSetMetadataOfInstance(ctx, id, lmap)
+	xerr := instance.rpcSetMetadataOfInstance(ctx, id, lmap)
 	return xerr
 }
 
-func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+func (instance *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
 	if kind != abstract.HostResource {
 		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
 	}
@@ -1165,6 +1204,6 @@ func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, k
 		report[k] = ""
 	}
 
-	xerr := s.rpcDeleteMetadataOfInstance(ctx, id, report)
+	xerr := instance.rpcDeleteMetadataOfInstance(ctx, id, report)
 	return xerr
 }

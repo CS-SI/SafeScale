@@ -20,8 +20,8 @@
 package shares
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"strings"
 	"testing"
 	"time"

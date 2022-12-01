@@ -21,7 +21,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // LabelHosts contains the values associated with Host bound to the Label
@@ -63,7 +62,7 @@ func (hlabel *LabelHosts) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*LabelHosts](p)
+	src, err := clonable.Cast[*LabelHosts](p)
 	if err != nil {
 		return err
 	}

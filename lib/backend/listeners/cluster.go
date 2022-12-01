@@ -104,10 +104,6 @@ func (s *ClusterListener) Create(inctx context.Context, in *protocol.ClusterCrea
 		return nil, xerr
 	}
 
-	// if req.Tenant == "" {
-	// 	req.Tenant = job.Tenant()
-	// }
-
 	handler := handlers.NewClusterHandler(job)
 	instance, xerr := handler.Create(*req)
 	if xerr != nil {

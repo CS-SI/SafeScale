@@ -71,10 +71,10 @@ type Stack interface {
 	ClearSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
 	// DeleteSecurityGroup deletes a security group and all its rules
 	DeleteSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) fail.Error
-	// AddRuleToSecurityGroup adds a rule to an existing security group
-	AddRuleToSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
-	// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
-	DeleteRuleFromSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+	// AddRulesToSecurityGroup adds a rule to an existing security group
+	AddRulesToSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+	// DeleteRulesFromSecurityGroup deletes a rule identified by ID from a security group
+	DeleteRulesFromSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// GetDefaultSecurityGroupName returns the name of the default security group automatically bound to new host
 	GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error)
 	// EnableSecurityGroup enables a Security Group
@@ -118,7 +118,7 @@ type Stack interface {
 	DeleteVIP(context.Context, *abstract.VirtualIP) fail.Error
 
 	// CreateHost creates a host that fulfills the request
-	CreateHost(ctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error)
+	CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (*abstract.HostFull, *userdata.Content, fail.Error)
 	// ClearHostStartupScript clears the Startup Script of the Host (if the stack can do it)
 	ClearHostStartupScript(context.Context, HostParameter) fail.Error
 

@@ -65,7 +65,10 @@ func (sconf *Profile) CreatePersistentTunneling() fail.Error {
 	return nil
 }
 
-func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig *Profile, secondaryGatewayConfig *Profile) *Profile {
+func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig sshapi.Config, secondaryGatewayConfig sshapi.Config) *Profile {
+	if port <= 0 {
+		port = 22
+	}
 	return &Profile{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
@@ -83,8 +86,7 @@ func NewConnector(ac sshapi.Config) (*Profile, fail.Error) {
 	localHost, _ := ac.GetLocalHost()
 	gatewayConfig, _ := ac.GetPrimaryGatewayConfig()
 	secondaryGatewayConfig, _ := ac.GetSecondaryGatewayConfig()
-
-	return &Profile{Hostname: hostname, IPAddress: IPAddress, Port: int(port), User: user, PrivateKey: privateKey, LocalPort: int(localPort), LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}, nil
+	return NewProfile(hostname, IPAddress, int(port), user, privateKey, int(localPort), localHost, gatewayConfig, secondaryGatewayConfig), nil
 }
 
 // Tunnel a SSH tunnel
@@ -352,7 +354,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			if client != nil {
 				clErr := client.Close()
 				if clErr != nil {
-					logrus.Warn(clErr)
+					logrus.WithContext(ctx).Warn(clErr)
 				}
 			}
 		}()
@@ -370,7 +372,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			default:
 			}
 
-			// Each ClientConn can support multiple interactive sessions, represented by a sessionManager.
+			// Each ClientConn can support multiple interactive sessions, represented by a Session.
 			var internalErr error
 			var newsession *ssh.Session
 			newsession, internalErr = client.NewSession()
@@ -418,7 +420,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 				err = session.Close()
 				if err != nil {
 					if !strings.Contains(err.Error(), "EOF") {
-						logrus.Warnf("error closing session: %v", err)
+						logrus.WithContext(ctx).Warnf("error closing session: %v", err)
 					}
 				}
 			}
@@ -434,7 +436,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 			return
 		}
 
-		// Once a sessionManager is created, you can execute a single command on
+		// Once a Session is created, you can execute a single command on
 		// the remote side using the Run method.
 		var errorCode int
 
@@ -467,7 +469,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 				}
 
 				if _, ok := err.(*ssh.ExitMissingError); ok {
-					logrus.Warnf("Found exit missing error of command '%s'", sc.cmd.String())
+					logrus.WithContext(ctx).Warnf("Found exit missing error of command '%s'", sc.cmd.String())
 					errorCode = -2
 				}
 
@@ -725,17 +727,17 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			cmd, _ := sconf.Command(fmt.Sprintf("sudo cat %s/user_data.%s.done", utils.StateFolder, phase))
 
 			var xerr fail.Error
-			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(ctx, outputs.COLLECT, 60*time.Second) // FIXME: Remove hardcoded timeout
+			retcode, stdout, stderr, xerr = cmd.RunWithTimeout(ctx, outputs.COLLECT, 45*time.Second) // FIXME: Remove hardcoded timeout
 			if xerr != nil {
 				if phase == "init" {
-					logrus.Debugf("SSH still not ready for %s", sconf.Hostname)
+					logrus.WithContext(ctx).Debugf("SSH still not ready for %s, phase %s", sconf.Hostname, phase)
 				}
 				return xerr
 			}
 
 			if retcode != 0 {
 				if phase == "init" {
-					logrus.Debugf("SSH still not ready for %s", sconf.Hostname)
+					logrus.WithContext(ctx).Debugf("SSH still not ready for %s, phase %s", sconf.Hostname, phase)
 				}
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
 				fe.Annotate("retcode", retcode)
@@ -752,7 +754,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		timeout+time.Minute,
 	)
 	if retryErr != nil {
-		logrus.WithContext(ctx).Debugf("WaitServerReady: the wait finished with: %v", retryErr)
+		logrus.WithContext(ctx).Debugf("WaitServerReady: the wait of %s finished with: %v", sconf.Hostname, retryErr)
 		return stdout, retryErr
 	}
 

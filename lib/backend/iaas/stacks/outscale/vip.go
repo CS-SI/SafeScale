@@ -29,8 +29,8 @@ import (
 )
 
 // CreateVIP ...
-func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	// networkID is not used by Outscale
@@ -44,12 +44,12 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale"), "(%s, '%s')", subnetID, name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	subnet, xerr := s.InspectSubnet(ctx, subnetID)
+	subnet, xerr := instance.InspectSubnet(ctx, subnetID)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	resp, xerr := s.rpcCreateNic(ctx, subnet.ID, name, name, securityGroups)
+	resp, xerr := instance.rpcCreateNic(ctx, subnet.ID, name, name, securityGroups)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -71,16 +71,16 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s stack) AddPublicIPToVIP(context.Context, *abstract.VirtualIP) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) AddPublicIPToVIP(context.Context, *abstract.VirtualIP) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (s stack) getFirstFreeDeviceNumber(ctx context.Context, hostID string) (int64, fail.Error) {
-	resp, xerr := s.rpcReadNicsOfVM(ctx, hostID)
+func (instance *stack) getFirstFreeDeviceNumber(ctx context.Context, hostID string) (int64, fail.Error) {
+	resp, xerr := instance.rpcReadNicsOfVM(ctx, hostID)
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -103,8 +103,8 @@ func (s stack) getFirstFreeDeviceNumber(ctx context.Context, hostID string) (int
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -119,8 +119,8 @@ func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostI
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -134,8 +134,8 @@ func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, h
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if vip == nil {
@@ -145,9 +145,9 @@ func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) (ferr fai
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale"), "(%v)", vip).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	if xerr := s.rpcDeleteNic(ctx, vip.ID); xerr != nil {
+	if xerr := instance.rpcDeleteNic(ctx, vip.ID); xerr != nil {
 		return xerr
 	}
 
-	return s.rpcDeletePublicIPByIP(ctx, vip.PublicIP)
+	return instance.rpcDeletePublicIPByIP(ctx, vip.PublicIP)
 }

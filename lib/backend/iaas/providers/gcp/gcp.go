@@ -140,6 +140,11 @@ func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaas
 		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
 	}
 
+	machineCreationLimit := 8
+	if _, ok = computeCfg["ConcurrentMachineCreationLimit"].(string); ok {
+		machineCreationLimit, _ = strconv.Atoi(computeCfg["ConcurrentMachineCreationLimit"].(string))
+	}
+
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
 		if operatorUsername, ok = operatorUsernameIf.(string); !ok {
@@ -153,7 +158,7 @@ func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaas
 	}
 	params["Safe"] = isSafe
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	authOptions := iaasoptions.Authentication{
 		IdentityEndpoint: identityEndpoint,
@@ -212,14 +217,15 @@ next:
 			"standard":   volumespeed.Cold,
 			"performant": volumespeed.Hdd,
 		},
-		MetadataBucketName: metadataBucketName,
-		DefaultImage:       defaultImage,
-		OperatorUsername:   operatorUsername,
-		UseNATService:      true,
-		ProviderName:       providerName,
-		MaxLifeTime:        maxLifeTime,
-		Timings:            timings,
-		Safe:               isSafe,
+		MetadataBucketName:             metadataBucketName,
+		DefaultImage:                   defaultImage,
+		OperatorUsername:               operatorUsername,
+		UseNATService:                  true,
+		ProviderName:                   providerName,
+		MaxLifeTime:                    maxLifeTime,
+		Timings:                        timings,
+		Safe:                           isSafe,
+		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
 	gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)

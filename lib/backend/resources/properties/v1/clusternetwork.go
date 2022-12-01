@@ -21,7 +21,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterNetwork contains network information relative to cluster
@@ -63,7 +62,7 @@ func (n *ClusterNetwork) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	casted, err := lang.Cast[*ClusterNetwork](p)
+	casted, err := clonable.Cast[*ClusterNetwork](p)
 	if err != nil {
 		return err
 	}

@@ -22,19 +22,19 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // Core represents a virtual network
 type (
-	Core struct {
+	core struct {
 		Name string                   `json:"name"` // name of the abstract resource
 		Tags data.Map[string, string] `json:"tags,omitempty"`
 
 		kind             string
 		terraformSnippet string
-		terraformData    []byte
+		terraformTypes   []string
+		extra            map[string]any
 		useTerraform     bool
 	}
 )
@@ -44,8 +44,8 @@ const (
 )
 
 // newCore initializes a new instance of Network
-func newCore(opts ...Option) (*Core, fail.Error) {
-	c := &Core{
+func newCore(opts ...Option) (*core, fail.Error) {
+	c := &core{
 		Name: Unnamed,
 		Tags: data.NewMap[string, string](),
 	}
@@ -56,7 +56,7 @@ func newCore(opts ...Option) (*Core, fail.Error) {
 }
 
 // AddOptions is used to add options on Core after creation
-func (c *Core) AddOptions(opts ...Option) fail.Error {
+func (c *core) AddOptions(opts ...Option) fail.Error {
 	if c == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -75,13 +75,13 @@ func (c *Core) AddOptions(opts ...Option) fail.Error {
 
 // IsNull ...
 // satisfies interface clonable.Clonable
-func (c *Core) IsNull() bool {
+func (c *core) IsNull() bool {
 	return c == nil || len(c.Tags) == 0
 }
 
 // Clone ...
 // satisfies interface clonable.Clonable
-func (c *Core) Clone() (clonable.Clonable, error) {
+func (c *core) Clone() (clonable.Clonable, error) {
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -96,7 +96,7 @@ func (c *Core) Clone() (clonable.Clonable, error) {
 
 // Replace ...
 // satisfies interface clonable.Clonable
-func (c *Core) Replace(p clonable.Clonable) error {
+func (c *core) Replace(p clonable.Clonable) error {
 	if c == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -104,7 +104,7 @@ func (c *Core) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := lang.Cast[*Core](p)
+	src, err := clonable.Cast[*core](p)
 	if err != nil {
 		return err
 	}
@@ -114,12 +114,21 @@ func (c *Core) Replace(p clonable.Clonable) error {
 }
 
 // TerraformSnippet returns the name of the terraform Snippet used to define resource
-func (c *Core) TerraformSnippet() string {
+func (c *core) TerraformSnippet() string {
 	if valid.IsNull(c) {
 		return ""
 	}
 
 	return c.terraformSnippet
+}
+
+// TerraformTypes returns the types of the resources in terraform corresponding to the abstract
+func (c *core) TerraformTypes() []string {
+	if valid.IsNull(c) {
+		return nil
+	}
+
+	return c.terraformTypes
 }
 
 // func (c *Core) Prepare(provider terraformer.ProviderUsingTerraform) error {
@@ -162,7 +171,7 @@ func (c *Core) TerraformSnippet() string {
 // 	return scope.AllAbstracts()
 // }
 
-func (c *Core) GetName() string {
+func (c *core) GetName() string {
 	if valid.IsNull(c) {
 		return ""
 	}
@@ -170,10 +179,18 @@ func (c *Core) GetName() string {
 	return c.Name
 }
 
-func (c *Core) Kind() string {
+func (c *core) Kind() string {
 	if valid.IsNull(c) {
 		return ""
 	}
 
 	return c.kind
+}
+
+func (c *core) Extra() map[string]any {
+	if valid.IsNull(c) {
+		return nil
+	}
+
+	return c.extra
 }

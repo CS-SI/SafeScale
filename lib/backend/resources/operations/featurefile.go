@@ -27,17 +27,16 @@ import (
 	"sync"
 	"time"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/eko/gocache/v2/store"
 	"github.com/farmergreg/rfsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"gopkg.in/fsnotify.v1"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -118,7 +117,7 @@ func (ff *FeatureFile) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*FeatureFile](p)
+	src, err := clonable.Cast[*FeatureFile](p)
 	if err != nil {
 		return err
 	}
@@ -709,7 +708,7 @@ func walkInsideFeatureFileFolders(ctx context.Context, filter featureFilter) ([]
 						switch casted.Err {
 						case NOTFOUND:
 							// entry not found, ignore it
-							debug.IgnoreError(err)
+							debug.IgnoreErrorWithContext(ctx, err)
 							return nil
 						default:
 						}
@@ -793,7 +792,7 @@ func addPathToWatch(ctx context.Context, w *rfsnotify.RWatcher, path string) err
 			switch casted.Err {
 			case NOTFOUND:
 				// folder not found, ignore it
-				debug.IgnoreError(err)
+				debug.IgnoreErrorWithContext(ctx, err)
 				return nil
 			default:
 				logrus.WithContext(ctx).Error(err)

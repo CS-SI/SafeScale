@@ -24,13 +24,13 @@ import (
 	"sort"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/ec2"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -42,6 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // CreateKeyPair creates a keypair and upload it to AWS
@@ -434,9 +435,7 @@ func toAbstractHostTemplate(in ec2.InstanceTypeInfo) *abstract.HostTemplate {
 
 // WaitHostReady waits until a host achieves ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
-func (s stack) WaitHostReady(
-	ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration,
-) (_ *abstract.HostCore, ferr fail.Error) {
+func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -457,6 +456,12 @@ func (s stack) WaitHostReady(
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, innerXErr := s.InspectHost(ctx, ahf)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -502,9 +507,7 @@ func (s stack) WaitHostReady(
 }
 
 // CreateHost creates a host
-func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
-	ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error,
-) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -560,7 +563,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	if xerr = userData.Prepare(s.Config, request, defaultSubnet.CIDR, "", timings); xerr != nil {
+	xerr = userData.Prepare(s.Config, request, defaultSubnet.CIDR, "", timings)
+	if xerr != nil {
 		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
 		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -659,6 +663,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 	// Retry creation until success, for 10 minutes
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			var (
 				server    *abstract.HostCore
 				innerXErr fail.Error
@@ -666,12 +676,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 			if request.Preemptible {
 				server, innerXErr = s.buildAwsSpotMachine( // FIXME: Disk size
 					ctx, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
-					string(userDataPhase1), publicIP, *template,
+					string(userDataPhase1), publicIP, *template, extra,
 				)
 			} else {
 				server, innerXErr = s.buildAwsMachine( // FIXME: Disk size
 					ctx, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
-					string(userDataPhase1), publicIP, *template,
+					string(userDataPhase1), publicIP, *template, extra,
 				)
 			}
 			if innerXErr != nil {
@@ -685,11 +695,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 
 					if server.IsConsistent() {
 						if xerr := s.DeleteHost(ctx, server.ID); xerr != nil {
-							_ = innerXErr.AddConsequence(
-								fail.Wrap(
-									xerr, "cleaning up on failure, failed to delete Host '%s'", server.Name,
-								),
-							)
+							_ = innerXErr.AddConsequence(fail.Wrap(xerr, "cleaning up on failure, failed to delete Host '%s'", server.Name))
 						}
 					}
 					return captured
@@ -705,7 +711,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 
 			// Wait until Host is ready, not just until the build is started
 			if _, innerXErr = s.WaitHostReady(ctx, ahf, timings.HostLongOperationTimeout()); innerXErr != nil {
-				if rerr := s.DeleteHost(ctx, ahf.ID); rerr != nil {
+				rerr := s.DeleteHost(ctx, ahf.ID)
+				if rerr != nil {
 					_ = innerXErr.AddConsequence(fail.Wrap(rerr, "cleaning up on failure, failed to delete Host"))
 				}
 				return innerXErr
@@ -732,7 +739,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && request.CleanOnFailure() {
 			if ahf.IsConsistent() {
-				logrus.WithContext(ctx).Infof("Reset, deleting host '%s'", ahf.Name)
+				logrus.WithContext(ctx).Infof("Cleanup, deleting host '%s'", ahf.Name)
 				derr := s.DeleteHost(context.Background(), ahf.ID)
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
@@ -760,6 +767,7 @@ func (s stack) buildAwsSpotMachine(
 	data string,
 	publicIP bool,
 	template abstract.HostTemplate,
+	extra interface{},
 ) (*abstract.HostCore, fail.Error) {
 	resp, xerr := s.rpcDescribeSpotPriceHistory(ctx, aws.String(zone), aws.String(template.ID))
 	if xerr != nil {
@@ -803,11 +811,12 @@ func (s stack) buildAwsMachine(
 	data string,
 	publicIP bool,
 	template abstract.HostTemplate,
+	extra interface{},
 ) (*abstract.HostCore, fail.Error) {
 
 	instance, xerr := s.rpcCreateInstance(ctx,
 		aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageID), diskSize,
-		aws.String(keypairName), aws.Bool(publicIP), []byte(data),
+		aws.String(keypairName), aws.Bool(publicIP), []byte(data), extra,
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -831,9 +840,7 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool,
 }
 
 // InspectHost loads information of a host from AWS
-func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (
-	ahf *abstract.HostFull, ferr fail.Error,
-) {
+func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (ahf *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -865,9 +872,7 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 	return ahf, xerr
 }
 
-func (s stack) inspectInstance(
-	ctx context.Context, ahf *abstract.HostFull, hostLabel string, instance *ec2.Instance,
-) (ferr fail.Error) {
+func (s stack) inspectInstance(ctx context.Context, ahf *abstract.HostFull, hostLabel string, instance *ec2.Instance) (ferr fail.Error) {
 	instanceName := ""
 	instanceType := ""
 
@@ -959,9 +964,7 @@ func (s stack) inspectInstance(
 	return nil
 }
 
-func (s stack) fromMachineTypeToHostEffectiveSizing(
-	ctx context.Context, machineType string,
-) (abstract.HostEffectiveSizing, fail.Error) {
+func (s stack) fromMachineTypeToHostEffectiveSizing(ctx context.Context, machineType string) (abstract.HostEffectiveSizing, fail.Error) {
 	nullSizing := abstract.HostEffectiveSizing{}
 	resp, xerr := s.rpcDescribeInstanceTypeByID(ctx, aws.String(machineType))
 	if xerr != nil {
@@ -1098,7 +1101,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// a host not found is considered as a successful deletion, continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 			vm = nil
 		default:
 			return xerr
@@ -1133,12 +1136,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 			cause := fail.ConvertError(xerr.Cause())
 			switch cause.(type) {
 			case *fail.ErrNotFound, *fail.ErrInvalidRequest:
-				debug.IgnoreError(cause)
+				debug.IgnoreErrorWithContext(ctx, cause)
 			default:
 				return fail.Wrap(cause, "failed to stop Host '%s' with id '%s'", ahfn, ahfi)
 			}
 		case *fail.ErrNotFound, *fail.ErrInvalidRequest:
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return fail.Wrap(xerr, "failed to stop Host '%s' with id '%s'", ahfn, ahfi)
 		}
@@ -1153,12 +1156,12 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 				xerr = fail.ConvertError(xerr.Cause())
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					debug.IgnoreError(xerr)
+					debug.IgnoreErrorWithContext(ctx, xerr)
 				default:
 					return xerr
 				}
 			case *fail.ErrNotFound:
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 			default:
 				return xerr
 			}
@@ -1179,7 +1182,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// A missing volume is considered as a successful deletion
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 			default:
 				logrus.WithContext(ctx).Warnf("failed to delete volume %s (error %s)", volume, reflect.TypeOf(xerr).String())
 			}
@@ -1193,7 +1196,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// A missing keypair is considered as a successful deletion
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 			default:
 				return fail.Wrap(xerr, "error deleting keypair '%s'", keyPairName)
 			}
@@ -1227,6 +1230,12 @@ func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gr
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, err := s.InspectHost(ctx, ahf.ID)
 			if err != nil {
 				return err
@@ -1248,7 +1257,7 @@ func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gr
 			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
 			return fail.Wrap(
-				fail.Cause(retryErr), "timeout waiting to get hostParam '%s' information after %v", hostRef,
+				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostRef,
 				timings.HostCleanupTimeout(),
 			)
 		default:
@@ -1284,6 +1293,12 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) (
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, innerErr := s.InspectHost(ctx, ahf.ID)
 			if innerErr != nil {
 				return innerErr
@@ -1338,6 +1353,12 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			hostTmp, innerErr := s.InspectHost(ctx, ahf)
 			if innerErr != nil {
 				return innerErr
@@ -1369,9 +1390,7 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 }
 
 // ResizeHost changes the sizing of an existing host
-func (s stack) ResizeHost(
-	ctx context.Context, hostParam iaasapi.HostParameter, request abstract.HostSizingRequirements,
-) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1382,9 +1401,7 @@ func (s stack) ResizeHost(
 // BindSecurityGroupToHost ...
 // Returns:
 // - *fail.ErrNotFound if the Host is not found
-func (s stack) BindSecurityGroupToHost(
-	ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter,
-) (ferr fail.Error) {
+func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1443,8 +1460,7 @@ func (s stack) BindSecurityGroupToHost(
 // Returns:
 // - nil means success
 // - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
-func (s stack) UnbindSecurityGroupFromHost(
-	ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter,
+func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter,
 ) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()

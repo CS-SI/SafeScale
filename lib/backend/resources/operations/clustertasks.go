@@ -19,17 +19,18 @@ package operations
 import (
 	"context"
 	"fmt"
+	"math"
 	"net"
-	"reflect"
 	"strings"
 	"time"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/davecgh/go-spew/spew"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
@@ -43,8 +44,8 @@ import (
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -56,288 +57,242 @@ import (
 )
 
 // taskCreateCluster is the TaskAction that creates a Cluster
-func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskCreateCluster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	req, ok := params.(abstract.ClusterRequest)
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "should be an abstract.ClusterRequest")
 	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
-	go func() (ferr fail.Error) {
-		defer fail.OnPanic(&ferr)
+	go func() {
 		defer close(chRes)
+		gres, gerr := func() (_ interface{}, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		// Check if Cluster exists in metadata; if yes, error
-		_, xerr := LoadCluster(ctx, req.Name)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				debug.IgnoreError(xerr)
-			default:
-				chRes <- result{nil, xerr}
-				return xerr
-			}
-		} else {
-			ar := result{nil, fail.DuplicateError("a Cluster named '%s' already exist", req.Name)}
-			chRes <- ar
-			return ar.rErr
-		}
-
-		// Create first metadata of Cluster after initialization
-		xerr = instance.firstLight(ctx, req)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		cleanFailure := false
-		// Starting from here, delete metadata if exiting with error
-		// but if the next cleaning steps fail, we must keep the metadata to try again, so we have the cleanFailure flag to detect that issue
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && req.CleanOnFailure() && !cleanFailure {
-				logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
-				if derr := instance.Core.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
-					logrus.WithContext(context.Background()).Errorf(
-						"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
-					)
-					_ = ferr.AddConsequence(derr)
-				} else {
-					logrus.WithContext(ctx).Debugf(
-						"Cleaning up on %s, successfully deleted metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
-					)
+			// Check if Cluster exists in metadata; if yes, error
+			_, xerr := LoadCluster(ctx, req.Name)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					debug.IgnoreErrorWithContext(ctx, xerr)
+				default:
+					return nil, xerr
 				}
+			} else {
+				ar := result{nil, fail.DuplicateError("a Cluster named '%s' already exist", req.Name)}
+				return nil, ar.rErr
 			}
-		}()
 
-		// Obtain number of nodes to create
-		_, privateNodeCount, _, xerr := instance.determineRequiredNodes(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
+			// Create first metadata of Cluster after initialization
+			xerr = instance.firstLight(ctx, req)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, xerr
+			}
 
-		if req.InitialNodeCount == 0 {
-			req.InitialNodeCount = privateNodeCount
-		}
-		if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
-			logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
-			req.InitialNodeCount = privateNodeCount
-		}
+			cleanFailure := false
+			// Starting from here, delete metadata if exiting with error
+			// but if the next cleaning steps fail, we must keep the metadata to try again, so we have the cleanFailure flag to detect that issue
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && req.CleanOnFailure() && !cleanFailure {
+					logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
+					if derr := instance.Core.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
+						logrus.WithContext(context.Background()).Errorf(
+							"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
+						)
+						_ = ferr.AddConsequence(derr)
+					} else {
+						logrus.WithContext(ctx).Debugf(
+							"Cleaning up on %s, successfully deleted metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
+						)
+					}
+				}
+			}()
 
-		// Define the sizing dependencies for Cluster hosts
-		if req.GatewaysDef.Image == "" {
-			req.GatewaysDef.Image = req.OS
-		}
-		if req.MastersDef.Image == "" {
-			req.MastersDef.Image = req.OS
-		}
-		if req.NodesDef.Image == "" {
-			req.NodesDef.Image = req.OS
-		}
+			// Obtain number of nodes to create
+			_, privateNodeCount, _, xerr := instance.determineRequiredNodes(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, xerr
+			}
 
-		// logrus.WithContext(ctx).Warnf("This is the cluster creation request before determination: %s", spew.String(req))
+			if req.InitialNodeCount == 0 {
+				req.InitialNodeCount = privateNodeCount
+			}
+			if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
+				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
+				req.InitialNodeCount = privateNodeCount
+			}
 
-		gatewaysDef, mastersDef, nodesDef, xerr := instance.determineSizingRequirements(ctx, req)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
+			// Define the sizing dependencies for Cluster hosts
+			if req.GatewaysDef.Image == "" {
+				req.GatewaysDef.Image = req.OS
+			}
+			if req.MastersDef.Image == "" {
+				req.MastersDef.Image = req.OS
+			}
+			if req.NodesDef.Image == "" {
+				req.NodesDef.Image = req.OS
+			}
 
-		var networkInstance resources.Network
-		var subnetInstance resources.Subnet
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && req.CleanOnFailure() { // FIXME: subnetInstance nil
-				if subnetInstance != nil && networkInstance != nil {
+			gatewaysDef, mastersDef, nodesDef, xerr := instance.determineSizingRequirements(ctx, req)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			var (
+				networkInstance resources.Network
+				subnetInstance  resources.Subnet
+			)
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && req.CleanOnFailure() && subnetInstance != nil && networkInstance != nil {
 					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Subnet '%s'...", subnetInstance.GetName())
 					if derr := subnetInstance.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
 							// missing Subnet is considered as a successful deletion, continue
-							debug.IgnoreError(derr)
+							debug.IgnoreErrorWithContext(ctx, derr)
 						default:
 							cleanFailure = true
-							logrus.WithContext(context.Background()).Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr),
-								subnetInstance.GetName())
+							logrus.WithContext(context.Background()).Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr), subnetInstance.GetName())
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 						}
 					} else {
-						logrus.WithContext(ctx).Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr),
-							subnetInstance.GetName())
+						logrus.WithContext(ctx).Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr), subnetInstance.GetName())
 						if req.NetworkID == "" {
 							logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
 							if derr := networkInstance.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
 								switch derr.(type) {
 								case *fail.ErrNotFound:
 									// missing Network is considered as a successful deletion, continue
-									debug.IgnoreError(derr)
+									debug.IgnoreErrorWithContext(ctx, derr)
 								default:
 									cleanFailure = true
-									logrus.WithContext(context.Background()).Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr),
-										networkInstance.GetName())
+									logrus.WithContext(context.Background()).Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr), networkInstance.GetName())
 									_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr)))
 								}
 							} else {
-								logrus.WithContext(ctx).Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr),
-									networkInstance.GetName())
+								logrus.WithContext(ctx).Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr), networkInstance.GetName())
 							}
 						}
 					}
 				}
+			}()
+
+			// Create the Network and Subnet
+			networkInstance, subnetInstance, xerr = instance.createNetworkingResources(ctx, req, gatewaysDef)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, xerr
 			}
-		}()
 
-		// Create the Network and Subnet
-		networkInstance, subnetInstance, xerr = instance.createNetworkingResources(ctx, req, gatewaysDef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
+			// FIXME: At some point clusterIdentity has to change...
 
-		timings, xerr := instance.Service().Timings()
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
+			// Starting from here, exiting with error deletes hosts if req.keepOnFailure is false
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && req.CleanOnFailure() {
+					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Hosts...")
+					var list []machineID
 
-		// FIXME: At some point clusterIdentity has to change...
-
-		// Starting from here, exiting with error deletes hosts if req.keepOnFailure is false
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && req.CleanOnFailure() {
-				logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Hosts...")
-				var list []machineID
-
-				var nodemap map[uint]*propertiesv3.ClusterNode
-				derr := instance.Inspect(jobapi.NewContextPropagatingJob(inctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Inspect(clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
-						nodesV3, err := lang.Cast[*propertiesv3.ClusterNodes](p)
-						if err != nil {
-							return fail.Wrap(err)
-						}
-
+					var nodemap map[uint]*propertiesv3.ClusterNode
+					derr := metadata.InspectProperty(cleanupContextFrom(ctx), instance, clusterproperty.NodesV3, func(nodesV3 *propertiesv3.ClusterNodes) fail.Error {
 						nodemap = nodesV3.ByNumericalID
 						return nil
 					})
-				})
-				if derr != nil {
-					cleanFailure = true
-					_ = ferr.AddConsequence(derr)
-					return
-				}
-
-				for _, v := range nodemap {
-					list = append(list, machineID{ID: v.ID, Name: v.Name})
-				}
-
-				if len(list) > 0 {
-					tg, tgerr := concurrency.NewTaskGroupWithContext(
-						jobapi.NewContextPropagatingJob(inctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
-					)
-					if tgerr != nil {
+					if derr != nil {
 						cleanFailure = true
-						_ = ferr.AddConsequence(tgerr)
+						_ = ferr.AddConsequence(derr)
 						return
 					}
 
-					for _, v := range list {
-						captured := v
-						if captured.ID != "" {
-							_, tgerr = tg.Start(
-								instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{ID: captured.ID, Name: captured.Name},
-								concurrency.InheritParentIDOption,
-								concurrency.AmendID(fmt.Sprintf("/host/%s/delete", captured.Name)),
-							)
-							if tgerr != nil {
-								_ = ferr.AddConsequence(tgerr)
-								abErr := tg.AbortWithCause(tgerr)
-								if abErr != nil {
-									logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-								}
-								cleanFailure = true
-								break
+					for _, v := range nodemap {
+						list = append(list, machineID{ID: v.ID, Name: v.Name})
+					}
+
+					if len(list) > 0 {
+						clean := new(errgroup.Group)
+						for _, v := range list {
+							captured := v
+							if captured.ID != "" {
+								clean.Go(func() error {
+									_, err := instance.taskDeleteNodeOnFailure(cleanupContextFrom(ctx), taskDeleteNodeOnFailureParameters{ID: captured.ID, Name: captured.Name, KeepOnFailure: req.KeepOnFailure, Timeout: 2 * time.Minute})
+									return err
+								})
 							}
 						}
+						clErr := fail.ConvertError(clean.Wait())
+						if clErr != nil {
+							cleanFailure = true
+							return
+						}
+					} else {
+						logrus.WithContext(ctx).Warningf("relying on metadata here was a mistake...")
 					}
-
-					_, _, tgerr = tg.WaitGroupFor(timings.HostLongOperationTimeout())
-					tgerr = debug.InjectPlannedFail(tgerr)
-					if tgerr != nil {
-						cleanFailure = true
-						_ = ferr.AddConsequence(tgerr)
-					}
-				} else {
-					logrus.WithContext(ctx).Warningf("relying on metadata here was a mistake...")
 				}
-			}
-		}()
+			}()
 
-		// Creates and configures hosts
-		xerr = instance.createHostResources(ctx, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, ExtractFeatureParameters(req.FeatureParameters), req.KeepOnFailure)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		// configure Cluster as a whole
-		xerr = instance.configureCluster(ctx, req)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		// Sets nominal state of the new Cluster in metadata
-		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			// update metadata about disabled default features
-			innerXErr := props.Alter(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-				featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures](p)
-				if err != nil {
-					return fail.Wrap(err)
-				}
-
-				featuresV1.Disabled = req.DisabledDefaultFeatures
-				return nil
-			})
-			if innerXErr != nil {
-				return innerXErr
+			// Creates and configures hosts
+			xerr = instance.createHostResources(ctx, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, ExtractFeatureParameters(req.FeatureParameters), req.KeepOnFailure)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, xerr
 			}
 
-			return props.Alter(clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
-				stateV1, err := lang.Cast[*propertiesv1.ClusterState](p)
-				if err != nil {
-					return fail.Wrap(err)
+			// configure Cluster as a whole
+			xerr = instance.configureCluster(ctx, req)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			// Sets nominal state of the new Cluster in metadata
+			xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+				// update metadata about disabled default features
+				innerXErr := props.Alter(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+					featuresV1, err := clonable.Cast[*propertiesv1.ClusterFeatures](p)
+					if err != nil {
+						return fail.Wrap(err)
+					}
+
+					featuresV1.Disabled = req.DisabledDefaultFeatures
+					return nil
+				})
+				if innerXErr != nil {
+					return innerXErr
 				}
 
-				stateV1.State = clusterstate.Nominal
-				return nil
-			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
+				return props.Alter(clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
+					stateV1, err := clonable.Cast[*propertiesv1.ClusterState](p)
+					if err != nil {
+						return fail.Wrap(err)
+					}
 
-		chRes <- result{nil, nil}
-		return nil
-	}() // nolint
+					stateV1.State = clusterstate.Nominal
+					return nil
+				})
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				return nil, xerr
+			}
+
+			return nil, nil
+		}() // nolint
+		chRes <- result{gres, gerr}
+	}()
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -345,10 +300,10 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		<-chRes // wait cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		<-chRes // wait cleanup
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
-
 }
 
 // firstLight contains the code leading to Cluster first metadata written
@@ -362,125 +317,129 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		if req.Name = strings.TrimSpace(req.Name); req.Name == "" {
-			chRes <- result{fail.InvalidParameterError("req.Name", "cannot be empty string")}
-			return
-		}
-
-		// Initializes instance
-		ci, xerr := abstract.NewCluster(abstract.WithName(req.Name))
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		ci.Flavor = req.Flavor
-		ci.Complexity = req.Complexity
-		ci.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
-
-		xerr = instance.carry(ctx, ci)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			aci, err := lang.Cast[*abstract.Cluster](p)
-			if err != nil {
-				return fail.Wrap(err)
+		gerr := func() (ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			if req.Name = strings.TrimSpace(req.Name); req.Name == "" {
+				xerr := fail.InvalidParameterError("req.Name", "cannot be empty string")
+				return xerr
 			}
 
-			innerXErr := props.Alter(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-				featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures](p)
+			// Initializes instance
+			ci, xerr := abstract.NewCluster(abstract.WithName(req.Name))
+			if xerr != nil {
+				return xerr
+			}
+
+			ci.Flavor = req.Flavor
+			ci.Complexity = req.Complexity
+			ci.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
+
+			xerr = instance.carry(ctx, ci)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+
+			xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+				aci, err := clonable.Cast[*abstract.Cluster](p)
 				if err != nil {
 					return fail.Wrap(err)
 				}
 
-				// VPL: For now, always disable addition of feature proxycache
-				featuresV1.Disabled["proxycache"] = struct{}{}
-				// ENDVPL
-				for k := range req.DisabledDefaultFeatures {
-					featuresV1.Disabled[k] = struct{}{}
-				}
-				return nil
-			})
-			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to disable feature 'proxycache'")
-			}
+				innerXErr := props.Alter(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+					featuresV1, err := clonable.Cast[*propertiesv1.ClusterFeatures](p)
+					if err != nil {
+						return fail.Wrap(err)
+					}
 
-			// Sets initial state of the new Cluster and create metadata
-			innerXErr = props.Alter(clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
-				stateV1, err := lang.Cast[*propertiesv1.ClusterState](p)
-				if err != nil {
-					return fail.Wrap(err)
-				}
-
-				stateV1.State = clusterstate.Creating
-				return nil
-			})
-			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to set initial state of Cluster")
-			}
-
-			// sets default sizing from req
-			innerXErr = props.Alter(clusterproperty.DefaultsV3, func(p clonable.Clonable) fail.Error {
-				defaultsV3, err := lang.Cast[*propertiesv3.ClusterDefaults](p)
-				if err != nil {
-					return fail.Wrap(err)
+					// VPL: For now, always disable addition of feature proxycache
+					featuresV1.Disabled["proxycache"] = struct{}{}
+					// ENDVPL
+					for k := range req.DisabledDefaultFeatures {
+						featuresV1.Disabled[k] = struct{}{}
+					}
+					return nil
+				})
+				if innerXErr != nil {
+					return fail.Wrap(innerXErr, "failed to disable feature 'proxycache'")
 				}
 
-				defaultsV3.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.GatewaysDef)
-				defaultsV3.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.MastersDef)
-				defaultsV3.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.NodesDef)
-				defaultsV3.Image = req.NodesDef.Image
-				defaultsV3.ImageID = req.NodesDef.Image
-				defaultsV3.GatewayTemplateID = req.GatewaysDef.Template
-				defaultsV3.NodeTemplateID = req.NodesDef.Template
-				defaultsV3.MasterTemplateID = req.MastersDef.Template
-				defaultsV3.FeatureParameters = req.FeatureParameters
-				return nil
-			})
-			if innerXErr != nil {
-				return innerXErr
-			}
+				// Sets initial state of the new Cluster and create metadata
+				innerXErr = props.Alter(clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
+					stateV1, err := clonable.Cast[*propertiesv1.ClusterState](p)
+					if err != nil {
+						return fail.Wrap(err)
+					}
 
-			// FUTURE: sets the Cluster composition (when we will be able to manage Cluster spread on several tenants...)
-			innerXErr = props.Alter(clusterproperty.CompositeV1, func(p clonable.Clonable) fail.Error {
-				compositeV1, err := lang.Cast[*propertiesv1.ClusterComposite](p)
-				if err != nil {
-					return fail.Wrap(err)
+					stateV1.State = clusterstate.Creating
+					return nil
+				})
+				if innerXErr != nil {
+					return fail.Wrap(innerXErr, "failed to set initial state of Cluster")
 				}
 
-				compositeV1.Tenants = []string{req.Tenant}
-				return nil
+				// sets default sizing from req
+				innerXErr = props.Alter(clusterproperty.DefaultsV3, func(p clonable.Clonable) fail.Error {
+					defaultsV3, err := clonable.Cast[*propertiesv3.ClusterDefaults](p)
+					if err != nil {
+						return fail.Wrap(err)
+					}
+
+					defaultsV3.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.GatewaysDef)
+					defaultsV3.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.MastersDef)
+					defaultsV3.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.NodesDef)
+					defaultsV3.Image = req.NodesDef.Image
+					defaultsV3.ImageID = req.NodesDef.Image
+					defaultsV3.GatewayTemplateID = req.GatewaysDef.Template
+					defaultsV3.NodeTemplateID = req.NodesDef.Template
+					defaultsV3.MasterTemplateID = req.MastersDef.Template
+					defaultsV3.FeatureParameters = req.FeatureParameters
+					return nil
+				})
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				// FUTURE: sets the Cluster composition (when we will be able to manage Cluster spread on several tenants...)
+				innerXErr = props.Alter(clusterproperty.CompositeV1, func(p clonable.Clonable) fail.Error {
+					compositeV1, err := clonable.Cast[*propertiesv1.ClusterComposite](p)
+					if err != nil {
+						return fail.Wrap(err)
+					}
+
+					compositeV1.Tenants = []string{req.Tenant}
+					return nil
+				})
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				// Create a KeyPair for the user cladm
+				kpName := "cluster_" + req.Name + "_cladm_key"
+				kp, innerXErr := abstract.NewKeyPair(kpName)
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				aci.Keypair = kp
+
+				// Generate needed password for account cladm
+				cladmPassword, innerErr := utils.GeneratePassword(16)
+				if innerErr != nil {
+					return fail.ConvertError(innerErr)
+				}
+				aci.AdminPassword = cladmPassword
+
+				// Links maker based on Flavor
+				return instance.bootstrap(aci.Flavor)
 			})
-			if innerXErr != nil {
-				return innerXErr
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			}
-
-			// Create a KeyPair for the user cladm
-			kpName := "cluster_" + req.Name + "_cladm_key"
-			kp, innerXErr := abstract.NewKeyPair(kpName)
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			aci.Keypair = kp
-
-			// Generate needed password for account cladm
-			cladmPassword, innerErr := utils.GeneratePassword(16)
-			if innerErr != nil {
-				return fail.ConvertError(innerErr)
-			}
-			aci.AdminPassword = cladmPassword
-
-			// Links maker based on Flavor
-			return instance.bootstrap(aci.Flavor)
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		chRes <- result{xerr}
-
+			return xerr
+		}()
+		chRes <- result{gerr}
 	}()
 	select {
 	case res := <-chRes:
@@ -488,14 +447,14 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 	case <-ctx.Done():
 		return fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return fail.ConvertError(inctx.Err())
 	}
 }
 
 // determineSizingRequirements calculates the sizings needed for the hosts of the Cluster
-func (instance *Cluster) determineSizingRequirements(inctx context.Context, req abstract.ClusterRequest) (
-	_ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, xerr fail.Error,
-) {
+func (instance *Cluster) determineSizingRequirements(inctx context.Context, req abstract.ClusterRequest) (_ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, xerr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -508,166 +467,159 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		var (
-			gatewaysDefault     *abstract.HostSizingRequirements
-			mastersDefault      *abstract.HostSizingRequirements
-			nodesDefault        *abstract.HostSizingRequirements
-			imageQuery, imageID string
-		)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			var (
+				gatewaysDefault     *abstract.HostSizingRequirements
+				mastersDefault      *abstract.HostSizingRequirements
+				nodesDefault        *abstract.HostSizingRequirements
+				imageQuery, imageID string
+			)
 
-		// Determine default image
-		imageQuery = req.NodesDef.Image
-		if imageQuery == "" {
-			cfg, xerr := instance.Service().ConfigurationOptions()
+			// Determine default image
+			imageQuery = req.NodesDef.Image
+			if imageQuery == "" {
+				cfg, xerr := instance.Service().ConfigurationOptions()
+				if xerr != nil {
+					xerr := fail.Wrap(xerr, "failed to get configuration options")
+					return result{nil, nil, nil, xerr}, xerr
+				}
+				imageQuery = cfg.DefaultImage
+			}
+			makers := instance.localCache.makers
+			if imageQuery == "" && makers.DefaultImage != nil {
+				imageQuery = makers.DefaultImage(instance)
+			}
+			if imageQuery == "" {
+				imageQuery = consts.DEFAULTOS
+			}
+			svc := instance.Service()
+			_, imageID, xerr = determineImageID(ctx, svc, imageQuery)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{nil, nil, nil, fail.Wrap(xerr, "failed to get configuration options")}
-				return
+				return result{nil, nil, nil, xerr}, xerr
 			}
-			imageQuery = cfg.DefaultImage
-		}
-		makers := instance.localCache.makers
-		if imageQuery == "" && makers.DefaultImage != nil {
-			imageQuery = makers.DefaultImage(instance)
-		}
-		if imageQuery == "" {
-			imageQuery = consts.DEFAULTOS
-		}
-		svc := instance.Service()
-		_, imageID, xerr = determineImageID(ctx, svc, imageQuery)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, nil, nil, xerr}
-			return
-		}
 
-		// Determine getGateway sizing
-		if makers.DefaultGatewaySizing != nil {
-			gatewaysDefault = complementSizingRequirements(nil, makers.DefaultGatewaySizing(instance))
-		} else {
-			gatewaysDefault = &abstract.HostSizingRequirements{
-				MinCores:    2,
-				MaxCores:    4,
-				MinRAMSize:  7.0,
-				MaxRAMSize:  16.0,
-				MinDiskSize: 50,
-				MinGPU:      -1,
-			}
-		}
-
-		emptySizing := abstract.HostSizingRequirements{
-			MinGPU: -1,
-		}
-
-		gatewaysDef := complementSizingRequirements(&req.GatewaysDef, *gatewaysDefault)
-		gatewaysDef.Image = imageID
-
-		if !req.GatewaysDef.Equals(emptySizing) {
-			if lower, err := req.GatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
-				if !req.Force {
-					chRes <- result{nil, nil, nil, fail.NewError("requested gateway sizing less than recommended")}
-					return
+			// Determine getGateway sizing
+			if makers.DefaultGatewaySizing != nil {
+				gatewaysDefault = complementSizingRequirements(nil, makers.DefaultGatewaySizing(instance))
+			} else {
+				gatewaysDefault = &abstract.HostSizingRequirements{
+					MinCores:    2,
+					MaxCores:    4,
+					MinRAMSize:  7.0,
+					MaxRAMSize:  16.0,
+					MinDiskSize: 50,
+					MinGPU:      -1,
 				}
 			}
-		}
 
-		tmpl, xerr := svc.FindTemplateBySizing(ctx, *gatewaysDef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, nil, nil, xerr}
-			return
-		}
-
-		gatewaysDef.Template = tmpl.ID
-
-		// Determine master sizing
-		if makers.DefaultMasterSizing != nil {
-			mastersDefault = complementSizingRequirements(nil, makers.DefaultMasterSizing(instance))
-		} else {
-			mastersDefault = &abstract.HostSizingRequirements{
-				MinCores:    4,
-				MaxCores:    8,
-				MinRAMSize:  15.0,
-				MaxRAMSize:  32.0,
-				MinDiskSize: 100,
-				MinGPU:      -1,
+			emptySizing := abstract.HostSizingRequirements{
+				MinGPU: -1,
 			}
-		}
-		mastersDef := complementSizingRequirements(&req.MastersDef, *mastersDefault)
-		mastersDef.Image = imageID
 
-		if !req.MastersDef.Equals(emptySizing) {
-			if lower, err := req.MastersDef.LowerThan(mastersDefault); err == nil && lower {
-				if !req.Force {
-					chRes <- result{nil, nil, nil, fail.NewError("requested master sizing less than recommended")}
-					return
+			gatewaysDef := complementSizingRequirements(&req.GatewaysDef, *gatewaysDefault)
+			gatewaysDef.Image = imageID
+
+			if !req.GatewaysDef.Equals(emptySizing) {
+				if lower, err := req.GatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
+					if !req.Force {
+						xerr := fail.NewError("requested gateway sizing less than recommended")
+						return result{nil, nil, nil, xerr}, xerr
+					}
 				}
 			}
-		}
 
-		tmpl, xerr = svc.FindTemplateBySizing(ctx, *mastersDef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, nil, nil, xerr}
-			return
-		}
-		mastersDef.Template = tmpl.ID
-
-		// Determine node sizing
-		if makers.DefaultNodeSizing != nil {
-			nodesDefault = complementSizingRequirements(nil, makers.DefaultNodeSizing(instance))
-		} else {
-			nodesDefault = &abstract.HostSizingRequirements{
-				MinCores:    4,
-				MaxCores:    8,
-				MinRAMSize:  15.0,
-				MaxRAMSize:  32.0,
-				MinDiskSize: 100,
-				MinGPU:      -1,
+			tmpl, xerr := svc.FindTemplateBySizing(ctx, *gatewaysDef)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, nil, nil, xerr}, xerr
 			}
-		}
-		nodesDef := complementSizingRequirements(&req.NodesDef, *nodesDefault)
-		nodesDef.Image = imageID
 
-		if !req.NodesDef.Equals(emptySizing) {
-			if lower, err := req.NodesDef.LowerThan(nodesDefault); err == nil && lower {
-				if !req.Force {
-					chRes <- result{nil, nil, nil, fail.NewError("requested node sizing less than recommended")}
-					return
+			gatewaysDef.Template = tmpl.ID
+
+			// Determine master sizing
+			if makers.DefaultMasterSizing != nil {
+				mastersDefault = complementSizingRequirements(nil, makers.DefaultMasterSizing(instance))
+			} else {
+				mastersDefault = &abstract.HostSizingRequirements{
+					MinCores:    4,
+					MaxCores:    8,
+					MinRAMSize:  15.0,
+					MaxRAMSize:  32.0,
+					MinDiskSize: 100,
+					MinGPU:      -1,
 				}
 			}
-		}
+			mastersDef := complementSizingRequirements(&req.MastersDef, *mastersDefault)
+			mastersDef.Image = imageID
 
-		tmpl, xerr = svc.FindTemplateBySizing(ctx, *nodesDef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, nil, nil, xerr}
-			return
-		}
-		nodesDef.Template = tmpl.ID
-
-		// Updates property
-		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(clusterproperty.DefaultsV2, func(p clonable.Clonable) fail.Error { //nolint
-				defaultsV2, err := lang.Cast[*propertiesv2.ClusterDefaults](p)
-				if err != nil {
-					return fail.Wrap(err)
+			if !req.MastersDef.Equals(emptySizing) {
+				if lower, err := req.MastersDef.LowerThan(mastersDefault); err == nil && lower {
+					if !req.Force {
+						xerr := fail.NewError("requested master sizing less than recommended")
+						return result{nil, nil, nil, xerr}, xerr
+					}
 				}
+			}
 
+			tmpl, xerr = svc.FindTemplateBySizing(ctx, *mastersDef)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, nil, nil, xerr}, xerr
+			}
+
+			mastersDef.Template = tmpl.ID
+
+			// Determine node sizing
+			if makers.DefaultNodeSizing != nil {
+				nodesDefault = complementSizingRequirements(nil, makers.DefaultNodeSizing(instance))
+			} else {
+				nodesDefault = &abstract.HostSizingRequirements{
+					MinCores:    4,
+					MaxCores:    8,
+					MinRAMSize:  15.0,
+					MaxRAMSize:  32.0,
+					MinDiskSize: 100,
+					MinGPU:      -1,
+				}
+			}
+			nodesDef := complementSizingRequirements(&req.NodesDef, *nodesDefault)
+			nodesDef.Image = imageID
+
+			if !req.NodesDef.Equals(emptySizing) {
+				if lower, err := req.NodesDef.LowerThan(nodesDefault); err == nil && lower {
+					if !req.Force {
+						xerr := fail.NewError("requested node sizing less than recommended")
+						return result{nil, nil, nil, xerr}, xerr
+					}
+				}
+			}
+
+			tmpl, xerr = svc.FindTemplateBySizing(ctx, *nodesDef)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, nil, nil, xerr}, xerr
+			}
+			nodesDef.Template = tmpl.ID
+
+			// Updates property
+			xerr = metadata.AlterProperty(ctx, instance, clusterproperty.DefaultsV2, func(defaultsV2 *propertiesv2.ClusterDefaults) fail.Error { //nolint
 				defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*gatewaysDef)
 				defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*mastersDef)
 				defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*nodesDef)
 				defaultsV2.Image = imageQuery
 				return nil
 			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, nil, nil, xerr}
-			return
-		}
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				return result{nil, nil, nil, xerr}, xerr
+			}
 
-		chRes <- result{gatewaysDef, mastersDef, nodesDef, nil}
-
+			return result{gatewaysDef, mastersDef, nodesDef, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -675,13 +627,15 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 	case <-ctx.Done():
 		return nil, nil, nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, nil, nil, fail.ConvertError(inctx.Err())
 	}
 
 }
 
 // createNetworkingResources creates the network and subnet for the Cluster
-func (instance *Cluster) createNetworkingResources(inctx context.Context, req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements) (_ resources.Network, _ resources.Subnet, _ fail.Error) {
+func (instance *Cluster) createNetworkingResources(inctx context.Context, req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements) (_ resources.Network, _ resources.Subnet, ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -691,63 +645,130 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 		rErr fail.Error
 	}
 	chRes := make(chan result)
-	go func() (ferr fail.Error) {
-		defer fail.OnPanic(&ferr)
+	go func() {
 		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		// Determine if getGateway Failover must be set
-		svc := instance.Service()
-		caps := svc.Capabilities()
-		gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
-		for k := range req.DisabledDefaultFeatures {
-			if k == "gateway-failover" {
-				gwFailoverDisabled = true
-				break
+			req.Name = strings.ToLower(strings.TrimSpace(req.Name))
+
+			if oldKey := ctx.Value("ID"); oldKey != nil {
+				ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/create/network/%s", oldKey, req.Name)) // nolint
 			}
-		}
 
-		var xerr fail.Error
-
-		// After Stein, no failover
-		{
-			st, xerr := svc.ProviderName()
-			if xerr != nil {
-				return xerr
+			// Determine if getGateway Failover must be set
+			svc := instance.Service()
+			caps := svc.Capabilities()
+			gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
+			for k := range req.DisabledDefaultFeatures {
+				if k == "gateway-failover" {
+					gwFailoverDisabled = true
+					break
+				}
 			}
-			if st == "ovh" {
-				logrus.WithContext(ctx).Warnf("Disabling failover for OVH due to SG issues")
-				gwFailoverDisabled = true
+
+			// Creates Network
+			var (
+				networkInstance resources.Network
+				xerr            fail.Error
+			)
+			if req.NetworkID != "" {
+				networkInstance, xerr = LoadNetwork(ctx, req.NetworkID)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					ar := result{nil, nil, fail.Wrap(xerr, "failed to use network %s to contain Cluster Subnet", req.NetworkID)}
+					return ar, ar.rErr
+				}
+			} else {
+				logrus.WithContext(ctx).Debugf("[Cluster %s] creating Network '%s'", req.Name, req.Name)
+				networkReq := abstract.NetworkRequest{
+					Name:          req.Name,
+					CIDR:          req.CIDR,
+					KeepOnFailure: req.KeepOnFailure,
+				}
+
+				defer func() {
+					ferr = debug.InjectPlannedFail(ferr)
+					if ferr != nil && req.CleanOnFailure() {
+						// FIXME: introduce jobapi.NewNewContextPropagatingJob() in cleanupContextFrom()
+						if derr := networkInstance.Delete(cleanupContextFrom(ctx) /*jobapi.NewContextPropagatingJob(inctx)*/); derr != nil {
+							switch derr.(type) {
+							case *fail.ErrNotFound:
+								// missing Network is considered as a successful deletion, continue
+								debug.IgnoreErrorWithContext(ctx, derr)
+							default:
+								_ = ferr.AddConsequence(derr)
+							}
+						}
+					}
+				}()
+
+				networkInstance, xerr = NewNetwork(ctx)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					ar := result{nil, nil, fail.Wrap(xerr, "failed to instantiate new Network")}
+					return ar, ar.rErr
+				}
+
+				xerr = networkInstance.Create(ctx, networkReq)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					ar := result{nil, nil, fail.Wrap(xerr, "failed to create Network '%s'", req.Name)}
+					return ar, ar.rErr
+				}
 			}
-		}
+			xerr = metadata.AlterProperty(ctx, instance, clusterproperty.NetworkV3, func(networkV3 *propertiesv3.ClusterNetwork) fail.Error {
+				var innerErr error
+				networkV3.NetworkID, innerErr = networkInstance.GetID()
+				if innerErr != nil {
+					return fail.ConvertError(innerErr)
+				}
 
-		req.Name = strings.ToLower(strings.TrimSpace(req.Name))
-
-		// Creates Network
-		var networkInstance resources.Network
-		if req.NetworkID != "" {
-			networkInstance, xerr = LoadNetwork(ctx, req.NetworkID)
+				networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the Cluster will be
+				networkV3.CIDR = req.CIDR
+				return nil
+			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := result{nil, nil, fail.Wrap(xerr, "failed to use network %s to contain Cluster Subnet", req.NetworkID)}
-				chRes <- ar
-				return ar.rErr
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				ar := result{nil, nil, xerr}
+				return ar, xerr
 			}
-		} else {
-			logrus.WithContext(ctx).Debugf("[Cluster %s] creating Network '%s'", req.Name, req.Name)
-			networkReq := abstract.NetworkRequest{
-				Name:          req.Name,
-				CIDR:          req.CIDR,
-				KeepOnFailure: req.KeepOnFailure,
+
+			nid, err := networkInstance.GetID()
+			if err != nil {
+				xerr := fail.ConvertError(err)
+				ar := result{nil, nil, xerr}
+				return ar, xerr
+			}
+
+			// Creates Subnet
+			logrus.WithContext(ctx).Debugf("[Cluster %s] creating Subnet '%s'", req.Name, req.Name)
+			subnetReq := abstract.SubnetRequest{
+				Name:           req.Name,
+				NetworkID:      nid,
+				CIDR:           req.CIDR,
+				HA:             !gwFailoverDisabled,
+				ImageRef:       gatewaysDef.Image,
+				DefaultSSHPort: uint32(req.DefaultSshPort),
+				KeepOnFailure:  false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
+			}
+
+			subnetInstance, xerr := NewSubnet(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, nil, xerr}, xerr
 			}
 
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
-				if ferr != nil && req.CleanOnFailure() {
-					if derr := networkInstance.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
+				if ferr != nil && req.CleanOnFailure() && subnetInstance != nil {
+					// FIXME
+					if derr := subnetInstance.Delete(cleanupContextFrom(ctx) /*jobapi.NewContextPropagatingJob(inctx)*/); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
-							// missing Network is considered as a successful deletion, continue
-							debug.IgnoreError(derr)
+							// missing Subnet is considered as a successful deletion, continue
+							debug.IgnoreErrorWithContext(ctx, derr)
 						default:
 							_ = ferr.AddConsequence(derr)
 						}
@@ -755,147 +776,62 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				}
 			}()
 
-			networkInstance, xerr = NewNetwork(ctx)
+			cluID, _ := instance.GetID()
+			xerr = subnetInstance.Create(ctx, subnetReq, "", gatewaysDef, map[string]string{
+				"type":      "gateway",
+				"clusterID": cluID,
+			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := result{nil, nil, fail.Wrap(xerr, "failed to instantiate new Network")}
-				chRes <- ar
-				return ar.rErr
-			}
-
-			xerr = networkInstance.Create(ctx, networkReq)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				ar := result{nil, nil, fail.Wrap(xerr, "failed to create Network '%s'", req.Name)}
-				chRes <- ar
-				return ar.rErr
-			}
-		}
-		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(
-				clusterproperty.NetworkV3, func(p clonable.Clonable) fail.Error {
-					networkV3, err := lang.Cast[*propertiesv3.ClusterNetwork](p)
+				switch xerr.(type) {
+				case *fail.ErrInvalidRequest:
+					// Some cloud providers do not allow to create a Subnet with the same CIDR than the Network; try with a sub-CIDR once
+					logrus.WithContext(ctx).Warnf("Cloud Provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
+					_, ipNet, err := net.ParseCIDR(subnetReq.CIDR)
+					err = debug.InjectPlannedError(err)
 					if err != nil {
-						return fail.Wrap(err)
+						_ = xerr.AddConsequence(fail.Wrap(err, "failed to compute subset of CIDR '%s'", req.CIDR))
+						return result{nil, nil, xerr}, xerr
 					}
 
-					networkV3.NetworkID, err = networkInstance.GetID()
-					if err != nil {
-						return fail.ConvertError(err)
+					subIPNet, subXErr := netutils.FirstIncludedSubnet(*ipNet, 1)
+					if subXErr != nil {
+						_ = xerr.AddConsequence(fail.Wrap(subXErr, "failed to compute subset of CIDR '%s'", req.CIDR))
+						return result{nil, nil, xerr}, xerr
 					}
+					subnetReq.CIDR = subIPNet.String()
 
-					networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the Cluster will be
-					networkV3.CIDR = req.CIDR
-					return nil
-				},
-			)
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, nil, xerr}
-			return xerr
-		}
-
-		nid, err := networkInstance.GetID()
-		if err != nil {
-			xerr := fail.ConvertError(err)
-			chRes <- result{nil, nil, xerr}
-			return xerr
-		}
-
-		// Creates Subnet
-		logrus.WithContext(ctx).Debugf("[Cluster %s] creating Subnet '%s'", req.Name, req.Name)
-		subnetReq := abstract.SubnetRequest{
-			Name:           req.Name,
-			NetworkID:      nid,
-			CIDR:           req.CIDR,
-			HA:             !gwFailoverDisabled,
-			ImageRef:       gatewaysDef.Image,
-			DefaultSSHPort: uint32(req.DefaultSshPort),
-			KeepOnFailure:  false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
-		}
-
-		subnetInstance, xerr := NewSubnet(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, nil, xerr}
-			return xerr
-		}
-
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && req.CleanOnFailure() {
-				if derr := subnetInstance.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
-					switch derr.(type) {
-					case *fail.ErrNotFound:
-						// missing Subnet is considered as a successful deletion, continue
-						debug.IgnoreError(derr)
-					default:
-						_ = ferr.AddConsequence(derr)
+					newSubnetInstance, xerr := NewSubnet(ctx) // subnetInstance.Create CANNOT be reused
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						ar := result{nil, nil, xerr}
+						return ar, xerr
 					}
-				}
-			}
-		}()
+					subnetInstance = newSubnetInstance // replace the external reference
 
-		xerr = subnetInstance.Create(ctx, subnetReq, "", gatewaysDef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrInvalidRequest:
-				// Some cloud providers do not allow to create a Subnet with the same CIDR than the Network; try with a sub-CIDR once
-				logrus.WithContext(ctx).Warnf("Cloud Provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
-				_, ipNet, err := net.ParseCIDR(subnetReq.CIDR)
-				err = debug.InjectPlannedError(err)
-				if err != nil {
-					_ = xerr.AddConsequence(fail.Wrap(err, "failed to compute subset of CIDR '%s'", req.CIDR))
-					chRes <- result{nil, nil, xerr}
-					return xerr
-				}
-
-				subIPNet, subXErr := netutils.FirstIncludedSubnet(*ipNet, 1)
-				if subXErr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(subXErr, "failed to compute subset of CIDR '%s'", req.CIDR))
-					chRes <- result{nil, nil, xerr}
-					return xerr
-				}
-				subnetReq.CIDR = subIPNet.String()
-
-				newSubnetInstance, xerr := NewSubnet(ctx) // subnetInstance.Create CANNOT be reused
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					ar := result{nil, nil, xerr}
-					chRes <- ar
-					return xerr
-				}
-				subnetInstance = newSubnetInstance // replace the external reference
-
-				if subXErr := subnetInstance.Create(ctx, subnetReq, "", gatewaysDef); subXErr != nil {
+					cluID, _ := instance.GetID()
+					subXErr = subnetInstance.Create(ctx, subnetReq, "", gatewaysDef, map[string]string{
+						"type":      "gateway",
+						"clusterID": cluID,
+					})
+					if subXErr != nil {
+						ar := result{nil, nil, fail.Wrap(
+							subXErr, "failed to create Subnet '%s' (with CIDR %s) in Network '%s' (with CIDR %s)",
+							subnetReq.Name, subnetReq.CIDR, req.NetworkID, req.CIDR,
+						)}
+						return ar, ar.rErr
+					}
+					logrus.WithContext(ctx).Infof("CIDR '%s' used successfully for Subnet, there will be less available private IP Addresses than expected.", subnetReq.CIDR)
+				default:
 					ar := result{nil, nil, fail.Wrap(
-						subXErr, "failed to create Subnet '%s' (with CIDR %s) in Network '%s' (with CIDR %s)",
-						subnetReq.Name, subnetReq.CIDR, networkInstance.GetName(), req.CIDR,
+						xerr, "failed to create Subnet '%s' in Network '%s'", req.Name, req.NetworkID,
 					)}
-					chRes <- ar
-					return ar.rErr
+					return ar, ar.rErr
 				}
-				logrus.WithContext(ctx).Infof("CIDR '%s' used successfully for Subnet, there will be less available private IP Addresses than expected.",
-					subnetReq.CIDR)
-			default:
-				ar := result{nil, nil, fail.Wrap(
-					xerr, "failed to create Subnet '%s' in Network '%s'", req.Name, networkInstance.GetName(),
-				)}
-				chRes <- ar
-				return ar.rErr
 			}
-		}
 
-		// Updates again Cluster metadata, propertiesv3.ClusterNetwork, with subnet infos
-		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(clusterproperty.NetworkV3, func(p clonable.Clonable) fail.Error {
-				networkV3, innerErr := lang.Cast[*propertiesv3.ClusterNetwork](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
+			// Updates again Cluster metadata, propertiesv3.ClusterNetwork, with subnet infos
+			xerr = metadata.AlterProperty(ctx, instance, clusterproperty.NetworkV3, func(networkV3 *propertiesv3.ClusterNetwork) fail.Error {
 				primaryGateway, innerXErr := subnetInstance.InspectGateway(ctx, true)
 				if innerXErr != nil {
 					return innerXErr
@@ -908,6 +844,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 						return innerXErr
 					}
 				}
+				var innerErr error
 				networkV3.SubnetID, innerErr = subnetInstance.GetID()
 				if innerErr != nil {
 					return fail.ConvertError(innerErr)
@@ -942,17 +879,18 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				}
 				return nil
 			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, nil, xerr}
-			return xerr
-		}
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				return result{nil, nil, xerr}, xerr
+			}
 
-		logrus.WithContext(ctx).Debugf("[Cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, networkInstance.GetName(), req.Name)
-		chRes <- result{networkInstance, subnetInstance, nil}
-		return nil
-	}() // nolint
+			logrus.WithContext(ctx).Debugf("[Cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, networkInstance.GetName(), req.Name)
+			chRes <- result{networkInstance, subnetInstance, nil}
+			return result{networkInstance, subnetInstance, nil}, nil
+		}() // nolint
+		chRes <- gres
+	}()
 	select {
 	case res := <-chRes:
 		return res.rn, res.rsn, res.rErr
@@ -960,6 +898,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 		<-chRes // wait for cleanup
 		return nil, nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
 		<-chRes // wait for cleanup
 		return nil, nil, fail.ConvertError(inctx.Err())
 	}
@@ -983,463 +922,274 @@ func (instance *Cluster) createHostResources(
 		rErr fail.Error
 	}
 	chRes := make(chan result)
-	go func() (ferr fail.Error) {
-		defer fail.OnPanic(&ferr)
+	go func() {
 		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		var startedTasks []concurrency.Task
-
-		timings, xerr := instance.Service().Timings()
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil {
-				taskID := func(t concurrency.Task) string {
-					tid, cleanErr := t.ID()
-					if cleanErr != nil {
-						_ = ferr.AddConsequence(cleanErr)
-						tid = "<unknown>"
-					}
-					return tid
-				}
-
-				// On error, instructs Tasks/TaskGroups to abort, to stop as soon as possible
-				for _, v := range startedTasks {
-					if !v.Aborted() {
-						cleanErr := v.AbortWithCause(ferr)
-						if cleanErr != nil {
-							cleanErr = fail.Wrap(
-								cleanErr,
-								"cleaning up on failure, failed to abort Task/TaskGroup %s spawn by createHostResources()",
-								reflect.TypeOf(v).String(), taskID(v),
-							)
-							logrus.WithContext(ctx).Error(cleanErr.Error())
-							_ = ferr.AddConsequence(cleanErr)
-						}
-					}
-				}
-
-				// we have to wait for completion of aborted Tasks/TaskGroups, not get out before
-				timeout := timings.HostLongOperationTimeout()
-				for _, v := range startedTasks {
-					_, _, werr := v.WaitFor(timeout)
-					if werr != nil {
-						werr = fail.Wrap(
-							werr, "cleaning up on failure, failed to wait for %s %s", reflect.TypeOf(v).String(), taskID(v),
-						)
-						_ = ferr.AddConsequence(werr)
-					}
-				}
-			}
-		}()
-
-		var (
-			primaryGateway, secondaryGateway  resources.Host
-			gatewayInstallStatus              fail.Error
-			gatewayConfigurationStatus        fail.Error
-			mastersStatus, privateNodesStatus fail.Error
-		)
-
-		primaryGateway, xerr = subnet.InspectGateway(ctx, true)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		haveSecondaryGateway := true
-		secondaryGateway, xerr = subnet.InspectGateway(ctx, false)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				debug.IgnoreError(xerr)
-				// It's a valid state not to have a secondary gateway, so continue
-				haveSecondaryGateway = false
-			default:
-				chRes <- result{xerr}
-				return xerr
-			}
-		}
-
-		// if this happens, then no, we don't have a secondary gateway, and we have also another problem...
-		if haveSecondaryGateway {
-			pgi, err := primaryGateway.GetID()
-			if err != nil {
-				xerr := fail.ConvertError(err)
-				chRes <- result{xerr}
-				return xerr
-			}
-
-			sgi, err := secondaryGateway.GetID()
-			if err != nil {
-				xerr := fail.ConvertError(err)
-				chRes <- result{xerr}
-				return xerr
-			}
-
-			if pgi == sgi {
-				ar := result{fail.InconsistentError("primary and secondary gateways have the same id %s", pgi)}
-				chRes <- ar
-				return ar.rErr
-			}
-		}
-
-		_, xerr = primaryGateway.WaitSSHReady(ctx, timings.ExecutionTimeout())
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			ar := result{fail.Wrap(xerr, "wait for remote ssh service to be ready")}
-			chRes <- ar
-			return ar.rErr
-		}
-
-		if haveSecondaryGateway {
-			_, xerr = secondaryGateway.WaitSSHReady(ctx, timings.ExecutionTimeout())
+			primaryGateway, xerr := subnet.InspectGateway(ctx, true)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := result{fail.Wrap(xerr, "failed to wait for remote ssh service to become ready")}
-				chRes <- ar
-				return ar.rErr
+				return result{xerr}, xerr
 			}
-		}
 
-		masterCount, _, _, xerr := instance.determineRequiredNodes(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		gwInstallTasks, xerr := concurrency.NewTaskGroupWithContext(
-			ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/gateway"),
-		)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		// Step 1: starts gateway installation plus masters creation plus nodes creation
-		_, xerr = gwInstallTasks.Start(
-			instance.taskInstallGateway, taskInstallGatewayParameters{host: primaryGateway, variables: parameters}, concurrency.InheritParentIDOption,
-			concurrency.AmendID(fmt.Sprintf("/%s/install", primaryGateway.GetName())),
-		)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		startedTasks = append(startedTasks, gwInstallTasks)
-
-		if haveSecondaryGateway {
-			_, xerr = gwInstallTasks.Start(
-				instance.taskInstallGateway, taskInstallGatewayParameters{host: secondaryGateway, variables: parameters},
-				concurrency.InheritParentIDOption,
-				concurrency.AmendID(fmt.Sprintf("/%s/install", secondaryGateway.GetName())),
-			)
+			haveSecondaryGateway := true
+			secondaryGateway, xerr := subnet.InspectGateway(ctx, false)
 			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil { // no need to abort and wait, the previous defer takes care of that
-				chRes <- result{xerr}
-				return xerr
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					debug.IgnoreErrorWithContext(ctx, xerr)
+					// It's a valid state not to have a secondary gateway, so continue
+					haveSecondaryGateway = false
+				default:
+					return result{xerr}, xerr
+				}
 			}
-		}
 
-		// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
-		defer func() { // FIXME: OPP This needs review
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && !keepOnFailure {
-				masters, merr := instance.unsafeListMasters(jobapi.NewContextPropagatingJob(inctx))
-				if merr != nil {
-					_ = ferr.AddConsequence(merr)
-					return
+			// if this happens, then no, we don't have a secondary gateway, and we have also another problem...
+			if haveSecondaryGateway {
+				pgi, err := primaryGateway.GetID()
+				if err != nil {
+					xerr := fail.ConvertError(err)
+					return result{xerr}, xerr
 				}
 
-				var list []machineID
-				for _, mach := range masters {
-					list = append(list, machineID{ID: mach.ID, Name: mach.Name})
+				sgi, err := secondaryGateway.GetID()
+				if err != nil {
+					xerr := fail.ConvertError(err)
+					return result{xerr}, xerr
 				}
 
-				hosts, merr := instance.Service().ListHosts(jobapi.NewContextPropagatingJob(inctx), false)
-				if merr != nil {
-					_ = ferr.AddConsequence(merr)
-					return
+				if pgi == sgi {
+					ar := result{fail.InconsistentError("primary and secondary gateways have the same id %s", pgi)}
+					return ar, ar.rErr
 				}
+			}
 
-				for _, invol := range hosts {
-					theName := invol.GetName()
-					theID, _ := invol.GetID()
-					if strings.Contains(theName, "master") {
-						if strings.Contains(theName, instance.GetName()) {
-							list = append(list, machineID{ID: theID, Name: invol.GetName()})
-						}
-					}
-				}
+			eg := new(errgroup.Group)
+			eg.Go(func() error {
+				_, xerr := instance.taskInstallGateway(ctx, taskInstallGatewayParameters{host: primaryGateway, variables: parameters})
+				return xerr
+			})
+			if haveSecondaryGateway {
+				eg.Go(func() error {
+					_, xerr := instance.taskInstallGateway(ctx, taskInstallGatewayParameters{host: secondaryGateway, variables: parameters})
+					return xerr
+				})
+			}
 
-				if len(list) > 0 {
-					tg, tgerr := concurrency.NewTaskGroupWithContext(
-						jobapi.NewContextPropagatingJob(inctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
-					)
-					if tgerr != nil {
-						_ = ferr.AddConsequence(tgerr)
+			xerr = fail.ConvertError(eg.Wait())
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{xerr}, xerr
+			}
+
+			masterCount, _, _, xerr := instance.determineRequiredNodes(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{xerr}, xerr
+			}
+
+			// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && !keepOnFailure {
+					// FIXME:
+					masters, merr := instance.unsafeListMasters(cleanupContextFrom(ctx) /*jobapi.NewContextPropagatingJob(inctx)*/)
+					if merr != nil {
+						_ = ferr.AddConsequence(merr)
 						return
 					}
 
-					for _, v := range list {
-						captured := v
-						if captured.ID != "" {
-							_, derr := tg.Start(
-								instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{ID: captured.ID, Name: captured.Name},
-								concurrency.InheritParentIDOption,
-								concurrency.AmendID(fmt.Sprintf("/host/%s/delete", captured.Name)),
-							)
-							if derr != nil {
-								_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete master '%s'", captured.Name))
-								abErr := tg.AbortWithCause(derr)
-								if abErr != nil {
-									logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-								}
-								break
-							}
-						}
+					var list []machineID
+					for _, mach := range masters {
+						list = append(list, machineID{ID: mach.ID, Name: mach.Name})
 					}
-					_, _, derr := tg.WaitGroupFor(timings.HostLongOperationTimeout())
-					derr = debug.InjectPlannedFail(derr)
-					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to wait for master deletions"))
-					}
-				}
-			}
-		}()
 
-		mastersCreateTasks, xerr := concurrency.NewTaskGroupWithContext(
-			ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/masters"),
-		)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		_, xerr = mastersCreateTasks.Start(
-			instance.taskCreateMasters, taskCreateMastersParameters{
-				count:         masterCount,
-				mastersDef:    mastersDef,
-				keepOnFailure: keepOnFailure,
-			}, concurrency.InheritParentIDOption,
-		)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil { // no need to abort and wait, the previous defer takes care of that
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		startedTasks = append(startedTasks, mastersCreateTasks)
-
-		// Starting from here, if exiting with error, delete nodes
-		defer func() { // FIXME: OPP, This needs review
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && !keepOnFailure {
-				nlist, merr := instance.unsafeListNodes(jobapi.NewContextPropagatingJob(inctx))
-				if merr != nil {
-					_ = ferr.AddConsequence(merr)
-					return
-				}
-
-				var list []machineID
-				for _, mach := range nlist {
-					list = append(list, machineID{ID: mach.ID, Name: mach.Name})
-				}
-
-				hosts, merr := instance.Service().ListHosts(context.Background(), false)
-				if merr != nil {
-					_ = ferr.AddConsequence(merr)
-					return
-				}
-
-				for _, invol := range hosts {
-					theName := invol.GetName()
-					theID, _ := invol.GetID()
-					if strings.Contains(theName, "node") {
-						if strings.Contains(theName, instance.GetName()) {
-							list = append(list, machineID{ID: theID, Name: invol.GetName()})
-						}
-					}
-				}
-
-				if len(list) > 0 {
-					tg, tgerr := concurrency.NewTaskGroupWithContext(
-						jobapi.NewContextPropagatingJob(inctx), concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"),
-					)
-					if tgerr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(tgerr, "cleaning up on failure, failed to create TaskGroup"))
+					// FIXME:
+					hosts, merr := instance.Service().ListHosts(cleanupContextFrom(ctx) /*jobapi.NewContextPropagatingJob(inctx)*/, false)
+					if merr != nil {
+						_ = ferr.AddConsequence(merr)
 						return
 					}
 
-					for _, v := range list {
-						captured := v
-						if captured.ID != "" {
-							_, derr := tg.Start(
-								instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{ID: captured.ID, Name: captured.Name},
-								concurrency.InheritParentIDOption,
-								concurrency.AmendID(fmt.Sprintf("/host/%s/delete", captured.Name)),
-							)
-							if derr != nil {
-								_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete node '%s'", captured.Name))
-								abErr := tg.AbortWithCause(derr)
-								if abErr != nil {
-									logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-								}
-								break
+					clusterName := instance.GetName()
+					for _, invol := range hosts {
+						theName := invol.GetName()
+						theID, _ := invol.GetID()
+						if strings.Contains(theName, "master") {
+							if strings.Contains(theName, clusterName) {
+								list = append(list, machineID{ID: theID, Name: invol.GetName()})
 							}
 						}
 					}
-					_, _, derr := tg.WaitGroupFor(timings.HostLongOperationTimeout())
-					derr = debug.InjectPlannedFail(derr)
-					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to wait for node deletions"))
+
+					if len(list) > 0 {
+						clean := new(errgroup.Group)
+						for _, v := range list {
+							captured := v
+							if captured.ID != "" {
+								clean.Go(func() error {
+									// FIXME:
+									_, err := instance.taskDeleteNodeOnFailure(cleanupContextFrom(ctx) /*jobapi.NewContextPropagatingJob(inctx)*/, taskDeleteNodeOnFailureParameters{ID: captured.ID, Name: captured.Name, KeepOnFailure: keepOnFailure, Timeout: 2 * time.Minute})
+									return err
+								})
+							}
+						}
+						clErr := fail.ConvertError(clean.Wait())
+						if clErr != nil {
+							_ = ferr.AddConsequence(clErr)
+						}
+						return
 					}
 				}
+			}()
+
+			// Step 3: start gateway configuration (needs MasterIPs so masters must be installed first)
+			// Configure gateway(s) and waits for the result
+
+			// Step 4: configure masters (if masters created successfully and gateways configured successfully)
+
+			// Step 5: awaits nodes creation
+
+			// Step 6: Starts nodes configuration, if all masters and nodes have been created and gateway has been configured with success
+
+			waitForMasters := make(chan struct{})
+			waitForBoth := make(chan struct{})
+			egMas := new(errgroup.Group)
+			egMas.Go(func() error {
+				defer func() {
+					close(waitForMasters)
+				}()
+				_, xerr := instance.taskCreateMasters(ctx, taskCreateMastersParameters{
+					count:         masterCount,
+					mastersDef:    mastersDef,
+					keepOnFailure: keepOnFailure,
+				})
+				if xerr != nil {
+					return xerr
+				}
+				return nil
+			})
+			egMas.Go(func() error {
+				<-waitForMasters
+				defer func() {
+					if !haveSecondaryGateway {
+						close(waitForBoth)
+					}
+				}()
+				_, xerr := instance.taskConfigureGateway(ctx, taskConfigureGatewayParameters{primaryGateway})
+				if xerr != nil {
+					return xerr
+				}
+				return nil
+			})
+			if haveSecondaryGateway {
+				egMas.Go(func() error {
+					<-waitForMasters
+					defer func() {
+						close(waitForBoth)
+					}()
+					_, xerr := instance.taskConfigureGateway(ctx, taskConfigureGatewayParameters{secondaryGateway})
+					if xerr != nil {
+						return xerr
+					}
+					return nil
+				})
 			}
-		}()
-
-		privateNodesCreateTasks, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/nodes"))
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		_, xerr = privateNodesCreateTasks.Start(
-			instance.taskCreateNodes, taskCreateNodesParameters{
-				count:         initialNodeCount,
-				public:        false,
-				nodesDef:      nodesDef,
-				keepOnFailure: keepOnFailure,
-			}, concurrency.InheritParentIDOption,
-		)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil { // no need to abort and wait, the previous defer takes care of that
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		startedTasks = append(startedTasks, privateNodesCreateTasks)
-
-		// Step 2: awaits gateway installation end and masters installation end
-		var gatewayInstallResult concurrency.TaskGroupResult
-		if gatewayInstallResult, gatewayInstallStatus = gwInstallTasks.WaitGroup(); gatewayInstallStatus != nil {
-			// no need to abort and wait, the previous defer takes care of that
-			chRes <- result{gatewayInstallStatus}
-			return gatewayInstallStatus
-		}
-		logrus.WithContext(ctx).Debugf("gateway install returned: %v", gatewayInstallResult)
-
-		var masterCreationResult concurrency.TaskGroupResult
-		if masterCreationResult, mastersStatus = mastersCreateTasks.WaitGroup(); mastersStatus != nil {
-			// no need to abort and wait, the previous defer takes care of that
-			chRes <- result{mastersStatus}
-			return mastersStatus
-		}
-		logrus.WithContext(ctx).Debugf("master creation returned: %v", masterCreationResult)
-
-		// Step 3: start gateway configuration (needs MasterIPs so masters must be installed first)
-		// Configure gateway(s) and waits for the result
-
-		gwCfgTasks, xerr := concurrency.NewTaskGroupWithContext(
-			ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/configuregateways"),
-		)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			// no need to abort and wait, the previous defer takes care of that
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		_, xerr = gwCfgTasks.Start(
-			instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: primaryGateway},
-			concurrency.InheritParentIDOption,
-			concurrency.AmendID(fmt.Sprintf("/host/%s/configure", primaryGateway.GetName())),
-		)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			// no need to abort and wait, the previous defer takes care of that
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		startedTasks = append(startedTasks, gwCfgTasks)
-
-		if haveSecondaryGateway {
-			_, xerr = gwCfgTasks.Start(
-				instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: secondaryGateway},
-				concurrency.InheritParentIDOption,
-			)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				// no need to abort and wait, the previous defer takes care of that
-				chRes <- result{xerr}
+			egMas.Go(func() error {
+				<-waitForMasters
+				<-waitForBoth
+				_, xerr := instance.taskConfigureMasters(ctx, taskConfigureMastersParameters{parameters})
 				return xerr
+			})
+
+			xerr = fail.ConvertError(egMas.Wait())
+			if xerr != nil {
+				return result{xerr}, xerr
 			}
-		}
 
-		var gatewayCfgResult concurrency.TaskGroupResult
-		gatewayCfgResult, gatewayConfigurationStatus = gwCfgTasks.WaitGroup()
-		if gatewayConfigurationStatus != nil {
-			chRes <- result{gatewayConfigurationStatus}
-			return gatewayConfigurationStatus
-		}
-		logrus.WithContext(ctx).Debugf("gateway cfg returned: %v", gatewayCfgResult)
+			// Starting from here, if exiting with error, delete nodes
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && !keepOnFailure {
+					var derr fail.Error
+					defer func() {
+						if derr != nil {
+							_ = ferr.AddConsequence(derr)
+						}
+					}()
 
-		// Step 4: configure masters (if masters created successfully and gateways configured successfully)
-		mastersCfgTask, xerr := concurrency.NewTaskWithContext(
-			ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/masters"),
-		)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
+					nlist, derr := instance.unsafeListNodes(cleanupContextFrom(ctx))
+					if derr != nil {
+						return
+					}
 
-		_, mastersStatus = instance.taskConfigureMasters(mastersCfgTask, taskConfigureMastersParameters{parameters})
-		if mastersStatus != nil {
-			chRes <- result{mastersStatus}
-			return mastersStatus
-		}
-		logrus.WithContext(ctx).Debugf("masters finished configuration")
+					var list []machineID
+					for _, mach := range nlist {
+						list = append(list, machineID{ID: mach.ID, Name: mach.Name})
+					}
 
-		// Step 5: awaits nodes creation
-		var privateNodesResult concurrency.TaskGroupResult
-		privateNodesResult, privateNodesStatus = privateNodesCreateTasks.WaitGroup()
-		if privateNodesStatus != nil {
-			chRes <- result{privateNodesStatus}
-			return privateNodesStatus
-		}
-		logrus.WithContext(ctx).Debugf("private node creation returned: %v", privateNodesResult)
+					hosts, derr := instance.Service().ListHosts(cleanupContextFrom(ctx), false)
+					if derr != nil {
+						return
+					}
 
-		// Step 6: Starts nodes configuration, if all masters and nodes have been created and gateway has been configured with success
-		privateNodesCfgTask, xerr := concurrency.NewTaskGroupWithContext(
-			ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/nodes"),
-		)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
+					clusterName := instance.GetName()
+					for _, invol := range hosts {
+						theName := invol.GetName()
+						theID, _ := invol.GetID()
+						if strings.Contains(theName, "node") && len(clusterName) > 0 && strings.Contains(theName, clusterName) {
+							list = append(list, machineID{ID: theID, Name: invol.GetName()})
+						}
+					}
 
-		_, privateNodesStatus = instance.taskConfigureNodes(privateNodesCfgTask, taskConfigureNodesParameters{variables: parameters})
-		if privateNodesStatus != nil {
-			chRes <- result{privateNodesStatus}
-			return privateNodesStatus
-		}
+					if len(list) > 0 {
+						clean := new(errgroup.Group)
+						for _, v := range list {
+							captured := v
+							if captured.ID != "" {
+								clean.Go(func() error {
+									// FIXME:
+									_, err := instance.taskDeleteNodeOnFailure(cleanupContextFrom(ctx), taskDeleteNodeOnFailureParameters{ID: captured.ID, Name: captured.Name, KeepOnFailure: keepOnFailure, Timeout: 2 * time.Minute})
+									return err
+								})
+							}
+						}
+						derr = fail.ConvertError(clean.Wait())
+					}
+				}
+			}()
 
-		chRes <- result{nil}
-		return nil
-	}() // nolint
+			egNod := new(errgroup.Group)
+			egNod.Go(func() error {
+				_, xerr := instance.taskCreateNodes(ctx, taskCreateNodesParameters{
+					count:         initialNodeCount,
+					public:        false,
+					nodesDef:      nodesDef,
+					keepOnFailure: keepOnFailure,
+				})
+				if xerr != nil {
+					return xerr
+				}
+
+				_, xerr = instance.taskConfigureNodes(ctx, taskConfigureNodesParameters{variables: parameters})
+				if xerr != nil {
+					return xerr
+				}
+
+				return nil
+			})
+			xerr = fail.ConvertError(egNod.Wait())
+			if xerr != nil {
+				return result{xerr}, xerr
+			}
+
+			return result{nil}, nil
+		}() // nolint
+		chRes <- gres
+	}()
 	select {
 	case res := <-chRes:
 		return res.rErr
@@ -1447,10 +1197,10 @@ func (instance *Cluster) createHostResources(
 		<-chRes // wait for cleanup
 		return fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
 		<-chRes // wait for cleanup
 		return fail.ConvertError(inctx.Err())
 	}
-
 }
 
 // complementSizingRequirements complements req with default values if needed
@@ -1503,75 +1253,69 @@ func complementSizingRequirements(req *abstract.HostSizingRequirements, def abst
 }
 
 // taskStartHost is the code called in a Task to start a Host
-func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
+func (instance *Cluster) taskStartHost(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	id, ok := params.(string)
+	if !ok || id == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
+	}
+
+	if oldKey := ctx.Value("ID"); oldKey != nil {
+		ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/start/host/%s", oldKey, id)) // nolint
+	}
+
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		id, ok := params.(string)
-		if !ok || id == "" {
-			chRes <- result{nil, fail.InvalidParameterCannotBeEmptyStringError("params")}
-			return
-		}
-
-		svc := instance.Service()
-
-		timings, xerr := instance.Service().Timings()
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		xerr = svc.StartHost(ctx, id)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) { // nolint
-			case *fail.ErrDuplicate: // A host already started is considered as a successful run
-				logrus.WithContext(ctx).Tracef("host duplicated, start considered as a success")
-				debug.IgnoreError(xerr)
-				chRes <- result{nil, nil}
-				return
+			svc := instance.Service()
+			timings, xerr := svc.Timings()
+			if xerr != nil {
+				return result{nil, xerr}, xerr
 			}
-		}
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
 
-		// -- refresh state of host --
-		hostInstance, xerr := LoadHost(ctx, id)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+			xerr = svc.StartHost(ctx, id)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) { // nolint
+				case *fail.ErrDuplicate: // A host already started is considered as a successful run
+					logrus.WithContext(ctx).Tracef("host duplicated, start considered as a success")
+					debug.IgnoreErrorWithContext(ctx, xerr)
+					return result{nil, nil}, nil
+				}
+			}
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		_, xerr = hostInstance.WaitSSHReady(ctx, timings.HostOperationTimeout())
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+			// -- refresh state of host --
+			hostInstance, xerr := LoadHost(ctx, id)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		_, xerr = hostInstance.ForceGetState(ctx)
-		chRes <- result{nil, xerr}
+			_, xerr = hostInstance.WaitSSHReady(ctx, timings.HostOperationTimeout())
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
+			_, xerr = hostInstance.ForceGetState(ctx)
+			return result{nil, xerr}, xerr
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -1579,76 +1323,71 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 
 }
 
-func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-	var xerr fail.Error
-
+func (instance *Cluster) taskStopHost(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+	id, ok := params.(string)
+	if !ok || id == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
 	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		id, ok := params.(string)
-		if !ok || id == "" {
-			chRes <- result{nil, fail.InvalidParameterCannotBeEmptyStringError("params")}
-			return
-		}
-
-		svc := instance.Service()
-		xerr = svc.StopHost(ctx, id, false)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) { // nolint
-			case *fail.ErrDuplicate: // A host already stopped is considered as a successful run
-				logrus.WithContext(ctx).Tracef("host duplicated, stopping considered as a success")
-				debug.IgnoreError(xerr)
-				chRes <- result{nil, nil}
-				return
-			default:
-				chRes <- result{nil, xerr}
-				return
+			svc := instance.Service()
+			xerr := svc.StopHost(ctx, id, false)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) { // nolint
+				case *fail.ErrDuplicate: // A host already stopped is considered as a successful run
+					logrus.WithContext(ctx).Tracef("host duplicated, stopping considered as a success")
+					debug.IgnoreErrorWithContext(ctx, xerr)
+					return result{nil, nil}, nil
+				default:
+					return result{nil, xerr}, xerr
+				}
 			}
-		}
 
-		// -- refresh state of host --
-		hostInstance, xerr := LoadHost(ctx, id)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+			// -- refresh state of host --
+			hostInstance, xerr := LoadHost(ctx, id)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		_, xerr = hostInstance.ForceGetState(ctx)
-		chRes <- result{nil, xerr}
-
+			_, xerr = hostInstance.ForceGetState(ctx)
+			return result{nil, xerr}, xerr
+		}()
+		chRes <- gres
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
-
 }
 
 type taskInstallGatewayParameters struct {
@@ -1657,76 +1396,84 @@ type taskInstallGatewayParameters struct {
 }
 
 // taskInstallGateway installs necessary components on one gateway
-func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskInstallGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+
+	p, ok := params.(taskInstallGatewayParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskInstallGatewayParameters'")
+	}
+	if p.host == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
-	inctx := task.Context()
+	// variables, _ := data.FromMap(p.variables)
+	variables := p.variables
+	hostLabel := p.host.GetName()
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	// FIXME: recycle concurrency.AmendID()
+	if oldKey := ctx.Value("ID"); oldKey != nil {
+		ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/install/gateway/%s", oldKey, hostLabel)) // nolint
+	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		p, ok := params.(taskInstallGatewayParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskInstallGatewayParameters'")}
-			return
-		}
-		if p.host == nil {
-			chRes <- result{nil, fail.InvalidParameterCannotBeNilError("params.Host")}
-			return
-		}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			p, ok := params.(taskInstallGatewayParameters)
+			if !ok {
+				xerr := fail.InvalidParameterError("params", "must be a 'taskInstallGatewayParameters'")
+				return result{nil, xerr}, xerr
+			}
+			if p.host == nil {
+				xerr := fail.InvalidParameterCannotBeNilError("params.Host")
+				return result{nil, xerr}, xerr
+			}
 
-		// variables, _ := data.FromMap(p.variables)
-		variables := p.variables
-		hostLabel := p.host.GetName()
+			timings, xerr := instance.Service().Timings()
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
-		defer tracer.Exiting()
+			logrus.WithContext(ctx).Debugf("starting installation.")
 
-		timings, xerr := instance.Service().Timings()
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+			_, xerr = p.host.WaitSSHReady(ctx, timings.HostOperationTimeout())
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		logrus.WithContext(ctx).Debugf("[%s] starting installation...", hostLabel)
+			// Installs docker and docker-compose on gateway
+			xerr = instance.installDocker(ctx, p.host, hostLabel, variables)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		_, xerr = p.host.WaitSSHReady(ctx, timings.HostOperationTimeout())
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+			// Installs dependencies as defined by Cluster Flavor (if it exists)
+			xerr = instance.installNodeRequirements(ctx, clusternodetype.Gateway, p.host, hostLabel)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		// Installs docker and docker-compose on gateway
-		xerr = instance.installDocker(ctx, p.host, hostLabel, variables)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		// Installs dependencies as defined by Cluster Flavor (if it exists)
-		xerr = instance.installNodeRequirements(ctx, clusternodetype.Gateway, p.host, hostLabel)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		logrus.WithContext(ctx).Debugf("[%s] preparation successful", hostLabel)
-		chRes <- result{nil, nil}
-
+			logrus.WithContext(ctx).Debugf("[%s] preparation successful", hostLabel)
+			return result{nil, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -1734,6 +1481,8 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 
@@ -1744,58 +1493,57 @@ type taskConfigureGatewayParameters struct {
 }
 
 // taskConfigureGateway prepares one gateway
-func (instance *Cluster) taskConfigureGateway(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
-	var xerr fail.Error
-
+func (instance *Cluster) taskConfigureGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+
+	// validate and convert parameters
+	p, ok := params.(taskConfigureGatewayParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskConfigureGatewayParameters'")
+	}
+	if p.Host == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
-	inctx := task.Context()
+	hostLabel := p.Host.GetName()
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	if oldKey := ctx.Value("ID"); oldKey != nil {
+		ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/gateway/%s", oldKey, hostLabel)) // nolint
+	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		// validate and convert parameters
-		p, ok := params.(taskConfigureGatewayParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskConfigureGatewayParameters'")}
-			return
-		}
-		if p.Host == nil {
-			chRes <- result{nil, fail.InvalidParameterCannotBeNilError("params.Host")}
-			return
-		}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		hostLabel := p.Host.GetName()
+			logrus.WithContext(ctx).Debugf("starting configuration")
 
-		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
-		defer tracer.Exiting()
-
-		logrus.WithContext(ctx).Debugf("[%s] starting configuration...", hostLabel)
-
-		makers := instance.localCache.makers
-		if makers.ConfigureGateway != nil {
-			xerr = makers.ConfigureGateway(instance)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				chRes <- result{nil, xerr}
-				return
+			makers := instance.localCache.makers
+			if makers.ConfigureGateway != nil {
+				xerr := makers.ConfigureGateway(instance)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return result{nil, xerr}, xerr
+				}
 			}
-		}
 
-		logrus.WithContext(ctx).Debugf("[%s] configuration successful in [%s].", p.Host.GetName(), tracer.Stopwatch().String())
-		chRes <- result{nil, nil}
-
+			logrus.WithContext(ctx).Debugf("[%s] configuration successful in [%s].", hostLabel, tracer.Stopwatch().String())
+			return result{nil, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -1803,6 +1551,8 @@ func (instance *Cluster) taskConfigureGateway(task concurrency.Task, params conc
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 
@@ -1815,195 +1565,154 @@ type taskCreateMastersParameters struct {
 }
 
 // taskCreateMasters creates masters
-func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskCreateMasters(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+	p, ok := params.(taskCreateMastersParameters)
+	if !ok {
+		xerr := fail.InvalidParameterError("params", "must be a 'taskCreteMastersParameters'")
+		return nil, xerr
+	}
+	if p.count < 1 {
+		xerr := fail.InvalidParameterError("params.count", "cannot be an integer less than 1")
+		return nil, xerr
 	}
 
-	inCtx := task.Context()
-	ctx, cancel := context.WithCancel(inCtx)
+	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	if p.count == 0 {
+		logrus.WithContext(ctx).Debugf("[Cluster %s] no masters to create.", instance.GetName())
+		return nil, nil
+	}
+
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		tracer := debug.NewTracer(tg, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
-		defer tracer.Exiting()
+			svc := instance.Service()
+			timings, xerr := svc.Timings()
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		// Convert and validate parameters
-		p, ok := params.(taskCreateMastersParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskCreteMastersParameters'")}
-			return
-		}
-		if p.count < 1 {
-			chRes <- result{nil, fail.InvalidParameterError("params.count", "cannot be an integer less than 1")}
-			return
-		}
+			logrus.WithContext(ctx).Debugf("Creating %d master%s...", p.count, strprocess.Plural(p.count))
 
-		clusterName := instance.GetName()
+			timeout := time.Duration(p.count) * timings.HostCreationTimeout() // FIXME: OPP This became the timeout for the whole cluster creation....
 
-		if p.count == 0 {
-			logrus.WithContext(ctx).Debugf("[Cluster %s] no masters to create.", clusterName)
-			chRes <- result{nil, nil}
-			return
-		}
+			winSize := 8
+			cfg, xerr := svc.ConfigurationOptions()
+			if xerr == nil {
+				winSize = cfg.ConcurrentMachineCreationLimit
+			}
 
-		timings, xerr := instance.Service().Timings()
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+			var listMasters []StdResult
+			masterChan := make(chan StdResult, p.count)
 
-		logrus.WithContext(ctx).Debugf("[Cluster %s] creating %d master%s...", clusterName, p.count, strprocess.Plural(p.count))
-
-		timeout := 3 * timings.HostCreationTimeout()
-		var collectedErs []error
-
-		for i := uint(1); i <= p.count; i++ {
-			captured := i
-			taskParams := taskCreateMasterParameters{
+			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), timeout, masterChan, instance.taskCreateMaster, taskCreateMasterParameters{
 				masterDef:     p.mastersDef,
-				timeout:       timeout,
-				index:         captured,
+				timeout:       timings.HostCreationTimeout(),
 				keepOnFailure: p.keepOnFailure,
+			})
+			if err != nil {
+				close(masterChan)
+				return result{nil, fail.ConvertError(err)}, fail.ConvertError(err)
 			}
-			_, ierr := tg.StartWithTimeout(
-				instance.taskCreateMaster, taskParams, timeout, concurrency.InheritParentIDOption,
-				concurrency.AmendID(fmt.Sprintf("/host/%d/create", captured)),
-			)
-			ierr = debug.InjectPlannedFail(ierr)
-			if ierr != nil {
-				collectedErs = append(collectedErs, ierr)
-				abErr := tg.AbortWithCause(ierr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+
+			close(masterChan)
+			for v := range masterChan {
+				if v.Err != nil {
+					continue
 				}
-				break
+				if v.ToBeDeleted {
+					if aho, ok := v.Content.(*Host); ok {
+						xerr = aho.Delete(cleanupContextFrom(ctx))
+						debug.IgnoreErrorWithContext(ctx, xerr)
+						continue
+					}
+				}
+				listMasters = append(listMasters, v)
 			}
-		}
 
-		var tr concurrency.TaskGroupResult
-		tr, xerr = tg.WaitGroup()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			if withTimeout(xerr) {
-				logrus.WithContext(ctx).Warnf("Timeouts creating masters !!")
-			}
-			rerr := fail.NewError("[Cluster %s] failed to create master(s): %s", clusterName, xerr)
-			if len(collectedErs) != 0 {
-				_ = rerr.AddConsequence(fail.NewErrorList(collectedErs))
-			}
-			chRes <- result{nil, rerr}
-			return
-		}
-
-		if len(collectedErs) != 0 {
-			chRes <- result{nil, fail.NewError(
-				"[Cluster %s] failed to create master(s): %s", clusterName, fail.NewErrorList(collectedErs),
-			)}
-			return
-		}
-
-		logrus.WithContext(ctx).Debugf("[Cluster %s] masters creation successful: %v", clusterName, tr)
-		chRes <- result{tr, nil}
-
+			logrus.WithContext(ctx).Debugf("Masters creation successful: %v", listMasters)
+			return result{listMasters, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
-	case <-inCtx.Done():
-		return nil, fail.ConvertError(inCtx.Err())
+	case <-inctx.Done():
+		cancel()
+		<-chRes
+		return nil, fail.ConvertError(inctx.Err())
 	}
 }
 
 type taskCreateMasterParameters struct {
-	index         uint
 	masterDef     abstract.HostSizingRequirements
 	timeout       time.Duration
 	keepOnFailure bool
 }
 
 // taskCreateMaster creates one master
-func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskCreateMaster(inctx context.Context, params interface{}) (_ interface{}, ferr fail.Error) {
 	var xerr fail.Error
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+	// Convert and validate parameters
+	p, ok := params.(taskCreateMasterParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskCreateMasterParameters'")
 	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	hostReq := abstract.HostRequest{}
+	hostReq.ResourceName, xerr = instance.buildHostname(ctx, "master", clusternodetype.Master)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if oldKey := ctx.Value("ID"); oldKey != nil {
+		ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/create/master/%s", oldKey, hostReq.ResourceName)) // nolint
+	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).Entering()
+	defer tracer.Exiting()
+
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
-	go func() (ferr fail.Error) {
-		defer fail.OnPanic(&ferr)
+	go func() {
 		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		// Convert and validate parameters
-		p, ok := params.(taskCreateMasterParameters)
-		if !ok {
-			ar := result{nil, fail.InvalidParameterError("params", "must be a 'taskCreateMasterParameters'")}
-			chRes <- ar
-			return ar.rErr
-		}
+			sleepTime := <-instance.randomDelayCh
+			time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
-		if p.index < 1 {
-			ar := result{nil, fail.InvalidParameterError("params.index", "must be an integer greater than 0")}
-			chRes <- ar
-			return ar.rErr
-		}
-
-		sleepTime := <-instance.randomDelayCh
-		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
-
-		hostReq := abstract.HostRequest{}
-		hostReq.ResourceName, xerr = instance.buildHostname(ctx, "master", clusternodetype.Master)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).Entering()
-		defer tracer.Exiting()
-
-		hostLabel := fmt.Sprintf("master #%d", p.index)
-		logrus.WithContext(ctx).Debugf("[%s] starting master Host creation...", hostLabel)
-
-		// First creates master in metadata, to keep track of its tried creation, in case of failure
-		var nodeIdx uint
-		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
-				nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
+			// First creates master in metadata, to keep track of its tried creation, in case of failure
+			var nodeIdx uint
+			xerr = metadata.AlterProperty(ctx, instance, clusterproperty.NodesV3, func(nodesV3 *propertiesv3.ClusterNodes) fail.Error {
 				nodesV3.GlobalLastIndex++
 				nodeIdx = nodesV3.GlobalLastIndex
 				node := &propertiesv3.ClusterNode{
@@ -2013,117 +1722,105 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 				nodesV3.ByNumericalID[nodeIdx] = node
 				return nil
 			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			ar := result{nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)}
-			chRes <- ar
-			return ar.rErr
-		}
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				ar := result{nil, fail.Wrap(xerr, "[%s] creation failed", fmt.Sprintf("master #%d", nodeIdx))}
+				return ar, ar.rErr
+			}
 
-		// Starting from here, if exiting with error, remove entry from master nodes of the metadata
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && !p.keepOnFailure {
-				derr := instance.Alter(context.Background(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Alter(clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
-						nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
-						if innerErr != nil {
-							return fail.Wrap(innerErr)
-						}
+			hostLabel := fmt.Sprintf("master %s", hostReq.ResourceName)
+			logrus.WithContext(ctx).Debugf("[%s] starting master Host creation...", hostLabel)
 
+			// Starting from here, if exiting with error, remove entry from master nodes of the metadata
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && !p.keepOnFailure {
+					derr := metadata.AlterProperty(cleanupContextFrom(ctx), instance, clusterproperty.NodesV3, func(nodesV3 *propertiesv3.ClusterNodes) fail.Error {
 						delete(nodesV3.ByNumericalID, nodeIdx)
 						return nil
 					})
-				})
-				if derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove master from Cluster metadata", ActionFromError(ferr)))
-				}
-			}
-		}()
-
-		netCfg, xerr := instance.GetNetworkConfig(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		subnet, xerr := LoadSubnet(ctx, "", netCfg.SubnetID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		// -- Create the Host --
-		xerr = subnet.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, innerErr := lang.Cast[*abstract.Subnet](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			hostReq.Subnets = []*abstract.Subnet{as}
-			return nil
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		hostReq.PublicIP = false
-		hostReq.KeepOnFailure = p.keepOnFailure
-		if p.masterDef.Image != "" {
-			hostReq.ImageID = p.masterDef.Image
-		}
-		if p.masterDef.Template != "" {
-			hostReq.TemplateID = p.masterDef.Template
-		}
-
-		hostInstance, xerr := NewHost(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && !p.keepOnFailure {
-				if derr := hostInstance.Delete(context.Background()); derr != nil {
-					switch derr.(type) {
-					case *fail.ErrNotFound:
-						// missing Host is considered as a successful deletion, continue
-						debug.IgnoreError(derr)
-					default:
-						_ = ferr.AddConsequence(derr)
+					if derr != nil {
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove master from Cluster metadata", ActionFromError(ferr)))
 					}
 				}
+			}()
+
+			netCfg, xerr := instance.GetNetworkConfig(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
 			}
-		}()
 
-		_, xerr = hostInstance.Create(ctx, hostReq, p.masterDef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
+			subnet, xerr := LoadSubnet(ctx, "", netCfg.SubnetID)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(clusterproperty.NodesV3, func(p clonable.Clonable) (innerXErr fail.Error) {
-				nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
+			// -- Create the Host --
+			xerr = subnet.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+				as, innerErr := clonable.Cast[*abstract.Subnet](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
 
+				hostReq.Subnets = []*abstract.Subnet{as}
+				return nil
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				return result{nil, xerr}, xerr
+			}
+
+			hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
+
+			hostReq.PublicIP = false
+			hostReq.KeepOnFailure = p.keepOnFailure
+			if p.masterDef.Image != "" {
+				hostReq.ImageID = p.masterDef.Image
+			}
+			if p.masterDef.Template != "" {
+				hostReq.TemplateID = p.masterDef.Template
+			}
+
+			hostInstance, xerr := NewHost(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
+
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && !p.keepOnFailure && hostInstance != nil {
+					if derr := hostInstance.Delete(cleanupContextFrom(ctx)); derr != nil {
+						switch derr.(type) {
+						case *fail.ErrNotFound:
+							// missing Host is considered as a successful deletion, continue
+							debug.IgnoreErrorWithContext(ctx, derr)
+						default:
+							_ = ferr.AddConsequence(derr)
+						}
+					}
+				}
+			}()
+
+			cluID, _ := instance.GetID()
+			_, xerr = hostInstance.Create(ctx, hostReq, p.masterDef, map[string]string{
+				"type":      "master",
+				"clusterID": cluID,
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
+
+			xerr = metadata.AlterProperty(ctx, instance, clusterproperty.NodesV3, func(nodesV3 *propertiesv3.ClusterNodes) (innerXErr fail.Error) {
 				node := nodesV3.ByNumericalID[nodeIdx]
 				var err error
 				node.ID, err = hostInstance.GetID()
@@ -2156,27 +1853,25 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 				return nil
 			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			ar := result{nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)}
-			chRes <- ar
-			return ar.rErr
-		}
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				ar := result{nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)}
+				return ar, ar.rErr
+			}
 
-		hostLabel = fmt.Sprintf("master #%d (%s)", p.index, hostInstance.GetName())
+			hostLabel = fmt.Sprintf("master (%s)", hostReq.ResourceName)
+			xerr = instance.installNodeRequirements(ctx, clusternodetype.Master, hostInstance, hostLabel)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		xerr = instance.installNodeRequirements(ctx, clusternodetype.Master, hostInstance, hostLabel)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		logrus.WithContext(ctx).Debugf("[%s] Master creation successful.", hostLabel)
-		chRes <- result{hostInstance, nil}
-		return nil
-	}() // nolint
+			logrus.WithContext(ctx).Debugf("[%s] Master creation successful.", hostLabel)
+			return result{hostInstance, nil}, nil
+		}() // nolint
+		chRes <- gres
+	}()
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -2184,7 +1879,8 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		<-chRes // wait for clean
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		<-chRes // wait for clean
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 
@@ -2213,245 +1909,187 @@ type taskConfigureMastersParameters struct {
 }
 
 // taskConfigureMasters configure masters
-func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
+func (instance *Cluster) taskConfigureMasters(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+	p, ok := params.(taskConfigureMastersParameters)
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast 'params' to 'taskConfiguraMastersParameters'")
 	}
 
-	inctx := task.Context()
+	variables := p.variables
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	started := time.Now()
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			logrus.WithContext(ctx).Debugf(
-				"[Cluster %s] Masters configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr),
-				temporal.FormatDuration(time.Since(started)),
-			)
-		} else {
-			logrus.WithContext(ctx).Debugf(
-				"[Cluster %s] Masters configuration successful in [%s].", instance.GetName(),
-				temporal.FormatDuration(time.Since(started)),
-			)
-		}
-	}()
+	tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		p, ok := params.(taskConfigureMastersParameters)
-		if !ok {
-			chRes <- result{nil, fail.InconsistentError("failed to cast 'params' to 'taskConfiguraMastersParameters'")}
-			return
-		}
-		// variables, _ := data.FromMap(p.variables)
-		variables := p.variables
-		tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-		defer tracer.Exiting()
+			clusterName := instance.GetName()
+			logrus.WithContext(ctx).Debugf("[Cluster %s] Configuring masters...", clusterName)
 
-		logrus.WithContext(ctx).Debugf("[Cluster %s] Configuring masters...", instance.GetName())
-
-		masters, xerr := instance.unsafeListMasters(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-		if len(masters) == 0 {
-			ar := result{nil, fail.NewError("[Cluster %s] master list cannot be empty.", instance.GetName())}
-			chRes <- result{nil, ar.rErr}
-			return
-		}
-
-		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		var (
-			loadErrors []error
-			taskErrors []error
-		)
-
-		for _, master := range masters {
-			if master.ID == "" {
-				chRes <- result{nil, fail.InvalidParameterError("masters", "cannot contain items with empty ID")}
-				return
-			}
-		}
-
-		for i, master := range masters {
-			captured := i
-			capturedMaster := master
-			host, xerr := LoadHost(ctx, capturedMaster.ID)
+			masters, xerr := instance.unsafeListMasters(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				loadErrors = append(loadErrors, xerr)
-				abErr := tg.AbortWithCause(xerr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-				}
-				break
+				return result{nil, xerr}, xerr
+			}
+			if len(masters) == 0 {
+				ar := result{nil, fail.NewError("[Cluster %s] master list cannot be empty.", clusterName)}
+				return ar, ar.rErr
 			}
 
-			_, xerr = tg.Start(
-				instance.taskConfigureMaster, taskConfigureMasterParameters{
-					Index:     captured + 1,
-					Host:      host,
-					variables: variables,
-				}, concurrency.InheritParentIDOption,
-				concurrency.AmendID(fmt.Sprintf("/host/%s/configure", host.GetName())),
-			)
-			xerr = debug.InjectPlannedFail(xerr)
+			for _, master := range masters {
+				if master.ID == "" {
+					ar := result{nil, fail.InvalidParameterError("masters", "cannot contain items with empty ID")}
+					return ar, ar.rErr
+				}
+			}
+
+			tgm := new(errgroup.Group)
+			for _, master := range masters {
+				capturedMaster := master
+				tgm.Go(func() error {
+					host, xerr := LoadHost(ctx, capturedMaster.ID)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							return nil
+						default:
+							return xerr
+						}
+					}
+
+					_, xerr = instance.taskConfigureMaster(ctx, taskConfigureMasterParameters{
+						Host:      host,
+						variables: variables,
+					})
+					if xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							return nil
+						default:
+							return xerr
+						}
+					}
+					return nil
+				})
+			}
+
+			xerr = fail.ConvertError(tgm.Wait())
 			if xerr != nil {
-				// a return here (unless is the first for iteration) will likely leave unchecked started tasks
-				taskErrors = append(taskErrors, xerr)
-				abErr := tg.AbortWithCause(xerr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-				}
-				break
+				return result{nil, xerr}, xerr
 			}
-		}
 
-		var tr concurrency.TaskGroupResult
-		tr, xerr = tg.WaitGroup()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			if withTimeout(xerr) {
-				logrus.WithContext(ctx).Warnf("Timeouts configuring masters !!")
-			}
-			rerr := fail.NewError("[Cluster %s] failed to configure master(s): %s", instance.GetName(), xerr)
-			if len(loadErrors) != 0 {
-				_ = rerr.AddConsequence(fail.NewErrorList(loadErrors))
-			}
-			if len(taskErrors) != 0 {
-				_ = rerr.AddConsequence(fail.NewErrorList(taskErrors))
-			}
-			chRes <- result{nil, rerr}
-			return
-		}
-
-		if len(loadErrors) != 0 || len(taskErrors) != 0 {
-			var allErrors []error
-			allErrors = append(allErrors, loadErrors...)
-			allErrors = append(allErrors, taskErrors...)
-			chRes <- result{nil, fail.NewError(allErrors)}
-			return
-		}
-
-		logrus.WithContext(ctx).Debugf("[Cluster %s] masters configuration successful: %v", instance.GetName(), tr)
-		chRes <- result{tr, nil}
-
+			logrus.WithContext(ctx).Debugf("[Cluster %s] masters configuration successful", clusterName)
+			return result{nil, nil}, nil
+		}()
+		chRes <- gres
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
-
 }
 
 type taskConfigureMasterParameters struct {
-	Index     uint
 	Host      resources.Host
 	variables data.Map[string, any]
 }
 
 // taskConfigureMaster configures one master
-func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-	var xerr fail.Error
-
+func (instance *Cluster) taskConfigureMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	inctx := task.Context()
+	// Convert and validate params
+	p, ok := params.(taskConfigureMasterParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskConfigureMasterParameters'")
+	}
+	if p.Host == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
+	}
+	variables := p.variables
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
+
+	if oldKey := ctx.Value("ID"); oldKey != nil {
+		ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/configure/master/%s", oldKey, p.Host.GetName())) // nolint
+	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		// Convert and validate params
-		p, ok := params.(taskConfigureMasterParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskConfigureMasterParameters'")}
-			return
-		}
+			started := time.Now()
 
-		if p.Index < 1 {
-			chRes <- result{nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")}
-			return
-		}
-		if p.Host == nil {
-			chRes <- result{nil, fail.InvalidParameterCannotBeNilError("params.Host")}
-			return
-		}
+			logrus.WithContext(ctx).Debugf("starting configuration...")
 
-		// variables, _ := data.FromMap(p.variables)
-		variables := p.variables
-
-		started := time.Now()
-
-		hostLabel := fmt.Sprintf("master #%d (%s)", p.Index, p.Host.GetName())
-		logrus.WithContext(ctx).Debugf("[%s] starting configuration...", hostLabel)
-
-		// install docker feature (including docker-compose)
-		xerr = instance.installDocker(ctx, p.Host, hostLabel, variables)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		// Configure master for flavor
-		makers := instance.localCache.makers
-		if makers.ConfigureMaster != nil {
-			xerr = makers.ConfigureMaster(instance, p.Index, p.Host)
-			xerr = debug.InjectPlannedFail(xerr)
+			does, xerr := p.Host.Exists(ctx)
 			if xerr != nil {
-				chRes <- result{nil, fail.Wrap(xerr, "failed to configure master '%s'", p.Host.GetName())}
-				return
+				return result{nil, xerr}, xerr
 			}
 
-			logrus.WithContext(ctx).Debugf("[%s] configuration successful in [%s].", hostLabel, temporal.FormatDuration(time.Since(started)))
-			chRes <- result{nil, nil}
-			return
-		}
+			if !does {
+				return result{nil, nil}, nil
+			}
 
-		// Not finding a callback isn't an error, so return nil in this case
-		chRes <- result{nil, nil}
+			// install docker feature (including docker-compose)
+			hostLabel := fmt.Sprintf("master (%s)", p.Host.GetName())
+			xerr = instance.installDocker(ctx, p.Host, hostLabel, variables)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
+			// Configure master for flavor
+			makers := instance.localCache.makers
+			if makers.ConfigureMaster != nil {
+				xerr = makers.ConfigureMaster(instance, p.Host)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					ar := result{nil, fail.Wrap(xerr, "failed to configure master '%s'", p.Host.GetName())}
+					return ar, ar.rErr
+				}
+
+				logrus.WithContext(ctx).Debugf("[%s] configuration successful in [%s].", hostLabel, temporal.FormatDuration(time.Since(started)))
+				return result{nil, nil}, nil
+			}
+
+			// Not finding a callback isn't an error, so return nil in this case
+			return result{nil, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -2459,6 +2097,8 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 }
@@ -2470,104 +2110,212 @@ type taskCreateNodesParameters struct {
 	keepOnFailure bool
 }
 
+func drainChannel(dch chan struct{}) {
+	for {
+		end := false
+		select {
+		case <-dch:
+		default:
+			end = true
+		}
+		if end {
+			break
+		}
+	}
+	close(dch)
+}
+
+func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.Duration, uat chan StdResult, runner func(context.Context, interface{}) (interface{}, fail.Error), data interface{}) error {
+	if windowSize > count {
+		return errors.Errorf("window size cannot be greater than task size: %d, %d", count, windowSize)
+	}
+
+	if windowSize == count {
+		if count >= 4 {
+			windowSize -= 2
+		}
+	}
+
+	window := make(chan struct{}, windowSize) // Sliding window of windowSize
+	target := make(chan struct{}, count)
+	done := make(chan struct{})
+
+	treeCtx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	finished := false
+	for { // only 4 simultaneous creations
+		select {
+		case <-done:
+			finished = true
+		case <-treeCtx.Done():
+			finished = true
+		case window <- struct{}{}:
+		}
+		if finished {
+			cancel()
+			break
+		}
+
+		go func() {
+			defer func() {
+				<-window
+			}()
+
+			res, err := runner(treeCtx, data)
+			if err != nil {
+				// log the error
+				logrus.WithContext(treeCtx).Errorf("window runner failed with: %s", err)
+				return
+			}
+
+			select {
+			case <-done:
+				uat <- StdResult{
+					Content:     res,
+					Err:         err,
+					ToBeDeleted: true,
+				}
+				return
+			case <-treeCtx.Done():
+				uat <- StdResult{
+					Content:     res,
+					Err:         err,
+					ToBeDeleted: true,
+				}
+				return
+			default:
+				uat <- StdResult{
+					Content:     res,
+					Err:         err,
+					ToBeDeleted: false,
+				}
+			}
+
+			select {
+			case <-done:
+				return
+			case <-treeCtx.Done():
+				return
+			case target <- struct{}{}:
+				if len(target) == int(count) {
+					close(done)
+					return
+				}
+				return
+			default: // if it blocks because it's full, end of story
+				close(done)
+				return
+			}
+		}()
+	}
+
+	defer drainChannel(window)
+	defer drainChannel(target)
+
+	select {
+	case <-done:
+		return nil
+	case <-inctx.Done():
+		return errors.Errorf("Task was cancelled by parent: %s", inctx.Err())
+	case <-treeCtx.Done():
+		if len(uat) == int(count) {
+			return nil
+		}
+		return errors.Errorf("Task was canceled when target is %d\n", len(target))
+	}
+}
+
+type StdResult struct {
+	Content     interface{}
+	Err         error
+	ToBeDeleted bool
+}
+
 // taskCreateNodes creates nodes
-func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("tg")
+	// Convert then validate params
+	p, ok := params.(taskCreateNodesParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskCreateNodesParameters'")
+	}
+	if p.count < 1 {
+		return nil, fail.InvalidParameterError("params.count", "cannot be an integer less than 1")
 	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		// Convert then validate params
-		p, ok := params.(taskCreateNodesParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskCreateNodesParameters'")}
-			return
-		}
-		if p.count < 1 {
-			chRes <- result{nil, fail.InvalidParameterError("params.count", "cannot be an integer less than 1")}
-			return
-		}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
-		defer tracer.Exiting()
-
-		timings, xerr := instance.Service().Timings()
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		clusterName := instance.GetName()
-
-		if p.count == 0 {
-			logrus.WithContext(ctx).Debugf("[Cluster %s] no nodes to create.", clusterName)
-			chRes <- result{nil, nil}
-			return
-		}
-		logrus.WithContext(ctx).Debugf("[Cluster %s] creating %d node%s...", clusterName, p.count, strprocess.Plural(p.count))
-
-		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		timeout := 3 * timings.HostCreationTimeout()
-		for i := uint(1); i <= p.count; i++ {
-			captured := i
-			_, xerr := tg.StartWithTimeout(
-				instance.taskCreateNode, taskCreateNodeParameters{
-					index:         captured,
-					nodeDef:       p.nodesDef,
-					timeout:       timeout,
-					keepOnFailure: p.keepOnFailure,
-				}, timeout, concurrency.InheritParentIDOption,
-			)
-			xerr = debug.InjectPlannedFail(xerr)
+			timings, xerr := instance.Service().Timings()
 			if xerr != nil {
-				abErr := tg.AbortWithCause(xerr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				return result{nil, xerr}, xerr
+			}
+
+			logrus.WithContext(ctx).Debugf("Creating %d node%s...", p.count, strprocess.Plural(p.count))
+
+			timeout := time.Duration(p.count) * timings.HostCreationTimeout()
+
+			winSize := 8
+			svc := instance.Service()
+			if cfg, xerr := svc.ConfigurationOptions(); xerr == nil {
+				winSize = cfg.ConcurrentMachineCreationLimit
+			}
+
+			var listNodes []StdResult
+			nodesChan := make(chan StdResult, p.count)
+
+			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), timeout, nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
+				nodeDef:       p.nodesDef,
+				timeout:       timings.HostOperationTimeout(),
+				keepOnFailure: p.keepOnFailure,
+			})
+			if err != nil {
+				return result{nil, fail.ConvertError(err)}, fail.ConvertError(err)
+			}
+
+			close(nodesChan)
+			for v := range nodesChan {
+				if v.Err != nil {
+					continue
 				}
-				break
+				if v.ToBeDeleted {
+					_, xerr = instance.taskDeleteNodeWithCtx(ctx, taskDeleteNodeParameters{node: v.Content.(*propertiesv3.ClusterNode)})
+					debug.IgnoreErrorWithContext(ctx, xerr)
+					continue
+				}
+				listNodes = append(listNodes, v)
 			}
-		}
 
-		tr, xerr := tg.WaitGroup()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			if withTimeout(xerr) {
-				logrus.WithContext(ctx).Warnf("Timeouts creating nodes !!")
-			}
-			rerr := fail.NewError("[Cluster %s] failed to create nodes(s): %s", instance.GetName(), xerr)
-			chRes <- result{nil, rerr}
-			return
-		}
-
-		logrus.WithContext(ctx).Debugf("[Cluster %s] %d node%s creation successful.", clusterName, p.count, strprocess.Plural(p.count))
-		chRes <- result{tr, nil}
-
+			logrus.WithContext(ctx).Debugf("%d node%s creation successful.", p.count, strprocess.Plural(p.count))
+			return result{listNodes, nil}, nil
+		}()
+		chRes <- gres
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 }
@@ -2579,295 +2327,260 @@ type taskCreateNodeParameters struct {
 	keepOnFailure bool
 }
 
-// taskCreateNode creates a node in the Cluster
-func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
-	var xerr fail.Error
+func cleanupContextFrom(inctx context.Context) context.Context {
+	newCtx := jobapi.NewContextPropagatingJob(inctx)
 
+	// FIXME: Make "ID" a constant, with an explicit value...
+	oldKey := inctx.Value("ID")
+	if oldKey != nil {
+		newCtx = context.WithValue(newCtx, "ID", oldKey) // nolint
+
+		// cleanup functions can look for "cleanup" to decide if a ctx is a cleanup context
+		newCtx = context.WithValue(newCtx, "cleanup", true) // nolint
+	}
+
+	return newCtx
+}
+
+// taskCreateNode creates a node in the Cluster
+func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+	var xerr fail.Error
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+	// Convert then validate parameters
+	p, ok := params.(taskCreateNodeParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskCreateNodeParameters'")
 	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	hostReq := abstract.HostRequest{}
+	hostReq.ResourceName, xerr = instance.buildHostname(ctx, "node", clusternodetype.Node)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if oldKey := ctx.Value("ID"); oldKey != nil {
+		ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/create/node/%s", oldKey, hostReq.ResourceName)) // nolint
+	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
-	go func() (ferr fail.Error) {
-		defer fail.OnPanic(&ferr)
+	go func() {
 		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		// Convert then validate parameters
-		p, ok := params.(taskCreateNodeParameters)
-		if !ok {
-			ar := result{nil, fail.InvalidParameterError("params", "must be a data.Map")}
-			chRes <- ar
-			return ar.rErr
-		}
+			sleepTime := <-instance.randomDelayCh
+			time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
-		if p.index < 1 {
-			ar := result{nil, fail.InvalidParameterError("params.index", "cannot be an integer less than 1")}
-			chRes <- ar
-			return ar.rErr
-		}
+			// -- First creates node in metadata, to keep track of its tried creation, in case of failure --
+			var nodeIdx uint
+			xerr = metadata.AlterProperty(ctx, instance, clusterproperty.NodesV3, func(nodesV3 *propertiesv3.ClusterNodes) fail.Error {
+				nodesV3.GlobalLastIndex++
+				nodeIdx = nodesV3.GlobalLastIndex
+				node := &propertiesv3.ClusterNode{
+					NumericalID: nodeIdx,
+					Name:        hostReq.ResourceName,
+				}
+				nodesV3.ByNumericalID[nodeIdx] = node
+				return nil
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				ar := result{nil, fail.Wrap(xerr, "[%s] creation failed", fmt.Sprintf("node %s", hostReq.ResourceName))}
+				return ar, ar.rErr
+			}
 
-		sleepTime := <-instance.randomDelayCh
-		time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+			hostLabel := fmt.Sprintf("node %s", hostReq.ResourceName)
 
-		hostReq := abstract.HostRequest{}
-		hostReq.ResourceName, xerr = instance.buildHostname(ctx, "node", clusternodetype.Node)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index).WithStopwatch().Entering()
-		defer tracer.Exiting()
-
-		hostLabel := fmt.Sprintf("node #%d", p.index)
-		logrus.WithContext(ctx).Debugf(tracer.TraceMessage("[%s] starting Host creation...", hostLabel))
-
-		// -- First creates node in metadata, to keep track of its tried creation, in case of failure --
-		var nodeIdx uint
-		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(
-				clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
-					nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
-					if innerErr != nil {
-						return fail.Wrap(innerErr)
-					}
-
-					nodesV3.GlobalLastIndex++
-					nodeIdx = nodesV3.GlobalLastIndex
-					node := &propertiesv3.ClusterNode{
-						NumericalID: nodeIdx,
-						Name:        hostReq.ResourceName,
-					}
-					nodesV3.ByNumericalID[nodeIdx] = node
-					return nil
-				},
-			)
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			ar := result{nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)}
-			chRes <- ar
-			return ar.rErr
-		}
-
-		// Starting from here, if exiting with error, remove entry from node of the metadata
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && !p.keepOnFailure {
-				derr := instance.Alter(context.Background(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Alter(clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
-						nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
-						if innerErr != nil {
-							return fail.Wrap(innerErr)
-						}
-
+			// Starting from here, if exiting with error, remove entry from node of the metadata
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && !p.keepOnFailure {
+					derr := metadata.AlterProperty(cleanupContextFrom(ctx), instance, clusterproperty.NodesV3, func(nodesV3 *propertiesv3.ClusterNodes) fail.Error {
 						delete(nodesV3.ByNumericalID, nodeIdx)
 						return nil
 					})
-				})
-				if derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove node from Cluster metadata", ActionFromError(ferr)))
-				}
-			}
-		}()
-
-		netCfg, xerr := instance.GetNetworkConfig(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			ar := result{nil, xerr}
-			chRes <- ar
-			return ar.rErr
-		}
-
-		subnet, xerr := LoadSubnet(ctx, "", netCfg.SubnetID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			ar := result{nil, xerr}
-			chRes <- ar
-			return ar.rErr
-		}
-
-		// -- Create the Host instance corresponding to the new node --
-		xerr = subnet.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, innerErr := lang.Cast[*abstract.Subnet](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			hostReq.Subnets = []*abstract.Subnet{as}
-			return nil
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		hostReq.PublicIP = false
-		hostReq.KeepOnFailure = p.keepOnFailure
-
-		if p.nodeDef.Image != "" {
-			hostReq.ImageID = p.nodeDef.Image
-		}
-		if p.nodeDef.Template != "" {
-			hostReq.TemplateID = p.nodeDef.Template
-		}
-
-		hostInstance, xerr := NewHost(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
-
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && !p.keepOnFailure {
-				if derr := hostInstance.Delete(context.Background()); derr != nil {
-					switch derr.(type) {
-					case *fail.ErrNotFound:
-						// missing Host is considered as a successful deletion, continue
-						debug.IgnoreError(derr)
-					default:
-						_ = ferr.AddConsequence(
-							fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), hostInstance.GetName()))
+					if derr != nil {
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove node from Cluster metadata", ActionFromError(ferr)))
 					}
 				}
+			}()
+
+			netCfg, xerr := instance.GetNetworkConfig(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				ar := result{nil, xerr}
+				return ar, ar.rErr
 			}
-		}()
 
-		// here is the actual creation of the machine
-		_, xerr = hostInstance.Create(ctx, hostReq, p.nodeDef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
+			subnet, xerr := LoadSubnet(ctx, "", netCfg.SubnetID)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				ar := result{nil, xerr}
+				return ar, ar.rErr
+			}
 
-		logrus.WithContext(ctx).Debugf(tracer.TraceMessage("[%s] Host updating cluster metadata...", hostLabel))
+			// -- Create the Host instance corresponding to the new node --
+			xerr = subnet.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+				as, innerErr := clonable.Cast[*abstract.Subnet](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
 
-		// -- update cluster metadata --
-		var node *propertiesv3.ClusterNode
-		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(
-				clusterproperty.NodesV3, func(p clonable.Clonable) (innerXErr fail.Error) {
-					nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
-					if innerErr != nil {
-						return fail.Wrap(innerErr)
-					}
+				hostReq.Subnets = []*abstract.Subnet{as}
+				return nil
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				return result{nil, xerr}, xerr
+			}
 
-					node = nodesV3.ByNumericalID[nodeIdx]
-					node.ID, innerErr = hostInstance.GetID()
-					if innerErr != nil {
-						return fail.Wrap(innerErr)
-					}
+			hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-					var inErr fail.Error
-					node.PublicIP, inErr = hostInstance.GetPublicIP(ctx)
-					if inErr != nil {
-						switch inErr.(type) {
+			hostReq.PublicIP = false
+			hostReq.KeepOnFailure = p.keepOnFailure
+
+			if p.nodeDef.Image != "" {
+				hostReq.ImageID = p.nodeDef.Image
+			}
+			if p.nodeDef.Template != "" {
+				hostReq.TemplateID = p.nodeDef.Template
+			}
+
+			hostInstance, xerr := NewHost(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
+
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && !p.keepOnFailure && hostInstance != nil {
+					if derr := hostInstance.Delete(cleanupContextFrom(ctx)); derr != nil {
+						switch derr.(type) {
 						case *fail.ErrNotFound:
-							// No public IP, this can happen; continue
+							// missing Host is considered as a successful deletion, continue
+							debug.IgnoreErrorWithContext(ctx, derr)
 						default:
-							return inErr
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), hostInstance.GetName()))
 						}
 					}
+				}
+			}()
 
-					if node.PrivateIP, inErr = hostInstance.GetPrivateIP(ctx); inErr != nil {
+			// here is the actual creation of the machine
+			cluID, _ := instance.GetID()
+			_, xerr = hostInstance.Create(ctx, hostReq, p.nodeDef, map[string]string{
+				"type":      "node",
+				"clusterID": cluID,
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
+
+			logrus.WithContext(ctx).Debugf(tracer.TraceMessage("[%s] Host updating cluster metadata...", hostLabel))
+
+			// -- update cluster metadata --
+			var node *propertiesv3.ClusterNode
+			xerr = metadata.AlterProperty(ctx, instance, clusterproperty.NodesV3, func(nodesV3 *propertiesv3.ClusterNodes) (innerXErr fail.Error) {
+				node = nodesV3.ByNumericalID[nodeIdx]
+				var innerErr error
+				node.ID, innerErr = hostInstance.GetID()
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				var inErr fail.Error
+				node.PublicIP, inErr = hostInstance.GetPublicIP(ctx)
+				if inErr != nil {
+					switch inErr.(type) {
+					case *fail.ErrNotFound:
+						// No public IP, this can happen; continue
+					default:
 						return inErr
 					}
-
-					nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, node.NumericalID)
-					nodesV3.PrivateNodeByName[node.Name] = node.NumericalID
-					nodesV3.PrivateNodeByID[node.ID] = node.NumericalID
-
-					return nil
-				},
-			)
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			ar := result{nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)}
-			chRes <- ar
-			return ar.rErr
-		}
-
-		// Starting from here, rollback on cluster metadata in case of failure
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && !p.keepOnFailure {
-				derr := instance.Alter(context.Background(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Alter(
-						clusterproperty.NodesV3, func(p clonable.Clonable) (innerXErr fail.Error) {
-							nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
-							if innerErr != nil {
-								return fail.Wrap(innerErr)
-							}
-
-							if found, indexInSlice := containsClusterNode(nodesV3.PrivateNodes, nodeIdx); found {
-								length := len(nodesV3.PrivateNodes)
-								if indexInSlice < length-1 {
-									nodesV3.PrivateNodes = append(nodesV3.PrivateNodes[:indexInSlice], nodesV3.PrivateNodes[indexInSlice+1:]...)
-								} else {
-									nodesV3.PrivateNodes = nodesV3.PrivateNodes[:indexInSlice]
-								}
-							}
-
-							hid, err := hostInstance.GetID()
-							if err != nil {
-								return fail.ConvertError(err)
-							}
-
-							delete(nodesV3.PrivateNodeByName, hostInstance.GetName())
-							delete(nodesV3.PrivateNodeByID, hid)
-
-							return nil
-						},
-					)
-				})
-				if derr != nil {
-					_ = ferr.AddConsequence(
-						fail.Wrap(
-							derr, "cleaning up on failure, failed to remove node '%s' from metadata of cluster '%s'",
-							hostInstance.GetName(), instance.GetName(),
-						),
-					)
 				}
+
+				if node.PrivateIP, inErr = hostInstance.GetPrivateIP(ctx); inErr != nil {
+					return inErr
+				}
+
+				nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, node.NumericalID)
+				nodesV3.PrivateNodeByName[node.Name] = node.NumericalID
+				nodesV3.PrivateNodeByID[node.ID] = node.NumericalID
+
+				return nil
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				ar := result{nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)}
+				return ar, ar.rErr
 			}
-		}()
 
-		logrus.WithContext(ctx).Debugf(tracer.TraceMessage("[%s] Host installing node requirements...", hostLabel))
+			// Starting from here, rollback on cluster metadata in case of failure
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && !p.keepOnFailure {
+					derr := metadata.AlterProperty(cleanupContextFrom(ctx), instance, clusterproperty.NodesV3, func(nodesV3 *propertiesv3.ClusterNodes) (innerXErr fail.Error) {
+						if found, indexInSlice := containsClusterNode(nodesV3.PrivateNodes, nodeIdx); found {
+							length := len(nodesV3.PrivateNodes)
+							if indexInSlice < length-1 {
+								nodesV3.PrivateNodes = append(nodesV3.PrivateNodes[:indexInSlice], nodesV3.PrivateNodes[indexInSlice+1:]...)
+							} else {
+								nodesV3.PrivateNodes = nodesV3.PrivateNodes[:indexInSlice]
+							}
+						}
 
-		xerr = instance.installNodeRequirements(ctx, clusternodetype.Node, hostInstance, hostLabel)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return xerr
-		}
+						hid, err := hostInstance.GetID()
+						if err != nil {
+							return fail.ConvertError(err)
+						}
 
-		logrus.WithContext(ctx).Debugf("[%s] Node creation successful.", hostLabel)
-		chRes <- result{node, nil}
-		return nil
-	}() // nolint
+						delete(nodesV3.PrivateNodeByName, hostInstance.GetName())
+						delete(nodesV3.PrivateNodeByID, hid)
+
+						return nil
+					})
+					if derr != nil {
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove node '%s' from metadata of cluster '%s'", hostInstance.GetName(), instance.GetName()))
+					}
+				}
+			}()
+
+			logrus.WithContext(ctx).Debugf(tracer.TraceMessage("[%s] Host installing node requirements...", hostLabel))
+
+			xerr = instance.installNodeRequirements(ctx, clusternodetype.Node, hostInstance, hostLabel)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
+
+			logrus.WithContext(ctx).Debugf("[%s] Node creation successful.", hostLabel)
+			return result{node, nil}, nil
+		}() // nolint
+		chRes <- gres
+	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -2875,7 +2588,8 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
-		<-chRes // wait for cleanup
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 
@@ -2886,220 +2600,196 @@ type taskConfigureNodesParameters struct {
 }
 
 // taskConfigureNodes configures nodes
-func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
+func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-
 	p, ok := params.(taskConfigureNodesParameters)
 	if !ok {
 		return nil, fail.InconsistentError("failed to cast 'params' to 'taskConfigureNodesParameters'")
 	}
-	//variables, _ := data.FromMap(p.variables)
 	variables := p.variables
-	inctx := task.Context()
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	started := time.Now()
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			logrus.WithContext(ctx).Debugf("[Cluster %s] Nodes configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr), temporal.FormatDuration(time.Since(started)))
-		} else {
-			logrus.WithContext(ctx).Debugf("[Cluster %s] Nodes configuration successful in [%s].", instance.GetName(), temporal.FormatDuration(time.Since(started)))
-		}
-	}()
+	tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		clusterName := instance.GetName()
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-		defer tracer.Exiting()
-
-		list, err := instance.unsafeListNodes(ctx)
-		err = debug.InjectPlannedFail(err)
-		if err != nil {
-			chRes <- result{nil, err}
-			return
-		}
-		if len(list) == 0 {
-			chRes <- result{nil, fail.NewError("[Cluster %s] node list cannot be empty.", instance.GetName())}
-			return
-		}
-
-		logrus.WithContext(ctx).Debugf("[Cluster %s] configuring nodes...", clusterName)
-
-		var (
-			startErrs []error
-		)
-
-		tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		for _, node := range list {
-			if node.ID == "" {
-				chRes <- result{nil, fail.InvalidParameterError("list", "cannot contain items with empty ID")}
-				return
+			list, err := instance.unsafeListNodes(ctx)
+			err = debug.InjectPlannedFail(err)
+			if err != nil {
+				return result{nil, err}, err
 			}
-		}
+			if len(list) == 0 {
+				ar := result{nil, fail.NewError("[Cluster %s] node list cannot be empty.", instance.GetName())}
+				return ar, ar.rErr
+			}
 
-		for i, node := range list {
-			captured := i
-			capturedNode := node
-			_, xerr = tg.Start(
-				instance.taskConfigureNode, taskConfigureNodeParameters{
-					index:     captured + 1,
-					node:      capturedNode,
-					variables: variables,
-				}, concurrency.InheritParentIDOption,
-				concurrency.AmendID(fmt.Sprintf("/host/%s/configure", capturedNode.Name)),
-			)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				// a return here (unless is the first for iteration) will likely leave unchecked started tasks, which is bad
-				startErrs = append(startErrs, xerr)
-				abErr := tg.AbortWithCause(xerr)
-				if abErr != nil {
-					logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+			clusterName := instance.GetName()
+			logrus.WithContext(ctx).Debugf("[Cluster %s] configuring nodes...", instance.GetName())
+
+			for _, node := range list {
+				if node.ID == "" {
+					ar := result{nil, fail.InvalidParameterError("list", "cannot contain items with empty ID")}
+					return ar, ar.rErr
 				}
-				break
 			}
-		}
 
-		var tgr concurrency.TaskGroupResult
-		tgr, xerr = tg.WaitGroup()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			if withTimeout(xerr) {
-				logrus.WithContext(ctx).Warnf("Timeouts configuring nodes !!")
+			type cfgRes struct {
+				who  string
+				what interface{}
 			}
-			rerr := fail.NewError("[Cluster %s] failed to configure nodes(s): %s", instance.GetName(), xerr)
-			if len(startErrs) > 0 {
-				_ = rerr.AddConsequence(fail.NewErrorList(startErrs)) // not actually a consequence, but a temporary patch until the logic of this function is fixed
+
+			resCh := make(chan cfgRes, len(list))
+			eg := new(errgroup.Group)
+			for _, node := range list {
+				capturedNode := node
+				eg.Go(func() error {
+					tr, xerr := instance.taskConfigureNode(ctx, taskConfigureNodeParameters{
+						node:      capturedNode,
+						variables: variables,
+					})
+					if xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							return nil
+						default:
+							return xerr
+						}
+					}
+
+					resCh <- cfgRes{
+						who:  capturedNode.ID,
+						what: tr,
+					}
+
+					return nil
+				})
 			}
-			chRes <- result{nil, rerr}
-			return
-		}
+			xerr := fail.ConvertError(eg.Wait())
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		if len(startErrs) != 0 {
-			var allErrors []error
-			allErrors = append(allErrors, startErrs...)
-			chRes <- result{nil, fail.NewError("[Cluster %s] failed to configure nodes(s): %s", instance.GetName(), fail.NewErrorList(allErrors))}
-			return
-		}
+			tgMap := make(map[string]interface{})
+			close(resCh)
+			for v := range resCh {
+				tgMap[v.who] = v.what
+			}
 
-		logrus.WithContext(ctx).Debugf("[Cluster %s] nodes configuration successful: %v", clusterName, tgr)
-		chRes <- result{tgr, nil}
-
+			logrus.WithContext(ctx).Debugf("[Cluster %s] nodes configuration successful: %v", clusterName, tgMap)
+			return result{tgMap, nil}, nil
+		}()
+		chRes <- gres
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 }
 
 type taskConfigureNodeParameters struct {
-	index     uint
 	node      *propertiesv3.ClusterNode
 	variables data.Map[string, any]
 }
 
 // taskConfigureNode configure one node
-func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskConfigureNode(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+	// Convert and validate params
+	p, ok := params.(taskConfigureNodeParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskConfigureNodeParameters'")
 	}
+	if p.node == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.Node")
+	}
+	// variables, _ := data.FromMap(p.variables)
+	variables := p.variables
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%s)", p.node.Name).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		// Convert and validate params
-		p, ok := params.(taskConfigureNodeParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskConfigureNodeParameters'")}
-			return
-		}
-		if p.index < 1 {
-			chRes <- result{nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")}
-			return
-		}
-		if p.node == nil {
-			chRes <- result{nil, fail.InvalidParameterCannotBeNilError("params.Node")}
-			return
-		}
-		// variables, _ := data.FromMap(p.variables)
-		variables := p.variables
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.index, p.node.Name).WithStopwatch().Entering()
-		defer tracer.Exiting()
+			hostLabel := fmt.Sprintf("node (%s)", p.node.Name)
+			logrus.WithContext(ctx).Debugf("[%s] starting configuration...", hostLabel)
 
-		hostLabel := fmt.Sprintf("node #%d (%s)", p.index, p.node.Name)
-		logrus.WithContext(ctx).Debugf("[%s] starting configuration...", hostLabel)
+			hostInstance, xerr := LoadHost(ctx, p.node.ID)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+				default:
+					ar := result{nil, fail.Wrap(xerr, "failed to get metadata of node '%s'", p.node.Name)}
+					return ar, ar.rErr
+				}
+			}
 
-		hostInstance, xerr := LoadHost(ctx, p.node.ID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, fail.Wrap(xerr, "failed to get metadata of node '%s'", p.node.Name)}
-			return
-		}
+			does, xerr := hostInstance.Exists(ctx)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		// Docker and docker-compose installation is mandatory on all nodes
-		xerr = instance.installDocker(ctx, hostInstance, hostLabel, variables)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+			if !does {
+				return result{nil, nil}, nil
+			}
 
-		// Now configures node specifically for Cluster flavor
-		makers := instance.localCache.makers
-		if makers.ConfigureNode == nil {
-			chRes <- result{nil, nil}
-			return
-		}
+			// Docker and docker-compose installation is mandatory on all nodes
+			xerr = instance.installDocker(ctx, hostInstance, hostLabel, variables)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
 
-		xerr = makers.ConfigureNode(instance, p.index, hostInstance)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			logrus.WithContext(ctx).Error(xerr.Error())
-			chRes <- result{nil, xerr}
-			return
-		}
+			// Now configures node specifically for Cluster flavor
+			makers := instance.localCache.makers
+			if makers.ConfigureNode == nil {
+				return result{nil, nil}, nil
+			}
 
-		logrus.WithContext(ctx).Debugf("[%s] configuration successful.", hostLabel)
-		chRes <- result{nil, nil}
+			xerr = makers.ConfigureNode(instance, hostInstance)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				logrus.WithContext(ctx).Error(xerr.Error())
+				return result{nil, xerr}, xerr
+			}
 
+			logrus.WithContext(ctx).Debugf("[%s] configuration successful.", hostLabel)
+			return result{nil, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -3107,6 +2797,8 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 }
@@ -3116,61 +2808,79 @@ type machineID struct {
 	Name string
 }
 
-type taskDeleteNodeOnFailureParameters = machineID
+type taskDeleteNodeOnFailureParameters struct {
+	ID            string
+	Name          string
+	KeepOnFailure bool
+	Timeout       time.Duration
+}
 
 // taskDeleteNodeOnFailure deletes a node when a failure occurred
-func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskDeleteNodeOnFailure(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+	// Convert and validate params
+	node, ok := params.(taskDeleteNodeOnFailureParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeOnFailureParameters'")
+	}
+	if node.ID == "" {
+		return nil, fail.InvalidParameterError("ID", "must NOT be empty")
+	}
+	if node.KeepOnFailure {
+		return nil, nil
 	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
+
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		// Convert and validate params
-		casted, ok := params.(taskDeleteNodeOnFailureParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeOnFailureParameters'")}
-			return
-		}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		node := casted
-
-		hostInstance, xerr := LoadHost(ctx, node.ID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				logrus.WithContext(ctx).Tracef("Node %s not found, deletion considered successful", node.Name)
-				chRes <- result{nil, nil}
-				return
-			default:
-				chRes <- result{nil, xerr}
-				return
+			hostInstance, xerr := LoadHost(ctx, node.ID)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					_ = instance.Service().DeleteHost(ctx, node.ID)
+					return result{nil, nil}, nil
+				default:
+					return result{nil, xerr}, xerr
+				}
 			}
-		}
 
-		xerr = deleteHostOnFailure(ctx, hostInstance)
-		chRes <- result{nil, xerr}
+			xerr = hostInstance.Delete(ctx)
+			_ = instance.Service().DeleteHost(ctx, node.ID)
+			if xerr != nil {
+				return result{}, xerr
+			}
 
+			return result{nil, nil}, nil
+		}()
+		chRes <- gres
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
+	case <-time.After(node.Timeout):
+		cancel()
+		<-chRes
+		return nil, fail.TimeoutError(fmt.Errorf("timeout trying to delete node on failure"), node.Timeout)
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 }
@@ -3180,154 +2890,140 @@ type taskDeleteNodeParameters struct {
 	master *Host
 }
 
-// taskDeleteNode deletes one node
-func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
-	var xerr fail.Error
-
+func (instance *Cluster) taskDeleteNodeWithCtx(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+	// Convert and validate params
+	p, ok := params.(taskDeleteNodeParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")
+	}
+	if p.node == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.node")
+	}
+	if p.node.NumericalID == 0 {
+		return nil, fail.InvalidParameterError("params.node.NumericalID", "cannot be 0")
+	}
+	if p.node.ID == "" && p.node.Name == "" {
+		return nil, fail.InvalidParameterError("params.node.ID|params.node.Name", "ID or Name must be set")
+	}
+	nodeName := p.node.Name
+	if nodeName == "" {
+		nodeName = p.node.ID
 	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	if oldKey := ctx.Value("ID"); oldKey != nil {
+		ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/delete/node/%s", oldKey, nodeName)) // nolint
+	}
+
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
+
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		// Convert and validate params
-		p, ok := params.(taskDeleteNodeParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")}
-			return
-		}
-		if p.node == nil {
-			chRes <- result{nil, fail.InvalidParameterCannotBeNilError("params.node")}
-			return
-		}
-		if p.node.NumericalID == 0 {
-			chRes <- result{nil, fail.InvalidParameterError("params.node.NumericalID", "cannot be 0")}
-			return
-		}
-		if p.node.ID == "" && p.node.Name == "" {
-			chRes <- result{nil, fail.InvalidParameterError("params.node.ID|params.node.Name", "ID or Name must be set")}
-			return
-		}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		nodeName := p.node.Name
-		if nodeName == "" {
-			nodeName = p.node.ID
-		}
+			// FIXME: This is another mitigation....
+			trueNodeID := p.node.ID
 
-		logrus.WithContext(ctx).Debugf("Deleting Node '%s'", nodeName)
-		xerr = instance.deleteNode(ctx, p.node, p.master)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				logrus.WithContext(ctx).Debugf("Node %s not found, deletion considered successful", nodeName)
-				chRes <- result{nil, nil}
-				return
-			default:
-				chRes <- result{nil, xerr}
-				return
+			logrus.WithContext(ctx).Debugf("Deleting Node...")
+			xerr := instance.deleteNode(ctx, p.node, p.master)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+				default:
+					return result{nil, xerr}, xerr
+				}
 			}
-		}
 
-		logrus.WithContext(ctx).Debugf("Successfully deleted Node '%s'", nodeName)
-		chRes <- result{nil, nil}
+			// kill zombies (instances without metadata)
+			_ = instance.Service().DeleteHost(ctx, trueNodeID)
 
+			logrus.WithContext(ctx).Debugf("Successfully deleted Node '%s'", nodeName)
+			return result{nil, nil}, nil
+		}()
+		chRes <- gres
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
-
 }
 
 // taskDeleteMaster deletes one master
-func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskDeleteMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+	// Convert and validate params
+	p, ok := params.(taskDeleteNodeParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")
+	}
+	if p.node == nil {
+		return nil, fail.InvalidParameterError("params.node", "cannot be nil")
+	}
+	if p.node.ID == "" && p.node.Name == "" {
+		return nil, fail.InvalidParameterError("params.node.ID|params.node.Name", "ID or Name must be set")
+	}
+	nodeRef := p.node.Name
+	if nodeRef == "" {
+		nodeRef = p.node.ID
 	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	if oldKey := ctx.Value("ID"); oldKey != nil {
+		ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/delete/master/%s", oldKey, nodeRef)) // nolint
+	}
+
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		// Convert and validate params
-		p, ok := params.(taskDeleteNodeParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")}
-			return
-		}
-		if p.node == nil {
-			chRes <- result{nil, fail.InvalidParameterError("params.node", "cannot be nil")}
-			return
-		}
-		if p.node.ID == "" && p.node.Name == "" {
-			chRes <- result{nil, fail.InvalidParameterError("params.node.ID|params.node.Name", "ID or Name must be set")}
-			return
-		}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		nodeRef := p.node.Name
-		if nodeRef == "" {
-			nodeRef = p.node.ID
-		}
-
-		host, xerr := LoadHost(ctx, nodeRef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				logrus.WithContext(ctx).Tracef("Master %s not found, deletion considered successful", p.node.Name)
-				chRes <- result{nil, nil}
-				return
-			default:
-				chRes <- result{nil, xerr}
-				return
+			logrus.WithContext(ctx).Debugf("Deleting Master %s", nodeRef)
+			trueMasterID := p.node.ID
+			xerr := instance.deleteMaster(ctx, trueMasterID)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+				default:
+					return result{nil, xerr}, xerr
+				}
 			}
-		}
 
-		logrus.WithContext(ctx).Debugf("Deleting Master '%s'", p.node.Name)
-		xerr = instance.deleteMaster(ctx, host)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				logrus.WithContext(ctx).Debugf("Master %s not found, deletion considered successful", p.node.Name)
-				chRes <- result{nil, nil}
-				return
-			default:
-				chRes <- result{nil, xerr}
-				return
-			}
-		}
+			// kill zombies (instances without metadata)
+			svc := instance.Service()
+			_ = svc.DeleteHost(ctx, trueMasterID)
 
-		logrus.WithContext(ctx).Debugf("Successfully deleted Master '%s'", p.node.Name)
-		chRes <- result{nil, nil}
-
+			logrus.WithContext(ctx).Debugf("Successfully deleted Master '%s'", p.node.Name)
+			return result{nil, nil}, nil
+		}()
+		chRes <- gres
 	}()
 	select {
 	case res := <-chRes:
@@ -3335,30 +3031,10 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
-}
-
-// deleteHostOnFailure deletes a Host with appropriate logs
-func deleteHostOnFailure(ctx context.Context, instance resources.Host) fail.Error {
-	prefix := "Cleaning up on failure, "
-	hostName := instance.GetName()
-	logrus.WithContext(ctx).Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
-
-	xerr := instance.Delete(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			logrus.WithContext(ctx).Tracef("Host %s not found, deletion considered successful", hostName)
-			return nil
-		default:
-			return xerr
-		}
-	}
-
-	logrus.WithContext(ctx).Debugf(prefix + fmt.Sprintf("successfully deleted Host '%s'", hostName))
-	return nil
 }
 
 type taskUpdateClusterInventoryMasterParameters struct {
@@ -3368,48 +3044,50 @@ type taskUpdateClusterInventoryMasterParameters struct {
 }
 
 // taskUpdateClusterInventoryMaster task to update a Host (master) ansible inventory
-func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, _ fail.Error) {
+func (instance *Cluster) taskUpdateClusterInventoryMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+	// Convert and validate params
+	casted, ok := params.(taskUpdateClusterInventoryMasterParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskUpdateClusterInventoryMasterParameters'")
 	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
+
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		// Convert and validate params
-		casted, ok := params.(taskUpdateClusterInventoryMasterParameters)
-		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "must be a 'taskUpdateClusterInventoryMasterParameters'")}
-			return
-		}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		xerr := instance.updateClusterInventoryMaster(ctx, casted.master, casted.inventoryData)
-		chRes <- result{nil, xerr}
-
+			xerr := instance.updateClusterInventoryMaster(ctx, casted)
+			return result{nil, xerr}, xerr
+		}()
+		chRes <- gres
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return nil, fail.ConvertError(inctx.Err())
 	}
 }
 
 // updateClusterInventoryMaster updates a Host (master) ansible inventory
-func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, master resources.Host, inventoryData string) (ferr fail.Error) {
+func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, param taskUpdateClusterInventoryMasterParameters) (ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -3418,11 +3096,24 @@ func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, mas
 	}
 	chRes := make(chan result)
 	go func() {
+		defer fail.OnPanic(&ferr)
 		defer close(chRes)
 
 		timings, xerr := instance.Service().Timings()
 		if xerr != nil {
 			chRes <- result{xerr}
+			return
+		}
+
+		master := param.master
+		inventoryData := param.inventoryData
+		does, xerr := master.Exists(ctx)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+		if !does {
+			chRes <- result{nil}
 			return
 		}
 
@@ -3435,7 +3126,7 @@ func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, mas
 		target := fmt.Sprintf("%s/ansible/inventory/", utils.EtcFolder)
 		commands := []string{
 			fmt.Sprintf("[ -f %s_inventory.py ] && sudo rm -f %s_inventory.py || exit 0", target, target),
-			fmt.Sprintf("sudo mv %s %s_inventory.py", rfcItem.Remote, target),
+			fmt.Sprintf("sudo mkdir -p %s && sudo mv %s %s_inventory.py", target, rfcItem.Remote, target),
 			fmt.Sprintf("sudo chown cladm:root %s_inventory.py", target),
 			fmt.Sprintf("ansible-inventory -i %s_inventory.py --list", target),
 			fmt.Sprintf("[ -f %sinventory.py ] && sudo rm -f %sinventory.py  || exit 0", target, target),
@@ -3499,12 +3190,15 @@ func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, mas
 
 		chRes <- result{nil}
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rErr
 	case <-ctx.Done():
 		return fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
+		<-chRes
 		return fail.ConvertError(inctx.Err())
 	}
 }

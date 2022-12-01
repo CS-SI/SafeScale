@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 //go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/backend/handlers.ShareHandler -o mocks/mock_share.go
@@ -191,7 +190,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 
 		xerr = host.Inspect(task.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.SharesV1, func(p clonable.Clonable) fail.Error {
-				hostSharesV1, innerErr := lang.Cast[*propertiesv1.HostShares](p)
+				hostSharesV1, innerErr := clonable.Cast[*propertiesv1.HostShares](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}

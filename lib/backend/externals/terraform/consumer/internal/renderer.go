@@ -186,6 +186,7 @@ func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fa
 		lvars := variables.Clone()
 		// lvars.Merge(map[string]any{"Resource": r.ToMap()})
 		lvars.Merge(map[string]any{"Resource": r})
+		lvars["Extra"] = r.Extra()
 		content, xerr := instance.RealizeSnippet(embeddedFS, r.TerraformSnippet(), lvars)
 		if xerr != nil {
 			return "", xerr
@@ -747,4 +748,16 @@ func (instance *renderer) Close() fail.Error {
 	instance.lastFilename = ""
 	instance.closed = true
 	return nil
+}
+
+// WorkDir returns the path where the renderer puts its production
+func (instance *renderer) WorkDir() (string, fail.Error) {
+	if valid.IsNull(instance) {
+		return "", fail.InvalidInstanceError()
+	}
+
+	instance.mu.Lock()
+	defer instance.mu.Unlock()
+
+	return instance.buildPath, nil
 }

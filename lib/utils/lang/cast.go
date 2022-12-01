@@ -27,13 +27,20 @@ import (
 // Cast casts a variable to another type and validate
 func Cast[T any](in any) (T, error) {
 	empty := new(T)
+
 	if in == nil {
-		return *empty, fail.InconsistentError("invalid parameter 'in': cannot be nil")
+		return *empty, fail.InvalidParameterCannotBeNilError("in")
+	}
+
+	// Note: failed to find a way for now to determine if 'in' is typed nil (like *string(nil)) other than using reflection...
+	r := reflect.ValueOf(in)
+	if r.Kind() == reflect.Ptr && r.IsNil() {
+		return *empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	out, ok := in.(T)
 	if !ok {
-		return *empty, fail.InconsistentError("failed to cast, expected '%s', provided '%s'", reflect.TypeOf(empty).String(), reflect.TypeOf(in).String())
+		return *empty, fail.InconsistentError("failed to cast, expected '%s', provided '%s'", reflect.TypeOf(*empty).String(), reflect.TypeOf(in).String())
 	}
 
 	return out, nil

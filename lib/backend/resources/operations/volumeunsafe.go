@@ -25,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // unsafeGetSpeed ...
@@ -33,7 +32,7 @@ import (
 func (instance *volume) unsafeGetSpeed(ctx context.Context) (volumespeed.Enum, fail.Error) {
 	var speed volumespeed.Enum
 	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		av, innerErr := lang.Cast[*abstract.Volume](p)
+		av, innerErr := clonable.Cast[*abstract.Volume](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -54,7 +53,7 @@ func (instance *volume) unsafeGetSpeed(ctx context.Context) (volumespeed.Enum, f
 func (instance *volume) unsafeGetSize(ctx context.Context) (int, fail.Error) {
 	var size int
 	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		av, innerErr := lang.Cast[*abstract.Volume](p)
+		av, innerErr := clonable.Cast[*abstract.Volume](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}

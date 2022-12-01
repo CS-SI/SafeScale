@@ -17,15 +17,14 @@
 package abstract
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 const VolumeKind = "volume"
@@ -45,7 +44,7 @@ func (vr VolumeRequest) CleanOnFailure() bool {
 
 // Volume represents a block volume
 type Volume struct {
-	*Core
+	*core
 	ID    string           `json:"id,omitempty"`
 	Size  int              `json:"size,omitempty"`
 	Speed volumespeed.Enum `json:"speed"`
@@ -61,7 +60,7 @@ func NewVolume(opts ...Option) (*Volume, fail.Error) {
 	}
 
 	nv := &Volume{
-		Core: c,
+		core: c,
 	}
 	nv.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	nv.Tags["ManagedBy"] = "safescale"
@@ -77,7 +76,7 @@ func NewEmptyVolume() *Volume {
 // IsNull ...
 // satisfies interface clonable.Clonable
 func (v *Volume) IsNull() bool {
-	return v == nil || (v.ID == "" && v.Name == "")
+	return v == nil || (v.ID == "" && (v.Name == "" || v.Name == Unnamed))
 }
 
 // Clone ...
@@ -99,13 +98,13 @@ func (v *Volume) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*Volume](p)
+	src, err := clonable.Cast[*Volume](p)
 	if err != nil {
 		return err
 	}
 
 	*v = *src
-	v.Core, err = clonable.CastedClone[*Core](src.Core)
+	v.core, err = clonable.CastedClone[*core](src.core)
 	if err != nil {
 		return err
 	}
@@ -143,11 +142,11 @@ func (v *Volume) Deserialize(buf []byte) (ferr fail.Error) {
 	return fail.ConvertError(json.Unmarshal(buf, v))
 }
 
-// GetName returns the name of the volume
-// Satisfies interface data.Identifiable
-func (v *Volume) GetName() string {
-	return v.Name
-}
+// // GetName returns the name of the volume
+// // Satisfies interface data.Identifiable
+// func (v *Volume) GetName() string {
+// 	return v.Name
+// }
 
 // GetID returns the ID of the volume
 // Satisfies interface data.Identifiable

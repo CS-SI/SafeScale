@@ -51,15 +51,14 @@ type SecurityGroup interface {
 	Core
 	metadata.Metadata
 
-	AddRule(context.Context, *abstract.SecurityGroupRule) fail.Error                                               // returns true if the host is member of a cluster
-	AddRules(context.Context, abstract.SecurityGroupRules) fail.Error                                              // returns true if the host is member of a cluster
+	AddRules(context.Context, ...*abstract.SecurityGroupRule) fail.Error                                           // adds rules to Security Group
 	BindToHost(context.Context, Host, SecurityGroupActivation, SecurityGroupMark) fail.Error                       // binds a security group to a host
 	BindToSubnet(context.Context, Subnet, SecurityGroupActivation, SecurityGroupMark) fail.Error                   // binds a security group to a network
 	Browse(ctx context.Context, callback func(*abstract.SecurityGroup) fail.Error) fail.Error                      // browses the metadata folder of Security Groups and call the callback on each entry
 	Clear(ctx context.Context) fail.Error                                                                          // removes rules from the security group
 	Create(ctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules) fail.Error // creates a new host and its metadata
 	Delete(ctx context.Context, force bool) fail.Error                                                             // deletes the Security Group
-	DeleteRule(ctx context.Context, rule *abstract.SecurityGroupRule) fail.Error                                   // deletes a rule from a Security Group
+	DeleteRules(ctx context.Context, rules ...*abstract.SecurityGroupRule) fail.Error                              // deletes rules from a Security Group
 	GetBoundHosts(ctx context.Context) ([]*propertiesv1.SecurityGroupBond, fail.Error)                             // returns a slice of bonds corresponding to hosts bound to the security group
 	GetBoundSubnets(ctx context.Context) ([]*propertiesv1.SecurityGroupBond, fail.Error)                           // returns a slice of bonds corresponding to networks bound to the security group
 	Reset(ctx context.Context) fail.Error                                                                          // resets the rules of the security group from the ones registered in metadata

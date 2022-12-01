@@ -149,7 +149,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 		subnetReq.Name = networkReq.Name
 		subnetReq.CIDR = subnetNet.String()
 		subnetReq.KeepOnFailure = networkReq.KeepOnFailure
-		xerr = subnetInstance.Create(ctx, *subnetReq, gwName, gwSizing)
+		xerr = subnetInstance.Create(ctx, *subnetReq, gwName, gwSizing, nil)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", networkReq.Name)
 		}

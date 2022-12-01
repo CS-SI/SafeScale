@@ -102,7 +102,12 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		return nil, fail.ConvertError(err)
 	}
 
-	abstractSubnet, xerr := abstract.NewSubnet(abstract.WithName(req.Name), abstract.UseTerraformSnippet(designSubnetResourceSnippetPath))
+	opts := []abstract.Option{
+		abstract.WithName(req.Name),
+		abstract.UseTerraformSnippet(designSubnetResourceSnippetPath),
+		abstract.WithResourceType("openstack_networking_subnet_v2"),
+	}
+	abstractSubnet, xerr := abstract.NewSubnet(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -153,6 +158,7 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		return nil, xerr
 	}
 
+	// FIXME: should be necessary to add local Resource for router, and add it to Assemble... Otherwise it will be difficult to remove routers during Destroy...
 	def, xerr := renderer.Assemble(abstractSubnet)
 	if xerr != nil {
 		return nil, xerr
@@ -166,7 +172,7 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && req.CleanOnFailure() {
 			logrus.WithContext(ctx).Infof("cleaning up on failure, deleting Subnet '%s'", req.Name)
-			derr := renderer.Destroy(ctx, def, api.WithTarget(req.Name))
+			derr := renderer.Destroy(ctx, def, api.WithTarget(abstractSubnet))
 			if derr != nil {
 				_ = ferr.AddConsequence(derr)
 			}
@@ -239,7 +245,7 @@ func (p *provider) DeleteSubnet(ctx context.Context, id string) fail.Error {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.openstack"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("provider.ovhtf"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	// FIXME: implement like DeleteNetwork
 	return fail.NotImplementedError()

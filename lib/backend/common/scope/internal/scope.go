@@ -450,7 +450,7 @@ func (s *scope) loadSubnets(ctx context.Context, provider providerUsingTerraform
 
 func (s *scope) loadSecurityGroups(ctx context.Context, provider providerUsingTerraform) (ferr fail.Error) {
 	count := 0
-	defer s.loadLogHelper("Hosts", &ferr, &count)()
+	defer s.loadLogHelper("Security Groups", &ferr, &count)()
 
 	browser, xerr := securitygroupfactory.New(ctx)
 	if xerr != nil {

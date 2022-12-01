@@ -14,27 +14,26 @@
  * limitations under the License.
  */
 
-package ovhtf
+package clonable
 
 import (
-	"context"
+	"reflect"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-func (p *provider) ListRegions(ctx context.Context) ([]string, fail.Error) {
-	if valid.IsNull(p) {
-		return nil, fail.InvalidInstanceError()
+// Cast casts a variable to another type and validate
+func Cast[T any](in Clonable) (T, error) {
+	var empty T
+
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	return p.MiniStack.ListRegions(ctx)
-}
-
-func (p *provider) ListAvailabilityZones(ctx context.Context) (map[string]bool, fail.Error) {
-	if valid.IsNull(p) {
-		return nil, fail.InvalidInstanceError()
+	out, ok := in.(T)
+	if !ok {
+		return empty, fail.InconsistentError("failed to cast, expected '%s', provided '%s'", reflect.TypeOf(empty).String(), reflect.TypeOf(in).String())
 	}
 
-	return p.MiniStack.ListAvailabilityZones(ctx)
+	return out, nil
 }

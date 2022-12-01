@@ -18,12 +18,13 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"os"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -104,12 +105,11 @@ func (errp *StderrBridge) Print(data interface{}) {
 
 // PipeBridgeController is the controller of the bridges of pipe
 type PipeBridgeController struct {
-	// taskGroup concurrency.Task
 	count        uint
 	bridges      []PipeBridge
-	displayTask  concurrency.Task
+	displayTask  *errgroup.Group
 	displayCh    chan outputItem
-	readersGroup concurrency.TaskGroup
+	readersGroup *errgroup.Group
 }
 
 // NewPipeBridgeController creates a new controller of bridges of pipe
@@ -134,18 +134,14 @@ func NewPipeBridgeController(bridges ...PipeBridge) (*PipeBridgeController, fail
 }
 
 // Start initiates the capture of pipe outputs and the display of what is captured
-func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
+func (pbc *PipeBridgeController) Start(ctx context.Context) fail.Error {
 	if pbc == nil {
 		return fail.InvalidInstanceError()
 	}
 	if pbc.bridges == nil {
 		return fail.InvalidInstanceContentError("pbc.bridges", "cannot be nil")
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	ctx := task.Context()
 	select {
 	case <-ctx.Done():
 		return fail.AbortedError(ctx.Err())
@@ -159,26 +155,23 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 	}
 
 	// First starts the "displayer" routine...
-	var xerr fail.Error
-	if pbc.displayTask, xerr = concurrency.NewTaskWithContext(ctx); xerr != nil {
-		return xerr
-	}
+	pbc.displayTask = new(errgroup.Group)
 
 	pbc.displayCh = make(chan outputItem, pipeCount)
-	if _, xerr = pbc.displayTask.Start(taskDisplay, taskDisplayParameters{ch: pbc.displayCh}); xerr != nil {
-		return xerr
-	}
+	pbc.displayTask.Go(func() error {
+		_, err := taskDisplay(ctx, taskDisplayParameters{ch: pbc.displayCh})
+		return err
+	})
 
 	// ... then starts the "pipe readers"
-	taskGroup, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/pipebridges"))
-	if xerr != nil {
-		return xerr
-	}
+	taskGroup := new(errgroup.Group)
 
 	for _, v := range pbc.bridges {
-		if _, xerr = taskGroup.Start(taskRead, taskReadParameters{bridge: v, ch: pbc.displayCh}); xerr != nil {
-			return xerr
-		}
+		v := v
+		taskGroup.Go(func() error {
+			_, err := taskRead(ctx, taskReadParameters{bridge: v, ch: pbc.displayCh})
+			return err
+		})
 	}
 	pbc.readersGroup = taskGroup
 	return nil
@@ -201,34 +194,17 @@ type taskReadParameters struct {
 }
 
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
-func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func taskRead(ctx context.Context, p taskReadParameters) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-
-	ctx := task.Context()
 	select {
 	case <-ctx.Done():
 		return nil, fail.AbortedError(ctx.Err())
 	default:
 	}
 
-	if p == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("p")
-	}
-
-	params, ok := p.(taskReadParameters)
-	if !ok {
-		return nil, fail.InvalidParameterError("p", "must be a 'taskReadParameters'")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("cli")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	// bufio.Scanner.Scan() may panic...
-	scanner := bufio.NewScanner(params.bridge.Reader())
+	scanner := bufio.NewScanner(p.bridge.Reader())
 	scanner.Split(bufio.ScanLines)
 
 	var err error
@@ -245,10 +221,10 @@ func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrenc
 
 		if scanner.Scan() {
 			item := outputItem{
-				bridge: params.bridge,
+				bridge: p.bridge,
 				data:   scanner.Text() + "\n",
 			}
-			params.ch <- item
+			p.ch <- item
 		} else {
 			err = scanner.Err()
 			break
@@ -273,26 +249,17 @@ type taskDisplayParameters struct {
 	ch <-chan outputItem
 }
 
-func taskDisplay(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func taskDisplay(ctx context.Context, params taskDisplayParameters) (_ interface{}, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-
-	ctx := task.Context()
-	select {
-	case <-ctx.Done():
-		return nil, fail.AbortedError(ctx.Err())
-	default:
-	}
-
-	p, ok := params.(taskDisplayParameters)
-	if !ok {
-		return nil, fail.InvalidParameterError("p", "must be a 'taskDisplayParameters'")
-	}
-	for item := range p.ch {
+	for item := range params.ch {
 		item.Print()
+
+		select {
+		case <-ctx.Done():
+			return nil, fail.AbortedError(ctx.Err())
+		default:
+		}
 	}
 	return nil, nil
 }
@@ -309,13 +276,13 @@ func (pbc *PipeBridgeController) Wait() fail.Error {
 		return fail.InvalidInstanceContentError("pbc.readersGroup", "cannot be nil")
 	}
 
-	_, xerr := pbc.readersGroup.WaitGroup()
+	xerr := fail.ConvertError(pbc.readersGroup.Wait())
 	close(pbc.displayCh)
 	if xerr != nil {
 		return xerr
 	}
 
-	_, xerr = pbc.displayTask.Wait()
+	xerr = fail.ConvertError(pbc.displayTask.Wait())
 	return xerr
 }
 
@@ -332,23 +299,9 @@ func (pbc *PipeBridgeController) Stop() fail.Error {
 	}
 
 	// Try to wait the end of the task group
-	ok, _, xerr := pbc.readersGroup.TryWaitGroup()
+	xerr := fail.ConvertError(pbc.readersGroup.Wait())
 	if xerr != nil {
 		return xerr
-	}
-	if !ok {
-		// If not done, abort it and wait until the end
-		_ = pbc.readersGroup.Abort()
-		if xerr = pbc.Wait(); xerr != nil {
-			// In case of error, report only if error is not aborted error, as we triggered it
-			switch xerr.(type) {
-			case *fail.ErrAborted:
-				// do nothing
-				debug.IgnoreError(xerr)
-			default:
-				return xerr
-			}
-		}
 	}
 
 	*pbc = PipeBridgeController{}

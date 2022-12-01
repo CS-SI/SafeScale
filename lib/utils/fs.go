@@ -18,7 +18,6 @@ package utils
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -42,7 +41,7 @@ func LazyRemove(path string) fail.Error {
 func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, fail.Error) {
 	defaultTmpDir := os.TempDir()
 
-	f, err := ioutil.TempFile(defaultTmpDir, "")
+	f, err := os.CreateTemp(defaultTmpDir, "")
 	if err != nil {
 		return nil, fail.ExecutionError(err, "failed to create temporary file")
 	}

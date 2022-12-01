@@ -25,7 +25,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/davecgh/go-spew/spew"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
@@ -41,6 +40,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -300,22 +300,22 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool, ferr fail.Error) {
+func (instance stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	var emptyMap map[string]bool
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("StackDriver.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	var allPages pagination.Page
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			allPages, innerErr = az.List(s.ComputeClient).AllPages()
+			allPages, innerErr = az.List(instance.ComputeClient).AllPages()
 			return innerErr
 		},
 		NormalizeError,
@@ -345,19 +345,19 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool,
 }
 
 // SelectedAvailabilityZone returns the selected availability zone
-func (s stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	if s.selectedAvailabilityZone == "" {
-		cfg, err := s.AuthenticationOptions()
+	if instance.selectedAvailabilityZone == "" {
+		cfg, err := instance.AuthenticationOptions()
 		if err != nil {
 			return "", err
 		}
-		s.selectedAvailabilityZone = cfg.AvailabilityZone
-		if s.selectedAvailabilityZone == "" {
-			azList, xerr := s.ListAvailabilityZones(ctx)
+		instance.selectedAvailabilityZone = cfg.AvailabilityZone
+		if instance.selectedAvailabilityZone == "" {
+			azList, xerr := instance.ListAvailabilityZones(ctx)
 			if xerr != nil {
 				return "", xerr
 			}
@@ -365,16 +365,16 @@ func (s stack) SelectedAvailabilityZone(ctx context.Context) (string, fail.Error
 			for azone = range azList {
 				break
 			}
-			s.selectedAvailabilityZone = azone
+			instance.selectedAvailabilityZone = azone
 		}
-		logrus.WithContext(ctx).Debugf("Selected Availability Zone: '%s'", s.selectedAvailabilityZone)
+		logrus.WithContext(ctx).Debugf("Selected Availability Zone: '%s'", instance.selectedAvailabilityZone)
 	}
-	return s.selectedAvailabilityZone, nil
+	return instance.selectedAvailabilityZone, nil
 }
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
-func (s stack) GetAvailabilityZoneOfServer(ctx context.Context, serverID string) (string, fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) GetAvailabilityZoneOfServer(ctx context.Context, serverID string) (string, fail.Error) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -392,7 +392,7 @@ func (s stack) GetAvailabilityZoneOfServer(ctx context.Context, serverID string)
 	)
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			allPages, innerErr = servers.List(s.ComputeClient, nil).AllPages()
+			allPages, innerErr = servers.List(instance.ComputeClient, nil).AllPages()
 			return innerErr
 		},
 		NormalizeError,
@@ -416,34 +416,29 @@ func (s stack) GetAvailabilityZoneOfServer(ctx context.Context, serverID string)
 }
 
 // CreateHost creates a new host
-func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (instance stack) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return nil, nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 
 	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if len(request.Subnets) == 0 && !request.PublicIP {
-		return nil, nil, abstract.ResourceInvalidRequestError(
-			"host creation", "cannot create a host without public IP or without attached network",
-		)
+		return nil, nil, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
 	}
 
 	// Validating name of the host
 	if ok, xerr := validateHostname(request); !ok {
 		if xerr != nil {
-			return nil, nil, fail.InvalidRequestError(
-				"name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, xerr.Error(),
-			)
+			return nil, nil, fail.InvalidRequestError("name '%s' is invalid for a FlexibleEngine Host: %s", request.ResourceName, xerr.Error())
 		}
-		return nil, nil, fail.InvalidRequestError(
-			"name '%s' is invalid for a FlexibleEngine Host", request.ResourceName,
-		)
+
+		return nil, nil, fail.InvalidRequestError("name '%s' is invalid for a FlexibleEngine Host", request.ResourceName)
 	}
 
 	// The default Network is the first of the provided list, by convention
@@ -466,24 +461,24 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	// --- prepares data structures for Provider usage ---
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "bad timings")
 	}
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", timings)
+	xerr = userData.Prepare(instance.cfgOpts, request, defaultSubnet.CIDR, "", timings)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
-	template, xerr := s.InspectTemplate(ctx, request.TemplateID)
+	template, xerr := instance.InspectTemplate(ctx, request.TemplateID)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to get template")
 	}
 
-	rim, xerr := s.InspectImage(ctx, request.ImageID)
+	rim, xerr := instance.InspectImage(ctx, request.ImageID)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -518,7 +513,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 	}
 
 	// Select usable availability zone
-	zone, xerr := s.SelectedAvailabilityZone(ctx)
+	zone, xerr := instance.SelectedAvailabilityZone(ctx)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to select Availability Zone")
 	}
@@ -541,7 +536,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	metadata := make(map[string]string)
 	metadata["ManagedBy"] = "safescale"
-	metadata["DeclaredInBucket"] = s.cfgOpts.MetadataBucketName
+	metadata["DeclaredInBucket"] = instance.cfgOpts.MetadataBucketName
 	metadata["Image"] = request.ImageRef
 	metadata["Template"] = request.TemplateID
 	metadata["CreationDate"] = time.Now().Format(time.RFC3339)
@@ -577,41 +572,65 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 	ahc.PrivateKey = userData.FirstPrivateKey
 	ahc.Password = request.Password
 
+	if extra != nil {
+		into, ok := extra.(map[string]string)
+		if !ok {
+			return nil, nil, fail.InvalidParameterError("extra", "must be a map[string]string")
+		}
+		for k, v := range into {
+			ahc.Tags[k] = v
+		}
+	}
+
 	// --- query provider for host creation ---
 
 	// Retry creation until success, for 10 minutes
-	var (
-		r      servers.CreateResult
-		server *servers.Server
-	)
+	var finalServer *servers.Server
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() (extErr error) {
+					// FIXME: this should be inside retry code before calling the callback...
+					select {
+					case <-ctx.Done():
+						return retry.StopRetryError(ctx.Err())
+					default:
+					}
+
+					var r servers.CreateResult
 					var hr *http.Response
-					hr, r.Err = s.ComputeClient.Post( // nolint
-						s.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
+					hr, r.Err = instance.ComputeClient.Post( // nolint
+						instance.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
 							OkCodes: []int{200, 202},
 						},
 					)
 					defer closer(hr)
-					var innerErr error
-					server, innerErr = r.Extract()
+
+					server, innerErr := r.Extract()
 					xerr := normalizeError(innerErr)
 					if xerr != nil {
 						if server != nil && server.ID != "" {
-							derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
+							derr := servers.Delete(instance.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
 								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
 							}
 						}
+						switch xerr.(type) {
+						case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+							return retry.StopRetryError(xerr)
+						default:
+							return xerr
+						}
 					}
-					switch xerr.(type) {
-					case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
-						return retry.StopRetryError(xerr)
-					default:
-						return xerr
-					}
+
+					finalServer = server
+					return nil
 				},
 				normalizeError,
 			)
@@ -624,14 +643,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 				}
 			}
 
-			ahc.ID = server.ID
-			ahc.Name = server.Name
+			ahc.ID = finalServer.ID
+			ahc.Name = finalServer.Name
 
 			if ahc.ID == "" {
 				return fail.InconsistentError("machine created with empty id")
 			}
 
-			creationZone, zoneErr := s.GetAvailabilityZoneOfServer(ctx, server.ID)
+			creationZone, zoneErr := instance.GetAvailabilityZoneOfServer(ctx, finalServer.ID)
 			if zoneErr != nil {
 				logrus.WithContext(ctx).Tracef("Host successfully created but cannot confirm Availability Zone: %s", zoneErr)
 			} else {
@@ -646,8 +665,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 			defer func() {
 				if innerXErr != nil {
-					if server != nil && server.ID != "" {
-						derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
+					if finalServer != nil && finalServer.ID != "" {
+						derr := servers.Delete(instance.ComputeClient, finalServer.ID).ExtractErr()
 						if derr != nil {
 							logrus.WithContext(ctx).Errorf("cleaning up on failure, failed to delete host: %s", derr.Error())
 						}
@@ -656,21 +675,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 			}()
 
 			// Wait that host is ready, not just that the build is started
-			// FIXME: timings.HostOperationTimeout() may not be sufficient time to wait when hosts are created in parallel...
-			//       at least with it's current default value of 2 minutes and at least for flexibleengine provider
-			//       We should think of a way to increase this timing based on number of hosts are created
-			server, innerXErr = s.WaitHostState(ctx, ahc, hoststate.Started, 2*timings.HostOperationTimeout())
+			finalServer, innerXErr = instance.WaitHostState(ctx, ahc, hoststate.Started, 2*timings.HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					if server != nil {
-						ahc.ID = server.ID
-						ahc.Name = server.Name
-						ahc.LastState = hoststate.Error
-					}
-
+					_ = instance.DeleteHost(cleanupContextFrom(ctx), finalServer.ID)
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
+					_ = instance.DeleteHost(cleanupContextFrom(ctx), finalServer.ID)
 					return innerXErr
 				}
 			}
@@ -695,7 +707,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			if ahc.IsConsistent() {
-				derr := s.DeleteHost(context.Background(), ahc.ID)
+				derr := instance.DeleteHost(cleanupContextFrom(ctx), ahc.ID)
 				if derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
@@ -713,7 +725,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		}
 	}()
 
-	host, xerr = s.complementHost(ctx, ahc, server)
+	host, xerr = instance.complementHost(ctx, ahc, finalServer)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -727,7 +739,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 
 	if request.PublicIP {
 		var fip *FloatingIP
-		if fip, xerr = s.attachFloatingIP(ctx, host); xerr != nil {
+		if fip, xerr = instance.attachFloatingIP(ctx, host); xerr != nil {
 			return nil, userData, fail.Wrap(xerr, "error attaching public IP for host '%s'", request.ResourceName)
 		}
 		if fip == nil {
@@ -738,7 +750,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := s.DeleteFloatingIP(context.Background(), fip.ID)
+				derr := instance.DeleteFloatingIP(cleanupContextFrom(ctx), fip.ID)
 				if derr != nil {
 					logrus.WithContext(ctx).Errorf("Error deleting Floating IP: %v", derr)
 					_ = ferr.AddConsequence(derr)
@@ -754,14 +766,14 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ho
 		userData.PublicIP = fip.PublicIPAddress
 
 		if isGateway {
-			xerr = s.enableHostRouterMode(ctx, host)
+			xerr = instance.enableHostRouterMode(ctx, host)
 			if xerr != nil {
 				return nil, userData, fail.Wrap(xerr, "error enabling gateway mode of host '%s'", request.ResourceName)
 			}
 		}
 	}
 
-	logrus.Infoln(msgSuccess)
+	logrus.WithContext(ctx).Infoln(msgSuccess)
 	return host, userData, nil
 }
 
@@ -830,21 +842,21 @@ func extractImage(in *images.Image) (_ abstract.Image, ferr fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("StackDriver.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var img *images.Image
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			aimg, innerErr := images.Get(s.ComputeClient, id).Extract()
+			aimg, innerErr := images.Get(instance.ComputeClient, id).Extract()
 			if innerErr != nil {
 				return innerErr
 			}
@@ -884,10 +896,10 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 // InspectHost updates the data inside host with the data from provider
 // Returns:
 // - *abstract.HostFull, nil if no error occurs
-func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
+func (instance stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -896,12 +908,12 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 		return nil, xerr
 	}
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	server, xerr := s.WaitHostState(ctx, ahf, hoststate.Any, timings.OperationTimeout())
+	server, xerr := instance.WaitHostState(ctx, ahf, hoststate.Any, timings.OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -921,7 +933,7 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 		return nil, abstract.ResourceNotFoundError("host", hostRef)
 	}
 
-	host, xerr = s.complementHost(ctx, ahf.HostCore, server)
+	host, xerr = instance.complementHost(ctx, ahf.HostCore, server)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -933,14 +945,14 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages(ctx context.Context, _ bool) (imgList []*abstract.Image, ferr fail.Error) {
+func (instance stack) ListImages(ctx context.Context, _ bool) (imgList []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
@@ -950,7 +962,7 @@ func (s stack) ListImages(ctx context.Context, _ bool) (imgList []*abstract.Imag
 	}
 
 	// Retrieve a pager (i.e. a paginated collection)
-	pager := images.List(s.ComputeClient, opts)
+	pager := images.List(instance.ComputeClient, opts)
 
 	// Define an anonymous function to be executed on each page's iteration
 	imgList = []*abstract.Image{}
@@ -975,12 +987,12 @@ func (s stack) ListImages(ctx context.Context, _ bool) (imgList []*abstract.Imag
 
 // ListTemplates lists available Host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTemplate, fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTemplate, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("StackDriver.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	opts := flavors.ListOpts{}
@@ -988,7 +1000,7 @@ func (s stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTempl
 	var flvList []*abstract.HostTemplate
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return flavors.ListDetail(s.ComputeClient, opts).EachPage(
+			return flavors.ListDetail(instance.ComputeClient, opts).EachPage(
 				func(page pagination.Page) (bool, error) {
 					list, err := flavors.ExtractFlavors(page)
 					if err != nil {
@@ -1029,10 +1041,10 @@ func (s stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTempl
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(ctx context.Context, host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, ferr fail.Error) {
+func (instance stack) complementHost(ctx context.Context, host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	networks, addresses, ipv4, ipv6, xerr := s.collectAddresses(ctx, host)
+	networks, addresses, ipv4, ipv6, xerr := instance.collectAddresses(ctx, host)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1121,7 +1133,7 @@ func (s stack) complementHost(ctx context.Context, host *abstract.HostCore, serv
 	var errors []error
 	for subnetID, subnetName := range completedHost.Networking.SubnetsByID {
 		if subnetName == "" {
-			subnet, xerr := s.InspectSubnet(ctx, subnetID)
+			subnet, xerr := instance.InspectSubnet(ctx, subnetID)
 			if xerr != nil {
 				logrus.WithContext(ctx).Errorf("failed to get network '%s'", subnetID)
 				errors = append(errors, xerr)
@@ -1141,7 +1153,7 @@ func (s stack) complementHost(ctx context.Context, host *abstract.HostCore, serv
 // collectAddresses converts adresses returned by the OpenStack driver
 // Returns string slice containing the name of the networks, string map of IP addresses
 // (indexed on network name), public ipv4 and ipv6 (if they exists)
-func (s stack) collectAddresses(ctx context.Context, host *abstract.HostCore) ([]string, map[ipversion.Enum]map[string]string, string, string, fail.Error) {
+func (instance stack) collectAddresses(ctx context.Context, host *abstract.HostCore) ([]string, map[ipversion.Enum]map[string]string, string, string, fail.Error) {
 	var (
 		networks      []string
 		addrs         = map[ipversion.Enum]map[string]string{}
@@ -1152,7 +1164,7 @@ func (s stack) collectAddresses(ctx context.Context, host *abstract.HostCore) ([
 
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			innerErr := s.listInterfaces(host.ID).EachPage(
+			innerErr := instance.listInterfaces(host.ID).EachPage(
 				func(page pagination.Page) (bool, error) {
 					list, err := nics.ExtractInterfaces(page)
 					if err != nil {
@@ -1178,7 +1190,7 @@ func (s stack) collectAddresses(ctx context.Context, host *abstract.HostCore) ([
 		for _, address := range item.FixedIPs {
 			fixedIP := address.IPAddress
 			ipv4 := net.ParseIP(fixedIP).To4() != nil
-			if item.NetID == s.cfgOpts.ProviderNetwork {
+			if item.NetID == instance.cfgOpts.ProviderNetwork {
 				if ipv4 {
 					AcccessIPv4 = fixedIP
 				} else {
@@ -1197,16 +1209,16 @@ func (s stack) collectAddresses(ctx context.Context, host *abstract.HostCore) ([
 }
 
 // ListHosts lists available hosts
-func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
+func (instance stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
 	var emptyList abstract.HostList
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 
 	var hostList abstract.HostList
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return servers.List(s.ComputeClient, servers.ListOpts{}).EachPage(
+			return servers.List(instance.ComputeClient, servers.ListOpts{}).EachPage(
 				func(page pagination.Page) (bool, error) {
 					list, err := servers.ExtractServers(page)
 					if err != nil {
@@ -1218,7 +1230,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 						h.ID = srv.ID
 						var ah *abstract.HostFull
 						if details {
-							ah, err = s.complementHost(ctx, h, &srv)
+							ah, err = instance.complementHost(ctx, h, &srv)
 							if err != nil {
 								return false, err
 							}
@@ -1237,13 +1249,13 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 	if xerr != nil {
 		return emptyList, xerr
 	}
-	// VPL: empty host list is not an abnormal situation, do not log or raise error
+
 	return hostList, nil
 }
 
 // DeleteHost deletes the host identified by id
-func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
-	if valid.IsNil(s) {
+func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -1252,18 +1264,18 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 		return xerr
 	}
 
-	_, xerr = s.InspectHost(ctx, ahf)
+	_, xerr = instance.InspectHost(ctx, ahf)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable: // It's in ERROR state, but it's there
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return xerr
 		}
 	}
 
-	if s.cfgOpts.UseFloatingIP {
-		fip, xerr := s.getFloatingIPOfHost(ctx, ahf.ID)
+	if instance.cfgOpts.UseFloatingIP {
+		fip, xerr := instance.getFloatingIPOfHost(ctx, ahf.ID)
 		if xerr != nil {
 			return xerr
 		}
@@ -1273,7 +1285,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 			retryErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
 					err := floatingips.DisassociateInstance(
-						s.ComputeClient, ahf.ID, floatingips.DisassociateOpts{
+						instance.ComputeClient, ahf.ID, floatingips.DisassociateOpts{
 							FloatingIP: fip.IP,
 						},
 					).ExtractErr()
@@ -1288,7 +1300,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 			// then delete it.
 			retryErr = stacks.RetryableRemoteCall(ctx,
 				func() error {
-					err := floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
+					err := floatingips.Delete(instance.ComputeClient, fip.ID).ExtractErr()
 					return normalizeError(err)
 				},
 				normalizeError,
@@ -1300,7 +1312,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 
 	}
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -1309,11 +1321,17 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	resourcePresent := true
 	outerRetryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			// 1st, send delete host order
 			if resourcePresent { // nolint
 				innerRetryErr := stacks.RetryableRemoteCall(ctx,
 					func() error {
-						innerErr := servers.Delete(s.ComputeClient, ahf.ID).ExtractErr()
+						innerErr := servers.Delete(instance.ComputeClient, ahf.ID).ExtractErr()
 						return normalizeError(innerErr)
 					},
 					normalizeError,
@@ -1332,9 +1350,15 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 				var host *servers.Server
 				innerRetryErr = retry.WhileUnsuccessful(
 					func() error {
+						select {
+						case <-ctx.Done():
+							return retry.StopRetryError(ctx.Err())
+						default:
+						}
+
 						commRetryErr := stacks.RetryableRemoteCall(ctx,
 							func() (innerErr error) {
-								host, innerErr = servers.Get(s.ComputeClient, hostRef).Extract()
+								host, innerErr = servers.Get(instance.ComputeClient, hostRef).Extract()
 								return normalizeError(innerErr)
 							},
 							normalizeError,
@@ -1394,11 +1418,11 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to a host
-func (s stack) getFloatingIPOfHost(ctx context.Context, hostID string) (*floatingips.FloatingIP, fail.Error) {
+func (instance stack) getFloatingIPOfHost(ctx context.Context, hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			innerErr := floatingips.List(s.ComputeClient).EachPage(
+			innerErr := floatingips.List(instance.ComputeClient).EachPage(
 				func(page pagination.Page) (bool, error) {
 					list, err := floatingips.ExtractFloatingIPs(page)
 					if err != nil {
@@ -1431,15 +1455,15 @@ func (s stack) getFloatingIPOfHost(ctx context.Context, hostID string) (*floatin
 }
 
 // attachFloatingIP creates a Floating IP and attaches it to a host
-func (s stack) attachFloatingIP(ctx context.Context, host *abstract.HostFull) (*FloatingIP, fail.Error) {
-	fip, xerr := s.CreateFloatingIP(ctx, host)
+func (instance stack) attachFloatingIP(ctx context.Context, host *abstract.HostFull) (*FloatingIP, fail.Error) {
+	fip, xerr := instance.CreateFloatingIP(ctx, host)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = s.AssociateFloatingIP(ctx, host.HostCore, fip.ID)
+	xerr = instance.AssociateFloatingIP(ctx, host.HostCore, fip.ID)
 	if xerr != nil {
-		rerr := s.DeleteFloatingIP(ctx, fip.ID)
+		rerr := instance.DeleteFloatingIP(ctx, fip.ID)
 		if rerr != nil {
 			logrus.WithContext(ctx).Warnf("Error deleting floating ip: %v", rerr)
 			_ = xerr.AddConsequence(rerr)
@@ -1451,12 +1475,12 @@ func (s stack) attachFloatingIP(ctx context.Context, host *abstract.HostFull) (*
 }
 
 // EnableHostRouterMode enables the host to act as a router/gateway.
-func (s stack) enableHostRouterMode(ctx context.Context, host *abstract.HostFull) fail.Error {
+func (instance stack) enableHostRouterMode(ctx context.Context, host *abstract.HostFull) fail.Error {
 	var (
 		portID *string
 	)
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -1464,8 +1488,14 @@ func (s stack) enableHostRouterMode(ctx context.Context, host *abstract.HostFull
 	// Sometimes, getOpenstackPortID doesn't find network interface, so let's retry in case it's a bad timing issue
 	retryErr := retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			var innerErr fail.Error
-			portID, innerErr = s.getOpenstackPortID(ctx, host)
+			portID, innerErr = instance.getOpenstackPortID(ctx, host)
 			if innerErr != nil {
 				return innerErr
 			}
@@ -1496,8 +1526,8 @@ func (s stack) enableHostRouterMode(ctx context.Context, host *abstract.HostFull
 				},
 			}
 			opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
-			_, innerErr := ports.Update(s.NetworkClient, *portID, opts).Extract()
-			return normalizeError(innerErr)
+			_, innerErr := ports.Update(instance.NetworkClient, *portID, opts).Extract()
+			return innerErr
 		},
 		normalizeError,
 	)
@@ -1508,10 +1538,10 @@ func (s stack) enableHostRouterMode(ctx context.Context, host *abstract.HostFull
 }
 
 // listInterfaces returns a pager of the interfaces attached to host identified by 'serverID'
-func (s stack) listInterfaces(hostID string) pagination.Pager {
-	url := s.ComputeClient.ServiceURL("servers", hostID, "os-interface")
+func (instance stack) listInterfaces(hostID string) pagination.Pager {
+	url := instance.ComputeClient.ServiceURL("servers", hostID, "os-interface")
 	return pagination.NewPager(
-		s.ComputeClient, url, func(r pagination.PageResult) pagination.Page {
+		instance.ComputeClient, url, func(r pagination.PageResult) pagination.Page {
 			return nics.InterfacePage{SinglePageBase: pagination.SinglePageBase(r)}
 		},
 	)
@@ -1519,13 +1549,13 @@ func (s stack) listInterfaces(hostID string) pagination.Pager {
 
 // getOpenstackPortID returns the port ID corresponding to the first private IP address of the host
 // returns nil,nil if not found
-func (s stack) getOpenstackPortID(ctx context.Context, host *abstract.HostFull) (*string, fail.Error) {
+func (instance stack) getOpenstackPortID(ctx context.Context, host *abstract.HostFull) (*string, fail.Error) {
 	ip := host.Networking.IPv4Addresses[host.Networking.DefaultSubnetID]
 	found := false
 	nic := nics.Interface{}
 	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			innerErr := s.listInterfaces(host.ID).EachPage(
+			return instance.listInterfaces(host.ID).EachPage(
 				func(page pagination.Page) (bool, error) {
 					list, err := nics.ExtractInterfaces(page)
 					if err != nil {
@@ -1543,7 +1573,6 @@ func (s stack) getOpenstackPortID(ctx context.Context, host *abstract.HostFull) 
 					return true, nil
 				},
 			)
-			return normalizeError(innerErr)
 		},
 		normalizeError,
 	)
@@ -1567,6 +1596,8 @@ func toHostState(status string) hoststate.Enum {
 		return hoststate.Stopping
 	case "Stopped", "stopped", "SHUTOFF", "shutoff":
 		return hoststate.Stopped
+	case "":
+		return hoststate.Unknown
 	default:
 		return hoststate.Error
 	}

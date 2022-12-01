@@ -18,8 +18,8 @@ package listeners
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
@@ -48,11 +48,11 @@ func (s *FeatureListener) List(inctx context.Context, in *protocol.FeatureListRe
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil").ToGRPCStatus()
-	}
 	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	targetType, xerr := convertTargetType(in.GetTargetType())
@@ -108,9 +108,11 @@ func (s *FeatureListener) Inspect(inctx context.Context, in *protocol.FeatureDet
 		return nil, fail.InvalidInstanceError()
 	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	targetType, xerr := convertTargetType(in.GetTargetType())
 	if xerr != nil {
 		return nil, xerr
@@ -157,8 +159,11 @@ func (s *FeatureListener) Export(inctx context.Context, in *protocol.FeatureDeta
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	targetType, xerr := convertTargetType(in.GetTargetType())
@@ -210,8 +215,11 @@ func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActio
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	targetType, xerr := convertTargetType(in.GetTargetType())
@@ -289,8 +297,11 @@ func (s *FeatureListener) Add(inctx context.Context, in *protocol.FeatureActionR
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	targetType, xerr := convertTargetType(in.GetTargetType())
@@ -341,7 +352,10 @@ func (s *FeatureListener) Remove(inctx context.Context, in *protocol.FeatureActi
 		return empty, fail.InvalidInstanceError()
 	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	targetType, xerr := convertTargetType(in.GetTargetType())

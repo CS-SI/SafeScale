@@ -21,7 +21,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // NetworkSecurityGroups contains a list of security groups owned by the Network
@@ -63,7 +62,7 @@ func (nsg *NetworkSecurityGroups) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*NetworkSecurityGroups](p)
+	src, err := clonable.Cast[*NetworkSecurityGroups](p)
 	if err != nil {
 		return err
 	}

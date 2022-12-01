@@ -22,11 +22,9 @@ import (
 	"fmt"
 	"strings"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -34,6 +32,7 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -108,7 +107,7 @@ func NewKongController(ctx context.Context, subnet resources.Subnet, addressPrim
 		if results.Successful() {
 			xerr = addressedGateway.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-					featuresV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
+					featuresV1, innerErr := clonable.Cast[*propertiesv1.HostFeatures](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -190,7 +189,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 
 	// Sets the values usable in all cases
 	xerr = k.subnet.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, innerErr := lang.Cast[*abstract.Subnet](p)
+		as, innerErr := clonable.Cast[*abstract.Subnet](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -247,7 +246,6 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 		if xerr != nil {
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
-		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s': %v", ruleName, jsonContent)
 		return ruleName, k.addSourceControl(ctx, ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "route":
@@ -282,7 +280,6 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
 
-		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, k.addSourceControl(ctx, ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "upstream":
@@ -326,7 +323,6 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
 
-		logrus.WithContext(ctx).Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, nil
 
 	default:
@@ -381,7 +377,7 @@ func (k *KongController) addSourceControl(ctx context.Context, ruleName, url, re
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -464,13 +460,12 @@ func (k *KongController) post(ctx context.Context, name, url, data string, v *da
 	}
 
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, stderr, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
+	retcode, stdout, _, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr
 	}
 	if retcode != 0 {
-		logrus.WithContext(ctx).Debugf("submit of rule '%s' failed on primary gateway: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, "", fail.NewError("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 
@@ -499,13 +494,12 @@ func (k *KongController) put(ctx context.Context, name, url, data string, v *dat
 	}
 
 	cmd := fmt.Sprintf(curlPut, url, data)
-	retcode, stdout, stderr, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
+	retcode, stdout, _, xerr := k.gateway.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr
 	}
 	if retcode != 0 {
-		logrus.WithContext(ctx).Debugf("submit of rule '%s' failed: retcode=%d, stdout=>>%s<<, stderr=>>%s<<", name, retcode, stdout, stderr)
 		return nil, "", fail.NewError("submit of rule '%s' failed: retcode=%d", name, retcode)
 	}
 

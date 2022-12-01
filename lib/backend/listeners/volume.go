@@ -54,11 +54,11 @@ func (s *VolumeListener) List(inctx context.Context, in *protocol.VolumeListRequ
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	job, err := prepareJob(inctx, in, "/volumes/list")
@@ -101,14 +101,14 @@ func (s *VolumeListener) Create(inctx context.Context, in *protocol.VolumeCreate
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	name := in.GetName()
+
 	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/volume/%s/create", name))
 	if xerr != nil {
 		return nil, xerr
@@ -140,13 +140,12 @@ func (s *VolumeListener) Attach(inctx context.Context, in *protocol.VolumeAttach
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if inctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("inctx")
-	}
-
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for volume")
@@ -196,13 +195,12 @@ func (s *VolumeListener) Detach(inctx context.Context, in *protocol.VolumeDetach
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for volume")
@@ -241,11 +239,11 @@ func (s *VolumeListener) Delete(inctx context.Context, in *protocol.Reference) (
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
@@ -280,11 +278,11 @@ func (s *VolumeListener) Inspect(inctx context.Context, in *protocol.Reference) 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {

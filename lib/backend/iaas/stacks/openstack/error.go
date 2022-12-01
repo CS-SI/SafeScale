@@ -18,8 +18,8 @@ package openstack
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"net"
 	"net/url"
 	"reflect"

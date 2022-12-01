@@ -50,11 +50,11 @@ func CreateTaskQueue(size uint) *TaskQueue {
 		size:       size,
 		processing: false,
 		mu:         &sync.RWMutex{},
-		handlers:   make(map[string][]chan uint, 0),
+		handlers:   make(map[string][]chan uint),
 	}
 }
 
-// Add a task todo in taskqueue
+// Push add a task todo in taskqueue
 func (e *TaskQueue) Push(f func() (interface{}, fail.Error), timeout time.Duration) (interface{}, fail.Error) {
 
 	task := TaskItem{

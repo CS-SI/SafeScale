@@ -169,7 +169,7 @@ func (p *provider) Build(opt map[string]interface{}, _ options.Options) (_ iaasa
 		isSafe = true
 	}
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	var timings *temporal.MutableTimings
 	s := &temporal.MutableTimings{}
@@ -186,7 +186,7 @@ next:
 			SecretKey: get(identity, "SecretKey"),
 		},
 		Compute: outscale.ComputeConfiguration{
-			URL:                get(compute, "URL", fmt.Sprintf("https://iaasapi.%s.outscale.com/api/v1", region)),
+			URL:                get(compute, "URL", fmt.Sprintf("https://api.%s.outscale.com/api/v1", region)),
 			Service:            get(compute, "Service", "api"),
 			Region:             region,
 			Subregion:          get(compute, "Subregion"),

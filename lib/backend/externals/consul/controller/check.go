@@ -19,7 +19,7 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"os/exec"
 
 	"github.com/hashicorp/go-version"

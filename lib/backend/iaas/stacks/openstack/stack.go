@@ -20,11 +20,12 @@ import (
 	context2 "context"
 	"strings"
 
-	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 	"golang.org/x/net/context"
 
+	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -223,7 +224,7 @@ func New(auth iaasoptions.Authentication, authScope *gophercloud.AuthScope, cfg 
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return nil, xerr
 		}
@@ -241,7 +242,6 @@ func New(auth iaasoptions.Authentication, authScope *gophercloud.AuthScope, cfg 
 		if !zoneIsValidInput {
 			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", auth.AvailabilityZone, strings.Join(validZones, ","))
 		}
-
 	}
 
 	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
@@ -267,7 +267,7 @@ func (instance stack) GetStackName() (string, fail.Error) {
 
 // Timings returns the instance containing current timeout settings
 func (instance *stack) Timings() (temporal.Timings, fail.Error) {
-	if instance == nil {
+	if valid.IsNull(instance) {
 		return temporal.NewTimings(), fail.InvalidInstanceError()
 	}
 	if instance.MutableTimings == nil {

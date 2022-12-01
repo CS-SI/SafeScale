@@ -95,11 +95,16 @@ func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaas
 	}
 	params["Safe"] = isSafe
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	maxLifeTime := 0
 	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
+	machineCreationLimit := 8
+	if _, ok = compute["ConcurrentMachineCreationLimit"].(string); ok {
+		machineCreationLimit, _ = strconv.Atoi(compute["ConcurrentMachineCreationLimit"].(string))
 	}
 
 	operatorUsername := abstract.DefaultUser
@@ -188,15 +193,16 @@ next:
 			"Hdd": volumespeed.Hdd,
 			"Ssd": volumespeed.Ssd,
 		},
-		MetadataBucketName:       metadataBucketName,
-		DNSServers:               cloudferroDNSServers,
-		DefaultImage:             defaultImage,
-		OperatorUsername:         operatorUsername,
-		ProviderName:             providerName,
-		DefaultSecurityGroupName: "default",
-		MaxLifeTime:              maxLifeTime,
-		Timings:                  timings,
-		Safe:                     isSafe,
+		MetadataBucketName:             metadataBucketName,
+		DNSServers:                     cloudferroDNSServers,
+		DefaultImage:                   defaultImage,
+		OperatorUsername:               operatorUsername,
+		ProviderName:                   providerName,
+		DefaultSecurityGroupName:       "default",
+		MaxLifeTime:                    maxLifeTime,
+		Timings:                        timings,
+		Safe:                           isSafe,
+		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)

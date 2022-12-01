@@ -19,6 +19,9 @@ type CommonConfig struct {
 }
 
 func NewConfig(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig sshapi.Config, secondaryGatewayConfig sshapi.Config) *CommonConfig {
+	if port <= 0 {
+		port = 22
+	}
 	return &CommonConfig{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
@@ -28,7 +31,7 @@ func NewConfigFrom(ac sshapi.Config) (*CommonConfig, fail.Error) {
 	}
 
 	hostname, _ := ac.GetHostname()
-	IPAddress, _ := ac.GetIPAddress()
+	ipAddress, _ := ac.GetIPAddress()
 	port, _ := ac.GetPort()
 	user, _ := ac.GetUser()
 	privateKey, _ := ac.GetPrivateKey()
@@ -37,7 +40,7 @@ func NewConfigFrom(ac sshapi.Config) (*CommonConfig, fail.Error) {
 	gatewayConfig, _ := ac.GetPrimaryGatewayConfig()
 	secondaryGatewayConfig, _ := ac.GetSecondaryGatewayConfig()
 
-	return &CommonConfig{Hostname: hostname, IPAddress: IPAddress, Port: int(port), User: user, PrivateKey: privateKey, LocalPort: int(localPort), LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}, nil
+	return NewConfig(hostname, ipAddress, int(port), user, privateKey, int(localPort), localHost, gatewayConfig, secondaryGatewayConfig), nil
 }
 
 func (sconf CommonConfig) GetUser() (string, fail.Error) {

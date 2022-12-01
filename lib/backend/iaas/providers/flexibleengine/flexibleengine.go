@@ -144,11 +144,16 @@ func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaas
 	}
 	params["Safe"] = isSafe
 
-	logrus.Warningf("Setting safety to: %t", isSafe)
+	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
 	maxLifeTime := 0
 	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string)) // nolint
+	}
+
+	machineCreationLimit := 4
+	if _, ok = compute["ConcurrentMachineCreationLimit"].(string); ok {
+		machineCreationLimit, _ = strconv.Atoi(compute["ConcurrentMachineCreationLimit"].(string))
 	}
 
 	authOptions := iaasoptions.Authentication{
@@ -226,9 +231,10 @@ next:
 		// BlacklistTemplateRegexp: blacklistTemplatePattern,
 		// WhitelistImageRegexp:    whitelistImagePattern,
 		// BlacklistImageRegexp:    blacklistImagePattern,
-		MaxLifeTime: maxLifeTime,
-		Timings:     timings,
-		Safe:        isSafe,
+		MaxLifeTime:                    maxLifeTime,
+		Timings:                        timings,
+		Safe:                           isSafe,
+		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)

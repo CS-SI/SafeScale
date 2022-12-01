@@ -19,29 +19,29 @@ package huaweicloud
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 const defaultSecurityGroupName = "default"
 
 // ListSecurityGroups lists existing security groups
 // Parameter 'networkRef' is not used in Openstack (they are tenant-wide)
-func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
+func (instance stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	var emptySlice []*abstract.SecurityGroup
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -50,7 +50,7 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*ab
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			list = []*abstract.SecurityGroup{}
-			return secgroups.List(s.NetworkClient, opts).EachPage(func(page pagination.Page) (bool, error) {
+			return secgroups.List(instance.NetworkClient, opts).EachPage(func(page pagination.Page) (bool, error) {
 				l, err := secgroups.ExtractGroups(page)
 				if err != nil {
 					return false, err
@@ -74,15 +74,15 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*ab
 // Parameter 'networkRef' is not used in Openstack, Security Groups are tenant-wide.
 // Returns nil, *fail.ErrDuplicate if already 1 security group exists with that name
 // Returns nil, *fail.ErrDuplicate(with a cause *fail.ErrDuplicate) if more than 1 security group exist with that name
-func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) CreateSecurityGroup(ctx context.Context, networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	asg, xerr := s.InspectSecurityGroup(ctx, name)
+	asg, xerr := instance.InspectSecurityGroup(ctx, name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -90,7 +90,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 			if xerr != nil {
 				return nil, xerr
 			}
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		case *fail.ErrDuplicate:
 			// Special case : a duplicate error may come from OpenStack after normalization, because there are already more than 1
 			// security groups with the same name. In this situation, returns a DuplicateError with the xerr as cause
@@ -109,7 +109,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 	}
 	xerr = stacks.RetryableRemoteCall(ctx,
 		func() error {
-			r, innerErr := secgroups.Create(s.NetworkClient, createOpts).Extract()
+			r, innerErr := secgroups.Create(instance.NetworkClient, createOpts).Extract()
 			if innerErr != nil {
 				return innerErr
 			}
@@ -126,7 +126,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.DeleteSecurityGroup(context.Background(), asg)
+			derr := instance.DeleteSecurityGroup(context.Background(), asg)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete security group"))
 			}
@@ -134,24 +134,23 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 	}()
 
 	// In OpenStack, freshly created security group may contain default rules; we do not want them
-	asg, xerr = s.ClearSecurityGroup(ctx, asg)
+	asg, xerr = instance.ClearSecurityGroup(ctx, asg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// now adds security rules
 	asg.Rules = make(abstract.SecurityGroupRules, 0, len(rules))
-	for _, v := range rules {
-		if asg, xerr = s.AddRuleToSecurityGroup(ctx, asg, v); xerr != nil {
-			return nil, xerr
-		}
+	if asg, xerr = instance.AddRulesToSecurityGroup(ctx, asg, rules...); xerr != nil {
+		return nil, xerr
 	}
+
 	return asg, nil
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (ferr fail.Error) {
-	if valid.IsNull(s) {
+func (instance stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (ferr fail.Error) {
+	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
 	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupParameter(sgParam)
@@ -159,7 +158,7 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Security
 		return xerr
 	}
 	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
+		asg, xerr = instance.InspectSecurityGroup(ctx, asg.ID)
 		if xerr != nil {
 			return xerr
 		}
@@ -173,7 +172,7 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Security
 		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				for _, id := range v.IDs {
-					if innerErr := secrules.Delete(s.NetworkClient, id).ExtractErr(); innerErr != nil {
+					if innerErr := secrules.Delete(instance.NetworkClient, id).ExtractErr(); innerErr != nil {
 						return innerErr
 					}
 				}
@@ -189,15 +188,15 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Security
 	// delete security group
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return secgroups.Delete(s.NetworkClient, asg.ID).ExtractErr()
+			return secgroups.Delete(instance.NetworkClient, asg.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
 }
 
 // InspectSecurityGroup returns information about a security group
-func (s stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	asg, asgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
@@ -214,7 +213,7 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Securit
 				id = asg.ID
 			case asg.Name != "":
 				// FIXME: returning *groups.secgroup may be more convenient; currently, we read twice the same record
-				id, innerErr = getSGIDFromName(s.NetworkClient, asg.Name)
+				id, innerErr = getSGIDFromName(instance.NetworkClient, asg.Name)
 				if innerErr != nil {
 					return innerErr
 				}
@@ -222,7 +221,7 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Securit
 			if id == "" {
 				return fail.NotFoundError("failed to query Security Group %s", asgLabel)
 			}
-			r, innerErr = secgroups.Get(s.NetworkClient, id).Extract()
+			r, innerErr = secgroups.Get(instance.NetworkClient, id).Extract()
 			return innerErr
 		},
 		NormalizeError,
@@ -255,15 +254,15 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Securit
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (s stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
-	asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
+	asg, xerr = instance.InspectSecurityGroup(ctx, asg.ID)
 	if xerr != nil {
 		return asg, xerr
 	}
@@ -273,7 +272,7 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityG
 		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				for _, id := range v.IDs {
-					if innerErr := secrules.Delete(s.NetworkClient, id).ExtractErr(); innerErr != nil {
+					if innerErr := secrules.Delete(instance.NetworkClient, id).ExtractErr(); innerErr != nil {
 						return innerErr
 					}
 				}
@@ -381,10 +380,10 @@ func convertEtherTypeFromAbstract(in ipversion.Enum) secrules.RuleEtherType {
 	}
 }
 
-// AddRuleToSecurityGroup adds a rule to a security group
+// AddRulesToSecurityGroup adds rules to a security group
 // On success, return Security Group with added rule
-func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -395,181 +394,192 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam iaasapi.Secur
 	}
 
 	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
+		asg, xerr = instance.InspectSecurityGroup(ctx, asg.ID)
 		if xerr != nil {
 			return asg, xerr
 		}
 	}
 
-	if _, xerr = asg.Rules.IndexOfEquivalentRule(rule); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// continue
-			debug.IgnoreError(xerr)
+	for k, currentRule := range rules {
+		if _, xerr = asg.Rules.IndexOfEquivalentRule(currentRule); xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// continue
+				debug.IgnoreError(xerr)
+			default:
+				return asg, xerr
+			}
+		}
+
+		direction := convertDirectionFromAbstract(currentRule.Direction)
+		if direction == "" { // Invalid direction is not permitted
+			return asg, fail.InvalidRequestError("invalid value '%s' in 'Direction' field of rule #%d", currentRule.Direction, k)
+		}
+
+		var (
+			involved   []string
+			usesGroups bool
+		)
+		switch currentRule.Direction {
+		case securitygroupruledirection.Ingress:
+			involved = currentRule.Sources
+			usesGroups, xerr = currentRule.SourcesConcernGroups()
+			if xerr != nil {
+				return nil, xerr
+			}
+		case securitygroupruledirection.Egress:
+			involved = currentRule.Targets
+			usesGroups, xerr = currentRule.TargetsConcernGroups()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, fail.InvalidParameterError("in.Direction", "contains an unsupported value")
+		}
+
+		etherType := convertEtherTypeFromAbstract(currentRule.EtherType)
+		if etherType == "" { // If no valid EtherType is provided, force to IPv4
+			etherType = secrules.EtherType4
+		}
+
+		portFrom := currentRule.PortFrom
+		portTo := currentRule.PortTo
+		if portFrom == 0 && portTo != 0 {
+			portFrom = portTo
+		}
+		if portFrom != 0 && portTo == 0 {
+			portTo = portFrom
+		}
+		if portTo < portFrom {
+			portFrom, portTo = portTo, portFrom
+		}
+
+		createOpts := secrules.CreateOpts{
+			SecGroupID:   asg.ID,
+			EtherType:    etherType,
+			Direction:    direction,
+			Description:  currentRule.Description,
+			PortRangeMin: int(portFrom),
+			PortRangeMax: int(portTo),
+			Protocol:     secrules.RuleProtocol(currentRule.Protocol),
+		}
+
+		currentRule.IDs = make([]string, 0, len(involved))
+		if usesGroups {
+			for _, v := range involved {
+				createOpts.RemoteGroupID = v
+				createOpts.Description = currentRule.Description + " (" + v + ")"
+				xerr = stacks.RetryableRemoteCall(ctx,
+					func() error {
+						r, innerErr := secrules.Create(instance.NetworkClient, createOpts).Extract()
+						if innerErr != nil {
+							return innerErr
+						}
+						currentRule.IDs = append(currentRule.IDs, r.ID)
+						return nil
+					},
+					NormalizeError,
+				)
+				if xerr != nil {
+					return asg, xerr
+				}
+			}
+		} else {
+			for _, v := range involved {
+				createOpts.RemoteIPPrefix = v
+				createOpts.Description = currentRule.Description + " (" + v + ")"
+				xerr = stacks.RetryableRemoteCall(ctx,
+					func() error {
+						r, innerErr := secrules.Create(instance.NetworkClient, createOpts).Extract()
+						if innerErr != nil {
+							return innerErr
+						}
+						currentRule.IDs = append(currentRule.IDs, r.ID)
+						return nil
+					},
+					NormalizeError,
+				)
+				if xerr != nil {
+					return asg, xerr
+				}
+			}
+		}
+		asg.Rules = append(asg.Rules, currentRule)
+	}
+	return asg, nil
+}
+
+// DeleteRulesFromSecurityGroup deletes rules from a security group
+// Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
+func (instance stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	var xerr fail.Error
+	asg, _, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if !asg.IsConsistent() {
+		asg, xerr = instance.InspectSecurityGroup(ctx, asg.ID)
+		if xerr != nil {
 			return asg, xerr
 		}
 	}
 
-	direction := convertDirectionFromAbstract(rule.Direction)
-	if direction == "" { // Invalid direction is not permitted
-		return asg, fail.InvalidRequestError("invalid value '%s' in 'Direction' field of rule", rule.Direction)
-	}
-
-	var (
-		involved   []string
-		usesGroups bool
-	)
-	switch rule.Direction {
-	case securitygroupruledirection.Ingress:
-		involved = rule.Sources
-		usesGroups, xerr = rule.SourcesConcernGroups()
+	for idx, currentRule := range rules {
+		index, xerr := asg.Rules.IndexOfEquivalentRule(currentRule)
 		if xerr != nil {
-			return nil, xerr
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// continue
+				debug.IgnoreError(xerr)
+				continue
+			}
+			return asg, xerr
 		}
-	case securitygroupruledirection.Egress:
-		involved = rule.Targets
-		usesGroups, xerr = rule.TargetsConcernGroups()
+
+		ruleIDs := asg.Rules[index].IDs
+		xerr = stacks.RetryableRemoteCall(ctx,
+			func() error {
+				for k, v := range ruleIDs {
+					innerErr := secrules.Delete(instance.NetworkClient, v).ExtractErr()
+					if innerErr != nil {
+						innerXErr := NormalizeError(innerErr)
+						switch innerXErr.(type) {
+						case *fail.ErrNotFound:
+							// If rule not found on provider side, consider the deletion as successful and continue the loop
+							break
+						default:
+							return fail.Wrap(innerErr, "failed to delete provider rule #%d", k)
+						}
+					}
+				}
+				innerXErr := asg.RemoveRuleByIndex(index)
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				return nil
+			},
+			NormalizeError,
+		)
 		if xerr != nil {
-			return nil, xerr
-		}
-	default:
-		return nil, fail.InvalidParameterError("in.Direction", "contains an unsupported value")
-	}
-
-	etherType := convertEtherTypeFromAbstract(rule.EtherType)
-	if etherType == "" { // If no valid EtherType is provided, force to IPv4
-		etherType = secrules.EtherType4
-	}
-
-	portFrom := rule.PortFrom
-	portTo := rule.PortTo
-	if portFrom == 0 && portTo != 0 {
-		portFrom = portTo
-	}
-	if portFrom != 0 && portTo == 0 {
-		portTo = portFrom
-	}
-	if portTo < portFrom {
-		portFrom, portTo = portTo, portFrom
-	}
-
-	createOpts := secrules.CreateOpts{
-		SecGroupID:   asg.ID,
-		EtherType:    etherType,
-		Direction:    direction,
-		Description:  rule.Description,
-		PortRangeMin: int(portFrom),
-		PortRangeMax: int(portTo),
-		Protocol:     secrules.RuleProtocol(rule.Protocol),
-	}
-
-	rule.IDs = make([]string, 0, len(involved))
-	if usesGroups {
-		for _, v := range involved {
-			createOpts.RemoteGroupID = v
-			createOpts.Description = rule.Description + " (" + v + ")"
-			xerr = stacks.RetryableRemoteCall(ctx,
-				func() error {
-					r, innerErr := secrules.Create(s.NetworkClient, createOpts).Extract()
-					if innerErr != nil {
-						return innerErr
-					}
-					rule.IDs = append(rule.IDs, r.ID)
-					return nil
-				},
-				NormalizeError,
-			)
-			if xerr != nil {
-				return asg, xerr
-			}
-		}
-	} else {
-		for _, v := range involved {
-			createOpts.RemoteIPPrefix = v
-			createOpts.Description = rule.Description + " (" + v + ")"
-			xerr = stacks.RetryableRemoteCall(ctx,
-				func() error {
-					r, innerErr := secrules.Create(s.NetworkClient, createOpts).Extract()
-					if innerErr != nil {
-						return innerErr
-					}
-					rule.IDs = append(rule.IDs, r.ID)
-					return nil
-				},
-				NormalizeError,
-			)
-			if xerr != nil {
-				return asg, xerr
-			}
+			return asg, fail.Wrap(xerr, "failed to delete rule #%d", idx)
 		}
 	}
-	asg.Rules = append(asg.Rules, rule)
 
 	return asg, nil
 }
 
-// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
-// Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
-	if valid.IsNil(s) {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	var xerr fail.Error
-	asg, _, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
-		if xerr != nil {
-			return asg, xerr
-		}
-	}
-	if rule == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("rule")
-	}
-
-	index, xerr := asg.Rules.IndexOfEquivalentRule(rule)
-	if xerr != nil {
-		return asg, xerr
-	}
-	ruleIDs := asg.Rules[index].IDs
-
-	return asg, stacks.RetryableRemoteCall(ctx,
-		func() error {
-			for k, v := range ruleIDs {
-				innerErr := secrules.Delete(s.NetworkClient, v).ExtractErr()
-				if innerErr != nil {
-					innerXErr := NormalizeError(innerErr)
-					switch innerXErr.(type) {
-					case *fail.ErrNotFound:
-						// If rule not found on provider side, consider the deletion as successful and continue the loop
-						break
-					default:
-						return fail.Wrap(innerErr, "failed to delete provider rule #%d", k)
-					}
-				}
-			}
-			innerXErr := asg.RemoveRuleByIndex(index)
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			return nil
-		},
-		NormalizeError,
-	)
-}
-
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
-func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	cfg, err := s.ConfigurationOptions()
+	cfg, err := instance.ConfigurationOptions()
 	if err != nil {
 		return "", err
 	}
@@ -579,12 +589,12 @@ func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Er
 
 // EnableSecurityGroup enables a Security Group
 // Does actually nothing for openstack
-func (s stack) EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
+func (instance stack) EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
 	return fail.NotAvailableError("openstack cannot enable a Security Group")
 }
 
 // DisableSecurityGroup disables a Security Group
 // Does actually nothing for openstack
-func (s stack) DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
+func (instance stack) DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
 	return fail.NotAvailableError("openstack cannot disable a Security Group")
 }

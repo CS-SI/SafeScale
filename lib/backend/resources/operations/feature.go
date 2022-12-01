@@ -21,12 +21,11 @@ import (
 	"fmt"
 	"strings"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -36,7 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -151,7 +150,7 @@ func (instance *Feature) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := lang.Cast[*Feature](p)
+	src, err := clonable.Cast[*Feature](p)
 	if err != nil {
 		return err
 	}
@@ -306,16 +305,9 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
 		}
 
-		xerr := castedTarget.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-				hostFeaturesV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				_, found = hostFeaturesV1.Installed[instance.GetName()]
-				return nil
-			})
+		xerr := metadata.InspectProperty(ctx, castedTarget, hostproperty.FeaturesV1, func(hostFeaturesV1 *propertiesv1.HostFeatures) fail.Error {
+			_, found = hostFeaturesV1.Installed[instance.GetName()]
+			return nil
 		})
 		if xerr != nil {
 			return nil, xerr
@@ -342,18 +334,6 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 		if state != hoststate.Started {
 			return nil, fail.InvalidRequestError(fmt.Sprintf("cannot check feature on '%s', '%s' is NOT started", targetName, targetName))
 		}
-		// FIXME: Fix deadlock
-		/*
-			case resources.Cluster:
-				state, xerr := ata.GetState()
-				if xerr != nil {
-					return nil, xerr
-				}
-
-				if state != clusterstate.Nominal {
-					return nil, fail.InvalidRequestError(fmt.Sprintf("cannot check feature on '%s', '%s' is NOT nominal", targetName, targetName))
-				}
-		*/
 	default:
 	}
 
@@ -499,7 +479,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting addition of Feature '%s' on %s '%s'...", featureName, targetType, targetName), fmt.Sprintf("Ending addition of Feature '%s' on %s '%s'", featureName, targetType, targetName))()
+	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting addition of Feature '%s' on %s '%s'...", featureName, targetType, targetName), fmt.Sprintf("Ending addition of Feature '%s' on %s '%s' with err '%s'", featureName, targetType, targetName, ferr))()
 
 	installer, xerr := instance.determineInstallerForTarget(ctx, target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
@@ -598,7 +578,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		return results, xerr
 	}
 
-	xerr = unregisterOnSuccessfulHostsInCluster(ctx, instance.Scope(), target, instance, results)
+	xerr = unregisterOnSuccessfulHostsInCluster(ctx, target, instance, results)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -737,7 +717,7 @@ func registerOnSuccessfulHostsInCluster(ctx context.Context, scope scopeapi.Scop
 	return nil
 }
 
-func unregisterOnSuccessfulHostsInCluster(ctx context.Context, scope scopeapi.Scope, target resources.Targetable, installed resources.Feature, results resources.Results) fail.Error {
+func unregisterOnSuccessfulHostsInCluster(ctx context.Context, target resources.Targetable, installed resources.Feature, results resources.Results) fail.Error {
 	if target.TargetType() == featuretargettype.Cluster {
 		// Walk through results and register Feature in successful hosts
 		successfulHosts := map[string]struct{}{}

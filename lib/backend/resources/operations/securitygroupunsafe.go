@@ -20,8 +20,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -29,7 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -75,7 +73,7 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 
 		xerr := instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			var innerErr error
-			abstractSG, innerErr = lang.Cast[*abstract.SecurityGroup](p)
+			abstractSG, innerErr = clonable.Cast[*abstract.SecurityGroup](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -87,7 +85,7 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 			if !force {
 				// check bonds to hosts
 				innerXErr := props.Inspect(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-					hostsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
+					hostsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -114,7 +112,7 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 
 				// check bonds to subnets
 				innerXErr = props.Inspect(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-					subnetsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupSubnets](p)
+					subnetsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -144,7 +142,7 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 
 			// unbind from Subnets (which will unbind from Hosts attached to these Subnets...)
 			innerXErr := props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-				sgnV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupSubnets](p)
+				sgnV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -157,7 +155,7 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 
 			// unbind from the Hosts if there are remaining ones
 			innerXErr = props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-				sghV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
+				sghV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -193,6 +191,7 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 		chRes <- result{nil}
 
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rErr
@@ -201,7 +200,6 @@ func (instance *SecurityGroup) unsafeDelete(inctx context.Context, force bool) f
 	case <-inctx.Done():
 		return fail.ConvertError(inctx.Err())
 	}
-
 }
 
 // updateNetworkMetadataOnRemoval removes the reference to instance in Network metadata
@@ -238,7 +236,7 @@ func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(inctx context.Cont
 
 		xerr = networkInstance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(networkproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-				nsgV1, innerErr := lang.Cast[*propertiesv1.NetworkSecurityGroups](p)
+				nsgV1, innerErr := clonable.Cast[*propertiesv1.NetworkSecurityGroups](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -255,6 +253,7 @@ func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(inctx context.Cont
 		chRes <- result{nil}
 
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rErr
@@ -286,7 +285,7 @@ func (instance *SecurityGroup) unsafeClear(inctx context.Context) fail.Error {
 		defer close(chRes)
 
 		xerr := instance.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			asg, innerErr := lang.Cast[*abstract.SecurityGroup](p)
+			asg, innerErr := clonable.Cast[*abstract.SecurityGroup](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -295,8 +294,8 @@ func (instance *SecurityGroup) unsafeClear(inctx context.Context) fail.Error {
 			return innerXErr
 		})
 		chRes <- result{xerr}
-
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rErr
@@ -308,7 +307,7 @@ func (instance *SecurityGroup) unsafeClear(inctx context.Context) fail.Error {
 }
 
 // unsafeAddRule adds a rule to a security group
-func (instance *SecurityGroup) unsafeAddRule(inctx context.Context, rule *abstract.SecurityGroupRule) (ferr fail.Error) {
+func (instance *SecurityGroup) unsafeAddRules(inctx context.Context, rules ...*abstract.SecurityGroupRule) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -326,19 +325,21 @@ func (instance *SecurityGroup) unsafeAddRule(inctx context.Context, rule *abstra
 	go func() {
 		defer close(chRes)
 
-		xerr := rule.Validate()
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
+		for k, v := range rules {
+			xerr := v.Validate()
+			if xerr != nil {
+				chRes <- result{fail.Wrap(xerr, "failed to validate rule #%d", k)}
+				return
+			}
 		}
 
-		xerr = instance.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			asg, innerErr := lang.Cast[*abstract.SecurityGroup](p)
+		xerr := instance.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			asg, innerErr := clonable.Cast[*abstract.SecurityGroup](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
 
-			_, innerXErr := instance.Service().AddRuleToSecurityGroup(ctx, asg, rule)
+			_, innerXErr := instance.Service().AddRulesToSecurityGroup(ctx, asg, rules...)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -346,8 +347,8 @@ func (instance *SecurityGroup) unsafeAddRule(inctx context.Context, rule *abstra
 			return nil
 		})
 		chRes <- result{xerr}
-
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rErr
@@ -377,15 +378,8 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 	go func() {
 		defer close(chRes)
 
-		task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
 		// Unbind Security Group from Hosts attached to Subnet
-		_, xerr = instance.taskUnbindFromHostsAttachedToSubnet(task, params)
+		_, xerr := instance.taskUnbindFromHostsAttachedToSubnet(ctx, params)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
@@ -394,7 +388,7 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 		// Update instance metadata
 		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-				sgsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupSubnets](p)
+				sgsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -406,8 +400,8 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 			})
 		})
 		chRes <- result{xerr}
-
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rErr
@@ -416,7 +410,6 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(inctx context.Context, par
 	case <-inctx.Done():
 		return fail.ConvertError(inctx.Err())
 	}
-
 }
 
 // unsafeBindToSubnet binds the security group to a host
@@ -460,7 +453,7 @@ func (instance *SecurityGroup) unsafeBindToSubnet(inctx context.Context, abstrac
 
 		xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			if mark == resources.MarkSecurityGroupAsDefault {
-				asg, innerErr := lang.Cast[*abstract.SecurityGroup](p)
+				asg, innerErr := clonable.Cast[*abstract.SecurityGroup](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -473,7 +466,7 @@ func (instance *SecurityGroup) unsafeBindToSubnet(inctx context.Context, abstrac
 			}
 
 			return props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-				sgsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupSubnets](p)
+				sgsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -534,11 +527,11 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 		}
 
 		hn := hostInstance.GetName()
-		logrus.WithContext(ctx).Warningf("Binding security group %s to host %s", sgid, hn)
+		logrus.WithContext(ctx).Infof("Binding security group %s to host %s", sgid, hn)
 
 		xerr := instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			if mark == resources.MarkSecurityGroupAsDefault {
-				asg, innerErr := lang.Cast[*abstract.SecurityGroup](p)
+				asg, innerErr := clonable.Cast[*abstract.SecurityGroup](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -555,7 +548,7 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 			}
 
 			return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-				sghV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
+				sghV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -588,7 +581,7 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrDuplicate:
-							debug.IgnoreError(xerr)
+							debug.IgnoreErrorWithContext(ctx, xerr)
 							// continue
 						default:
 							return xerr
@@ -601,7 +594,7 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
-							debug.IgnoreError(xerr)
+							debug.IgnoreErrorWithContext(ctx, xerr)
 							// continue
 						default:
 							return xerr
@@ -612,8 +605,8 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 			})
 		})
 		chRes <- result{xerr}
-
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rErr

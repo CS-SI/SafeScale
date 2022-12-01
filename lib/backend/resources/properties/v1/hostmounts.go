@@ -21,7 +21,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostLocalMount stores information about a device (as an attached volume) mount
@@ -64,7 +63,7 @@ func (hlm *HostLocalMount) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*HostLocalMount](p)
+	src, err := clonable.Cast[*HostLocalMount](p)
 	if err != nil {
 		return err
 	}
@@ -112,7 +111,7 @@ func (hrm *HostRemoteMount) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*HostRemoteMount](p)
+	src, err := clonable.Cast[*HostRemoteMount](p)
 	if err != nil {
 		return err
 	}
@@ -171,7 +170,7 @@ func (hm *HostMounts) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*HostMounts](p)
+	src, err := clonable.Cast[*HostMounts](p)
 	if err != nil {
 		return err
 	}

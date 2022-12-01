@@ -21,7 +21,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // BucketMounts contains information about hosts that have mounted the bucket
@@ -64,7 +63,7 @@ func (bm *BucketMounts) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*BucketMounts](p)
+	src, err := clonable.Cast[*BucketMounts](p)
 	if err != nil {
 		return err
 	}

@@ -93,7 +93,7 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
@@ -145,7 +145,7 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && req.CleanOnFailure() {
 			logrus.WithContext(ctx).Infof("Cleaning up on failure, deleting Network '%s'", req.Name)
-			derr := renderer.Destroy(ctx, def)
+			derr := renderer.Destroy(ctx, def, terraformerapi.WithTarget(abstractNetwork))
 			if derr != nil {
 				logrus.WithContext(ctx).Errorf("failed to delete Network '%s': %v", req.Name, derr)
 				_ = ferr.AddConsequence(derr)
@@ -168,7 +168,7 @@ func (p *provider) DesignNetwork(ctx context.Context, req abstract.NetworkReques
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
@@ -189,7 +189,12 @@ func (p *provider) DesignNetwork(ctx context.Context, req abstract.NetworkReques
 		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
 	}
 
-	newNet, xerr := abstract.NewNetwork(abstract.WithName(req.Name), abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
+	opts := []abstract.Option{
+		abstract.WithName(req.Name),
+		abstract.UseTerraformSnippet(networkDesignResourceSnippetPath),
+		abstract.WithResourceType("openstack_networking_network_v2"),
+	}
+	newNet, xerr := abstract.NewNetwork(opts...)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -236,10 +241,10 @@ func (p *provider) DesignNetwork(ctx context.Context, req abstract.NetworkReques
 // InspectNetworkByName returns information about a Network identified by its name
 // Note: uses MiniStack, as there is no way (as far as I know) to do that with terraform
 // returns:
-//  - nil, *fail.ErrInvalidParameter: one parameter is invalid
-//  - nil, *fail.ErrNotFound: network not found
-//  - nil, *fail.ErrDuplicate: found multiple networks with that name
-//  - *abstract.Network, nil: network found and returned information
+//   - nil, *fail.ErrInvalidParameter: one parameter is invalid
+//   - nil, *fail.ErrNotFound: network not found
+//   - nil, *fail.ErrDuplicate: found multiple networks with that name
+//   - *abstract.Network, nil: network found and returned information
 func (p *provider) InspectNetworkByName(ctx context.Context, name string) (*abstract.Network, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
@@ -248,7 +253,7 @@ func (p *provider) InspectNetworkByName(ctx context.Context, name string) (*abst
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
 	return p.MiniStack.InspectNetworkByName(ctx, name)
 }
@@ -343,10 +348,10 @@ func unmarshalOutput[T any](in tfexec.OutputMeta) (T, fail.Error) {
 // InspectNetwork returns the network identified by id
 // Note: found a way to do that with terraform (far from being simple)... Not sure we shouldn't use MiniStack instead...
 // returns:
-//  - nil, *fail.ErrInvalidParameter: one parameter is invalid
-//  - nil, *fail.ErrNotFound: network not found
-//  - nil, *fail.ErrDuplicate: found multiple networks with that name
-//  - *abstract.Network, nil: network found and returned information
+//   - nil, *fail.ErrInvalidParameter: one parameter is invalid
+//   - nil, *fail.ErrNotFound: network not found
+//   - nil, *fail.ErrDuplicate: found multiple networks with that name
+//   - *abstract.Network, nil: network found and returned information
 func (p *provider) InspectNetwork(ctx context.Context, id string) (*abstract.Network, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
@@ -355,7 +360,7 @@ func (p *provider) InspectNetwork(ctx context.Context, id string) (*abstract.Net
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	return p.MiniStack.InspectNetwork(ctx, id)
 	//
@@ -390,7 +395,7 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 		return xerr
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", networkLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.network"), "(%s)", networkLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if an.ID != "" {
@@ -462,7 +467,7 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 		return xerr
 	}
 
-	xerr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(an.GetName()))
+	xerr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(an))
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to delete network %s", an.ID)
 	}

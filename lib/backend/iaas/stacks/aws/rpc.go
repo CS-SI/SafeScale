@@ -1044,12 +1044,10 @@ func (s stack) rpcDescribeAddresses(ctx context.Context, ids []*string) ([]*ec2.
 	var req ec2.DescribeAddressesInput
 	if len(ids) > 0 {
 		for _, v := range ids {
-			req.Filters = append(
-				req.Filters, &ec2.Filter{
-					Name:   aws.String("instance-id"),
-					Values: []*string{v},
-				},
-			)
+			req.Filters = append(req.Filters, &ec2.Filter{
+				Name:   aws.String("instance-id"),
+				Values: []*string{v},
+			})
 		}
 	}
 	var resp *ec2.DescribeAddressesOutput
@@ -1093,8 +1091,7 @@ func (s stack) rpcDescribeInstances(ctx context.Context, ids []*string) ([]*ec2.
 			_ = ec2.InstanceState{}
 			state, xerr := toHostState(i.State)
 			if xerr != nil {
-				logrus.WithContext(ctx).Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
-					aws.Int64Value(i.State.Code)&0xff)
+				logrus.WithContext(ctx).Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId), aws.Int64Value(i.State.Code)&0xff)
 				continue
 			}
 			if state != hoststate.Terminated {
@@ -1642,7 +1639,7 @@ func (s stack) rpcRequestSpotInstance(ctx context.Context, price, zone, subnetID
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
+func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte, extra interface{}) (_ *ec2.Instance, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return nil, xerr
 	}
@@ -1698,11 +1695,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 			if ferr != nil {
 				derr := s.rpcReleaseAddress(context.Background(), addrAllocID)
 				if derr != nil {
-					_ = ferr.AddConsequence(
-						fail.Wrap(
-							derr, "cleaning up on failure, failed to release Elastic IP %s", addrAllocID,
-						),
-					)
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to release Elastic IP %s", addrAllocID))
 				}
 			}
 		}()
@@ -1722,6 +1715,45 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 				}
 			}
 		}()
+	}
+
+	datags := []*ec2.Tag{
+		{
+			Key:   awsTagNameLabel,
+			Value: name,
+		},
+		{
+			Key:   aws.String("ManagedBy"),
+			Value: aws.String("safescale"),
+		},
+		{
+			Key:   aws.String("DeclaredInBucket"),
+			Value: aws.String(s.Config.MetadataBucketName),
+		},
+		{
+			Key:   aws.String("Image"),
+			Value: imageID,
+		},
+		{
+			Key:   aws.String("Template"),
+			Value: templateID,
+		},
+		{
+			Key:   aws.String("CreationDate"),
+			Value: aws.String(time.Now().Format(time.RFC3339)),
+		},
+	}
+	if extra != nil {
+		into, ok := extra.(map[string]string)
+		if !ok {
+			return nil, fail.InvalidParameterError("extra", "must be a map[string]string")
+		}
+		for k, v := range into {
+			datags = append(datags, &ec2.Tag{
+				Key:   aws.String(k),
+				Value: aws.String(v),
+			})
+		}
 	}
 
 	// Request now the creation and start of new instance with the previously created interface
@@ -1856,7 +1888,7 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// continue
-						debug.IgnoreError(xerr)
+						debug.IgnoreErrorWithContext(ctx, xerr)
 					default:
 						return fail.Wrap(xerr, "failed to req information about Elastic IP '%s'", ip)
 					}
@@ -1902,6 +1934,12 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 	// Wait for effective removal of host (status terminated)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			resp, innerXErr := s.rpcDescribeInstances(ctx, []*string{instance.InstanceId})
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -1952,7 +1990,7 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound, *fail.ErrInvalidRequest:
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 			default:
 				return fail.Wrap(xerr, "failed to delete network interface %s from instance", aws.StringValue(v))
 			}

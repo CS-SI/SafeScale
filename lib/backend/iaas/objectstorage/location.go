@@ -104,7 +104,7 @@ type Location interface {
 	// HasObject ...
 	HasObject(context.Context, string, string) (bool, fail.Error)
 	// ReadObject ...
-	ReadObject(context.Context, string, string, io.Writer, int64, int64) fail.Error
+	ReadObject(context.Context, string, string, io.Writer, int64, int64) (bytes.Buffer, fail.Error)
 	// WriteMultiPartObject ...
 	WriteMultiPartObject(context.Context, string, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error)
 	// WriteObject ...
@@ -234,7 +234,7 @@ func (instance location) Configuration() (Config, fail.Error) {
 }
 
 func (instance location) estimateSize(prefix string) (int, error) {
-	containerSet := make(map[string]bool) // newCore empty set
+	containerSet := make(map[string]bool) // New empty set
 	currentPageSize := 10
 
 	for {
@@ -450,9 +450,7 @@ func (instance location) InvalidateObject(_ context.Context, _ string, _ string)
 }
 
 // InspectObject ...
-func (instance location) InspectObject(
-	ctx context.Context, bucketName string, objectName string,
-) (aosi abstract.ObjectStorageItem, ferr fail.Error) {
+func (instance location) InspectObject(ctx context.Context, bucketName string, objectName string) (aosi abstract.ObjectStorageItem, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	aosi = abstract.ObjectStorageItem{}
 	if valid.IsNil(instance) {
@@ -521,9 +519,7 @@ func (instance location) DeleteObject(ctx context.Context, bucketName string, ob
 }
 
 // ListObjects lists the objects in a GetBucket
-func (instance location) ListObjects(ctx context.Context, bucketName string, path string, prefix string) (
-	_ []string, ferr fail.Error,
-) {
+func (instance location) ListObjects(ctx context.Context, bucketName string, path string, prefix string) (_ []string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return []string{}, fail.InvalidInstanceError()
@@ -542,9 +538,7 @@ func (instance location) ListObjects(ctx context.Context, bucketName string, pat
 }
 
 // BrowseBucket walks through the objects in a GetBucket and apply callback to each object
-func (instance location) BrowseBucket(
-	ctx context.Context, bucketName string, path, prefix string, callback func(o Object) fail.Error,
-) (ferr fail.Error) {
+func (instance location) BrowseBucket(ctx context.Context, bucketName string, path, prefix string, callback func(o Object) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -619,9 +613,7 @@ func (instance location) UploadBucket(ctx context.Context, bucketName, localDire
 }
 
 // DownloadBucket just downloads the bucket
-func (instance location) DownloadBucket(ctx context.Context, bucketName, decryptionKey string) (
-	_ []byte, ferr fail.Error,
-) {
+func (instance location) DownloadBucket(ctx context.Context, bucketName, decryptionKey string) (_ []byte, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -659,7 +651,7 @@ func (instance location) DownloadBucket(ctx context.Context, bucketName, decrypt
 		name = strings.TrimPrefix(name, path)
 
 		var buffer bytes.Buffer
-		ierr := instance.ReadObject(ctx, bucketName, path+name, &buffer, 0, 0)
+		_, ierr := instance.ReadObject(ctx, bucketName, path+name, &buffer, 0, 0)
 		if ierr != nil {
 			return ierr
 		}
@@ -706,9 +698,7 @@ func (instance location) DownloadBucket(ctx context.Context, bucketName, decrypt
 }
 
 // ClearBucket ...
-func (instance location) ClearBucket(
-	ctx context.Context, bucketName string, path string, prefix string,
-) (ferr fail.Error) {
+func (instance location) ClearBucket(ctx context.Context, bucketName string, path string, prefix string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -726,9 +716,7 @@ func (instance location) ClearBucket(
 	return b.Clear(ctx, path, prefix)
 }
 
-func (instance location) ItemEtag(ctx context.Context, bucketName string, objectName string) (
-	_ string, ferr fail.Error,
-) {
+func (instance location) ItemEtag(ctx context.Context, bucketName string, objectName string) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
@@ -764,9 +752,7 @@ func (instance location) ItemEtag(ctx context.Context, bucketName string, object
 	return o.GetETag(ctx)
 }
 
-func (instance location) HasObject(ctx context.Context, bucketName string, objectName string) (
-	_ bool, ferr fail.Error,
-) {
+func (instance location) HasObject(ctx context.Context, bucketName string, objectName string) (_ bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return false, fail.InvalidInstanceError()
@@ -800,54 +786,54 @@ func (instance location) HasObject(ctx context.Context, bucketName string, objec
 }
 
 // ReadObject reads the content of an object and put it in an io.Writer
-func (instance location) ReadObject(
-	ctx context.Context, bucketName string, objectName string, writer io.Writer, from int64, to int64,
-) (ferr fail.Error) {
+func (instance location) ReadObject(ctx context.Context, bucketName string, objectName string, writer io.Writer, from int64, to int64) (i bytes.Buffer, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
+		return bytes.Buffer{}, fail.InvalidInstanceError()
 	}
 	if bucketName == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("bucketName")
+		return bytes.Buffer{}, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 	if objectName == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("objectName")
+		return bytes.Buffer{}, fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
 	has, err := instance.HasObject(ctx, bucketName, objectName)
 	if err != nil {
-		return err
+		return bytes.Buffer{}, err
 	}
 
 	if !has {
-		return fail.NotFoundError("object '%s' not found in bucket '%s'", objectName, bucketName)
+		return bytes.Buffer{}, fail.NotFoundError("object '%s' not found in bucket '%s'", objectName, bucketName)
 	}
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
-		return err
+		return bytes.Buffer{}, err
 	}
 
 	objectName = strings.Trim(objectName, "/")
 	o, err := newObject(&b, objectName)
 	if err != nil {
-		return err
+		return bytes.Buffer{}, err
 	}
 
-	if err = o.Read(ctx, writer, from, to); err != nil {
-		return err
+	var buffer bytes.Buffer
+	muw := io.MultiWriter(writer, &buffer)
+
+	if err = o.Read(ctx, muw, from, to); err != nil {
+		return bytes.Buffer{}, err
 	}
 
-	return nil
+	// logrus.Warnf("Nice: we recovered %s", buffer.String())
+
+	return buffer, nil
 }
 
 // WriteObject writes the content of reader in the Object
-func (instance location) WriteObject(
-	ctx context.Context, bucketName string, objectName string, source io.Reader, size int64,
-	metadata abstract.ObjectStorageItemMetadata,
-) (aosi abstract.ObjectStorageItem, ferr fail.Error) {
+func (instance location) WriteObject(ctx context.Context, bucketName string, objectName string, source io.Reader, size int64, metadata abstract.ObjectStorageItemMetadata) (aosi abstract.ObjectStorageItem, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	aosi = abstract.ObjectStorageItem{}
 	if valid.IsNil(instance) {
@@ -889,10 +875,7 @@ func (instance location) WriteObject(
 
 // WriteMultiPartObject writes data from 'source' to an object in Object Storage, splitting data in parts of 'chunkSize' bytes
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
-func (instance location) WriteMultiPartObject(
-	ctx context.Context, bucketName string, objectName string, source io.Reader, sourceSize int64, chunkSize int,
-	metadata abstract.ObjectStorageItemMetadata,
-) (aosi abstract.ObjectStorageItem, ferr fail.Error) {
+func (instance location) WriteMultiPartObject(ctx context.Context, bucketName string, objectName string, source io.Reader, sourceSize int64, chunkSize int, metadata abstract.ObjectStorageItemMetadata) (aosi abstract.ObjectStorageItem, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	aosi = abstract.ObjectStorageItem{}
 	if valid.IsNil(instance) {

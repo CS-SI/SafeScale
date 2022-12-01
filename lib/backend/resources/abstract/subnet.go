@@ -17,7 +17,6 @@
 package abstract
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -25,8 +24,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 const SubnetKind = "subnet"
@@ -53,7 +52,7 @@ func (sr SubnetRequest) CleanOnFailure() bool {
 
 // Subnet represents a subnet4
 type Subnet struct {
-	*Core
+	*core
 
 	ID                      string           `json:"id"`                                   // ID of the subnet (from provider)
 	Network                 string           `json:"network"`                              // parent Network of the subnet
@@ -67,8 +66,8 @@ type Subnet struct {
 	GWSecurityGroupID       string           `json:"gw_security_group_id,omitempty"`       // Contains the ID of the Security Group for external access of gateways in Subnet
 	PublicIPSecurityGroupID string           `json:"publicip_security_group_id,omitempty"` // contains the ID of the Security Group for hosts with public IP in Subnet
 	InternalSecurityGroupID string           `json:"internal_security_group_id,omitempty"` // contains the ID of the security group for internal access of hosts
-	DefaultSSHPort          uint32           `json:"default_ssh_port,omitempty"`           // contains the port to use for SSH by default on gateways in the Subnet
 	SingleHostCIDRIndex     uint             `json:"single_host_cidr_index,omitempty"`     // if > 0, contains the index of the CIDR in the single Host Network
+	DefaultSSHPort          uint32           `json:"default_ssh_port,omitempty"`           // contains the port to use for SSH by default on gateways in the Subnet
 }
 
 // NewSubnet initializes a new instance of Subnet
@@ -80,7 +79,7 @@ func NewSubnet(opts ...Option) (*Subnet, fail.Error) {
 	}
 
 	sn := &Subnet{
-		Core:           c,
+		core:           c,
 		State:          subnetstate.Unknown,
 		DefaultSSHPort: 22,
 	}
@@ -96,7 +95,7 @@ func NewEmptySubnet() *Subnet {
 // IsNull ...
 // satisfies interface clonable.Clonable
 func (s *Subnet) IsNull() bool {
-	return s == nil || s.Core.IsNull() || (s.ID == "" && s.Name == "")
+	return s == nil || s.core.IsNull() || (s.ID == "" && (s.Name == "" || s.Name == Unnamed))
 }
 
 // Clone ...
@@ -120,20 +119,28 @@ func (s *Subnet) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := lang.Cast[*Subnet](p)
+	src, err := clonable.Cast[*Subnet](p)
 	if err != nil {
 		return err
 	}
 
 	*s = *src
-	s.Core, err = clonable.CastedClone[*Core](src.Core)
+	s.core, err = clonable.CastedClone[*core](src.core)
 	if err != nil {
 		return err
 	}
 
-	s.DNSServers = make([]string, len(src.DNSServers), 0)
+	if src.VIP != nil {
+		s.VIP, err = clonable.CastedClone[*VirtualIP](src.VIP)
+		if err != nil {
+			return err
+		}
+	}
+
+	s.DNSServers = make([]string, len(src.DNSServers))
 	copy(s.DNSServers, src.DNSServers)
-	s.GatewayIDs = make([]string, len(src.GatewayIDs), 0)
+
+	s.GatewayIDs = make([]string, len(src.GatewayIDs))
 	copy(s.GatewayIDs, src.GatewayIDs)
 
 	return nil
@@ -182,11 +189,11 @@ func (s *Subnet) Deserialize(buf []byte) (ferr fail.Error) {
 	return fail.ConvertError(json.Unmarshal(buf, s))
 }
 
-// GetName ...
-// satisfies interface data.Identifiable
-func (s *Subnet) GetName() string {
-	return s.Name
-}
+// // GetName ...
+// // satisfies interface data.Identifiable
+// func (s *Subnet) GetName() string {
+// 	return s.Name
+// }
 
 // GetID ...
 // satisfies interface data.Identifiable
@@ -203,7 +210,7 @@ func (s *Subnet) GetCIDR() string {
 
 // VirtualIP is a structure containing information needed to manage VIP (virtual IP)
 type VirtualIP struct {
-	*Core
+	*core
 
 	ID string `json:"id,omitempty"`
 	// Name      string      `json:"name,omitempty"`    // Inside Core
@@ -223,7 +230,7 @@ func NewVirtualIP(opts ...Option) (*VirtualIP, fail.Error) {
 	}
 
 	nvip := &VirtualIP{
-		Core:  nc,
+		core:  nc,
 		Hosts: []*HostCore{},
 	}
 	return nvip, nil
@@ -232,7 +239,7 @@ func NewVirtualIP(opts ...Option) (*VirtualIP, fail.Error) {
 // IsNull ...
 // satisfies interface clonable.Clonable
 func (vip *VirtualIP) IsNull() bool {
-	return vip == nil || vip.Core.IsNull() || (vip.ID == "" && vip.Name == "")
+	return vip == nil || vip.core.IsNull() || (vip.ID == "" && (vip.Name == "" || vip.Name == Unnamed))
 }
 
 // Clone ...
@@ -257,19 +264,20 @@ func (vip *VirtualIP) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*VirtualIP)
-	if !ok {
-		return fail.InconsistentError("failed to cast 'p' to '*VirtualIP'")
+	src, err := clonable.Cast[*VirtualIP](p)
+	if err != nil {
+		return fail.Wrap(err)
 	}
+
 	*vip = *src
-	vip.Hosts = make([]*HostCore, 0, len(src.Hosts))
-	for _, v := range src.Hosts {
+	vip.Hosts = make([]*HostCore, len(src.Hosts))
+	for k, v := range src.Hosts {
 		clone, err := clonable.CastedClone[*HostCore](v)
 		if err != nil {
 			return err
 		}
 
-		vip.Hosts = append(vip.Hosts, clone)
+		vip.Hosts[k] = clone
 	}
 	return nil
 }

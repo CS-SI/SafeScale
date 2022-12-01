@@ -17,6 +17,8 @@
 package handlers
 
 import (
+	"github.com/sirupsen/logrus"
+
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -35,8 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/sirupsen/logrus"
 )
 
 //go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/backend/handlers.HostHandler -o mocks/mock_host.go
@@ -216,7 +216,7 @@ func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.Hos
 		return nil, xerr
 	}
 
-	_, xerr = hostInstance.Create(handler.job.Context(), req, sizing)
+	_, xerr = hostInstance.Create(handler.job.Context(), req, sizing, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -249,7 +249,7 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 	reduce := false
 	xerr = hostInstance.Inspect(handler.job.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
-			hostSizingV2, innerErr := lang.Cast[*propertiesv2.HostSizing](p)
+			hostSizingV2, innerErr := clonable.Cast[*propertiesv2.HostSizing](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -605,7 +605,7 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 	var list []*protocol.LabelInspectResponse
 	xerr = hostInstance.Review(handler.job.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.LabelsV1, func(p clonable.Clonable) fail.Error {
-			hlV1, innerErr := lang.Cast[*propertiesv1.HostLabels](p)
+			hlV1, innerErr := clonable.Cast[*propertiesv1.HostLabels](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -662,7 +662,7 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 	var outValue string
 	xerr = labelInstance.Review(handler.job.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			lhV1, innerErr := lang.Cast[*propertiesv1.LabelHosts](p)
+			lhV1, innerErr := clonable.Cast[*propertiesv1.LabelHosts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

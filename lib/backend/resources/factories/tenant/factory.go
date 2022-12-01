@@ -527,10 +527,10 @@ func initObjectStorageLocationConfig(authOpts iaasoptions.Authentication, tenant
 			if _, ok = v.(bool); ok {
 				continue
 			}
-			if k == "DNSServers" {
+			if k == "DNSServers" || k == "DNSList" {
 				continue
 			}
-			return config, fail.InconsistentError("'compute' it's a map[string]string, and the key %s is not a string: %v", k, v)
+			return config, fail.InconsistentError("'compute' is a map[string]string, and the key %s is not a string: %v", k, v)
 		}
 	}
 	for k, v := range ostorage {

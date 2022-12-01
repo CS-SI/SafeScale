@@ -18,7 +18,8 @@ package operations
 
 import (
 	"context"
-	"fmt"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
@@ -26,22 +27,16 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/sirupsen/logrus"
 )
 
 // taskUnbindFromHost unbinds a Host from the security group
 // params is intended to receive a '*host'
-func (instance *SecurityGroup) taskUnbindFromHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *SecurityGroup) taskUnbindFromHost(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	hostInstance, ok := params.(*Host)
 	if !ok {
@@ -51,29 +46,26 @@ func (instance *SecurityGroup) taskUnbindFromHost(task concurrency.Task, params 
 		return nil, fail.InvalidParameterCannotBeNilError("params")
 	}
 
-	inctx := task.Context()
+	sgID, err := instance.GetID()
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	hid, err := hostInstance.GetID()
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-
-		sgID, err := instance.GetID()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		hid, err := hostInstance.GetID()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
 
 		// Unbind Security Group from Host on provider side
 		xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgID, hid)
@@ -82,7 +74,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(task concurrency.Task, params 
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// if the security group is not bound to the host, considered as a success and continue
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 			default:
 				chRes <- result{nil, xerr}
 				return
@@ -91,7 +83,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(task concurrency.Task, params 
 
 		// Updates host metadata regarding Security Groups
 		xerr = hostInstance.AlterProperty(ctx, hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-			hsgV1, innerErr := lang.Cast[*propertiesv1.HostSecurityGroups](p)
+			hsgV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -102,6 +94,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(task concurrency.Task, params 
 		})
 		chRes <- result{nil, xerr}
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -120,14 +113,11 @@ type taskUnbindFromHostsAttachedToSubnetParams struct {
 
 // taskUnbindFromHostsAttachedToSubnet unbinds security group from hosts attached to a Subnet
 // 'params' expects to be a *propertiesv1.SubnetHosts
-func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
 	p, ok := params.(taskUnbindFromHostsAttachedToSubnetParams)
@@ -135,12 +125,11 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 		return nil, fail.InvalidParameterError("params", "must be a 'taskUnbindFromHostsAttachedToSubnetParams'")
 	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -148,50 +137,41 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 		defer close(chRes)
 
 		if len(p.subnetHosts.ByID) > 0 {
-			tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption)
-			if xerr != nil {
-				chRes <- result{nil, fail.Wrap(xerr, "failed to start new task group to remove Security Group '%s' from Hosts attached to the Subnet '%s'", instance.GetName(), p.subnetName)}
-				return
-			}
+			tg := new(errgroup.Group)
 
 			for k, v := range p.subnetHosts.ByID {
-				hostInstance, xerr := LoadHost(ctx, k)
-				if xerr != nil {
-					switch xerr.(type) {
-					case *fail.ErrNotFound:
-						// if Host is not found, consider operation as a success and continue
-						debug.IgnoreError(xerr)
-						continue
-					default:
-						chRes <- result{nil, xerr}
-						return
-					}
-				}
+				k, _ := k, v
 
-				_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/unbind", v)))
-				if xerr != nil {
-					abErr := tg.AbortWithCause(xerr)
-					if abErr != nil {
-						logrus.WithContext(ctx).Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				tg.Go(func() error {
+					hostInstance, xerr := LoadHost(ctx, k)
+					if xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							// if Host is not found, consider operation as a success and continue
+							debug.IgnoreErrorWithContext(ctx, xerr)
+							return nil
+						default:
+							return xerr
+						}
 					}
-					break
-				}
+
+					_, err := instance.taskUnbindFromHost(ctx, hostInstance)
+					return err
+				})
+
 			}
 
-			_, werr := tg.WaitGroup()
+			werr := fail.ConvertError(tg.Wait())
 			werr = debug.InjectPlannedFail(werr)
 			if werr != nil {
 				chRes <- result{nil, werr}
 				return
 			}
-
-			chRes <- result{nil, xerr}
-			return
 		}
 
 		chRes <- result{nil, nil}
-
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -209,22 +189,18 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 // - nil, *fail.ErrInvalidParameter: some parameters are invalid
 // - nil, *fail.ErrAborted: received abortion signal
 // - nil, *fail.ErrNotFound: Host identified by params not found
-func (instance *SecurityGroup) taskBindEnabledOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *SecurityGroup) taskBindEnabledOnHost(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -242,7 +218,7 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(task concurrency.Task, para
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// host vanished, considered as a success
-				debug.IgnoreError(innerXErr)
+				debug.IgnoreErrorWithContext(ctx, innerXErr)
 			default:
 				chRes <- result{nil, innerXErr}
 				return
@@ -262,8 +238,8 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(task concurrency.Task, para
 			}
 		}
 		chRes <- result{nil, nil}
-
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -272,27 +248,22 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(task concurrency.Task, para
 	case <-inctx.Done():
 		return nil, fail.ConvertError(inctx.Err())
 	}
-
 }
 
 // taskBindDisabledOnHost removes rules of security group from host
 // params is intended to receive a non-empty string corresponding to host ID
-func (instance *SecurityGroup) taskBindDisabledOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *SecurityGroup) taskBindDisabledOnHost(inctx context.Context, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	inctx := task.Context()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	type result struct {
-		rTr  concurrency.TaskResult
+		rTr  interface{}
 		rErr fail.Error
 	}
 	chRes := make(chan result)
@@ -310,7 +281,7 @@ func (instance *SecurityGroup) taskBindDisabledOnHost(task concurrency.Task, par
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// host vanished, considered as a success
-				debug.IgnoreError(innerXErr)
+				debug.IgnoreErrorWithContext(ctx, innerXErr)
 			default:
 				chRes <- result{nil, innerXErr}
 				return
@@ -329,8 +300,8 @@ func (instance *SecurityGroup) taskBindDisabledOnHost(task concurrency.Task, par
 			}
 		}
 		chRes <- result{nil, nil}
-
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr

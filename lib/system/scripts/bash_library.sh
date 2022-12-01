@@ -76,11 +76,20 @@ function sfFinishPreviousInstall() {
 }
 export -f sfFinishPreviousInstall
 
+function sfKillApt(){
+  sudo pkill -9 apt || true
+  sudo pkill -9 aptitude || true
+  sudo pkill -9 dpkg || true
+  sudo rm -f /var/{lib/{dpkg,apt/lists},cache/apt/archives}/{lock,lock-frontend}
+}
+export -f sfKillApt
+
 # sfWaitForApt waits an already running apt-like command to finish
 function sfWaitForApt() {
+  sfKillApt || true
   sfFinishPreviousInstall || true
   [ $? -ne 0 ] && return $?
-  sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
+  sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/{lock,lock-frontend}
   [ $? -ne 0 ] && return $?
   return 0
 }

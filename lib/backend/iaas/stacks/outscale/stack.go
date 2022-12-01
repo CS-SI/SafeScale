@@ -109,7 +109,7 @@ func NullStack() *stack { // nolint
 }
 
 // GetStackName returns the name of the stack
-func (s stack) GetStackName() (string, fail.Error) {
+func (instance *stack) GetStackName() (string, fail.Error) {
 	return "outscale", nil
 }
 
@@ -229,15 +229,15 @@ func deviceNames() []string {
 }
 
 // ListRegions list available regions
-func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return []string{}, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, _, err := s.client.RegionApi.ReadRegions(s.auth, nil)
+	resp, _, err := instance.client.RegionApi.ReadRegions(instance.auth, nil)
 	if err != nil {
 		return []string{}, normalizeError(err)
 	}
@@ -251,16 +251,16 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 }
 
 // ListAvailabilityZones returns availability zone in a set
-func (s stack) ListAvailabilityZones(ctx context.Context) (az map[string]bool, ferr fail.Error) {
+func (instance *stack) ListAvailabilityZones(ctx context.Context) (az map[string]bool, ferr fail.Error) {
 	emptyMap := make(map[string]bool)
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)
+	resp, _, err := instance.client.SubregionApi.ReadSubregions(instance.auth, nil)
 	if err != nil {
 		return emptyMap, normalizeError(err)
 	}

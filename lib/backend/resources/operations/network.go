@@ -22,10 +22,10 @@ import (
 	"strings"
 	"time"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
@@ -37,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -177,6 +176,7 @@ func LoadNetwork(inctx context.Context, ref string) (resources.Network, fail.Err
 		}()
 		chRes <- result{ga, gerr}
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -269,99 +269,104 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		rErr fail.Error
 	}
 	chRes := make(chan result)
-	go func() (ferr fail.Error) {
-		defer fail.OnPanic(&ferr)
+	go func() {
 		defer close(chRes)
 
-		// Check if Network already exists and is managed by SafeScale
-		_, xerr := LoadNetwork(ctx, req.Name)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// continue
-				debug.IgnoreError(xerr)
-			default:
-				chRes <- result{xerr}
-				return xerr
-			}
-		} else {
-			xerr := fail.DuplicateError("Network '%s' already exists", req.Name)
-			_ = xerr.Annotate("managed", true)
-			chRes <- result{xerr}
-			return xerr
-		}
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		// Verify if the network already exist and in this case is not managed by SafeScale
-		_, xerr = svc.InspectNetworkByName(ctx, req.Name)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// continue
-				debug.IgnoreError(xerr)
-			default:
-				chRes <- result{xerr}
-				return xerr
+			// Check if Network already exists and is managed by SafeScale
+			_, xerr := LoadNetwork(ctx, req.Name)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// continue
+					debug.IgnoreErrorWithContext(ctx, xerr)
+				default:
+					ar := result{xerr}
+					return ar, ar.rErr
+				}
+			} else {
+				xerr := fail.DuplicateError("Network '%s' already exists", req.Name)
+				_ = xerr.Annotate("managed", true)
+				ar := result{xerr}
+				return ar, ar.rErr
 			}
-		} else {
-			xerr := fail.DuplicateError("Network '%s' already exists ", req.Name)
-			_ = xerr.Annotate("managed", false)
-			chRes <- result{xerr}
-			return xerr
-		}
 
-		// Verify the CIDR is not routable
-		if req.CIDR != "" {
-			routable, xerr := netretry.IsCIDRRoutable(req.CIDR)
+			// Verify if the network already exist and in this case is not managed by SafeScale
+			_, xerr = svc.InspectNetworkByName(ctx, req.Name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				rv := fail.Wrap(xerr, "failed to determine if CIDR is not routable")
-				chRes <- result{rv}
-				return rv
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// continue
+					debug.IgnoreErrorWithContext(ctx, xerr)
+				default:
+					ar := result{xerr}
+					return ar, ar.rErr
+				}
+			} else {
+				xerr := fail.DuplicateError("Network '%s' already exists ", req.Name)
+				_ = xerr.Annotate("managed", false)
+				ar := result{xerr}
+				return ar, ar.rErr
 			}
 
-			if routable {
-				rv := fail.InvalidRequestError("cannot create such a Networking, CIDR must not be routable; please choose abstractNetwork appropriate CIDR (RFC1918)")
-				chRes <- result{rv}
-				return rv
-			}
-		}
+			// Verify the CIDR is not routable
+			if req.CIDR != "" {
+				routable, xerr := netretry.IsCIDRRoutable(req.CIDR)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					rv := fail.Wrap(xerr, "failed to determine if CIDR is not routable")
+					ar := result{rv}
+					return ar, ar.rErr
+				}
 
-		var abstractNetwork *abstract.Network
-
-		defer func() {
-			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil && req.CleanOnFailure() && !valid.IsNull(abstractNetwork) {
-				derr := svc.DeleteNetwork(jobapi.NewContextPropagatingJob(inctx), abstractNetwork.ID)
-				derr = debug.InjectPlannedFail(derr)
-				if derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
+				if routable {
+					rv := fail.InvalidRequestError("cannot create such a Networking, CIDR must not be routable; please choose abstractNetwork appropriate CIDR (RFC1918)")
+					ar := result{rv}
+					return ar, ar.rErr
 				}
 			}
+
+			var abstractNetwork *abstract.Network
+
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && req.CleanOnFailure() && !valid.IsNull(abstractNetwork) {
+					derr := svc.DeleteNetwork(cleanupContextFrom(ctx), abstractNetwork.ID)
+					derr = debug.InjectPlannedFail(derr)
+					if derr != nil {
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
+					}
+				}
+			}()
+
+			// Create the Network
+			logrus.WithContext(ctx).Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
+			abstractNetwork, xerr = svc.CreateNetwork(ctx, req)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				rv := fail.Wrap(xerr, "failure creating provider network")
+				ar := result{rv}
+				return ar, ar.rErr
+			}
+
+			// Write subnet object metadata
+			logrus.WithContext(ctx).Debugf("Saving Subnet metadata '%s' ...", abstractNetwork.Name)
+			abstractNetwork.Imported = false
+			xerr = instance.carry(ctx, abstractNetwork)
+			if xerr != nil {
+				ar := result{xerr}
+				return ar, ar.rErr
+			}
+
+			ar := result{nil}
+			return ar, ar.rErr
 		}()
-
-		// Create the Network
-		logrus.WithContext(ctx).Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
-		abstractNetwork, xerr = svc.CreateNetwork(ctx, req)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			rv := fail.Wrap(xerr, "failure creating provider network")
-			chRes <- result{rv}
-			return rv
-		}
-
-		// Write subnet object metadata
-		logrus.WithContext(ctx).Debugf("Saving Subnet metadata '%s' ...", abstractNetwork.Name)
-		abstractNetwork.Imported = false
-		xerr = instance.carry(ctx, abstractNetwork)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return xerr
-		}
-
-		chRes <- result{nil}
-		return nil
+		chRes <- gres
 	}() // nolint
+
 	select {
 	case res := <-chRes:
 		return res.rErr
@@ -369,6 +374,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		<-chRes // wait for cleanup
 		return fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		cancel()
 		<-chRes // wait for cleanup
 		return fail.ConvertError(inctx.Err())
 	}
@@ -419,7 +425,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -506,13 +512,12 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 
 		xerr := instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			var innerErr error
-			networkAbstract, innerErr = lang.Cast[*abstract.Network](p)
+			networkAbstract, innerErr = clonable.Cast[*abstract.Network](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
 
 			outprops = props
-
 			return nil
 		})
 		if xerr != nil {
@@ -535,7 +540,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 		var abstractNetwork *abstract.Network
 		xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			var innerErr error
-			abstractNetwork, innerErr = lang.Cast[*abstract.Network](p)
+			abstractNetwork, innerErr = clonable.Cast[*abstract.Network](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -544,7 +549,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 
 			var subnets map[string]string
 			innerXErr := props.Inspect(networkproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-				subnetsV1, innerErr := lang.Cast[*propertiesv1.NetworkSubnets](p)
+				subnetsV1, innerErr := clonable.Cast[*propertiesv1.NetworkSubnets](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -573,7 +578,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 							switch xerr.(type) {
 							case *fail.ErrNotFound:
 								// Subnet is already deleted, considered as a success and continue
-								debug.IgnoreError(xerr)
+								debug.IgnoreErrorWithContext(ctx, xerr)
 								deleted = true
 							default:
 								return xerr
@@ -600,7 +605,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 			// delete Network if not imported, with tolerance
 			if !abstractNetwork.Imported {
 				innerXErr = props.Alter(networkproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-					nsgV1, innerErr := lang.Cast[*propertiesv1.NetworkSecurityGroups](p)
+					nsgV1, innerErr := clonable.Cast[*propertiesv1.NetworkSecurityGroups](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -610,7 +615,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 						if propsXErr != nil {
 							switch propsXErr.(type) {
 							case *fail.ErrNotFound:
-								debug.IgnoreError(propsXErr)
+								debug.IgnoreErrorWithContext(ctx, propsXErr)
 								continue
 							default:
 								return propsXErr
@@ -703,7 +708,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 				// continue
 			default:
 				xerr.WithContext(ctx)
@@ -722,6 +727,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 
 		chRes <- result{nil}
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rErr
@@ -747,7 +753,7 @@ func (instance *Network) GetCIDR(ctx context.Context) (cidr string, ferr fail.Er
 
 	cidr = ""
 	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		an, innerErr := lang.Cast[*abstract.Network](p)
+		an, innerErr := clonable.Cast[*abstract.Network](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -770,7 +776,7 @@ func (instance *Network) ToProtocol(ctx context.Context) (out *protocol.Network,
 	// defer instance.lock.RUnlock()
 
 	xerr := instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		an, innerErr := lang.Cast[*abstract.Network](p)
+		an, innerErr := clonable.Cast[*abstract.Network](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 
@@ -783,10 +789,11 @@ func (instance *Network) ToProtocol(ctx context.Context) (out *protocol.Network,
 		}
 
 		return props.Inspect(networkproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-			nsV1, innerErr := lang.Cast[*propertiesv1.NetworkSubnets](p)
+			nsV1, innerErr := clonable.Cast[*propertiesv1.NetworkSubnets](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
+
 			for k := range nsV1.ByName {
 				out.Subnets = append(out.Subnets, k)
 			}
@@ -845,7 +852,7 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 
 	return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-			nsV1, innerErr := lang.Cast[*propertiesv1.NetworkSubnets](p)
+			nsV1, innerErr := clonable.Cast[*propertiesv1.NetworkSubnets](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -875,7 +882,7 @@ func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (fe
 
 	return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-			nsV1, innerErr := lang.Cast[*propertiesv1.NetworkSubnets](p)
+			nsV1, innerErr := clonable.Cast[*propertiesv1.NetworkSubnets](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -900,7 +907,7 @@ func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (fe
 func FreeCIDRForSingleHost(ctx context.Context, network resources.Network, index uint) fail.Error {
 	return network.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SingleHostsV1, func(p clonable.Clonable) fail.Error {
-			nshV1, innerErr := lang.Cast[*propertiesv1.NetworkSingleHosts](p)
+			nshV1, innerErr := clonable.Cast[*propertiesv1.NetworkSingleHosts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

@@ -17,10 +17,10 @@
 package shielded
 
 import (
-	"encoding/json"
 	"sync"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sanity-io/litter"

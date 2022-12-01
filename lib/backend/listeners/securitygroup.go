@@ -51,6 +51,9 @@ func (s *SecurityGroupListener) List(inctx context.Context, in *protocol.Securit
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 
 	job, err := prepareJob(inctx, in, "/securitygroups/list")
 	if err != nil {
@@ -60,7 +63,7 @@ func (s *SecurityGroupListener) List(inctx context.Context, in *protocol.Securit
 
 	all := in.GetAll()
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
@@ -86,15 +89,15 @@ func (s *SecurityGroupListener) Create(inctx context.Context, in *protocol.Secur
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	name := in.GetName()
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
+
 	job, xerr := prepareJob(inctx, in.GetNetwork(), fmt.Sprintf("/network/%s/securitygroup/%s/create", networkRef, name))
 	if xerr != nil {
 		return nil, xerr
@@ -102,7 +105,7 @@ func (s *SecurityGroupListener) Create(inctx context.Context, in *protocol.Secur
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "('%s', '%s')", networkRefLabel, name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "('%s', '%s')", networkRefLabel, name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
@@ -130,13 +133,12 @@ func (s *SecurityGroupListener) Clear(inctx context.Context, in *protocol.Refere
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	// FIXME: networkRef is missing to locate security group if name is provided
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
@@ -150,7 +152,7 @@ func (s *SecurityGroupListener) Clear(inctx context.Context, in *protocol.Refere
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
@@ -173,13 +175,12 @@ func (s *SecurityGroupListener) Reset(inctx context.Context, in *protocol.Refere
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -192,7 +193,7 @@ func (s *SecurityGroupListener) Reset(inctx context.Context, in *protocol.Refere
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
@@ -214,13 +215,12 @@ func (s *SecurityGroupListener) Inspect(inctx context.Context, in *protocol.Refe
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	// FIXME: networkRef missing if security group is provided by name
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
@@ -234,7 +234,7 @@ func (s *SecurityGroupListener) Inspect(inctx context.Context, in *protocol.Refe
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
@@ -256,13 +256,12 @@ func (s *SecurityGroupListener) Delete(inctx context.Context, in *protocol.Secur
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	// FIXME: networkRef missing if security group is provided by name
 	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
@@ -276,7 +275,7 @@ func (s *SecurityGroupListener) Delete(inctx context.Context, in *protocol.Secur
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "(%s)", sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
@@ -298,13 +297,12 @@ func (s *SecurityGroupListener) AddRule(inctx context.Context, in *protocol.Secu
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	sgRef, sgRefLabel := srvutils.GetReference(in.Group)
 	if sgRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -322,7 +320,7 @@ func (s *SecurityGroupListener) AddRule(inctx context.Context, in *protocol.Secu
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "(%s)", sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
@@ -344,13 +342,12 @@ func (s *SecurityGroupListener) DeleteRule(inctx context.Context, in *protocol.S
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	ref, refLabel := srvutils.GetReference(in.GetGroup())
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -368,7 +365,7 @@ func (s *SecurityGroupListener) DeleteRule(inctx context.Context, in *protocol.S
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s, %v)", refLabel, rule).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "(%s, %v)", refLabel, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
@@ -391,13 +388,12 @@ func (s *SecurityGroupListener) Sanitize(inctx context.Context, in *protocol.Ref
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -410,7 +406,7 @@ func (s *SecurityGroupListener) Sanitize(inctx context.Context, in *protocol.Ref
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
@@ -425,13 +421,12 @@ func (s *SecurityGroupListener) Bonds(inctx context.Context, in *protocol.Securi
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	ref, refLabel := srvutils.GetReference(in.GetTarget())
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
@@ -454,7 +449,7 @@ func (s *SecurityGroupListener) Bonds(inctx context.Context, in *protocol.Securi
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 

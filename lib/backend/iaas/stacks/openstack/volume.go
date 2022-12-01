@@ -89,7 +89,7 @@ func (instance *stack) getVolumeSpeed(vType string) volumespeed.Enum {
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (instance stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (volume *abstract.Volume, ferr fail.Error) {
+func (instance *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (volume *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -177,8 +177,8 @@ func (instance stack) CreateVolume(ctx context.Context, request abstract.VolumeR
 }
 
 // InspectVolume returns the volume identified by id
-func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -190,7 +190,7 @@ func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, 
 	var vol *volumesv2.Volume
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			vol, innerErr = volumesv2.Get(s.VolumeClient, id).Extract()
+			vol, innerErr = volumesv2.Get(instance.VolumeClient, id).Extract()
 			return innerErr
 		},
 		NormalizeError,
@@ -211,14 +211,14 @@ func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, 
 
 	av.ID = vol.ID
 	av.Size = vol.Size
-	av.Speed = s.getVolumeSpeed(vol.VolumeType)
+	av.Speed = instance.getVolumeSpeed(vol.VolumeType)
 	av.State = toVolumeState(vol.Status)
 	return av, nil
 }
 
 // ListVolumes returns the list of all volumes known on the current tenant
-func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -228,7 +228,7 @@ func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error)
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			vs = []*abstract.Volume{} // If call fails, need to restart list from 0...
-			innerErr := volumesv2.List(s.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+			innerErr := volumesv2.List(instance.VolumeClient, volumesv2.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumesv2.ExtractVolumes(page)
 				if err != nil {
 					logrus.WithContext(ctx).Errorf("Error listing volumes: volume extraction: %+v", err)
@@ -242,7 +242,7 @@ func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error)
 
 					av.ID = vol.ID
 					av.Size = vol.Size
-					av.Speed = s.getVolumeSpeed(vol.VolumeType)
+					av.Speed = instance.getVolumeSpeed(vol.VolumeType)
 					av.State = toVolumeState(vol.Status)
 					vs = append(vs, av)
 				}
@@ -260,10 +260,10 @@ func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error)
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
+func (instance *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
@@ -272,7 +272,7 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -282,7 +282,7 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
-					return volumesv2.Delete(s.VolumeClient, id, nil).ExtractErr()
+					return volumesv2.Delete(instance.VolumeClient, id, nil).ExtractErr()
 				},
 				NormalizeError,
 			)
@@ -314,8 +314,8 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (string, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if request.Name = strings.TrimSpace(request.Name); request.Name == "" {
@@ -328,7 +328,7 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 	var va *volumeattach.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			va, innerErr = volumeattach.Create(s.ComputeClient, request.HostID, volumeattach.CreateOpts{
+			va, innerErr = volumeattach.Create(instance.ComputeClient, request.HostID, volumeattach.CreateOpts{
 				VolumeID: request.VolumeID,
 			}).Extract()
 			return innerErr
@@ -342,9 +342,9 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by id
-func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	nilA := abstract.NewVolumeAttachment()
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return nilA, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -359,7 +359,7 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string)
 	var va *volumeattach.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			va, innerErr = volumeattach.Get(s.ComputeClient, serverID, id).Extract()
+			va, innerErr = volumeattach.Get(instance.ComputeClient, serverID, id).Extract()
 			return innerErr
 		},
 		NormalizeError,
@@ -376,8 +376,8 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string)
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -390,7 +390,7 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*a
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			vs = []*abstract.VolumeAttachment{} // If call fails, need to reset volume list to prevent duplicates
-			return volumeattach.List(s.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
+			return volumeattach.List(instance.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumeattach.ExtractVolumeAttachments(page)
 				if err != nil {
 					return false, err
@@ -415,13 +415,13 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*a
 	return vs, nil
 }
 
-func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
+func (instance *stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
-func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string) fail.Error {
-	if valid.IsNil(s) {
+func (instance *stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
@@ -435,7 +435,7 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return volumeattach.Delete(s.ComputeClient, serverID, vaID).ExtractErr()
+			return volumeattach.Delete(instance.ComputeClient, serverID, vaID).ExtractErr()
 		},
 		NormalizeError,
 	)

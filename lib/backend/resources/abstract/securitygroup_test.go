@@ -537,63 +537,54 @@ func TestSecurityGroupRules_IndexOfRuleByID(t *testing.T) {
 }
 
 func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
-	sg := &SecurityGroup{
-		ID:               "SG ID",
-		Network:          "SG Network",
-		Description:      "SG Description",
-		Rules:            SecurityGroupRules{},
-		DefaultForSubnet: "SG DefaultForSubnet",
-		DefaultForHost:   "SG DefaultForHost",
-	}
-	sg.Name = "SG Name"
+	sg, _ := NewSecurityGroup(WithName("SG Name"))
+	sg.ID = "SG ID"
+	sg.Network = "SG Network"
+	sg.Description = "SG Description"
+	sg.Rules = SecurityGroupRules{}
+	sg.DefaultForSubnet = "SG DefaultForSubnet"
+	sg.DefaultForHost = "SG DefaultForHost"
 	err := sg.RemoveRuleByIndex(0)
 	if err == nil {
 		t.Error("Can't remove anything from empty list")
 		t.Fail()
 	}
-	sg = &SecurityGroup{
-		ID:          "SG ID",
-		Network:     "SG Network",
-		Description: "SG Description",
-		Rules: SecurityGroupRules{
-			&SecurityGroupRule{
-				IDs:         []string{"a1", "b1", "c1"},
-				Description: "SG1 Description",
-				EtherType:   ipversion.IPv6,
-				Direction:   securitygroupruledirection.Ingress,
-				Protocol:    "icmp",
-				PortFrom:    0,
-				PortTo:      0,
-				Sources:     []string{"src_a1", "src_b1", "src_c1"},
-				Targets:     []string{"trg_a1", "trg_b1", "trg_c1"},
-			},
-			&SecurityGroupRule{
-				IDs:         []string{"a2", "b2", "c2"},
-				Description: "SG2 Description",
-				EtherType:   ipversion.IPv6,
-				Direction:   securitygroupruledirection.Ingress,
-				Protocol:    "icmp",
-				PortFrom:    0,
-				PortTo:      0,
-				Sources:     []string{"src_a2", "src_b2", "src_c2"},
-				Targets:     []string{"trg_a2", "trg_b2", "trg_c2"},
-			},
-			&SecurityGroupRule{
-				IDs:         []string{"a3", "b3", "c3"},
-				Description: "SG3 Description",
-				EtherType:   ipversion.IPv6,
-				Direction:   securitygroupruledirection.Ingress,
-				Protocol:    "icmp",
-				PortFrom:    0,
-				PortTo:      0,
-				Sources:     []string{"src_a3", "src_b3", "src_c3"},
-				Targets:     []string{"trg_a3", "trg_b3", "trg_c3"},
-			},
+
+	sg.Rules = SecurityGroupRules{
+		&SecurityGroupRule{
+			IDs:         []string{"a1", "b1", "c1"},
+			Description: "SG1 Description",
+			EtherType:   ipversion.IPv6,
+			Direction:   securitygroupruledirection.Ingress,
+			Protocol:    "icmp",
+			PortFrom:    0,
+			PortTo:      0,
+			Sources:     []string{"src_a1", "src_b1", "src_c1"},
+			Targets:     []string{"trg_a1", "trg_b1", "trg_c1"},
 		},
-		DefaultForSubnet: "SG DefaultForSubnet",
-		DefaultForHost:   "SG DefaultForHost",
+		&SecurityGroupRule{
+			IDs:         []string{"a2", "b2", "c2"},
+			Description: "SG2 Description",
+			EtherType:   ipversion.IPv6,
+			Direction:   securitygroupruledirection.Ingress,
+			Protocol:    "icmp",
+			PortFrom:    0,
+			PortTo:      0,
+			Sources:     []string{"src_a2", "src_b2", "src_c2"},
+			Targets:     []string{"trg_a2", "trg_b2", "trg_c2"},
+		},
+		&SecurityGroupRule{
+			IDs:         []string{"a3", "b3", "c3"},
+			Description: "SG3 Description",
+			EtherType:   ipversion.IPv6,
+			Direction:   securitygroupruledirection.Ingress,
+			Protocol:    "icmp",
+			PortFrom:    0,
+			PortTo:      0,
+			Sources:     []string{"src_a3", "src_b3", "src_c3"},
+			Targets:     []string{"trg_a3", "trg_b3", "trg_c3"},
+		},
 	}
-	sg.Name = "SG Name"
 
 	err = sg.RemoveRuleByIndex(-1)
 	if err == nil {
@@ -619,7 +610,6 @@ func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
 		t.Error(fmt.Sprintf("Item still present in list after being removed at position #%d", result))
 		t.Fail()
 	}
-
 }
 
 func TestSecurityGroup_SetID(t *testing.T) {
@@ -772,15 +762,8 @@ func TestSecurityGroup_Clone(t *testing.T) {
 		},
 	}
 
-	at, err := sg.Clone()
-	if err != nil {
-		t.Error(err)
-	}
-
-	sgc, ok := at.(*SecurityGroup)
-	if !ok {
-		t.Fail()
-	}
+	sgc, err := clonable.CastedClone[*SecurityGroup](sg)
+	require.Nil(t, err)
 
 	assert.Equal(t, sg, sgc)
 	sgc.Description = "changed description"
@@ -795,23 +778,12 @@ func TestSecurityGroup_Clone(t *testing.T) {
 	sgr.Description = "run for cover"
 	sg.Rules = append(sg.Rules, sgr)
 
-	sgr = NewSecurityGroupRule()
-	sgr.Description = "the road is long"
-	sg.Rules = append(sg.Rules, sgr)
-
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "don't")
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "look")
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "back")
 
-	at, err = sg.Clone()
-	if err != nil {
-		t.Error(err)
-	}
-
-	sgc, ok = at.(*SecurityGroup)
-	if !ok {
-		t.Fail()
-	}
+	sgc, err = clonable.CastedClone[*SecurityGroup](sg)
+	require.Nil(t, err)
 
 	// If we are cloning right, the 'value' (ignoring pointer memory addresses) of both sg and sgc should be the same
 	require.EqualValues(t, *sg, *sgc)
@@ -833,15 +805,15 @@ func TestSecurityGroup_NewSecurityGroup(t *testing.T) {
 
 	sg, _ := NewSecurityGroup()
 	if !sg.IsNull() {
-		t.Error("SecurityGroup is null !")
+		t.Error("SecurityGroup is expected to be null!")
 		t.Fail()
 	}
 	if sg.IsConsistent() {
-		t.Error("SecurityGroup is not consistent !")
+		t.Error("SecurityGroup is expected to not be consistent!")
 		t.Fail()
 	}
 	if sg.IsComplete() {
-		t.Error("SecurityGroup is not complete !")
+		t.Error("SecurityGroup is expected to not be complete!")
 		t.Fail()
 	}
 	sg.ID = "SecurityGroup ID"
@@ -886,7 +858,12 @@ func TestSecurityGroup_Replace(t *testing.T) {
 	sgc, _ = NewSecurityGroup()
 	err = sgc.Replace(sg)
 	require.Nil(t, err)
+
+	sg.Rules[1].Sources = []string{"needed"}
+	err = sgc.Replace(sg)
+	require.Nil(t, err)
 	assert.Equal(t, sgc, sg)
+
 	var clob clonable.Clonable = sg
 	require.EqualValues(t, clob, sgc)
 
@@ -902,7 +879,8 @@ func TestSecurityGroup_Replace(t *testing.T) {
 		t.Fail()
 	}
 
-	require.NotEqualValues(t, clob, sg)
+	require.EqualValues(t, clob, sg)
+	require.NotEqualValues(t, clob, sgc)
 }
 
 func TestSecurityGroup_Serialize(t *testing.T) {

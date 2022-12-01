@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -74,6 +75,8 @@ type Content struct {
 	ProviderName                string
 	BuildSubnetworks            bool
 	Debug                       bool
+	WithoutFirewall             bool
+	DefaultFirewall             bool
 	// Dashboard bool // Add kubernetes dashboard
 }
 
@@ -165,6 +168,14 @@ func (ud *Content) Prepare(options iaasoptions.Configuration, request abstract.H
 
 	if debugFlag := os.Getenv("SAFESCALE_DEBUG"); debugFlag != "" {
 		ud.Debug = true
+	}
+
+	if debugFlag := os.Getenv("SAFESCALE_DEBUG"); debugFlag == "NoFirewall" {
+		ud.WithoutFirewall = true
+	}
+
+	if debugFlag := os.Getenv("SAFESCALE_DEBUG"); debugFlag == "DefaultFirewall" {
+		ud.DefaultFirewall = true
 	}
 
 	ud.BashLibraryDefinition = *bashLibraryDefinition
@@ -291,6 +302,21 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 	}
 
 	return result, nil
+}
+
+// GenerateToFile is like Generate but output the result in a file
+func (ud Content) GenerateToFile(phase Phase, filename string) fail.Error {
+	content, xerr := ud.Generate(phase)
+	if xerr != nil {
+		return xerr
+	}
+
+	err := ioutil.WriteFile(filename, content, 0600)
+	if err != nil {
+		return fail.Wrap(err, "failed to generate userdata in file '%s'", filename)
+	}
+
+	return nil
 }
 
 // AddInTag adds some useful code on the end of userdata.netsec.sh just before the end (on the label #insert_tag)

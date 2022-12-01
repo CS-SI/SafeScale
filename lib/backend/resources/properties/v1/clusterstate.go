@@ -24,7 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterState contains the bare minimum information about the state of a cluster
@@ -62,7 +61,7 @@ func (s *ClusterState) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	casted, err := lang.Cast[*ClusterState](p)
+	casted, err := clonable.Cast[*ClusterState](p)
 	if err != nil {
 		return err
 	}

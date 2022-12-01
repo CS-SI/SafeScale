@@ -17,14 +17,13 @@
 package abstract
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/sirupsen/logrus"
-
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -52,7 +51,7 @@ type SubNetwork struct { // DEPRECATED: deprecated
 
 // Network represents a virtual network
 type Network struct {
-	*Core
+	*core
 	ID                 string         `json:"id"`                             // ID for the network (from provider)
 	CIDR               string         `json:"mask"`                           // network in CIDR notation (if it has a meaning...)
 	DNSServers         []string       `json:"dns_servers,omitempty"`          // list of dns servers to be used inside the Network/VPC
@@ -74,12 +73,9 @@ func NewNetwork(opts ...Option) (*Network, fail.Error) {
 	}
 
 	nn := &Network{
-		Core:       c,
+		core:       c,
 		DNSServers: make([]string, 0),
-		// Tags:       data.NewMap[string, string](),
 	}
-	// nn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
-	// nn.Tags["ManagedBy"] = "safescale"
 	return nn, nil
 }
 
@@ -92,7 +88,7 @@ func NewEmptyNetwork() *Network {
 // IsNull ...
 // satisfies interface clonable.Clonable
 func (n *Network) IsNull() bool {
-	return n == nil || n.Core.IsNull() || n.ID == ""
+	return n == nil || n.core.IsNull() || (n.ID == "" && (n.Name == "" || n.Name == Unnamed))
 }
 
 // Clone ...
@@ -120,13 +116,13 @@ func (n *Network) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := lang.Cast[*Network](p)
+	src, err := clonable.Cast[*Network](p)
 	if err != nil {
 		return err
 	}
 
 	*n = *src
-	n.Core, err = clonable.CastedClone[*Core](src.Core)
+	n.core, err = clonable.CastedClone[*core](src.core)
 	if err != nil {
 		return err
 	}
@@ -176,11 +172,11 @@ func (n *Network) Deserialize(buf []byte) (ferr fail.Error) {
 	return fail.ConvertError(json.Unmarshal(buf, n))
 }
 
-// GetName ...
-// satisfies interface data.Identifiable
-func (n *Network) GetName() string {
-	return n.Name
-}
+// // GetName ...
+// // satisfies interface data.Identifiable
+// func (n *Network) GetName() string {
+// 	return n.Name
+// }
 
 // GetID ...
 // satisfies interface data.Identifiable

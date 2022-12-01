@@ -219,7 +219,7 @@ func (instance *folder) Read(ctx context.Context, path string, name string, call
 			if iErr != nil {
 				return iErr
 			}
-			iErr = instance.job.Service().ReadObject(ctx, bucket.Name, instance.AbsolutePath(path, name), &buffer, 0, 0)
+			_, iErr = instance.job.Service().ReadObject(ctx, bucket.Name, instance.AbsolutePath(path, name), &buffer, 0, 0)
 			if iErr != nil {
 				switch iErr.(type) {
 				case *fail.ErrNotFound:
@@ -370,7 +370,8 @@ func (instance folder) Write(ctx context.Context, path string, name string, cont
 
 					var target bytes.Buffer
 					// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
-					if innerErr := instance.job.Service().ReadObject(ctx, bucketName, absolutePath, &target, 0, int64(source.Len())); innerErr != nil {
+					_, innerErr := instance.job.Service().ReadObject(ctx, bucketName, absolutePath, &target, 0, int64(source.Len()))
+					if innerErr != nil {
 						_ = instance.job.Service().InvalidateObject(ctx, bucketName, absolutePath)
 						logrus.WithContext(ctx).Warnf(innerErr.Error())
 						return innerErr
@@ -470,7 +471,7 @@ func (instance folder) Browse(ctx context.Context, path string, callback storage
 			continue
 		}
 		var buffer bytes.Buffer
-		xerr = instance.job.Service().ReadObject(ctx, metadataBucket.Name, i, &buffer, 0, 0)
+		_, xerr = instance.job.Service().ReadObject(ctx, metadataBucket.Name, i, &buffer, 0, 0)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			_ = instance.job.Service().InvalidateObject(ctx, metadataBucket.Name, i)

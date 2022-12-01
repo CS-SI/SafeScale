@@ -22,7 +22,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -30,7 +29,7 @@ const BucketKind = "bucket"
 
 // Bucket abstracts an Objet Storage container (also known as bucket in some implementations)
 type Bucket struct {
-	*Core
+	*core
 	ID         string `json:"id,omitempty"`
 	Host       string `json:"host,omitempty"`
 	MountPoint string `json:"mountPoint,omitempty"`
@@ -44,7 +43,7 @@ func NewBucket(opts ...Option) (*Bucket, fail.Error) {
 		return nil, xerr
 	}
 
-	out := &Bucket{Core: c}
+	out := &Bucket{core: c}
 	return out, nil
 }
 
@@ -68,7 +67,7 @@ func (instance Bucket) OK() bool {
 }
 
 func (instance *Bucket) IsNull() bool {
-	return instance == nil || instance.Core.IsNull() || (instance.Name == "" && instance.ID == "")
+	return instance == nil || instance.core.IsNull() || (instance.ID == "" && (instance.Name == "" || instance.Name == Unnamed))
 }
 
 // Clone does a deep-copy of the Bucket
@@ -90,17 +89,14 @@ func (instance *Bucket) Replace(p clonable.Clonable) error {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if p == nil {
-		return fail.InvalidParameterCannotBeNilError("p")
-	}
 
-	src, err := lang.Cast[*Bucket](p)
+	src, err := clonable.Cast[*Bucket](p)
 	if err != nil {
 		return err
 	}
 
 	*instance = *src
-	instance.Core, err = clonable.CastedClone[*Core](src.Core)
+	instance.core, err = clonable.CastedClone[*core](src.core)
 	if err != nil {
 		return err
 	}
@@ -147,15 +143,23 @@ func (instance *Bucket) Deserialize(buf []byte) (ferr fail.Error) {
 	return nil
 }
 
-// GetName name returns the name of the host
-// Satisfies interface data.Identifiable
-func (instance Bucket) GetName() string {
-	return instance.Name
-}
+// // GetName name returns the name of the host
+// // Satisfies interface data.Identifiable
+// func (instance *Bucket) GetName() string {
+// 	if instance == nil || valid.IsNull(instance.Core) {
+// 		return ""
+// 	}
+//
+// 	return instance.Name
+// }
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
-func (instance Bucket) GetID() (string, error) {
+func (instance *Bucket) GetID() (string, error) {
+	if valid.IsNull(instance) {
+		return "", fail.InvalidInstanceError()
+	}
+
 	return instance.ID, nil
 }
 

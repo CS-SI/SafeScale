@@ -23,10 +23,10 @@ import (
 	"sync"
 	"time"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -42,7 +42,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -133,6 +132,7 @@ func LoadBucket(inctx context.Context, name string) (resources.Bucket, fail.Erro
 			if !ok {
 				return nil, fail.InconsistentError("cache content should be a resources.Bucket", name)
 			}
+
 			if b == nil {
 				return nil, fail.InconsistentError("nil value found in Bucket cache for key '%s'", name)
 			}
@@ -306,7 +306,7 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, ferr fail.Error)
 
 	var res string
 	xerr := instance.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		ab, err := lang.Cast[*abstract.Bucket](p)
+		ab, err := clonable.Cast[*abstract.Bucket](p)
 		if err != nil {
 			return fail.Wrap(err)
 		}
@@ -336,7 +336,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 
 	var res string
 	xerr := instance.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		ab, err := lang.Cast[*abstract.Bucket](p)
+		ab, err := clonable.Cast[*abstract.Bucket](p)
 		if err != nil {
 			return fail.Wrap(err)
 		}
@@ -516,7 +516,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	// -- check if Bucket is already mounted on any Host (only one Mount by Bucket allowed by design, to mitigate sync issues induced by Object Storage)
 	xerr = instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(bucketproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			mountsV1, err := lang.Cast[*propertiesv1.BucketMounts](p)
+			mountsV1, err := clonable.Cast[*propertiesv1.BucketMounts](p)
 			if err != nil {
 				return fail.Wrap(err)
 			}
@@ -595,7 +595,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	// -- update metadata of Bucket
 	xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(bucketproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			mountsV1, innerErr := lang.Cast[*propertiesv1.BucketMounts](p)
+			mountsV1, innerErr := clonable.Cast[*propertiesv1.BucketMounts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -612,7 +612,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	// -- update metadata of Host
 	return hostInstance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			mountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
+			mountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -696,7 +696,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 
 	xerr = hostInstance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			mountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
+			mountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -711,7 +711,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 
 	xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(bucketproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			mountsV1, innerErr := lang.Cast[*propertiesv1.BucketMounts](p)
+			mountsV1, innerErr := clonable.Cast[*propertiesv1.BucketMounts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -739,7 +739,7 @@ func (instance *bucket) ToProtocol(ctx context.Context) (*protocol.BucketRespons
 
 	xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(bucketproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			mountsV1, innerErr := lang.Cast[*propertiesv1.BucketMounts](p)
+			mountsV1, innerErr := clonable.Cast[*propertiesv1.BucketMounts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

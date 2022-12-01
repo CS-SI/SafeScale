@@ -5,7 +5,11 @@ GO?=go
 all: generate
 
 generate: clean
-	@$(GO) generate -run minimock ./...
+	@mkdir -p mocks || true
+	@(cd objectstorage && $(MAKE) $(@))
+	@(cd providers && $(MAKE) $(@))
+	@(cd userdata && $(MAKE) $(@))
+	@(cd stacks && $(MAKE) $(@))
 
 vet:
 	@$(GO) vet ./...

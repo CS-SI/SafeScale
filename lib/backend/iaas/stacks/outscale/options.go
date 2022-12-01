@@ -23,10 +23,10 @@ import (
 )
 
 // ConfigurationOptions ...
-func (s stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
+func (instance *stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 	out := iaasoptions.Configuration{
 		ProviderNetwork:           "",
-		DNSServers:                s.Options.Compute.DNSList,
+		DNSServers:                instance.Options.Compute.DNSList,
 		UseFloatingIP:             false,
 		UseLayer3Networking:       false,
 		UseNATService:             false,
@@ -38,9 +38,9 @@ func (s stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 			"gp2":      volumespeed.Hdd,
 			"io1":      volumespeed.Ssd,
 		},
-		DefaultImage:             s.Options.Compute.DefaultImage,
-		MetadataBucketName:       s.Options.Metadata.Bucket,
-		OperatorUsername:         s.Options.Compute.OperatorUsername,
+		DefaultImage:             instance.Options.Compute.DefaultImage,
+		MetadataBucketName:       instance.Options.Metadata.Bucket,
+		OperatorUsername:         instance.Options.Compute.OperatorUsername,
 		DefaultSecurityGroupName: "",
 		DefaultNetworkName:       "",
 		DefaultNetworkCIDR:       "",
@@ -49,22 +49,22 @@ func (s stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 		WhitelistImageRegexp:     nil,
 		BlacklistImageRegexp:     nil,
 		MaxLifeTime:              0,
-		Timings:                  s.Options.Timings,
-		Safe:                     s.Options.Compute.Safe,
+		Timings:                  instance.Options.Timings,
+		Safe:                     instance.Options.Compute.Safe,
 	}
 	return out, nil
 }
 
 // AuthenticationOptions ...
-func (s stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
+func (instance *stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
 	return iaasoptions.Authentication{
-		IdentityEndpoint: s.Options.Compute.URL,
+		IdentityEndpoint: instance.Options.Compute.URL,
 		Username:         "",
 		UserID:           "",
-		AccessKeyID:      s.Options.Identity.AccessKey,
+		AccessKeyID:      instance.Options.Identity.AccessKey,
 		Password:         "",
 		APIKey:           "",
-		SecretAccessKey:  s.Options.Identity.SecretKey,
+		SecretAccessKey:  instance.Options.Identity.SecretKey,
 		DomainID:         "",
 		DomainName:       "",
 		TenantID:         "",
@@ -73,8 +73,8 @@ func (s stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) 
 		ProjectID:        "",
 		AllowReauth:      false,
 		TokenID:          "",
-		Region:           s.Options.Compute.Region,
-		AvailabilityZone: s.Options.Compute.Subregion,
+		Region:           instance.Options.Compute.Region,
+		AvailabilityZone: instance.Options.Compute.Subregion,
 		FloatingIPPool:   "",
 		// AK:               "",
 		// AS:               "",

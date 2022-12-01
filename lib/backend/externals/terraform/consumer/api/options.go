@@ -8,10 +8,10 @@ import (
 
 const OptionTargets = "targets"
 
-func WithTarget(name string) options.Option {
+func WithTarget(rsc Resource) options.Option {
 	return func(o options.Options) fail.Error {
-		if name == "" {
-			return fail.InvalidParameterCannotBeEmptyStringError(name)
+		if rsc == nil {
+			return fail.InvalidParameterCannotBeEmptyStringError("rsc")
 		}
 
 		var targets []string
@@ -31,7 +31,10 @@ func WithTarget(name string) options.Option {
 				return fail.Wrap(err)
 			}
 		}
-		targets = append(targets, name)
+
+		for _, v := range rsc.TerraformTypes() {
+			targets = append(targets, v+"."+rsc.GetName())
+		}
 		return o.Store("targets", targets)
 	}
 }

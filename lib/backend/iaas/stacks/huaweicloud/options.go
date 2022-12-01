@@ -35,11 +35,11 @@ import (
 // }
 
 // ConfigurationOptions ...
-func (s *stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
-	return s.cfgOpts, nil
+func (instance *stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
+	return instance.cfgOpts, nil
 }
 
 // AuthenticationOptions ...
-func (s *stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
-	return s.authOpts, nil
+func (instance *stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
+	return instance.authOpts, nil
 }

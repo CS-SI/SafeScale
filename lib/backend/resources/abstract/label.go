@@ -17,18 +17,18 @@
 package abstract
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 const LabelKind = "label"
 
 type Label struct {
-	*Core
+	*core
 	ID           string `json:"id"`
 	HasDefault   bool   `json:"has_default"` // if false, this represents a Tag
 	DefaultValue string `json:"default_value,omitempty"`
@@ -43,7 +43,7 @@ func NewLabel(opts ...Option) (*Label, fail.Error) {
 	}
 
 	out := &Label{
-		Core:       c,
+		core:       c,
 		HasDefault: true,
 	}
 	return out, nil
@@ -58,7 +58,7 @@ func NewEmptyLabel() *Label {
 // IsNull ...
 // satisfies interface clonable.Clonable
 func (instance *Label) IsNull() bool {
-	return instance == nil || (instance.ID == "" && instance.Name == "")
+	return instance == nil || valid.IsNull(instance.core) || (instance.ID == "" && (instance.Name == "" || instance.Name == Unnamed))
 }
 
 // Clone ...
@@ -79,20 +79,21 @@ func (instance *Label) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*Label](p)
+	src, err := clonable.Cast[*Label](p)
 	if err != nil {
 		return err
 	}
 
 	*instance = *src
-	return nil
+	instance.core, err = clonable.CastedClone[*core](src.core)
+	return err
 }
 
 // Valid checks if content of Label is valid
 func (instance *Label) Valid() bool {
 	result := instance != nil
 	result = result && instance.ID != ""
-	result = result && instance.Name != ""
+	result = result && (instance.Name != "" && instance.Name != Unnamed)
 	return result
 }
 
@@ -125,11 +126,11 @@ func (instance *Label) Deserialize(buf []byte) (ferr fail.Error) {
 	return fail.ConvertError(json.Unmarshal(buf, instance))
 }
 
-// GetName returns the name of the tag
-// Satisfies interface data.Identifiable
-func (instance *Label) GetName() string {
-	return instance.Name
-}
+// // GetName returns the name of the tag
+// // Satisfies interface data.Identifiable
+// func (instance *Label) GetName() string {
+// 	return instance.Name
+// }
 
 // GetID returns the ID of the tag
 // Satisfies interface data.Identifiable

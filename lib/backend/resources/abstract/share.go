@@ -20,7 +20,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -32,7 +31,7 @@ const (
 
 // Share contains information about a Share
 type Share struct {
-	*Core
+	*core
 
 	HostID    string `json:"host_id"`    // contains the ID of the host serving the Share
 	HostName  string `json:"host_name"`  // contains the name of the host serving the Share
@@ -50,7 +49,7 @@ func NewShare(opts ...Option) (*Share, fail.Error) {
 	}
 
 	sn := &Share{
-		Core: c,
+		core: c,
 	}
 	return sn, nil
 }
@@ -121,7 +120,7 @@ func (si *Share) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := lang.Cast[*Share](p)
+	src, err := clonable.Cast[*Share](p)
 	if err != nil {
 		return err
 	}

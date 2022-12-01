@@ -211,13 +211,10 @@ func (s *stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fai
 	var volumes []*abstract.Volume
 	for _, v := range resp.Volumes {
 		volumeName := aws.StringValue(v.VolumeId)
-		if len(v.Tags) > 0 {
-			for _, tag := range v.Tags {
-				if tag != nil {
-					if aws.StringValue(tag.Key) == "Name" {
-						volumeName = aws.StringValue(tag.Value)
-					}
-				}
+		for _, tag := range v.Tags {
+			if tag != nil && aws.StringValue(tag.Key) == "Name" {
+				volumeName = aws.StringValue(tag.Value)
+				break
 			}
 		}
 

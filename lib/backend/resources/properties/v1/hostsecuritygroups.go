@@ -21,7 +21,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostSecurityGroups contains a list of security groups bound to the host
@@ -64,7 +63,7 @@ func (hsg *HostSecurityGroups) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*HostSecurityGroups](p)
+	src, err := clonable.Cast[*HostSecurityGroups](p)
 	if err != nil {
 		return err
 	}

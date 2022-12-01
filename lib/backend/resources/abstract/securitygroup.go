@@ -27,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -316,7 +315,7 @@ func (instance *SecurityGroupRule) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := lang.Cast[*SecurityGroupRule](p)
+	src, err := clonable.Cast[*SecurityGroupRule](p)
 	if err != nil {
 		return err
 	}
@@ -369,13 +368,12 @@ func (sgrs SecurityGroupRules) Clone() (SecurityGroupRules, error) {
 			continue
 		}
 
-		cloned, err := v.Clone()
+		cloned, err := clonable.CastedClone[*SecurityGroupRule](v)
 		if err != nil {
 			return nil, err
 		}
 
-		casted, _ := cloned.(*SecurityGroupRule) //nolint
-		asgr = append(asgr, casted)
+		asgr = append(asgr, cloned)
 	}
 	return asgr, nil
 }
@@ -429,7 +427,7 @@ func (instance *SecurityGroup) RemoveRuleByIndex(index int) fail.Error {
 // SecurityGroup represents a security group
 // Note: by design, security group names must be unique tenant-wide
 type SecurityGroup struct {
-	*Core
+	*core
 	ID               string             `json:"id"`                    // ID of the group
 	Network          string             `json:"network,omitempty"`     // Contains the ID of the Network owning the Security Group
 	Description      string             `json:"description,omitempty"` // description of the group
@@ -447,7 +445,7 @@ func NewSecurityGroup(opts ...Option) (*SecurityGroup, fail.Error) {
 	}
 
 	asg := &SecurityGroup{
-		Core:             c,
+		core:             c,
 		ID:               "",
 		Network:          "",
 		Description:      "",
@@ -466,20 +464,24 @@ func NewEmptySecurityGroup() *SecurityGroup {
 
 // IsNull tells if the SecurityGroup is a null value
 func (instance *SecurityGroup) IsNull() bool {
-	return instance == nil || (instance.Name == "" && instance.ID == "")
+	return instance == nil || (instance.ID == "" && (instance.Name == "" || instance.Name == Unnamed))
 }
 
 // IsConsistent tells if the content of the security group is consistent
-func (instance SecurityGroup) IsConsistent() bool {
-	if instance.ID == "" && (instance.Name == "" || instance.Network == "") {
+func (instance *SecurityGroup) IsConsistent() bool {
+	if instance.IsNull() {
 		return false
 	}
 	return true
 }
 
 // IsComplete tells if the content of the security group is complete
-func (instance SecurityGroup) IsComplete() bool {
-	return instance.ID != "" && instance.Name != "" && instance.Network != ""
+func (instance *SecurityGroup) IsComplete() bool {
+	if instance.IsNull() {
+		return false
+	}
+
+	return instance.ID != "" && (instance.Name != "" && instance.Name != Unnamed) && instance.Network != ""
 }
 
 // SetID sets the value of field ID in sg
@@ -529,13 +531,13 @@ func (instance *SecurityGroup) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := lang.Cast[*SecurityGroup](p)
+	src, err := clonable.Cast[*SecurityGroup](p)
 	if err != nil {
 		return err
 	}
 
 	*instance = *src
-	instance.Core, err = clonable.CastedClone[*Core](src.Core)
+	instance.core, err = clonable.CastedClone[*core](src.core)
 	if err != nil {
 		return fail.Wrap(err)
 	}
@@ -586,11 +588,11 @@ func (instance *SecurityGroup) GetNetworkID() string {
 	return instance.Network
 }
 
-// GetName returns the name of the securitygroup
-// Satisfies interface data.Identifiable
-func (instance *SecurityGroup) GetName() string {
-	return instance.Name
-}
+// // GetName returns the name of the securitygroup
+// // Satisfies interface data.Identifiable
+// func (instance *SecurityGroup) GetName() string {
+// 	return instance.Name
+// }
 
 // GetID returns the ID of the securitygroup
 // Satisfies interface data.Identifiable

@@ -50,7 +50,10 @@ func (s *TemplateListener) List(inctx context.Context, in *protocol.TemplateList
 		return nil, fail.InvalidInstanceError()
 	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	job, xerr := prepareJob(inctx, in, "/templates/list")
@@ -90,7 +93,10 @@ func (s *TemplateListener) Match(inctx context.Context, in *protocol.TemplateMat
 		return nil, fail.InvalidInstanceError()
 	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	job, xerr := prepareJob(inctx, in, "/template/match")
@@ -133,13 +139,13 @@ func (s *TemplateListener) Inspect(inctx context.Context, in *protocol.TemplateI
 		return nil, fail.InvalidInstanceError()
 	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-
 	ref, _ := srvutils.GetReference(in.GetTemplate())
+
 	job, xerr := prepareJob(inctx, in.GetTemplate(), fmt.Sprintf("template/%s/inspect", ref))
 	if xerr != nil {
 		return nil, xerr

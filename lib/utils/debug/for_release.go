@@ -23,3 +23,6 @@ package debug
 // Does nothing in release mode
 func IgnoreError(err error) {
 }
+
+func IgnoreErrorWithContext(ctx context.Context, err error) {
+}

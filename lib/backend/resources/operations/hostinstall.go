@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
@@ -34,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -81,7 +81,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		xerr = instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			// updates HostFeatures property for host
 			return props.Alter(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-				hostFeaturesV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
+				hostFeaturesV1, innerErr := clonable.Cast[*propertiesv1.HostFeatures](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -184,17 +184,11 @@ func (instance *Host) DeleteFeature(inctx context.Context, name string, vars dat
 			tracer.Trace(strprocess.Capitalize(msg) + ":\n" + outcomes.AllErrorMessages())
 			return fail.NewError(msg)
 		}
-		return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			// updates HostFeatures property for host
-			return props.Alter(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-				hostFeaturesV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
 
-				delete(hostFeaturesV1.Installed, name)
-				return nil
-			})
+		// updates HostFeatures property for host
+		return metadata.AlterProperty(ctx, instance, hostproperty.FeaturesV1, func(hostFeaturesV1 *propertiesv1.HostFeatures) fail.Error {
+			delete(hostFeaturesV1.Installed, name)
+			return nil
 		})
 	}()
 	return nil, xerr
@@ -242,41 +236,32 @@ func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Featur
 		return fail.InvalidParameterCannotBeNilError("feat")
 	}
 
-	return instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-			featuresV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
+	return metadata.AlterProperty(ctx, instance, hostproperty.FeaturesV1, func(featuresV1 *propertiesv1.HostFeatures) fail.Error {
+		item, ok := featuresV1.Installed[feat.GetName()]
+		if !ok {
+			requirements, innerXErr := feat.Dependencies(ctx)
+			if innerXErr != nil {
+				return innerXErr
 			}
 
-			item, ok := featuresV1.Installed[feat.GetName()]
-			if !ok {
-				requirements, innerXErr := feat.Dependencies(ctx)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				item = propertiesv1.NewHostInstalledFeature()
-				if requirements != nil {
-					item.Requires = requirements
-				}
-				item.HostContext = !clusterContext
-
-				featuresV1.Installed[feat.GetName()] = item
+			item = propertiesv1.NewHostInstalledFeature()
+			if requirements != nil {
+				item.Requires = requirements
 			}
-			if item != nil {
-				if !valid.IsNil(requiredBy) {
-					if item.RequiredBy != nil {
-						item.RequiredBy[requiredBy.GetName()] = struct{}{}
-					} else {
-						item.RequiredBy = make(map[string]struct{})
-						item.RequiredBy[requiredBy.GetName()] = struct{}{}
-					}
-				}
-			}
+			item.HostContext = !clusterContext
 
-			return nil
-		})
+			featuresV1.Installed[feat.GetName()] = item
+		}
+		if item != nil && !valid.IsNil(requiredBy) {
+			if item.RequiredBy != nil {
+				item.RequiredBy[requiredBy.GetName()] = struct{}{}
+			} else {
+				item.RequiredBy = make(map[string]struct{})
+				item.RequiredBy[requiredBy.GetName()] = struct{}{}
+			}
+		}
+
+		return nil
 	})
 }
 
@@ -294,19 +279,12 @@ func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr 
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
-	return instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-			featuresV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			delete(featuresV1.Installed, feat)
-			for _, v := range featuresV1.Installed {
-				delete(v.RequiredBy, feat)
-			}
-			return nil
-		})
+	return metadata.AlterProperty(ctx, instance, hostproperty.FeaturesV1, func(featuresV1 *propertiesv1.HostFeatures) fail.Error {
+		delete(featuresV1.Installed, feat)
+		for _, v := range featuresV1.Installed {
+			delete(v.RequiredBy, feat)
+		}
+		return nil
 	})
 }
 
@@ -359,18 +337,11 @@ func (instance *Host) InstalledFeatures(ctx context.Context) ([]string, fail.Err
 	}
 
 	var out []string
-	xerr := instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-			featuresV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			for k := range featuresV1.Installed {
-				out = append(out, k)
-			}
-			return nil
-		})
+	xerr := metadata.InspectProperty(ctx, instance, hostproperty.FeaturesV1, func(featuresV1 *propertiesv1.HostFeatures) fail.Error {
+		for k := range featuresV1.Installed {
+			out = append(out, k)
+		}
+		return nil
 	})
 	if xerr != nil {
 		return []string{}, xerr
@@ -398,19 +369,12 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 	v["ShortHostname"] = instance.GetName()
 	domain := ""
 
-	xerr := instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
-			hostDescriptionV1, innerErr := lang.Cast[*propertiesv1.HostDescription](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			domain = hostDescriptionV1.Domain
-			if domain != "" {
-				domain = "." + domain
-			}
-			return nil
-		})
+	xerr := metadata.InspectProperty(ctx, instance, hostproperty.DescriptionV1, func(hostDescriptionV1 *propertiesv1.HostDescription) fail.Error {
+		domain = hostDescriptionV1.Domain
+		if domain != "" {
+			domain = "." + domain
+		}
+		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -428,7 +392,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// Host may not have Public IP, ignore this error
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return xerr
 		}
@@ -496,7 +460,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 			case *fail.ErrNotFound:
 				v["SecondaryGatewayIP"] = ""
 				v["SecondaryPublicIP"] = ""
-				debug.IgnoreError(xerr)
+				debug.IgnoreErrorWithContext(ctx, xerr)
 			default:
 				return xerr
 			}
@@ -541,15 +505,8 @@ func (instance *Host) IsFeatureInstalled(ctx context.Context, name string) (foun
 		return false, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	return found, instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-			featuresV1, innerErr := lang.Cast[*propertiesv1.HostFeatures](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			_, found = featuresV1.Installed[name]
-			return nil
-		})
+	return found, metadata.InspectProperty(ctx, instance, hostproperty.FeaturesV1, func(featuresV1 *propertiesv1.HostFeatures) fail.Error {
+		_, found = featuresV1.Installed[name]
+		return nil
 	})
 }

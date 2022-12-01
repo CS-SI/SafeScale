@@ -27,13 +27,10 @@ import (
 	"sync"
 	"time"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -43,12 +40,14 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // PriceInfo stores price information
@@ -452,7 +451,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}()
 
 	xerr = subnet.Inspect(context.Background(), func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, innerErr := lang.Cast[*abstract.Subnet](p)
+		as, innerErr := clonable.Cast[*abstract.Subnet](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -550,7 +549,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		Image: defaultScanImage,
 	}
 
-	if _, xerr = host.Create(handler.job.Context(), req, def); xerr != nil {
+	if _, xerr = host.Create(handler.job.Context(), req, def, nil); xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': error creation", template.Name, hostName)
 	}
 
@@ -773,7 +772,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (_ resources.Subne
 		subnetHostSizing := abstract.HostSizingRequirements{
 			MinGPU: -1,
 		}
-		xerr = subnet.Create(handler.job.Context(), req, "", &subnetHostSizing)
+		xerr = subnet.Create(handler.job.Context(), req, "", &subnetHostSizing, nil)
 		if xerr != nil {
 			return nil, xerr
 		}

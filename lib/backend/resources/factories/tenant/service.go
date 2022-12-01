@@ -18,13 +18,14 @@ package tenant
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/eko/gocache/v2/cache"
@@ -998,7 +999,7 @@ func addPadding(in string, maxLength int) string {
 }
 
 // CreateHostWithKeyPair creates a host
-func (instance service) CreateHostWithKeyPair(inctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
+func (instance service) CreateHostWithKeyPair(inctx context.Context, request abstract.HostRequest, extra interface{}) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, nil, nil, fail.InvalidInstanceError()
 	}
@@ -1067,7 +1068,7 @@ func (instance service) CreateHostWithKeyPair(inctx context.Context, request abs
 			// DefaultGateway: request.DefaultGateway,
 			TemplateID: request.TemplateID,
 		}
-		host, userData, rerr := instance.CreateHost(ctx, hostReq)
+		host, userData, rerr := instance.CreateHost(ctx, hostReq, extra)
 		if rerr != nil {
 			chRes <- result{nil, nil, nil, rerr}
 			return

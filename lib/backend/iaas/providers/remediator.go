@@ -257,20 +257,20 @@ func (s Remediator) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Sec
 	return xerr
 }
 
-func (s Remediator) AddRuleToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	group, xerr := s.Provider.AddRuleToSecurityGroup(ctx, sgParam, rule)
+	group, xerr := s.Provider.AddRulesToSecurityGroup(ctx, sgParam, rules...)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
 	return group, xerr
 }
 
-func (s Remediator) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	group, xerr := s.Provider.DeleteRuleFromSecurityGroup(ctx, sgParam, rule)
+	group, xerr := s.Provider.DeleteRulesFromSecurityGroup(ctx, sgParam, rules...)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
@@ -457,10 +457,10 @@ func (s Remediator) DeleteVIP(ctx context.Context, ip *abstract.VirtualIP) (ferr
 	return xerr
 }
 
-func (s Remediator) CreateHost(ctx context.Context, request abstract.HostRequest) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
+func (s Remediator) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (_ *abstract.HostFull, _ *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	host, content, xerr := s.Provider.CreateHost(ctx, request)
+	host, content, xerr := s.Provider.CreateHost(ctx, request, extra)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}

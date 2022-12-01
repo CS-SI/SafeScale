@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/gofrs/uuid"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
@@ -225,7 +224,7 @@ func (hse *HostEffectiveSizing) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*HostEffectiveSizing](p)
+	src, err := clonable.Cast[*HostEffectiveSizing](p)
 	if err != nil {
 		return err
 	}
@@ -257,7 +256,7 @@ func (ht HostTemplate) OK() bool {
 // HostCore contains the core information about a host
 // This information should not change over time, but IT ACTUALLY happens
 type HostCore struct {
-	*Core
+	*core
 	ID string `json:"id,omitempty"`
 	// Name              string            `json:"name,omitempty"`
 	PrivateKey        string         `json:"private_key,omitempty"`
@@ -276,7 +275,7 @@ func NewHostCore(opts ...Option) (*HostCore, fail.Error) {
 	}
 
 	hc := &HostCore{
-		Core:              c,
+		core:              c,
 		SSHPort:           22,
 		LastState:         hoststate.Unknown,
 		ProvisioningState: hoststate.Unknown,
@@ -284,9 +283,15 @@ func NewHostCore(opts ...Option) (*HostCore, fail.Error) {
 	return hc, nil
 }
 
+// NewEmptyHostCore returns a empty, unnamed HostCore instance
+func NewEmptyHostCore() *HostCore {
+	out, _ := NewHostCore()
+	return out
+}
+
 // IsNull tells if the instance should be considered as a null value
 func (hc *HostCore) IsNull() bool {
-	return hc == nil || hc.Core.IsNull() || (hc.ID == "" && hc.Name == "")
+	return hc == nil || hc.core.IsNull() || (hc.ID == "" && (hc.Name == "" || hc.Name == Unnamed))
 }
 
 // IsConsistent tells if host struct is consistent
@@ -333,13 +338,13 @@ func (hc *HostCore) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*HostCore](p)
+	src, err := clonable.Cast[*HostCore](p)
 	if err != nil {
 		return err
 	}
 
 	*hc = *src
-	hc.Core, err = clonable.CastedClone[*Core](src)
+	hc.core, err = clonable.CastedClone[*core](src.core)
 	if err != nil {
 		return err
 	}
@@ -386,11 +391,11 @@ func (hc *HostCore) Deserialize(buf []byte) (ferr fail.Error) {
 	return nil
 }
 
-// GetName returns the name of the host
-// Satisfies interface data.Identifiable
-func (hc *HostCore) GetName() string {
-	return hc.Name
-}
+// // GetName returns the name of the host
+// // Satisfies interface data.Identifiable
+// func (hc *HostCore) GetName() string {
+// 	return hc.Name
+// }
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
@@ -439,7 +444,7 @@ func (hn *HostNetworking) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*HostNetworking](p)
+	src, err := clonable.Cast[*HostNetworking](p)
 	if err != nil {
 		return err
 	}
@@ -488,7 +493,7 @@ func (hd *HostDescription) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*HostDescription](p)
+	src, err := clonable.Cast[*HostDescription](p)
 	if err != nil {
 		return err
 	}
@@ -573,11 +578,11 @@ func (hf *HostFull) GetID() (string, error) {
 	return hf.ID, nil
 }
 
-// GetName returns the name of the host
-// satisfies interface data.Identifiable
-func (hf *HostFull) GetName() string {
-	return hf.Name
-}
+// // GetName returns the name of the host
+// // satisfies interface data.Identifiable
+// func (hf *HostFull) GetName() string {
+// 	return hf.Name
+// }
 
 // SetName is a setter to initialize field 'Name'
 func (hf *HostFull) SetName(name string) *HostFull {
@@ -599,22 +604,6 @@ func (hf *HostFull) Clone() (clonable.Clonable, error) {
 		return nil, xerr
 	}
 
-	var err error
-	nhf.Description, err = lang.Cast[*HostDescription](hf.Description)
-	if err != nil {
-		return nil, err
-	}
-
-	nhf.Sizing, err = lang.Cast[*HostEffectiveSizing](hf.Sizing)
-	if err != nil {
-		return nil, err
-	}
-
-	nhf.Networking, err = lang.Cast[*HostNetworking](hf.Networking)
-	if err != nil {
-		return nil, err
-	}
-
 	return nhf, nhf.Replace(hf)
 }
 
@@ -625,12 +614,32 @@ func (hf *HostFull) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*HostFull](p)
+	src, err := clonable.Cast[*HostFull](p)
 	if err != nil {
 		return err
 	}
 
 	*hf = *src
+	hf.core, err = clonable.CastedClone[*core](src.core)
+	if err != nil {
+		return err
+	}
+
+	hf.Description, err = clonable.CastedClone[*HostDescription](hf.Description)
+	if err != nil {
+		return err
+	}
+
+	hf.Sizing, err = clonable.CastedClone[*HostEffectiveSizing](hf.Sizing)
+	if err != nil {
+		return err
+	}
+
+	hf.Networking, err = clonable.CastedClone[*HostNetworking](hf.Networking)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

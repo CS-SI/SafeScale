@@ -52,13 +52,12 @@ func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCrea
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	networkName := in.GetName()
 	if networkName == "" {
 		return nil, fail.InvalidRequestError("network name cannot be empty string")
@@ -142,11 +141,11 @@ func (s *NetworkListener) List(inctx context.Context, in *protocol.NetworkListRe
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	job, xerr := prepareJob(inctx, in, "/networks/list")
@@ -187,13 +186,12 @@ func (s *NetworkListener) Inspect(inctx context.Context, in *protocol.Reference)
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	networkRef, networkRefLabel := srvutils.GetReference(in)
 	if networkRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -237,11 +235,11 @@ func (s *NetworkListener) Delete(inctx context.Context, in *protocol.NetworkDele
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.Network)

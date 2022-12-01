@@ -1,6 +1,7 @@
 package objectstorage
 
 import (
+	"bytes"
 	"context"
 	"io"
 
@@ -76,16 +77,16 @@ func (l locationtransparent) ItemEtag(ctx context.Context, bucketName string, ob
 	return l.inner.ItemEtag(ctx, bucketName, objectName)
 }
 
-func (l locationtransparent) ReadObject(ctx context.Context, s string, s2 string, writer io.Writer, i int64, i2 int64) fail.Error {
+func (l locationtransparent) ReadObject(ctx context.Context, s string, s2 string, writer io.Writer, i int64, i2 int64) (bytes.Buffer, fail.Error) {
 	incrementExpVar("readobject")
 	incrementExpVar("metadata.reads")
 
-	xerr := l.inner.ReadObject(ctx, s, s2, writer, i, i2)
+	wr, xerr := l.inner.ReadObject(ctx, s, s2, writer, i, i2)
 	if xerr != nil {
-		return xerr
+		return bytes.Buffer{}, xerr
 	}
 
-	return nil
+	return wr, nil
 }
 
 func (l locationtransparent) WriteMultiPartObject(ctx context.Context, s string, s2 string, reader io.Reader, i int64, i2 int, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {

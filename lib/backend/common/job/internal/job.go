@@ -278,7 +278,6 @@ func (instance *job) Aborted() (bool, fail.Error) {
 
 // Close tells the job to wait for end of operation; this ensures everything is cleaned up correctly
 func (instance *job) Close() {
-	fmt.Println("calling *job.Close()...")
 	if instance != nil {
 		_ = deregister(instance.ID())
 		if instance.cancel != nil {

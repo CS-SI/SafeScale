@@ -21,7 +21,7 @@ package tests
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"io/ioutil"
 	"regexp"
 	"strings"

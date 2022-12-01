@@ -30,18 +30,18 @@ import (
 func TestVolume_NewVolume(t *testing.T) {
 	v, _ := NewVolume()
 	if !v.IsNull() {
-		t.Error("Volume is null !")
+		t.Error("Volume is expected to be null!")
 		t.Fail()
 	}
 	if v.OK() {
-		t.Error("Volume is not ok !")
+		t.Error("Volume is expected to be not ok!")
 		t.Fail()
 	}
 	v.ID = "Volume ID"
 	v.Name = "Volume Name"
 	v.Size = 42
 	if v.IsNull() {
-		t.Error("Volume is notnull !")
+		t.Error("Volume is expected to be not null!")
 		t.Fail()
 	}
 	if !v.OK() {

@@ -25,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -59,7 +58,7 @@ func (cr ClusterRequest) CleanOnFailure() bool {
 
 // Cluster contains the bare minimum information about a cluster
 type Cluster struct {
-	*Core
+	*core
 	Flavor        clusterflavor.Enum     `json:"flavor"`         // Flavor tells what kind of cluster it is
 	Complexity    clustercomplexity.Enum `json:"complexity"`     // Complexity is the mode of cluster
 	Keypair       *KeyPair               `json:"keypair"`        // Keypair contains the key-pair used inside the Cluster
@@ -75,7 +74,7 @@ func NewCluster(opts ...Option) (*Cluster, fail.Error) {
 	}
 
 	out := &Cluster{
-		Core: c,
+		core: c,
 	}
 	out.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	out.Tags["ManagedBy"] = "safescale"
@@ -90,7 +89,7 @@ func NewEmptyCluster() *Cluster {
 
 // IsNull ...
 func (instance *Cluster) IsNull() bool {
-	return instance == nil || instance.Core.IsNull()
+	return instance == nil || instance.core.IsNull() || (instance.Flavor != clusterflavor.K8S && instance.Flavor != clusterflavor.BOH)
 }
 
 // Clone makes a copy of the instance
@@ -114,13 +113,13 @@ func (instance *Cluster) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := lang.Cast[*Cluster](p)
+	src, err := clonable.Cast[*Cluster](p)
 	if err != nil {
 		return err
 	}
 
 	*instance = *src
-	instance.Core, err = clonable.CastedClone[*Core](src.Core)
+	instance.core, err = clonable.CastedClone[*core](src.core)
 	if err != nil {
 		return err
 	}
@@ -133,11 +132,15 @@ func (instance *Cluster) Replace(p clonable.Clonable) error {
 	return nil
 }
 
-// GetName returns the name of the cluster
-// Satisfies interface data.Identifiable
-func (instance Cluster) GetName() string {
-	return instance.Name
-}
+// // GetName returns the name of the cluster
+// // Satisfies interface data.Identifiable
+// func (instance *Cluster) GetName() string {
+// 	if instance == nil || valid.IsNull(instance.Core) {
+// 		return ""
+// 	}
+//
+// 	return instance.Name
+// }
 
 // GetID returns the ID of the cluster (== GetName)
 // Satisfies interface data.Identifiable

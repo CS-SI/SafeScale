@@ -25,8 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -37,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -53,16 +54,14 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
-	/*
-		state, xerr := instance.GetState(ctx)
-		if xerr != nil {
-			return invalid, "", "", xerr
-		}
+	state, xerr := instance.ForceGetState(ctx)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
 
-		if state != hoststate.Started {
-			return invalid, "", "", fail.NewError("the machine is not started")
-		}
-	*/
+	if state != hoststate.Started {
+		return invalid, "", "", fail.NewError("the machine is not started: %s", state.String())
+	}
 
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
@@ -115,13 +114,13 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 // - *fail.ErrNotAvailable: execution with 409 or 404 errors
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
-func run(ctx context.Context, sshProfile sshapi.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func run(ctx context.Context, sshProfile2 sshapi.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
 		timeout = temporal.HostLongOperationTimeout()
 	}
 
-	cfg, xerr := sshProfile.Config()
+	cfg, xerr := sshProfile2.Config()
 	if xerr != nil {
 		return 0, "", "", xerr
 	}
@@ -140,6 +139,12 @@ func run(ctx context.Context, sshProfile sshapi.Connector, cmd string, outs outp
 			case <-ctx.Done():
 				return retry.StopRetryError(ctx.Err())
 			default:
+			}
+
+			// recreate the profile every retry
+			sshProfile, xerr := sshfactory.NewConnector(cfg)
+			if xerr != nil {
+				return xerr
 			}
 
 			iterations++
@@ -226,6 +231,15 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		return invalid, "", "", xerr
 	}
 
+	state, xerr := instance.ForceGetState(ctx)
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	if state != hoststate.Started {
+		return invalid, "", "", fail.NewError("the machine is not started: %s", state.String())
+	}
+
 	md5hash := ""
 	uploadSize := 0
 	if source != "" {
@@ -240,19 +254,15 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	var (
 		stdout, stderr string
 	)
+
+	var finalProfile sshapi.Connector
 	retcode := -1
 	sshCfg, xerr := instance.GetSSHConfig(ctx)
 	if xerr != nil {
 		return retcode, stdout, stderr, xerr
 	}
 
-	sshProfile, xerr := sshfactory.NewConnector(sshCfg)
-	if xerr != nil {
-		return retcode, stdout, stderr, xerr
-	}
-
 	timeout = temporal.MaxTimeout(4*(time.Duration(uploadSize)*time.Second/(64*1024)+30*time.Second), timeout)
-
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			select {
@@ -261,6 +271,12 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 			default:
 			}
 
+			sshProfile, xerr := sshfactory.NewConnector(sshCfg)
+			if xerr != nil {
+				return xerr
+			}
+
+			finalProfile = sshProfile
 			uploadTime := time.Duration(uploadSize)*time.Second/(64*1024) + 30*time.Second
 
 			copyCtx, cancel := context.WithTimeout(ctx, uploadTime)
@@ -356,7 +372,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		iretcode, istdout, istderr, innerXerr := run(ctx, sshProfile, cmd, outputs.COLLECT, timeout)
+		iretcode, istdout, istderr, innerXerr := run(ctx, finalProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {
 			innerXerr.Annotate("retcode", iretcode)
@@ -390,16 +406,9 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 // Note: must be used with wisdom
 func (instance *Host) unsafeGetVolumes(ctx context.Context) (*propertiesv1.HostVolumes, fail.Error) {
 	var hvV1 *propertiesv1.HostVolumes
-	xerr := instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
-			var innerErr error
-			hvV1, innerErr = lang.Cast[*propertiesv1.HostVolumes](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			return nil
-		})
+	xerr := metadata.InspectProperty(ctx, instance, hostproperty.VolumesV1, func(p *propertiesv1.HostVolumes) fail.Error {
+		hvV1 = p
+		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -411,17 +420,12 @@ func (instance *Host) unsafeGetVolumes(ctx context.Context) (*propertiesv1.HostV
 
 // unsafeGetMounts returns the information about the mounts of the host
 // Intended to be used when instance is notoriously not nil (because previously checked)
-func (instance *Host) unsafeGetMounts(ctx context.Context) (mounts *propertiesv1.HostMounts, ferr fail.Error) {
-	xerr := instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			mounts, innerErr = clonable.CastedClone[*propertiesv1.HostMounts](hostMountsV1)
-			return fail.Wrap(innerErr)
-		})
+func (instance *Host) unsafeGetMounts(ctx context.Context) (_ *propertiesv1.HostMounts, ferr fail.Error) {
+	var mounts *propertiesv1.HostMounts
+	xerr := metadata.InspectProperty(ctx, instance, hostproperty.MountsV1, func(hostMountsV1 *propertiesv1.HostMounts) fail.Error {
+		var innerErr error
+		mounts, innerErr = clonable.CastedClone[*propertiesv1.HostMounts](hostMountsV1)
+		return fail.Wrap(innerErr)
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -451,6 +455,15 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return xerr
+	}
+
+	state, xerr := instance.ForceGetState(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.NewError("the machine is not started: %s", state.String())
 	}
 
 	hostName := instance.GetName()
@@ -517,7 +530,7 @@ func (instance *Host) unsafeGetDefaultSubnet(ctx context.Context) (subnetInstanc
 	xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(hostproperty.NetworkV2) {
 			return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-				networkV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
+				networkV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -531,7 +544,7 @@ func (instance *Host) unsafeGetDefaultSubnet(ctx context.Context) (subnetInstanc
 			})
 		}
 		return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-			hostNetworkV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
+			hostNetworkV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

@@ -21,21 +21,19 @@ import (
 	"net"
 	"reflect"
 
-	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	// "github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
-
 	// "github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	// propsv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
@@ -103,7 +101,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 	if _, xerr = s.rpcDescribeVpcByName(ctx, aws.String(req.Name)); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 			// continue
 		default:
 			return nil, xerr
@@ -122,6 +120,12 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 	if IsOperation(theVpc, "State", reflect.TypeOf("")) {
 		retryErr := retry.WhileUnsuccessful(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				vpcTmp, innerXErr := s.rpcDescribeVpcByID(ctx, theVpc.VpcId)
 				if innerXErr != nil {
 					return innerXErr
@@ -457,6 +461,12 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (re
 	if IsOperation(resp, "State", reflect.TypeOf("")) {
 		retryErr := retry.WhileUnsuccessful(
 			func() error {
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
 				descr, innerXErr := s.rpcDescribeSubnetByID(ctx, resp.SubnetId)
 				if innerXErr != nil {
 					return innerXErr

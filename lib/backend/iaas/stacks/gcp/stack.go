@@ -18,7 +18,7 @@ package gcp
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"

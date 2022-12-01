@@ -228,15 +228,15 @@ func TestHostCore_NewHostCore(t *testing.T) {
 
 	hc, _ := NewHostCore()
 	if !hc.IsNull() {
-		t.Error("HostCore is null !")
+		t.Error("HostCore is expected to be null!")
 		t.Fail()
 	}
 	if hc.IsConsistent() {
-		t.Error("HostCore is not consistent !")
+		t.Error("HostCore is expected to not be consistent!")
 		t.Fail()
 	}
 	if hc.OK() {
-		t.Error("HostCore is not ok !")
+		t.Error("HostCore is expected to not be ok!")
 		t.Fail()
 	}
 	hc.SetID("hostcore ID")
@@ -503,7 +503,7 @@ func TestHostFull_GetName_ThatPanics(t *testing.T) {
 func TestHostFull_GetName(t *testing.T) {
 	hf, _ := NewHostFull()
 	name := hf.GetName()
-	if name != "" {
+	if name != "" && name != Unnamed {
 		t.Error("(empty) *Hostfull has no id")
 		t.Fail()
 	}

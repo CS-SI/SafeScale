@@ -22,11 +22,11 @@ import (
 	"strings"
 	"time"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/eko/gocache/v2/store"
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/labelproperty"
@@ -39,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -171,6 +170,7 @@ func LoadLabel(inctx context.Context, ref string) (resources.Label, fail.Error) 
 		}()
 		chRes <- result{ga, gerr}
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -362,7 +362,7 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return fail.Wrap(xerr, "failed to check if %s '%s' already exists", kind, name)
 		}
@@ -396,7 +396,7 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 	var labelHostsV1 *propertiesv1.LabelHosts
 	out := &protocol.LabelInspectResponse{}
 	xerr := instance.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		alabel, innerErr := lang.Cast[*abstract.Label](p)
+		alabel, innerErr := clonable.Cast[*abstract.Label](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -412,7 +412,7 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 
 		return props.Inspect(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
 			var innerErr error
-			labelHostsV1, innerErr = lang.Cast[*propertiesv1.LabelHosts](p)
+			labelHostsV1, innerErr = clonable.Cast[*propertiesv1.LabelHosts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -452,7 +452,7 @@ func (instance *label) IsTag(ctx context.Context) (bool, fail.Error) {
 
 	var out bool
 	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		alabel, innerErr := lang.Cast[*abstract.Label](p)
+		alabel, innerErr := clonable.Cast[*abstract.Label](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -475,7 +475,7 @@ func (instance *label) DefaultValue(ctx context.Context) (string, fail.Error) {
 
 	var out string
 	xerr := instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		alabel, innerErr := lang.Cast[*abstract.Label](p)
+		alabel, innerErr := clonable.Cast[*abstract.Label](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -506,7 +506,7 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 	defer tracer.Exiting()
 
 	xerr := instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		alabel, innerErr := lang.Cast[*abstract.Label](p)
+		alabel, innerErr := clonable.Cast[*abstract.Label](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -514,7 +514,7 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 		isTag := !alabel.HasDefault
 
 		return props.Alter(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			labelHostsV1, innerErr := lang.Cast[*propertiesv1.LabelHosts](p)
+			labelHostsV1, innerErr := clonable.Cast[*propertiesv1.LabelHosts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -563,7 +563,7 @@ func (instance *label) UnbindFromHost(ctx context.Context, hostInstance resource
 
 	xerr := instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			labelHostsV1, innerErr := lang.Cast[*propertiesv1.LabelHosts](p)
+			labelHostsV1, innerErr := clonable.Cast[*propertiesv1.LabelHosts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

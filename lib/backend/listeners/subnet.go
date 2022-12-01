@@ -56,13 +56,12 @@ func (s *SubnetListener) Create(inctx context.Context, in *protocol.SubnetCreate
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	networkRef, networkLabel := srvutils.GetReference(in.GetNetwork())
 	if networkRef == "" {
 		return nil, fail.InvalidParameterError("in.Network", "must contain an ID or a Name")
@@ -123,11 +122,11 @@ func (s *SubnetListener) List(inctx context.Context, in *protocol.SubnetListRequ
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	if networkRef == "" {
@@ -170,13 +169,12 @@ func (s *SubnetListener) Inspect(inctx context.Context, in *protocol.SubnetInspe
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	subnetRef, subnetRefLabel := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
@@ -213,13 +211,12 @@ func (s *SubnetListener) Delete(inctx context.Context, in *protocol.SubnetDelete
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	subnetRef, subnetRefLabel := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
@@ -257,19 +254,17 @@ func (s *SubnetListener) BindSecurityGroup(inctx context.Context, in *protocol.S
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
-
 	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
@@ -308,19 +303,17 @@ func (s *SubnetListener) UnbindSecurityGroup(inctx context.Context, in *protocol
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Subnet")
 	}
-
 	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
@@ -351,19 +344,17 @@ func (s *SubnetListener) EnableSecurityGroup(inctx context.Context, in *protocol
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	subnetRef, subnetRefLabel := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
-
 	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
@@ -394,13 +385,12 @@ func (s *SubnetListener) DisableSecurityGroup(inctx context.Context, in *protoco
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
@@ -436,13 +426,12 @@ func (s *SubnetListener) ListSecurityGroups(inctx context.Context, in *protocol.
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {

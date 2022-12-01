@@ -24,11 +24,9 @@ import (
 	"strings"
 	"time"
 
-	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -41,6 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -149,7 +148,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 
 	if isSingle || isGateway {
 		xerr = host.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			ahc, innerErr := lang.Cast[*abstract.HostCore](p)
+			ahc, innerErr := clonable.Cast[*abstract.HostCore](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -164,7 +163,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 	} else {
 		var subnetInstance resources.Subnet
 		xerr = host.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			ahc, innerErr := lang.Cast[*abstract.HostCore](p)
+			ahc, innerErr := clonable.Cast[*abstract.HostCore](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -172,7 +171,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 			sshConfig.PrivateKey = ahc.PrivateKey
 			sshConfig.Port = int(ahc.SSHPort)
 			return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-				hnV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
+				hnV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -228,7 +227,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 		} else {
 			xerr = gw.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var innerErr error
-				gwahc, innerErr = lang.Cast[*abstract.HostCore](p)
+				gwahc, innerErr = clonable.Cast[*abstract.HostCore](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -270,7 +269,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 		} else {
 			xerr = gw.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var innerErr error
-				gwahc, innerErr = lang.Cast[*abstract.HostCore](p)
+				gwahc, innerErr = clonable.Cast[*abstract.HostCore](p)
 				return fail.Wrap(innerErr)
 			})
 			if xerr != nil {

@@ -51,13 +51,12 @@ func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareCreateRe
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("in")
-	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	shareName := in.GetName()
 	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/share/%s/create", shareName))
 	if xerr != nil {
@@ -108,8 +107,8 @@ func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (e
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-
 	shareName := in.GetName()
+
 	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/share/%s/delete", shareName))
 	if xerr != nil {
 		return nil, xerr
@@ -136,6 +135,9 @@ func (s *ShareListener) List(inctx context.Context, in *protocol.Reference) (_ *
 	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	job, xerr := prepareJob(inctx, in, "/shares/list")
@@ -180,9 +182,9 @@ func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountRequ
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
+
 	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/share/%s/host/%s/mount", shareRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
@@ -215,14 +217,14 @@ func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountRe
 		return empty, fail.InvalidInstanceError()
 	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	if in == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("in")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
+
 	job, xerr := prepareJob(inctx, in.GetHost(), fmt.Sprintf("/share/%s/host/%s/unmount", shareRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
@@ -258,8 +260,8 @@ func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-
 	shareRef, _ := srvutils.GetReference(in)
+
 	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/share/%s/inspect", shareRef))
 	if xerr != nil {
 		return nil, xerr

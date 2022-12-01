@@ -121,7 +121,7 @@ type createResult struct {
 	commonResult
 }
 
-// Output represents the result of a get operation. Call its Extract
+// getResult represents the result of a get operation. Call its Extract
 // method to interpret it as a FloatingIP.
 type getResult struct {
 	commonResult
@@ -132,25 +132,25 @@ type deleteResult struct {
 }
 
 // ListFloatingIPs lists all the floating IP currently requested for the VPC
-func (s stack) ListFloatingIPs() (pagination.Pager, fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) ListFloatingIPs() (pagination.Pager, fail.Error) {
+	if valid.IsNil(instance) {
 		return pagination.Pager{}, fail.InvalidInstanceError()
 	}
 
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips" // FIXME: Hardcoded endpoint
-	return pagination.NewPager(s.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
+	url := instance.NetworkClient.Endpoint + "v1/" + instance.authOpts.ProjectID + "/publicips" // FIXME: Hardcoded endpoint
+	return pagination.NewPager(instance.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
 		return floatingIPPage{pagination.LinkedPageBase{PageResult: r}}
 	}), nil
 }
 
 // GetFloatingIP returns FloatingIP instance corresponding to ID 'id'
-func (s stack) GetFloatingIP(ctx context.Context, id string) (*FloatingIP, fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) GetFloatingIP(ctx context.Context, id string) (*FloatingIP, fail.Error) {
+	if valid.IsNil(instance) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
 
 	r := getResult{}
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id // FIXME: Hardcoded endpoint
+	url := instance.NetworkClient.Endpoint + "v1/" + instance.authOpts.ProjectID + "/publicips/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -158,7 +158,7 @@ func (s stack) GetFloatingIP(ctx context.Context, id string) (*FloatingIP, fail.
 	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
-			hr, err := s.Driver.Request("GET", url, &opts) // nolint
+			hr, err := instance.Driver.Request("GET", url, &opts) // nolint
 			r.Err = err
 			defer closer(hr)
 			return normalizeError(err)
@@ -177,8 +177,8 @@ func (s stack) GetFloatingIP(ctx context.Context, id string) (*FloatingIP, fail.
 }
 
 // FindFloatingIPByIP returns FloatingIP instance associated with 'ipAddress'
-func (s stack) FindFloatingIPByIP(ctx context.Context, ipAddress string) (*FloatingIP, error) {
-	if valid.IsNil(s) {
+func (instance stack) FindFloatingIPByIP(ctx context.Context, ipAddress string) (*FloatingIP, error) {
+	if valid.IsNil(instance) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
 
@@ -186,7 +186,7 @@ func (s stack) FindFloatingIPByIP(ctx context.Context, ipAddress string) (*Float
 	fip := FloatingIP{}
 	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			floats, innerErr := s.ListFloatingIPs()
+			floats, innerErr := instance.ListFloatingIPs()
 			if innerErr != nil {
 				return normalizeError(innerErr)
 			}
@@ -218,8 +218,8 @@ func (s stack) FindFloatingIPByIP(ctx context.Context, ipAddress string) (*Float
 }
 
 // CreateFloatingIP creates a floating IP
-func (s stack) CreateFloatingIP(ctx context.Context, host *abstract.HostFull) (*FloatingIP, fail.Error) {
-	if valid.IsNil(s) {
+func (instance stack) CreateFloatingIP(ctx context.Context, host *abstract.HostFull) (*FloatingIP, fail.Error) {
+	if valid.IsNil(instance) {
 		return &FloatingIP{}, fail.InvalidInstanceError()
 	}
 	if host == nil {
@@ -250,7 +250,7 @@ func (s stack) CreateFloatingIP(ctx context.Context, host *abstract.HostFull) (*
 	}
 
 	r := createResult{}
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips" // FIXME: Hardcoded endpoint
+	url := instance.NetworkClient.Endpoint + "v1/" + instance.authOpts.ProjectID + "/publicips" // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONBody:     bb,
 		JSONResponse: &r.Body,
@@ -259,7 +259,7 @@ func (s stack) CreateFloatingIP(ctx context.Context, host *abstract.HostFull) (*
 	commRetryErr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
-			hr, innerErr := s.Driver.Request("POST", url, &opts) // nolint
+			hr, innerErr := instance.Driver.Request("POST", url, &opts) // nolint
 			defer closer(hr)
 			return normalizeError(innerErr)
 		},
@@ -277,13 +277,13 @@ func (s stack) CreateFloatingIP(ctx context.Context, host *abstract.HostFull) (*
 }
 
 // DeleteFloatingIP deletes a floating IP
-func (s stack) DeleteFloatingIP(ctx context.Context, id string) fail.Error {
-	if valid.IsNil(s) {
+func (instance stack) DeleteFloatingIP(ctx context.Context, id string) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
 	r := deleteResult{}
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id // FIXME: Hardcoded endpoint
+	url := instance.NetworkClient.Endpoint + "v1/" + instance.authOpts.ProjectID + "/publicips/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -291,7 +291,7 @@ func (s stack) DeleteFloatingIP(ctx context.Context, id string) fail.Error {
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var hr *http.Response
-			hr, r.Err = s.Driver.Request("DELETE", url, &opts) // nolint
+			hr, r.Err = instance.Driver.Request("DELETE", url, &opts) // nolint
 			err := r.ExtractErr()
 			defer closer(hr)
 			return normalizeError(err)
@@ -301,12 +301,12 @@ func (s stack) DeleteFloatingIP(ctx context.Context, id string) fail.Error {
 }
 
 // AssociateFloatingIP associates a floating ip to a host
-func (s stack) AssociateFloatingIP(ctx context.Context, host *abstract.HostCore, id string) fail.Error {
-	if valid.IsNil(s) {
+func (instance stack) AssociateFloatingIP(ctx context.Context, host *abstract.HostCore, id string) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	fip, xerr := s.GetFloatingIP(ctx, id)
+	fip, xerr := instance.GetFloatingIP(ctx, id)
 	if xerr != nil {
 		return xerr
 	}
@@ -321,7 +321,7 @@ func (s stack) AssociateFloatingIP(ctx context.Context, host *abstract.HostCore,
 		func() error {
 			var hr *http.Response
 			r := servers.ActionResult{}
-			hr, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil) // nolint
+			hr, r.Err = instance.ComputeClient.Post(instance.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil) // nolint
 			defer closer(hr)
 			return normalizeError(r.ExtractErr())
 		},
@@ -330,12 +330,12 @@ func (s stack) AssociateFloatingIP(ctx context.Context, host *abstract.HostCore,
 }
 
 // DissociateFloatingIP from host
-func (s stack) DissociateFloatingIP(ctx context.Context, host *abstract.HostCore, id string) fail.Error {
-	if valid.IsNil(s) {
+func (instance stack) DissociateFloatingIP(ctx context.Context, host *abstract.HostCore, id string) fail.Error {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	fip, xerr := s.GetFloatingIP(ctx, id)
+	fip, xerr := instance.GetFloatingIP(ctx, id)
 	if xerr != nil {
 		return xerr
 	}
@@ -350,7 +350,7 @@ func (s stack) DissociateFloatingIP(ctx context.Context, host *abstract.HostCore
 		func() error {
 			var hr *http.Response
 			r := servers.ActionResult{}
-			hr, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil) // nolint
+			hr, r.Err = instance.ComputeClient.Post(instance.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil) // nolint
 			defer closer(hr)
 			return normalizeError(r.ExtractErr())
 		},

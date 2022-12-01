@@ -17,7 +17,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -25,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/cmdstatus"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 )
 
 // response define a standard response for most safescale commands

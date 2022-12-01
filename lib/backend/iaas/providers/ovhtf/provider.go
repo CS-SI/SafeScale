@@ -118,6 +118,8 @@ type provider struct {
 
 	tenantParameters map[string]interface{}
 	*temporal.MutableTimings
+
+	availabilityZone string
 }
 
 func (p provider) GetStackName() (string, fail.Error) {

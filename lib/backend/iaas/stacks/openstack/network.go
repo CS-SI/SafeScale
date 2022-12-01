@@ -21,8 +21,6 @@ import (
 	"net"
 	"strings"
 
-	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -33,6 +31,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/gophercloud/gophercloud/pagination"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -41,6 +40,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // RouterRequest represents a router request
@@ -70,7 +70,7 @@ func (instance *stack) DefaultNetwork(context.Context) (*abstract.Network, fail.
 }
 
 // CreateNetwork creates a network named name
-func (instance stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (_ *abstract.Network, ferr fail.Error) {
+func (instance *stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (_ *abstract.Network, ferr fail.Error) {
 	var xerr fail.Error
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -120,7 +120,7 @@ func (instance stack) CreateNetwork(ctx context.Context, req abstract.NetworkReq
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := stacks.RetryableRemoteCall(context.Background(),
+			derr := stacks.RetryableRemoteCall(cleanupContextFrom(ctx),
 				func() error {
 					return networks.Delete(instance.NetworkClient, network.ID).ExtractErr()
 				},
@@ -145,7 +145,7 @@ func (instance stack) CreateNetwork(ctx context.Context, req abstract.NetworkReq
 }
 
 // InspectNetworkByName ...
-func (instance stack) InspectNetworkByName(ctx context.Context, name string) (*abstract.Network, fail.Error) {
+func (instance *stack) InspectNetworkByName(ctx context.Context, name string) (*abstract.Network, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -191,7 +191,7 @@ func (instance stack) InspectNetworkByName(ctx context.Context, name string) (*a
 }
 
 // InspectNetwork returns the network identified by id
-func (instance stack) InspectNetwork(ctx context.Context, id string) (*abstract.Network, fail.Error) {
+func (instance *stack) InspectNetwork(ctx context.Context, id string) (*abstract.Network, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -215,7 +215,7 @@ func (instance stack) InspectNetwork(ctx context.Context, id string) (*abstract.
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return nil, xerr
 		}
@@ -238,7 +238,7 @@ func (instance stack) InspectNetwork(ctx context.Context, id string) (*abstract.
 }
 
 // ListNetworks lists available networks
-func (instance stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error) {
+func (instance *stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error) {
 	var emptySlice []*abstract.Network
 	if valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -287,7 +287,7 @@ func (instance stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fa
 }
 
 // DeleteNetwork deletes the network identified by id
-func (instance stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) fail.Error {
+func (instance *stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -295,13 +295,13 @@ func (instance stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.Ne
 	if xerr != nil {
 		return xerr
 	}
+	if an.ID == "" {
+		return fail.InvalidParameterError("networkParam", "does not contain valid value for 'ID' field")
+	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", networkLabel).WithStopwatch().Entering().Exiting()
 
 	var network *networks.Network
-	if an.ID == "" {
-		return fail.InvalidParameterError("networkParam", "does not contain valid value for 'ID' field")
-	}
 	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
 			network, innerErr = networks.Get(instance.NetworkClient, an.ID).Extract()
@@ -365,8 +365,18 @@ func ToAbstractIPVersion(v int) ipversion.Enum {
 	}
 }
 
+func cleanupContextFrom(inctx context.Context) context.Context {
+	if oldKey := inctx.Value("ID"); oldKey != nil {
+		ctx := context.WithValue(context.Background(), "ID", oldKey) // nolint
+		// cleanup functions can look for "cleanup" to decide if a ctx is a cleanup context
+		ctx = context.WithValue(ctx, "cleanup", true) // nolint
+		return ctx
+	}
+	return context.Background()
+}
+
 // CreateSubnet creates a subnet
-func (instance stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (newNet *abstract.Subnet, ferr fail.Error) {
+func (instance *stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (newNet *abstract.Subnet, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -426,10 +436,9 @@ func (instance stack) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := instance.DeleteSubnet(context.Background(), subnet.ID)
+			derr := instance.DeleteSubnet(cleanupContextFrom(ctx), subnet.ID)
 			if derr != nil {
 				wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", subnet.Name)
-				logrus.Error(wrapErr.Error())
 				_ = ferr.AddConsequence(wrapErr)
 			}
 		}
@@ -447,12 +456,11 @@ func (instance stack) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 		// Starting from here, delete router if exit with error
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil {
+			if ferr != nil && router != nil {
 				derr := instance.deleteRouter(context.Background(), router.ID)
 				if derr != nil {
 					wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", router.Name)
 					_ = ferr.AddConsequence(wrapErr)
-					logrus.Error(wrapErr.Error())
 				}
 			}
 		}()
@@ -477,7 +485,7 @@ func (instance stack) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 	return out, nil
 }
 
-func (instance stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {
+func (instance *stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {
 	_, _ /*subnetDesc*/, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
 		return fail.Wrap(err, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
@@ -486,7 +494,7 @@ func (instance stack) validateCIDR(req abstract.SubnetRequest, network *abstract
 }
 
 // InspectSubnet returns the subnet identified by id
-func (instance stack) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet, ferr fail.Error) {
+func (instance *stack) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -522,7 +530,7 @@ func (instance stack) InspectSubnet(ctx context.Context, id string) (_ *abstract
 }
 
 // InspectSubnetByName ...
-func (instance stack) InspectSubnetByName(ctx context.Context, networkRef, name string) (subnet *abstract.Subnet, ferr fail.Error) {
+func (instance *stack) InspectSubnetByName(ctx context.Context, networkRef, name string) (subnet *abstract.Subnet, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -557,15 +565,16 @@ func (instance stack) InspectSubnetByName(ctx context.Context, networkRef, name 
 	var resp []subnets.Subnet
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
-			var allPages pagination.Page
-			var innerErr error
-			if allPages, innerErr = subnets.List(instance.NetworkClient, listOpts).AllPages(); innerErr != nil {
+			allPages, innerErr := subnets.List(instance.NetworkClient, listOpts).AllPages()
+			if innerErr != nil {
 				return innerErr
 			}
+
 			resp, innerErr = subnets.ExtractSubnets(allPages)
 			if innerErr != nil {
 				return innerErr
 			}
+
 			return nil
 		},
 		NormalizeError,
@@ -611,7 +620,7 @@ func (instance stack) InspectSubnetByName(ctx context.Context, networkRef, name 
 }
 
 // ListSubnets lists available subnets in a network
-func (instance stack) ListSubnets(ctx context.Context, networkID string) ([]*abstract.Subnet, fail.Error) {
+func (instance *stack) ListSubnets(ctx context.Context, networkID string) ([]*abstract.Subnet, fail.Error) {
 	var emptySlice []*abstract.Subnet
 	if valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -657,7 +666,7 @@ func (instance stack) ListSubnets(ctx context.Context, networkID string) ([]*abs
 }
 
 // DeleteSubnet deletes the network identified by id
-func (instance stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
+func (instance *stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -690,8 +699,36 @@ func (instance stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 		}
 	}
 
+	// delete detached ports and ports in error state
+	opos, xerr := instance.rpcListPorts(ctx, ports.ListOpts{})
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to list ports associated with Subnet %s", id)
+	}
+
+	for _, opo := range opos {
+		switch opo.Status {
+		case "DOWN":
+			xerr = instance.rpcDeletePort(ctx, opo.ID)
+			if xerr != nil {
+				debug.IgnoreErrorWithContext(ctx, xerr)
+			}
+		case "ERROR":
+			xerr = instance.rpcDeletePort(ctx, opo.ID)
+			if xerr != nil {
+				debug.IgnoreErrorWithContext(ctx, xerr)
+			}
+		default:
+		}
+	}
+
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
 					return subnets.Delete(instance.NetworkClient, id).ExtractErr()
@@ -705,7 +742,7 @@ func (instance stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 					return retry.StopRetryError(fail.Wrap(innerXErr, msg))
 				case *fail.ErrNotFound:
 					// consider a missing Subnet as a successful deletion
-					debug.IgnoreError(innerXErr)
+					debug.IgnoreErrorWithContext(ctx, innerXErr)
 				default:
 					return innerXErr
 				}
@@ -729,7 +766,7 @@ func (instance stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 }
 
 // createRouter creates a router satisfying req
-func (instance stack) createRouter(ctx context.Context, req RouterRequest) (*Router, fail.Error) {
+func (instance *stack) createRouter(ctx context.Context, req RouterRequest) (*Router, fail.Error) {
 	// Create a router to connect external Provider network
 	gi := routers.GatewayInfo{
 		NetworkID: req.NetworkID,
@@ -761,7 +798,7 @@ func (instance stack) createRouter(ctx context.Context, req RouterRequest) (*Rou
 }
 
 // ListRouters lists available routers
-func (instance stack) ListRouters(ctx context.Context) ([]Router, fail.Error) {
+func (instance *stack) ListRouters(ctx context.Context) ([]Router, fail.Error) {
 	var emptySlice []Router
 	if valid.IsNil(instance) {
 		return emptySlice, fail.InvalidInstanceError()
@@ -794,7 +831,7 @@ func (instance stack) ListRouters(ctx context.Context) ([]Router, fail.Error) {
 }
 
 // deleteRouter deletes the router identified by id
-func (instance stack) deleteRouter(ctx context.Context, id string) fail.Error {
+func (instance *stack) deleteRouter(ctx context.Context, id string) fail.Error {
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return routers.Delete(instance.NetworkClient, id).ExtractErr()
@@ -804,7 +841,7 @@ func (instance stack) deleteRouter(ctx context.Context, id string) fail.Error {
 }
 
 // addSubnetToRouter attaches subnet to router
-func (instance stack) addSubnetToRouter(ctx context.Context, routerID string, subnetID string) fail.Error {
+func (instance *stack) addSubnetToRouter(ctx context.Context, routerID string, subnetID string) fail.Error {
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, innerErr := routers.AddInterface(instance.NetworkClient, routerID, routers.AddInterfaceOpts{
@@ -817,7 +854,7 @@ func (instance stack) addSubnetToRouter(ctx context.Context, routerID string, su
 }
 
 // removeSubnetFromRouter detaches a subnet from router interface
-func (instance stack) removeSubnetFromRouter(ctx context.Context, routerID string, subnetID string) fail.Error {
+func (instance *stack) removeSubnetFromRouter(ctx context.Context, routerID string, subnetID string) fail.Error {
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			_, innerErr := routers.RemoveInterface(instance.NetworkClient, routerID, routers.RemoveInterfaceOpts{
@@ -831,7 +868,7 @@ func (instance stack) removeSubnetFromRouter(ctx context.Context, routerID strin
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (instance stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
+func (instance *stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -884,7 +921,7 @@ func (instance stack) CreateVIP(ctx context.Context, networkID, subnetID, name s
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (instance stack) AddPublicIPToVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Error {
+func (instance *stack) AddPublicIPToVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -893,7 +930,7 @@ func (instance stack) AddPublicIPToVIP(ctx context.Context, vip *abstract.Virtua
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (instance stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
+func (instance *stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -944,7 +981,7 @@ func (instance stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (instance stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
+func (instance *stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -995,7 +1032,7 @@ func (instance stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.Virtu
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (instance stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Error {
+func (instance *stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}

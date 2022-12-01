@@ -21,6 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/hashicorp/terraform-exec/tfexec"
+	tfjson "github.com/hashicorp/terraform-json"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -31,7 +32,9 @@ type (
 		Kind() string
 		GetID() (string, error)
 		GetName() string
+		Extra() map[string]any
 		TerraformSnippet() string
+		TerraformTypes() []string
 		// ToMap() map[string]any
 		// String() string
 	}
@@ -46,7 +49,8 @@ type (
 		SetEnv(key, value string) fail.Error
 		AddEnv(key, value string) fail.Error
 		Reset() fail.Error
-		// State(ctx context.Context) (_ *tfjson.State, ferr fail.Error)
+		State(ctx context.Context) (_ *tfjson.State, ferr fail.Error)
+		WorkDir() (string, fail.Error)
 	}
 
 	RequiredProvider struct {

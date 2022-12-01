@@ -19,7 +19,6 @@ package operations
 import (
 	"context"
 	"embed"
-	"encoding/json"
 	"expvar"
 	"fmt"
 	"os"
@@ -27,8 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
@@ -39,11 +39,12 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
@@ -95,18 +96,11 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.
 	}
 
 	var out []string
-	xerr := instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-			featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures](p)
-			if err != nil {
-				return fail.Wrap(err)
-			}
-
-			for k := range featuresV1.Installed {
-				out = append(out, k)
-			}
-			return nil
-		})
+	xerr := metadata.InspectProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
+		for k := range featuresV1.Installed {
+			out = append(out, k)
+		}
+		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -117,10 +111,13 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.
 
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
-func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data.Map[string, any]) fail.Error {
+func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v data.Map[string, any]) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
 	identity, xerr := instance.unsafeGetIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -163,26 +160,19 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	}
 	v["CIDR"] = networkCfg.CIDR
 
-	var controlPlaneV1 *propertiesv1.ClusterControlplane
-	xerr = instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.ControlPlaneV1, func(p clonable.Clonable) fail.Error {
-			var err error
-			controlPlaneV1, err = lang.Cast[*propertiesv1.ClusterControlplane](p)
-			if err != nil {
-				return fail.Wrap(err)
-			}
-
-			return nil
-		})
+	var cpV1 *propertiesv1.ClusterControlplane
+	xerr = metadata.InspectProperty(ctx, instance, clusterproperty.ControlPlaneV1, func(controlPlaneV1 *propertiesv1.ClusterControlplane) fail.Error {
+		cpV1 = controlPlaneV1
+		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	if controlPlaneV1.VirtualIP != nil && controlPlaneV1.VirtualIP.PrivateIP != "" {
+	if cpV1.VirtualIP != nil && cpV1.VirtualIP.PrivateIP != "" {
 		v["ClusterControlplaneUsesVIP"] = true
-		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
+		v["ClusterControlplaneEndpointIP"] = cpV1.VirtualIP.PrivateIP
 	} else {
 		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
 		master, xerr := instance.unsafeFindAvailableMaster(ctx)
@@ -262,37 +252,35 @@ func (instance *Cluster) RegisterFeature(ctx context.Context, feat resources.Fea
 		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
 	}
 
-	return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-			featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures](p)
-			if err != nil {
-				return fail.Wrap(err)
+	return metadata.AlterProperty(ctx, instance, clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+		featuresV1, err := clonable.Cast[*propertiesv1.ClusterFeatures](p)
+		if err != nil {
+			return fail.Wrap(err)
+		}
+
+		item, ok := featuresV1.Installed[feat.GetName()]
+		if !ok {
+			requirements, innerXErr := feat.Dependencies(ctx)
+			if innerXErr != nil {
+				return innerXErr
 			}
 
-			item, ok := featuresV1.Installed[feat.GetName()]
-			if !ok {
-				requirements, innerXErr := feat.Dependencies(ctx)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				item = propertiesv1.NewClusterInstalledFeature()
-				item.Name = feat.GetName()
-				item.FileName = feat.GetDisplayFilename(ctx)
-				item.Requires = requirements
-				featuresV1.Installed[item.Name] = item
-			}
-			if !valid.IsNil(requiredBy) {
-				item.RequiredBy[requiredBy.GetName()] = struct{}{}
-			}
-			return nil
-		})
+			item = propertiesv1.NewClusterInstalledFeature()
+			item.Name = feat.GetName()
+			item.FileName = feat.GetDisplayFilename(ctx)
+			item.Requires = requirements
+			featuresV1.Installed[item.Name] = item
+		}
+		if !valid.IsNil(requiredBy) {
+			item.RequiredBy[requiredBy.GetName()] = struct{}{}
+		}
+		return nil
 	})
 }
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
 // satisfies interface resources.Targetable
-func (instance *Cluster) UnregisterFeature(ctx context.Context, feat string) (ferr fail.Error) {
+func (instance *Cluster) UnregisterFeature(inctx context.Context, feat string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -302,20 +290,20 @@ func (instance *Cluster) UnregisterFeature(ctx context.Context, feat string) (fe
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
-	return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-			featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures](p)
-			if err != nil {
-				return fail.Wrap(err)
-			}
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 
-			delete(featuresV1.Installed, feat)
-			for _, v := range featuresV1.Installed {
-				delete(v.RequiredBy, feat)
-			}
-			return nil
-		})
+	xerr := metadata.AlterProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
+		delete(featuresV1.Installed, feat)
+		for _, v := range featuresV1.Installed {
+			delete(v.RequiredBy, feat)
+		}
+		return nil
 	})
+	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+	}
+	return xerr
 }
 
 // ListEligibleFeatures returns a slice of features eligible to Cluster
@@ -369,29 +357,10 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 		return nil, fail.InvalidInstanceError()
 	}
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
 	list, xerr := instance.InstalledFeatures(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
-	// var list map[string]*propertiesv1.ClusterInstalledFeature
-	// xerr := instance.Inspect(func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 	return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-	// 		featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures)
-	// 		if !ok {
-	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 		}
-	//
-	// 		list = featuresV1.Installed
-	// 		return nil
-	// 	})
-	// })
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return emptySlice, xerr
-	// }
 
 	out := make([]resources.Feature, 0, len(list))
 	for _, v := range list {
@@ -407,9 +376,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 }
 
 // AddFeature installs a feature on the Cluster
-func (instance *Cluster) AddFeature(
-	ctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings,
-) (resources.Results, fail.Error) {
+func (instance *Cluster) AddFeature(ctx context.Context, name string, vars data.Map[string, any], settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -840,16 +807,9 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 		}
 
 		dockerDisabled := false
-		xerr = instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				_, dockerDisabled = featuresV1.Disabled["docker"]
-				return nil
-			})
+		xerr = metadata.InspectProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
+			_, dockerDisabled = featuresV1.Disabled["docker"]
+			return nil
 		})
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -863,12 +823,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 
 		clusterName := identity.Name
 		disabled := false
-		xerr = instance.ReviewProperty(ctx, clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-			featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
+		xerr = metadata.InspectProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
 			_, disabled = featuresV1.Disabled["reverseproxy"]
 			return nil
 		})
@@ -900,6 +855,20 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 				chRes <- result{fail.NewError("[Cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)}
 				return
 			}
+
+			xerr = metadata.AlterProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
+				featuresV1.Installed[feat.GetName()] = &propertiesv1.ClusterInstalledFeature{
+					Name: feat.GetName(),
+				}
+				return nil
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				chRes <- result{xerr}
+				return
+			}
+
 			logrus.WithContext(ctx).Debugf("[Cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
 			chRes <- result{nil}
 			return
@@ -941,16 +910,9 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 		}
 
 		dockerDisabled := false
-		xerr = instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				_, dockerDisabled = featuresV1.Disabled["docker"]
-				return nil
-			})
+		xerr = metadata.InspectProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
+			_, dockerDisabled = featuresV1.Disabled["docker"]
+			return nil
 		})
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -963,16 +925,9 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 		}
 
 		disabled := false
-		xerr = instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				_, disabled = featuresV1.Disabled["remotedesktop"]
-				return nil
-			})
+		xerr = metadata.InspectProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
+			_, disabled = featuresV1.Disabled["remotedesktop"]
+			return nil
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -1014,8 +969,22 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 				return
 			}
 
+			xerr = metadata.AlterProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
+				featuresV1.Installed["remotedesktop"] = &propertiesv1.ClusterInstalledFeature{
+					Name: "remotedesktop",
+				}
+				return nil
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				chRes <- result{xerr}
+				return
+			}
+
 			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'remotedesktop' added successfully", identity.Name)
 		}
+
 		chRes <- result{nil}
 
 	}()
@@ -1051,19 +1020,13 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map[s
 		}
 
 		disabled := false
-		xerr = instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				_, disabled = featuresV1.Disabled["ansible"]
-				return nil
-			})
+		xerr = metadata.InspectProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
+			_, disabled = featuresV1.Disabled["ansible"]
+			return nil
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			chRes <- result{xerr}
 			return
 		}
@@ -1117,6 +1080,20 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map[s
 				chRes <- result{fail.NewError("[Cluster %s] failed to add 'ansible-for-cluster': %s", identity.Name, msg)}
 				return
 			}
+
+			xerr = metadata.AlterProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
+				featuresV1.Installed["ansible-for-cluster"] = &propertiesv1.ClusterInstalledFeature{
+					Name: "ansible-for-cluster",
+				}
+				return nil
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				chRes <- result{xerr}
+				return
+			}
+
 			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'ansible-for-cluster' added successfully", identity.Name)
 		}
 		chRes <- result{nil}
@@ -1147,18 +1124,12 @@ func (instance *Cluster) installDocker(inctx context.Context, host resources.Hos
 		defer close(chRes)
 
 		dockerDisabled := false
-		xerr := instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				_, dockerDisabled = featuresV1.Disabled["docker"]
-				return nil
-			})
+		xerr := metadata.InspectProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
+			_, dockerDisabled = featuresV1.Disabled["docker"]
+			return nil
 		})
 		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 			chRes <- result{xerr}
 			return
 		}
@@ -1203,6 +1174,20 @@ func (instance *Cluster) installDocker(inctx context.Context, host resources.Hos
 				return
 			}
 		}
+
+		xerr = metadata.AlterProperty(ctx, instance, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
+			featuresV1.Installed[feat.GetName()] = &propertiesv1.ClusterInstalledFeature{
+				Name: feat.GetName(),
+			}
+			return nil
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+			chRes <- result{xerr}
+			return
+		}
+
 		logrus.WithContext(ctx).Debugf("[%s] feature 'docker' addition successful.", hostLabel)
 		chRes <- result{nil}
 

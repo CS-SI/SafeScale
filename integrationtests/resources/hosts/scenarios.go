@@ -20,7 +20,6 @@
 package hosts
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -29,6 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 

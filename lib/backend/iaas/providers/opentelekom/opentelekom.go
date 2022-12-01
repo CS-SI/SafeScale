@@ -123,6 +123,11 @@ func (p *provider) Build(params map[string]interface{}, _ options.Options) (iaas
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 
+	machineCreationLimit := 8
+	if _, ok := compute["ConcurrentMachineCreationLimit"].(string); ok {
+		machineCreationLimit, _ = strconv.Atoi(compute["ConcurrentMachineCreationLimit"].(string))
+	}
+
 	authOptions := iaasoptions.Authentication{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -188,15 +193,16 @@ next:
 			"SAS":  volumespeed.Hdd,
 			"Ssd":  volumespeed.Ssd,
 		},
-		MetadataBucketName: metadataBucketName,
-		OperatorUsername:   operatorUsername,
-		ProviderName:       providerName,
-		DefaultNetworkName: vpcName,
-		DefaultNetworkCIDR: vpcCIDR,
-		DefaultImage:       defaultImage,
-		MaxLifeTime:        maxLifeTime,
-		Timings:            timings,
-		Safe:               isSafe,
+		MetadataBucketName:             metadataBucketName,
+		OperatorUsername:               operatorUsername,
+		ProviderName:                   providerName,
+		DefaultNetworkName:             vpcName,
+		DefaultNetworkCIDR:             vpcCIDR,
+		DefaultImage:                   defaultImage,
+		MaxLifeTime:                    maxLifeTime,
+		Timings:                        timings,
+		Safe:                           isSafe,
+		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
 	if xerr != nil {

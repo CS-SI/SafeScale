@@ -383,7 +383,7 @@ func Test_HostCoreToHostFull(t *testing.T) {
 
 	ahf := HostCoreToHostFull(ahc)
 
-	require.EqualValues(t, ahf.Core, &ahc)
+	require.EqualValues(t, ahf.HostCore, &ahc)
 
 }
 
@@ -583,23 +583,15 @@ func Test_ClusterIdentityFromAbstractToProtocol(t *testing.T) {
 		t.Error(innerXErr)
 		t.Fail()
 	}
-	aci := abstract.Cluster{
-		Flavor:        clusterflavor.K8S,
-		Complexity:    clustercomplexity.Small,
-		Keypair:       kp,
-		AdminPassword: "Password",
-		Core: &abstract.Core{
-			Tags: map[string]string{
-				"CreationDate": time.Now().Format(time.RFC3339),
-				"ManagedBy":    "safescale",
-			},
-		},
-	}
-	aci.Name = "Cluster Name"
+	aci, _ := abstract.NewCluster(abstract.WithName("Cluster Name"))
+	aci.Flavor = clusterflavor.K8S
+	aci.Complexity = clustercomplexity.Small
+	aci.Keypair = kp
+	aci.AdminPassword = "Password"
 
-	pclr := ClusterListFromAbstractToProtocol([]abstract.Cluster{aci})
+	pclr := ClusterListFromAbstractToProtocol([]abstract.Cluster{*aci})
 
-	require.EqualValues(t, pclr.Clusters[0].Identity, ClusterIdentityFromAbstractToProtocol(aci))
+	require.EqualValues(t, pclr.Clusters[0].Identity, ClusterFromAbstractToProtocol(*aci))
 }
 
 func Test_SecurityGroupRulesFromAbstractToProtocol(t *testing.T) {

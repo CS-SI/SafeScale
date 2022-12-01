@@ -18,7 +18,7 @@ package aws
 
 import (
 	"bytes"
-	"encoding/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"regexp"
 	"strconv"
 	"strings"

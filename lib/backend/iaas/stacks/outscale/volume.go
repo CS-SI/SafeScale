@@ -30,8 +30,8 @@ import (
 )
 
 // CreateVolume creates a block volume
-func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if request.Name == "" {
@@ -41,11 +41,11 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	v, xerr := s.InspectVolumeByName(ctx, request.Name)
+	v, xerr := instance.InspectVolumeByName(ctx, request.Name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
+			debug.IgnoreErrorWithContext(ctx, xerr)
 		default:
 			return nil, xerr
 		}
@@ -60,7 +60,7 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 			IOPS = 13000
 		}
 	}
-	resp, xerr := s.rpcCreateVolume(ctx, request.Name, int32(request.Size), int32(IOPS), s.fromAbstractVolumeSpeed(request.Speed))
+	resp, xerr := instance.rpcCreateVolume(ctx, request.Name, int32(request.Size), int32(IOPS), instance.fromAbstractVolumeSpeed(request.Speed))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -68,13 +68,13 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := s.rpcDeleteVolume(context.Background(), resp.VolumeId); derr != nil {
+			if derr := instance.rpcDeleteVolume(context.Background(), resp.VolumeId); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume"))
 			}
 		}
 	}()
 
-	xerr = s.WaitForVolumeState(ctx, resp.VolumeId, volumestate.Available)
+	xerr = instance.WaitForVolumeState(ctx, resp.VolumeId, volumestate.Available)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -85,26 +85,26 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 	}
 
 	volume.ID = resp.VolumeId
-	volume.Speed = s.toAbstractVolumeSpeed(resp.VolumeType)
+	volume.Speed = instance.toAbstractVolumeSpeed(resp.VolumeType)
 	volume.Size = int(resp.Size)
 	volume.State = volumestate.Available
 	return volume, nil
 }
 
-func (s stack) toAbstractVolumeSpeed(t string) volumespeed.Enum {
-	if s, ok := s.configurationOptions.VolumeSpeeds[t]; ok {
+func (instance *stack) toAbstractVolumeSpeed(t string) volumespeed.Enum {
+	if s, ok := instance.configurationOptions.VolumeSpeeds[t]; ok {
 		return s
 	}
 	return volumespeed.Hdd
 }
 
-func (s stack) fromAbstractVolumeSpeed(speed volumespeed.Enum) string {
-	for t, s := range s.configurationOptions.VolumeSpeeds {
+func (instance *stack) fromAbstractVolumeSpeed(speed volumespeed.Enum) string {
+	for t, s := range instance.configurationOptions.VolumeSpeeds {
 		if s == speed {
 			return t
 		}
 	}
-	return s.fromAbstractVolumeSpeed(volumespeed.Hdd)
+	return instance.fromAbstractVolumeSpeed(volumespeed.Hdd)
 }
 
 func toAbstractVolumeState(state string) volumestate.Enum {
@@ -127,22 +127,28 @@ func toAbstractVolumeState(state string) volumestate.Enum {
 }
 
 // WaitForVolumeState wait for volume to be in the specified state
-func (s stack) WaitForVolumeState(ctx context.Context, volumeID string, state volumestate.Enum) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) WaitForVolumeState(ctx context.Context, volumeID string, state volumestate.Enum) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return xerr
 	}
 
 	return retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
-			vol, innerErr := s.InspectVolume(ctx, volumeID)
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
+			vol, innerErr := instance.InspectVolume(ctx, volumeID)
 			if innerErr != nil {
 				return innerErr
 			}
@@ -157,8 +163,8 @@ func (s stack) WaitForVolumeState(ctx context.Context, volumeID string, state vo
 }
 
 // InspectVolume returns the volume identified by id
-func (s stack) InspectVolume(ctx context.Context, id string) (av *abstract.Volume, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectVolume(ctx context.Context, id string) (av *abstract.Volume, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -168,7 +174,7 @@ func (s stack) InspectVolume(ctx context.Context, id string) (av *abstract.Volum
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := s.rpcReadVolumeByID(ctx, id)
+	resp, xerr := instance.rpcReadVolumeByID(ctx, id)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -176,7 +182,7 @@ func (s stack) InspectVolume(ctx context.Context, id string) (av *abstract.Volum
 	// Note: cannot use abstract.WithName() here, as it may happen that volume has no name...
 	av, _ = abstract.NewVolume()
 	av.ID = resp.VolumeId
-	av.Speed = s.toAbstractVolumeSpeed(resp.VolumeType)
+	av.Speed = instance.toAbstractVolumeSpeed(resp.VolumeType)
 	av.Size = int(resp.Size)
 	av.State = toAbstractVolumeState(resp.State)
 	av.Name = getResourceTag(resp.Tags, tagNameLabel, "")
@@ -184,8 +190,8 @@ func (s stack) InspectVolume(ctx context.Context, id string) (av *abstract.Volum
 }
 
 // InspectVolumeByName returns the volume with name name
-func (s stack) InspectVolumeByName(ctx context.Context, name string) (av *abstract.Volume, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectVolumeByName(ctx context.Context, name string) (av *abstract.Volume, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -195,29 +201,29 @@ func (s stack) InspectVolumeByName(ctx context.Context, name string) (av *abstra
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := s.rpcReadVolumeByName(ctx, name)
+	resp, xerr := instance.rpcReadVolumeByName(ctx, name)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	av, _ = abstract.NewVolume(abstract.WithName(name)) // note: no need to check error, 'name' is already validated
 	av.ID = resp.VolumeId
-	av.Speed = s.toAbstractVolumeSpeed(resp.VolumeType)
+	av.Speed = instance.toAbstractVolumeSpeed(resp.VolumeType)
 	av.Size = int(resp.Size)
 	av.State = toAbstractVolumeState(resp.State)
 	return av, nil
 }
 
 // ListVolumes list available volumes
-func (s stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := s.rpcReadVolumes(ctx, nil)
+	resp, xerr := instance.rpcReadVolumes(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -227,7 +233,7 @@ func (s stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail
 		volume, _ := abstract.NewVolume() // note: cannot use abstract.WithName() here as Name may be empty...
 		volume.Name = getResourceTag(ov.Tags, "name", "")
 		volume.ID = ov.VolumeId
-		volume.Speed = s.toAbstractVolumeSpeed(ov.VolumeType)
+		volume.Speed = instance.toAbstractVolumeSpeed(ov.VolumeType)
 		volume.Size = int(ov.Size)
 		volume.State = toAbstractVolumeState(ov.State)
 		volume.Tags["CreationDate"] = getResourceTag(ov.Tags, "CreationDate", "")
@@ -239,8 +245,8 @@ func (s stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -250,7 +256,7 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return s.rpcDeleteVolume(ctx, id)
+	return instance.rpcDeleteVolume(ctx, id)
 }
 
 func freeDevice(usedDevices []string, device string) bool {
@@ -262,19 +268,19 @@ func freeDevice(usedDevices []string, device string) bool {
 	return true
 }
 
-func (s stack) getFirstFreeDeviceName(ctx context.Context, serverID string) (string, fail.Error) {
+func (instance *stack) getFirstFreeDeviceName(ctx context.Context, serverID string) (string, fail.Error) {
 	var usedDeviceNames []string
-	atts, _ := s.ListVolumeAttachments(ctx, serverID)
+	atts, _ := instance.ListVolumeAttachments(ctx, serverID)
 	if atts == nil {
-		if len(s.deviceNames) > 0 {
-			return s.deviceNames[0], nil
+		if len(instance.deviceNames) > 0 {
+			return instance.deviceNames[0], nil
 		}
 		return "", fail.InconsistentError("device names is empty")
 	}
 	for _, att := range atts {
 		usedDeviceNames = append(usedDeviceNames, att.Device)
 	}
-	for _, deviceName := range s.deviceNames {
+	for _, deviceName := range instance.deviceNames {
 		if freeDevice(usedDeviceNames, deviceName) {
 			return deviceName, nil
 		}
@@ -283,10 +289,8 @@ func (s stack) getFirstFreeDeviceName(ctx context.Context, serverID string) (str
 }
 
 // CreateVolumeAttachment attaches a volume to a host
-func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (
-	_ string, ferr fail.Error,
-) {
-	if valid.IsNil(s) {
+func (instance *stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 	if request.HostID == "" {
@@ -299,12 +303,12 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	firstDeviceName, xerr := s.getFirstFreeDeviceName(ctx, request.HostID)
+	firstDeviceName, xerr := instance.getFirstFreeDeviceName(ctx, request.HostID)
 	if xerr != nil {
 		return "", xerr
 	}
 
-	if xerr := s.rpcLinkVolume(ctx, request.VolumeID, request.HostID, firstDeviceName); xerr != nil {
+	if xerr := instance.rpcLinkVolume(ctx, request.VolumeID, request.HostID, firstDeviceName); xerr != nil {
 		return "", xerr
 	}
 	// No ID of attachment in outscale, volume can be attached to only one server; Volume Attachment ID is equal to VolumeID
@@ -312,10 +316,8 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by volumeID
-func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, volumeID string) (
-	_ *abstract.VolumeAttachment, ferr fail.Error,
-) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, volumeID string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -328,7 +330,7 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, volumeID s
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := s.rpcReadVolumeByID(ctx, volumeID)
+	resp, xerr := instance.rpcReadVolumeByID(ctx, volumeID)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -351,10 +353,8 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, volumeID s
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (
-	_ []*abstract.VolumeAttachment, ferr fail.Error,
-) {
-	if valid.IsNil(s) {
+func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -364,13 +364,13 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", serverID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	volumes, err := s.ListVolumes(ctx)
+	volumes, err := instance.ListVolumes(ctx)
 	if err != nil {
 		return nil, err
 	}
 	atts := make([]*abstract.VolumeAttachment, 0, len(volumes))
 	for _, v := range volumes {
-		att, _ := s.InspectVolumeAttachment(ctx, serverID, v.ID)
+		att, _ := instance.InspectVolumeAttachment(ctx, serverID, v.ID)
 		if att != nil {
 			atts = append(atts, att)
 		}
@@ -378,13 +378,13 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (
 	return atts, nil
 }
 
-func (s stack) Migrate(_ context.Context, _ string, _ map[string]interface{}) (ferr fail.Error) {
+func (instance *stack) Migrate(_ context.Context, _ string, _ map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
-func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, volumeID string) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) DeleteVolumeAttachment(ctx context.Context, serverID, volumeID string) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -397,9 +397,9 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, volumeID st
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	xerr := s.rpcUnlinkVolume(ctx, volumeID)
+	xerr := instance.rpcUnlinkVolume(ctx, volumeID)
 	if xerr != nil {
 		return xerr
 	}
-	return s.WaitForVolumeState(ctx, volumeID, volumestate.Available)
+	return instance.WaitForVolumeState(ctx, volumeID, volumestate.Available)
 }

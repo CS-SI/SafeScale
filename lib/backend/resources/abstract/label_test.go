@@ -126,10 +126,10 @@ func TestLabel_Replace(t *testing.T) {
 
 	s, _ = NewLabel()
 	err = s.Replace(nil)
-	require.Contains(t, err.Error(), "invalid parameter: p")
+	require.Contains(t, err.Error(), "cannot be nil")
 
 	err = s.Replace(NewBrokenLabel())
-	require.Contains(t, err.Error(), "p is not a *Label")
+	require.Contains(t, err.Error(), "failed to cast")
 }
 
 func TestLabel_Clone(t *testing.T) {

@@ -5,6 +5,18 @@ resource "openstack_networking_secgroup_v2" "{{ .Resource.Name }}" {
     description             = "{{ .Resource.Description }}"
     tenant_id               = "{{ .Provider.Authentication.TenantID }}"
     delete_default_rules    = true
+
+    tags = {
+{{ for $t, $v := range .Resource.Tags }}
+        {{ $t }} = "{{ $v }}"
+{{ end }}
+    }
+
+    lifecycle {
+{{- if not .Extra.MarkedForDestroy }}
+        prevent_destroy = true
+{{ end }}
+    }
 }
 
 output "sg_{{ .Resource.Name }}_id" {
@@ -23,6 +35,18 @@ resource "openstack_networking_secgroup_rule_v2" "{{ .Resource.Name }}-rule-{{ $
     remote_ip_prefix        = "{{ $v.Remote }}"
     tenant_id               = "{{ or .Provider.Authentication.TenantId .Provider.Authentication.TenantName }}"
     security_group_id       = ${openstack_networking_secgroup_v2.{{ .Resource.Name }}.id}
+
+    tags = {
+{{ for $t, $v := range .Resource.Tags }}
+        {{ $t }} = "{{ $v }}"
+{{ end }}
+    }
+
+    lifecycle {
+{{- if not .Extra.MarkedForDestroy }}
+        prevent_destroy = true
+{{ end }}
+    }
 }
 
 output "sg_{{ .Resource.Name }}_rule_{{ $k }}_id" {

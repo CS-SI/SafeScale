@@ -58,6 +58,12 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 	}
 
+	if does, xerr := host.Exists(ctx); xerr != nil {
+		return xerr
+	} else if !does {
+		return fail.InvalidParameterError("host", "must exist")
+	}
+
 	timings, xerr := host.Service().Timings()
 	if xerr != nil {
 		return xerr
@@ -73,7 +79,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 	uploadSize = info.Size()
 
 	uploadTime := time.Duration(uploadSize)*time.Second/(64*1024) + 30*time.Second
-	timeout := 6 * uploadTime
+	timeout := 4 * 8 * uploadTime
 
 	tracer := debug.NewTracerFromCtx(ctx, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -112,7 +118,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 			}
 			return nil
 		},
-		timings.NormalDelay(),
+		timings.SmallDelay(),
 		timeout,
 	)
 	if retryErr != nil {

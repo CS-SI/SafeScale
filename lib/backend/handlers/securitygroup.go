@@ -247,7 +247,7 @@ func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.Securi
 		return nil, xerr
 	}
 
-	xerr = sgInstance.AddRule(handler.job.Context(), rule)
+	xerr = sgInstance.AddRules(handler.job.Context(), rule)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -283,7 +283,7 @@ func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.Sec
 		return nil, xerr
 	}
 
-	xerr = sgInstance.DeleteRule(handler.job.Context(), rule)
+	xerr = sgInstance.DeleteRules(handler.job.Context(), rule)
 	if xerr != nil {
 		return nil, xerr
 	}

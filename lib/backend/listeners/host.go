@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/davecgh/go-spew/spew"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
@@ -35,6 +33,7 @@ import (
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -79,12 +78,15 @@ func (s *HostListener) Start(inctx context.Context, in *protocol.Reference) (emp
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, fail.InvalidParameterError("ref", "cannot be empty string")
-	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
 	job, xerr := prepareJob(inctx, in, fmt.Sprintf("/host/%s/start", ref))
@@ -111,12 +113,13 @@ func (s *HostListener) Stop(inctx context.Context, in *protocol.Reference) (empt
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("inctx").ToGRPCStatus()
-	}
+
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, fail.InvalidRequestError("neither name nor id of host has been provided")
@@ -150,6 +153,9 @@ func (s *HostListener) Reboot(inctx context.Context, in *protocol.Reference) (em
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, fail.InvalidRequestError("neither name nor id of host has been provided")
@@ -181,6 +187,9 @@ func (s *HostListener) List(inctx context.Context, in *protocol.HostListRequest)
 	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	job, xerr := prepareJob(inctx, in, "/hosts/list")
@@ -271,7 +280,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequ
 			}
 
 			xerr = subnetInstance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-				as, innerErr := lang.Cast[*abstract.Subnet](p)
+				as, innerErr := clonable.Cast[*abstract.Subnet](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -291,7 +300,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequ
 		}
 
 		xerr = subnetInstance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, innerErr := lang.Cast[*abstract.Subnet](p)
+			as, innerErr := clonable.Cast[*abstract.Subnet](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -430,7 +439,6 @@ func (s *HostListener) Inspect(inctx context.Context, in *protocol.Reference) (h
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
-
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
@@ -478,7 +486,6 @@ func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (em
 	if inctx == nil {
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
-
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
@@ -606,11 +613,11 @@ func (s *HostListener) UnbindSecurityGroup(inctx context.Context, in *protocol.S
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -648,11 +655,11 @@ func (s *HostListener) EnableSecurityGroup(inctx context.Context, in *protocol.S
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -690,11 +697,11 @@ func (s *HostListener) DisableSecurityGroup(inctx context.Context, in *protocol.
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -731,11 +738,11 @@ func (s *HostListener) ListSecurityGroups(inctx context.Context, in *protocol.Se
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
 	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -772,13 +779,12 @@ func (s *HostListener) ListLabels(inctx context.Context, in *protocol.LabelBound
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if inctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("inctx").ToGRPCStatus()
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
@@ -824,18 +830,16 @@ func (s *HostListener) InspectLabel(inctx context.Context, in *protocol.HostLabe
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	if inctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	}
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if inctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("inctx").ToGRPCStatus()
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
-
 	labelRef, labelRefLabel := srvutils.GetReference(in.GetLabel())
 	if labelRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
@@ -882,18 +886,16 @@ func (s *HostListener) BindLabel(inctx context.Context, in *protocol.LabelBindRe
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("inctx").ToGRPCStatus()
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
-
 	labelRef, labelRefLabel := srvutils.GetReference(in.GetLabel())
 	if labelRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
@@ -929,13 +931,12 @@ func (s *HostListener) UnbindLabel(inctx context.Context, in *protocol.LabelBind
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("inctx").ToGRPCStatus()
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
@@ -976,18 +977,16 @@ func (s *HostListener) UpdateLabel(inctx context.Context, in *protocol.LabelBind
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("inctx").ToGRPCStatus()
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
-
 	labelRef, labelRefLabel := srvutils.GetReference(in.GetLabel())
 	if labelRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
@@ -1023,18 +1022,16 @@ func (s *HostListener) ResetLabel(inctx context.Context, in *protocol.LabelBindR
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
+	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("inctx").ToGRPCStatus()
-	}
-
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
-
 	labelRef, labelRefLabel := srvutils.GetReference(in.GetLabel())
 	if labelRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
