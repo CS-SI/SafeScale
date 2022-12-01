@@ -513,6 +513,9 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}()
 
 	// --- Create the gateway(s) ---
+	if req.DefaultSSHPort <= 0 {
+		req.DefaultSSHPort = 22
+	}
 	xerr = instance.unsafeCreateGateways(ctx, req, gwname, gwSizing, nil)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failure in 'unsafe' creating gateways")
