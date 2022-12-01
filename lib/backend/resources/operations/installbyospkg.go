@@ -18,8 +18,6 @@ package operations
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/sirupsen/logrus"
@@ -164,76 +162,4 @@ func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t res
 		return r, fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 	return r, nil
-}
-
-// aptInstaller is an installer using script to add and remove a Feature
-type aptInstaller struct {
-	genericPackager
-}
-
-// NewAptInstaller creates a new instance of Installer using script
-func NewAptInstaller() Installer {
-	return &aptInstaller{
-		genericPackager: genericPackager{
-			keyword: strings.ToLower(installmethod.Apt.String()),
-			method:  installmethod.Apt,
-			checkCommand: func(pkg string) string {
-				return fmt.Sprintf("sudo dpkg-query -s '%s' &>/dev/null", pkg)
-			},
-			addCommand: func(pkg string) string {
-				return fmt.Sprintf("sudo apt-get install -y '%s'", pkg)
-			},
-			removeCommand: func(pkg string) string {
-				return fmt.Sprintf("sudo apt-get remove -y '%s'", pkg)
-			},
-		},
-	}
-}
-
-// yumInstaller is an installer using yum to add and remove a Feature
-type yumInstaller struct {
-	genericPackager
-}
-
-// NewYumInstaller creates a new instance of Installer using script
-func NewYumInstaller() Installer {
-	return &yumInstaller{
-		genericPackager: genericPackager{
-			keyword: strings.ToLower(installmethod.Yum.String()),
-			method:  installmethod.Yum,
-			checkCommand: func(pkg string) string {
-				return fmt.Sprintf("sudo rpm -q %s &>/dev/null", pkg)
-			},
-			addCommand: func(pkg string) string {
-				return fmt.Sprintf("sudo yum install -y %s", pkg)
-			},
-			removeCommand: func(pkg string) string {
-				return fmt.Sprintf("sudo yum remove -y %s", pkg)
-			},
-		},
-	}
-}
-
-// dnfInstaller is an installer using yum to add and remove a Feature
-type dnfInstaller struct {
-	genericPackager
-}
-
-// NewDnfInstaller creates a new instance of Installer using script
-func NewDnfInstaller() Installer {
-	return &dnfInstaller{
-		genericPackager: genericPackager{
-			keyword: strings.ToLower(installmethod.Dnf.String()),
-			method:  installmethod.Dnf,
-			checkCommand: func(pkg string) string {
-				return fmt.Sprintf("sudo dnf list installed %s &>/dev/null", pkg)
-			},
-			addCommand: func(pkg string) string {
-				return fmt.Sprintf("sudo dnf install -y %s", pkg)
-			},
-			removeCommand: func(pkg string) string {
-				return fmt.Sprintf("sudo dnf uninstall -y %s", pkg)
-			},
-		},
-	}
 }

@@ -212,13 +212,6 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
-	instance.localCache.RLock()
-	notok := instance.localCache.sshProfile == nil
-	instance.localCache.RUnlock() // nolint
-	if notok {
-		return invalid, "", "", fail.InvalidInstanceContentError("instance.localCache.sshProfile", "cannot be nil")
-	}
-
 	if source == "" {
 		return invalid, "", "", fail.InvalidParameterError("source", "cannot be empty string")
 	}
@@ -456,12 +449,6 @@ func (instance *Host) unsafeGetMounts(ctx context.Context) (mounts *propertiesv1
 func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	instance.localCache.RLock()
-	notok := instance.localCache.sshProfile == nil
-	instance.localCache.RUnlock() // nolint
-	if notok {
-		return fail.InvalidInstanceContentError("instance.localCache.sshProfile", "cannot be nil")
-	}
 	if content == "" {
 		return fail.InvalidParameterError("content", "cannot be empty string")
 	}

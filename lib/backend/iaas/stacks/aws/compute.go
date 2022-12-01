@@ -655,6 +655,20 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 
 	logrus.WithContext(ctx).Debugf("requesting host resource creation...")
 
+	// Starting from here, delete host if exiting with error
+	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil && !request.KeepOnFailure {
+			if ahf.IsConsistent() {
+				logrus.WithContext(ctx).Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
+				if derr := s.DeleteHost(context.Background(), ahf.Core.ID); derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
+					logrus.WithContext(ctx).Warnf("Error deleting host in cleanup: %v", derr)
+				}
+			}
+		}
+	}()
+
 	// Retry creation until success, for 10 minutes
 	xerr = retry.WhileUnsuccessful(
 		func() error {
@@ -731,20 +745,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 			return nil, nil, xerr
 		}
 	}
-
-	// Starting from here, delete host if exiting with error
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil && !request.KeepOnFailure {
-			if ahf.IsConsistent() {
-				logrus.WithContext(ctx).Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
-				if derr := s.DeleteHost(context.Background(), ahf.Core.ID); derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
-					logrus.WithContext(ctx).Warnf("Error deleting host in cleanup: %v", derr)
-				}
-			}
-		}
-	}()
 
 	if !ahf.OK() {
 		logrus.WithContext(ctx).Warnf("Missing data in ahf: %v", ahf)
@@ -1393,17 +1393,6 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (
 	}
 
 	return nil
-}
-
-// ResizeHost changes the sizing of an existing host
-func (s stack) ResizeHost(
-	ctx context.Context, hostParam stacks.HostParameter, request abstract.HostSizingRequirements,
-) (*abstract.HostFull, fail.Error) {
-	if valid.IsNil(s) {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // BindSecurityGroupToHost ...

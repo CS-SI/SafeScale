@@ -45,14 +45,12 @@ var (
 		DefaultMasterSizing:    nodeSizing,
 		DefaultNodeSizing:      nodeSizing,
 		DefaultImage:           defaultImage,
-		// GetGlobalSystemRequirements: flavors.GetGlobalSystemRequirements,
-		// GetNodeInstallationScript: getNodeInstallationScript,
-		ConfigureCluster:     configureCluster,
-		LeaveNodeFromCluster: leaveNodeFromCluster,
+		ConfigureCluster:       configureCluster,
+		LeaveNodeFromCluster:   leaveNodeFromCluster,
 	}
 )
 
-func minimumRequiredServers(clusterIdentity abstract.ClusterIdentity) (uint, uint, uint, fail.Error) {
+func minimumRequiredServers(ctx context.Context, clusterIdentity abstract.ClusterIdentity) (uint, uint, uint, fail.Error) {
 	var masterCount uint
 	var privateNodeCount uint
 	var publicNodeCount uint
@@ -71,7 +69,7 @@ func minimumRequiredServers(clusterIdentity abstract.ClusterIdentity) (uint, uin
 	return masterCount, privateNodeCount, publicNodeCount, nil
 }
 
-func gatewaySizing(_ resources.Cluster) abstract.HostSizingRequirements {
+func gatewaySizing(ctx context.Context, _ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
@@ -82,7 +80,7 @@ func gatewaySizing(_ resources.Cluster) abstract.HostSizingRequirements {
 	}
 }
 
-func nodeSizing(_ resources.Cluster) abstract.HostSizingRequirements {
+func nodeSizing(ctx context.Context, _ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    4,
 		MaxCores:    8,
@@ -93,7 +91,7 @@ func nodeSizing(_ resources.Cluster) abstract.HostSizingRequirements {
 	}
 }
 
-func defaultImage(_ resources.Cluster) string {
+func defaultImage(ctx context.Context, _ resources.Cluster) string {
 	return consts.DEFAULTOS
 }
 

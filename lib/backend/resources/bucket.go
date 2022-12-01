@@ -33,6 +33,7 @@ type Bucket interface {
 	data.Identifiable
 	Consistent
 
+	GetName() string
 	Browse(ctx context.Context, callback func(bucket *abstract.ObjectStorageBucket) fail.Error) fail.Error
 	Create(ctx context.Context, name string) fail.Error
 	Delete(ctx context.Context) fail.Error

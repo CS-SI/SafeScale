@@ -141,20 +141,20 @@ func LoadSecurityGroup(
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, sgInstance.GetName()), sgInstance, &store.Options{Expiration: 1 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, sgInstance.GetName()), sgInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 				hid, err := sgInstance.GetID()
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), sgInstance, &store.Options{Expiration: 1 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), sgInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 
 				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
 					casted, ok := val.(*SecurityGroup)
@@ -164,7 +164,7 @@ func LoadSecurityGroup(
 						logrus.WithContext(ctx).Warnf("wrong type of resources.SecurityGroup")
 					}
 				} else {
-					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("sg cache response (%s): %v", cacheref, xerr)
 				}
 			}
 
@@ -211,7 +211,13 @@ func (instance *SecurityGroup) IsNull() bool {
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
-func (instance *SecurityGroup) Exists(ctx context.Context) (bool, fail.Error) {
+func (instance *SecurityGroup) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if valid.IsNil(instance) {
+		return false, fail.InvalidInstanceError()
+	}
+
 	// FIXME: Not so easy, securitygroups are in some cases a metadata-only construct -> we need to turn those into tags (provider ones) 1st
 	theID, err := instance.GetID()
 	if err != nil {
@@ -407,8 +413,18 @@ func (instance *SecurityGroup) Create(
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil {
+					theID, _ := instance.GetID()
+
 					if derr := instance.MetadataCore.Delete(cleanupContextFrom(ctx)); derr != nil {
 						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(ferr)))
+					}
+
+					if ka, err := instance.Service().GetCache(ctx); err == nil {
+						if ka != nil {
+							if theID != "" {
+								_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+							}
+						}
 					}
 				}
 			}()

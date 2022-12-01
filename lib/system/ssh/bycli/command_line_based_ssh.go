@@ -433,8 +433,6 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		gwPort,
 	)
 
-	// logrus.WithContext(context.Background()).Tracef("Creating SSH tunnel with '%s'", cmdString)
-
 	cmd := exec.Command("bash", "-c", cmdString)
 	cmd.SysProcAttr = getSyscallAttrs()
 	cerr := cmd.Start()
@@ -442,13 +440,13 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		return nil, fail.ConvertError(cerr)
 	}
 
-	// gives 10s to build a tunnel, 1s is not enough as the number of tunnels keeps growing
-	for nbiter := 0; !isTunnelReady(int(localPort)) && nbiter < 100; nbiter++ {
+	// gives 60s to build a tunnel, 1s is not enough as the number of tunnels keeps growing
+	for nbiter := 0; !isTunnelReady(int(localPort)) && nbiter < 600; nbiter++ {
 		time.Sleep(100 * time.Millisecond)
 	}
 
 	if !isTunnelReady(int(localPort)) {
-		xerr := fail.NotAvailableError("the tunnel is not ready")
+		xerr := fail.NotAvailableError("the tunnel is not ready after waiting for port %d 60 sec", localPort)
 		derr := killProcess(cmd.Process)
 		if derr != nil {
 			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to kill SSH process"))
@@ -887,9 +885,9 @@ func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (data.
 
 // Close is called to clean Command (close tunnel(s), remove temporary files, ...)
 func (scmd *CliCommand) Close() (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
+	defer fail.SilentOnPanic(&ferr)
 	if scmd == nil {
-		return fail.InvalidInstanceError()
+		return fail.NewError("another problem with nil interfaces")
 	}
 
 	var err1 error
@@ -1337,9 +1335,49 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 
 // CopyWithTimeout copies a file/directory from/to local to/from remote, and fails after 'timeout'
 func (sconf *Profile) CopyWithTimeout(
-	ctx context.Context, remotePath, localPath string, isUpload bool, timeout time.Duration,
+	inctx context.Context, remotePath, localPath string, isUpload bool, timeout time.Duration,
 ) (int, string, string, fail.Error) {
-	return sconf.copy(ctx, remotePath, localPath, isUpload, timeout)
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	const invalid = -1
+
+	type result struct {
+		a    int
+		b    string
+		c    string
+		rErr fail.Error
+	}
+
+	chRes := make(chan result)
+
+	go func() {
+		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+
+			a, b, c, d := sconf.copy(ctx, remotePath, localPath, isUpload, timeout)
+			ar := result{
+				a:    a,
+				b:    b,
+				c:    c,
+				rErr: d,
+			}
+
+			return ar, ar.rErr
+		}() // nolint
+		chRes <- gres
+	}()
+	select {
+	case res := <-chRes:
+		return res.a, res.b, res.c, res.rErr
+	case <-ctx.Done():
+		<-chRes
+		return invalid, "", "", fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		<-chRes
+		return invalid, "", "", fail.ConvertError(inctx.Err())
+	}
 }
 
 // copy copies a file/directory from/to local to/from remote, and fails after 'timeout' (if timeout > 0)

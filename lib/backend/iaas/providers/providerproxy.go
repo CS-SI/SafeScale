@@ -610,16 +610,6 @@ func (s ProviderProxy) RebootHost(ctx context.Context, parameter stacks.HostPara
 	return xerr
 }
 
-func (s ProviderProxy) ResizeHost(ctx context.Context, parameter stacks.HostParameter, requirements abstract.HostSizingRequirements) (_ *abstract.HostFull, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	host, xerr := s.Provider.ResizeHost(ctx, parameter, requirements)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return host, xerr
-}
-
 func (s ProviderProxy) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

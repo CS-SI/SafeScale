@@ -32,6 +32,7 @@ require (
 	github.com/ovh/go-ovh v1.3.0
 	github.com/pelletier/go-toml/v2 v2.0.5
 	github.com/pkg/errors v0.9.1
+	github.com/pkg/profile v1.7.0
 	github.com/pkg/sftp v1.13.5
 	github.com/quasilyte/go-ruleguard/dsl v0.3.21
 	github.com/sanity-io/litter v1.5.5

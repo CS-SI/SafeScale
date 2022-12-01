@@ -22,20 +22,21 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
-	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -180,7 +181,7 @@ func (instance *Feature) GetDisplayFilename(ctx context.Context) string {
 	return instance.file.displayFileName
 }
 
-// InstanciateInstallerOfMethod instanciates the right installer corresponding to the method
+// InstanciateInstallerOfMethod instantiates the right installer corresponding to the method
 func (instance *Feature) InstanciateInstallerOfMethod(m installmethod.Enum) Installer {
 	if instance.IsNull() {
 		return nil
@@ -190,12 +191,6 @@ func (instance *Feature) InstanciateInstallerOfMethod(m installmethod.Enum) Inst
 	switch m {
 	case installmethod.Bash:
 		installer = newBashInstaller()
-	case installmethod.Apt:
-		installer = NewAptInstaller()
-	case installmethod.Yum:
-		installer = NewYumInstaller()
-	case installmethod.Dnf:
-		installer = NewDnfInstaller()
 	case installmethod.None:
 		installer = newNoneInstaller()
 	}
@@ -264,6 +259,7 @@ func (instance *Feature) Applicable(ctx context.Context, tg resources.Targetable
 // Check is ok if error is nil and Results.Successful() is true
 func (instance *Feature) Check(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+	defer elapsed("Feature.Check")()
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -301,24 +297,56 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 				return nil
 			})
 		})
-		if xerr != nil {
-			return nil, xerr
+		if xerr == nil {
+			if found {
+				outcomes := &results{}
+				_ = outcomes.Add(featureName, &unitResults{
+					targetName: &stepResult{
+						complete: true,
+						success:  true,
+					},
+				})
+				return outcomes, nil
+			}
+		} else {
+			debug.IgnoreError2(ctx, xerr)
 		}
-		if found {
-			outcomes := &results{}
-			_ = outcomes.Add(featureName, &unitResults{
-				targetName: &stepResult{
-					complete: true,
-					success:  true,
-				},
+	case resources.Cluster:
+		var found bool
+		castedTarget, ok := target.(*Cluster)
+		if !ok {
+			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
+		}
+
+		xerr := castedTarget.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				clufea, ok := clonable.(*propertiesv1.ClusterFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				_, found = clufea.Installed[instance.GetName()]
+				return nil
 			})
-			return outcomes, nil
+		})
+		if xerr == nil {
+			if found {
+				outcomes := &results{}
+				_ = outcomes.Add(featureName, &unitResults{
+					targetName: &stepResult{
+						complete: true,
+						success:  true,
+					},
+				})
+				return outcomes, nil
+			}
+		} else {
+			debug.IgnoreError2(ctx, xerr)
 		}
 	}
 
 	switch ata := target.(type) {
 	case resources.Host:
-		state, xerr := ata.GetState(ctx)
+		state, xerr := ata.ForceGetState(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -344,20 +372,11 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 		return nil, xerr
 	}
 
-	// // Checks required parameters have their values
-	// xerr = checkRequiredParameters(*instance, myV)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
 	r, xerr := installer.Check(ctx, instance, target, myV, s)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	// FIXME: restore Feature check using iaas.ResourceCache
-	// _ = checkCache.ForceSet(cacheKey, results)
 	return r, xerr
 }
 
@@ -366,6 +385,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 //   - nil: everything went well
 //   - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
 func (instance Feature) prepareParameters(ctx context.Context, externals data.Map, target resources.Targetable) (data.Map, fail.Error) {
+	defer elapsed("prepareParameters")()
 	xerr := instance.conditionParameters(ctx, externals, target)
 	if xerr != nil {
 		return nil, xerr
@@ -387,6 +407,7 @@ func (instance Feature) prepareParameters(ctx context.Context, externals data.Ma
 //   - nil: everything went well
 //   - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
 func (instance *Feature) conditionParameters(ctx context.Context, externals data.Map, target resources.Targetable) fail.Error {
+	defer elapsed("conditionParameters")()
 	if instance.conditionedParameters == nil {
 		var xerr fail.Error
 		instance.conditionedParameters = make(ConditionedFeatureParameters)
@@ -434,8 +455,8 @@ func (instance *Feature) determineInstallerForTarget(ctx context.Context, target
 
 	var installer Installer
 	w := instance.file.installers
-	for i := uint8(1); i <= uint8(len(methods)); i++ {
-		meth := methods[i]
+	for _, v := range methods {
+		meth := v
 		if _, ok := w[strings.ToLower(meth.String())]; ok {
 			installer = instance.InstanciateInstallerOfMethod(meth)
 			if installer != nil {
@@ -518,10 +539,13 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 		return nil, xerr
 	}
 
-	// FIXME: restore Feature check cache using iaas.ResourceCache
-	// _ = checkCache.ForceSet(featureName()+"@"+targetName, results)
+	xerr = target.RegisterFeature(ctx, instance, nil, target.TargetType() == featuretargettype.Cluster)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
 
-	return results, target.RegisterFeature(ctx, instance, nil, target.TargetType() == featuretargettype.Cluster)
+	return results, nil
 }
 
 // Remove uninstalls the Feature from the target
@@ -576,7 +600,13 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 		return nil, xerr
 	}
 
-	return results, target.UnregisterFeature(ctx, instance.GetName())
+	xerr = target.UnregisterFeature(ctx, instance.GetName())
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return results, nil
 }
 
 // Dependencies returns a list of features needed as dependencies
@@ -631,11 +661,11 @@ func (instance *Feature) installRequirements(ctx context.Context, t resources.Ta
 			var msgTail string
 			switch t.TargetType() {
 			case featuretargettype.Host:
-				msgTail = fmt.Sprintf("on host '%s'", t.(data.Identifiable).GetName())
+				msgTail = fmt.Sprintf("on host '%s'", t.GetName())
 			case featuretargettype.Node:
-				msgTail = fmt.Sprintf("on cluster node '%s'", t.(data.Identifiable).GetName())
+				msgTail = fmt.Sprintf("on cluster node '%s'", t.GetName())
 			case featuretargettype.Cluster:
-				msgTail = fmt.Sprintf("on cluster '%s'", t.(data.Identifiable).GetName())
+				msgTail = fmt.Sprintf("on cluster '%s'", t.GetName())
 			}
 			logrus.WithContext(ctx).Debugf("%s %s...", msgHead, msgTail)
 		}

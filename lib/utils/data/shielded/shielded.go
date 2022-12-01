@@ -59,6 +59,15 @@ func (instance *Shielded) Clone() (*Shielded, error) {
 	return NewShielded(cloned)
 }
 
+// UnWrap is the fastest way to get a clone of the shielded data
+func (instance *Shielded) UnWrap() (data.Clonable, error) {
+	ak, err := instance.Clone()
+	if err != nil {
+		return nil, err
+	}
+	return ak.witness, nil
+}
+
 func (instance *Shielded) Sdump() (string, error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()

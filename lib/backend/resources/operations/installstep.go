@@ -335,9 +335,9 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources
 		for _, h := range hosts {
 			h := h
 			tg.Go(func() error {
-				moctx, lord := context.WithCancel(ctx)
-				defer lord()
-				tr, err := is.taskRunOnHostWithLoop(moctx, runOnHostParameters{Host: h, Variables: v})
+				actx, loopCancel := context.WithCancel(ctx)
+				defer loopCancel()
+				tr, err := is.taskRunOnHostWithLoop(actx, runOnHostParameters{Host: h, Variables: v})
 				hid, _ := h.GetID()
 				blue <- partResult{who: hid, what: tr, err: err}
 				if err != nil {
@@ -447,6 +447,7 @@ type runOnHostParameters struct {
 
 func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+	defer elapsed("taskRunOnHostWithLoop")()
 
 	if params == nil {
 		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")
@@ -475,6 +476,7 @@ func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{})
 // taskRunOnHost ...
 func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+	defer elapsed("taskRunOnHost")()
 
 	if params == nil {
 		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")
@@ -613,8 +615,10 @@ func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ step
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
+		<-chRes
 		return stepResult{}, fail.ConvertError(ctx.Err())
 	case <-inctx.Done():
+		<-chRes
 		return stepResult{}, fail.ConvertError(inctx.Err())
 	}
 }

@@ -798,10 +798,10 @@ function sfDoesDockerRunContainer() {
       FOUND=yes
     elif [ "$INSTANCE_2" != "$INSTANCE" ]; then
       if [ "$INSTANCE_2" == "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE_2" | uniq)" ]; then
-        found=y
+        FOUND=yes
       fi
     fi
-    [ "$FOUND" != "y"] && return 1
+    [ "$FOUND" != "yes"] && return 1
   fi
   echo $LIST | cut -d'|' -f3 | grep -i "^up" &> /dev/null || return 1
   return 0

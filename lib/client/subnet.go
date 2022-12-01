@@ -71,9 +71,12 @@ func (s subnetConsumer) Delete(networkRef string, names []string, timeout time.D
 	}
 
 	// finally, using context
-	valCtx := context.WithValue(ctx, &forceCtxKey, force) // nolint
-	newCtx, cancel := context.WithTimeout(valCtx, timeout)
-	defer cancel()
+	newCtx := ctx // nolint
+	if timeout != 0 {
+		aCtx, cancel := context.WithTimeout(newCtx, timeout)
+		defer cancel()
+		newCtx = aCtx
+	}
 
 	var (
 		mutex sync.Mutex
@@ -86,7 +89,7 @@ func (s subnetConsumer) Delete(networkRef string, names []string, timeout time.D
 		_, err := service.Delete(newCtx, &protocol.SubnetDeleteRequest{
 			Network: &protocol.Reference{Name: networkRef},
 			Subnet:  &protocol.Reference{Name: aname},
-			Force:   true,
+			Force:   force,
 		})
 
 		if err != nil {

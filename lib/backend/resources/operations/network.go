@@ -129,20 +129,20 @@ func LoadNetwork(inctx context.Context, svc iaas.Service, ref string, options ..
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, networkInstance.GetName()), networkInstance, &store.Options{Expiration: 1 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, networkInstance.GetName()), networkInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 				hid, err := networkInstance.GetID()
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), networkInstance, &store.Options{Expiration: 1 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), networkInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 
 				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
 					casted, ok := val.(resources.Network)
@@ -152,7 +152,7 @@ func LoadNetwork(inctx context.Context, svc iaas.Service, ref string, options ..
 						logrus.WithContext(ctx).Warnf("wrong type of resources.Network")
 					}
 				} else {
-					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("network cache response (%s): %v", cacheref, xerr)
 				}
 			}
 
@@ -200,7 +200,13 @@ func (instance *Network) IsNull() bool {
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
-func (instance *Network) Exists(ctx context.Context) (bool, fail.Error) {
+func (instance *Network) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if valid.IsNil(instance) {
+		return false, fail.InvalidInstanceError()
+	}
+
 	theID, err := instance.GetID()
 	if err != nil {
 		return false, fail.ConvertError(err)
@@ -694,6 +700,8 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 			}
 		}
 
+		theID, _ := instance.GetID()
+
 		// Remove metadata
 		xerr = instance.MetadataCore.Delete(ctx)
 		if xerr != nil {
@@ -701,6 +709,15 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 			chRes <- result{xerr}
 			return
 		}
+
+		if ka, err := instance.Service().GetCache(ctx); err == nil {
+			if ka != nil {
+				if theID != "" {
+					_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+				}
+			}
+		}
+
 		chRes <- result{nil}
 
 	}()

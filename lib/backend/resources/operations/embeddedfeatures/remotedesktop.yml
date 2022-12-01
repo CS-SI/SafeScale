@@ -556,6 +556,7 @@ feature:
                             </zone>
                             EOF
 
+                            sfFirewallReload || sfFail 204 "Firewall problem reloading service"
                             # Allow only gateway(s) to connect to port {{ .GuacamolePort }}
                             sfFirewall --zone=sf_remotedesktop --add-service=safescale_remotedesktop_guacd || sfFail 204 "Firewall problem adding service"
                             {{ if .DefaultRouteIP }}
@@ -573,7 +574,7 @@ feature:
                             # Starts remotedesktop container                          #
                             ###########################################################
                             echo "docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail
+                            sfRetryEx 15m 5 docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 209
                             sfExit
 
             remove:
@@ -585,7 +586,7 @@ feature:
                             masters: all
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 192
+                            sfRetryEx 15m 5 docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 192
                             docker image rm -f safescale/remotedesktop:latest || sfFail 193
                             rm -rf ${SF_ETCDIR}/remotedesktop
                             sfExit

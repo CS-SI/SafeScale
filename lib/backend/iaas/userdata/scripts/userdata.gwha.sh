@@ -17,6 +17,9 @@
 #{{.Revision}}
 # Script customized for {{.ProviderName}} driver
 
+# shellcheck disable=SC1009
+# shellcheck disable=SC1073
+# shellcheck disable=SC1054
 {{.Header}}
 
 last_error=
@@ -74,6 +77,9 @@ date
 uptime > /opt/safescale/var/state/user_data.gwha.done
 
 # Includes the BashLibrary
+# shellcheck disable=SC1009
+# shellcheck disable=SC1073
+# shellcheck disable=SC1054
 {{ .reserved_BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.gwha.done
 

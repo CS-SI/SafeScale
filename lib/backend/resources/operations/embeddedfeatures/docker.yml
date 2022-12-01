@@ -207,7 +207,7 @@ feature:
                             op=-1
                             VERSION="{{.DockerComposeVersion}}"
                             if [[ "latest" = "${VERSION}" ]]; then
-                                VERSION=$(sfRetry "curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq -r .name") && op=$? || true
+                                VERSION=$(curl -kSsL https://api.github.com/repos/docker/compose/releases/latest | jq -r .name) && op=$? || true
                                 [ $op -ne 0 ] && sfFail 206 "error getting latest docker-compose version"
                             fi
                             echo "docker-compose version=$VERSION"
@@ -298,8 +298,9 @@ feature:
                         run: |
                             sfService enable docker || sfFail 211
                             sfService restart docker || sfFail 212
+                            sleep {{ or .reserved_DefaultDelay 10 }}
                             op=-1
-                            sfRetry "sfService status docker &>/dev/null" && op=$? || true
+                            sfService status docker &>/dev/null && op=$? || true
                             [ $op -ne 0 ] && sfFail 213
                             sfExit
                     verify:
@@ -309,7 +310,6 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sleep {{ or .reserved_DefaultDelay 10 }}
                             sleep {{ or .reserved_DefaultDelay 10 }}
                             rm -f /tmp/docker-fail.txt || true
                             op=-1

@@ -37,8 +37,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
-	"github.com/sirupsen/logrus"
-
 	// Gophercloud OpenStack API
 	"github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
@@ -728,24 +726,6 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) f
 		},
 		NormalizeError,
 	)
-}
-
-// ResizeHost ...
-func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	if valid.IsNil(s) {
-		return nil, fail.InvalidInstanceError()
-	}
-	_ /*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
-
-	logrus.WithContext(ctx).Debugf("Trying to resize a Host...")
-	// servers.Resize()
-
-	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // WaitHostState waits a host achieve defined state

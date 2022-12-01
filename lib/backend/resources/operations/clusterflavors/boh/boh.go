@@ -24,6 +24,8 @@ package boh
  */
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
@@ -40,17 +42,16 @@ var (
 		DefaultMasterSizing:    nodeSizing,
 		DefaultNodeSizing:      nodeSizing,
 		DefaultImage:           defaultImage,
-		// GetNodeInstallationScript:   makers.GetNodeInstallationScript,
-		// GetGlobalSystemRequirements: flavors.GetGlobalSystemRequirements,
 	}
 )
 
-func minimumRequiredServers(clusterIdentity abstract.ClusterIdentity) (uint, uint, uint, fail.Error) {
+func minimumRequiredServers(ctx context.Context, clusterIdentity abstract.ClusterIdentity) (uint, uint, uint, fail.Error) {
 	var (
 		privateNodeCount uint
 		masterNodeCount  uint
 	)
 
+	// custom configuration
 	switch clusterIdentity.Complexity {
 	case clustercomplexity.Small:
 		privateNodeCount = 1
@@ -65,7 +66,7 @@ func minimumRequiredServers(clusterIdentity abstract.ClusterIdentity) (uint, uin
 	return masterNodeCount, privateNodeCount, 0, nil
 }
 
-func gatewaySizing(_ resources.Cluster) abstract.HostSizingRequirements {
+func gatewaySizing(ctx context.Context, _ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
@@ -76,7 +77,7 @@ func gatewaySizing(_ resources.Cluster) abstract.HostSizingRequirements {
 	}
 }
 
-func nodeSizing(_ resources.Cluster) abstract.HostSizingRequirements {
+func nodeSizing(ctx context.Context, _ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
@@ -87,6 +88,6 @@ func nodeSizing(_ resources.Cluster) abstract.HostSizingRequirements {
 	}
 }
 
-func defaultImage(_ resources.Cluster) string {
+func defaultImage(ctx context.Context, _ resources.Cluster) string {
 	return consts.DEFAULTOS
 }

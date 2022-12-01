@@ -136,20 +136,20 @@ func LoadBucket(inctx context.Context, svc iaas.Service, name string) (resources
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, b.GetName()), b, &store.Options{Expiration: 1 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, b.GetName()), b, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 				hid, err := b.GetID()
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), b, &store.Options{Expiration: 1 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), b, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 
 				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
 					casted, ok := val.(resources.Bucket)
@@ -159,7 +159,7 @@ func LoadBucket(inctx context.Context, svc iaas.Service, name string) (resources
 						logrus.WithContext(ctx).Warnf("wrong type of resources.Bucket")
 					}
 				} else {
-					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("bucket cache response (%s): %v", cachename, xerr)
 				}
 			}
 
@@ -205,7 +205,13 @@ func (instance *bucket) IsNull() bool {
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
-func (instance *bucket) Exists(ctx context.Context) (bool, fail.Error) {
+func (instance *bucket) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if valid.IsNil(instance) {
+		return false, fail.InvalidInstanceError()
+	}
+
 	theID, err := instance.GetID()
 	if err != nil {
 		return false, fail.ConvertError(err)
@@ -473,11 +479,21 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
+	theID, _ := instance.GetID()
+
 	// -- delete metadata
 	xerr = instance.MetadataCore.Delete(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
+	}
+
+	if ka, err := instance.Service().GetCache(ctx); err == nil {
+		if ka != nil {
+			if theID != "" {
+				_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+			}
+		}
 	}
 
 	return nil

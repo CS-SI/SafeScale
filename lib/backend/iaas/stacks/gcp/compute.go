@@ -307,6 +307,23 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	logrus.WithContext(ctx).Debugf("requesting host '%s' resource creation...", request.ResourceName)
 
 	var ahf *abstract.HostFull
+
+	defer func() {
+		if ferr != nil {
+			if ahf.IsConsistent() {
+				if !request.KeepOnFailure {
+					logrus.WithContext(ctx).Debugf("Clean up on failure, deleting host '%s'", ahf.GetName())
+					if derr := s.DeleteHost(context.Background(), ahf); derr != nil {
+						msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", ahf.GetName())
+						_ = ferr.AddConsequence(fail.Wrap(derr, msg))
+					} else {
+						logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleted Host '%s' successfully.", ahf.GetName())
+					}
+				}
+			}
+		}
+	}()
+
 	// Retry creation until success, for 10 minutes
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -317,7 +334,24 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 			}
 
 			var innerXErr fail.Error
-			ahf, innerXErr = s.buildGcpMachine(ctx, request.ResourceName, an, defaultSubnet, *template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs, extra)
+			var lahf *abstract.HostFull
+
+			// Starting from here, delete host if exiting with error, to be in good shape to retry
+			defer func() {
+				if innerXErr != nil {
+					if lahf.IsConsistent() {
+						logrus.WithContext(ctx).Debugf("Clean up on failure, deleting host '%s'", lahf.GetName())
+						if derr := s.DeleteHost(context.Background(), lahf); derr != nil {
+							msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", lahf.GetName())
+							_ = innerXErr.AddConsequence(fail.Wrap(derr, msg))
+						} else {
+							logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleted Host '%s' successfully.", lahf.GetName())
+						}
+					}
+				}
+			}()
+
+			lahf, innerXErr = s.buildGcpMachine(ctx, request.ResourceName, an, defaultSubnet, *template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs, extra)
 			if innerXErr != nil {
 				captured := normalizeError(innerXErr)
 				switch captured.(type) {
@@ -328,21 +362,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 				}
 			}
 
-			// Starting from here, delete host if exiting with error, to be in good shape to retry
-			defer func() {
-				if innerXErr != nil {
-					if ahf.IsConsistent() {
-						logrus.WithContext(ctx).Debugf("Clean up on failure, deleting host '%s'", ahf.GetName())
-						if derr := s.DeleteHost(context.Background(), ahf); derr != nil {
-							msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", ahf.GetName())
-							_ = innerXErr.AddConsequence(fail.Wrap(derr, msg))
-						} else {
-							logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleted Host '%s' successfully.", ahf.GetName())
-						}
-					}
-				}
-			}()
-
+			ahf = lahf
 			ahfid, err := ahf.GetID()
 			if err != nil {
 				return fail.ConvertError(err)
@@ -475,6 +495,7 @@ func (s stack) buildGcpMachine(
 			return nil, fail.InvalidParameterError("extra", "must be a map[string]string")
 		}
 		for k, v := range into {
+			k, v := k, v
 			ahf.Core.Tags[k] = v
 		}
 	}
@@ -730,11 +751,6 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 	return nil
 }
 
-// ResizeHost change the template used by a host
-func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
-}
-
 // ListHosts lists available hosts
 func (s stack) ListHosts(ctx context.Context, detailed bool) (_ abstract.HostList, ferr fail.Error) {
 	var emptyList abstract.HostList
@@ -759,7 +775,6 @@ func (s stack) ListHosts(ctx context.Context, detailed bool) (_ abstract.HostLis
 			return nil, xerr
 		}
 
-		// FIXME: Also populate tags
 		var hostFull *abstract.HostFull
 		if detailed {
 			hostFull, xerr = s.InspectHost(ctx, nhost)
@@ -771,7 +786,6 @@ func (s stack) ListHosts(ctx context.Context, detailed bool) (_ abstract.HostLis
 			hostFull.Core = nhost
 		}
 
-		// FIXME: Populate host, what's missing ?
 		out = append(out, hostFull)
 	}
 

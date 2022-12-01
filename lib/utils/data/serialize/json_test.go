@@ -79,7 +79,7 @@ func (f *LikeFeatures) Replace(p data.Clonable) (data.Clonable, error) {
 
 func TestJsonProperty_IsNull(t *testing.T) {
 
-	var jp *jsonProperty
+	var jp *JSONProperty
 	result := jp.IsNull()
 	require.EqualValues(t, result, true)
 
@@ -106,7 +106,7 @@ func (e *SomeClonable) GetValue() string {
 
 func TestJsonProperty_Replace(t *testing.T) {
 
-	var jp *jsonProperty
+	var jp *JSONProperty
 	var data data.Clonable = nil
 
 	_, err := jp.Replace(data)
@@ -136,9 +136,9 @@ func TestJsonPropertyRealReplace(t *testing.T) {
 	allbad, _ := NewJSONProperties("clusters")
 	assert.NotNil(t, allbad)
 
-	// @TODO fix JsonProperty::Replace, clonable.(*jsonProperty) casting makes panic
+	// @TODO fix JSONProperty::Replace, clonable.(*JSONProperty) casting makes panic
 	// d := &SomeClonable{value: "any"}
-	// jp = &jsonProperty{}
+	// jp = &JSONProperty{}
 	// result = jp.Replace(d)
 	// fmt.Println(result.(*SomeClonable).GetValue())
 }
@@ -201,7 +201,7 @@ func TestJSONProperties_Count(t *testing.T) {
 
 	jp = &JSONProperties{
 		module: "module",
-		Properties: map[string]*jsonProperty{
+		Properties: map[string]*JSONProperty{
 			"a": {},
 			"b": {},
 		},

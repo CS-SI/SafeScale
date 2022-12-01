@@ -27,7 +27,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -41,7 +40,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/labelproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
@@ -80,15 +78,6 @@ const (
 // follows interface resources.Host
 type Host struct {
 	*MetadataCore
-
-	localCache struct {
-		sync.RWMutex
-		installMethods                sync.Map
-		privateIP, publicIP, accessIP string
-		sshProfile                    sshapi.Connector
-		sshCfg                        sshapi.Config
-		once                          bool
-	}
 }
 
 // NewHost ...
@@ -113,6 +102,7 @@ func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
 
 // LoadHost ...
 func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Host, fail.Error) {
+	defer elapsed(fmt.Sprintf("LoadHost of %s", ref))()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -146,13 +136,13 @@ func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...da
 				if val, xerr := cache.Get(ctx, refcache); xerr == nil {
 					casted, ok := val.(resources.Host)
 					if ok {
-						incrementExpVar("newhost.cache.hit")
+						incrementExpVar("host.cache.hit")
 						return casted, nil
 					} else {
 						logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
 					}
 				} else {
-					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("loadhost host cache response (%s): %v", refcache, xerr)
 				}
 			}
 
@@ -160,6 +150,8 @@ func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...da
 			if xerr != nil {
 				return nil, xerr
 			}
+
+			incrementExpVar("newhost.cache.hit")
 			hostInstance, ok := anon.(*Host)
 			if !ok {
 				return nil, fail.InconsistentError("cache content for key %s is not a resources.Host", ref)
@@ -175,32 +167,37 @@ func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...da
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hostInstance.GetName()), hostInstance, &store.Options{Expiration: 1 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 				hid, err := hostInstance.GetID()
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
 
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), hostInstance, &store.Options{Expiration: 1 * time.Minute})
+				err = cache.Set(ctx, refcache, hostInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hostInstance.GetName()), hostInstance, &store.Options{Expiration: 120 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), hostInstance, &store.Options{Expiration: 120 * time.Minute})
+				if err != nil {
+					return nil, fail.ConvertError(err)
+				}
+				time.Sleep(100 * time.Millisecond) // consolidate cache.Set
 
 				if val, xerr := cache.Get(ctx, refcache); xerr == nil {
 					casted, ok := val.(resources.Host)
 					if ok {
-						incrementExpVar("newhost.cache.hit")
+						incrementExpVar("host.cache.hit")
 						return casted, nil
 					} else {
 						logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
 					}
 				} else {
-					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("host cache response (%s): %v", refcache, xerr)
 				}
 
 			}
@@ -232,6 +229,7 @@ func Stack() []byte {
 
 // onHostCacheMiss is called when host 'ref' is not found in cache
 func onHostCacheMiss(inctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
+	defer elapsed(fmt.Sprintf("onHostCacheMiss of %s", ref))()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -256,15 +254,22 @@ func onHostCacheMiss(inctx context.Context, svc iaas.Service, ref string) (data.
 			}
 
 			incrementExpVar("host.load.hits")
-
 			incrementExpVar("newhost.cache.read")
+
 			if innerXErr = hostInstance.Read(ctx, ref); innerXErr != nil {
-				return nil, innerXErr
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					return nil, fail.NotFoundError("host '%s' not found", ref)
+				default:
+					return nil, innerXErr
+				}
 			}
 
-			xerr = hostInstance.updateCachedInformation(ctx)
-			if xerr != nil {
-				return nil, xerr
+			var does bool
+			if does, innerXErr = hostInstance.Exists(ctx); innerXErr == nil {
+				if !does {
+					return nil, fail.NotFoundError("host '%s' does not exist", ref)
+				}
 			}
 
 			afterSerialized, xerr := hostInstance.Sdump(ctx)
@@ -291,7 +296,14 @@ func onHostCacheMiss(inctx context.Context, svc iaas.Service, ref string) (data.
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
-func (instance *Host) Exists(ctx context.Context) (bool, fail.Error) {
+func (instance *Host) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if valid.IsNil(instance) {
+		return false, fail.InvalidInstanceError()
+	}
+
+	defer elapsed(fmt.Sprintf("Exist of %s", instance.name.Load().(string)))()
 	theID, err := instance.GetID()
 	if err != nil {
 		return false, fail.ConvertError(err)
@@ -311,16 +323,16 @@ func (instance *Host) Exists(ctx context.Context) (bool, fail.Error) {
 }
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
-func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
+func (instance *Host) updateCachedInformation(ctx context.Context) (sshapi.Connector, fail.Error) {
+	defer elapsed(fmt.Sprintf("updateCachedInformation of %s", instance.name.Load().(string)))()
 	svc := instance.Service()
 
 	opUser, opUserErr := getOperatorUsernameFromCfg(ctx, svc)
 	if opUserErr != nil {
-		return opUserErr
+		return nil, opUserErr
 	}
 
-	instance.localCache.Lock()
-	defer instance.localCache.Unlock()
+	var conn sshapi.Connector
 
 	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
@@ -335,26 +347,6 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			if len(hnV2.IPv4Addresses) > 0 {
-				instance.localCache.privateIP = hnV2.IPv4Addresses[hnV2.DefaultSubnetID]
-				if instance.localCache.privateIP == "" {
-					instance.localCache.privateIP = hnV2.IPv6Addresses[hnV2.DefaultSubnetID]
-				}
-			}
-			instance.localCache.publicIP = hnV2.PublicIPv4
-			if instance.localCache.publicIP == "" {
-				instance.localCache.publicIP = hnV2.PublicIPv6
-			}
-
-			// FIXME: find a better way to handle the use case (adjust SG? something else?)
-			// Workaround for a specific use: safescaled inside a cluster, to force access to host using internal IP
-			fromInside := os.Getenv("SAFESCALED_FROM_INSIDE")
-			if instance.localCache.publicIP == "" || fromInside == "true" {
-				instance.localCache.accessIP = instance.localCache.privateIP
-			} else {
-				instance.localCache.accessIP = instance.localCache.publicIP
-			}
-
 			// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
 			// Do not execute iff Host is single or is a gateway
 			if !hnV2.Single && !hnV2.IsGateway && hnV2.DefaultSubnetID != "" {
@@ -364,7 +356,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 					return xerr
 				}
 
-				gwInstance, xerr := subnetInstance.unsafeInspectGateway(ctx, true)
+				gwInstance, xerr := subnetInstance.InspectGateway(ctx, true)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -394,7 +386,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 				}
 
 				// Secondary gateway may not exist...
-				gwInstance, xerr = subnetInstance.unsafeInspectGateway(ctx, false)
+				gwInstance, xerr = subnetInstance.InspectGateway(ctx, false)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -435,54 +427,27 @@ func (instance *Host) updateCachedInformation(ctx context.Context) fail.Error {
 			return innerXErr
 		}
 
-		cfg := ssh.NewConfig(instance.GetName(), instance.localCache.accessIP, int(ahc.SSHPort), opUser, ahc.PrivateKey, 0, "", primaryGatewayConfig, secondaryGatewayConfig)
-		conn, innerXErr := sshfactory.NewConnector(cfg)
+		gaip, innerXErr := instance.GetAccessIP(ctx)
 		if innerXErr != nil {
 			return innerXErr
 		}
 
-		instance.localCache.sshCfg = cfg
-		instance.localCache.sshProfile = conn
-
-		var index uint8
-		innerXErr = props.Inspect(hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
-			systemV1, ok := clonable.(*propertiesv1.HostSystem)
-			if !ok {
-				logrus.WithContext(ctx).Error(fail.InconsistentError("'*propertiesv1.HostSystem' expected, '%s' provided", reflect.TypeOf(clonable).String()))
-			}
-			if systemV1.Type == "linux" {
-				switch systemV1.Flavor {
-				case "centos", "redhat":
-					index++
-					instance.localCache.installMethods.Store(index, installmethod.Yum)
-				case "debian":
-					fallthrough
-				case "ubuntu":
-					index++
-					instance.localCache.installMethods.Store(index, installmethod.Apt)
-				case "fedora", "rhel":
-					index++
-					instance.localCache.installMethods.Store(index, installmethod.Dnf)
-				}
-			}
-			return nil
-		})
+		// FIXME: OPP, Ha !!, this is the true problem !!
+		cfg := ssh.NewConfig(instance.GetName(), gaip, int(ahc.SSHPort), opUser, ahc.PrivateKey, 0, "", primaryGatewayConfig, secondaryGatewayConfig)
+		aconn, innerXErr := sshfactory.NewConnector(cfg)
 		if innerXErr != nil {
 			return innerXErr
 		}
 
-		index++
-		instance.localCache.installMethods.Store(index, installmethod.Bash)
-		index++
-		instance.localCache.installMethods.Store(index, installmethod.None)
+		conn = aconn
 		return nil
 	})
 
 	if xerr != nil {
-		return xerr
+		return nil, xerr
 	}
 
-	return nil
+	return conn, nil
 }
 
 func getOperatorUsernameFromCfg(ctx context.Context, svc iaas.Service) (string, fail.Error) {
@@ -571,6 +536,7 @@ func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCo
 
 // ForceGetState returns the current state of the provider Host then alter metadata
 func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, ferr fail.Error) {
+	defer elapsed(fmt.Sprintf("ForceGetState of %s", instance.name.Load().(string)))()
 	defer fail.OnPanic(&ferr)
 
 	state = hoststate.Unknown
@@ -581,33 +547,34 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 		return state, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
-	defer tracer.Exiting()
+	hid, err := instance.GetID()
+	if err != nil {
+		return state, fail.ConvertError(err)
+	}
 
-	xerr := instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		ahc, ok := clonable.(*abstract.HostCore)
-		if !ok {
-			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		abstractHostFull, innerXErr := instance.Service().InspectHost(ctx, ahc.ID)
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		if abstractHostFull != nil {
-			state = abstractHostFull.Core.LastState
-			if state != ahc.LastState {
-				ahc.LastState = state
-				return nil
-			}
-			return fail.AlteredNothingError()
-		}
-
-		return fail.InconsistentError("Host shouldn't be nil")
-	})
+	state, xerr := instance.Service().GetTrueHostState(ctx, hid)
 	if xerr != nil {
-		return hoststate.Unknown, xerr
+		return state, xerr
+	}
+
+	previousState, xerr := instance.GetState(ctx)
+	if xerr != nil {
+		return state, xerr
+	}
+
+	if state != previousState {
+		xerr = instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			ahc, ok := clonable.(*abstract.HostCore)
+			if !ok {
+				return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			ahc.LastState = state
+			return nil
+		})
+		if xerr != nil {
+			return hoststate.Unknown, xerr
+		}
 	}
 
 	return state, nil
@@ -664,11 +631,11 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 
 		thing, err := cache.Get(ctx, hid)
 		if err != nil || thing == nil { // usually notfound
-			err = cache.Set(ctx, hid, instance, &store.Options{Expiration: 1 * time.Minute})
+			err = cache.Set(ctx, hid, instance, &store.Options{Expiration: 120 * time.Minute})
 			if err != nil {
 				return fail.ConvertError(err)
 			}
-			time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+			time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 		} else if _, ok := thing.(*Host); !ok {
 			return fail.NewError("cache stored the wrong type")
 		}
@@ -744,7 +711,7 @@ func (instance *Host) unsafeReload(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
-	return instance.updateCachedInformation(ctx)
+	return nil
 }
 
 // GetState returns the last known state of the Host, without forced inspect
@@ -753,9 +720,6 @@ func (instance *Host) GetState(ctx context.Context) (hoststate.Enum, fail.Error)
 	if valid.IsNil(instance) {
 		return state, fail.InvalidInstanceError()
 	}
-
-	// instance.RLock()
-	// defer instance.RUnlock()
 
 	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
@@ -853,8 +817,10 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 		}
 		return res.ct, res.err
 	case <-ctx.Done():
+		<-chRes // wait for cleanup
 		return nil, fail.ConvertError(ctx.Err())
 	case <-inctx.Done(): // if not because parent context was canceled
+		<-chRes // wait for cleanup
 		return nil, fail.Wrap(inctx.Err(), "canceled by parent")
 	}
 }
@@ -879,7 +845,7 @@ func (instance *Host) implCreate(
 			svc := instance.Service()
 
 			// Check if Host exists and is managed bySafeScale
-			_, xerr := LoadHost(ctx, svc, hostReq.ResourceName)
+			hc, xerr := LoadHost(ctx, svc, hostReq.ResourceName)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -891,11 +857,18 @@ func (instance *Host) implCreate(
 					return ar, ar.err
 				}
 			} else {
+				if does, xerr := hc.Exists(ctx); xerr == nil {
+					if !does {
+						logrus.WithContext(ctx).Warningf("Either metadata corruption or cache not properly invalidated")
+					}
+				}
+
 				ar := result{nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)}
 				return ar, ar.err
 			}
 
 			// Check if Host exists but is not managed by SafeScale
+			// FIXME: OPP Another mistake, we are not looking for the managed tag
 			_, xerr = svc.InspectHost(ctx, abstract.NewHostCore().SetName(hostReq.ResourceName))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -1059,15 +1032,39 @@ func (instance *Host) implCreate(
 			var userdataContent *userdata.Content
 
 			defer func() {
-				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !hostReq.KeepOnFailure {
-					if ahf != nil {
-						if ahf.IsConsistent() {
-							if derr := svc.DeleteHost(cleanupContextFrom(ctx), ahf.Core.ID); derr != nil {
-								_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Core.Name))
-							}
-							ahf.Core.LastState = hoststate.Deleted
+					if ahf.IsConsistent() {
+						aname, aid := ahf.Core.Name, ahf.Core.ID
+						logrus.WithContext(ctx).Warningf("Trying to delete failed instance: %s, %s", ahf.Core.Name, ahf.Core.ID)
+						if derr := svc.DeleteHost(cleanupContextFrom(ctx), ahf.Core.ID); derr != nil {
+							logrus.WithContext(ctx).Errorf(
+								"cleaning up on %s, failed to delete Host '%s' instance: %v", ActionFromError(ferr), ahf.Core.Name,
+								derr,
+							)
+							_ = ferr.AddConsequence(derr)
 						}
+
+						theID, _ := instance.GetID()
+
+						if derr := instance.MetadataCore.Delete(cleanupContextFrom(ctx)); derr != nil {
+							logrus.WithContext(ctx).Errorf(
+								"cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name,
+								derr,
+							)
+							_ = ferr.AddConsequence(derr)
+						}
+
+						if ka, err := instance.Service().GetCache(ctx); err == nil {
+							if ka != nil {
+								if theID != "" {
+									_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+								}
+							}
+						}
+
+						logrus.WithContext(ctx).Warningf("Now the instance: %s, %s, should be deleted", aname, aid)
+					} else {
+						logrus.WithContext(ctx).Warningf("We should NOT trust consistency")
 					}
 				}
 			}()
@@ -1108,19 +1105,6 @@ func (instance *Host) implCreate(
 				ar := result{nil, xerr}
 				return ar, ar.err
 			}
-
-			defer func() {
-				ferr = debug.InjectPlannedFail(ferr)
-				if ferr != nil && !hostReq.KeepOnFailure {
-					if derr := instance.MetadataCore.Delete(cleanupContextFrom(ctx)); derr != nil {
-						logrus.WithContext(ctx).Errorf(
-							"cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name,
-							derr,
-						)
-						_ = ferr.AddConsequence(derr)
-					}
-				}
-			}()
 
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
@@ -1225,13 +1209,6 @@ func (instance *Host) implCreate(
 				return ar, ar.err
 			}
 
-			xerr = instance.updateCachedInformation(ctx)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				ar := result{nil, xerr}
-				return ar, ar.err
-			}
-
 			xerr = instance.setSecurityGroups(ctx, hostReq, defaultSubnet)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -1307,7 +1284,7 @@ func (instance *Host) implCreate(
 
 			for numReboots := 0; numReboots < 2; numReboots++ { // 2 reboots at most
 				if maybePackerFailure {
-					logrus.WithContext(ctx).Warningf("Hard Rebooting the host %s", hostReq.ResourceName)
+					logrus.WithContext(ctx).Infof("Hard Rebooting the host %s", hostReq.ResourceName)
 					hostID, err := instance.GetID()
 					if err != nil {
 						ar := result{nil, fail.ConvertError(err)}
@@ -1967,14 +1944,6 @@ func (instance *Host) thePhaseReboots(_ context.Context, phase userdata.Phase, u
 func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content, timeout time.Duration) (ferr fail.Error) {
 	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting install phase %s on '%s'...", phase, instance.GetName()), fmt.Sprintf("Ending phase %s on '%s' with err '%s' ...", phase, instance.GetName(), ferr))()
 
-	instance.localCache.RLock()
-	notok := instance.localCache.sshProfile == nil
-	instance.localCache.RUnlock() // nolint
-	if notok {
-		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
-	}
-	incrementExpVar("host.cache.hit")
-
 	content, xerr := userdataContent.Generate(phase)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2307,14 +2276,6 @@ func (instance *Host) undoUpdateSubnets(inctx context.Context, req abstract.Host
 }
 
 func (instance *Host) finalizeProvisioning(ctx context.Context, hr abstract.HostRequest, userdataContent *userdata.Content) fail.Error {
-	instance.localCache.RLock()
-	notok := instance.localCache.sshProfile == nil
-	instance.localCache.RUnlock() // nolint
-	if notok {
-		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
-	}
-	incrementExpVar("host.cache.hit")
-
 	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
 	svc := instance.Service()
 
@@ -2363,12 +2324,6 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, hr abstract.Host
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to update Keypair of machine '%s'", hr.ResourceName)
-	}
-
-	xerr = instance.updateCachedInformation(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
 	}
 
 	if inBackground() {
@@ -2701,7 +2656,8 @@ func (instance *Host) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	return instance.RelaxedDeleteHost(ctx)
+	xerr = instance.RelaxedDeleteHost(ctx)
+	return xerr
 }
 
 // RelaxedDeleteHost is the method that really deletes a host, being a gateway or not
@@ -3121,6 +3077,8 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
+	theID, _ := instance.GetID()
+
 	// Deletes metadata from Object Storage
 	xerr = instance.MetadataCore.Delete(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -3133,26 +3091,19 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		logrus.WithContext(ctx).Tracef("core instance not found, deletion considered as a success")
 	}
 
+	if ka, err := instance.Service().GetCache(ctx); err == nil {
+		if ka != nil {
+			if theID != "" {
+				_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+			}
+		}
+	}
+
 	if cache != nil {
 		_ = cache.Delete(ctx, hid)
 		_ = cache.Delete(ctx, hname)
 	}
 
-	return nil
-}
-
-func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context) fail.Error {
-	instance.localCache.RLock()
-	doRefresh := instance.localCache.sshProfile == nil
-	instance.localCache.RUnlock() // nolint
-	if doRefresh {
-		xerr := instance.updateCachedInformation(ctx)
-		if xerr != nil {
-			return xerr
-		}
-	} else {
-		incrementExpVar("host.cache.hit")
-	}
 	return nil
 }
 
@@ -3164,18 +3115,14 @@ func (instance *Host) GetSSHConfig(ctx context.Context) (_ sshapi.Config, ferr f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	xerr := instance.refreshLocalCacheIfNeeded(ctx)
+	sshProfile, xerr := instance.updateCachedInformation(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	instance.localCache.RLock()
-	sshProfile := instance.localCache.sshProfile
-	instance.localCache.RUnlock() // nolint
 	if valid.IsNil(sshProfile) {
 		return nil, fail.NotFoundError("failed to find SSH Config of Host '%s'", instance.GetName())
 	}
-	incrementExpVar("host.cache.hit")
 
 	return sshProfile.Config()
 }
@@ -3188,13 +3135,6 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 	if valid.IsNil(instance) {
 		return invalid, "", "", fail.InvalidInstanceError()
 	}
-	instance.localCache.RLock()
-	notok := instance.localCache.sshProfile == nil
-	instance.localCache.RUnlock() // nolint
-	if notok {
-		return invalid, "", "", fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
-	}
-	incrementExpVar("host.cache.hit")
 
 	if ctx == nil {
 		return invalid, "", "", fail.InvalidParameterCannotBeNilError("ctx")
@@ -3205,17 +3145,6 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(cmd='%s', outs=%s)", outs.String()).Entering()
 	defer tracer.Exiting()
-
-	targetName := instance.GetName()
-
-	state, xerr := instance.GetState(ctx)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	if state != hoststate.Started {
-		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot run anything on '%s', '%s' is NOT started", targetName, targetName))
-	}
 
 	return instance.unsafeRun(ctx, cmd, outs, connectionTimeout, executionTimeout)
 }
@@ -3252,7 +3181,7 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 	targetName := instance.GetName()
 
 	var state hoststate.Enum
-	state, xerr = instance.GetState(ctx)
+	state, xerr = instance.ForceGetState(ctx)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -3334,17 +3263,6 @@ func (instance *Host) Push(
 
 	// instance.RLock()
 	// defer instance.RUnlock()
-
-	targetName := instance.GetName()
-
-	state, xerr := instance.GetState(ctx)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	if state != hoststate.Started {
-		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started: %s", targetName, targetName, state.String()))
-	}
 
 	return instance.unsafePush(ctx, source, target, owner, mode, timeout)
 }
@@ -3610,15 +3528,6 @@ func (instance *Host) Sync(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	state, xerr := instance.ForceGetState(ctx)
-	if xerr != nil {
-		return fail.Wrap(xerr, "there was an error retrieving machine state")
-	}
-
-	if state != hoststate.Started {
-		return fail.NewError("if the machine is not started sync won't work: %s", state.String())
-	}
-
 	// Sync Host
 	logrus.WithContext(ctx).Infof("Host '%s': sync", instance.GetName())
 	command := `sync`
@@ -3691,24 +3600,6 @@ func (instance *Host) hardReboot(ctx context.Context) (ferr fail.Error) {
 	return nil
 }
 
-// Resize ...
-// not yet implemented
-func (instance *Host) Resize(ctx context.Context, hostSize abstract.HostSizingRequirements) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
-	return fail.NotImplementedError("Host.Resize() not yet implemented") // FIXME: Technical debt
-}
-
 // GetPublicIP returns the public IP address of the Host
 func (instance *Host) GetPublicIP(ctx context.Context) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -3717,20 +3608,25 @@ func (instance *Host) GetPublicIP(ctx context.Context) (_ string, ferr fail.Erro
 		return "", fail.InvalidInstanceError()
 	}
 
-	xerr := instance.refreshLocalCacheIfNeeded(ctx)
-	if xerr != nil {
-		return "", xerr
+	this, err := instance.MetadataCore.properties.UnWrap()
+	if err != nil {
+		return "", fail.ConvertError(err)
+	}
+	aclo, err := this[hostproperty.NetworkV2].UnWrap()
+	if err != nil {
+		return "", fail.ConvertError(err)
+	}
+	hnV2, _ := aclo.(*propertiesv2.HostNetworking) // nolint
+
+	publicIP := hnV2.PublicIPv4
+	if publicIP == "" {
+		publicIP = hnV2.PublicIPv6
+		if publicIP == "" {
+			return "", fail.NotFoundError("failed to find Public IP of Host '%s'", instance.GetName())
+		}
 	}
 
-	instance.localCache.RLock()
-	ip := instance.localCache.publicIP
-	instance.localCache.RUnlock() // nolint
-	if ip == "" {
-		return "", fail.NotFoundError("failed to find Public IP of Host '%s'", instance.GetName())
-	}
-	incrementExpVar("host.cache.hit")
-
-	return ip, nil
+	return publicIP, nil
 }
 
 // GetPrivateIP returns the private IP of the Host on its default Networking
@@ -3741,20 +3637,28 @@ func (instance *Host) GetPrivateIP(ctx context.Context) (_ string, ferr fail.Err
 		return "", fail.InvalidInstanceError()
 	}
 
-	xerr := instance.refreshLocalCacheIfNeeded(ctx)
-	if xerr != nil {
-		return "", xerr
+	this, err := instance.MetadataCore.properties.UnWrap()
+	if err != nil {
+		return "", fail.ConvertError(err)
+	}
+	aclo, err := this[hostproperty.NetworkV2].UnWrap()
+	if err != nil {
+		return "", fail.ConvertError(err)
+	}
+	hnV2, _ := aclo.(*propertiesv2.HostNetworking) // nolint
+
+	var privateIP string
+	if len(hnV2.IPv4Addresses) > 0 {
+		privateIP = hnV2.IPv4Addresses[hnV2.DefaultSubnetID]
+		if privateIP == "" {
+			privateIP = hnV2.IPv6Addresses[hnV2.DefaultSubnetID]
+		}
 	}
 
-	instance.localCache.RLock()
-	ip := instance.localCache.privateIP
-	instance.localCache.RUnlock() // nolint
-	if ip == "" {
+	if privateIP == "" {
 		return "", fail.NotFoundError("failed to find Private IP of Host '%s'", instance.GetName())
 	}
-	incrementExpVar("host.cache.hit")
-
-	return ip, nil
+	return privateIP, nil
 }
 
 // GetPrivateIPOnSubnet returns the private IP of the Host on its default Subnet
@@ -3795,20 +3699,27 @@ func (instance *Host) GetAccessIP(ctx context.Context) (_ string, ferr fail.Erro
 		return "", fail.InvalidInstanceError()
 	}
 
-	xerr := instance.refreshLocalCacheIfNeeded(ctx)
-	if xerr != nil {
-		return "", xerr
-	}
+	publicIP, _ := instance.GetPublicIP(ctx)
 
-	instance.localCache.RLock()
-	ip := instance.localCache.accessIP
-	instance.localCache.RUnlock() // nolint
-	if ip == "" {
-		return "", fail.NotFoundError("failed to find Access IP of Host '%s'", instance.GetName())
-	}
-	incrementExpVar("host.cache.hit")
+	// FIXME: find a better way to handle the use case (adjust SG? something else?)
+	// Workaround for a specific use: safescaled inside a cluster, to force access to host using internal IP
+	fromInside := os.Getenv("SAFESCALED_FROM_INSIDE")
+	if publicIP == "" || fromInside == "true" {
+		privIP, xerr := instance.GetPrivateIP(ctx)
+		if xerr != nil {
+			return "", xerr
+		}
 
-	return ip, nil
+		if privIP == "" {
+			return "", fail.NotFoundError("failed to find Access IP of Host '%s'", instance.GetName())
+		}
+		return privIP, nil
+	} else {
+		if publicIP == "" {
+			return "", fail.NotFoundError("failed to find Access IP of Host '%s'", instance.GetName())
+		}
+		return publicIP, nil
+	}
 }
 
 // GetShares returns the information about the shares hosted by the Host
@@ -3942,11 +3853,6 @@ func (instance *Host) IsSingle(ctx context.Context) (_ bool, ferr fail.Error) {
 	return state, nil
 }
 
-// PushStringToFile creates a file 'filename' on remote 'Host' with the content 'content'
-func (instance *Host) PushStringToFile(ctx context.Context, content string, filename string) (ferr fail.Error) {
-	return instance.PushStringToFileWithOwnership(ctx, content, filename, "", "")
-}
-
 // PushStringToFileWithOwnership creates a file 'filename' on remote 'Host' with the content 'content', and apply ownership
 func (instance *Host) PushStringToFileWithOwnership(
 	ctx context.Context, content string, filename string, owner, mode string,
@@ -3971,17 +3877,6 @@ func (instance *Host) PushStringToFileWithOwnership(
 
 	// instance.RLock()
 	// defer instance.RUnlock()
-
-	targetName := instance.GetName()
-
-	state, xerr := instance.GetState(ctx)
-	if xerr != nil {
-		return xerr
-	}
-
-	if state != hoststate.Started {
-		return fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started: %s", targetName, targetName, state.String()))
-	}
 
 	return instance.unsafePushStringToFileWithOwnership(ctx, content, filename, owner, mode)
 }

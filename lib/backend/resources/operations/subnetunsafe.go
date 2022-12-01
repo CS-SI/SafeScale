@@ -43,38 +43,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// unsafeInspectGateway returns the gateway related to Subnet
-// Note: you must take a lock (instance.lock.Lock() ) before calling this method
-func (instance *Subnet) unsafeInspectGateway(ctx context.Context, primary bool) (_ resources.Host, ferr fail.Error) {
-	gwIdx := 0
-	if !primary {
-		gwIdx = 1
-	}
-
-	instance.localCache.RLock()
-	out := instance.localCache.gateways[gwIdx]
-	instance.localCache.RUnlock() // nolint
-	if out == nil {
-		xerr := instance.updateCachedInformation(ctx)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		instance.localCache.RLock()
-		out = instance.localCache.gateways[gwIdx]
-		instance.localCache.RUnlock() // nolint
-		if out == nil {
-			return nil, fail.NotFoundError("failed to find gateway")
-		} else {
-			incrementExpVar("net.cache.hit")
-		}
-	} else {
-		incrementExpVar("net.cache.hit")
-	}
-
-	return out, nil
-}
-
 // unsafeGetDefaultRouteIP ...
 func (instance *Subnet) unsafeGetDefaultRouteIP(ctx context.Context) (_ string, ferr fail.Error) {
 	var ip string
@@ -646,18 +614,21 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !req.KeepOnFailure {
+					theID, _ := instance.GetID()
+
 					if derr := instance.MetadataCore.Delete(cleanupContextFrom(ctx)); derr != nil {
 						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet metadata", ActionFromError(ferr)))
 					}
+
+					if ka, err := instance.Service().GetCache(ctx); err == nil {
+						if ka != nil {
+							if theID != "" {
+								_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+							}
+						}
+					}
 				}
 			}()
-
-			xerr = instance.updateCachedInformation(ctx)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				ar := result{xerr}
-				return ar, ar.rErr
-			}
 
 			if req.DefaultSSHPort == 0 {
 				req.DefaultSSHPort = 22
@@ -853,52 +824,6 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 	}
 }
 
-func (instance *Subnet) unsafeUpdateSubnetStatus(inctx context.Context, target subnetstate.Enum) fail.Error {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
-		xerr := instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			as.State = target
-			return nil
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		xerr = instance.updateCachedInformation(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		chRes <- result{nil}
-
-	}()
-	select {
-	case res := <-chRes:
-		return res.rErr
-	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
-	}
-}
-
 func (instance *Subnet) unsafeFinalizeSubnetCreation(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -919,13 +844,6 @@ func (instance *Subnet) unsafeFinalizeSubnetCreation(inctx context.Context) fail
 			as.State = subnetstate.Ready
 			return nil
 		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		xerr = instance.updateCachedInformation(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}

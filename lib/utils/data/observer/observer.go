@@ -16,15 +16,11 @@
 
 package observer
 
-import (
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-)
-
 //go:generate minimock -o mocks/mock_observer.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data/observer.Observer
 
 // Observer is the interface a struct must satisfy to be observed by outside
 type Observer interface {
-	data.Identifiable // FIXME: Identifiable also has to be refactored to return error, and this change is painful, it impacts everything but also will fix several problems -> it will require its own PR
+	GetID() (string, error) // GetID Returns the ID of the instance
 
 	SignalChange(id string)  // is called by Observable to signal an Observer a change occurred
 	MarkAsFreed(id string)   // is called by Observable to signal an Observer the content will not be used anymore (decreasing the counter of uses)
@@ -35,10 +31,9 @@ type Observer interface {
 
 // Observable is the interface a struct must satisfy to signal internal change to observers
 type Observable interface {
-	data.Identifiable // FIXME: Identifiable also has to be refactored to return error, and this change is painful, it impacts everything but also will fix several problems -> it will require its own PR
+	GetID() (string, error) // GetID Returns the ID of the instance
 
-	AddObserver(o Observer) error // register an Observer to be kept in touch
-	// FIXME: This is also wrong, it should be NotifyObservers(Observable) error, to make sure we use the Observable identity
-	NotifyObservers() error           // notify observers a change occurred on content (using Observer.SignalChange)
-	RemoveObserver(name string) error // deregister an Observer that will not be notified further
+	AddObserver(o Observer) error        // register an Observer to be kept in touch
+	NotifyObservers(ob Observable) error // notify observers a change occurred on content (using Observer.SignalChange)
+	RemoveObserver(name string) error    // deregister an Observer that will not be notified further
 }

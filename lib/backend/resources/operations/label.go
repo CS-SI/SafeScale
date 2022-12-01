@@ -133,20 +133,20 @@ func LoadLabel(inctx context.Context, svc iaas.Service, ref string, options ...d
 			}
 
 			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, labelInstance.GetName()), labelInstance, &store.Options{Expiration: 1 * time.Minute})
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, labelInstance.GetName()), labelInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 				hid, err := labelInstance.GetID()
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), labelInstance, &store.Options{Expiration: 1 * time.Minute})
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), labelInstance, &store.Options{Expiration: 120 * time.Minute})
 				if err != nil {
 					return nil, fail.ConvertError(err)
 				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
 
 				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
 					casted, ok := val.(resources.Label)
@@ -156,7 +156,7 @@ func LoadLabel(inctx context.Context, svc iaas.Service, ref string, options ...d
 						logrus.WithContext(ctx).Warnf("wrong type of resources.Label")
 					}
 				} else {
-					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					logrus.WithContext(ctx).Warnf("label cache response (%s): %v", cacheref, xerr)
 				}
 			}
 
@@ -310,8 +310,23 @@ func (instance *label) Delete(inctx context.Context) fail.Error {
 				}
 			}
 
+			theID, _ := instance.GetID()
+
 			// remove metadata
-			return instance.MetadataCore.Delete(ctx)
+			xerr = instance.MetadataCore.Delete(ctx)
+			if xerr != nil {
+				return xerr
+			}
+
+			if ka, err := instance.Service().GetCache(ctx); err == nil {
+				if ka != nil {
+					if theID != "" {
+						_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
+					}
+				}
+			}
+
+			return nil
 		}()
 		chRes <- result{gerr}
 	}()

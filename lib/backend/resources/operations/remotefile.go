@@ -122,6 +122,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 		timeout,
 	)
 	if retryErr != nil {
+		logrus.WithContext(ctx).Warningf("upload to %s failed, this happened: %s", host.GetName(), retryErr)
 		switch realErr := retryErr.(type) { // nolint
 		case *retry.ErrStopRetry:
 			return fail.Wrap(fail.Cause(realErr), "failed to copy file to remote host '%s'", host.GetName())

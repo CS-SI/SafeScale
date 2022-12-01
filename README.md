@@ -128,7 +128,6 @@ SafeScale is currently under active development and does not yet offer all the a
     - OpenTelekom
     - CloudFerro
     - Generic OpenStack
-    - local provider (unstable, not compiled by default)
     - AWS
     - GCP (Google Cloud Platform)
     - Outscale

@@ -32,11 +32,6 @@ func (w *wrappedCache) Set(ctx context.Context, key, object interface{}, options
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	_, err := w.cacheManager.Get(ctx, key)
-	if err == nil { // already have something in there...
-		return nil
-	}
-
 	return w.cacheManager.Set(ctx, key, object, options)
 }
 
