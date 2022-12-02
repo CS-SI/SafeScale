@@ -91,8 +91,12 @@ feature:
                             nodes: no
                         run: |
                             {{ if .HostIsGateway }}
+                            sleep 0.$((200 + RANDOM%600))
+                            grep postgres4gateway ${SF_LOGDIR}/docker.log && sfExit
                             echo "docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 194
+                            pgrep docker-compose && sfExit
+                            docker system prune -f || sfExit
+                            pgrep docker-compose || docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 194
                             sfRetryEx 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || sfFail 195
                             sfExit
                             {{ else }}
@@ -111,7 +115,7 @@ feature:
                         run: |
                             {{ if .HostIsGateway }}
                             echo "docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 196
+                            docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 196
                             docker image rm -f postgres:11-alpine
                             sfExit
                             {{ else }}
