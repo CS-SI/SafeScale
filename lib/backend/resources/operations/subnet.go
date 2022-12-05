@@ -1013,9 +1013,8 @@ func (instance *Subnet) GetGatewayPublicIP(ctx context.Context, primary bool) (_
 func (instance *Subnet) GetGatewayPublicIPs(ctx context.Context) (_ []string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptySlice []string
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	// instance.lock.RLock()
@@ -1743,12 +1742,11 @@ func (instance *Subnet) UnbindSecurityGroup(ctx context.Context, sgInstance reso
 func (instance *Subnet) ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptyList []*propertiesv1.SecurityGroupBond
 	if valid.IsNil(instance) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"), "(%s)", state.String()).Entering()

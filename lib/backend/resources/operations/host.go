@@ -4169,9 +4169,8 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 func (instance *Host) ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptySlice []*propertiesv1.SecurityGroupBond
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	// instance.RLock()
@@ -4190,7 +4189,7 @@ func (instance *Host) ListSecurityGroups(ctx context.Context, state securitygrou
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	return list, nil

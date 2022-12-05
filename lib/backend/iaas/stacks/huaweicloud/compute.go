@@ -302,9 +302,8 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptyMap map[string]bool
 	if valid.IsNil(s) {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
@@ -320,12 +319,12 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool,
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptyMap, xerr
+		return nil, xerr
 	}
 
 	content, err := az.ExtractAvailabilityZones(allPages)
 	if err != nil {
-		return emptyMap, fail.ConvertError(err)
+		return nil, fail.ConvertError(err)
 	}
 
 	azList := map[string]bool{}
@@ -1224,9 +1223,8 @@ func (s stack) collectAddresses(ctx context.Context, host *abstract.HostCore) ([
 
 // ListHosts lists available hosts
 func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
-	var emptyList abstract.HostList
 	if valid.IsNil(s) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var hostList abstract.HostList
@@ -1262,7 +1260,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	return hostList, nil

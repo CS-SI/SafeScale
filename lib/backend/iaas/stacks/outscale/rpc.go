@@ -1450,8 +1450,7 @@ func (s stack) rpcReadNets(ctx context.Context, ids []string) ([]osc.Net, fail.E
 		}),
 	}
 	var (
-		emptySlice []osc.Net
-		resp       osc.ReadNetsResponse
+		resp osc.ReadNetsResponse
 	)
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
@@ -1465,13 +1464,13 @@ func (s stack) rpcReadNets(ctx context.Context, ids []string) ([]osc.Net, fail.E
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	if len(resp.Nets) == 0 {
 		if len(ids) > 0 {
-			return emptySlice, fail.NotFoundError("failed to read Networks")
+			return nil, fail.NotFoundError("failed to read Networks")
 		}
-		return emptySlice, nil
+		return nil, nil
 	}
 	return resp.Nets, nil
 }

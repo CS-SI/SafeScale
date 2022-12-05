@@ -1661,18 +1661,17 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 func (instance *Cluster) ListMasters(ctx context.Context) (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	emptyList := resources.IndexedListOfClusterNodes{}
 	if valid.IsNil(instance) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	xerr := instance.beingRemoved(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	return instance.unsafeListMasters(ctx)
@@ -1705,12 +1704,11 @@ func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resour
 func (instance *Cluster) ListNodes(ctx context.Context) (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	emptyList := resources.IndexedListOfClusterNodes{}
 	if valid.IsNil(instance) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	xerr := instance.beingRemoved(ctx)
@@ -1742,12 +1740,11 @@ func (instance *Cluster) beingRemoved(ctx context.Context) fail.Error {
 func (instance *Cluster) ListNodeNames(ctx context.Context) (list data.IndexedListOfStrings, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	emptyList := data.IndexedListOfStrings{}
 	if valid.IsNil(instance) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	xerr := instance.beingRemoved(ctx)
@@ -1775,7 +1772,7 @@ func (instance *Cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	return list, nil
@@ -3095,21 +3092,20 @@ func (instance *Cluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterRes
 func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint) (_ []*propertiesv3.ClusterNode, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	emptySlice := make([]*propertiesv3.ClusterNode, 0)
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return emptySlice, fail.InvalidParameterCannotBeNilError("ctx")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if count == 0 {
-		return emptySlice, fail.InvalidParameterError("count", "cannot be 0")
+		return nil, fail.InvalidParameterError("count", "cannot be 0")
 	}
 
 	xerr := instance.beingRemoved(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	var (
@@ -3154,7 +3150,7 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	defer func() {
@@ -3196,7 +3192,7 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 
 		selectedMaster, xerr := instance.unsafeFindAvailableMaster(ctx)
 		if xerr != nil {
-			return emptySlice, xerr
+			return nil, xerr
 		}
 
 		for _, v := range removedNodes {
@@ -3213,11 +3209,11 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 		}
 	}
 	if len(errors) > 0 {
-		return emptySlice, fail.NewErrorList(errors)
+		return nil, fail.NewErrorList(errors)
 	}
 	xerr = instance.unsafeUpdateClusterInventory(ctx)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	return removedNodes, nil

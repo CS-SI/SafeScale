@@ -151,9 +151,8 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
 
 // ListAvailabilityZones lists AWS availability zones available
 func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
-	emptyMap := map[string]bool{}
 	if valid.IsNil(s) {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
@@ -161,7 +160,7 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, fe
 
 	resp, xerr := s.rpcDescribeAvailabilityZones(ctx, nil)
 	if xerr != nil {
-		return emptyMap, xerr
+		return nil, xerr
 	}
 	if len(resp) > 0 {
 		zones := make(map[string]bool, len(resp))
@@ -174,7 +173,7 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, fe
 		return zones, nil
 	}
 
-	return emptyMap, nil
+	return nil, nil
 }
 
 // ListRegions lists regions available in AWS

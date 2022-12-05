@@ -113,9 +113,8 @@ func (s stack) rpcGetHostByName(ctx context.Context, name string) (*servers.Serv
 
 // rpcGetMetadataOfInstance returns the metadata associated with the instance
 func (s stack) rpcGetMetadataOfInstance(ctx context.Context, id string) (map[string]string, fail.Error) {
-	emptyMap := map[string]string{}
 	if id = strings.TrimSpace(id); id == "" {
-		return emptyMap, fail.InvalidParameterError("id", "cannpt be empty string")
+		return nil, fail.InvalidParameterError("id", "cannpt be empty string")
 	}
 
 	var out map[string]string
@@ -130,11 +129,11 @@ func (s stack) rpcGetMetadataOfInstance(ctx context.Context, id string) (map[str
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return emptyMap, fail.Wrap(fail.Cause(xerr), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		case *retry.ErrStopRetry:
-			return emptyMap, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		default:
-			return emptyMap, xerr
+			return nil, xerr
 		}
 	}
 
@@ -484,8 +483,7 @@ func (s stack) rpcDeletePort(ctx context.Context, id string) fail.Error {
 // rpcListPorts lists all ports available
 func (s stack) rpcListPorts(ctx context.Context, options ports.ListOpts) ([]ports.Port, fail.Error) {
 	var (
-		emptyList []ports.Port
-		allPages  pagination.Page
+		allPages pagination.Page
 	)
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
@@ -495,12 +493,12 @@ func (s stack) rpcListPorts(ctx context.Context, options ports.ListOpts) ([]port
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	r, err := ports.ExtractPorts(allPages)
 	if err != nil {
-		return emptyList, NormalizeError(err)
+		return nil, NormalizeError(err)
 	}
 	return r, nil
 }

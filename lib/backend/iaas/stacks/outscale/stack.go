@@ -251,9 +251,8 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 
 // ListAvailabilityZones returns availability zone in a set
 func (s stack) ListAvailabilityZones(ctx context.Context) (az map[string]bool, ferr fail.Error) {
-	emptyMap := make(map[string]bool)
 	if valid.IsNil(s) {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
@@ -261,7 +260,7 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (az map[string]bool, f
 
 	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)
 	if err != nil {
-		return emptyMap, normalizeError(err)
+		return nil, normalizeError(err)
 	}
 
 	az = make(map[string]bool, len(resp.Subregions))

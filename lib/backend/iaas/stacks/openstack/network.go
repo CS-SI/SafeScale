@@ -230,9 +230,8 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (*abstract.Network
 
 // ListNetworks lists available networks
 func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error) {
-	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "").WithStopwatch().Entering().Exiting()
@@ -267,7 +266,7 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	return netList, nil
@@ -594,9 +593,8 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, name string)
 
 // ListSubnets lists available subnets in a network
 func (s stack) ListSubnets(ctx context.Context, networkID string) ([]*abstract.Subnet, fail.Error) {
-	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "").WithStopwatch().Entering().Exiting()
@@ -628,7 +626,7 @@ func (s stack) ListSubnets(ctx context.Context, networkID string) ([]*abstract.S
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	// VPL: empty subnet list is not an abnormal situation, do not log
 	return subnetList, nil
@@ -768,9 +766,8 @@ func (s stack) createRouter(ctx context.Context, req RouterRequest) (*Router, fa
 
 // ListRouters lists available routers
 func (s stack) ListRouters(ctx context.Context) ([]Router, fail.Error) {
-	var emptySlice []Router
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var ns []Router

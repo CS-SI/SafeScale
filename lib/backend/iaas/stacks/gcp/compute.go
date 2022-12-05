@@ -753,16 +753,15 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 
 // ListHosts lists available hosts
 func (s stack) ListHosts(ctx context.Context, detailed bool) (_ abstract.HostList, ferr fail.Error) {
-	var emptyList abstract.HostList
 	if valid.IsNil(s) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(detailed=%v)", detailed).Entering().Exiting()
 
 	resp, xerr := s.rpcListInstances(ctx)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	out := make(abstract.HostList, 0, len(resp))
@@ -878,14 +877,13 @@ func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParame
 func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
-	emptyMap := make(map[string]bool)
 	if valid.IsNil(s) {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	resp, xerr := s.rpcListZones(ctx)
 	if xerr != nil {
-		return emptyMap, xerr
+		return nil, xerr
 	}
 
 	zones := make(map[string]bool, len(resp))
@@ -899,14 +897,13 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, fe
 func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
-	var emptySlice []string
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	resp, xerr := s.rpcListRegions(ctx)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	out := make([]string, 0, len(resp))

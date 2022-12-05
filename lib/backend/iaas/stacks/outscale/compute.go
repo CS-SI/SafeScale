@@ -1272,9 +1272,8 @@ func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParame
 
 // ListHosts lists all hosts
 func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList, ferr fail.Error) {
-	emptyList := abstract.HostList{}
 	if valid.IsNil(s) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
@@ -1282,7 +1281,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList
 
 	resp, xerr := s.rpcReadVMs(ctx, nil)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	var hosts abstract.HostList
@@ -1304,7 +1303,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList
 		} else {
 			tags, xerr := s.rpcReadTagsOfResource(ctx, vm.VmId)
 			if xerr != nil {
-				return emptyList, xerr
+				return nil, xerr
 			}
 
 			if tag, ok := tags["name"]; ok {

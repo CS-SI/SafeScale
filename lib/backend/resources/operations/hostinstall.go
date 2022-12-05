@@ -307,9 +307,8 @@ func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr 
 func (instance *Host) ListEligibleFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptySlice []resources.Feature
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	return filterEligibleFeatures(ctx, instance, allWithEmbedded)
@@ -319,9 +318,8 @@ func (instance *Host) ListEligibleFeatures(ctx context.Context) (_ []resources.F
 func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptySlice []resources.Feature
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	// instance.lock.RLock()
@@ -333,7 +331,7 @@ func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.
 		item, xerr := NewFeature(ctx, instance.Service(), v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return emptySlice, xerr
+			return nil, xerr
 		}
 
 		out = append(out, item)

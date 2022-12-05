@@ -256,16 +256,15 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstra
 
 // ListNetworks ...
 func (s stack) ListNetworks(ctx context.Context) (_ []*abstract.Network, ferr fail.Error) {
-	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
 
 	resp, xerr := s.rpcDescribeVpcs(ctx, nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	nets := make([]*abstract.Network, 0, len(resp))
@@ -580,9 +579,8 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, subnetName s
 
 // ListSubnets ...
 func (s stack) ListSubnets(ctx context.Context, networkRef string) (list []*abstract.Subnet, ferr fail.Error) {
-	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
