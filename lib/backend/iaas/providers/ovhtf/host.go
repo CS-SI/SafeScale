@@ -626,7 +626,7 @@ func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostParamet
 
 	xerr = ahf.AddOptions(
 		abstract.UseTerraformSnippet(hostDesignResourceSnippetPath),
-		abstract.WithExtraData("MarkedForDestroy", true),
+		abstract.WithExtraData(abstract.ExtraMarkedForDestruction, true),
 	)
 	if xerr != nil {
 		return xerr

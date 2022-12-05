@@ -26,6 +26,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/controller"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 )
@@ -54,6 +55,8 @@ var cleanupOnce sync.Once
 func Cleanup() {
 	cleanupOnce.Do(func() {
 		fmt.Println("Cleaning up...")
+
+		controller.StopAgent()
 	})
 }
 

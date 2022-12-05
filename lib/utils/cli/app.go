@@ -88,7 +88,7 @@ func (app *App) Run(ctx context.Context, cleanup func(*cobra.Command)) error {
 
 	signalCh := make(chan os.Signal, 1)
 	// Starts ctrl+c handler before app.RunContext()
-	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGKILL, syscall.SIGQUIT, syscall.SIGTERM)
 
 	go func() {
 		var crash error

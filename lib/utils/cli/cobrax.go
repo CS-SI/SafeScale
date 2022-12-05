@@ -44,6 +44,5 @@ func ElderOfCommand(cmd *cobra.Command) (*cobra.Command, fail.Error) {
 	prev := cmd
 	for ; prev.HasParent() && prev.Parent().HasParent(); prev = prev.Parent() {
 	}
-
 	return prev, nil
 }

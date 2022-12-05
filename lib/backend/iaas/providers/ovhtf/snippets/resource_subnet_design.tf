@@ -8,13 +8,13 @@ resource "openstack_networking_subnet_v2" "{{ .Resource.Name }}" {
     enable_dhcp             = true
 
     tags = {
-{{ for $t, $v := range .Resource.Tags }}
-        {{ $t }} = "{{ $v }}"
+{{ range $t, $v := .Resource.Tags }}
+        "{{ $t }}" = "{{ $v }}"
 {{ end }}
     }
 
     lifecycle {
-{{- if not .Extra.MarkedForDestroy }}
+{{- if not .Extra.MarkedForDestruction }}
         prevent_destroy = true
 {{ end }}
     }
@@ -33,13 +33,13 @@ resource "openstack_networking_router_v2" "{{ .Resource.Name }}" {
     region                  = "{{ .Provider.Authentication.Region }}"
 
     tags = {
-{{ for $t, $v := range .Resource.Tags }}
-        {{ $t }} = "{{ $v }}"
+{{ range $t, $v := .Resource.Tags }}
+        "{{ $t }}" = "{{ $v }}"
 {{ end }}
     }
 
     lifecycle {
-{{- if not .Extra.MarkedForDestroy }}
+{{- if not .Extra.MarkedForDestruction }}
         prevent_destroy = true
 {{ end }}
     }
@@ -50,13 +50,13 @@ resource "openstack_networking_router_interface_v2" "router_interface_1" {
     subnet_id = "${openstack_networking_subnet_v2.{{ .Resource.Name }}.id}"
 
     tags = {
-{{ for $t, $v := range .Resource.Tags }}
-        {{ $t }} = "{{ $v }}"
+{{ range $t, $v := .Resource.Tags }}
+        "{{ $t }}" = "{{ $v }}"
 {{ end }}
     }
 
     lifecycle {
-{{- if not .Extra.MarkedForDestroy }}
+{{- if not .Extra.MarkedForDestruction }}
         prevent_destroy = true
 {{ end }}
     }

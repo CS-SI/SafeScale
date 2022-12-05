@@ -104,12 +104,17 @@ func cleanup(cmd *cobra.Command) {
 	}
 
 	// cleans up accordingly with the first argument
-	switch precursor.Name() {
+	pName := precursor.Name()
+	fmt.Printf("precursor name=%s\n", pName)
+	switch pName {
 	case global.BackendCmdLabel:
+		fmt.Println("calling backend.Cleanup()...")
 		backend.Cleanup()
 	case global.WebUICmdLabel:
+		fmt.Println("calling webui.Cleanup()...")
 		webui.Cleanup()
 	default:
+		fmt.Println("calling client.Cleanup()...")
 		client.Cleanup()
 	}
 }

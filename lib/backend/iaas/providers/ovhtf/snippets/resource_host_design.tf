@@ -1,4 +1,4 @@
-{{- for $k, $v := range .Resource.Networking.SubnetByName }}
+{{- range $k, $v := .Resource.Networking.SubnetByName }}
 resource "openstack_networking_port_v2" "port_{{ .Resource.Name }}_$k" {
     provider           = openstack.ovh
     name               = "port-{{ .Resource.Name }}-$k"
@@ -11,13 +11,13 @@ resource "openstack_networking_port_v2" "port_{{ .Resource.Name }}_$k" {
     }
 
     tags = {
-{{ for $t, $v := range .Resource.Tags }}
+{{ range $t, $v := .Resource.Tags }}
         {{ $t }} = "{{ $v }}"
 {{ end }}
     }
 
     lifecycle {
-{{- if not .Extra.MarkedForDestroy }}
+{{- if not .Extra.MarkedForDestruction }}
         prevent_destroy = true
 {{ end }}
     }
@@ -42,7 +42,7 @@ resource "openstack_compute_instance_v2" "{{ .Resource.Name }}" {
     availability_zone = "{{ .Extra.AvailabilityZone }}"
     power_state = "{{ or .Extra.WantedHostState active }}"
 
-{{- for $k, $v := range .Resource.Networking.SubnetByName }}
+{{- range $k := .Resource.Networking.SubnetByName }}
     network {
         port = openstack_networking_port_v2.port_{{ .Resource.Name }}_$k.id
     }
@@ -65,14 +65,14 @@ resource "openstack_compute_instance_v2" "{{ .Resource.Name }}" {
     user_data = "${file("{{ .Resource.Name }}_userdata")}"
 
     tags = {
-{{ for $t, $v := range .Resource.Tags }}
-        {{ $t }} = "{{ $v }}"
+{{ range $t, $v := .Resource.Tags }}
+        "{{ $t }}" = "{{ $v }}"
 {{ end }}
     }
 
     lifecycle {
         ignore = [block_device, user_data]
-{{- if not .Extra.MarkedForDestroy }}
+{{- if not .Extra.MarkedForDestruction }}
         prevent_destroy = true
 {{ end }}
     }

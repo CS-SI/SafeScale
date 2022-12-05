@@ -20,9 +20,7 @@
 package backend
 
 func startTrack() {
-
 }
 
 func endTrack() {
-
 }

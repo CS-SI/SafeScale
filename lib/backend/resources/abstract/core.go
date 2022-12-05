@@ -41,6 +41,8 @@ type (
 
 const (
 	Unnamed = "unnamed"
+
+	ExtraMarkedForDestruction = "MarkedForDestruction"
 )
 
 // newCore initializes a new instance of Network
@@ -48,10 +50,12 @@ func newCore(opts ...Option) (*core, fail.Error) {
 	c := &core{
 		Name: Unnamed,
 		Tags: data.NewMap[string, string](),
+		extra: map[string]any{
+			ExtraMarkedForDestruction: false,
+		},
 	}
 	c.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	c.Tags["ManagedBy"] = "safescale"
-
 	return c, c.AddOptions(opts...)
 }
 

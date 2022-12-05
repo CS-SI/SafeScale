@@ -6,13 +6,13 @@ resource "openstack_compute_volume_attach_v2" "{{ .Resource.Name }}" {
     tenant_id   = "{{ .Provider.Authentication.TenantID }}"
 
     tags = {
-{{ for $t, $v := range .Resource.Tags }}
-        {{ $t }} = "{{ $v }}"
+{{ range $t, $v := .Resource.Tags }}
+        "{{ $t }}" = "{{ $v }}"
 {{ end }}
     }
 
     lifecycle {
-{{- if not .Extra.MarkedForDestroy }}
+{{- if not .Extra.MarkedForDestruction }}
         prevent_destroy = true
 {{ end }}
     }

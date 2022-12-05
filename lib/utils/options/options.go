@@ -41,10 +41,10 @@ func New(opts ...Option) (*options, fail.Error) {
 
 // Load returns the value of key in options
 // returns:
-//  - <value>, nil: key found
-//  - nil, *fail.ErrNotFound:  key not found
-//  - nil, *fail.ErrInvalidInstance: 'o' is a null value of *options
-//  - nil, *fail.ErrInvalidParameter: a parameter is invalid
+//   - <value>, nil: key found
+//   - nil, *fail.ErrNotFound:  key not found
+//   - nil, *fail.ErrInvalidInstance: 'o' is a null value of *options
+//   - nil, *fail.ErrInvalidParameter: a parameter is invalid
 func (o *options) Load(key string) (any, fail.Error) {
 	if valid.IsNull(o) {
 		return nil, fail.InvalidInstanceError()

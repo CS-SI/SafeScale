@@ -53,7 +53,7 @@ func runCommand() *cobra.Command {
 	return out
 }
 
-const stopCmdLabel = "start"
+const stopCmdLabel = "stop"
 
 func stopCommand() *cobra.Command {
 	out := &cobra.Command{

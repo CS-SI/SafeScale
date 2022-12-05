@@ -48,6 +48,7 @@ var (
 	consulConfigTemplate string
 
 	currentConsulProc atomic.Value
+	cancelAgent       context.CancelFunc
 )
 
 // StartAgent creates consul configuration file if needed and starts consul agent in server mode
@@ -114,6 +115,9 @@ func StartAgent(ctx context.Context) (startedCh chan bool, doneCh chan Result[co
 		return nil, nil, cancelNOP, fail.NotAvailableError("'%s' is a directory; should be a file", consulConfigFile)
 	}
 
+	// Make sure to stop already running consul on start
+	killRemainingConsul(consulRootDir)
+
 	cliArgs := []string{
 		"agent",
 		"-config-dir=" + consulEtcDir,
@@ -132,7 +136,8 @@ func StartAgent(ctx context.Context) (startedCh chan bool, doneCh chan Result[co
 		}...)
 	}
 
-	agentCtx, cancelAgent := context.WithCancel(ctx)
+	var agentCtx context.Context
+	agentCtx, cancelAgent = context.WithCancel(ctx)
 
 	// starts a goroutine to start consul server as long as it's needed, depending on the termination reason
 	go func() {
@@ -197,6 +202,23 @@ func StartAgent(ctx context.Context) (startedCh chan bool, doneCh chan Result[co
 	return startedCh, doneCh, cancelAgent, nil
 }
 
+// killRemainingConsul will stop previous consul that may have not been correctly stopped
+func killRemainingConsul(rootDir string) {
+	pidfile := filepath.Join(rootDir, "var/consul.pid")
+	_ = pidfile
+	// test file exists
+	// If exists, read content
+	// check it's a consul agent running with the pid
+	// if yes, kill it
+	// rm pidfile
+}
+
+func StopAgent() {
+	if cancelAgent != nil {
+		cancelAgent()
+	}
+}
+
 type Result[T any] struct {
 	err    error
 	output T
@@ -253,7 +275,7 @@ func startCommand(ctx context.Context, args []string) (chan Result[commandOutput
 		return nil, fail.Wrap(err, "failed to start consul")
 	}
 
-	doneCh := make(chan Result[commandOutput])
+	currentConsulProc.Store(cmd.Process)
 
 	// Starts a goroutine to react to cancellation
 	go func() {
@@ -270,6 +292,7 @@ func startCommand(ctx context.Context, args []string) (chan Result[commandOutput
 	}()
 
 	// starts a goroutine to react to agent termination
+	doneCh := make(chan Result[commandOutput])
 	go func() {
 		defer close(doneCh)
 

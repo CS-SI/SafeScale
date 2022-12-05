@@ -20,8 +20,9 @@
 package debug
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 // IgnoreError logs an error that's considered not important by the caller
