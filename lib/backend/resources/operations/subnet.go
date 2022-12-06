@@ -19,16 +19,10 @@ package operations
 import (
 	"context"
 	"fmt"
-	"net"
-	"reflect"
-	"strings"
-	"time"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
@@ -45,8 +39,10 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
+	"net"
+	"reflect"
+	"strings"
 )
 
 const (
@@ -124,200 +120,6 @@ func NewSubnet(svc iaas.Service) (_ *Subnet, ferr fail.Error) {
 	}
 
 	return instance, nil
-}
-
-// LoadSubnet loads the metadata of a Subnet
-func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef string, options ...data.ImmutableKeyValue) (*Subnet, fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  *Subnet
-		rErr fail.Error
-	}
-
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		ga, gerr := func() (_ *Subnet, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			if svc == nil {
-				return nil, fail.InvalidParameterCannotBeNilError("svc")
-			}
-			if subnetRef = strings.TrimSpace(subnetRef); subnetRef == "" {
-				return nil, fail.InvalidParameterError("subnetRef", "cannot be empty string")
-			}
-
-			// trick to avoid collisions
-			var kt *Subnet
-			cachesubnetRef := fmt.Sprintf("%T/%s", kt, subnetRef)
-
-			cache, xerr := svc.GetCache(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				if val, xerr := cache.Get(ctx, cachesubnetRef); xerr == nil {
-					casted, ok := val.(*Subnet)
-					if ok {
-						return casted, nil
-					}
-				}
-			}
-
-			// -- First step: identify subnetID from (networkRef, subnetRef) --
-			var (
-				subnetID        string
-				networkInstance resources.Network
-			)
-
-			networkRef = strings.TrimSpace(networkRef)
-			switch networkRef {
-			case "":
-				// If networkRef is empty, subnetRef must be subnetID
-				subnetID = subnetRef
-			default:
-				// Try to load Network metadata
-				networkInstance, xerr = LoadNetwork(ctx, svc, networkRef)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					switch xerr.(type) {
-					case *fail.ErrNotFound:
-						debug.IgnoreError2(ctx, xerr)
-						// Network metadata can be missing if it's the default Network, so continue
-					default:
-						return nil, xerr
-					}
-				}
-
-				withDefaultSubnetwork, err := svc.HasDefaultNetwork(ctx)
-				if err != nil {
-					return nil, err
-				}
-
-				if networkInstance != nil { // nolint
-					// Network metadata loaded, find the ID of the Subnet (subnetRef may be ID or Name)
-					xerr = networkInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-						return props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-							subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-							if !ok {
-								return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
-							}
-
-							var found bool
-							for k, v := range subnetsV1.ByName {
-								if k == subnetRef || v == subnetRef {
-									subnetID = v
-									found = true
-									break
-								}
-							}
-							if !found {
-								return fail.NotFoundError("failed to find a Subnet referenced by '%s' in network '%s'", subnetRef, networkInstance.GetName())
-							}
-							return nil
-						})
-					})
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return nil, xerr
-					}
-				} else if withDefaultSubnetwork {
-					// No Network Metadata, try to use the default Network if there is one
-					an, xerr := svc.GetDefaultNetwork(ctx)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return nil, xerr
-					}
-
-					if an.Name == networkRef || an.ID == networkRef {
-						// We are in default Network context, query Subnet list and search for the one requested
-						list, xerr := ListSubnets(ctx, svc, an.ID, false)
-						xerr = debug.InjectPlannedFail(xerr)
-						if xerr != nil {
-							return nil, xerr
-						}
-
-						for _, v := range list {
-							if v.ID == subnetRef || v.Name == subnetRef {
-								subnetID = v.ID
-								break
-							}
-						}
-					}
-				} else {
-					// failed to identify the Network owning the Subnets
-					return nil, fail.NotFoundError("failed to find Network '%s'", networkRef)
-				}
-			}
-
-			if subnetID == "" {
-				return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
-			}
-
-			// -- second step: search instance in service cache
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSubnetCacheMiss(ctx, svc, subnetID) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			var ok bool
-			subnetInstance, ok := anon.(*Subnet)
-			if !ok {
-				return nil, fail.InconsistentError("cache entry for %s is not a *Subnet", subnetID)
-			}
-			if subnetInstance == nil {
-				return nil, fail.InconsistentError("nil found in cache for Subnet with id %s", subnetID)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = subnetInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, subnetInstance.GetName()), subnetInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				hid, err := subnetInstance.GetID()
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), subnetInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(100 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, cachesubnetRef); xerr == nil {
-					casted, ok := val.(*Subnet)
-					if ok {
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.Subnet")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("subnet cache response (%s): %v", cachesubnetRef, xerr)
-				}
-			}
-
-			return subnetInstance, nil
-		}()
-		chRes <- result{ga, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
 }
 
 // onSubnetCacheMiss is called when there is no instance in cache of Subnet 'subnetID'
@@ -505,8 +307,6 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(ctx context.Context, id s
 	if xerr != nil {
 		return xerr
 	}
-
-	// FIXME: OPP List the ports, delete the ports, and then...
 
 	xerr = svc.DeleteSubnet(ctx, id)
 	xerr = debug.InjectPlannedFail(xerr)

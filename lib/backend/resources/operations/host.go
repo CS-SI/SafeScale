@@ -100,122 +100,6 @@ func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
 	return instance, nil
 }
 
-// LoadHost ...
-func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Host, fail.Error) {
-	defer elapsed(fmt.Sprintf("LoadHost of %s", ref))()
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		a    resources.Host
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		ga, gerr := func() (_ resources.Host, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			if svc == nil {
-				return nil, fail.InvalidParameterCannotBeNilError("svc")
-			}
-			if ref == "" {
-				return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-			}
-
-			// trick to avoid collisions
-			var kt *Host
-			refcache := fmt.Sprintf("%T/%s", kt, ref)
-
-			cache, xerr := svc.GetCache(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				if val, xerr := cache.Get(ctx, refcache); xerr == nil {
-					casted, ok := val.(resources.Host)
-					if ok {
-						incrementExpVar("host.cache.hit")
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("loadhost host cache response (%s): %v", refcache, xerr)
-				}
-			}
-
-			anon, xerr := onHostCacheMiss(ctx, svc, ref)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			incrementExpVar("newhost.cache.hit")
-			hostInstance, ok := anon.(*Host)
-			if !ok {
-				return nil, fail.InconsistentError("cache content for key %s is not a resources.Host", ref)
-			}
-			if hostInstance == nil {
-				return nil, fail.InconsistentError("nil value found in Host cache for key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = hostInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				hid, err := hostInstance.GetID()
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-
-				err = cache.Set(ctx, refcache, hostInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hostInstance.GetName()), hostInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), hostInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(100 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, refcache); xerr == nil {
-					casted, ok := val.(resources.Host)
-					if ok {
-						incrementExpVar("host.cache.hit")
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("host cache response (%s): %v", refcache, xerr)
-				}
-
-			}
-
-			return hostInstance, nil
-		}()
-		chRes <- result{ga, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.a, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
-}
-
 func Stack() []byte {
 	buf := make([]byte, 1024)
 	for {
@@ -432,7 +316,6 @@ func (instance *Host) updateCachedInformation(ctx context.Context) (sshapi.Conne
 			return innerXErr
 		}
 
-		// FIXME: OPP, Ha !!, this is the true problem !!
 		cfg := ssh.NewConfig(instance.GetName(), gaip, int(ahc.SSHPort), opUser, ahc.PrivateKey, 0, "", primaryGatewayConfig, secondaryGatewayConfig)
 		aconn, innerXErr := sshfactory.NewConnector(cfg)
 		if innerXErr != nil {
@@ -3382,7 +3265,16 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 			default:
 			}
 
-			return svc.WaitHostState(ctx, hostID, hoststate.Started, timings.HostOperationTimeout())
+			hs, err := instance.GetState(ctx)
+			if err != nil {
+				return err
+			}
+
+			if hs != hoststate.Started {
+				return fail.NewError("%s not started yet: %s", hostName, hs.String())
+			}
+
+			return nil
 		},
 		timings.NormalDelay(),
 		timings.ExecutionTimeout(),
@@ -3458,7 +3350,16 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 			default:
 			}
 
-			return svc.WaitHostState(ctx, hostID, hoststate.Stopped, timings.HostOperationTimeout())
+			hs, err := instance.GetState(ctx)
+			if err != nil {
+				return err
+			}
+
+			if hs != hoststate.Stopped {
+				return fail.NewError("%s not stopped yet: %s", hostName, hs.String())
+			}
+
+			return nil
 		},
 		timings.NormalDelay(),
 		timings.ExecutionTimeout(),

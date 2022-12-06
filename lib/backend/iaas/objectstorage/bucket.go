@@ -209,7 +209,7 @@ func (instance bucket) ListObjects(ctx context.Context, path string, prefix stri
 func (instance bucket) Browse(
 	ctx context.Context, path string, prefix string, callback func(Object) fail.Error,
 ) (ferr fail.Error) {
-	// FIXME: Make this ctx sensitive
+	// FIXME: OPP Make this ctx sensitive
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -231,7 +231,7 @@ func (instance bucket) Browse(
 			}
 			if strings.Index(item.Name(), fullPath) == 0 {
 				o := newObjectFromStow(&instance, item)
-				return callback(&o)
+				return callback(o)
 			}
 			return nil
 		},

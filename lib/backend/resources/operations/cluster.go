@@ -31,7 +31,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/eko/gocache/v2/store"
 	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -251,208 +250,6 @@ func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max
 	return nil
 }
 
-// LoadCluster loads cluster information from metadata
-func LoadCluster(inctx context.Context, svc iaas.Service, name string, options ...data.ImmutableKeyValue) (_ resources.Cluster, ferr fail.Error) {
-	defer elapsed("LoadCluster")()
-	defer fail.OnPanic(&ferr)
-
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if name = strings.TrimSpace(name); name == "" {
-		return nil, fail.InvalidParameterError("name", "cannot be empty string")
-	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  resources.Cluster
-		rErr fail.Error
-	}
-
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
-		// trick to avoid collisions
-		var kt *Cluster
-		cachename := fmt.Sprintf("%T/%s", kt, name)
-
-		cache, xerr := svc.GetCache(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		if cache != nil {
-			if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-				casted, ok := val.(resources.Cluster)
-				if ok {
-					chRes <- result{casted, nil}
-					return
-				}
-			}
-		}
-
-		cacheMissLoader := func() (data.Identifiable, fail.Error) { return onClusterCacheMiss(ctx, svc, name) }
-		anon, xerr := cacheMissLoader()
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		var (
-			clusterInstance *Cluster
-			ok              bool
-		)
-		if clusterInstance, ok = anon.(*Cluster); !ok {
-			chRes <- result{nil, fail.InconsistentError("value found in Cluster cache for key '%s' is not a Cluster", name)}
-			return
-		}
-		if clusterInstance == nil {
-			chRes <- result{nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)}
-			return
-		}
-
-		if clusterInstance.randomDelayCh == nil {
-			xerr = clusterInstance.startRandomDelayGenerator(ctx, 0, 2000)
-			if xerr != nil {
-				chRes <- result{nil, xerr}
-				return
-			}
-		}
-
-		// if cache failed we are here, so we better retrieve updated information...
-		xerr = clusterInstance.Reload(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		if cache != nil {
-			err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, clusterInstance.GetName()), clusterInstance, &store.Options{Expiration: 120 * time.Minute})
-			if err != nil {
-				chRes <- result{nil, fail.ConvertError(err)}
-				return
-			}
-			hid, err := clusterInstance.GetID()
-			if err != nil {
-				chRes <- result{nil, fail.ConvertError(err)}
-				return
-			}
-			err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), clusterInstance, &store.Options{Expiration: 120 * time.Minute})
-			if err != nil {
-				chRes <- result{nil, fail.ConvertError(err)}
-				return
-			}
-			time.Sleep(100 * time.Millisecond) // consolidate cache.Set
-
-			if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-				casted, ok := val.(resources.Cluster)
-				if ok {
-					chRes <- result{casted, nil}
-					return
-				} else {
-					logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
-				}
-			} else {
-				logrus.WithContext(ctx).Warnf("cluster cache response (%s): %v", cachename, xerr)
-			}
-		}
-
-		// FIXME: OPP We need to load extra info here
-		xerr = clusterInstance.updateCachedInformation(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		// And now prevent useless metadata trickery here...
-		shi, err := clusterInstance.MetadataCore.shielded.UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		aclu, ok := shi.(*abstract.ClusterIdentity)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-		clusterInstance.cluID = aclu
-
-		aclupro, err := clusterInstance.MetadataCore.properties.UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		flavor, xerr := clusterInstance.GetFlavor(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		xerr = clusterInstance.bootstrap(flavor)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		foo, err := aclupro[clusterproperty.NodesV3].UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		gotta, ok := foo.(*propertiesv3.ClusterNodes)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-		for k := range gotta.PrivateNodeByID {
-			clusterInstance.nodes = append(clusterInstance.nodes, k)
-		}
-		for k := range gotta.MasterByID {
-			clusterInstance.masters = append(clusterInstance.masters, k)
-		}
-
-		asta, err := aclupro[clusterproperty.StateV1].UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		gurb, ok := asta.(*propertiesv1.ClusterState)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-
-		clusterInstance.state = gurb.State
-
-		for k, v := range gotta.ByNumericalID {
-			if strings.Contains(v.Name, "node") {
-				clusterInstance.nodeIPs[k] = v.PrivateIP
-			}
-			if strings.Contains(v.Name, "master") {
-				clusterInstance.masterIPs[k] = v.PrivateIP
-			}
-		}
-
-		chRes <- result{clusterInstance, nil}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
-}
-
 // onClusterCacheMiss is called when cluster cache does not contain an instance of cluster 'name'
 func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (data.Identifiable, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
@@ -597,7 +394,6 @@ func (instance *Cluster) updateCachedInformation(inctx context.Context) fail.Err
 			}
 		}
 
-		// FIXME: OPP Populate all other local structs...
 		chRes <- result{nil}
 	}()
 	select {
@@ -852,7 +648,6 @@ func (instance *Cluster) GetNetworkConfig(ctx context.Context) (config *properti
 						"'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
 					)
 				}
-				// config = networkV3.Clone().(*propertiesv3.ClusterNetwork)
 				config = networkV3
 				return nil
 			},
@@ -1026,8 +821,6 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	var problems []error
-
 	runGroup := new(errgroup.Group)
 
 	runGroup.Go(func() error {
@@ -1063,48 +856,11 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 	xerr = fail.ConvertError(runGroup.Wait())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		if len(problems) > 0 {
-			_ = xerr.AddConsequence(fail.NewErrorList(problems))
-		}
+		_ = instance.changeStatusTo(ctx, clusterstate.Degraded)
 		return xerr
 	}
 
-	if len(problems) > 0 {
-		// Mark Cluster as state Degraded
-		outerr := fail.NewErrorList(problems)
-		xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-				stateV1, ok := clonable.(*propertiesv1.ClusterState)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				stateV1.State = clusterstate.Degraded
-				instance.state = clusterstate.Degraded
-				return nil
-			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-			_ = outerr.AddConsequence(xerr)
-		}
-		return outerr
-	}
-
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-			stateV1, ok := clonable.(*propertiesv1.ClusterState)
-			if !ok {
-				return fail.InconsistentError(
-					"'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-				)
-			}
-			stateV1.State = clusterstate.Nominal
-			instance.state = clusterstate.Nominal
-			return nil
-		})
-	})
+	xerr = instance.changeStatusTo(ctx, clusterstate.Nominal)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
@@ -3284,4 +3040,26 @@ func (instance *Cluster) IsFeatureInstalled(inctx context.Context, name string) 
 		<-chRes
 		return false, fail.ConvertError(inctx.Err())
 	}
+}
+
+func (instance *Cluster) changeStatusTo(ctx context.Context, stat clusterstate.Enum) fail.Error {
+	// Mark Cluster as state Degraded
+	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+			stateV1, ok := clonable.(*propertiesv1.ClusterState)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			stateV1.State = stat
+			instance.state = stat
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+		return xerr
+	}
+	return nil
 }

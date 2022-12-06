@@ -78,7 +78,7 @@ type stack struct {
 
 // NullStack is not exposed through API, is needed essentially by tests
 func NullStack() *stack { // nolint
-	return &stack{}
+	return nil
 }
 
 // New authenticates and return interface stack

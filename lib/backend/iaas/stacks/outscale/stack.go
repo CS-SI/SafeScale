@@ -104,7 +104,7 @@ type stack struct {
 
 // NullStack returns a null value of the stack
 func NullStack() *stack { // nolint
-	return &stack{}
+	return nil
 }
 
 // GetStackName returns the name of the stack

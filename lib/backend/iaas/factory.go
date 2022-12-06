@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/dgraph-io/ristretto"
@@ -161,9 +162,18 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		}
 
 		newS := &service{
-			Provider:     providerInstance,
-			tenantName:   tenantName,
-			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 120 * time.Minute}))),
+			Provider:           providerInstance,
+			tenantName:         tenantName,
+			cacheManager:       NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 120 * time.Minute}))),
+			mLoadHost:          &sync.Mutex{},
+			mLoadCluster:       &sync.Mutex{},
+			mLoadLabel:         &sync.Mutex{},
+			mLoadNetwork:       &sync.Mutex{},
+			mLoadShare:         &sync.Mutex{},
+			mLoadVolume:        &sync.Mutex{},
+			mLoadBucket:        &sync.Mutex{},
+			mLoadSubnet:        &sync.Mutex{},
+			mLoadSecurityGroup: &sync.Mutex{},
 		}
 
 		if beta := os.Getenv("SAFESCALE_CACHE"); beta != "disabled" {

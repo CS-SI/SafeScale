@@ -19,16 +19,13 @@ package operations
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"strings"
-	"time"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	mapset "github.com/deckarep/golang-set"
-	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
+	"reflect"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -76,109 +73,6 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 		MetadataCore: coreInstance,
 	}
 	return instance, nil
-}
-
-// LoadVolume loads the metadata of a subnet
-func LoadVolume(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Volume, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if ref = strings.TrimSpace(ref); ref == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  resources.Volume
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		ga, gerr := func() (_ resources.Volume, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			// trick to avoid collisions
-			var kt *volume
-			cacheref := fmt.Sprintf("%T/%s", kt, ref)
-
-			cache, xerr := svc.GetCache(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(resources.Volume)
-					if ok {
-						return casted, nil
-					}
-				}
-			}
-
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, svc, ref) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			var ok bool
-			volumeInstance, ok := anon.(resources.Volume)
-			if !ok {
-				return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
-			}
-			if volumeInstance == nil {
-				return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = volumeInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, volumeInstance.GetName()), volumeInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-				hid, err := volumeInstance.GetID()
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), volumeInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(resources.Volume)
-					if ok {
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.Volume")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("volume cache response (%s): %v", cacheref, xerr)
-				}
-			}
-
-			return volumeInstance, nil
-		}()
-		chRes <- result{ga, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
 }
 
 // onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'

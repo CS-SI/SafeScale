@@ -20,13 +20,18 @@ package tests
 import (
 	"context"
 	"fmt"
-	"testing"
-	"time"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"testing"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/aws"            // Imported to initialize tenant aws
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/gcp"            // Imported to initialize tenant gcp
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekom
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/outscale"       // Imported to initialize tenant outscale
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/ovh"            // Imported to initialize tenant ovh
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/aws"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/gcp"
@@ -37,18 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
-
-	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/aws"            // Imported to initialize tenant aws
-	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
-	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
-	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/gcp"            // Imported to initialize tenant gcp
-	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekom
-	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/outscale"       // Imported to initialize tenant outscale
-	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/ovh"            // Imported to initialize tenant ovh
 )
 
 // ServiceTester helper class to test clients
@@ -592,78 +586,12 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 	{
 		err := tester.Service.StopHost(context.Background(), host.Core.ID, true)
 		require.Nil(t, err)
-		start := time.Now()
-		err = tester.Service.WaitHostState(context.Background(), host.Core.ID, hoststate.Stopped, temporal.BigDelay())
-		tt := time.Now()
-		fmt.Println(tt.Sub(start))
-		assert.Nil(t, err)
-		// assert.Equal(t, host.State, hoststate.Stopped)
+		assert.Equal(t, host.CurrentState, hoststate.Stopped)
 	}
 	{
 		err := tester.Service.StartHost(context.Background(), host.Core.ID)
 		require.Nil(t, err)
-		start := time.Now()
-		err = tester.Service.WaitHostState(context.Background(), host.Core.ID, hoststate.Started, temporal.BigDelay())
-		tt := time.Now()
-		fmt.Println(tt.Sub(start))
-		assert.Nil(t, err)
 		assert.Equal(t, host.CurrentState, hoststate.Started)
-	}
-}
-
-// Volumes test
-func (tester *ServiceTester) Volumes(t *testing.T) {
-	// Get initial number of volumes
-	lst, err := tester.Service.ListVolumes(context.Background())
-	require.NotNil(t, err)
-	nbVolumes := len(lst)
-
-	v1, err := tester.Service.CreateVolume(context.Background(), abstract.VolumeRequest{
-		Name:  "test_volume1",
-		Size:  25,
-		Speed: volumespeed.Hdd,
-	})
-	assert.Nil(t, err)
-	defer func() {
-		_ = tester.Service.DeleteVolume(context.Background(), v1.ID)
-	}()
-
-	assert.Equal(t, "test_volume1", v1.Name)
-	assert.Equal(t, 25, v1.Size)
-	assert.Equal(t, volumespeed.Hdd, v1.Speed)
-
-	_, err = tester.Service.WaitVolumeState(context.Background(), v1.ID, volumestate.Available, temporal.BigDelay())
-	assert.Nil(t, err)
-
-	v2, err := tester.Service.CreateVolume(context.Background(), abstract.VolumeRequest{
-		Name:  "test_volume2",
-		Size:  35,
-		Speed: volumespeed.Hdd,
-	})
-	assert.Nil(t, err)
-	defer func() {
-		_ = tester.Service.DeleteVolume(context.Background(), v2.ID)
-	}()
-
-	_, err = tester.Service.WaitVolumeState(context.Background(), v2.ID, volumestate.Available, temporal.BigDelay())
-	assert.Nil(t, err)
-
-	lst, err = tester.Service.ListVolumes(context.Background())
-	assert.Nil(t, err)
-	assert.Equal(t, nbVolumes+2, len(lst))
-	for _, vl := range lst {
-		switch vl.ID {
-		case v1.ID:
-			assert.Equal(t, v1.Name, vl.Name)
-			assert.Equal(t, v1.Size, vl.Size)
-			assert.Equal(t, v1.Speed, vl.Speed)
-		case v2.ID:
-			assert.Equal(t, v2.Name, vl.Name)
-			assert.Equal(t, v2.Size, vl.Size)
-			assert.Equal(t, v2.Speed, vl.Speed)
-		default:
-			t.Fail()
-		}
 	}
 }
 

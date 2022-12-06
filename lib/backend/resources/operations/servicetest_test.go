@@ -1010,6 +1010,11 @@ func (e *ServiceTest) GetProviderName() (string, fail.Error) {
 	}
 	return providername, nil
 }
+
+func (e *ServiceTest) GetLock(en abstract.Enum) (*sync.Mutex, fail.Error) {
+	return &sync.Mutex{}, nil
+}
+
 func (e *ServiceTest) GetMetadataBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
 
 	e.options.mu.RLock()
@@ -3374,29 +3379,6 @@ func (e *ServiceTest) CreateBucket(ctx context.Context, name string) (abstract.O
 	if err != nil {
 		return b, fail.Wrap(err)
 	}
-
-	/*
-		 bucket, xerr := NewCore(e, "bucket", "buckets", &b)
-		 if xerr != nil {
-			 return b, xerr
-		 }
-		 xerr = bucket.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			 return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-				 mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
-				 if !ok {
-					 return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				 }
-				 mountsV1.ByHostID
-				 mountsV1.ByHostName
-				 return nil
-			 })
-
-			 return nil
-		 })
-		 if xerr != nil {
-			 return b, xerr
-		 }
-	*/
 
 	return b, nil
 }
