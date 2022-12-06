@@ -201,15 +201,6 @@ func Test_StartStopHost(t *testing.T) {
 	cli.StartStopHost(t)
 }
 
-func Test_Volumes(t *testing.T) {
-	cli, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	cli.Volumes(t)
-}
-
 func Test_Containers(t *testing.T) {
 	cli, err := getTester()
 	if err != nil {

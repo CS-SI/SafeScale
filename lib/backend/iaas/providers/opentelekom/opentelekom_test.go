@@ -112,15 +112,6 @@ func Test_StartStopHost(t *testing.T) {
 	tt.StartStopHost(t)
 }
 
-func Test_Volumes(t *testing.T) {
-	tt, err := getTester()
-	if err != nil {
-		t.Skip(err)
-	}
-	require.Nil(t, err)
-	tt.Volumes(t)
-}
-
 func Test_Containers(t *testing.T) {
 	tt, err := getTester()
 	if err != nil {
