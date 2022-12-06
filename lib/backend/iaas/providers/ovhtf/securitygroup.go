@@ -260,15 +260,9 @@ func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
-		case *fail.ErrDuplicate:
-			// Special case : a duplicate error may come from OpenStack after normalization, because there are already more than 1
-			// security groups with the same name. In this situation, returns a DuplicateError with the xerr as cause
-			return nil, fail.DuplicateErrorWithCause(xerr, nil, "more than one Security Group %s found", sgLabel)
 		default:
 			return nil, xerr
 		}
-	} else {
-		return nil, fail.DuplicateError("a Security Group %s already exist", sgLabel)
 	}
 
 	newAsg, err := clonable.CastedClone[*abstract.SecurityGroup](asg)

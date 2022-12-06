@@ -1851,7 +1851,7 @@ func (instance *Host) thePhaseReboots(_ context.Context, phase userdata.Phase, u
 
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
 func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content, timeout time.Duration) (ferr fail.Error) {
-	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting install phase %s on '%s'...", phase, instance.GetName()), fmt.Sprintf("Ending phase %s on '%s' with err '%s' ...", phase, instance.GetName(), ferr))()
+	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting install phase %s on '%s'...", phase, instance.GetName()), fmt.Sprintf("Ending phase %s on '%s' with err '%v' ...", phase, instance.GetName(), ferr))()
 
 	instance.localCache.RLock()
 	notok := instance.localCache.sshProfile == nil

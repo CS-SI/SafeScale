@@ -530,12 +530,10 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	return nil
 }
 
-// CreateSecurityGroups ...
-func (instance *Subnet) CreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool, defaultSSHPort int32) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-	return instance.unsafeCreateSecurityGroups(ctx, networkInstance, keepOnFailure, defaultSSHPort)
-}
+// // CreateSecurityGroups ...
+// func (instance *Subnet) CreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool, defaultSSHPort int32) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
+// 	return instance.unsafeCreateSecurityGroups(ctx, networkInstance, keepOnFailure, defaultSSHPort)
+// }
 
 // bindInternalSecurityGroupToGateway does what its name says
 func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host) fail.Error {

@@ -86,6 +86,11 @@ func (app *App) Run(ctx context.Context, cleanup func(*cobra.Command)) error {
 		return fail.InvalidParameterCannotBeNilError("app")
 	}
 
+	cmd, _, err := app.rootCmd.Traverse(os.Args[1:])
+	if err != nil {
+		cmd = app.rootCmd
+	}
+
 	signalCh := make(chan os.Signal, 1)
 	// Starts ctrl+c handler before app.RunContext()
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGKILL, syscall.SIGQUIT, syscall.SIGTERM)
@@ -99,7 +104,7 @@ func (app *App) Run(ctx context.Context, cleanup func(*cobra.Command)) error {
 			_ = sig
 
 			if cleanup != nil {
-				cleanup(app.rootCmd)
+				cleanup(cmd)
 			}
 
 			if app.profileCloseFunc != nil {
@@ -113,7 +118,7 @@ func (app *App) Run(ctx context.Context, cleanup func(*cobra.Command)) error {
 	}()
 
 	ctx, app.cancelFunc = context.WithCancel(ctx)
-	err := app.rootCmd.ExecuteContext(ctx)
+	err = app.rootCmd.ExecuteContext(ctx)
 	if err != nil {
 		app.doneCh <- struct{}{}
 		// fmt.Println("Error Running safescale: " + err.Error())
