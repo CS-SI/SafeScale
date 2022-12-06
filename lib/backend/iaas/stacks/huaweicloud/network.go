@@ -374,11 +374,11 @@ func (instance stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fa
 }
 
 // DeleteNetwork deletes a Network/VPC identified by 'id'
-func (instance stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) fail.Error {
+func (instance stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkIdentifier) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	an, _, xerr := iaasapi.ValidateNetworkParameter(networkParam)
+	an, _, xerr := iaasapi.ValidateNetworkIdentifier(networkParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -674,15 +674,23 @@ func (instance stack) ListSubnets(ctx context.Context, networkRef string) ([]*ab
 }
 
 // DeleteSubnet consists to delete subnet in FlexibleEngine VPC
-func (instance stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
+func (instance stack) DeleteSubnet(ctx context.Context, subnetParam iaasapi.SubnetIdentifier) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	as, subnetLabel, xerr := iaasapi.ValidateSubnetIdentifier(subnetParam)
+	if xerr != nil {
+		return xerr
 	}
 
-	as, xerr := instance.InspectSubnet(ctx, id)
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.huaweicloud"), "(%s)", subnetLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	if as.ID != "" {
+		as, xerr = instance.InspectSubnet(ctx, as.ID)
+	} else {
+		as, xerr = instance.InspectSubnetByName(ctx, as.Network, as.Name)
+	}
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -694,7 +702,7 @@ func (instance stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 		}
 	}
 
-	url := instance.NetworkClient.Endpoint + "v1/" + instance.authOpts.ProjectID + "/vpcs/" + as.Network + "/subnets/" + id // FIXME: Hardcoded endpoint
+	url := instance.NetworkClient.Endpoint + "v1/" + instance.authOpts.ProjectID + "/vpcs/" + as.Network + "/subnets/" + as.ID // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		OkCodes: []int{204},
 	}

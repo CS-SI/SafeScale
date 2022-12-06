@@ -6,14 +6,8 @@ resource "openstack_networking_secgroup_v2" "{{ .Resource.Name }}" {
     tenant_id               = "{{ .Provider.Authentication.TenantID }}"
     delete_default_rules    = true
 
-    tags = {
-{{ range $t, $v := .Resource.Tags }}
-        "{{ $t }}" = "{{ $v }}"
-{{ end }}
-    }
-
     lifecycle {
-{{- if not .Extra.MarkedForDestruction }}
+{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
 {{ end }}
     }
@@ -38,12 +32,12 @@ resource "openstack_networking_secgroup_rule_v2" "{{ .Resource.Name }}-rule-{{ $
 
     tags = {
 {{ range $t, $v := .Resource.Tags }}
-        "{{ $t }}" = "{{ $v }}"
+        {{ $t }} = "{{ $v }}"
 {{ end }}
     }
 
     lifecycle {
-{{- if not .Extra.MarkedForDestruction }}
+{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
 {{ end }}
     }

@@ -19,16 +19,21 @@ package options
 import (
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 type options struct {
-	m sync.Map
+	lock *sync.RWMutex
+	m    data.Map[string, any]
 }
 
 func New(opts ...Option) (*options, fail.Error) {
-	out := &options{}
+	out := &options{
+		m:    data.Map[string, any]{},
+		lock: &sync.RWMutex{},
+	}
 	for _, v := range opts {
 		xerr := v(out)
 		if xerr != nil {
@@ -53,7 +58,10 @@ func (o *options) Load(key string) (any, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	out, ok := o.m.Load(key)
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+
+	out, ok := o.m[key]
 	if !ok {
 		return nil, fail.NotFoundError("failed to find key '%s' in options", key)
 	}
@@ -70,7 +78,10 @@ func (o *options) Store(key string, value any) fail.Error {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	o.m.Store(key, value)
+	o.lock.Lock()
+	defer o.lock.Unlock()
+
+	o.m[key] = value
 	return nil
 }
 
@@ -80,8 +91,11 @@ func (o *options) StoreMany(entry ...Entry) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
+	o.lock.Lock()
+	defer o.lock.Unlock()
+
 	for _, v := range entry {
-		o.m.Store(v.Key, v.Value)
+		o.m[v.Key] = v.Value
 	}
 	return nil
 }
@@ -96,6 +110,7 @@ func (o *options) Subset(keys ...string) (Options, fail.Error) {
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	for _, v := range keys {
 		item, xerr := o.Load(v)
 		if xerr != nil {

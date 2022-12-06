@@ -57,31 +57,31 @@ func NullStack() *stack { // nolint
 }
 
 // IsNull tells if the instance represents a null value
-func (s *stack) IsNull() bool {
-	return s == nil || s.EC2Service == nil
+func (instance *stack) IsNull() bool {
+	return instance == nil || instance.EC2Service == nil
 }
 
 // GetStackName returns the name of the stack
-func (s stack) GetStackName() (string, fail.Error) {
+func (instance stack) GetStackName() (string, fail.Error) {
 	return "aws", nil
 }
 
 // ConfigurationOptions ...
-func (s *stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
+	if valid.IsNil(instance) {
 		return iaasoptions.Configuration{}, fail.InvalidInstanceError()
 	}
 
-	return s.Config, nil
+	return instance.Config, nil
 }
 
 // AuthenticationOptions ...
-func (s *stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) AuthenticationOptions() (iaasoptions.Authentication, fail.Error) {
+	if valid.IsNil(instance) {
 		return iaasoptions.Authentication{}, fail.InvalidInstanceError()
 	}
 
-	return s.AuthOptions, nil
+	return instance.AuthOptions, nil
 }
 
 // New creates and initializes an AWS stack
@@ -145,17 +145,17 @@ func New(auth iaasoptions.Authentication, localCfg stacks.AWSConfiguration, cfg 
 }
 
 // Timings returns the instance containing current timeout/delay settings
-func (s *stack) Timings() (temporal.Timings, fail.Error) {
-	if s == nil {
+func (instance *stack) Timings() (temporal.Timings, fail.Error) {
+	if instance == nil {
 		return temporal.NewTimings(), fail.InvalidInstanceError()
 	}
-	if s.MutableTimings == nil {
-		s.MutableTimings = temporal.NewTimings()
+	if instance.MutableTimings == nil {
+		instance.MutableTimings = temporal.NewTimings()
 	}
-	return s.MutableTimings, nil
+	return instance.MutableTimings, nil
 }
 
-func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
+func (instance *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
 	if kind != abstract.HostResource {
 		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
 	}
@@ -168,11 +168,11 @@ func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, l
 		})
 	}
 
-	xerr := s.rpcCreateTags(ctx, []*string{&id}, tags)
+	xerr := instance.rpcCreateTags(ctx, []*string{&id}, tags)
 	return xerr
 }
 
-func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
+func (instance *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
 	if kind != abstract.HostResource {
 		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
 	}
@@ -185,6 +185,6 @@ func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, k
 		})
 	}
 
-	xerr := s.rpcDeleteTags(ctx, []*string{&id}, tags)
+	xerr := instance.rpcDeleteTags(ctx, []*string{&id}, tags)
 	return xerr
 }

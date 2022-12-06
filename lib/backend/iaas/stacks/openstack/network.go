@@ -287,11 +287,11 @@ func (instance *stack) ListNetworks(ctx context.Context) ([]*abstract.Network, f
 }
 
 // DeleteNetwork deletes the network identified by id
-func (instance *stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) fail.Error {
+func (instance *stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkIdentifier) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	an, networkLabel, xerr := iaasapi.ValidateHostParameter(networkParam)
+	an, networkLabel, xerr := iaasapi.ValidateHostIdentifier(networkParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -666,15 +666,33 @@ func (instance *stack) ListSubnets(ctx context.Context, networkID string) ([]*ab
 }
 
 // DeleteSubnet deletes the network identified by id
-func (instance *stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
+func (instance *stack) DeleteSubnet(ctx context.Context, subnetParam iaasapi.SubnetIdentifier) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	as, subnetLabel, xerr := iaasapi.ValidateSubnetIdentifier(subnetParam)
+	if xerr != nil {
+		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.openstack"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.openstack"), "(%s)", subnetLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	if as.ID != "" {
+		as, xerr = instance.InspectSubnet(ctx, as.ID)
+	} else {
+		as, xerr = instance.InspectSubnetByName(ctx, as.Network, as.Name)
+	}
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If subnet is not found, considered as a success
+			debug.IgnoreErrorWithContext(ctx, xerr)
+			return nil
+		default:
+			return xerr
+		}
+	}
 
 	timings, xerr := instance.Timings()
 	if xerr != nil {
@@ -685,24 +703,24 @@ func (instance *stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 	var router *Router
 	for _, r := range routerList {
 		r := r
-		if r.Name == id {
+		if r.Name == as.ID {
 			router = &r
 			break
 		}
 	}
 	if router != nil {
-		if xerr := instance.removeSubnetFromRouter(ctx, router.ID, id); xerr != nil {
-			return fail.Wrap(xerr, "failed to remove Subnet %s from its router %s", id, router.ID)
+		if xerr := instance.removeSubnetFromRouter(ctx, router.ID, as.ID); xerr != nil {
+			return fail.Wrap(xerr, "failed to remove Subnet %s from its router %s", as.ID, router.ID)
 		}
 		if xerr := instance.deleteRouter(ctx, router.ID); xerr != nil {
-			return fail.Wrap(xerr, "failed to delete router %s associated with Subnet %s", router.ID, id)
+			return fail.Wrap(xerr, "failed to delete router %s associated with Subnet %s", router.ID, as.ID)
 		}
 	}
 
 	// delete detached ports and ports in error state
 	opos, xerr := instance.rpcListPorts(ctx, ports.ListOpts{})
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to list ports associated with Subnet %s", id)
+		return fail.Wrap(xerr, "failed to list ports associated with Subnet %s", as.ID)
 	}
 
 	for _, opo := range opos {
@@ -731,7 +749,7 @@ func (instance *stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
-					return subnets.Delete(instance.NetworkClient, id).ExtractErr()
+					return subnets.Delete(instance.NetworkClient, as.ID).ExtractErr()
 				},
 				NormalizeError,
 			)

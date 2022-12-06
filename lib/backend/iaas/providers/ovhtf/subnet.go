@@ -21,7 +21,8 @@ import (
 	"net"
 
 	terraformer "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
+	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -31,7 +32,7 @@ import (
 )
 
 const (
-	designSubnetResourceSnippetPath = "snippets/resource_subnet_design.tf"
+	subnetDesignResourceSnippetPath = "snippets/resource_subnet_design.tf"
 )
 
 // type subnetResource struct {
@@ -102,12 +103,12 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		return nil, fail.ConvertError(err)
 	}
 
-	opts := []abstract.Option{
-		abstract.WithName(req.Name),
-		abstract.UseTerraformSnippet(designSubnetResourceSnippetPath),
-		abstract.WithResourceType("openstack_networking_subnet_v2"),
+	abstractSubnet, xerr := abstract.NewSubnet(abstract.WithName(req.Name))
+	if xerr != nil {
+		return nil, xerr
 	}
-	abstractSubnet, xerr := abstract.NewSubnet(opts...)
+
+	xerr = p.ConsolidateSubnetSnippet(abstractSubnet)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -117,6 +118,12 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 	abstractSubnet.DNSServers = req.DNSServers
 	abstractSubnet.Network = req.NetworkID
 	abstractSubnet.Domain = req.Domain
+
+	// Pass information to terraformer that we are in creation process
+	xerr = abstractSubnet.AddOptions(abstract.MarkForCreation())
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	// // If req.IPVersion contains invalid value, force to IPv4
 	// var ipVersion gophercloud.IPVersion
@@ -172,7 +179,7 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && req.CleanOnFailure() {
 			logrus.WithContext(ctx).Infof("cleaning up on failure, deleting Subnet '%s'", req.Name)
-			derr := renderer.Destroy(ctx, def, api.WithTarget(abstractSubnet))
+			derr := renderer.Destroy(ctx, def, terraformerapi.WithTarget(abstractSubnet))
 			if derr != nil {
 				_ = ferr.AddConsequence(derr)
 			}
@@ -207,7 +214,7 @@ func (p *provider) InspectSubnet(ctx context.Context, id string) (_ *abstract.Su
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	// FIXME: implement like InspectNetwork or use MiniStack?
-	return nil, fail.NotImplementedError()
+	return p.MiniStack.InspectSubnet(ctx, id)
 }
 
 // InspectSubnetByName ...
@@ -237,80 +244,58 @@ func (p *provider) ListSubnets(ctx context.Context, networkID string) ([]*abstra
 }
 
 // DeleteSubnet deletes the network identified by id
-func (p *provider) DeleteSubnet(ctx context.Context, id string) fail.Error {
+func (p *provider) DeleteSubnet(ctx context.Context, subnetParam iaasapi.SubnetIdentifier) fail.Error {
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	as, subnetLabel, xerr := iaasapi.ValidateSubnetIdentifier(subnetParam)
+	if xerr != nil {
+		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("provider.ovhtf"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("providers.network") || tracing.ShouldTrace("provider.ovhtf"), "(%s)", subnetLabel).WithStopwatch().Entering().Exiting()
 
-	// FIXME: implement like DeleteNetwork
-	return fail.NotImplementedError()
+	if as.ID != "" {
+		as, xerr = p.InspectSubnet(ctx, as.ID)
+	} else {
+		as, xerr = p.InspectSubnetByName(ctx, as.Network, as.Name)
+	}
+	if xerr != nil {
+		return xerr
+	}
 
-	/*
-		timings, xerr := s.Timings()
-		if xerr != nil {
-			return xerr
-		}
+	xerr = p.ConsolidateSubnetSnippet(as)
+	if xerr != nil {
+		return xerr
+	}
 
-		routerList, _ := s.ListRouters(ctx)
-		var router *Router
-		for _, r := range routerList {
-			r := r
-			if r.Name == id {
-				router = &r
-				break
-			}
-		}
-		if router != nil {
-			if xerr := s.removeSubnetFromRouter(ctx, router.ID, id); xerr != nil {
-				return fail.Wrap(xerr, "failed to remove Subnet %s from its router %s", id, router.ID)
-			}
-			if xerr := s.deleteRouter(ctx, router.ID); xerr != nil {
-				return fail.Wrap(xerr, "failed to delete router %s associated with Subnet %s", router.ID, id)
-			}
-		}
+	xerr = as.AddOptions(abstract.MarkForDestruction())
+	if xerr != nil {
+		return xerr
+	}
 
-		retryErr := retry.WhileUnsuccessful(
-			func() error {
-				innerXErr := stacks.RetryableRemoteCall(ctx,
-					func() error {
-						return subnets.Delete(s.NetworkClient, id).ExtractErr()
-					},
-					NormalizeError,
-				)
-				if innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrInvalidRequest, *fail.ErrDuplicate:
-						msg := "hosts or services are still attached"
-						return retry.StopRetryError(fail.Wrap(innerXErr, msg))
-					case *fail.ErrNotFound:
-						// consider a missing Subnet as a successful deletion
-						debug.IgnoreError(innerXErr)
-					default:
-						return innerXErr
-					}
-				}
-				return nil
-			},
-			timings.NormalDelay(),
-			timings.ContextTimeout(),
-		)
-		if retryErr != nil {
-			switch retryErr.(type) {
-			case *retry.ErrTimeout:
-				return fail.Wrap(fail.Cause(retryErr), "timeout")
-			case *retry.ErrStopRetry:
-				return fail.Wrap(fail.Cause(retryErr), "stopping retries")
-			default:
-				return retryErr
-			}
-		}
-		return nil
-	*/
+	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
+	if xerr != nil {
+		return xerr
+	}
+	defer func() { _ = renderer.Close() }()
+
+	xerr = renderer.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
+	if xerr != nil {
+		return xerr
+	}
+
+	def, xerr := renderer.Assemble(as)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(as))
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to delete Network '%s'", as.Name)
+	}
+
+	return nil
 }
 
 // // createRouter creates a router satisfying req
@@ -414,10 +399,13 @@ func (p *provider) DeleteSubnet(ctx context.Context, id string) fail.Error {
 // 	)
 // }
 
-func (p *provider) ConsolidateSubnetSnippet(as *abstract.Subnet) {
+func (p *provider) ConsolidateSubnetSnippet(as *abstract.Subnet) fail.Error {
 	if valid.IsNil(p) || as == nil {
-		return
+		return nil
 	}
 
-	_ = as.AddOptions(abstract.UseTerraformSnippet(designSubnetResourceSnippetPath))
+	return as.AddOptions(
+		abstract.UseTerraformSnippet(subnetDesignResourceSnippetPath),
+		abstract.WithResourceType("openstack_networking_subnet_v2"),
+	)
 }

@@ -24,21 +24,21 @@ import (
 )
 
 type (
-	// NetworkParameter can represent a network by a string (containing name or id) or an *abstract.Network
-	NetworkParameter any
+	// NetworkIdentifier can represent a network by a string (containing name or id) or an *abstract.Network
+	NetworkIdentifier any
 
-	// SubnetParameter can represent a Subnet by a string (containing name or id) or an *abstract.Subnet
-	SubnetParameter any
+	// SubnetIdentifier can represent a Subnet by a string (containing name or id) or an *abstract.Subnet
+	SubnetIdentifier any
 
-	// SecurityGroupParameter can represent a Security Group by a string as ID or an *abstract.SecurityGroup
-	SecurityGroupParameter any
+	// SecurityGroupIdentifier can represent a Security Group by a string as ID or an *abstract.SecurityGroup
+	SecurityGroupIdentifier any
 
-	// HostParameter can represent a host by a string (containing name or id), an *abstract.HostCore or an *abstract.HostFull
-	HostParameter any
+	// HostIdentifier can represent a host by a string (containing name or id), an *abstract.HostCore or an *abstract.HostFull
+	HostIdentifier any
 )
 
-// ValidateNetworkParameter validates host parameter that can be a string as ID or an *abstract.Network
-func ValidateNetworkParameter(networkParam NetworkParameter) (an *abstract.Network, networkLabel string, ferr fail.Error) {
+// ValidateNetworkIdentifier validates host parameter that can be a string as ID or an *abstract.Network
+func ValidateNetworkIdentifier(networkParam NetworkIdentifier) (an *abstract.Network, networkLabel string, ferr fail.Error) {
 	switch networkParam := networkParam.(type) {
 	case string:
 		if networkParam == "" {
@@ -75,8 +75,8 @@ func ValidateNetworkParameter(networkParam NetworkParameter) (an *abstract.Netwo
 	return an, networkLabel, nil
 }
 
-// ValidateSubnetParameter validates Subnet parameter that can be a string as ID or an *abstract.Subnet
-func ValidateSubnetParameter(subnetParam SubnetParameter) (as *abstract.Subnet, subnetLabel string, ferr fail.Error) {
+// ValidateSubnetIdentifier validates Subnet parameter that can be a string as ID or an *abstract.Subnet
+func ValidateSubnetIdentifier(subnetParam SubnetIdentifier) (as *abstract.Subnet, subnetLabel string, ferr fail.Error) {
 	switch subnetParam := subnetParam.(type) {
 	case string:
 		if subnetParam == "" {
@@ -115,8 +115,8 @@ func ValidateSubnetParameter(subnetParam SubnetParameter) (as *abstract.Subnet, 
 	return as, subnetLabel, nil
 }
 
-// ValidateHostParameter validates host parameter that can be a string as ID or an *abstract.HostCore
-func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hostLabel string, ferr fail.Error) {
+// ValidateHostIdentifier validates host parameter that can be a string as ID or an *abstract.HostCore
+func ValidateHostIdentifier(hostParam HostIdentifier) (ahf *abstract.HostFull, hostLabel string, ferr fail.Error) {
 	switch hostParam := hostParam.(type) {
 	case string:
 		if hostParam == "" {
@@ -160,8 +160,8 @@ func ValidateHostParameter(hostParam HostParameter) (ahf *abstract.HostFull, hos
 	return ahf, hostLabel, nil
 }
 
-// ValidateSecurityGroupParameter validates securitygroup parameter that can be a string as ID or an *abstract.SecurityGroup
-func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstract.SecurityGroup, sgLabel string, _ fail.Error) {
+// ValidateSecurityGroupIdentifier validates securitygroup parameter that can be a string as ID or an *abstract.SecurityGroup
+func ValidateSecurityGroupIdentifier(sgParam SecurityGroupIdentifier) (asg *abstract.SecurityGroup, sgLabel string, _ fail.Error) {
 	switch sgParam := sgParam.(type) {
 	case string:
 		if sgParam == "" {

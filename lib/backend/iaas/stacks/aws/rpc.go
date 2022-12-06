@@ -48,11 +48,11 @@ func validateAWSString(stringContent *string, stringLabel string, notEmpty bool)
 	return nil
 }
 
-func (s stack) rpcCreateInternetGateway(ctx context.Context) (*ec2.InternetGateway, fail.Error) {
+func (instance *stack) rpcCreateInternetGateway(ctx context.Context) (*ec2.InternetGateway, fail.Error) {
 	var gw *ec2.CreateInternetGatewayOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			gw, err = s.EC2Service.CreateInternetGateway(&ec2.CreateInternetGatewayInput{})
+			gw, err = instance.EC2Service.CreateInternetGateway(&ec2.CreateInternetGatewayInput{})
 			return err
 		},
 		normalizeError,
@@ -63,7 +63,7 @@ func (s stack) rpcCreateInternetGateway(ctx context.Context) (*ec2.InternetGatew
 	return gw.InternetGateway, nil
 }
 
-func (s stack) rpcCreateRoute(ctx context.Context, internetGatewayID, routeTableID, cidr *string) fail.Error {
+func (instance *stack) rpcCreateRoute(ctx context.Context, internetGatewayID, routeTableID, cidr *string) fail.Error {
 	if xerr := validateAWSString(internetGatewayID, "internetGatewayID", true); xerr != nil {
 		return xerr
 	}
@@ -81,14 +81,14 @@ func (s stack) rpcCreateRoute(ctx context.Context, internetGatewayID, routeTable
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.CreateRoute(&createRouteInput)
+			_, err := instance.EC2Service.CreateRoute(&createRouteInput)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcAttachInternetGateway(ctx context.Context, vpcID, internetGatewayID *string) fail.Error {
+func (instance *stack) rpcAttachInternetGateway(ctx context.Context, vpcID, internetGatewayID *string) fail.Error {
 	if xerr := validateAWSString(vpcID, "vpcID", true); xerr != nil {
 		return xerr
 	}
@@ -102,14 +102,14 @@ func (s stack) rpcAttachInternetGateway(ctx context.Context, vpcID, internetGate
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.AttachInternetGateway(&attachInternetGatewayInput)
+			_, err := instance.EC2Service.AttachInternetGateway(&attachInternetGatewayInput)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDescribeVpcs(ctx context.Context, ids []*string) ([]*ec2.Vpc, fail.Error) {
+func (instance *stack) rpcDescribeVpcs(ctx context.Context, ids []*string) ([]*ec2.Vpc, fail.Error) {
 	var req ec2.DescribeVpcsInput
 	if len(ids) > 0 {
 		req.VpcIds = ids
@@ -117,7 +117,7 @@ func (s stack) rpcDescribeVpcs(ctx context.Context, ids []*string) ([]*ec2.Vpc, 
 	var resp *ec2.DescribeVpcsOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeVpcs(&req)
+			resp, err = instance.EC2Service.DescribeVpcs(&req)
 			return err
 		},
 		normalizeError,
@@ -128,12 +128,12 @@ func (s stack) rpcDescribeVpcs(ctx context.Context, ids []*string) ([]*ec2.Vpc, 
 	return resp.Vpcs, nil
 }
 
-func (s stack) rpcDescribeVpcByID(ctx context.Context, id *string) (*ec2.Vpc, fail.Error) {
+func (instance *stack) rpcDescribeVpcByID(ctx context.Context, id *string) (*ec2.Vpc, fail.Error) {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return &ec2.Vpc{}, xerr
 	}
 
-	resp, xerr := s.rpcDescribeVpcs(ctx, []*string{id})
+	resp, xerr := instance.rpcDescribeVpcs(ctx, []*string{id})
 	if xerr != nil {
 		return &ec2.Vpc{}, xerr
 	}
@@ -146,7 +146,7 @@ func (s stack) rpcDescribeVpcByID(ctx context.Context, id *string) (*ec2.Vpc, fa
 	return resp[0], nil
 }
 
-func (s stack) rpcDescribeVpcByName(ctx context.Context, name *string) (*ec2.Vpc, fail.Error) {
+func (instance *stack) rpcDescribeVpcByName(ctx context.Context, name *string) (*ec2.Vpc, fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return &ec2.Vpc{}, xerr
 	}
@@ -162,7 +162,7 @@ func (s stack) rpcDescribeVpcByName(ctx context.Context, name *string) (*ec2.Vpc
 	var resp *ec2.DescribeVpcsOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeVpcs(&req)
+			resp, err = instance.EC2Service.DescribeVpcs(&req)
 			return err
 		},
 		normalizeError,
@@ -180,7 +180,7 @@ func (s stack) rpcDescribeVpcByName(ctx context.Context, name *string) (*ec2.Vpc
 	return resp.Vpcs[0], nil
 }
 
-func (s stack) rpcCreateVpc(ctx context.Context, name, cidr *string) (_ *ec2.Vpc, ferr fail.Error) {
+func (instance *stack) rpcCreateVpc(ctx context.Context, name, cidr *string) (_ *ec2.Vpc, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return &ec2.Vpc{}, xerr
 	}
@@ -194,7 +194,7 @@ func (s stack) rpcCreateVpc(ctx context.Context, name, cidr *string) (_ *ec2.Vpc
 	var resp *ec2.CreateVpcOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.CreateVpc(&req)
+			resp, err = instance.EC2Service.CreateVpc(&req)
 			return err
 		},
 		normalizeError,
@@ -206,7 +206,7 @@ func (s stack) rpcCreateVpc(ctx context.Context, name, cidr *string) (_ *ec2.Vpc
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.rpcDeleteVpc(context.Background(), resp.Vpc.VpcId)
+			derr := instance.rpcDeleteVpc(context.Background(), resp.Vpc.VpcId)
 			if derr != nil {
 				_ = ferr.AddConsequence(
 					fail.Wrap(
@@ -230,14 +230,14 @@ func (s stack) rpcCreateVpc(ctx context.Context, name, cidr *string) (_ *ec2.Vpc
 		},
 		{
 			Key:   aws.String("DeclaredInBucket"),
-			Value: aws.String(s.Config.MetadataBucketName),
+			Value: aws.String(instance.Config.MetadataBucketName),
 		},
 		{
 			Key:   aws.String("CreationDate"),
 			Value: aws.String(time.Now().Format(time.RFC3339)),
 		},
 	}
-	xerr = s.rpcCreateTags(ctx, []*string{resp.Vpc.VpcId}, tags)
+	xerr = instance.rpcCreateTags(ctx, []*string{resp.Vpc.VpcId}, tags)
 	if xerr != nil {
 		return &ec2.Vpc{}, xerr
 	}
@@ -245,7 +245,7 @@ func (s stack) rpcCreateVpc(ctx context.Context, name, cidr *string) (_ *ec2.Vpc
 	return resp.Vpc, nil
 }
 
-func (s stack) rpcCreateTags(ctx context.Context, resources []*string, tags []*ec2.Tag) fail.Error {
+func (instance *stack) rpcCreateTags(ctx context.Context, resources []*string, tags []*ec2.Tag) fail.Error {
 	if len(resources) == 0 {
 		return fail.InvalidParameterError("resources", "cannot be an empty slice")
 	}
@@ -259,14 +259,14 @@ func (s stack) rpcCreateTags(ctx context.Context, resources []*string, tags []*e
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.CreateTags(&req)
+			_, err := instance.EC2Service.CreateTags(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDeleteTags(ctx context.Context, resources []*string, tags []*ec2.Tag) fail.Error {
+func (instance *stack) rpcDeleteTags(ctx context.Context, resources []*string, tags []*ec2.Tag) fail.Error {
 	if len(resources) == 0 {
 		return fail.InvalidParameterError("resources", "cannot be an empty slice")
 	}
@@ -280,14 +280,14 @@ func (s stack) rpcDeleteTags(ctx context.Context, resources []*string, tags []*e
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DeleteTags(&req)
+			_, err := instance.EC2Service.DeleteTags(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDeleteVpc(ctx context.Context, id *string) fail.Error {
+func (instance *stack) rpcDeleteVpc(ctx context.Context, id *string) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -297,14 +297,14 @@ func (s stack) rpcDeleteVpc(ctx context.Context, id *string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DeleteVpc(&req)
+			_, err := instance.EC2Service.DeleteVpc(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDetachInternetGateway(ctx context.Context, vpcID, internetGatewayID *string) fail.Error {
+func (instance *stack) rpcDetachInternetGateway(ctx context.Context, vpcID, internetGatewayID *string) fail.Error {
 	if xerr := validateAWSString(vpcID, "vpcID", true); xerr != nil {
 		return xerr
 	}
@@ -318,14 +318,14 @@ func (s stack) rpcDetachInternetGateway(ctx context.Context, vpcID, internetGate
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DetachInternetGateway(&req)
+			_, err := instance.EC2Service.DetachInternetGateway(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDeleteRoute(ctx context.Context, routeTableID, cidr *string) fail.Error {
+func (instance *stack) rpcDeleteRoute(ctx context.Context, routeTableID, cidr *string) fail.Error {
 	if xerr := validateAWSString(routeTableID, "routeTableID", true); xerr != nil {
 		return xerr
 	}
@@ -339,14 +339,14 @@ func (s stack) rpcDeleteRoute(ctx context.Context, routeTableID, cidr *string) f
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DeleteRoute(&req)
+			_, err := instance.EC2Service.DeleteRoute(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDeleteRouteTable(ctx context.Context, id *string) fail.Error {
+func (instance *stack) rpcDeleteRouteTable(ctx context.Context, id *string) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -356,14 +356,14 @@ func (s stack) rpcDeleteRouteTable(ctx context.Context, id *string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DeleteRouteTable(&deleteRouteTable)
+			_, err := instance.EC2Service.DeleteRouteTable(&deleteRouteTable)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDeleteInternetGateway(ctx context.Context, id *string) fail.Error {
+func (instance *stack) rpcDeleteInternetGateway(ctx context.Context, id *string) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -373,14 +373,14 @@ func (s stack) rpcDeleteInternetGateway(ctx context.Context, id *string) fail.Er
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DeleteInternetGateway(&req)
+			_, err := instance.EC2Service.DeleteInternetGateway(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDescribeInternetGateways(ctx context.Context, vpcID *string, ids []*string) ([]*ec2.InternetGateway, fail.Error) {
+func (instance *stack) rpcDescribeInternetGateways(ctx context.Context, vpcID *string, ids []*string) ([]*ec2.InternetGateway, fail.Error) {
 	var filters []*ec2.Filter
 	if vpcID != nil && aws.StringValue(vpcID) != "" {
 		filters = append(
@@ -404,7 +404,7 @@ func (s stack) rpcDescribeInternetGateways(ctx context.Context, vpcID *string, i
 	var resp *ec2.DescribeInternetGatewaysOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeInternetGateways(&req)
+			resp, err = instance.EC2Service.DescribeInternetGateways(&req)
 			return err
 		},
 		normalizeError,
@@ -415,12 +415,12 @@ func (s stack) rpcDescribeInternetGateways(ctx context.Context, vpcID *string, i
 	return resp.InternetGateways, nil
 }
 
-func (s stack) rpcDescribeSubnetByID(ctx context.Context, id *string) (*ec2.Subnet, fail.Error) {
+func (instance *stack) rpcDescribeSubnetByID(ctx context.Context, id *string) (*ec2.Subnet, fail.Error) {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return &ec2.Subnet{}, xerr
 	}
 
-	resp, xerr := s.rpcDescribeSubnets(ctx, []*string{id})
+	resp, xerr := instance.rpcDescribeSubnets(ctx, []*string{id})
 	if xerr != nil {
 		return &ec2.Subnet{}, xerr
 	}
@@ -434,7 +434,7 @@ func (s stack) rpcDescribeSubnetByID(ctx context.Context, id *string) (*ec2.Subn
 	return resp[0], nil
 }
 
-func (s stack) rpcCreateSubnet(ctx context.Context, name, vpcID, azID, cidr *string) (_ *ec2.Subnet, ferr fail.Error) {
+func (instance *stack) rpcCreateSubnet(ctx context.Context, name, vpcID, azID, cidr *string) (_ *ec2.Subnet, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return &ec2.Subnet{}, xerr
 	}
@@ -456,7 +456,7 @@ func (s stack) rpcCreateSubnet(ctx context.Context, name, vpcID, azID, cidr *str
 	var resp *ec2.CreateSubnetOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.CreateSubnet(&req)
+			resp, err = instance.EC2Service.CreateSubnet(&req)
 			return err
 		},
 		normalizeError,
@@ -468,7 +468,7 @@ func (s stack) rpcCreateSubnet(ctx context.Context, name, vpcID, azID, cidr *str
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.rpcDeleteSubnet(context.Background(), resp.Subnet.SubnetId)
+			derr := instance.rpcDeleteSubnet(context.Background(), resp.Subnet.SubnetId)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet %s", aws.StringValue(resp.Subnet.SubnetId)))
 			}
@@ -486,21 +486,21 @@ func (s stack) rpcCreateSubnet(ctx context.Context, name, vpcID, azID, cidr *str
 		},
 		{
 			Key:   aws.String("DeclaredInBucket"),
-			Value: aws.String(s.Config.MetadataBucketName),
+			Value: aws.String(instance.Config.MetadataBucketName),
 		},
 		{
 			Key:   aws.String("CreationDate"),
 			Value: aws.String(time.Now().Format(time.RFC3339)),
 		},
 	}
-	if xerr = s.rpcCreateTags(ctx, []*string{resp.Subnet.SubnetId}, tags); xerr != nil {
+	if xerr = instance.rpcCreateTags(ctx, []*string{resp.Subnet.SubnetId}, tags); xerr != nil {
 		return &ec2.Subnet{}, xerr
 	}
 
 	return resp.Subnet, nil
 }
 
-func (s stack) rpcAssociateRouteTable(ctx context.Context, subnetID, routeID *string) fail.Error {
+func (instance *stack) rpcAssociateRouteTable(ctx context.Context, subnetID, routeID *string) fail.Error {
 	if xerr := validateAWSString(subnetID, "subnetID", true); xerr != nil {
 		return xerr
 	}
@@ -514,14 +514,14 @@ func (s stack) rpcAssociateRouteTable(ctx context.Context, subnetID, routeID *st
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.AssociateRouteTable(&req)
+			_, err := instance.EC2Service.AssociateRouteTable(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDescribeRouteTables(ctx context.Context, key *string, values []*string) ([]*ec2.RouteTable, fail.Error) {
+func (instance *stack) rpcDescribeRouteTables(ctx context.Context, key *string, values []*string) ([]*ec2.RouteTable, fail.Error) {
 	var emptySlice []*ec2.RouteTable
 	if xerr := validateAWSString(key, "key", true); xerr != nil {
 		return emptySlice, xerr
@@ -541,7 +541,7 @@ func (s stack) rpcDescribeRouteTables(ctx context.Context, key *string, values [
 	var resp *ec2.DescribeRouteTablesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeRouteTables(&req)
+			resp, err = instance.EC2Service.DescribeRouteTables(&req)
 			return err
 		},
 		normalizeError,
@@ -552,7 +552,7 @@ func (s stack) rpcDescribeRouteTables(ctx context.Context, key *string, values [
 	return resp.RouteTables, nil
 }
 
-func (s stack) rpcDisassociateRouteTable(ctx context.Context, id *string) fail.Error {
+func (instance *stack) rpcDisassociateRouteTable(ctx context.Context, id *string) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -562,14 +562,14 @@ func (s stack) rpcDisassociateRouteTable(ctx context.Context, id *string) fail.E
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DisassociateRouteTable(&req)
+			_, err := instance.EC2Service.DisassociateRouteTable(&req)
 			return normalizeError(err)
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDeleteSubnet(ctx context.Context, id *string) fail.Error {
+func (instance *stack) rpcDeleteSubnet(ctx context.Context, id *string) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -579,14 +579,14 @@ func (s stack) rpcDeleteSubnet(ctx context.Context, id *string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DeleteSubnet(&req)
+			_, err := instance.EC2Service.DeleteSubnet(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDeleteSecurityGroup(ctx context.Context, id *string) fail.Error {
+func (instance *stack) rpcDeleteSecurityGroup(ctx context.Context, id *string) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -596,14 +596,14 @@ func (s stack) rpcDeleteSecurityGroup(ctx context.Context, id *string) fail.Erro
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DeleteSecurityGroup(&req)
+			_, err := instance.EC2Service.DeleteSecurityGroup(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcCreateSecurityGroup(ctx context.Context, networkID, name, description *string) (*string, fail.Error) {
+func (instance *stack) rpcCreateSecurityGroup(ctx context.Context, networkID, name, description *string) (*string, fail.Error) {
 	if xerr := validateAWSString(networkID, "networkID", true); xerr != nil {
 		return aws.String(""), xerr
 	}
@@ -622,7 +622,7 @@ func (s stack) rpcCreateSecurityGroup(ctx context.Context, networkID, name, desc
 	var resp *ec2.CreateSecurityGroupOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.CreateSecurityGroup(&req)
+			resp, err = instance.EC2Service.CreateSecurityGroup(&req)
 			return err
 		},
 		normalizeError,
@@ -633,7 +633,7 @@ func (s stack) rpcCreateSecurityGroup(ctx context.Context, networkID, name, desc
 	return resp.GroupId, nil
 }
 
-func (s stack) rpcDescribeSecurityGroups(ctx context.Context, networkID *string, ids []*string) ([]*ec2.SecurityGroup, fail.Error) {
+func (instance *stack) rpcDescribeSecurityGroups(ctx context.Context, networkID *string, ids []*string) ([]*ec2.SecurityGroup, fail.Error) {
 	var req ec2.DescribeSecurityGroupsInput
 	if aws.StringValue(networkID) != "" {
 		req.Filters = []*ec2.Filter{
@@ -649,7 +649,7 @@ func (s stack) rpcDescribeSecurityGroups(ctx context.Context, networkID *string,
 	var resp *ec2.DescribeSecurityGroupsOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeSecurityGroups(&req)
+			resp, err = instance.EC2Service.DescribeSecurityGroups(&req)
 			return err
 		},
 		normalizeError,
@@ -663,12 +663,12 @@ func (s stack) rpcDescribeSecurityGroups(ctx context.Context, networkID *string,
 	return resp.SecurityGroups, nil
 }
 
-func (s stack) rpcDescribeSecurityGroupByID(ctx context.Context, id *string) (*ec2.SecurityGroup, fail.Error) {
+func (instance *stack) rpcDescribeSecurityGroupByID(ctx context.Context, id *string) (*ec2.SecurityGroup, fail.Error) {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return &ec2.SecurityGroup{}, xerr
 	}
 
-	resp, xerr := s.rpcDescribeSecurityGroups(ctx, aws.String(""), []*string{id})
+	resp, xerr := instance.rpcDescribeSecurityGroups(ctx, aws.String(""), []*string{id})
 	if xerr != nil {
 		return &ec2.SecurityGroup{}, xerr
 	}
@@ -685,7 +685,7 @@ func (s stack) rpcDescribeSecurityGroupByID(ctx context.Context, id *string) (*e
 	return resp[0], nil
 }
 
-func (s stack) rpcDescribeSecurityGroupByName(ctx context.Context, networkID, name *string) (*ec2.SecurityGroup, fail.Error) {
+func (instance *stack) rpcDescribeSecurityGroupByName(ctx context.Context, networkID, name *string) (*ec2.SecurityGroup, fail.Error) {
 	if xerr := validateAWSString(networkID, "networkID", true); xerr != nil {
 		return &ec2.SecurityGroup{}, xerr
 	}
@@ -708,7 +708,7 @@ func (s stack) rpcDescribeSecurityGroupByName(ctx context.Context, networkID, na
 	var resp *ec2.DescribeSecurityGroupsOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeSecurityGroups(&req)
+			resp, err = instance.EC2Service.DescribeSecurityGroups(&req)
 			return err
 		},
 		normalizeError,
@@ -734,7 +734,7 @@ func (s stack) rpcDescribeSecurityGroupByName(ctx context.Context, networkID, na
 	return resp.SecurityGroups[0], nil
 }
 
-func (s stack) rpcRevokeSecurityGroupIngress(ctx context.Context, id *string, ingress []*ec2.IpPermission) fail.Error {
+func (instance *stack) rpcRevokeSecurityGroupIngress(ctx context.Context, id *string, ingress []*ec2.IpPermission) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -748,14 +748,14 @@ func (s stack) rpcRevokeSecurityGroupIngress(ctx context.Context, id *string, in
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.RevokeSecurityGroupIngress(&req)
+			_, err := instance.EC2Service.RevokeSecurityGroupIngress(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcRevokeSecurityGroupEgress(ctx context.Context, id *string, egress []*ec2.IpPermission) fail.Error {
+func (instance *stack) rpcRevokeSecurityGroupEgress(ctx context.Context, id *string, egress []*ec2.IpPermission) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -769,14 +769,14 @@ func (s stack) rpcRevokeSecurityGroupEgress(ctx context.Context, id *string, egr
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.RevokeSecurityGroupEgress(&req)
+			_, err := instance.EC2Service.RevokeSecurityGroupEgress(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcAuthorizeSecurityGroupIngress(ctx context.Context, id *string, ingress []*ec2.IpPermission) fail.Error {
+func (instance *stack) rpcAuthorizeSecurityGroupIngress(ctx context.Context, id *string, ingress []*ec2.IpPermission) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -790,14 +790,14 @@ func (s stack) rpcAuthorizeSecurityGroupIngress(ctx context.Context, id *string,
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.AuthorizeSecurityGroupIngress(&req)
+			_, err := instance.EC2Service.AuthorizeSecurityGroupIngress(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcAuthorizeSecurityGroupEgress(ctx context.Context, id *string, egress []*ec2.IpPermission) fail.Error {
+func (instance *stack) rpcAuthorizeSecurityGroupEgress(ctx context.Context, id *string, egress []*ec2.IpPermission) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -811,19 +811,19 @@ func (s stack) rpcAuthorizeSecurityGroupEgress(ctx context.Context, id *string, 
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.AuthorizeSecurityGroupEgress(&req)
+			_, err := instance.EC2Service.AuthorizeSecurityGroupEgress(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcAllocateAddress(ctx context.Context, description string) (allocID *string, publicIP *string, ferr fail.Error) {
+func (instance *stack) rpcAllocateAddress(ctx context.Context, description string) (allocID *string, publicIP *string, ferr fail.Error) {
 	req := ec2.AllocateAddressInput{}
 	var resp *ec2.AllocateAddressOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.AllocateAddress(&req)
+			resp, innerErr = instance.EC2Service.AllocateAddress(&req)
 			return innerErr
 		},
 		normalizeError,
@@ -838,7 +838,7 @@ func (s stack) rpcAllocateAddress(ctx context.Context, description string) (allo
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.rpcReleaseAddress(context.Background(), resp.AllocationId)
+			derr := instance.rpcReleaseAddress(context.Background(), resp.AllocationId)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to release Elastic IP"))
 			}
@@ -856,14 +856,14 @@ func (s stack) rpcAllocateAddress(ctx context.Context, description string) (allo
 		},
 		{
 			Key:   aws.String("DeclaredInBucket"),
-			Value: aws.String(s.Config.MetadataBucketName),
+			Value: aws.String(instance.Config.MetadataBucketName),
 		},
 		{
 			Key:   aws.String("CreationDate"),
 			Value: aws.String(time.Now().Format(time.RFC3339)),
 		},
 	}
-	xerr = s.rpcCreateTags(ctx, []*string{resp.AllocationId}, tags)
+	xerr = instance.rpcCreateTags(ctx, []*string{resp.AllocationId}, tags)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to name Elastic IP")
 	}
@@ -871,7 +871,7 @@ func (s stack) rpcAllocateAddress(ctx context.Context, description string) (allo
 	return resp.AllocationId, resp.PublicIp, nil
 }
 
-func (s stack) rpcReleaseAddress(ctx context.Context, id *string) fail.Error {
+func (instance *stack) rpcReleaseAddress(ctx context.Context, id *string) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -881,14 +881,14 @@ func (s stack) rpcReleaseAddress(ctx context.Context, id *string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.ReleaseAddress(&req)
+			_, err := instance.EC2Service.ReleaseAddress(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcAssociateAddress(ctx context.Context, nicID, addressID *string) (*string, fail.Error) { // nolint
+func (instance *stack) rpcAssociateAddress(ctx context.Context, nicID, addressID *string) (*string, fail.Error) { // nolint
 	if xerr := validateAWSString(nicID, "nicID", true); xerr != nil {
 		return nil, xerr
 	}
@@ -903,7 +903,7 @@ func (s stack) rpcAssociateAddress(ctx context.Context, nicID, addressID *string
 	var resp *ec2.AssociateAddressOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.AssociateAddress(&req)
+			resp, err = instance.EC2Service.AssociateAddress(&req)
 			return err
 		}, normalizeError,
 	)
@@ -916,7 +916,7 @@ func (s stack) rpcAssociateAddress(ctx context.Context, nicID, addressID *string
 	return resp.AssociationId, nil
 }
 
-func (s stack) rpcDisassociateAddress(ctx context.Context, id *string) fail.Error { // nolint
+func (instance *stack) rpcDisassociateAddress(ctx context.Context, id *string) fail.Error { // nolint
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -926,13 +926,13 @@ func (s stack) rpcDisassociateAddress(ctx context.Context, id *string) fail.Erro
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DisassociateAddress(&req)
+			_, err := instance.EC2Service.DisassociateAddress(&req)
 			return err
 		}, normalizeError,
 	)
 }
 
-func (s stack) rpcDescribeAddressByIP(ctx context.Context, ip *string) (*ec2.Address, fail.Error) {
+func (instance *stack) rpcDescribeAddressByIP(ctx context.Context, ip *string) (*ec2.Address, fail.Error) {
 	if xerr := validateAWSString(ip, "ip", true); xerr != nil {
 		return nil, xerr
 	}
@@ -948,7 +948,7 @@ func (s stack) rpcDescribeAddressByIP(ctx context.Context, ip *string) (*ec2.Add
 	var resp *ec2.DescribeAddressesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeAddresses(&req)
+			resp, err = instance.EC2Service.DescribeAddresses(&req)
 			return err
 		},
 		normalizeError,
@@ -965,12 +965,12 @@ func (s stack) rpcDescribeAddressByIP(ctx context.Context, ip *string) (*ec2.Add
 	return resp.Addresses[0], nil
 }
 
-func (s stack) rpcDescribeInstanceByID(ctx context.Context, id *string) (*ec2.Instance, fail.Error) {
+func (instance *stack) rpcDescribeInstanceByID(ctx context.Context, id *string) (*ec2.Instance, fail.Error) {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return &ec2.Instance{}, xerr
 	}
 
-	resp, xerr := s.rpcDescribeInstances(ctx, []*string{id})
+	resp, xerr := instance.rpcDescribeInstances(ctx, []*string{id})
 	if xerr != nil {
 		return &ec2.Instance{}, xerr
 	}
@@ -983,7 +983,7 @@ func (s stack) rpcDescribeInstanceByID(ctx context.Context, id *string) (*ec2.In
 	return resp[0], nil
 }
 
-func (s stack) rpcDescribeInstanceByName(ctx context.Context, name *string) (*ec2.Instance, fail.Error) {
+func (instance *stack) rpcDescribeInstanceByName(ctx context.Context, name *string) (*ec2.Instance, fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return &ec2.Instance{}, xerr
 	}
@@ -999,7 +999,7 @@ func (s stack) rpcDescribeInstanceByName(ctx context.Context, name *string) (*ec
 	var resp *ec2.DescribeInstancesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeInstances(&req)
+			resp, err = instance.EC2Service.DescribeInstances(&req)
 			return err
 		},
 		normalizeError,
@@ -1012,8 +1012,8 @@ func (s stack) rpcDescribeInstanceByName(ctx context.Context, name *string) (*ec
 	}
 
 	var (
-		found    int
-		instance *ec2.Instance
+		found  int
+		server *ec2.Instance
 	)
 	for _, v := range resp.Reservations {
 		for _, i := range v.Instances {
@@ -1026,7 +1026,7 @@ func (s stack) rpcDescribeInstanceByName(ctx context.Context, name *string) (*ec
 				continue
 			}
 			if state != hoststate.Terminated {
-				instance = i
+				server = i
 				found++
 			}
 		}
@@ -1037,10 +1037,10 @@ func (s stack) rpcDescribeInstanceByName(ctx context.Context, name *string) (*ec
 	if found > 1 {
 		return &ec2.Instance{}, fail.InconsistentError("found more than one Host named '%s'", aws.StringValue(name))
 	}
-	return instance, nil
+	return server, nil
 }
 
-func (s stack) rpcDescribeAddresses(ctx context.Context, ids []*string) ([]*ec2.Address, fail.Error) {
+func (instance *stack) rpcDescribeAddresses(ctx context.Context, ids []*string) ([]*ec2.Address, fail.Error) {
 	var req ec2.DescribeAddressesInput
 	if len(ids) > 0 {
 		for _, v := range ids {
@@ -1053,7 +1053,7 @@ func (s stack) rpcDescribeAddresses(ctx context.Context, ids []*string) ([]*ec2.
 	var resp *ec2.DescribeAddressesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeAddresses(&req)
+			resp, err = instance.EC2Service.DescribeAddresses(&req)
 			return err
 		},
 		normalizeError,
@@ -1064,7 +1064,7 @@ func (s stack) rpcDescribeAddresses(ctx context.Context, ids []*string) ([]*ec2.
 	return resp.Addresses, nil
 }
 
-func (s stack) rpcDescribeInstances(ctx context.Context, ids []*string) ([]*ec2.Instance, fail.Error) {
+func (instance *stack) rpcDescribeInstances(ctx context.Context, ids []*string) ([]*ec2.Instance, fail.Error) {
 	var req ec2.DescribeInstancesInput
 	if len(ids) > 0 {
 		req.InstanceIds = ids
@@ -1072,7 +1072,7 @@ func (s stack) rpcDescribeInstances(ctx context.Context, ids []*string) ([]*ec2.
 	var resp *ec2.DescribeInstancesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeInstances(&req)
+			resp, err = instance.EC2Service.DescribeInstances(&req)
 			return err
 		},
 		normalizeError,
@@ -1102,7 +1102,7 @@ func (s stack) rpcDescribeInstances(ctx context.Context, ids []*string) ([]*ec2.
 	return out, nil
 }
 
-func (s stack) rpcImportKeyPair(ctx context.Context, name *string, pubKey []byte) fail.Error {
+func (instance *stack) rpcImportKeyPair(ctx context.Context, name *string, pubKey []byte) fail.Error {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return xerr
 	}
@@ -1113,14 +1113,14 @@ func (s stack) rpcImportKeyPair(ctx context.Context, name *string, pubKey []byte
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.ImportKeyPair(&req)
+			_, err := instance.EC2Service.ImportKeyPair(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDescribeKeyPairs(ctx context.Context, ids []*string) ([]*ec2.KeyPairInfo, fail.Error) {
+func (instance *stack) rpcDescribeKeyPairs(ctx context.Context, ids []*string) ([]*ec2.KeyPairInfo, fail.Error) {
 	req := ec2.DescribeKeyPairsInput{}
 	if len(ids) > 0 {
 		req.KeyPairIds = ids
@@ -1128,7 +1128,7 @@ func (s stack) rpcDescribeKeyPairs(ctx context.Context, ids []*string) ([]*ec2.K
 	var resp *ec2.DescribeKeyPairsOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeKeyPairs(&req)
+			resp, err = instance.EC2Service.DescribeKeyPairs(&req)
 			return err
 		},
 		normalizeError,
@@ -1139,12 +1139,12 @@ func (s stack) rpcDescribeKeyPairs(ctx context.Context, ids []*string) ([]*ec2.K
 	return resp.KeyPairs, nil
 }
 
-func (s stack) rpcDescribeKeyPairByID(ctx context.Context, id *string) (*ec2.KeyPairInfo, fail.Error) {
+func (instance *stack) rpcDescribeKeyPairByID(ctx context.Context, id *string) (*ec2.KeyPairInfo, fail.Error) {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return &ec2.KeyPairInfo{}, xerr
 	}
 
-	resp, xerr := s.rpcDescribeKeyPairs(ctx, []*string{id})
+	resp, xerr := instance.rpcDescribeKeyPairs(ctx, []*string{id})
 	if xerr != nil {
 		return &ec2.KeyPairInfo{}, xerr
 	}
@@ -1157,7 +1157,7 @@ func (s stack) rpcDescribeKeyPairByID(ctx context.Context, id *string) (*ec2.Key
 	return resp[0], nil
 }
 
-func (s stack) rpcDescribeKeyPairByName(ctx context.Context, name *string) (*ec2.KeyPairInfo, fail.Error) {
+func (instance *stack) rpcDescribeKeyPairByName(ctx context.Context, name *string) (*ec2.KeyPairInfo, fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return &ec2.KeyPairInfo{}, xerr
 	}
@@ -1168,7 +1168,7 @@ func (s stack) rpcDescribeKeyPairByName(ctx context.Context, name *string) (*ec2
 	var resp *ec2.DescribeKeyPairsOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeKeyPairs(&req)
+			resp, err = instance.EC2Service.DescribeKeyPairs(&req)
 			return err
 		},
 		normalizeError,
@@ -1185,7 +1185,7 @@ func (s stack) rpcDescribeKeyPairByName(ctx context.Context, name *string) (*ec2
 	return resp.KeyPairs[0], nil
 }
 
-func (s stack) rpcDeleteKeyPair(ctx context.Context, name *string) fail.Error {
+func (instance *stack) rpcDeleteKeyPair(ctx context.Context, name *string) fail.Error {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return xerr
 	}
@@ -1195,14 +1195,14 @@ func (s stack) rpcDeleteKeyPair(ctx context.Context, name *string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DeleteKeyPair(&req)
+			_, err := instance.EC2Service.DeleteKeyPair(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDescribeAvailabilityZones(ctx context.Context, ids []*string) ([]*ec2.AvailabilityZone, fail.Error) {
+func (instance *stack) rpcDescribeAvailabilityZones(ctx context.Context, ids []*string) ([]*ec2.AvailabilityZone, fail.Error) {
 	var req ec2.DescribeAvailabilityZonesInput
 	if len(ids) > 0 {
 		req.ZoneIds = ids
@@ -1210,7 +1210,7 @@ func (s stack) rpcDescribeAvailabilityZones(ctx context.Context, ids []*string) 
 	var resp *ec2.DescribeAvailabilityZonesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeAvailabilityZones(&req)
+			resp, err = instance.EC2Service.DescribeAvailabilityZones(&req)
 			return err
 		},
 		normalizeError,
@@ -1221,7 +1221,7 @@ func (s stack) rpcDescribeAvailabilityZones(ctx context.Context, ids []*string) 
 	return resp.AvailabilityZones, nil
 }
 
-func (s stack) rpcDescribeRegions(ctx context.Context, names []*string) ([]*ec2.Region, fail.Error) {
+func (instance *stack) rpcDescribeRegions(ctx context.Context, names []*string) ([]*ec2.Region, fail.Error) {
 	var req ec2.DescribeRegionsInput
 	if len(names) > 0 {
 		req.RegionNames = names
@@ -1229,7 +1229,7 @@ func (s stack) rpcDescribeRegions(ctx context.Context, names []*string) ([]*ec2.
 	var resp *ec2.DescribeRegionsOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeRegions(&req)
+			resp, err = instance.EC2Service.DescribeRegions(&req)
 			return err
 		},
 		normalizeError,
@@ -1240,7 +1240,7 @@ func (s stack) rpcDescribeRegions(ctx context.Context, names []*string) ([]*ec2.
 	return resp.Regions, nil
 }
 
-func rpcDescribeImagesByOwner(ctx context.Context, s stack, ids []*string, filters []*ec2.Filter) ([]*ec2.Image, fail.Error) {
+func rpcDescribeImagesByOwner(ctx context.Context, s *stack, ids []*string, filters []*ec2.Filter) ([]*ec2.Image, fail.Error) {
 	var req ec2.DescribeImagesInput
 	if len(ids) > 0 {
 		req.ImageIds = ids
@@ -1277,7 +1277,7 @@ func rpcDescribeImagesByOwner(ctx context.Context, s stack, ids []*string, filte
 	return resp.Images, nil
 }
 
-func (s stack) rpcDescribeImages(ctx context.Context, ids []*string) ([]*ec2.Image, fail.Error) {
+func (instance *stack) rpcDescribeImages(ctx context.Context, ids []*string) ([]*ec2.Image, fail.Error) {
 	var req ec2.DescribeImagesInput
 	if len(ids) > 0 {
 		req.ImageIds = ids
@@ -1287,7 +1287,7 @@ func (s stack) rpcDescribeImages(ctx context.Context, ids []*string) ([]*ec2.Ima
 	// Default filters
 	req.Filters = append(req.Filters, createFilters()...)
 	// Added filtering by owner-id
-	req.Filters = append(req.Filters, filterOwners(s)...)
+	req.Filters = append(req.Filters, filterOwners(instance)...)
 
 	countDecodingProblems := 0
 	var decodingProblems bool
@@ -1295,7 +1295,7 @@ func (s stack) rpcDescribeImages(ctx context.Context, ids []*string) ([]*ec2.Ima
 	var resp *ec2.DescribeImagesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeImages(&req)
+			resp, err = instance.EC2Service.DescribeImages(&req)
 			if err != nil {
 				if awe, ok := err.(awserr.Error); ok {
 					if awe.Code() == "SerializationError" {
@@ -1325,11 +1325,11 @@ func (s stack) rpcDescribeImages(ctx context.Context, ids []*string) ([]*ec2.Ima
 
 	// either we had decoding problems or everything is ok
 	if decodingProblems {
-		for _, owner := range filterOwners(s) {
+		for _, owner := range filterOwners(instance) {
 			var filters []*ec2.Filter
 			filters = append(filters, createFilters()...)
 			filters = append(filters, owner)
-			newImages, err := rpcDescribeImagesByOwner(ctx, s, ids, filters)
+			newImages, err := rpcDescribeImagesByOwner(ctx, instance, ids, filters)
 			if err != nil {
 				continue
 			}
@@ -1346,12 +1346,12 @@ func (s stack) rpcDescribeImages(ctx context.Context, ids []*string) ([]*ec2.Ima
 	return resp.Images, nil
 }
 
-func (s stack) rpcDescribeImageByID(ctx context.Context, id *string) (*ec2.Image, fail.Error) {
+func (instance *stack) rpcDescribeImageByID(ctx context.Context, id *string) (*ec2.Image, fail.Error) {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return &ec2.Image{}, xerr
 	}
 
-	resp, xerr := s.rpcDescribeImages(ctx, []*string{id})
+	resp, xerr := instance.rpcDescribeImages(ctx, []*string{id})
 	if xerr != nil {
 		return &ec2.Image{}, xerr
 	}
@@ -1365,7 +1365,7 @@ func (s stack) rpcDescribeImageByID(ctx context.Context, id *string) (*ec2.Image
 }
 
 // FIXME: typeOfferings s.EC2Service.DescribeInstanceTypeOfferings
-func (s stack) rpcDescribeInstanceTypeOfferings(ctx context.Context, az *string) (*ec2.DescribeInstanceTypeOfferingsOutput, fail.Error) {
+func (instance *stack) rpcDescribeInstanceTypeOfferings(ctx context.Context, az *string) (*ec2.DescribeInstanceTypeOfferingsOutput, fail.Error) {
 	filters := []*ec2.Filter{
 		{
 			Name:   aws.String("location"),
@@ -1381,7 +1381,7 @@ func (s stack) rpcDescribeInstanceTypeOfferings(ctx context.Context, az *string)
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
 			var err error
-			offerings, err = s.EC2Service.DescribeInstanceTypeOfferings(&req)
+			offerings, err = instance.EC2Service.DescribeInstanceTypeOfferings(&req)
 			return err
 		},
 		normalizeError,
@@ -1393,7 +1393,7 @@ func (s stack) rpcDescribeInstanceTypeOfferings(ctx context.Context, az *string)
 	return offerings, nil
 }
 
-func (s stack) rpcModifyInstanceSecurityGroups(ctx context.Context, id *string, sgIDs []*string) fail.Error {
+func (instance *stack) rpcModifyInstanceSecurityGroups(ctx context.Context, id *string, sgIDs []*string) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -1407,14 +1407,14 @@ func (s stack) rpcModifyInstanceSecurityGroups(ctx context.Context, id *string, 
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.ModifyInstanceAttribute(&req)
+			_, err := instance.EC2Service.ModifyInstanceAttribute(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcGetProducts(ctx context.Context, ids []*string) ([]aws.JSONValue, fail.Error) {
+func (instance *stack) rpcGetProducts(ctx context.Context, ids []*string) ([]aws.JSONValue, fail.Error) {
 	filters := make([]*pricing.Filter, 0, 2+len(ids))
 	filters = append(
 		filters, []*pricing.Filter{
@@ -1444,7 +1444,7 @@ func (s stack) rpcGetProducts(ctx context.Context, ids []*string) ([]aws.JSONVal
 	var resp *pricing.GetProductsOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.PricingService.GetProducts(&req)
+			resp, err = instance.PricingService.GetProducts(&req)
 			return err
 		},
 		normalizeError,
@@ -1463,12 +1463,12 @@ func (s stack) rpcGetProducts(ctx context.Context, ids []*string) ([]aws.JSONVal
 	return resp.PriceList, nil
 }
 
-func (s stack) rpcGetProductByID(ctx context.Context, id *string) (aws.JSONValue, fail.Error) {
+func (instance *stack) rpcGetProductByID(ctx context.Context, id *string) (aws.JSONValue, fail.Error) {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return nil, xerr
 	}
 
-	resp, xerr := s.rpcGetProducts(ctx, []*string{id})
+	resp, xerr := instance.rpcGetProducts(ctx, []*string{id})
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1478,7 +1478,7 @@ func (s stack) rpcGetProductByID(ctx context.Context, id *string) (aws.JSONValue
 	return resp[0], nil
 }
 
-func (s stack) rpcDescribeInstanceTypes(ctx context.Context, ids []*string) ([]*ec2.InstanceTypeInfo, fail.Error) {
+func (instance *stack) rpcDescribeInstanceTypes(ctx context.Context, ids []*string) ([]*ec2.InstanceTypeInfo, fail.Error) {
 	var emptySlice []*ec2.InstanceTypeInfo
 	req := ec2.DescribeInstanceTypesInput{}
 	if len(ids) > 0 {
@@ -1503,7 +1503,7 @@ func (s stack) rpcDescribeInstanceTypes(ctx context.Context, ids []*string) ([]*
 		var resp *ec2.DescribeInstanceTypesOutput
 		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
-				resp, err = s.EC2Service.DescribeInstanceTypes(&req)
+				resp, err = instance.EC2Service.DescribeInstanceTypes(&req)
 				return err
 			},
 			normalizeError,
@@ -1535,12 +1535,12 @@ func (s stack) rpcDescribeInstanceTypes(ctx context.Context, ids []*string) ([]*
 	return out, nil
 }
 
-func (s stack) rpcDescribeInstanceTypeByID(ctx context.Context, id *string) (*ec2.InstanceTypeInfo, fail.Error) {
+func (instance *stack) rpcDescribeInstanceTypeByID(ctx context.Context, id *string) (*ec2.InstanceTypeInfo, fail.Error) {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return &ec2.InstanceTypeInfo{}, xerr
 	}
 
-	resp, xerr := s.rpcDescribeInstanceTypes(ctx, []*string{id})
+	resp, xerr := instance.rpcDescribeInstanceTypes(ctx, []*string{id})
 	if xerr != nil {
 		return &ec2.InstanceTypeInfo{}, xerr
 	}
@@ -1552,7 +1552,7 @@ func (s stack) rpcDescribeInstanceTypeByID(ctx context.Context, id *string) (*ec
 	return resp[0], nil
 }
 
-func (s stack) rpcDescribeSpotPriceHistory(ctx context.Context, zone, templateID *string) ([]*ec2.SpotPrice, fail.Error) {
+func (instance *stack) rpcDescribeSpotPriceHistory(ctx context.Context, zone, templateID *string) ([]*ec2.SpotPrice, fail.Error) {
 	var emptySlice []*ec2.SpotPrice
 	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
 		return emptySlice, xerr
@@ -1569,7 +1569,7 @@ func (s stack) rpcDescribeSpotPriceHistory(ctx context.Context, zone, templateID
 	var resp *ec2.DescribeSpotPriceHistoryOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeSpotPriceHistory(&req)
+			resp, err = instance.EC2Service.DescribeSpotPriceHistory(&req)
 			return err
 		},
 		normalizeError,
@@ -1583,7 +1583,7 @@ func (s stack) rpcDescribeSpotPriceHistory(ctx context.Context, zone, templateID
 	return resp.SpotPriceHistory, nil
 }
 
-func (s stack) rpcRequestSpotInstance(ctx context.Context, price, zone, subnetID *string, publicIP *bool, templateID, imageID, keypairName *string, userdata []byte) (*ec2.SpotInstanceRequest, fail.Error) {
+func (instance *stack) rpcRequestSpotInstance(ctx context.Context, price, zone, subnetID *string, publicIP *bool, templateID, imageID, keypairName *string, userdata []byte) (*ec2.SpotInstanceRequest, fail.Error) {
 	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
 		return nil, xerr
 	}
@@ -1625,7 +1625,7 @@ func (s stack) rpcRequestSpotInstance(ctx context.Context, price, zone, subnetID
 	var resp *ec2.RequestSpotInstancesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.RequestSpotInstances(&req)
+			resp, err = instance.EC2Service.RequestSpotInstances(&req)
 			return err
 		},
 		normalizeError,
@@ -1639,7 +1639,7 @@ func (s stack) rpcRequestSpotInstance(ctx context.Context, price, zone, subnetID
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte, extra interface{}) (_ *ec2.Instance, ferr fail.Error) {
+func (instance *stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte, extra interface{}) (_ *ec2.Instance, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return nil, xerr
 	}
@@ -1664,7 +1664,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 
 	// Create Network Interface
 	description := aws.StringValue(name) + " network interface"
-	nic, xerr := s.rpcCreateNetworkInterface(ctx, subnetID, description)
+	nic, xerr := instance.rpcCreateNetworkInterface(ctx, subnetID, description)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to create network interface for instance '%s'", aws.StringValue(name))
 	}
@@ -1672,7 +1672,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.rpcDeleteNetworkInterface(context.Background(), nic.NetworkInterfaceId)
+			derr := instance.rpcDeleteNetworkInterface(context.Background(), nic.NetworkInterfaceId)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete network interface"))
 			}
@@ -1685,7 +1685,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 		description := fmt.Sprintf(
 			"elasticip--%s--%s", aws.StringValue(nic.NetworkInterfaceId), aws.StringValue(name),
 		) // Make each description unique
-		addrAllocID, _, xerr := s.rpcAllocateAddress(ctx, description)
+		addrAllocID, _, xerr := instance.rpcAllocateAddress(ctx, description)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to allocate Elastic IP")
 		}
@@ -1693,7 +1693,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := s.rpcReleaseAddress(context.Background(), addrAllocID)
+				derr := instance.rpcReleaseAddress(context.Background(), addrAllocID)
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to release Elastic IP %s", addrAllocID))
 				}
@@ -1701,7 +1701,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 		}()
 
 		// Attach the Elastic IP to the NetworkInterface
-		attachID, xerr := s.rpcAssociateAddress(ctx, nic.NetworkInterfaceId, addrAllocID)
+		attachID, xerr := instance.rpcAssociateAddress(ctx, nic.NetworkInterfaceId, addrAllocID)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to attach Elastic IP to network interface")
 		}
@@ -1709,7 +1709,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
-				derr := s.rpcDisassociateAddress(context.Background(), attachID)
+				derr := instance.rpcDisassociateAddress(context.Background(), attachID)
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to detach Elastic IP from network interface"))
 				}
@@ -1728,7 +1728,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 		},
 		{
 			Key:   aws.String("DeclaredInBucket"),
-			Value: aws.String(s.Config.MetadataBucketName),
+			Value: aws.String(instance.Config.MetadataBucketName),
 		},
 		{
 			Key:   aws.String("Image"),
@@ -1787,7 +1787,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 					},
 					{
 						Key:   aws.String("DeclaredInBucket"),
-						Value: aws.String(s.Config.MetadataBucketName),
+						Value: aws.String(instance.Config.MetadataBucketName),
 					},
 					{
 						Key:   aws.String("Image"),
@@ -1820,7 +1820,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 	var resp *ec2.Reservation
 	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.RunInstances(&req)
+			resp, err = instance.EC2Service.RunInstances(&req)
 			return err
 		},
 		normalizeError,
@@ -1836,7 +1836,7 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			for _, v := range resp.Instances {
-				derr := s.rpcTerminateInstance(context.Background(), v)
+				derr := instance.rpcTerminateInstance(context.Background(), v)
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete instance %s", v.InstanceId))
 				}
@@ -1848,12 +1848,12 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 		return nil, fail.InconsistentError("more than one instance has been created by Cloud Provider")
 	}
 
-	instance := resp.Instances[0]
+	server := resp.Instances[0]
 	xerr = stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.ModifyInstanceAttribute(
+			_, err := instance.EC2Service.ModifyInstanceAttribute(
 				&ec2.ModifyInstanceAttributeInput{
-					InstanceId:      instance.InstanceId,
+					InstanceId:      server.InstanceId,
 					SourceDestCheck: &ec2.AttributeBooleanValue{Value: aws.Bool(false)},
 				},
 			)
@@ -1865,25 +1865,25 @@ func (s stack) rpcCreateInstance(ctx context.Context, name, zone, subnetID, temp
 		return nil, xerr
 	}
 
-	return instance, nil
+	return server, nil
 }
 
-func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance) fail.Error {
-	if instance == nil {
+func (instance *stack) rpcTerminateInstance(ctx context.Context, server *ec2.Instance) fail.Error {
+	if server == nil {
 		return fail.InvalidParameterCannotBeNilError("instance")
 	}
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return xerr
 	}
 
 	var nics []*string
-	for _, v := range instance.NetworkInterfaces {
+	for _, v := range server.NetworkInterfaces {
 		// Detach and release Elastic IP from the network interface if needed
 		if v.Association != nil {
 			if ip := aws.StringValue(v.Association.PublicIp); ip != "" {
-				address, xerr := s.rpcDescribeAddressByIP(ctx, v.Association.PublicIp)
+				address, xerr := instance.rpcDescribeAddressByIP(ctx, v.Association.PublicIp)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
@@ -1893,12 +1893,12 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 						return fail.Wrap(xerr, "failed to req information about Elastic IP '%s'", ip)
 					}
 				} else {
-					xerr = s.rpcDisassociateAddress(ctx, address.AssociationId)
+					xerr = instance.rpcDisassociateAddress(ctx, address.AssociationId)
 					if xerr != nil {
 						return fail.Wrap(xerr, "failed to disassociate Elastic IP '%s' from interface", ip)
 					}
 
-					xerr = s.rpcReleaseAddress(ctx, address.AllocationId)
+					xerr = instance.rpcReleaseAddress(ctx, address.AllocationId)
 					if xerr != nil {
 						return fail.Wrap(xerr, "failed to release Elastic IP '%s'", ip)
 					}
@@ -1912,12 +1912,12 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 
 	// now request to delete instance
 	req := ec2.TerminateInstancesInput{
-		InstanceIds: []*string{instance.InstanceId},
+		InstanceIds: []*string{server.InstanceId},
 	}
 	var resp *ec2.TerminateInstancesOutput
 	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.TerminateInstances(&req)
+			resp, innerErr = instance.EC2Service.TerminateInstances(&req)
 			return innerErr
 		},
 		normalizeError,
@@ -1927,7 +1927,7 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 	}
 	if len(resp.TerminatingInstances) == 0 {
 		return fail.NotFoundError(
-			"failed to find instance %s wanted to terminate", aws.StringValue(instance.InstanceId),
+			"failed to find instance %s wanted to terminate", aws.StringValue(server.InstanceId),
 		)
 	}
 
@@ -1940,7 +1940,7 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 			default:
 			}
 
-			resp, innerXErr := s.rpcDescribeInstances(ctx, []*string{instance.InstanceId})
+			resp, innerXErr := instance.rpcDescribeInstances(ctx, []*string{server.InstanceId})
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -1977,7 +1977,7 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
 			return fail.Wrap(
-				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId, timings.HostCleanupTimeout(),
+				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", server.InstanceId, timings.HostCleanupTimeout(),
 			)
 		default:
 			return retryErr
@@ -1986,7 +1986,7 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 
 	for _, v := range nics {
 		// Delete network interface
-		xerr = s.rpcDeleteNetworkInterface(ctx, v)
+		xerr = instance.rpcDeleteNetworkInterface(ctx, v)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound, *fail.ErrInvalidRequest:
@@ -2000,7 +2000,7 @@ func (s stack) rpcTerminateInstance(ctx context.Context, instance *ec2.Instance)
 	return nil
 }
 
-func (s stack) rpcStartInstances(ctx context.Context, ids []*string) fail.Error {
+func (instance *stack) rpcStartInstances(ctx context.Context, ids []*string) fail.Error {
 	if len(ids) == 0 {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
@@ -2010,14 +2010,14 @@ func (s stack) rpcStartInstances(ctx context.Context, ids []*string) fail.Error 
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.StartInstances(&req)
+			_, err := instance.EC2Service.StartInstances(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcRebootInstances(ctx context.Context, ids []*string) fail.Error {
+func (instance *stack) rpcRebootInstances(ctx context.Context, ids []*string) fail.Error {
 	if len(ids) == 0 {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
@@ -2027,14 +2027,14 @@ func (s stack) rpcRebootInstances(ctx context.Context, ids []*string) fail.Error
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.RebootInstances(&req)
+			_, err := instance.EC2Service.RebootInstances(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDescribeSubnets(ctx context.Context, ids []*string) ([]*ec2.Subnet, fail.Error) {
+func (instance *stack) rpcDescribeSubnets(ctx context.Context, ids []*string) ([]*ec2.Subnet, fail.Error) {
 	var emptySlice []*ec2.Subnet
 	if len(ids) == 0 {
 		return emptySlice, fail.InvalidParameterError("ids", "cannot be empty slice")
@@ -2049,7 +2049,7 @@ func (s stack) rpcDescribeSubnets(ctx context.Context, ids []*string) ([]*ec2.Su
 		var resp *ec2.DescribeSubnetsOutput
 		xerr := stacks.RetryableRemoteCall(ctx,
 			func() (err error) {
-				resp, err = s.EC2Service.DescribeSubnets(&req)
+				resp, err = instance.EC2Service.DescribeSubnets(&req)
 				return err
 			},
 			normalizeError,
@@ -2077,7 +2077,7 @@ func (s stack) rpcDescribeSubnets(ctx context.Context, ids []*string) ([]*ec2.Su
 	return out, nil
 }
 
-func (s stack) rpcStopInstances(ctx context.Context, ids []*string, gracefully *bool) fail.Error {
+func (instance *stack) rpcStopInstances(ctx context.Context, ids []*string, gracefully *bool) fail.Error {
 	if len(ids) == 0 {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
@@ -2092,14 +2092,14 @@ func (s stack) rpcStopInstances(ctx context.Context, ids []*string, gracefully *
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.StopInstances(&req)
+			_, err := instance.EC2Service.StopInstances(&req)
 			return err
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDescribeNetworkInterfacesOfInstance(ctx context.Context, id *string) ([]*ec2.NetworkInterface, fail.Error) {
+func (instance *stack) rpcDescribeNetworkInterfacesOfInstance(ctx context.Context, id *string) ([]*ec2.NetworkInterface, fail.Error) {
 	var emptySlice []*ec2.NetworkInterface
 	req := ec2.DescribeNetworkInterfacesInput{
 		Filters: []*ec2.Filter{
@@ -2112,7 +2112,7 @@ func (s stack) rpcDescribeNetworkInterfacesOfInstance(ctx context.Context, id *s
 	var resp *ec2.DescribeNetworkInterfacesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeNetworkInterfaces(&req)
+			resp, err = instance.EC2Service.DescribeNetworkInterfaces(&req)
 			return err
 		},
 		normalizeError,
@@ -2126,7 +2126,7 @@ func (s stack) rpcDescribeNetworkInterfacesOfInstance(ctx context.Context, id *s
 	return resp.NetworkInterfaces, nil
 }
 
-func (s stack) rpcModifySecurityGroupsOfNetworkInterface(ctx context.Context, id *string, sgs []*string) fail.Error {
+func (instance *stack) rpcModifySecurityGroupsOfNetworkInterface(ctx context.Context, id *string, sgs []*string) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
@@ -2137,7 +2137,7 @@ func (s stack) rpcModifySecurityGroupsOfNetworkInterface(ctx context.Context, id
 	}
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			_, err = s.EC2Service.ModifyNetworkInterfaceAttribute(&req)
+			_, err = instance.EC2Service.ModifyNetworkInterfaceAttribute(&req)
 			return err
 		},
 		normalizeError,
@@ -2148,7 +2148,7 @@ func (s stack) rpcModifySecurityGroupsOfNetworkInterface(ctx context.Context, id
 	return nil
 }
 
-func (s stack) rpcCreateNetworkInterface(ctx context.Context, subnetID *string, description string) (*ec2.NetworkInterface, fail.Error) {
+func (instance *stack) rpcCreateNetworkInterface(ctx context.Context, subnetID *string, description string) (*ec2.NetworkInterface, fail.Error) {
 	if xerr := validateAWSString(subnetID, "subnetID", true); xerr != nil {
 		return nil, xerr
 	}
@@ -2160,7 +2160,7 @@ func (s stack) rpcCreateNetworkInterface(ctx context.Context, subnetID *string, 
 	var resp *ec2.CreateNetworkInterfaceOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.CreateNetworkInterface(&req)
+			resp, innerErr = instance.EC2Service.CreateNetworkInterface(&req)
 			return innerErr
 		},
 		normalizeError,
@@ -2174,7 +2174,7 @@ func (s stack) rpcCreateNetworkInterface(ctx context.Context, subnetID *string, 
 	return resp.NetworkInterface, nil
 }
 
-func (s stack) rpcDeleteNetworkInterface(ctx context.Context, nicID *string) fail.Error {
+func (instance *stack) rpcDeleteNetworkInterface(ctx context.Context, nicID *string) fail.Error {
 	if xerr := validateAWSString(nicID, "nicID", true); xerr != nil {
 		return xerr
 	}
@@ -2184,14 +2184,14 @@ func (s stack) rpcDeleteNetworkInterface(ctx context.Context, nicID *string) fai
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			_, innerErr = s.EC2Service.DeleteNetworkInterface(&req)
+			_, innerErr = instance.EC2Service.DeleteNetworkInterface(&req)
 			return innerErr
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcAttachNetworkInterface(ctx context.Context, instanceID, nicID *string) (*string, fail.Error) {
+func (instance *stack) rpcAttachNetworkInterface(ctx context.Context, instanceID, nicID *string) (*string, fail.Error) {
 	if xerr := validateAWSString(instanceID, "instanceID", true); xerr != nil {
 		return nil, xerr
 	}
@@ -2206,7 +2206,7 @@ func (s stack) rpcAttachNetworkInterface(ctx context.Context, instanceID, nicID 
 	var resp *ec2.AttachNetworkInterfaceOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.AttachNetworkInterface(&req)
+			resp, innerErr = instance.EC2Service.AttachNetworkInterface(&req)
 			return innerErr
 		},
 		normalizeError,
@@ -2220,7 +2220,7 @@ func (s stack) rpcAttachNetworkInterface(ctx context.Context, instanceID, nicID 
 	return resp.AttachmentId, nil
 }
 
-func (s stack) rpcDetachNetworkInterface(ctx context.Context, attachmentID *string) fail.Error {
+func (instance *stack) rpcDetachNetworkInterface(ctx context.Context, attachmentID *string) fail.Error {
 	if xerr := validateAWSString(attachmentID, "attachmentID", true); xerr != nil {
 		return xerr
 	}
@@ -2230,21 +2230,21 @@ func (s stack) rpcDetachNetworkInterface(ctx context.Context, attachmentID *stri
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			_, innerErr = s.EC2Service.DetachNetworkInterface(&req)
+			_, innerErr = instance.EC2Service.DetachNetworkInterface(&req)
 			return innerErr
 		},
 		normalizeError,
 	)
 }
 
-func (s stack) rpcDescribeNetworkInterface(ctx context.Context, nicID *string) (*ec2.NetworkInterface, fail.Error) {
+func (instance *stack) rpcDescribeNetworkInterface(ctx context.Context, nicID *string) (*ec2.NetworkInterface, fail.Error) {
 	req := ec2.DescribeNetworkInterfacesInput{
 		NetworkInterfaceIds: []*string{nicID},
 	}
 	var resp *ec2.DescribeNetworkInterfacesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeNetworkInterfaces(&req)
+			resp, err = instance.EC2Service.DescribeNetworkInterfaces(&req)
 			return err
 		},
 		normalizeError,
@@ -2261,7 +2261,7 @@ func (s stack) rpcDescribeNetworkInterface(ctx context.Context, nicID *string) (
 	return resp.NetworkInterfaces[0], nil
 }
 
-func (s stack) rpcDescribeVolumes(ctx context.Context, ids []*string) ([]*ec2.Volume, fail.Error) {
+func (instance *stack) rpcDescribeVolumes(ctx context.Context, ids []*string) ([]*ec2.Volume, fail.Error) {
 	var req ec2.DescribeVolumesInput
 	if len(ids) > 0 {
 		req.VolumeIds = ids
@@ -2269,7 +2269,7 @@ func (s stack) rpcDescribeVolumes(ctx context.Context, ids []*string) ([]*ec2.Vo
 	var resp *ec2.DescribeVolumesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeVolumes(&req)
+			resp, err = instance.EC2Service.DescribeVolumes(&req)
 			return err
 		},
 		normalizeError,
@@ -2283,7 +2283,7 @@ func (s stack) rpcDescribeVolumes(ctx context.Context, ids []*string) ([]*ec2.Vo
 	return resp.Volumes, nil
 }
 
-func (s stack) rpcDescribeVolumeByID(ctx context.Context, id *string) (*ec2.Volume, fail.Error) {
+func (instance *stack) rpcDescribeVolumeByID(ctx context.Context, id *string) (*ec2.Volume, fail.Error) {
 	if id == nil {
 		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("id")
 	}
@@ -2291,7 +2291,7 @@ func (s stack) rpcDescribeVolumeByID(ctx context.Context, id *string) (*ec2.Volu
 		return &ec2.Volume{}, fail.InvalidParameterError("id", "cannot be empty AWS String")
 	}
 
-	resp, xerr := s.rpcDescribeVolumes(ctx, []*string{id})
+	resp, xerr := instance.rpcDescribeVolumes(ctx, []*string{id})
 	if xerr != nil {
 		return &ec2.Volume{}, xerr
 	}
@@ -2306,7 +2306,7 @@ func (s stack) rpcDescribeVolumeByID(ctx context.Context, id *string) (*ec2.Volu
 }
 
 // rpcDescribeVolumeByName returns information about a volume identified by its name
-func (s stack) rpcDescribeVolumeByName(ctx context.Context, name *string) (*ec2.Volume, fail.Error) {
+func (instance *stack) rpcDescribeVolumeByName(ctx context.Context, name *string) (*ec2.Volume, fail.Error) {
 	if name == nil {
 		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("name")
 	}
@@ -2325,7 +2325,7 @@ func (s stack) rpcDescribeVolumeByName(ctx context.Context, name *string) (*ec2.
 	var resp *ec2.DescribeVolumesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeVolumes(&req)
+			resp, err = instance.EC2Service.DescribeVolumes(&req)
 			return err
 		},
 		normalizeError,
@@ -2343,7 +2343,7 @@ func (s stack) rpcDescribeVolumeByName(ctx context.Context, name *string) (*ec2.
 	return resp.Volumes[0], nil
 }
 
-func (s stack) rpcCreateVolume(ctx context.Context, name *string, size int64, speed string) (_ *ec2.Volume, ferr fail.Error) {
+func (instance *stack) rpcCreateVolume(ctx context.Context, name *string, size int64, speed string) (_ *ec2.Volume, ferr fail.Error) {
 	if name == nil {
 		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("name")
 	}
@@ -2357,12 +2357,12 @@ func (s stack) rpcCreateVolume(ctx context.Context, name *string, size int64, sp
 	req := ec2.CreateVolumeInput{
 		Size:             aws.Int64(size),
 		VolumeType:       aws.String(speed),
-		AvailabilityZone: aws.String(s.AwsConfig.Zone),
+		AvailabilityZone: aws.String(instance.AwsConfig.Zone),
 	}
 	var resp *ec2.Volume
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.CreateVolume(&req)
+			resp, err = instance.EC2Service.CreateVolume(&req)
 			return err
 		},
 		normalizeError,
@@ -2374,7 +2374,7 @@ func (s stack) rpcCreateVolume(ctx context.Context, name *string, size int64, sp
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.rpcDeleteVolume(context.Background(), resp.VolumeId)
+			derr := instance.rpcDeleteVolume(context.Background(), resp.VolumeId)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
 			}
@@ -2392,21 +2392,21 @@ func (s stack) rpcCreateVolume(ctx context.Context, name *string, size int64, sp
 		},
 		{
 			Key:   aws.String("DeclaredInBucket"),
-			Value: aws.String(s.Config.MetadataBucketName),
+			Value: aws.String(instance.Config.MetadataBucketName),
 		},
 		{
 			Key:   aws.String("CreationDate"),
 			Value: aws.String(time.Now().Format(time.RFC3339)),
 		},
 	}
-	if xerr := s.rpcCreateTags(ctx, []*string{resp.VolumeId}, tags); xerr != nil {
+	if xerr := instance.rpcCreateTags(ctx, []*string{resp.VolumeId}, tags); xerr != nil {
 		return nil, xerr
 	}
 
 	return resp, nil
 }
 
-func (s stack) rpcDeleteVolume(ctx context.Context, id *string) fail.Error {
+func (instance *stack) rpcDeleteVolume(ctx context.Context, id *string) fail.Error {
 	if id == nil {
 		return fail.InvalidParameterCannotBeNilError("id")
 	}
@@ -2419,7 +2419,7 @@ func (s stack) rpcDeleteVolume(ctx context.Context, id *string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DeleteVolume(&req)
+			_, err := instance.EC2Service.DeleteVolume(&req)
 			return err
 		},
 		normalizeError,

@@ -59,7 +59,7 @@ const protocolSeparator = ":"
 type SSHHandler interface {
 	Run(hostname, cmd string) (int, string, string, fail.Error)
 	Copy(from string, to string) (int, string, string, fail.Error)
-	GetConfig(iaasapi.HostParameter) (sshapi.Connector, fail.Error)
+	GetConfig(iaasapi.HostIdentifier) (sshapi.Connector, fail.Error)
 }
 
 // FIXME: ROBUSTNESS All functions MUST propagate context
@@ -75,7 +75,7 @@ func NewSSHHandler(job jobapi.Job) SSHHandler {
 }
 
 // GetConfig creates Profile to connect to a host
-func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.Connector, ferr fail.Error) {
+func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi.Connector, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -104,7 +104,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 
 	task := handler.job.Task()
 	ctx := handler.job.Context()
-	_, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	_, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -296,7 +296,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostParameter) (_ sshapi.
 }
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
-func (handler *sshHandler) WaitServerReady(hostParam iaasapi.HostParameter, timeout time.Duration) (ferr fail.Error) {
+func (handler *sshHandler) WaitServerReady(hostParam iaasapi.HostIdentifier, timeout time.Duration) (ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())

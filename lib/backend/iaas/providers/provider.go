@@ -37,11 +37,11 @@ type (
 
 	ReservedForTerraformerUse interface {
 		// TerraformRenderer(iaasapi.Provider) (terraformerapi.Terraformer, fail.Error)
-		ConsolidateNetworkSnippet(*abstract.Network)
-		ConsolidateSubnetSnippet(*abstract.Subnet)
-		ConsolidateSecurityGroupSnippet(*abstract.SecurityGroup)
+		ConsolidateNetworkSnippet(*abstract.Network) fail.Error
+		ConsolidateSubnetSnippet(*abstract.Subnet) fail.Error
+		ConsolidateSecurityGroupSnippet(*abstract.SecurityGroup) fail.Error
 		// ConsolidateLabelSnippet(*abstract.Label)
-		ConsolidateHostSnippet(*abstract.HostCore)
-		ConsolidateVolumeSnippet(*abstract.Volume)
+		ConsolidateHostSnippet(*abstract.HostCore) fail.Error
+		ConsolidateVolumeSnippet(*abstract.Volume) fail.Error
 	}
 )

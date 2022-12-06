@@ -13,6 +13,9 @@ func WithTarget(rsc Resource) options.Option {
 		if rsc == nil {
 			return fail.InvalidParameterCannotBeEmptyStringError("rsc")
 		}
+		if len(rsc.TerraformTypes()) == 0 {
+			return fail.InconsistentError("abnormal situation: no terraform types associated with the resource")
+		}
 
 		var targets []string
 		value, xerr := o.Load(OptionTargets)

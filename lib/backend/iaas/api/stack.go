@@ -66,15 +66,15 @@ type Stack interface {
 	// CreateSecurityGroup creates a security group
 	CreateSecurityGroup(ctx context.Context, networkRef, name, description string, rules abstract.SecurityGroupRules) (*abstract.SecurityGroup, fail.Error)
 	// InspectSecurityGroup returns information about a security group
-	InspectSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
+	InspectSecurityGroup(ctx context.Context, sgParam SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error)
 	// ClearSecurityGroup removes rules from group
-	ClearSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
+	ClearSecurityGroup(ctx context.Context, sgParam SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error)
 	// DeleteSecurityGroup deletes a security group and all its rules
-	DeleteSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter) fail.Error
+	DeleteSecurityGroup(ctx context.Context, sgParam SecurityGroupIdentifier) fail.Error
 	// AddRulesToSecurityGroup adds a rule to an existing security group
-	AddRulesToSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+	AddRulesToSecurityGroup(ctx context.Context, sgParam SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// DeleteRulesFromSecurityGroup deletes a rule identified by ID from a security group
-	DeleteRulesFromSecurityGroup(ctx context.Context, sgParam SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+	DeleteRulesFromSecurityGroup(ctx context.Context, sgParam SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// GetDefaultSecurityGroupName returns the name of the default security group automatically bound to new host
 	GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error)
 	// EnableSecurityGroup enables a Security Group
@@ -93,7 +93,7 @@ type Stack interface {
 	// ListNetworks lists all networks
 	ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error)
 	// DeleteNetwork deletes the network identified by id
-	DeleteNetwork(ctx context.Context, parameter NetworkParameter) fail.Error
+	DeleteNetwork(ctx context.Context, parameter NetworkIdentifier) fail.Error
 
 	// CreateSubnet creates a subnet in an existing network
 	CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (*abstract.Subnet, fail.Error)
@@ -104,7 +104,7 @@ type Stack interface {
 	// ListSubnets lists all subnets of a network (or all subnets if no networkRef is provided)
 	ListSubnets(ctx context.Context, networkID string) ([]*abstract.Subnet, fail.Error)
 	// DeleteSubnet deletes the subnet identified by id
-	DeleteSubnet(ctx context.Context, id string) fail.Error
+	DeleteSubnet(ctx context.Context, subnetParam SubnetIdentifier) fail.Error
 
 	// CreateVIP ...
 	CreateVIP(ctx context.Context, networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error)
@@ -120,32 +120,32 @@ type Stack interface {
 	// CreateHost creates a host that fulfills the request
 	CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (*abstract.HostFull, *userdata.Content, fail.Error)
 	// ClearHostStartupScript clears the Startup Script of the Host (if the stack can do it)
-	ClearHostStartupScript(context.Context, HostParameter) fail.Error
+	ClearHostStartupScript(context.Context, HostIdentifier) fail.Error
 
 	ChangeSecurityGroupSecurity(context.Context, bool, bool, string, string) fail.Error
 
 	// InspectHost returns the information of the Host identified by id
-	InspectHost(context.Context, HostParameter) (*abstract.HostFull, fail.Error)
+	InspectHost(context.Context, HostIdentifier) (*abstract.HostFull, fail.Error)
 	// GetHostState returns the current state of the host identified by id
-	GetHostState(context.Context, HostParameter) (hoststate.Enum, fail.Error)
+	GetHostState(context.Context, HostIdentifier) (hoststate.Enum, fail.Error)
 	// ListHosts lists all hosts
 	ListHosts(context.Context, bool) (abstract.HostList, fail.Error)
 	// DeleteHost deletes the host identified by id
-	DeleteHost(context.Context, HostParameter) fail.Error
+	DeleteHost(context.Context, HostIdentifier) fail.Error
 	// StopHost stops the host identified by id
-	StopHost(ctx context.Context, host HostParameter, gracefully bool) fail.Error
+	StopHost(ctx context.Context, host HostIdentifier, gracefully bool) fail.Error
 	// StartHost starts the host identified by id
-	StartHost(context.Context, HostParameter) fail.Error
+	StartHost(context.Context, HostIdentifier) fail.Error
 	// RebootHost reboots a host
-	RebootHost(context.Context, HostParameter) fail.Error
+	RebootHost(context.Context, HostIdentifier) fail.Error
 	// ResizeHost resizes a host
-	ResizeHost(context.Context, HostParameter, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error)
+	ResizeHost(context.Context, HostIdentifier, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error)
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
-	WaitHostReady(ctx context.Context, hostParam HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error)
+	WaitHostReady(ctx context.Context, hostParam HostIdentifier, timeout time.Duration) (*abstract.HostCore, fail.Error)
 	// BindSecurityGroupToHost attaches a security group to a host
-	BindSecurityGroupToHost(ctx context.Context, sgParam SecurityGroupParameter, hostParam HostParameter) fail.Error
+	BindSecurityGroupToHost(ctx context.Context, sgParam SecurityGroupIdentifier, hostParam HostIdentifier) fail.Error
 	// UnbindSecurityGroupFromHost detaches a security group from a host
-	UnbindSecurityGroupFromHost(ctx context.Context, sgParam SecurityGroupParameter, hostParam HostParameter) fail.Error
+	UnbindSecurityGroupFromHost(ctx context.Context, sgParam SecurityGroupIdentifier, hostParam HostIdentifier) fail.Error
 
 	// CreateVolume creates a block volume
 	CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error)

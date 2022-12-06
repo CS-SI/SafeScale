@@ -19,6 +19,7 @@ package outscale
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -312,11 +313,11 @@ func (instance *stack) ListNetworks(ctx context.Context) (_ []*abstract.Network,
 }
 
 // DeleteNetwork deletes the network identified by id
-func (instance *stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) (ferr fail.Error) {
+func (instance *stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkIdentifier) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	an, networkLabel, xerr := iaasapi.ValidateNetworkParameter(networkParam)
+	an, networkLabel, xerr := iaasapi.ValidateNetworkIdentifier(networkParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -582,17 +583,37 @@ func (instance *stack) listSubnetsByHost(ctx context.Context, hostID string) ([]
 	return list, resp, nil
 }
 
-// DeleteSubnet deletes the subnet identified by id
-func (instance *stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
+// DeleteSubnet deletes the subnet
+func (instance *stack) DeleteSubnet(ctx context.Context, subnetParam iaasapi.SubnetIdentifier) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
+	as, subnetLabel, xerr := iaasapi.ValidateSubnetIdentifier(subnetParam)
+	if xerr != nil {
+		return xerr
+	}
 
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", subnetLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	// Reads NIS that belong to the subnet
-	resp, xerr := instance.rpcReadNics(ctx, id, "")
+	if as.ID != "" {
+		as, xerr = instance.InspectSubnet(ctx, as.ID)
+	} else {
+		as, xerr = instance.InspectSubnetByName(ctx, as.Network, as.Name)
+	}
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If subnet is not found, considered as a success
+			debug.IgnoreErrorWithContext(ctx, xerr)
+			return nil
+		default:
+			return xerr
+		}
+	}
+
+	// Reads NICs that belong to the subnet
+	resp, xerr := instance.rpcReadNics(ctx, as.ID, "")
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -620,7 +641,7 @@ func (instance *stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.E
 		}
 	}
 
-	return instance.rpcDeleteSubnet(ctx, id)
+	return instance.rpcDeleteSubnet(ctx, as.ID)
 }
 
 func (instance *stack) updateDefaultSecurityRules(ctx context.Context, sg osc.SecurityGroup) fail.Error {

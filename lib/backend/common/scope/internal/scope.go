@@ -31,7 +31,6 @@ import (
 	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/securitygroup"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/subnet"
 	volumefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/volume"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/puzpuzpuz/xsync"
 	"github.com/sirupsen/logrus"
 
@@ -49,29 +48,28 @@ var (
 type (
 	// providerUsingTerraform interface for use by scope
 	providerUsingTerraform interface {
-		ConsolidateNetworkSnippet(*abstract.Network)             // configures if needed Terraform Snippet to use for abstract.Network in parameter
-		ConsolidateSubnetSnippet(*abstract.Subnet)               // configures if needed Terraform Snippet to use for abstract.Subnet in parameter
-		ConsolidateSecurityGroupSnippet(*abstract.SecurityGroup) // configures if needed Terraform Snippet to use for abstract.SecurityGroup in parameter
-		ConsolidateHostSnippet(*abstract.HostCore)               // configures if needed Terraform Snippet to use for abstract.Host in parameter
-		// ConsolidateLabelSnippet(*abstract.Label)                 // configures if needed Terraform Snippet to use for abstract.Label in parameter
-		ConsolidateVolumeSnippet(*abstract.Volume) // configures if needed Terraform Snippet to use for abstract.Volume
+		ConsolidateNetworkSnippet(*abstract.Network) fail.Error             // configures if needed Terraform Snippet to use for abstract.Network in parameter
+		ConsolidateSubnetSnippet(*abstract.Subnet) fail.Error               // configures if needed Terraform Snippet to use for abstract.Subnet in parameter
+		ConsolidateSecurityGroupSnippet(*abstract.SecurityGroup) fail.Error // configures if needed Terraform Snippet to use for abstract.SecurityGroup in parameter
+		ConsolidateHostSnippet(*abstract.HostCore) fail.Error               // configures if needed Terraform Snippet to use for abstract.Host in parameter
+		// ConsolidateLabelSnippet(*abstract.Label) fail.Error                // configures if needed Terraform Snippet to use for abstract.Label in parameter
+		ConsolidateVolumeSnippet(*abstract.Volume) fail.Error // configures if needed Terraform Snippet to use for abstract.Volume
 	}
 
 	// scope contains information about context of the Job
 	scope struct {
-		lock           *sync.RWMutex
-		resourceByName *xsync.MapOf[string, string]
-		resourceByID   *xsync.MapOf[string, terraformerapi.Resource]
-		consulClient   *consumer.Client
-		consulKV       *consumer.KV
-		service        iaasapi.Service
-		organization   string
-		project        string
-		tenant         string
-		description    string
-		kvPath         string
-		fsPath         string
-		loaded         bool
+		lock         *sync.RWMutex
+		resources    *xsync.MapOf[string, terraformerapi.Resource]
+		consulClient *consumer.Client
+		consulKV     *consumer.KV
+		service      iaasapi.Service
+		organization string
+		project      string
+		tenant       string
+		description  string
+		kvPath       string
+		fsPath       string
+		loaded       bool
 	}
 )
 
@@ -119,15 +117,14 @@ func New(organization, project, tenant, description string) (*scope, fail.Error)
 	}
 
 	out := &scope{
-		organization:   organization,
-		project:        project,
-		tenant:         tenant,
-		description:    description,
-		fsPath:         filepath.Join(organization, project, tenant),
-		kvPath:         strings.Join([]string{organization, project, tenant}, "/"),
-		resourceByID:   xsync.NewMapOf[terraformerapi.Resource](),
-		resourceByName: xsync.NewMapOf[string](),
-		lock:           &sync.RWMutex{},
+		organization: organization,
+		project:      project,
+		tenant:       tenant,
+		description:  description,
+		fsPath:       filepath.Join(organization, project, tenant),
+		kvPath:       strings.Join([]string{organization, project, tenant}, "/"),
+		resources:    xsync.NewMapOf[terraformerapi.Resource](),
+		lock:         &sync.RWMutex{},
 	}
 
 	_, loaded := scopeList.LoadOrStore(out.kvPath, out)
@@ -151,7 +148,7 @@ func New(organization, project, tenant, description string) (*scope, fail.Error)
 
 // IsNull tells if the scope is considered as null value
 func (s *scope) IsNull() bool {
-	return s == nil || s.organization == "" || s.project == "" || s.tenant == "" || s.resourceByName == nil || s.resourceByID == nil
+	return s == nil || s.organization == "" || s.project == "" || s.tenant == "" || s.resources == nil
 }
 
 // IsLoaded tells if resources of the scope have been browsed
@@ -277,29 +274,6 @@ func (s *scope) ConsulKV() *consumer.KV {
 	return s.consulKV
 }
 
-// // Resource returns the resource corresponding to key (being an id or a name)
-// func (s *scope) Resource(kind string, ref string) (clonable.Clonable, fail.Error) {
-// 	if valid.IsNull(s) {
-// 		return nil, fail.InvalidInstanceError()
-// 	}
-// 	if ref = strings.TrimSpace(ref); ref == "" {
-// 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-// 	}
-//
-// 	index := kind + ":" + ref
-// 	id, found := s.resourceByName.Load(ref)
-// 	if found {
-// 		index = kind + ":" + id
-// 	}
-//
-// 	rsc, found := s.resourceByID.Load(index)
-// 	if found {
-// 		return rsc, nil
-// 	}
-//
-// 	return nil, fail.NotFoundError("failed to find resource identified by %s", ref)
-// }
-
 func (s *scope) LoadAbstracts(ctx context.Context) fail.Error {
 	if valid.IsNull(s) {
 		return fail.InvalidInstanceError()
@@ -372,13 +346,12 @@ func (s *scope) loadNetworks(ctx context.Context, provider providerUsingTerrafor
 	}
 
 	return browser.Browse(ctx, func(an *abstract.Network) fail.Error {
-		provider.ConsolidateNetworkSnippet(an)
-		casted, innerErr := lang.Cast[terraformerapi.Resource](an)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
+		innerXErr := provider.ConsolidateNetworkSnippet(an)
+		if innerXErr != nil {
+			return innerXErr
 		}
 
-		innerXErr := s.unsafeRegisterResource(casted)
+		innerXErr = s.unsafeRegisterResource(an)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -414,9 +387,9 @@ func (s *scope) extractProvider(ctx context.Context) (providerUsingTerraform, fa
 		return nil, xerr
 	}
 
-	providerSuperset, err := lang.Cast[providerUsingTerraform](provider)
-	if err != nil {
-		return nil, fail.Wrap(err)
+	providerSuperset, ok := provider.(providerUsingTerraform)
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast provodier to 'providerUsingTerraform'")
 	}
 
 	return providerSuperset, nil
@@ -432,13 +405,12 @@ func (s *scope) loadSubnets(ctx context.Context, provider providerUsingTerraform
 	}
 
 	return browser.Browse(ctx, func(as *abstract.Subnet) fail.Error {
-		provider.ConsolidateSubnetSnippet(as)
-		casted, innerErr := lang.Cast[terraformerapi.Resource](as)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
+		innerXErr := provider.ConsolidateSubnetSnippet(as)
+		if innerXErr != nil {
+			return innerXErr
 		}
 
-		innerXErr := s.unsafeRegisterResource(casted)
+		innerXErr = s.unsafeRegisterResource(as)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -458,13 +430,12 @@ func (s *scope) loadSecurityGroups(ctx context.Context, provider providerUsingTe
 	}
 
 	return browser.Browse(ctx, func(asg *abstract.SecurityGroup) fail.Error {
-		provider.ConsolidateSecurityGroupSnippet(asg)
-		casted, innerErr := lang.Cast[terraformerapi.Resource](asg)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
+		innerXErr := provider.ConsolidateSecurityGroupSnippet(asg)
+		if innerXErr != nil {
+			return innerXErr
 		}
 
-		innerXErr := s.unsafeRegisterResource(casted)
+		innerXErr = s.unsafeRegisterResource(asg)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -484,13 +455,12 @@ func (s *scope) loadHosts(ctx context.Context, provider providerUsingTerraform) 
 	}
 
 	return browser.Browse(ctx, func(ahc *abstract.HostCore) fail.Error {
-		provider.ConsolidateHostSnippet(ahc)
-		casted, innerErr := lang.Cast[terraformerapi.Resource](ahc)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
+		innerXErr := provider.ConsolidateHostSnippet(ahc)
+		if innerXErr != nil {
+			return innerXErr
 		}
 
-		innerXErr := s.unsafeRegisterResource(casted)
+		innerXErr = s.unsafeRegisterResource(ahc)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -500,7 +470,7 @@ func (s *scope) loadHosts(ctx context.Context, provider providerUsingTerraform) 
 	})
 }
 
-func (s *scope) loadLabels(ctx context.Context, provider providerUsingTerraform) (ferr fail.Error) {
+func (s *scope) loadLabels(ctx context.Context, _ providerUsingTerraform) (ferr fail.Error) {
 	count := 0
 	defer s.loadLogHelper("Labels", &ferr, &count)()
 
@@ -511,12 +481,7 @@ func (s *scope) loadLabels(ctx context.Context, provider providerUsingTerraform)
 
 	return browser.Browse(ctx, func(al *abstract.Label) fail.Error {
 		// provider.ConsolidateLabelSnippet(al)
-		casted, innerErr := lang.Cast[terraformerapi.Resource](al)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
-		}
-
-		innerXErr := s.unsafeRegisterResource(casted)
+		innerXErr := s.unsafeRegisterResource(al)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -536,13 +501,12 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 	}
 
 	return browser.Browse(ctx, func(av *abstract.Volume) fail.Error {
-		provider.ConsolidateVolumeSnippet(av)
-		casted, innerErr := lang.Cast[terraformerapi.Resource](av)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
+		innerXErr := provider.ConsolidateVolumeSnippet(av)
+		if innerXErr != nil {
+			return innerXErr
 		}
 
-		innerXErr := s.unsafeRegisterResource(casted)
+		innerXErr = s.unsafeRegisterResource(av)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -563,12 +527,7 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 // 	}
 //
 // 	return browser.Browse(ctx, func(ac *abstract.Cluster) fail.Error {
-// 		casted, innerErr := lang.Cast[terraformerapi.Resource](ac)
-// 		if innerErr != nil {
-// 			return fail.Wrap(innerErr)
-// 		}
-//
-// 		innerXErr := s.unsafeRegisterResource(casted)
+// 		innerXErr := s.unsafeRegisterResource(ac)
 // 		if innerXErr != nil {
 // 			return innerXErr
 // 		}
@@ -588,12 +547,7 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 // 	}
 //
 // 	return browser.Browse(ctx, func(ab *abstract.Bucket) fail.Error {
-// 		casted, innerErr := lang.Cast[terraformerapi.Resource](ab)
-// 		if innerErr != nil {
-// 			return fail.Wrap(innerErr)
-// 		}
-//
-// 		innerXErr := s.unsafeRegisterResource(casted)
+// 		innerXErr := s.unsafeRegisterResource(ab)
 // 		if innerXErr != nil {
 // 			return innerXErr
 // 		}
@@ -603,7 +557,7 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 // 	})
 // }
 
-func (s *scope) AllAbstracts() ([]terraformerapi.Resource, fail.Error) {
+func (s *scope) AllAbstracts() (map[string]terraformerapi.Resource, fail.Error) {
 	if valid.IsNull(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -611,9 +565,9 @@ func (s *scope) AllAbstracts() ([]terraformerapi.Resource, fail.Error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	list := make([]terraformerapi.Resource, 0, s.resourceByID.Size())
-	s.resourceByID.Range(func(key string, value terraformerapi.Resource) bool {
-		list = append(list, value)
+	list := make(map[string]terraformerapi.Resource, s.resources.Size())
+	s.resources.Range(func(key string, value terraformerapi.Resource) bool {
+		list[key] = value
 		return true
 	})
 
@@ -635,29 +589,19 @@ func (s *scope) RegisterResource(rsc terraformerapi.Resource) fail.Error {
 }
 
 func (s *scope) unsafeRegisterResource(rsc terraformerapi.Resource) fail.Error {
-	kind, name, queryID, queryName, xerr := buildResourceIndexes(rsc)
+	kind, name, queryName, xerr := s.extractResourceIndex(rsc)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Check duplicate by name
-	storedID, found := s.resourceByName.Load(queryName)
-	if found {
-		_, found = s.resourceByID.Load(storedID)
-		if found {
-			return fail.DuplicateError("a %s named '%s' is already registered", kind, name)
-		}
-	}
-
-	// check duplicate by id
-	_, found = s.resourceByID.Load(queryID)
+	_, found := s.resources.Load(queryName)
 	if found {
 		return fail.DuplicateError("a %s named '%s' is already registered", kind, name)
 	}
 
 	// Now registers resource
-	s.resourceByID.Store(queryID, rsc)
-	s.resourceByName.Store(queryName, queryID)
+	s.resources.Store(queryName, rsc)
 	return nil
 }
 
@@ -669,7 +613,7 @@ func (s *scope) UnregisterResource(rsc terraformerapi.Resource) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("rsc")
 	}
 
-	_, _, queryID, queryName, xerr := buildResourceIndexes(rsc)
+	_, _, queryName, xerr := s.extractResourceIndex(rsc)
 	if xerr != nil {
 		return xerr
 	}
@@ -678,28 +622,18 @@ func (s *scope) UnregisterResource(rsc terraformerapi.Resource) fail.Error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.resourceByName.Delete(queryName)
-	s.resourceByID.Delete(queryID)
+	s.resources.Delete(queryName)
 	return nil
 }
 
-// buildResourceIndexes returns kind, name, queryID and queryName corresponding to resource
-func buildResourceIndexes(rsc terraformerapi.Resource) (string, string, string, string, fail.Error) {
+// extractResourceIndex returns kind, name and index corresponding to resource
+func (s *scope) extractResourceIndex(rsc terraformerapi.Resource) (string, string, string, fail.Error) {
+	if valid.IsNull(s) {
+		return "", "", "", fail.InvalidInstanceError()
+	}
 	if valid.IsNull(rsc) {
-		return "", "", "", "", fail.InvalidParameterCannotBeNilError("rsc")
+		return "", "", "", fail.InvalidParameterCannotBeNilError("rsc")
 	}
 
-	kind := rsc.Kind()
-
-	id, err := rsc.GetID()
-	if err != nil {
-		return "", "", "", "", fail.Wrap(err)
-	}
-
-	queryID := kind + ":" + id
-
-	name := rsc.GetName()
-	queryName := kind + ":" + name
-
-	return kind, name, queryID, queryName, nil
+	return rsc.Kind(), rsc.GetName(), rsc.UniqueID(), nil
 }

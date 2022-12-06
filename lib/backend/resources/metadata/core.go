@@ -522,9 +522,9 @@ func (instance *Core) Carry(inctx context.Context, abstractResource clonable.Clo
 				return xerr
 			}
 
-			tfResource, err := lang.Cast[terraformerapi.Resource](abstractResource)
-			if err != nil {
-				return fail.Wrap(err)
+			tfResource, ok := abstractResource.(terraformerapi.Resource)
+			if !ok {
+				return fail.InconsistentError("failed to cast '%s' to 'terraformerapi.Resource'", reflect.TypeOf(abstractResource).String())
 			}
 
 			xerr = myjob.Scope().RegisterResource(tfResource)
@@ -1351,9 +1351,9 @@ func (instance *Core) Delete(inctx context.Context) (_ fail.Error) {
 
 			// First remove entry from scope registered abstracts
 			innerXErr := instance.shielded.Inspect(func(p clonable.Clonable) fail.Error {
-				abstractResource, innerErr := lang.Cast[terraformerapi.Resource](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
+				abstractResource, ok := p.(terraformerapi.Resource)
+				if !ok {
+					return fail.InconsistentError("failed to cast '%s' to 'terraformerapi.Resource'", reflect.TypeOf(p).String())
 				}
 
 				// Registers the abstract in scope

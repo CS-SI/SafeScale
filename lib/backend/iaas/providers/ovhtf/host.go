@@ -135,7 +135,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 	_ = azone
 
 	// --- Initializes abstract.HostFull ---
-	ahf, xerr := p.newAbstract(request.ResourceName)
+	ahf, xerr := p.designHostFull(request.ResourceName)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -163,7 +163,10 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		}
 	}
 
-	xerr = ahf.AddOptions(abstract.WithExtraData("Request", request))
+	xerr = ahf.AddOptions(
+		abstract.WithExtraData("Request", request),
+		abstract.MarkForCreation(),
+	)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -421,16 +424,12 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 	return ahf /*newHost*/, userData, nil
 }
 
-func (p *provider) newAbstract(name string) (*abstract.HostFull, fail.Error) {
-	ahf, xerr := abstract.NewHostFull(
-		abstract.WithName(name),
-		abstract.WithResourceType("openstack_networking_port_v2"),
-		abstract.WithResourceType("openstack_compute_instance_v2"),
-		abstract.WithResourceType("openstack_images_image_v2"),
-	)
+func (p *provider) designHostFull(name string) (*abstract.HostFull, fail.Error) {
+	ahf, xerr := abstract.NewHostFull(abstract.WithName(name))
 	if xerr != nil {
 		return nil, xerr
 	}
+	p.ConsolidateHostSnippet(ahf.HostCore)
 
 	return ahf, nil
 }
@@ -571,17 +570,17 @@ func (p provider) complementHost(ctx context.Context, hostCore *abstract.HostCor
 }
 */
 
-func (p *provider) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (p *provider) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	// TODO implement me
 	panic("implement me")
 }
 
 // InspectHost ...
-func (p *provider) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (*abstract.HostFull, fail.Error) {
+func (p *provider) InspectHost(ctx context.Context, hostParam iaasapi.HostIdentifier) (*abstract.HostFull, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	_, hostLabel, xerr := iaasapi.ValidateHostParameter(hostParam)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -591,7 +590,7 @@ func (p *provider) InspectHost(ctx context.Context, hostParam iaasapi.HostParame
 	return p.MiniStack.InspectHost(ctx, hostParam)
 }
 
-func (p *provider) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter) (hoststate.Enum, fail.Error) {
+func (p *provider) GetHostState(ctx context.Context, hostParam iaasapi.HostIdentifier) (hoststate.Enum, fail.Error) {
 	// TODO implement me
 	panic("implement me")
 }
@@ -607,11 +606,11 @@ func (p *provider) ListHosts(ctx context.Context, b bool) (abstract.HostList, fa
 	return p.MiniStack.ListHosts(ctx, b)
 }
 
-func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -626,7 +625,7 @@ func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostParamet
 
 	xerr = ahf.AddOptions(
 		abstract.UseTerraformSnippet(hostDesignResourceSnippetPath),
-		abstract.WithExtraData(abstract.ExtraMarkedForDestruction, true),
+		abstract.MarkForDestruction(),
 	)
 	if xerr != nil {
 		return xerr
@@ -656,11 +655,11 @@ func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostParamet
 	return nil
 }
 
-func (p *provider) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gracefully bool) fail.Error {
+func (p *provider) StopHost(ctx context.Context, hostParam iaasapi.HostIdentifier, gracefully bool) fail.Error {
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -706,11 +705,11 @@ func (p *provider) StopHost(ctx context.Context, hostParam iaasapi.HostParameter
 	return nil
 }
 
-func (p *provider) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (p *provider) StartHost(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -756,35 +755,40 @@ func (p *provider) StartHost(ctx context.Context, hostParam iaasapi.HostParamete
 	return nil
 }
 
-func (p *provider) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (p *provider) RebootHost(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, requirements abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (p *provider) ResizeHost(ctx context.Context, hostParam iaasapi.HostIdentifier, requirements abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+func (p *provider) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIdentifier, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
+func (p *provider) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
+func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (p *provider) ConsolidateHostSnippet(ahc *abstract.HostCore) {
+func (p *provider) ConsolidateHostSnippet(ahc *abstract.HostCore) fail.Error {
 	if valid.IsNil(p) || ahc == nil {
-		return
+		return nil
 	}
 
-	_ = ahc.AddOptions(abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
+	return ahc.AddOptions(
+		abstract.UseTerraformSnippet(hostDesignResourceSnippetPath),
+		abstract.WithResourceType("openstack_networking_port_v2"),
+		abstract.WithResourceType("openstack_compute_instance_v2"),
+		abstract.WithResourceType("openstack_images_image_v2"),
+	)
 }

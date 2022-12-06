@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"net"
+	"reflect"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -28,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/sirupsen/logrus"
 )
@@ -59,9 +59,9 @@ func NewNetworkHandler(ctx context.Context) (NetworkHandler, fail.Error) {
 		return nil, fail.InvalidRequestError("failed to get the job inside the context")
 	}
 
-	job, err := lang.Cast[jobapi.Job](value)
-	if err != nil {
-		return nil, fail.Wrap(err)
+	job, ok := value.(jobapi.Job)
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast value (%s) to 'jobapi.Job'", reflect.TypeOf(value).String())
 	}
 
 	return &networkHandler{job}, nil
@@ -69,13 +69,14 @@ func NewNetworkHandler(ctx context.Context) (NetworkHandler, fail.Error) {
 
 // Create a new network
 func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnetReq *abstract.SubnetRequest, gwName string, gwSizing *abstract.HostSizingRequirements) (_ resources.Network, ferr fail.Error) {
+	ctx := handler.job.Context()
 	defer func() {
 		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
+			ferr.WithContext(ctx)
 		}
 	}()
 	defer fail.OnPanic(&ferr)
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, "cannot create network")
+	defer fail.OnExitLogError(ctx, &ferr, "cannot create network")
 
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -84,7 +85,6 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkReq.Name")
 	}
 
-	ctx := handler.job.Context()
 	tracer := debug.NewTracer(ctx, true, "('%s')", networkReq.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
@@ -116,7 +116,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && networkReq.CleanOnFailure() {
-			derr := networkInstance.Delete(context.Background())
+			derr := networkInstance.Delete(jobapi.NewContextPropagatingJob(ctx))
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", networkReq.Name))
 			}
@@ -130,7 +130,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 			return nil, fail.Wrap(xerr, "failed to derive the CIDR of the Subnet from Network CIDR '%s'", networkReq.CIDR)
 		}
 
-		logrus.WithContext(handler.job.Context()).Debugf("Creating default Subnet of Network '%s' with CIDR '%s'", networkReq.Name, subnetNet.String())
+		logrus.WithContext(ctx).Debugf("Creating default Subnet of Network '%s' with CIDR '%s'", networkReq.Name, subnetNet.String())
 
 		if gwSizing == nil {
 			gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}

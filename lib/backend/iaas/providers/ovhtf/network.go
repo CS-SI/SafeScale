@@ -96,25 +96,13 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
-	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
-	if len(req.DNSServers) == 0 {
-		req.DNSServers = []string{"0.0.0.0"}
+	abstractNetwork, xerr := p.designNetwork(ctx, req)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	// Checks if CIDR is valid...
-	if req.CIDR != "" {
-		_, _, err := net.ParseCIDR(req.CIDR)
-		if err != nil {
-			return nil, fail.Wrap(err)
-		}
-	} else { // CIDR is empty, choose the first Class C one possible
-		tracer.Trace("CIDR is empty, choosing one...")
-		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
-	}
-
-	abstractNetwork, xerr := p.DesignNetwork(ctx, req)
+	// Pass information to terraformer that we are in creation process
+	xerr = abstractNetwork.AddOptions(abstract.MarkForCreation())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -161,8 +149,8 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 	return abstractNetwork, nil
 }
 
-// DesignNetwork initializes a networkResource to create/inspect/destroy Network
-func (p *provider) DesignNetwork(ctx context.Context, req abstract.NetworkRequest) (_ *abstract.Network, ferr fail.Error) {
+// designNetwork initializes a networkResource to create/inspect/destroy Network
+func (p *provider) designNetwork(ctx context.Context, req abstract.NetworkRequest) (_ *abstract.Network, ferr fail.Error) {
 	var xerr fail.Error
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
@@ -189,12 +177,12 @@ func (p *provider) DesignNetwork(ctx context.Context, req abstract.NetworkReques
 		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
 	}
 
-	opts := []abstract.Option{
-		abstract.WithName(req.Name),
-		abstract.UseTerraformSnippet(networkDesignResourceSnippetPath),
-		abstract.WithResourceType("openstack_networking_network_v2"),
+	newNet, xerr := abstract.NewNetwork(abstract.WithName(req.Name))
+	if xerr != nil {
+		return nil, xerr
 	}
-	newNet, xerr := abstract.NewNetwork(opts...)
+
+	xerr = p.ConsolidateNetworkSnippet(newNet)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -363,14 +351,6 @@ func (p *provider) InspectNetwork(ctx context.Context, id string) (*abstract.Net
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	return p.MiniStack.InspectNetwork(ctx, id)
-	//
-	// netRsc, xerr := newNetworkResource("", networkInspectResourceSnippetPath, terraformer.WithLocalState())
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// netRsc.id = id
-	// return p.inspectNetworkResource(ctx, netRsc)
 }
 
 // ListNetworks lists available networks
@@ -386,11 +366,11 @@ func (p *provider) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.
 }
 
 // DeleteNetwork deletes the network identified by id
-func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkParameter) fail.Error {
+func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkIdentifier) fail.Error {
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
 	}
-	an, networkLabel, xerr := iaasapi.ValidateNetworkParameter(parameter)
+	an, networkLabel, xerr := iaasapi.ValidateNetworkIdentifier(parameter)
 	if xerr != nil {
 		return xerr
 	}
@@ -446,7 +426,12 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 		return nil
 	*/
 
-	xerr = an.AddOptions(abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
+	xerr = p.ConsolidateNetworkSnippet(an)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = an.AddOptions(abstract.MarkForDestruction())
 	if xerr != nil {
 		return xerr
 	}
@@ -602,10 +587,13 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkP
 // 	)
 // }
 
-func (p *provider) ConsolidateNetworkSnippet(an *abstract.Network) {
+func (p *provider) ConsolidateNetworkSnippet(an *abstract.Network) fail.Error {
 	if valid.IsNil(p) || an == nil {
-		return
+		return nil
 	}
 
-	_ = an.AddOptions(abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
+	return an.AddOptions(
+		abstract.UseTerraformSnippet(networkDesignResourceSnippetPath),
+		abstract.WithResourceType("openstack_networking_network_v2"),
+	)
 }

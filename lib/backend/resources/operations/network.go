@@ -44,7 +44,7 @@ import (
 
 const (
 	networkKind = "network"
-	// networksFolderName is the technical name of the Object Storage container used to store networks info
+	// networksFolderName is the technical name of the metadata container used to store networks info
 	networksFolderName = "networks"
 )
 
@@ -220,7 +220,7 @@ func (instance *Network) Kind() string {
 	return networkKind
 }
 
-// Exists checks if the resource actually exists in provider side (not in stow metadata)
+// Exists checks if the resource actually exists in provider side (not in metadata)
 func (instance *Network) Exists(ctx context.Context) (bool, fail.Error) {
 	theID, err := instance.GetID()
 	if err != nil {
@@ -643,7 +643,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 				}
 
 				maybeDeleted := false
-				innerXErr = svc.DeleteNetwork(ctx, abstractNetwork.ID)
+				innerXErr = svc.DeleteNetwork(ctx, abstractNetwork)
 				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:

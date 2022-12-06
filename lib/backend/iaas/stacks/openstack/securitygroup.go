@@ -155,14 +155,14 @@ func (instance *stack) CreateSecurityGroup(ctx context.Context, networkRef, name
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (instance *stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (ferr fail.Error) {
+func (instance *stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (ferr fail.Error) {
 	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if instance.NetworkClient == nil {
 		return fail.InvalidInstanceContentError("instance.NetworkClient", "cannot be nil")
 	}
-	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupIdentifier(sgParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -206,7 +206,7 @@ func (instance *stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.
 }
 
 // InspectSecurityGroup returns information about a security group
-func (instance *stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (instance *stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -270,7 +270,7 @@ func (instance *stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (instance *stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (instance *stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -403,7 +403,7 @@ func convertEtherTypeFromAbstract(in ipversion.Enum) secrules.RuleEtherType {
 
 // AddRulesToSecurityGroup adds rules to a Security Group
 // On success, return Security Group with added rule
-func (instance *stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
+func (instance *stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -537,7 +537,7 @@ func (instance *stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaas
 
 // DeleteRulesFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (instance *stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
+func (instance *stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}

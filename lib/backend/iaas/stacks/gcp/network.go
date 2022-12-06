@@ -171,11 +171,11 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) (ferr fail.Error) {
+func (s stack) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkIdentifier) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	an, networkLabel, xerr := iaasapi.ValidateNetworkParameter(networkParam)
+	an, networkLabel, xerr := iaasapi.ValidateNetworkIdentifier(networkParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -470,20 +470,36 @@ func toAbstractSubnet(in compute.Subnetwork) *abstract.Subnet {
 }
 
 // DeleteSubnet deletes the subnet identified by id
-func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
+func (s stack) DeleteSubnet(ctx context.Context, subnetParam iaasapi.SubnetIdentifier) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	as, subnetLabel, xerr := iaasapi.ValidateSubnetIdentifier(subnetParam)
+	if xerr != nil {
+		return xerr
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", subnetLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	if as.ID != "" {
+		as, xerr = s.InspectSubnet(ctx, as.ID)
+	} else {
+		as, xerr = s.InspectSubnetByName(ctx, as.Network, as.Name)
+	}
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If subnet is not found, considered as a success
+			debug.IgnoreErrorWithContext(ctx, xerr)
+			return nil
+		default:
+			return xerr
+		}
+	}
+
 	// Delete NAT route
-	natRouteName := fmt.Sprintf(NATRouteNameFormat, id)
-	var xerr fail.Error
+	natRouteName := fmt.Sprintf(NATRouteNameFormat, as.ID)
 	if xerr = s.rpcDeleteRoute(ctx, natRouteName); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -494,7 +510,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 		}
 	}
 
-	subn, xerr := s.rpcGetSubnetByID(ctx, id)
+	subn, xerr := s.rpcGetSubnetByID(ctx, as.ID)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

@@ -23,11 +23,11 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"time"
 
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
@@ -97,9 +97,10 @@ func UseService(ctx context.Context, opts ...options.Option) (_ iaasapi.Service,
 		return nil, xerr
 	}
 
-	castedScope, err := lang.Cast[terraformerapi.ScopeLimitedToTerraformerUse](myjob.Scope())
-	if err != nil {
-		return nil, fail.Wrap(err)
+	scope := myjob.Scope()
+	castedScope, ok := scope.(terraformerapi.ScopeLimitedToTerraformerUse)
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast: expecting 'terraformerapi.ScopeLimitedToTerraformerUse', receiving '%s'", reflect.TypeOf(scope).String())
 	}
 
 	opts = append(opts, iaasoptions.WithScope(castedScope))

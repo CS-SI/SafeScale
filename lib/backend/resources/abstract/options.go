@@ -70,3 +70,13 @@ func WithExtraData(name string, value any) Option {
 		return nil
 	}
 }
+
+// MarkForCreation is used to mark resource as to be created
+func MarkForCreation() Option {
+	return WithExtraData(ExtraMarkedForCreation, true)
+}
+
+// MarkForDestruction is used to mark resource as to be destroyed
+func MarkForDestruction() Option {
+	return WithExtraData(ExtraMarkedForDestruction, true)
+}

@@ -394,19 +394,24 @@ func (p *provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error)
 	return out, nil
 }
 
-func (p *provider) ConsolidateNetworkSnippet(_ *abstract.Network) {
+func (p *provider) ConsolidateNetworkSnippet(_ *abstract.Network) fail.Error {
+	return nil
 }
 
-func (p *provider) ConsolidateSubnetSnippet(_ *abstract.Subnet) {
+func (p *provider) ConsolidateSubnetSnippet(_ *abstract.Subnet) fail.Error {
+	return nil
 }
 
-func (p *provider) ConsolidateSecurityGroupSnippet(_ *abstract.SecurityGroup) {
+func (p *provider) ConsolidateSecurityGroupSnippet(_ *abstract.SecurityGroup) fail.Error {
+	return nil
 }
 
-func (p *provider) ConsolidateHostSnippet(_ *abstract.HostCore) {
+func (p *provider) ConsolidateHostSnippet(_ *abstract.HostCore) fail.Error {
+	return nil
 }
 
-func (p *provider) ConsolidateVolumeSnippet(_ *abstract.Volume) {
+func (p *provider) ConsolidateVolumeSnippet(_ *abstract.Volume) fail.Error {
+	return nil
 }
 
 func init() {

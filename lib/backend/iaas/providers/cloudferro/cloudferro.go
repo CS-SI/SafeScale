@@ -346,19 +346,24 @@ func (p *provider) DefaultNetwork(ctx context.Context) (*abstract.Network, fail.
 	return nil, fail.NotFoundError("this provider has no default network")
 }
 
-func (p *provider) ConsolidateNetworkSnippet(_ *abstract.Network) {
+func (p *provider) ConsolidateNetworkSnippet(_ *abstract.Network) fail.Error {
+	return nil
 }
 
-func (p *provider) ConsolidateSubnetSnippet(_ *abstract.Subnet) {
+func (p *provider) ConsolidateSubnetSnippet(_ *abstract.Subnet) fail.Error {
+	return nil
 }
 
-func (p *provider) ConsolidateSecurityGroupSnippet(_ *abstract.SecurityGroup) {
+func (p *provider) ConsolidateSecurityGroupSnippet(_ *abstract.SecurityGroup) fail.Error {
+	return nil
 }
 
-func (p *provider) ConsolidateHostSnippet(_ *abstract.HostCore) {
+func (p *provider) ConsolidateHostSnippet(_ *abstract.HostCore) fail.Error {
+	return nil
 }
 
-func (p *provider) ConsolidateVolumeSnippet(_ *abstract.Volume) {
+func (p *provider) ConsolidateVolumeSnippet(_ *abstract.Volume) fail.Error {
+	return nil
 }
 
 func init() {

@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+	"reflect"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -29,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 type scopeFromProtocol interface {
@@ -67,12 +67,16 @@ func prepareJob(ctx context.Context, in scopeFromProtocol, description string) (
 	}
 
 	if j.Service().Capabilities().UseTerraformer {
-		castedScope, err := lang.Cast[terraformerapi.ScopeLimitedToTerraformerUse](scopeHolder)
-		if err != nil {
-			return nil, fail.Wrap(err)
+		castedScope, ok := scopeHolder.(terraformerapi.ScopeLimitedToTerraformerUse)
+		if !ok {
+			return nil, fail.InconsistentError("failed to cast: expecting 'terraformerapi.ScopeLimitedToTerraformerUse', received '%s'", reflect.TypeOf(scopeHolder).String())
 		}
+
 		if !castedScope.IsLoaded() {
 			xerr = castedScope.LoadAbstracts(j.Context())
+			if xerr != nil {
+				return nil, xerr
+			}
 		}
 	}
 	return j, nil

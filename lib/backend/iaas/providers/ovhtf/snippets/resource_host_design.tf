@@ -10,14 +10,8 @@ resource "openstack_networking_port_v2" "port_{{ .Resource.Name }}_$k" {
         subnet_id = "{{ $v }}"
     }
 
-    tags = {
-{{ range $t, $v := .Resource.Tags }}
-        {{ $t }} = "{{ $v }}"
-{{ end }}
-    }
-
     lifecycle {
-{{- if not .Extra.MarkedForDestruction }}
+{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
 {{ end }}
     }
@@ -64,15 +58,15 @@ resource "openstack_compute_instance_v2" "{{ .Resource.Name }}" {
 
     user_data = "${file("{{ .Resource.Name }}_userdata")}"
 
-    tags = {
+    metadata = {
 {{ range $t, $v := .Resource.Tags }}
-        "{{ $t }}" = "{{ $v }}"
+        {{ $t }} = "{{ $v }}"
 {{ end }}
     }
 
     lifecycle {
         ignore = [block_device, user_data]
-{{- if not .Extra.MarkedForDestruction }}
+{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
 {{ end }}
     }

@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	designSecurityGroupResourceSnippetPath = "snippets/resource_sg_design.tf"
+	securityGroupDesignResourceSnippetPath = "snippets/resource_sg_design.tf"
 )
 
 func (p *provider) ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
@@ -70,12 +70,18 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 	}
 
 	// create security group on provider side
-	opts := []abstract.Option{
-		abstract.WithName(name),
-		abstract.UseTerraformSnippet(designSecurityGroupResourceSnippetPath),
-		abstract.WithResourceType("openstack_networking_secgroup_v2"),
+	asg, xerr = abstract.NewSecurityGroup(abstract.WithName(name))
+	if xerr != nil {
+		return nil, xerr
 	}
-	asg, xerr = abstract.NewSecurityGroup(opts...)
+
+	xerr = p.ConsolidateSecurityGroupSnippet(asg)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// Pass information to terraformer that we are in creation process
+	xerr = asg.AddOptions(abstract.MarkForCreation())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -83,6 +89,7 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 	asg.Description = description
 	asg.Network = networkRef
 
+	// initialize terraformer
 	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
 	if xerr != nil {
 		return nil, xerr
@@ -94,7 +101,6 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 		return nil, xerr
 	}
 
-	// FIXME: should be necessary to create local Resource for SG rules and add them to assemble, to be able to remove SG AND its rules with Destroy...
 	def, xerr := renderer.Assemble(asg)
 	if xerr != nil {
 		return nil, xerr
@@ -169,11 +175,11 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 	return asg, nil
 }
 
-func (p *provider) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (p *provider) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	_, sgLabel, xerr := iaasapi.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := iaasapi.ValidateSecurityGroupIdentifier(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -183,15 +189,15 @@ func (p *provider) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Sec
 	return p.MiniStack.InspectSecurityGroup(ctx, sgParam)
 }
 
-func (p *provider) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (p *provider) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error) {
 	return nil, fail.NotImplementedError()
 }
 
-func (p *provider) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) fail.Error {
+func (p *provider) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) fail.Error {
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupIdentifier(sgParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -238,16 +244,16 @@ func (p *provider) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Secu
 	return nil
 }
 
-func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupIdentifier(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.ovhtf") || tracing.ShouldTrace("stacks.securitygroup"), "(%s)", sgLabel).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.securitygroup"), "(%s)", sgLabel).WithStopwatch().Entering().Exiting()
 
 	asg, xerr = p.InspectSecurityGroup(ctx, asg)
 	if xerr != nil {
@@ -270,10 +276,7 @@ func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.
 		return nil, fail.Wrap(xerr)
 	}
 
-	xerr = newAsg.AddOptions(
-		abstract.UseTerraformSnippet(designSecurityGroupResourceSnippetPath),
-		abstract.WithResourceType("openstack_networking_secgroup_v2"),
-	)
+	xerr = p.ConsolidateSecurityGroupSnippet(newAsg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -366,30 +369,33 @@ func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.
 	return asg, nil
 }
 
-func (p *provider) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	return nil, fail.NotImplementedError()
+func (p *provider) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+	return nil, fail.NotImplementedError("DeleteRulesFromSecurityGroup() not implemented")
 }
 
 func (p *provider) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
-	return "", fail.NotImplementedError()
+	return "", fail.NotImplementedError("GetDefaultSecurityGroupName() not implemented")
 }
 
 func (p *provider) EnableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) fail.Error {
-	return fail.NotImplementedError()
+	return fail.NotImplementedError("EnableSecurityGroup() not implemented")
 }
 
 func (p *provider) DisableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) fail.Error {
-	return fail.NotImplementedError()
+	return fail.NotImplementedError("DisableSecurityGroup() not implemented")
 }
 
 func (p *provider) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, s string, s2 string) fail.Error {
-	return fail.NotImplementedError()
+	return fail.NotImplementedError("ChangeSecurityGroupSecurity() not implemented")
 }
 
-func (p *provider) ConsolidateSecurityGroupSnippet(asg *abstract.SecurityGroup) {
+func (p *provider) ConsolidateSecurityGroupSnippet(asg *abstract.SecurityGroup) fail.Error {
 	if valid.IsNil(p) || asg == nil {
-		return
+		return nil
 	}
 
-	_ = asg.AddOptions(abstract.UseTerraformSnippet(designSecurityGroupResourceSnippetPath))
+	return asg.AddOptions(
+		abstract.UseTerraformSnippet(securityGroupDesignResourceSnippetPath),
+		abstract.WithResourceType("openstack_networking_secgroup_v2"),
+	)
 }

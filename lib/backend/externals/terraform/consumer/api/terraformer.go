@@ -35,6 +35,7 @@ type (
 		Extra() map[string]any
 		TerraformSnippet() string
 		TerraformTypes() []string
+		UniqueID() string
 		// ToMap() map[string]any
 		// String() string
 	}
@@ -61,9 +62,9 @@ type (
 	RequiredProviders data.Map[string, RequiredProvider]
 
 	ScopeLimitedToTerraformerUse interface {
+		AllAbstracts() (map[string]Resource, fail.Error)
 		IsLoaded() bool
 		LoadAbstracts(ctx context.Context) fail.Error
-		AllAbstracts() ([]Resource, fail.Error)
 	}
 
 	Configuration struct {

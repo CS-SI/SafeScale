@@ -170,7 +170,7 @@ func (s Remediator) CreateSecurityGroup(ctx context.Context, networkRef, name, d
 	return groups, xerr
 }
 
-func (s Remediator) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.Stack.InspectSecurityGroup(ctx, sgParam)
@@ -180,7 +180,7 @@ func (s Remediator) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Se
 	return groups, xerr
 }
 
-func (s Remediator) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.Stack.ClearSecurityGroup(ctx, sgParam)
@@ -190,7 +190,7 @@ func (s Remediator) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.Secu
 	return groups, xerr
 }
 
-func (s Remediator) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (ferr fail.Error) {
+func (s Remediator) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Stack.DeleteSecurityGroup(ctx, sgParam)
@@ -200,7 +200,7 @@ func (s Remediator) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Sec
 	return xerr
 }
 
-func (s Remediator) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	group, xerr := s.Stack.AddRulesToSecurityGroup(ctx, sgParam, rules...)
@@ -210,7 +210,7 @@ func (s Remediator) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi
 	return group, xerr
 }
 
-func (s Remediator) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	group, xerr := s.Stack.DeleteRulesFromSecurityGroup(ctx, sgParam, rules...)
@@ -290,7 +290,7 @@ func (s Remediator) ListNetworks(ctx context.Context) (_ []*abstract.Network, fe
 	return network, xerr
 }
 
-func (s Remediator) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) (ferr fail.Error) {
+func (s Remediator) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Stack.DeleteNetwork(ctx, networkParam)
@@ -340,10 +340,10 @@ func (s Remediator) ListSubnets(ctx context.Context, networkID string) (_ []*abs
 	return network, xerr
 }
 
-func (s Remediator) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
+func (s Remediator) DeleteSubnet(ctx context.Context, param iaasapi.SubnetIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Stack.DeleteSubnet(ctx, id)
+	xerr := s.Stack.DeleteSubnet(ctx, param)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
@@ -410,7 +410,7 @@ func (s Remediator) CreateHost(ctx context.Context, request abstract.HostRequest
 	return host, content, xerr
 }
 
-func (s Remediator) ClearHostStartupScript(ctx context.Context, parameter iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) ClearHostStartupScript(ctx context.Context, parameter iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Stack.ClearHostStartupScript(ctx, parameter)
@@ -428,7 +428,7 @@ func (s Remediator) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 
 	return xerr
 }
 
-func (s Remediator) InspectHost(ctx context.Context, parameter iaasapi.HostParameter) (_ *abstract.HostFull, ferr fail.Error) {
+func (s Remediator) InspectHost(ctx context.Context, parameter iaasapi.HostIdentifier) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Stack.InspectHost(ctx, parameter)
@@ -438,7 +438,7 @@ func (s Remediator) InspectHost(ctx context.Context, parameter iaasapi.HostParam
 	return host, xerr
 }
 
-func (s Remediator) GetHostState(ctx context.Context, parameter iaasapi.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
+func (s Remediator) GetHostState(ctx context.Context, parameter iaasapi.HostIdentifier) (_ hoststate.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Stack.GetHostState(ctx, parameter)
@@ -458,7 +458,7 @@ func (s Remediator) ListHosts(ctx context.Context, b bool) (_ abstract.HostList,
 	return host, xerr
 }
 
-func (s Remediator) DeleteHost(ctx context.Context, parameter iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) DeleteHost(ctx context.Context, parameter iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Stack.DeleteHost(ctx, parameter)
@@ -468,7 +468,7 @@ func (s Remediator) DeleteHost(ctx context.Context, parameter iaasapi.HostParame
 	return xerr
 }
 
-func (s Remediator) StopHost(ctx context.Context, host iaasapi.HostParameter, gracefully bool) (ferr fail.Error) {
+func (s Remediator) StopHost(ctx context.Context, host iaasapi.HostIdentifier, gracefully bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Stack.StopHost(ctx, host, gracefully)
@@ -478,7 +478,7 @@ func (s Remediator) StopHost(ctx context.Context, host iaasapi.HostParameter, gr
 	return xerr
 }
 
-func (s Remediator) StartHost(ctx context.Context, parameter iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) StartHost(ctx context.Context, parameter iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Stack.StartHost(ctx, parameter)
@@ -488,7 +488,7 @@ func (s Remediator) StartHost(ctx context.Context, parameter iaasapi.HostParamet
 	return xerr
 }
 
-func (s Remediator) RebootHost(ctx context.Context, parameter iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) RebootHost(ctx context.Context, parameter iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Stack.RebootHost(ctx, parameter)
@@ -498,7 +498,7 @@ func (s Remediator) RebootHost(ctx context.Context, parameter iaasapi.HostParame
 	return xerr
 }
 
-func (s Remediator) ResizeHost(ctx context.Context, parameter iaasapi.HostParameter, requirements abstract.HostSizingRequirements) (_ *abstract.HostFull, ferr fail.Error) {
+func (s Remediator) ResizeHost(ctx context.Context, parameter iaasapi.HostIdentifier, requirements abstract.HostSizingRequirements) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Stack.ResizeHost(ctx, parameter, requirements)
@@ -508,7 +508,7 @@ func (s Remediator) ResizeHost(ctx context.Context, parameter iaasapi.HostParame
 	return host, xerr
 }
 
-func (s Remediator) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
+func (s Remediator) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIdentifier, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Stack.WaitHostReady(ctx, hostParam, timeout)
@@ -518,7 +518,7 @@ func (s Remediator) WaitHostReady(ctx context.Context, hostParam iaasapi.HostPar
 	return host, xerr
 }
 
-func (s Remediator) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Stack.BindSecurityGroupToHost(ctx, sgParam, hostParam)
@@ -528,7 +528,7 @@ func (s Remediator) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi
 	return xerr
 }
 
-func (s Remediator) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Stack.UnbindSecurityGroupFromHost(ctx, sgParam, hostParam)

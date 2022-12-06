@@ -43,6 +43,7 @@ func TestCast(t *testing.T) {
 	require.NotNil(t, err)
 
 	// successful cast
+	lt = &langTest{}
 	casted, err = Cast[langTestInterface](lt)
 	require.Nil(t, err)
 }

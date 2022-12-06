@@ -37,8 +37,8 @@ import (
 )
 
 // CreateVolume ...
-func (s *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -51,7 +51,7 @@ func (s *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest
 		request.Size = 125
 	}
 
-	resp, xerr := s.rpcCreateVolume(ctx, aws.String(request.Name), int64(request.Size), volumeType)
+	resp, xerr := instance.rpcCreateVolume(ctx, aws.String(request.Name), int64(request.Size), volumeType)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -59,7 +59,7 @@ func (s *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := s.rpcDeleteVolume(context.Background(), resp.VolumeId)
+			derr := instance.rpcDeleteVolume(context.Background(), resp.VolumeId)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", request.Name))
 			}
@@ -79,8 +79,8 @@ func (s *stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest
 }
 
 // InspectVolume ...
-func (s *stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volume, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volume, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ref == "" {
@@ -92,11 +92,11 @@ func (s *stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volu
 	// defer fail.OnExitLogError(&xerr)
 
 	var name string
-	resp, xerr := s.rpcDescribeVolumeByName(ctx, aws.String(ref))
+	resp, xerr := instance.rpcDescribeVolumeByName(ctx, aws.String(ref))
 	if xerr != nil || resp == nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound, *fail.ErrInvalidRequest:
-			resp, xerr = s.rpcDescribeVolumeByID(ctx, aws.String(ref))
+			resp, xerr = instance.rpcDescribeVolumeByID(ctx, aws.String(ref))
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound, *fail.ErrInvalidRequest:
@@ -188,8 +188,8 @@ func toAbstractVolumeState(s *string) volumestate.Enum {
 }
 
 // ListVolumes ...
-func (s *stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -199,7 +199,7 @@ func (s *stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fai
 	var resp *ec2.DescribeVolumesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.DescribeVolumes(&ec2.DescribeVolumesInput{})
+			resp, innerErr = instance.EC2Service.DescribeVolumes(&ec2.DescribeVolumesInput{})
 			return normalizeError(innerErr)
 		},
 		normalizeError,
@@ -230,8 +230,8 @@ func (s *stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fai
 }
 
 // DeleteVolume ...
-func (s *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -246,7 +246,7 @@ func (s *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, innerErr := s.EC2Service.DeleteVolume(&query)
+			_, innerErr := instance.EC2Service.DeleteVolume(&query)
 			return normalizeError(innerErr)
 		},
 		normalizeError,
@@ -254,8 +254,8 @@ func (s *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 }
 
 // CreateVolumeAttachment ...
-func (s *stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (_ string, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -270,12 +270,12 @@ func (s *stack) CreateVolumeAttachment(ctx context.Context, request abstract.Vol
 				deviceName string
 				innerXErr  fail.Error
 			)
-			deviceName, availableDevices, innerXErr = s.findNextAvailableDevice(ctx, request.HostID, availableDevices)
+			deviceName, availableDevices, innerXErr = instance.findNextAvailableDevice(ctx, request.HostID, availableDevices)
 			if innerXErr != nil {
 				return innerXErr
 			}
 
-			resp, innerErr = s.EC2Service.AttachVolume(&ec2.AttachVolumeInput{
+			resp, innerErr = instance.EC2Service.AttachVolume(&ec2.AttachVolumeInput{
 				Device:     aws.String(deviceName), // aws.String(request.Name),
 				InstanceId: aws.String(request.HostID),
 				VolumeId:   aws.String(request.VolumeID),
@@ -303,8 +303,8 @@ func initAvailableDevices() map[string]struct{} {
 	return availableSlots
 }
 
-func (s *stack) findNextAvailableDevice(ctx context.Context, hostID string, availableSlots map[string]struct{}) (string, map[string]struct{}, fail.Error) {
-	instance, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(hostID))
+func (instance *stack) findNextAvailableDevice(ctx context.Context, hostID string, availableSlots map[string]struct{}) (string, map[string]struct{}, fail.Error) {
+	server, xerr := instance.rpcDescribeInstanceByID(ctx, aws.String(hostID))
 	if xerr != nil {
 		return "", availableSlots, xerr
 	}
@@ -312,7 +312,7 @@ func (s *stack) findNextAvailableDevice(ctx context.Context, hostID string, avai
 	var sdCount, xvdCount uint
 	// walk through all the devices already attached to the Host and remove from available slots the ones that
 	// are already used
-	for _, v := range instance.BlockDeviceMappings {
+	for _, v := range server.BlockDeviceMappings {
 		var suffix string
 		deviceName := aws.StringValue(v.DeviceName)
 		if strings.HasPrefix(deviceName, "/dev/sd") { // nolint
@@ -351,9 +351,9 @@ func (s *stack) findNextAvailableDevice(ctx context.Context, hostID string, avai
 }
 
 // InspectVolumeAttachment returns information about a volume attachment
-func (s *stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
+func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
 	nilA := abstract.NewVolumeAttachment()
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return nilA, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -373,7 +373,7 @@ func (s *stack) InspectVolumeAttachment(ctx context.Context, serverID, id string
 	var resp *ec2.DescribeVolumesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeVolumes(&query)
+			resp, err = instance.EC2Service.DescribeVolumes(&query)
 			return normalizeError(err)
 		},
 		normalizeError,
@@ -396,8 +396,8 @@ func (s *stack) InspectVolumeAttachment(ctx context.Context, serverID, id string
 }
 
 // ListVolumeAttachments ...
-func (s *stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -417,7 +417,7 @@ func (s *stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ [
 	var resp *ec2.DescribeVolumesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
-			resp, err = s.EC2Service.DescribeVolumes(&query)
+			resp, err = instance.EC2Service.DescribeVolumes(&query)
 			return normalizeError(err)
 		},
 		normalizeError,
@@ -440,13 +440,13 @@ func (s *stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ [
 	return vas, nil
 }
 
-func (s *stack) Migrate(_ context.Context, _ string, _ map[string]interface{}) (ferr fail.Error) {
+func (instance *stack) Migrate(_ context.Context, _ string, _ map[string]interface{}) (ferr fail.Error) {
 	return nil
 }
 
 // DeleteVolumeAttachment detach from server 'serverID' the volume 'id'
-func (s *stack) DeleteVolumeAttachment(ctx context.Context, serverID, id string) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) DeleteVolumeAttachment(ctx context.Context, serverID, id string) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if serverID == "" {
@@ -464,7 +464,7 @@ func (s *stack) DeleteVolumeAttachment(ctx context.Context, serverID, id string)
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			_, err := s.EC2Service.DetachVolume(&query)
+			_, err := instance.EC2Service.DetachVolume(&query)
 			return normalizeError(err)
 		},
 		normalizeError,

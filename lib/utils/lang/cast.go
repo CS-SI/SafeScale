@@ -25,9 +25,8 @@ import (
 //go:generate minimock -o mocks/mock_validatable.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data.Validatable
 
 // Cast casts a variable to another type and validate
-func Cast[T any](in any) (T, error) {
-	empty := new(T)
-
+func Cast[T any, PT interface{ *T }](in any) (T, error) {
+	empty := PT(new(T))
 	if in == nil {
 		return *empty, fail.InvalidParameterCannotBeNilError("in")
 	}
@@ -40,8 +39,14 @@ func Cast[T any](in any) (T, error) {
 
 	out, ok := in.(T)
 	if !ok {
-		return *empty, fail.InconsistentError("failed to cast, expected '%s', provided '%s'", reflect.TypeOf(*empty).String(), reflect.TypeOf(in).String())
+		return *empty, fail.InconsistentError("failed to cast, expecting '%s', providing '%s'", reflect.TypeOf(*empty).String(), r.String())
 	}
 
 	return out, nil
 }
+
+// // CastError casts a variable to another type and validate
+// func CastError[T any, PT interface{*T}](in any) fail.Error {
+// 	empty := PT(new(T))
+// 	return fail.InconsistentError("failed to cast, expecting '%s', providing '%s'", reflect.TypeOf(*empty).String(), reflect.TypeOf(in).String())
+// }

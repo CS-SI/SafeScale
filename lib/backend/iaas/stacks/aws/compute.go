@@ -46,8 +46,8 @@ import (
 )
 
 // CreateKeyPair creates a keypair and upload it to AWS
-func (s stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyPair, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyPair, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -62,15 +62,15 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyP
 		return nil, xerr
 	}
 
-	if xerr = s.rpcImportKeyPair(ctx, aws.String(keypair.Name), []byte(keypair.PublicKey)); xerr != nil {
+	if xerr = instance.rpcImportKeyPair(ctx, aws.String(keypair.Name), []byte(keypair.PublicKey)); xerr != nil {
 		return nil, xerr
 	}
 	return keypair, nil
 }
 
 // ImportKeyPair imports an existing resources.KeyPair to AWS (not in the interface yet, but will come soon)
-func (s stack) ImportKeyPair(ctx context.Context, keypair *abstract.KeyPair) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ImportKeyPair(ctx context.Context, keypair *abstract.KeyPair) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if keypair == nil {
@@ -80,13 +80,13 @@ func (s stack) ImportKeyPair(ctx context.Context, keypair *abstract.KeyPair) (fe
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", keypair).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	return s.rpcImportKeyPair(ctx, aws.String(keypair.Name), []byte(keypair.PublicKey))
+	return instance.rpcImportKeyPair(ctx, aws.String(keypair.Name), []byte(keypair.PublicKey))
 }
 
 // InspectKeyPair loads a keypair from AWS
 // Note: the private key is not stored by AWS...
-func (s stack) InspectKeyPair(ctx context.Context, id string) (_ *abstract.KeyPair, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectKeyPair(ctx context.Context, id string) (_ *abstract.KeyPair, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -99,7 +99,7 @@ func (s stack) InspectKeyPair(ctx context.Context, id string) (_ *abstract.KeyPa
 		Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	resp, xerr := s.rpcDescribeKeyPairByID(ctx, aws.String(id))
+	resp, xerr := instance.rpcDescribeKeyPairByID(ctx, aws.String(id))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -117,8 +117,8 @@ func toAbstractKeyPair(in ec2.KeyPairInfo) *abstract.KeyPair {
 }
 
 // ListKeyPairs lists keypairs stored in AWS
-func (s stack) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -128,7 +128,7 @@ func (s stack) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fa
 		Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	resp, xerr := s.rpcDescribeKeyPairs(ctx, nil)
+	resp, xerr := instance.rpcDescribeKeyPairs(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -140,28 +140,28 @@ func (s stack) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fa
 }
 
 // DeleteKeyPair deletes a keypair from AWS
-func (s stack) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	return s.rpcDeleteKeyPair(ctx, aws.String(id))
+	return instance.rpcDeleteKeyPair(ctx, aws.String(id))
 }
 
 // ListAvailabilityZones lists AWS availability zones available
-func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
+func (instance *stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
 	emptyMap := map[string]bool{}
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	resp, xerr := s.rpcDescribeAvailabilityZones(ctx, nil)
+	resp, xerr := instance.rpcDescribeAvailabilityZones(ctx, nil)
 	if xerr != nil {
 		return emptyMap, xerr
 	}
@@ -180,15 +180,15 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, fe
 }
 
 // ListRegions lists regions available in AWS
-func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	resp, xerr := s.rpcDescribeRegions(ctx, nil)
+	resp, xerr := instance.rpcDescribeRegions(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -204,8 +204,8 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 }
 
 // InspectImage loads information about an image stored in AWS
-func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -215,7 +215,7 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	resp, xerr := s.rpcDescribeImageByID(ctx, aws.String(id))
+	resp, xerr := instance.rpcDescribeImageByID(ctx, aws.String(id))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -224,8 +224,8 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 }
 
 // InspectTemplate loads information about a template stored in AWS
-func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstract.HostTemplate, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectTemplate(ctx context.Context, id string) (template *abstract.HostTemplate, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -235,7 +235,7 @@ func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstra
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	resp, xerr := s.rpcDescribeInstanceTypeByID(ctx, aws.String(id))
+	resp, xerr := instance.rpcDescribeInstanceTypeByID(ctx, aws.String(id))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -276,7 +276,7 @@ func createFilters() []*ec2.Filter {
 }
 
 // createFilters ...
-func filterOwners(s stack) []*ec2.Filter {
+func filterOwners(s *stack) []*ec2.Filter {
 	var owners []*string
 
 	ownerSet := mapset.NewSet()
@@ -319,15 +319,15 @@ func filterOwners(s stack) []*ec2.Filter {
 }
 
 // ListImages lists available image
-func (s stack) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	resp, xerr := s.rpcDescribeImages(ctx, nil)
+	resp, xerr := instance.rpcDescribeImages(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -359,8 +359,8 @@ func toAbstractImage(in ec2.Image) *abstract.Image {
 }
 
 // ListTemplates lists templates stored in AWS
-func (s stack) ListTemplates(ctx context.Context, all bool) (templates []*abstract.HostTemplate, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ListTemplates(ctx context.Context, all bool) (templates []*abstract.HostTemplate, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -368,13 +368,13 @@ func (s stack) ListTemplates(ctx context.Context, all bool) (templates []*abstra
 	defer fail.OnExitTraceError(ctx, &ferr)
 
 	var resp []*ec2.InstanceTypeInfo
-	unfilteredResp, xerr := s.rpcDescribeInstanceTypes(ctx, nil)
+	unfilteredResp, xerr := instance.rpcDescribeInstanceTypes(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// list only the resources actually available in our AZ
-	under, xerr := s.rpcDescribeInstanceTypeOfferings(ctx, aws.String(s.AwsConfig.Zone))
+	under, xerr := instance.rpcDescribeInstanceTypeOfferings(ctx, aws.String(instance.AwsConfig.Zone))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -435,13 +435,13 @@ func toAbstractHostTemplate(in ec2.InstanceTypeInfo) *abstract.HostTemplate {
 
 // WaitHostReady waits until a host achieves ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
-func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
+func (instance *stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIdentifier, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -462,7 +462,7 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 			default:
 			}
 
-			hostTmp, innerXErr := s.InspectHost(ctx, ahf)
+			hostTmp, innerXErr := instance.InspectHost(ctx, ahf)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -507,10 +507,10 @@ func (s stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParamete
 }
 
 // CreateHost creates a host
-func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequest, extra interface{}) (ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return nil, nil, fail.InvalidInstanceError()
 	}
 
@@ -556,25 +556,25 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 
 	// --- prepares data structures for Provider usage ---
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(s.Config, request, defaultSubnet.CIDR, "", timings)
+	xerr = userData.Prepare(instance.Config, request, defaultSubnet.CIDR, "", timings)
 	if xerr != nil {
 		logrus.WithContext(ctx).Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
 		return nil, nil, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
-	template, xerr := s.InspectTemplate(ctx, request.TemplateID)
+	template, xerr := instance.InspectTemplate(ctx, request.TemplateID)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
 	}
 
-	rim, xerr := s.InspectImage(ctx, request.ImageID)
+	rim, xerr := instance.InspectImage(ctx, request.ImageID)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
 	}
@@ -611,8 +611,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	logrus.WithContext(ctx).Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
 
 	// Select usable availability zone, the first one in the list
-	if s.AwsConfig.Zone == "" {
-		azList, xerr := s.ListAvailabilityZones(ctx)
+	if instance.AwsConfig.Zone == "" {
+		azList, xerr := instance.ListAvailabilityZones(ctx)
 		if xerr != nil {
 			return nil, nil, xerr
 		}
@@ -620,7 +620,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 		for az = range azList {
 			break
 		}
-		s.AwsConfig.Zone = az
+		instance.AwsConfig.Zone = az
 		logrus.WithContext(ctx).Debugf("Selected Availability Zone: '%s'", az)
 	}
 
@@ -652,7 +652,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 		PublicKey:  userData.FirstPublicKey,
 		PrivateKey: userData.FirstPrivateKey,
 	}
-	if xerr = s.ImportKeyPair(ctx, &keypair); xerr != nil {
+	if xerr = instance.ImportKeyPair(ctx, &keypair); xerr != nil {
 		return nil, nil, xerr
 	}
 
@@ -674,13 +674,13 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 				innerXErr fail.Error
 			)
 			if request.Preemptible {
-				server, innerXErr = s.buildAwsSpotMachine( // FIXME: Disk size
-					ctx, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
+				server, innerXErr = instance.buildAwsSpotMachine( // FIXME: Disk size
+					ctx, keyPairName, request.ResourceName, rim.ID, instance.AwsConfig.Zone, defaultSubnet.ID, diskSize,
 					string(userDataPhase1), publicIP, *template, extra,
 				)
 			} else {
-				server, innerXErr = s.buildAwsMachine( // FIXME: Disk size
-					ctx, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
+				server, innerXErr = instance.buildAwsMachine( // FIXME: Disk size
+					ctx, keyPairName, request.ResourceName, rim.ID, instance.AwsConfig.Zone, defaultSubnet.ID, diskSize,
 					string(userDataPhase1), publicIP, *template, extra,
 				)
 			}
@@ -694,7 +694,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 					logrus.WithContext(ctx).Warnf("error creating Host: %+v", captured)
 
 					if server.IsConsistent() {
-						if xerr := s.DeleteHost(ctx, server.ID); xerr != nil {
+						if xerr := instance.DeleteHost(ctx, server.ID); xerr != nil {
 							_ = innerXErr.AddConsequence(fail.Wrap(xerr, "cleaning up on failure, failed to delete Host '%s'", server.Name))
 						}
 					}
@@ -710,8 +710,8 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 			ahf.Name = server.Name
 
 			// Wait until Host is ready, not just until the build is started
-			if _, innerXErr = s.WaitHostReady(ctx, ahf, timings.HostLongOperationTimeout()); innerXErr != nil {
-				rerr := s.DeleteHost(ctx, ahf.ID)
+			if _, innerXErr = instance.WaitHostReady(ctx, ahf, timings.HostLongOperationTimeout()); innerXErr != nil {
+				rerr := instance.DeleteHost(ctx, ahf.ID)
 				if rerr != nil {
 					_ = innerXErr.AddConsequence(fail.Wrap(rerr, "cleaning up on failure, failed to delete Host"))
 				}
@@ -740,7 +740,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 		if ferr != nil && request.CleanOnFailure() {
 			if ahf.IsConsistent() {
 				logrus.WithContext(ctx).Infof("Cleanup, deleting host '%s'", ahf.Name)
-				derr := s.DeleteHost(context.Background(), ahf.ID)
+				derr := instance.DeleteHost(context.Background(), ahf.ID)
 				if derr != nil {
 					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 					logrus.WithContext(ctx).Warnf("Error deleting host in cleanup: %v", derr)
@@ -756,7 +756,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	return ahf, userData, nil
 }
 
-func (s stack) buildAwsSpotMachine(
+func (instance *stack) buildAwsSpotMachine(
 	ctx context.Context,
 	keypairName string,
 	name string,
@@ -769,7 +769,7 @@ func (s stack) buildAwsSpotMachine(
 	template abstract.HostTemplate,
 	extra interface{},
 ) (*abstract.HostCore, fail.Error) {
-	resp, xerr := s.rpcDescribeSpotPriceHistory(ctx, aws.String(zone), aws.String(template.ID))
+	resp, xerr := instance.rpcDescribeSpotPriceHistory(ctx, aws.String(zone), aws.String(template.ID))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -781,7 +781,7 @@ func (s stack) buildAwsSpotMachine(
 	lastPrice := resp[len(resp)-1]
 	logrus.WithContext(ctx).Warnf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
 
-	instance, xerr := s.rpcRequestSpotInstance(
+	server, xerr := instance.rpcRequestSpotInstance(
 		ctx, lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(publicIP), aws.String(template.ID),
 		aws.String(imageID), aws.String(keypairName), []byte(data),
 	)
@@ -796,11 +796,11 @@ func (s stack) buildAwsSpotMachine(
 		return nil, xerr
 	}
 
-	host.ID = aws.StringValue(instance.InstanceId)
+	host.ID = aws.StringValue(server.InstanceId)
 	return host, nil
 }
 
-func (s stack) buildAwsMachine(
+func (instance *stack) buildAwsMachine(
 	ctx context.Context,
 	keypairName string,
 	name string,
@@ -814,7 +814,7 @@ func (s stack) buildAwsMachine(
 	extra interface{},
 ) (*abstract.HostCore, fail.Error) {
 
-	instance, xerr := s.rpcCreateInstance(ctx,
+	server, xerr := instance.rpcCreateInstance(ctx,
 		aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageID), diskSize,
 		aws.String(keypairName), aws.Bool(publicIP), []byte(data), extra,
 	)
@@ -826,29 +826,29 @@ func (s stack) buildAwsMachine(
 	if xerr != nil {
 		return nil, xerr
 	}
-	hostCore.ID = aws.StringValue(instance.InstanceId)
+	hostCore.ID = aws.StringValue(server.InstanceId)
 	return hostCore, nil
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
-func (s stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	return nil
 }
 
-func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
+func (instance *stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
 	return nil
 }
 
 // InspectHost loads information of a host from AWS
-func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (ahf *abstract.HostFull, ferr fail.Error) {
+func (instance *stack) InspectHost(ctx context.Context, hostParam iaasapi.HostIdentifier) (ahf *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	var hostLabel string
 	var xerr fail.Error
-	ahf, hostLabel, xerr = iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr = iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -857,54 +857,53 @@ func (s stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter)
 
 	var resp *ec2.Instance
 	if ahf.ID != "" {
-		resp, xerr = s.rpcDescribeInstanceByID(ctx, aws.String(ahf.ID))
+		resp, xerr = instance.rpcDescribeInstanceByID(ctx, aws.String(ahf.ID))
 		if xerr != nil {
 			return nil, xerr
 		}
 	} else {
-		resp, xerr = s.rpcDescribeInstanceByName(ctx, aws.String(ahf.Name))
+		resp, xerr = instance.rpcDescribeInstanceByName(ctx, aws.String(ahf.Name))
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
 
-	xerr = s.inspectInstance(ctx, ahf, hostLabel, resp)
+	xerr = instance.inspectInstance(ctx, ahf, hostLabel, resp)
 	return ahf, xerr
 }
 
-func (s stack) inspectInstance(ctx context.Context, ahf *abstract.HostFull, hostLabel string, instance *ec2.Instance) (ferr fail.Error) {
-	instanceName := ""
-	instanceType := ""
-
+func (instance *stack) inspectInstance(ctx context.Context, ahf *abstract.HostFull, hostLabel string, server *ec2.Instance) (ferr fail.Error) {
 	var xerr fail.Error
-	if ahf.CurrentState, xerr = toHostState(instance.State); xerr != nil {
+	if ahf.CurrentState, xerr = toHostState(server.State); xerr != nil {
 		return xerr
 	}
 	ahf.LastState = ahf.CurrentState
 
-	for _, tag := range instance.Tags {
-		if tag != nil && (aws.StringValue(tag.Key) == tagNameLabel || aws.StringValue(tag.Key) == "tag:"+tagNameLabel) && aws.StringValue(tag.Value) != "" {
-			instanceName = aws.StringValue(tag.Value)
-		}
-
-		if aws.StringValue(instance.InstanceType) != "" {
-			instanceType = aws.StringValue(instance.InstanceType)
-		}
-
-		if instanceName != "" && instanceType != "" {
-			break
-		}
+	var instanceName, instanceType string
+	if aws.StringValue(server.InstanceType) != "" {
+		instanceType = aws.StringValue(server.InstanceType)
 	}
-
 	if instanceType == "" {
 		return fail.InconsistentError(nil, "error recovering instance type of Host %s", hostLabel)
 	}
 
-	var subnets []IPInSubnet
+	for _, tag := range server.Tags {
+		if tag != nil {
+			tagKey, tagValue := aws.StringValue(tag.Key), aws.StringValue(tag.Value)
+			ahf.Tags[tagKey] = tagValue
 
-	for _, ni := range instance.NetworkInterfaces {
+			if instanceName != "" && (tagKey == tagNameLabel || tagKey == "tag:"+tagNameLabel) && tagValue != "" {
+				instanceName = tagValue
+			}
+		}
+	}
+	ahf.Tags["Template"] = instanceType
+	ahf.Tags["Image"] = aws.StringValue(server.ImageId)
+
+	var subnets []IPInSubnet
+	for _, ni := range server.NetworkInterfaces {
 		newSubnet := IPInSubnet{
-			Name: s.getTagOfSubnet(ctx, ni.SubnetId, tagNameLabel),
+			Name: instance.getTagOfSubnet(ctx, ni.SubnetId, tagNameLabel),
 			ID:   aws.StringValue(ni.SubnetId),
 			IP:   aws.StringValue(ni.PrivateIpAddress),
 		}
@@ -940,7 +939,7 @@ func (s stack) inspectInstance(ctx context.Context, ahf *abstract.HostFull, host
 		ahf.Networking.PublicIPv4 = ipv4
 	}
 
-	sizing, xerr := s.fromMachineTypeToHostEffectiveSizing(ctx, instanceType)
+	sizing, xerr := instance.fromMachineTypeToHostEffectiveSizing(ctx, instanceType)
 	if xerr != nil {
 		return xerr
 	}
@@ -948,25 +947,13 @@ func (s stack) inspectInstance(ctx context.Context, ahf *abstract.HostFull, host
 	ahf.Sizing.Cores = sizing.Cores
 	ahf.Sizing.RAMSize = sizing.RAMSize
 	ahf.Sizing.DiskSize = sizing.DiskSize
-
 	ahf.Name = instanceName
-
-	// Store template and image also in tags
-	for _, tag := range instance.Tags {
-		if tag != nil {
-			ahf.Tags[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
-		}
-	}
-
-	ahf.Tags["Template"] = instanceType
-	ahf.Tags["Image"] = aws.StringValue(instance.ImageId)
-
 	return nil
 }
 
-func (s stack) fromMachineTypeToHostEffectiveSizing(ctx context.Context, machineType string) (abstract.HostEffectiveSizing, fail.Error) {
+func (instance *stack) fromMachineTypeToHostEffectiveSizing(ctx context.Context, machineType string) (abstract.HostEffectiveSizing, fail.Error) {
 	nullSizing := abstract.HostEffectiveSizing{}
-	resp, xerr := s.rpcDescribeInstanceTypeByID(ctx, aws.String(machineType))
+	resp, xerr := instance.rpcDescribeInstanceTypeByID(ctx, aws.String(machineType))
 	if xerr != nil {
 		return nullSizing, xerr
 	}
@@ -975,8 +962,8 @@ func (s stack) fromMachineTypeToHostEffectiveSizing(ctx context.Context, machine
 	return *hs, nil
 }
 
-func (s stack) getTagOfSubnet(ctx context.Context, subnetID *string, str string) string {
-	resp, xerr := s.rpcDescribeSubnetByID(ctx, subnetID)
+func (instance *stack) getTagOfSubnet(ctx context.Context, subnetID *string, str string) string {
+	resp, xerr := instance.rpcDescribeSubnetByID(ctx, subnetID)
 	if xerr != nil {
 		return aws.StringValue(subnetID)
 	}
@@ -990,8 +977,8 @@ func (s stack) getTagOfSubnet(ctx context.Context, subnetID *string, str string)
 }
 
 // InspectHostByName returns host information by its name
-func (s stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.HostFull, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.HostFull, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -1001,7 +988,7 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	resp, xerr := s.rpcDescribeInstanceByName(ctx, aws.String(name))
+	resp, xerr := instance.rpcDescribeInstanceByName(ctx, aws.String(name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1010,16 +997,16 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.
 		return nil, xerr
 	}
 
-	return ahf, s.inspectInstance(ctx, ahf, "'"+name+"'", resp)
+	return ahf, instance.inspectInstance(ctx, ahf, "'"+name+"'", resp)
 }
 
 // GetHostState returns the current state of the host
-func (s stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) GetHostState(ctx context.Context, hostParam iaasapi.HostIdentifier) (_ hoststate.Enum, ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
-	host, xerr := s.InspectHost(ctx, hostParam)
+	host, xerr := instance.InspectHost(ctx, hostParam)
 	if xerr != nil {
 		return hoststate.Error, xerr
 	}
@@ -1028,31 +1015,29 @@ func (s stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter
 }
 
 // ListHosts returns a list of hosts
-func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.HostList, ferr fail.Error) {
+func (instance *stack) ListHosts(ctx context.Context, details bool) (hosts abstract.HostList, ferr fail.Error) {
 	empty := abstract.HostList{}
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return empty, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(details=%v)", details).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	resp, xerr := s.rpcDescribeInstances(ctx, nil)
+	resp, xerr := instance.rpcDescribeInstances(ctx, nil)
 	if xerr != nil {
 		return empty, xerr
 	}
 
 	hosts = abstract.HostList{}
-	for _, instance := range resp {
-		if instance != nil {
-			state, _ := toHostState(instance.State)
+	for _, server := range resp {
+		if server != nil {
+			state, _ := toHostState(server.State)
 			name := ""
 
-			for _, tag := range instance.Tags {
-				if aws.StringValue(tag.Key) == "Name" {
-					if aws.StringValue(tag.Value) != "" {
-						name = aws.StringValue(tag.Value)
-					}
+			for _, tag := range server.Tags {
+				if aws.StringValue(tag.Key) == "Name" && aws.StringValue(tag.Value) != "" {
+					name = aws.StringValue(tag.Value)
 				}
 			}
 
@@ -1061,10 +1046,10 @@ func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.Host
 				return empty, xerr
 			}
 
-			ahf.ID = aws.StringValue(instance.InstanceId)
+			ahf.ID = aws.StringValue(server.InstanceId)
 			ahf.CurrentState, ahf.LastState = state, state
 			if details {
-				ahf, xerr = s.InspectHost(ctx, ahf)
+				ahf, xerr = instance.InspectHost(ctx, ahf)
 				if xerr != nil {
 					return empty, xerr
 				}
@@ -1077,11 +1062,11 @@ func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.Host
 }
 
 // DeleteHost deletes a Host
-func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1096,7 +1081,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	vm, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
+	vm, xerr := instance.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1129,7 +1114,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	}
 
 	// Stop instance forcibly
-	xerr = s.StopHost(ctx, ahf, false)
+	xerr = instance.StopHost(ctx, ahf, false)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAborted, *fail.ErrTimeout:
@@ -1149,7 +1134,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 
 	// Terminate instance
 	if vm != nil {
-		xerr = s.rpcTerminateInstance(ctx, vm)
+		xerr = instance.rpcTerminateInstance(ctx, vm)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrAborted, *fail.ErrTimeout:
@@ -1173,7 +1158,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 		// TODO: parallelize ?
 		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
-				_, err := s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{VolumeId: aws.String(volume)})
+				_, err := instance.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{VolumeId: aws.String(volume)})
 				return err
 			},
 			normalizeError,
@@ -1191,7 +1176,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 
 	// Remove keypair
 	if keyPairName != "" {
-		xerr = s.rpcDeleteKeyPair(ctx, aws.String(keyPairName))
+		xerr = instance.rpcDeleteKeyPair(ctx, aws.String(keyPairName))
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -1207,11 +1192,11 @@ func (s stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 }
 
 // StopHost stops a running host
-func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gracefully bool) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) StopHost(ctx context.Context, hostParam iaasapi.HostIdentifier, gracefully bool) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1219,12 +1204,12 @@ func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gr
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return xerr
 	}
 
-	if xerr = s.rpcStopInstances(ctx, []*string{aws.String(ahf.ID)}, aws.Bool(gracefully)); xerr != nil {
+	if xerr = instance.rpcStopInstances(ctx, []*string{aws.String(ahf.ID)}, aws.Bool(gracefully)); xerr != nil {
 		return xerr
 	}
 
@@ -1236,7 +1221,7 @@ func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gr
 			default:
 			}
 
-			hostTmp, err := s.InspectHost(ctx, ahf.ID)
+			hostTmp, err := instance.InspectHost(ctx, ahf.ID)
 			if err != nil {
 				return err
 			}
@@ -1269,11 +1254,11 @@ func (s stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gr
 }
 
 // StartHost starts a stopped host
-func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) StartHost(ctx context.Context, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1281,12 +1266,12 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) (
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = s.rpcStartInstances(ctx, []*string{aws.String(ahf.ID)})
+	xerr = instance.rpcStartInstances(ctx, []*string{aws.String(ahf.ID)})
 	if xerr != nil {
 		return xerr
 	}
@@ -1299,7 +1284,7 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) (
 			default:
 			}
 
-			hostTmp, innerErr := s.InspectHost(ctx, ahf.ID)
+			hostTmp, innerErr := instance.InspectHost(ctx, ahf.ID)
 			if innerErr != nil {
 				return innerErr
 			}
@@ -1330,16 +1315,16 @@ func (s stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) (
 }
 
 // RebootHost stops then starts a host
-func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) RebootHost(ctx context.Context, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	timings, xerr := s.Timings()
+	timings, xerr := instance.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -1347,7 +1332,7 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	if xerr = s.rpcRebootInstances(ctx, []*string{aws.String(ahf.ID)}); xerr != nil {
+	if xerr = instance.rpcRebootInstances(ctx, []*string{aws.String(ahf.ID)}); xerr != nil {
 		return xerr
 	}
 
@@ -1359,7 +1344,7 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 			default:
 			}
 
-			hostTmp, innerErr := s.InspectHost(ctx, ahf)
+			hostTmp, innerErr := instance.InspectHost(ctx, ahf)
 			if innerErr != nil {
 				return innerErr
 			}
@@ -1390,8 +1375,8 @@ func (s stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) 
 }
 
 // ResizeHost changes the sizing of an existing host
-func (s stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostIdentifier, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1401,16 +1386,16 @@ func (s stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, 
 // BindSecurityGroupToHost ...
 // Returns:
 // - *fail.ErrNotFound if the Host is not found
-func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) (ferr fail.Error) {
-	if valid.IsNil(s) {
+func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
 	if !ahf.IsConsistent() {
-		if ahf, xerr = s.InspectHost(ctx, ahf); xerr != nil {
+		if ahf, xerr = instance.InspectHost(ctx, ahf); xerr != nil {
 			return xerr
 		}
 	}
@@ -1419,7 +1404,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 		return xerr
 	}
 	if !asg.IsConsistent() {
-		if asg, xerr = s.InspectSecurityGroup(ctx, asg); xerr != nil {
+		if asg, xerr = instance.InspectSecurityGroup(ctx, asg); xerr != nil {
 			return xerr
 		}
 	}
@@ -1429,7 +1414,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 		return fail.ConvertError(err)
 	}
 
-	resp, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
+	resp, xerr := instance.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
 	if xerr != nil {
 		return xerr
 	}
@@ -1449,7 +1434,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 	if len(sgs) == len(resp.SecurityGroups) {
 		return nil
 	}
-	if xerr = s.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahfi), sgs); xerr != nil {
+	if xerr = instance.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahfi), sgs); xerr != nil {
 		return xerr
 	}
 
@@ -1460,17 +1445,17 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.Secu
 // Returns:
 // - nil means success
 // - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
-func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter,
+func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier,
 ) fail.Error {
-	if valid.IsNil(s) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
 	if !ahf.IsConsistent() {
-		ahf, xerr = s.InspectHost(ctx, ahf)
+		ahf, xerr = instance.InspectHost(ctx, ahf)
 		if xerr != nil {
 			return xerr
 		}
@@ -1481,7 +1466,7 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.
 	}
 
 	if !asg.IsComplete() {
-		asg, xerr = s.InspectSecurityGroup(ctx, asg)
+		asg, xerr = instance.InspectSecurityGroup(ctx, asg)
 		if xerr != nil {
 			return xerr
 		}
@@ -1493,7 +1478,7 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.
 	}
 
 	// query the instance to get its current Security Groups
-	resp, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
+	resp, xerr := instance.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
 	if xerr != nil {
 		return xerr
 	}
@@ -1504,12 +1489,12 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.
 	if len(resp.SecurityGroups) == 1 && aws.StringValue(resp.SecurityGroups[0].GroupId) == asg.ID {
 		defaultSG, _ := abstract.NewSecurityGroup()
 		var err fail.Error
-		defaultSG.Name, err = s.GetDefaultSecurityGroupName(ctx)
+		defaultSG.Name, err = instance.GetDefaultSecurityGroupName(ctx)
 		if err != nil {
 			return err
 		}
 		defaultSG.Network = asg.Network
-		defaultSG, xerr := s.InspectSecurityGroup(ctx, defaultSG)
+		defaultSG, xerr := instance.InspectSecurityGroup(ctx, defaultSG)
 		if xerr != nil {
 			return xerr
 		}
@@ -1530,5 +1515,5 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.
 		return nil
 	}
 
-	return s.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahfi), sgs)
+	return instance.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahfi), sgs)
 }

@@ -43,6 +43,7 @@ const (
 	Unnamed = "unnamed"
 
 	ExtraMarkedForDestruction = "MarkedForDestruction"
+	ExtraMarkedForCreation    = "MarkedForCreation"
 )
 
 // newCore initializes a new instance of Network
@@ -166,13 +167,13 @@ func (c *core) TerraformTypes() []string {
 // 	if xerr != nil {
 // 		return nil, xerr
 // 	}
-//
-// 	scope, err := lang.Cast[ScopeLimitedToAbstractUse](myjob.Scope())
-// 	if err != nil {
-// 		return nil, fail.Wrap(err)
+//  scope := myjob.Scope()
+// 	castedScope, ok := scope.(ScopeLimitedToAbstractUse)
+// 	if !ok {
+// 		return nil, fail.InconsistentError("failed to cast '%s' to 'ScopeLimitedToAbstractUse'", reflect.TypeOf(scope).String())
 // 	}
 //
-// 	return scope.AllAbstracts()
+// 	return castedScope.AllAbstracts()
 // }
 
 func (c *core) GetName() string {
@@ -196,5 +197,21 @@ func (c *core) Extra() map[string]any {
 		return nil
 	}
 
+	if _, ok := c.extra[ExtraMarkedForDestruction]; !ok {
+		c.extra[ExtraMarkedForDestruction] = false
+	}
+	if _, ok := c.extra[ExtraMarkedForCreation]; !ok {
+		c.extra[ExtraMarkedForCreation] = false
+	}
+
 	return c.extra
+}
+
+// UniqueID returns the index that uniquely identifiy an abstract
+func (c *core) UniqueID() string {
+	if valid.IsNull(c) {
+		return ""
+	}
+
+	return c.Kind() + ":" + c.GetName()
 }

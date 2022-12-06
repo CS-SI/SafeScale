@@ -7,14 +7,8 @@ resource "openstack_networking_network_v2" "{{ .Resource.Name }}" {
     tenant_id             = "{{ .Provider.Authentication.TenantID }}"
     region                = "{{ .Provider.Authentication.Region }}"
 
-    tags = {
-{{ range $t, $v := .Resource.Tags }}
-        "{{ $t }}" = "{{ $v }}"
-{{ end }}
-    }
-
     lifecycle {
-{{- if not .Extra.MarkedForDestruction }}
+{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
 {{ end }}
     }

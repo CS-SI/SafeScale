@@ -181,11 +181,11 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (string, bool
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (ferr fail.Error) {
+func (s stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (ferr fail.Error) {
 	if valid.IsNull(s) {
 		return fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupParameter(sgParam)
+	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupIdentifier(sgParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -219,7 +219,7 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Security
 
 // InspectSecurityGroup returns information about a security group
 // Actually there is no Security Group resource in GCP, so this function always returns a *fail.NotImplementedError error
-func (s stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return &abstract.SecurityGroup{}, fail.InvalidInstanceError()
 	}
@@ -233,7 +233,7 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Securit
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (s stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -270,7 +270,7 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityG
 }
 
 // AddRulesToSecurityGroup adds a rule to a security group
-func (s stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -312,7 +312,7 @@ func (s stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.Secu
 
 // DeleteRulesFromSecurityGroup deletes rules from a security group
 // For now, this function does nothing in GCP context (have to figure out how to identify Firewall rule corresponding to abstract Security Group rule
-func (s stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}

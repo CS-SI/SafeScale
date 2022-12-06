@@ -25,53 +25,56 @@ import (
 )
 
 const (
-	designVolumeResourceSnippetPath = "snippets/resource_volume_design.tf"
+	volumeDesignResourceSnippetPath = "snippets/resource_volume_design.tf"
 )
 
 func (p *provider) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
 	// TODO implement me
-	panic("implement me")
+	return nil, fail.NotImplementedError("CreateVolume() not implemented")
 }
 
 func (p *provider) InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error) {
 	// TODO implement me
-	panic("implement me")
+	return nil, fail.NotImplementedError("InspectVolume() not implemented")
 }
 
 func (p *provider) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error) {
 	// TODO implement me
-	panic("implement me")
+	return nil, fail.NotImplementedError("ListVolumes() not implemented")
 }
 
 func (p *provider) DeleteVolume(ctx context.Context, id string) fail.Error {
 	// TODO implement me
-	panic("implement me")
+	return fail.NotImplementedError("DeleteVolume() not implemented")
 }
 
 func (p *provider) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	// TODO implement me
-	panic("implement me")
+	return "", fail.NotImplementedError("CreateVolumeAttachment() not implemented")
 }
 
 func (p *provider) InspectVolumeAttachment(ctx context.Context, serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	// TODO implement me
-	panic("implement me")
+	return nil, fail.NotImplementedError("InspectVolumeAttachment not implemented")
 }
 
 func (p *provider) ListVolumeAttachments(ctx context.Context, serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
 	// TODO implement me
-	panic("implement me")
+	return nil, fail.NotImplementedError("ListVolumeAttachments() not implemented")
 }
 
 func (p *provider) DeleteVolumeAttachment(ctx context.Context, serverID, id string) fail.Error {
 	// TODO implement me
-	panic("implement me")
+	return fail.NotImplementedError("DeleteVolumeAttachment() not implemeted")
 }
 
-func (p *provider) ConsolidateVolumeSnippet(av *abstract.Volume) {
+func (p *provider) ConsolidateVolumeSnippet(av *abstract.Volume) fail.Error {
 	if valid.IsNil(p) || av == nil {
-		return
+		return nil
 	}
 
-	_ = av.AddOptions(abstract.UseTerraformSnippet(designVolumeResourceSnippetPath))
+	return av.AddOptions(
+		abstract.UseTerraformSnippet(volumeDesignResourceSnippetPath),
+		abstract.WithResourceType("openstack_block_storage_volume_v2"), // FIXME: or v3?
+	)
 }

@@ -321,5 +321,4 @@ func deregister(id string) fail.Error {
 
 func init() {
 	JobList = xsync.NewMapOf[jobapi.Job]()
-
 }

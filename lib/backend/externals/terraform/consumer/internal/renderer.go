@@ -154,14 +154,14 @@ func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fa
 		return "", xerr
 	}
 
-	providerSuperset, err := lang.Cast[ProviderUsingTerraform](instance.provider)
-	if err != nil {
-		return "", fail.Wrap(err)
-	}
+	// providerSuperset, err := lang.Cast[ProviderUsingTerraform](instance.provider)
+	// if err != nil {
+	// 	return "", fail.Wrap(err)
+	// }
 
 	variables := data.NewMap[string, any]()
 	variables["Provider"] = map[string]any{
-		"Name":           providerSuperset.Name(),
+		"Name":           instance.provider.Name(),
 		"Authentication": authOpts,
 		"Configuration":  configOpts,
 	}
@@ -169,8 +169,8 @@ func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fa
 		"Config": instance.config,
 	}
 
-	embeddedFS := providerSuperset.EmbeddedFS()
-	variables["ProviderDeclaration"], xerr = instance.RealizeSnippet(embeddedFS, providerSuperset.TerraformDefinitionSnippet(), variables)
+	embeddedFS := instance.provider.EmbeddedFS()
+	variables["ProviderDeclaration"], xerr = instance.RealizeSnippet(embeddedFS, instance.provider.TerraformDefinitionSnippet(), variables)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -179,8 +179,14 @@ func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fa
 	if xerr != nil {
 		return "", xerr
 	}
-
-	allAbstracts = append(resources, allAbstracts...)
+	for _, v := range resources {
+		if v != nil {
+			uniqueID := v.UniqueID()
+			if uniqueID != "" {
+				allAbstracts[uniqueID] = v
+			}
+		}
+	}
 	resourceContent := data.NewSlice[string](len(allAbstracts))
 	for _, r := range allAbstracts {
 		lvars := variables.Clone()
@@ -578,6 +584,7 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
+
 		default:
 			return xerr
 		}

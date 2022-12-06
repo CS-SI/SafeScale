@@ -896,14 +896,14 @@ func (instance stack) InspectImage(ctx context.Context, id string) (_ *abstract.
 // InspectHost updates the data inside host with the data from provider
 // Returns:
 // - *abstract.HostFull, nil if no error occurs
-func (instance stack) InspectHost(ctx context.Context, hostParam iaasapi.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
+func (instance stack) InspectHost(ctx context.Context, hostParam iaasapi.HostIdentifier) (host *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1254,12 +1254,12 @@ func (instance stack) ListHosts(ctx context.Context, details bool) (abstract.Hos
 }
 
 // DeleteHost deletes the host identified by id
-func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}

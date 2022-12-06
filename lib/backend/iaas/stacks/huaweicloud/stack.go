@@ -634,7 +634,7 @@ func (instance *stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) f
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
 // Does nothing for OpenStack, userdata cannot be updated
-func (instance *stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	return nil
 }
 
@@ -644,11 +644,11 @@ func (instance *stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, 
 
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
-func (instance *stack) GetHostState(ctx context.Context, hostParam iaasapi.HostParameter) (hoststate.Enum, fail.Error) {
+func (instance *stack) GetHostState(ctx context.Context, hostParam iaasapi.HostIdentifier) (hoststate.Enum, fail.Error) {
 	if valid.IsNil(instance) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return hoststate.Unknown, xerr
 	}
@@ -672,11 +672,11 @@ func (instance *stack) GetHostState(ctx context.Context, hostParam iaasapi.HostP
 }
 
 // StopHost stops the host identified by id
-func (instance *stack) StopHost(ctx context.Context, hostParam iaasapi.HostParameter, gracefully bool) fail.Error {
+func (instance *stack) StopHost(ctx context.Context, hostParam iaasapi.HostIdentifier, gracefully bool) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -692,11 +692,11 @@ func (instance *stack) StopHost(ctx context.Context, hostParam iaasapi.HostParam
 }
 
 // StartHost starts the host identified by id
-func (instance *stack) StartHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) StartHost(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -712,11 +712,11 @@ func (instance *stack) StartHost(ctx context.Context, hostParam iaasapi.HostPara
 }
 
 // RebootHost reboots unconditionally the host identified by id
-func (instance *stack) RebootHost(ctx context.Context, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) RebootHost(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -737,11 +737,11 @@ func (instance *stack) RebootHost(ctx context.Context, hostParam iaasapi.HostPar
 }
 
 // ResizeHost ...
-func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostIdentifier, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	_ /*ahf*/, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	_ /*ahf*/, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -756,12 +756,12 @@ func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostPar
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (instance *stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
+func (instance *stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostIdentifier, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostLabel, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -864,12 +864,12 @@ func (instance *stack) WaitHostState(ctx context.Context, hostParam iaasapi.Host
 
 // WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (instance *stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+func (instance *stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIdentifier, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -900,11 +900,11 @@ func (instance *stack) WaitHostReady(ctx context.Context, hostParam iaasapi.Host
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to Host, returns *fail.ErrDuplicate
-func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -927,7 +927,7 @@ func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaas
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) fail.Error {
+func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -935,7 +935,7 @@ func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam 
 	if xerr != nil {
 		return xerr
 	}
-	ahf, _, xerr := iaasapi.ValidateHostParameter(hostParam)
+	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}

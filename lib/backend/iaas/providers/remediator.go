@@ -227,7 +227,7 @@ func (s Remediator) CreateSecurityGroup(ctx context.Context, networkRef, name, d
 	return groups, xerr
 }
 
-func (s Remediator) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.Provider.InspectSecurityGroup(ctx, sgParam)
@@ -237,7 +237,7 @@ func (s Remediator) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Se
 	return groups, xerr
 }
 
-func (s Remediator) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.Provider.ClearSecurityGroup(ctx, sgParam)
@@ -247,7 +247,7 @@ func (s Remediator) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.Secu
 	return groups, xerr
 }
 
-func (s Remediator) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter) (ferr fail.Error) {
+func (s Remediator) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DeleteSecurityGroup(ctx, sgParam)
@@ -257,7 +257,7 @@ func (s Remediator) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Sec
 	return xerr
 }
 
-func (s Remediator) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	group, xerr := s.Provider.AddRulesToSecurityGroup(ctx, sgParam, rules...)
@@ -267,7 +267,7 @@ func (s Remediator) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi
 	return group, xerr
 }
 
-func (s Remediator) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	group, xerr := s.Provider.DeleteRulesFromSecurityGroup(ctx, sgParam, rules...)
@@ -347,7 +347,7 @@ func (s Remediator) ListNetworks(ctx context.Context) (_ []*abstract.Network, fe
 	return network, xerr
 }
 
-func (s Remediator) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkParameter) (ferr fail.Error) {
+func (s Remediator) DeleteNetwork(ctx context.Context, networkParam iaasapi.NetworkIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DeleteNetwork(ctx, networkParam)
@@ -397,10 +397,10 @@ func (s Remediator) ListSubnets(ctx context.Context, networkID string) (_ []*abs
 	return network, xerr
 }
 
-func (s Remediator) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
+func (s Remediator) DeleteSubnet(ctx context.Context, subnetParam iaasapi.SubnetIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Provider.DeleteSubnet(ctx, id)
+	xerr := s.Provider.DeleteSubnet(ctx, subnetParam)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
@@ -467,7 +467,7 @@ func (s Remediator) CreateHost(ctx context.Context, request abstract.HostRequest
 	return host, content, xerr
 }
 
-func (s Remediator) ClearHostStartupScript(ctx context.Context, parameter iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) ClearHostStartupScript(ctx context.Context, parameter iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.ClearHostStartupScript(ctx, parameter)
@@ -485,7 +485,7 @@ func (s Remediator) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 
 	return xerr
 }
 
-func (s Remediator) InspectHost(ctx context.Context, parameter iaasapi.HostParameter) (_ *abstract.HostFull, ferr fail.Error) {
+func (s Remediator) InspectHost(ctx context.Context, parameter iaasapi.HostIdentifier) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Provider.InspectHost(ctx, parameter)
@@ -495,7 +495,7 @@ func (s Remediator) InspectHost(ctx context.Context, parameter iaasapi.HostParam
 	return host, xerr
 }
 
-func (s Remediator) GetHostState(ctx context.Context, parameter iaasapi.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
+func (s Remediator) GetHostState(ctx context.Context, parameter iaasapi.HostIdentifier) (_ hoststate.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Provider.GetHostState(ctx, parameter)
@@ -515,7 +515,7 @@ func (s Remediator) ListHosts(ctx context.Context, b bool) (_ abstract.HostList,
 	return host, xerr
 }
 
-func (s Remediator) DeleteHost(ctx context.Context, parameter iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) DeleteHost(ctx context.Context, parameter iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.DeleteHost(ctx, parameter)
@@ -525,7 +525,7 @@ func (s Remediator) DeleteHost(ctx context.Context, parameter iaasapi.HostParame
 	return xerr
 }
 
-func (s Remediator) StopHost(ctx context.Context, host iaasapi.HostParameter, gracefully bool) (ferr fail.Error) {
+func (s Remediator) StopHost(ctx context.Context, host iaasapi.HostIdentifier, gracefully bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.StopHost(ctx, host, gracefully)
@@ -535,7 +535,7 @@ func (s Remediator) StopHost(ctx context.Context, host iaasapi.HostParameter, gr
 	return xerr
 }
 
-func (s Remediator) StartHost(ctx context.Context, parameter iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) StartHost(ctx context.Context, parameter iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.StartHost(ctx, parameter)
@@ -545,7 +545,7 @@ func (s Remediator) StartHost(ctx context.Context, parameter iaasapi.HostParamet
 	return xerr
 }
 
-func (s Remediator) RebootHost(ctx context.Context, parameter iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) RebootHost(ctx context.Context, parameter iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.RebootHost(ctx, parameter)
@@ -555,7 +555,7 @@ func (s Remediator) RebootHost(ctx context.Context, parameter iaasapi.HostParame
 	return xerr
 }
 
-func (s Remediator) ResizeHost(ctx context.Context, parameter iaasapi.HostParameter, requirements abstract.HostSizingRequirements) (_ *abstract.HostFull, ferr fail.Error) {
+func (s Remediator) ResizeHost(ctx context.Context, parameter iaasapi.HostIdentifier, requirements abstract.HostSizingRequirements) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Provider.ResizeHost(ctx, parameter, requirements)
@@ -565,7 +565,7 @@ func (s Remediator) ResizeHost(ctx context.Context, parameter iaasapi.HostParame
 	return host, xerr
 }
 
-func (s Remediator) WaitHostReady(ctx context.Context, hostParam iaasapi.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
+func (s Remediator) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIdentifier, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.Provider.WaitHostReady(ctx, hostParam, timeout)
@@ -575,7 +575,7 @@ func (s Remediator) WaitHostReady(ctx context.Context, hostParam iaasapi.HostPar
 	return host, xerr
 }
 
-func (s Remediator) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.BindSecurityGroupToHost(ctx, sgParam, hostParam)
@@ -585,7 +585,7 @@ func (s Remediator) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi
 	return xerr
 }
 
-func (s Remediator) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupParameter, hostParam iaasapi.HostParameter) (ferr fail.Error) {
+func (s Remediator) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.Provider.UnbindSecurityGroupFromHost(ctx, sgParam, hostParam)
@@ -684,26 +684,26 @@ func (s Remediator) DeleteVolumeAttachment(ctx context.Context, serverID, id str
 // 	return nil, fail.InvalidRequestError("the provider does not use terraform")
 // }
 
-func (s Remediator) ConsolidateNetworkSnippet(p *abstract.Network) {
-	s.Provider.(ReservedForTerraformerUse).ConsolidateNetworkSnippet(p)
+func (s Remediator) ConsolidateNetworkSnippet(p *abstract.Network) fail.Error {
+	return s.Provider.(ReservedForTerraformerUse).ConsolidateNetworkSnippet(p)
 }
 
-func (s Remediator) ConsolidateSubnetSnippet(p *abstract.Subnet) {
-	s.Provider.(ReservedForTerraformerUse).ConsolidateSubnetSnippet(p)
+func (s Remediator) ConsolidateSubnetSnippet(p *abstract.Subnet) fail.Error {
+	return s.Provider.(ReservedForTerraformerUse).ConsolidateSubnetSnippet(p)
 }
 
-func (s Remediator) ConsolidateSecurityGroupSnippet(p *abstract.SecurityGroup) {
-	s.Provider.(ReservedForTerraformerUse).ConsolidateSecurityGroupSnippet(p)
+func (s Remediator) ConsolidateSecurityGroupSnippet(p *abstract.SecurityGroup) fail.Error {
+	return s.Provider.(ReservedForTerraformerUse).ConsolidateSecurityGroupSnippet(p)
 }
 
 // func (s Remediator) ConsolidateLabelSnippet(p *abstract.Label) {
 // 	s.Provider.(ReservedForTerraformerUse).ConsolidateLabelSnippet(p)
 // }
 
-func (s Remediator) ConsolidateHostSnippet(p *abstract.HostCore) {
-	s.Provider.(ReservedForTerraformerUse).ConsolidateHostSnippet(p)
+func (s Remediator) ConsolidateHostSnippet(p *abstract.HostCore) fail.Error {
+	return s.Provider.(ReservedForTerraformerUse).ConsolidateHostSnippet(p)
 }
 
-func (s Remediator) ConsolidateVolumeSnippet(p *abstract.Volume) {
-	s.Provider.(ReservedForTerraformerUse).ConsolidateVolumeSnippet(p)
+func (s Remediator) ConsolidateVolumeSnippet(p *abstract.Volume) fail.Error {
+	return s.Provider.(ReservedForTerraformerUse).ConsolidateVolumeSnippet(p)
 }
