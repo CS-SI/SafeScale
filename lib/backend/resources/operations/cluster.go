@@ -1264,7 +1264,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		return nil, xerr
 	}
 	if makers.ConfigureCluster != nil {
-		xerr = makers.ConfigureCluster(ctx, instance, parameters)
+		xerr = makers.ConfigureCluster(ctx, instance, parameters, true)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -2242,7 +2242,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 		makers, _ := instance.getMaker(ctx)
 		incrementExpVar("cluster.cache.hit")
 		if makers.ConfigureCluster != nil {
-			chRes <- result{makers.ConfigureCluster(ctx, instance, parameters)}
+			chRes <- result{makers.ConfigureCluster(ctx, instance, parameters, false)}
 			return
 		}
 

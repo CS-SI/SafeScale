@@ -95,11 +95,76 @@ func defaultImage(ctx context.Context, _ resources.Cluster) string {
 	return consts.DEFAULTOS
 }
 
-func configureCluster(ctx context.Context, c resources.Cluster, params data.Map) fail.Error {
+func kubernetesIsRunning(ctx context.Context, c resources.Cluster, params data.Map) fail.Error {
+	if c == nil {
+		return fail.InvalidParameterCannotBeNilError("clusterInstance")
+	}
+
+	sm, xerr := c.FindAvailableMaster(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	// sudo -u cladm kubectl get nodes | tail -n +2 | wc -l
+	cmd := fmt.Sprintf("sudo -u cladm kubectl get nodes | tail -n +2 | wc -l")
+	timings, xerr := c.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	retcode, stdout, stderr, xerr := sm.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to get number of nodes '%s'", c.GetName())
+	}
+	switch retcode {
+	case 0:
+		break
+	default:
+		xerr := fail.ExecutionError(nil, "failed to get number of nodes '%s'", c.GetName())
+		xerr.Annotate("retcode", retcode)
+		xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stderr", stderr)
+		return xerr
+	}
+	first := stdout
+
+	// sudo -u cladm kubectl get nodes | tail -n +2 | wc -l
+	cmd = fmt.Sprintf("sudo -u cladm kubectl get nodes | tail -n +2 | grep Ready | wc -l")
+	timings, xerr = c.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	retcode, stdout, stderr, xerr = sm.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to get number of nodes '%s'", c.GetName())
+	}
+	switch retcode {
+	case 0:
+		break
+	default:
+		xerr := fail.ExecutionError(nil, "failed to get number of nodes '%s'", c.GetName())
+		xerr.Annotate("retcode", retcode)
+		xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stderr", stderr)
+		return xerr
+	}
+	second := stdout
+
+	if first != second {
+		return fail.NewError("not all k8s nodes are Ready")
+	}
+
+	return nil
+}
+
+func configureCluster(ctx context.Context, c resources.Cluster, params data.Map, b bool) fail.Error {
 	clusterName := c.GetName()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
-	results, xerr := c.AddFeature(ctx, "kubernetes", params, resources.FeatureSettings{})
+	results, xerr := c.AddFeature(ctx, "kubernetes", params, resources.FeatureSettings{
+		AddUnconditionally: b,
+	})
 	if xerr != nil {
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'kubernetes'", clusterName)
 	}
@@ -110,7 +175,9 @@ func configureCluster(ctx context.Context, c resources.Cluster, params data.Map)
 		return xerr
 	}
 
-	results, xerr = c.AddFeature(ctx, "helm3", params, resources.FeatureSettings{})
+	results, xerr = c.AddFeature(ctx, "helm3", params, resources.FeatureSettings{
+		AddUnconditionally: b,
+	})
 	if xerr != nil {
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'helm3'", clusterName)
 	}
@@ -119,6 +186,11 @@ func configureCluster(ctx context.Context, c resources.Cluster, params data.Map)
 		xerr = fail.NewError(fmt.Errorf(results.AllErrorMessages()), nil, "failed to add feature 'helm3' to cluster '%s'", clusterName)
 		logrus.WithContext(ctx).Errorf("[cluster %s] failed to add feature 'helm3': %s", clusterName, xerr.Error())
 		return xerr
+	}
+
+	xerr = kubernetesIsRunning(ctx, c, params)
+	if xerr != nil {
+		return fail.Wrap(xerr, "[cluster %s] failed to verify all nodes are running", clusterName)
 	}
 
 	logrus.WithContext(ctx).Infof("[cluster %s] feature 'kubernetes' addition successful.", clusterName)
