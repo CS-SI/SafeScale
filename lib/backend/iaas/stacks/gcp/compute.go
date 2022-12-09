@@ -840,7 +840,7 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) f
 	return s.rpcStartInstance(ctx, ahf.Core.ID)
 }
 
-func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
 	if valid.IsNil(s) {

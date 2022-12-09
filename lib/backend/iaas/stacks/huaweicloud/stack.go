@@ -621,7 +621,7 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool,
 	return nil
 }
 
-func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}

@@ -1239,7 +1239,7 @@ func (s stack) complementHost(ctx context.Context, ahf *abstract.HostFull, vm os
 }
 
 // GetTrueHostState returns the current state of the host identified by id
-func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
+func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}

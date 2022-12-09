@@ -1008,7 +1008,7 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.
 	return ahf, s.inspectInstance(ctx, ahf, "'"+name+"'", resp)
 }
 
-func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
+func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}

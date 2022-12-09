@@ -435,7 +435,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 		return state, fail.ConvertError(err)
 	}
 
-	state, xerr := instance.Service().GetTrueHostState(ctx, hid)
+	state, xerr := instance.Service().GetHostState(ctx, hid)
 	if xerr != nil {
 		return state, xerr
 	}
@@ -1282,7 +1282,7 @@ func (instance *Host) implCreate(
 				return ar, ar.err
 			}
 
-			trueState, err = svc.GetTrueHostState(ctx, hostID)
+			trueState, err = svc.GetHostState(ctx, hostID)
 			if err != nil {
 				ar := result{nil, fail.ConvertError(err)}
 				return ar, ar.err
@@ -2903,7 +2903,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					default:
 					}
 
-					state, stateErr := svc.GetTrueHostState(ctx, hid)
+					state, stateErr := svc.GetHostState(ctx, hid)
 					if stateErr != nil {
 						switch stateErr.(type) {
 						case *fail.ErrNotFound:
