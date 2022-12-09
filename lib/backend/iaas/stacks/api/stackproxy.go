@@ -468,16 +468,6 @@ func (s StackProxy) InspectHost(ctx context.Context, parameter stacks.HostParame
 	return host, xerr
 }
 
-func (s StackProxy) GetHostState(ctx context.Context, parameter stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	host, xerr := s.FullStack.GetHostState(ctx, parameter)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return host, xerr
-}
-
 func (s StackProxy) GetTrueHostState(ctx context.Context, parameter stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

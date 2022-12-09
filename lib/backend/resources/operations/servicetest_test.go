@@ -2331,10 +2331,6 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 
 	return ahf, nil
 }
-func (e *ServiceTest) GetHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	e._survey("ServiceTest::GetHostState (not implemented)")
-	return hoststate.Enum(0), nil
-}
 func (e *ServiceTest) GetTrueHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	e._survey("ServiceTest::GetTrueHostState (not implemented)")
 	return hoststate.Enum(0), nil

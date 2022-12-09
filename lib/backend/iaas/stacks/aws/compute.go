@@ -1008,20 +1008,6 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.
 	return ahf, s.inspectInstance(ctx, ahf, "'"+name+"'", resp)
 }
 
-// GetHostState returns the current state of the host
-func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
-	if valid.IsNil(s) {
-		return hoststate.Unknown, fail.InvalidInstanceError()
-	}
-
-	host, xerr := s.InspectHost(ctx, hostParam)
-	if xerr != nil {
-		return hoststate.Error, xerr
-	}
-
-	return host.CurrentState, nil
-}
-
 func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()

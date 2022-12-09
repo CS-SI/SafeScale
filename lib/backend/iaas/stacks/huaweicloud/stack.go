@@ -621,22 +621,6 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool,
 	return nil
 }
 
-// GetHostState returns the current state of host identified by id
-// hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
-func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	if valid.IsNil(s) {
-		return hoststate.Unknown, fail.InvalidInstanceError()
-	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
-
-	host, xerr := s.InspectHost(ctx, hostParam)
-	if xerr != nil {
-		return hoststate.Error, xerr
-	}
-	return host.CurrentState, nil
-}
-
 func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()

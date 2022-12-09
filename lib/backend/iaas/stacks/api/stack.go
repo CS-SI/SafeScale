@@ -122,8 +122,7 @@ type Stack interface {
 
 	// InspectHost returns the information of the Host identified by id
 	InspectHost(context.Context, stacks.HostParameter) (*abstract.HostFull, fail.Error)
-	// GetHostState returns the current state of the host identified by id
-	GetHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error)
+
 	// GetTrueHostState returns the current state of the host identified by id
 	GetTrueHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error)
 	// ListHosts lists all hosts
