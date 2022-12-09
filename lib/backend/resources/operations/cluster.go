@@ -1084,6 +1084,15 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		return nil, fail.InvalidParameterError("count", "must be an int > 0")
 	}
 
+	defer func() {
+		// drop the cache when we are done expanding the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
+
 	parameters, err := data.FromMap(parameters)
 	if err != nil {
 		return nil, fail.ConvertError(err)
@@ -2857,6 +2866,15 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 	if count == 0 {
 		return nil, fail.InvalidParameterError("count", "cannot be 0")
 	}
+
+	defer func() {
+		// drop the cache when we are done shrinking the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
 
 	xerr := instance.beingRemoved(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
