@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go v1.44.121
+	github.com/aws/aws-sdk-go v1.44.155
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
@@ -32,11 +32,10 @@ require (
 	github.com/ovh/go-ovh v1.3.0
 	github.com/pelletier/go-toml/v2 v2.0.5
 	github.com/pkg/errors v0.9.1
-	github.com/pkg/profile v1.7.0
 	github.com/pkg/sftp v1.13.5
 	github.com/quasilyte/go-ruleguard/dsl v0.3.21
 	github.com/sanity-io/litter v1.5.5
-	github.com/schollz/progressbar/v3 v3.11.0
+	github.com/schollz/progressbar/v3 v3.12.2
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/viper v1.11.0
@@ -45,11 +44,11 @@ require (
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
-	golang.org/x/net v0.0.0-20220909164309-bea034e7d591
+	golang.org/x/net v0.1.0
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.0.0-20221010170243-090e33056c14
-	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035
+	golang.org/x/sys v0.3.0
+	golang.org/x/term v0.3.0
 	golang.org/x/text v0.4.0
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.101.0
@@ -88,7 +87,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/keybase/go-ps v0.0.0-20190827175125-91aafc93ba19 // indirect
 	github.com/kr/fs v0.1.0 // indirect
-	github.com/mattn/go-runewidth v0.0.13 // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
@@ -103,7 +102,7 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.33.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/shirou/gopsutil v2.20.9+incompatible // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
