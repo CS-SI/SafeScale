@@ -742,7 +742,7 @@ func (instance *Host) implCreate(
 			} else {
 				if does, xerr := hc.Exists(ctx); xerr == nil {
 					if !does {
-						logrus.WithContext(ctx).Warningf("Either metadata corruption or cache not properly invalidated")
+						logrus.WithContext(ctx).Debugf("Either metadata corruption or cache not properly invalidated")
 					}
 				}
 
@@ -918,7 +918,7 @@ func (instance *Host) implCreate(
 				if ferr != nil && !hostReq.KeepOnFailure {
 					if ahf.IsConsistent() {
 						aname, aid := ahf.Core.Name, ahf.Core.ID
-						logrus.WithContext(ctx).Warningf("Trying to delete failed instance: %s, %s", ahf.Core.Name, ahf.Core.ID)
+						logrus.WithContext(ctx).Debugf("Trying to delete failed instance: %s, %s", ahf.Core.Name, ahf.Core.ID)
 						if derr := svc.DeleteHost(cleanupContextFrom(ctx), ahf.Core.ID); derr != nil {
 							logrus.WithContext(ctx).Errorf(
 								"cleaning up on %s, failed to delete Host '%s' instance: %v", ActionFromError(ferr), ahf.Core.Name,
@@ -945,9 +945,9 @@ func (instance *Host) implCreate(
 							}
 						}
 
-						logrus.WithContext(ctx).Warningf("Now the instance: %s, %s, should be deleted", aname, aid)
+						logrus.WithContext(ctx).Debugf("Now the instance: %s, %s, should be deleted", aname, aid)
 					} else {
-						logrus.WithContext(ctx).Warningf("We should NOT trust consistency")
+						logrus.WithContext(ctx).Debugf("We should NOT trust consistency")
 					}
 				}
 			}()

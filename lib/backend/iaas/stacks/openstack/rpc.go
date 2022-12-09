@@ -22,6 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
@@ -29,11 +32,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsecurity"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
-	"github.com/sirupsen/logrus"
-
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 )
 
 func (s stack) rpcGetHostByID(ctx context.Context, id string) (*servers.Server, fail.Error) {
@@ -412,7 +410,6 @@ func (s stack) rpcChangePortSecurity(ctx context.Context, portID string, state b
 
 			innerErr := ports.Update(s.NetworkClient, portID, updateOpts).ExtractInto(&portWithPortSecurityExtensions)
 			if innerErr != nil {
-				logrus.WithContext(ctx).Warningf(innerErr.Error())
 				return innerErr
 			}
 
@@ -449,7 +446,6 @@ func (s stack) rpcRemoveSGFromPort(ctx context.Context, portID string) (_ *ports
 
 			innerErr := ports.Update(s.NetworkClient, portID, updateOpts).ExtractInto(&portWithPortSecurityExtensions)
 			if innerErr != nil {
-				logrus.WithContext(ctx).Warningf(innerErr.Error())
 				return innerErr
 			}
 

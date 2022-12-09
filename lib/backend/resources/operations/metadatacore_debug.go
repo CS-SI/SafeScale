@@ -215,7 +215,7 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Inspection of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Inspection of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()
@@ -313,7 +313,7 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Review of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Review of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()
@@ -369,7 +369,7 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Alter of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Alter of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()
@@ -480,7 +480,7 @@ func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable)
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Carry of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Carry of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()
