@@ -167,7 +167,10 @@ func kubernetesIsRunning(ctx context.Context, c resources.Cluster, params data.M
 	}
 
 	numMachines := len(lm) + len(ln)
-	running, err := strconv.Atoi(first)
+
+	bar := strings.Trim(first, "\n")
+	bar = strings.Trim(bar, " ")
+	running, err := strconv.Atoi(bar)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
