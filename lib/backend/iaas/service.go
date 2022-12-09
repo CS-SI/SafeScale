@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/eko/gocache/v2/cache"
@@ -38,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	imagefilters "github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract/filters/images"
 	templatefilters "github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract/filters/templates"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
@@ -67,8 +67,8 @@ type Service interface {
 	ObjectStorageConfiguration(ctx context.Context) (objectstorage.Config, fail.Error)
 	SearchImage(context.Context, string) (*abstract.Image, fail.Error)
 	TenantCleanup(context.Context, bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
-	WaitHostState(context.Context, string, hoststate.Enum, time.Duration) fail.Error
-	WaitVolumeState(context.Context, string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
+
+	GetLock(abstract.Enum) (*sync.Mutex, fail.Error)
 
 	// Provider --- from interface iaas.Providers ---
 	providers.Provider
@@ -77,6 +77,18 @@ type Service interface {
 
 	// Location --- from interface objectstorage.Location ---
 	objectstorage.Location
+}
+
+type Loader interface {
+	LoadHost(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadCluster(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadLabel(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadNetwork(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadShare(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadVolume(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadBucket(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadSubnet(inctx context.Context, svc Service, netref string, ref string) (interface{}, fail.Error)
+	LoadSecurityGroup(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
 }
 
 // service is the implementation struct of interface Service
@@ -88,7 +100,6 @@ type service struct {
 
 	cacheManager *wrappedCache
 
-	//	metadataBucket objectstorage.GetBucket
 	metadataBucket abstract.ObjectStorageBucket
 	metadataKey    *crypt.Key
 
@@ -96,6 +107,18 @@ type service struct {
 	blacklistTemplateREs []*regexp.Regexp
 	whitelistImageREs    []*regexp.Regexp
 	blacklistImageREs    []*regexp.Regexp
+
+	// this is a hack to avoid race conditions calling the Load* functions
+	// the Load* global functions were a bad idea
+	mLoadHost          *sync.Mutex
+	mLoadCluster       *sync.Mutex
+	mLoadLabel         *sync.Mutex
+	mLoadNetwork       *sync.Mutex
+	mLoadShare         *sync.Mutex
+	mLoadVolume        *sync.Mutex
+	mLoadBucket        *sync.Mutex
+	mLoadSubnet        *sync.Mutex
+	mLoadSecurityGroup *sync.Mutex
 }
 
 const (
@@ -107,40 +130,9 @@ const (
 	DiskDRFWeight float32 = 1.0 / 16.0
 )
 
-// RankDRF computes the Dominant Resource Fairness Rank of a host template
-func RankDRF(t *abstract.HostTemplate) float32 {
-	fc := float32(t.Cores)
-	fr := t.RAMSize
-	fd := float32(t.DiskSize)
-	return fc*CoreDRFWeight + fr*RAMDRFWeight + fd*DiskDRFWeight
-}
-
-// ByRankDRF implements sort.Interface for []HostTemplate based on
-// the Dominant Resource Fairness
-type ByRankDRF []*abstract.HostTemplate
-
-func (a ByRankDRF) Len() int      { return len(a) }
-func (a ByRankDRF) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-// Less returns what entry is less between indexes i and j, based on rank. If rank is identical, compares entry names
-func (a ByRankDRF) Less(i, j int) bool {
-	ra := RankDRF(a[i])
-	rb := RankDRF(a[j])
-
-	if ra < rb {
-		return true
-	}
-
-	if ra > rb {
-		return false
-	}
-
-	return a[i].Name < a[j].Name
-}
-
 // NullService creates a service instance corresponding to null value
 func NullService() *service { // nolint
-	return &service{}
+	return nil
 }
 
 // IsNull tells if the instance is null value
@@ -168,6 +160,35 @@ func (instance service) GetName() (string, fail.Error) {
 	}
 
 	return instance.tenantName, nil
+}
+
+func (instance service) GetLock(en abstract.Enum) (*sync.Mutex, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InconsistentError()
+	}
+
+	switch en {
+	case abstract.ClusterResource:
+		return instance.mLoadCluster, nil
+	case abstract.HostResource:
+		return instance.mLoadHost, nil
+	case abstract.LabelResource:
+		return instance.mLoadLabel, nil
+	case abstract.NetworkResource:
+		return instance.mLoadNetwork, nil
+	case abstract.SecurityGroupResource:
+		return instance.mLoadSecurityGroup, nil
+	case abstract.SubnetResource:
+		return instance.mLoadSubnet, nil
+	case abstract.VolumeResource:
+		return instance.mLoadVolume, nil
+	case abstract.ShareResource:
+		return instance.mLoadShare, nil
+	case abstract.ObjectStorageBucketResource:
+		return instance.mLoadBucket, nil
+	default:
+		return nil, fail.InvalidParameterError("en", "wrong enumeration")
+	}
 }
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket
@@ -199,79 +220,6 @@ func (instance *service) ChangeProvider(provider providers.Provider) fail.Error 
 	}
 	instance.Provider = provider
 	return nil
-}
-
-// WaitHostState waits until a host achieves state 'state'
-// If host is in error state, returns utils.ErrNotAvailable
-// If timeout is reached, returns utils.ErrTimeout
-func (instance service) WaitHostState(ctx context.Context, hostID string, state hoststate.Enum, timeout time.Duration) (rerr fail.Error) {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-	if hostID == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("hostID")
-	}
-
-	timer := time.After(timeout)
-	host := abstract.NewHostFull()
-	host.Core.ID = hostID
-
-	errCh := make(chan fail.Error)
-	done := make(chan struct{})
-	defer close(errCh)
-
-	go func() {
-		var crash error
-		defer func() {
-			if crash != nil {
-				errCh <- fail.ConvertError(crash)
-				return
-			}
-		}()
-		defer fail.SilentOnPanic(&crash)
-
-		for {
-			select {
-			case <-done: // only when it's closed
-				return
-			default:
-			}
-
-			host, rerr = instance.InspectHost(ctx, host)
-			if rerr != nil {
-				errCh <- rerr
-				return
-			}
-			if host.CurrentState == state {
-				errCh <- nil
-				return
-			}
-			if host.CurrentState == hoststate.Error {
-				errCh <- fail.NotAvailableError("host in error state")
-				return
-			}
-
-			select {
-			case <-done: // only when it's closed
-				return
-			default:
-				timings, _ := instance.Timings()
-				time.Sleep(timings.SmallDelay())
-			}
-		}
-	}()
-
-	select {
-	case <-timer:
-		close(done)
-		return fail.TimeoutError(nil, timeout, "Wait state timeout")
-	case rErr := <-errCh:
-		close(done)
-		if rErr != nil {
-			return rErr
-		}
-		return nil
-	}
 }
 
 // WaitVolumeState waits until a volume achieves state

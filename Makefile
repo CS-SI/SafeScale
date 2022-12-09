@@ -167,7 +167,7 @@ common: begin ground getdevdeps mod sdk generate
 
 versioncut:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Go version check$(NO_COLOR)\n";
-	@(($(GO) version | grep go1.19) || ($(GO) version | grep go1.18) || ($(GO) version | grep go1.17)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.17 ! $(NO_COLOR)\n" && false);
+	@(($(GO) version | grep go1.19) || ($(GO) version | grep go1.18)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.17 ! $(NO_COLOR)\n" && false);
 
 begin: versioncut
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins, branch $$(git rev-parse --abbrev-ref HEAD), commit $$(git log --format="%H" -n 1), go '$$($(GO) version)', protoc '$$(protoc --version)' ...$(NO_COLOR)\n";

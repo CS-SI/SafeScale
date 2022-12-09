@@ -19,17 +19,14 @@ package operations
 import (
 	"context"
 	"fmt"
-	"path"
-	"reflect"
-	"strings"
-	"time"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/eko/gocache/v2/store"
 	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
+	"path"
+	"reflect"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -135,114 +132,6 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 		MetadataCore: coreInstance,
 	}
 	return instance, nil
-}
-
-// LoadShare returns the name of the host owing the Share 'ref', read from Object Storage
-// logic: try to read until success.
-//
-//	If error is fail.ErrNotFound return this error
-//	In case of any other error, abort the retry to propagate the error
-//	If retry times out, return fail.ErrTimeout
-func LoadShare(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Share, fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  resources.Share
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		ga, gerr := func() (_ resources.Share, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			if svc == nil {
-				return nil, fail.InvalidParameterCannotBeNilError("svc")
-			}
-			if ref == "" {
-				return nil, fail.InvalidParameterError("ref", "cannot be empty string")
-			}
-
-			// trick to avoid collisions
-			var kt *Share
-			cacheref := fmt.Sprintf("%T/%s", kt, ref)
-
-			cache, xerr := svc.GetCache(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(resources.Share)
-					if ok {
-						return casted, nil
-					}
-				}
-			}
-
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(ctx, svc, ref) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			var ok bool
-			var shareInstance resources.Share
-			if shareInstance, ok = anon.(resources.Share); !ok {
-				return nil, fail.InconsistentError("cache content should be a resources.Share", ref)
-			}
-			if shareInstance == nil {
-				return nil, fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = shareInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, shareInstance.GetName()), shareInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-				hid, err := shareInstance.GetID()
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), shareInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(resources.Share)
-					if ok {
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.Share")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("share cache response (%s): %v", cacheref, xerr)
-				}
-			}
-
-			return shareInstance, nil
-		}()
-		chRes <- result{ga, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
 }
 
 // onShareCacheMiss is called when there is no instance in cache of Share 'ref'

@@ -215,7 +215,7 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Inspection of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Inspection of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()
@@ -313,7 +313,7 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Review of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Review of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()
@@ -365,11 +365,11 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)
-func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Callback, options ...data.ImmutableKeyValue) (rerr fail.Error) {
+func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Alter of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Alter of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()
@@ -423,17 +423,6 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 			}
 
 			doReload := true
-			if len(options) > 0 {
-				for _, v := range options {
-					switch v.Key() {
-					case "Reload":
-						if bv, ok := v.Value().(bool); ok {
-							doReload = bv
-						}
-					default:
-					}
-				}
-			}
 			// Reload reloads data from object storage to be sure to have the last revision
 			if doReload {
 				xerr := myself.unsafeReload(ctx)
@@ -491,7 +480,7 @@ func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable)
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Carry of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Carry of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()

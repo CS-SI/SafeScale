@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	uuid "github.com/gofrs/uuid"
+	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
 	"google.golang.org/api/compute/v1"
@@ -39,15 +39,14 @@ import (
 // ListSecurityGroups lists existing security groups
 // There is no Security Group resource in GCP, so ListSecurityGroups always returns empty slice
 func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
-	var emptySlice []*abstract.SecurityGroup
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return emptySlice, nil
+	return nil, nil
 }
 
 // CreateSecurityGroup creates a security group

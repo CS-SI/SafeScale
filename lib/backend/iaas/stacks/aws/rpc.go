@@ -520,12 +520,11 @@ func (s stack) rpcAssociateRouteTable(ctx context.Context, subnetID, routeID *st
 }
 
 func (s stack) rpcDescribeRouteTables(ctx context.Context, key *string, values []*string) ([]*ec2.RouteTable, fail.Error) {
-	var emptySlice []*ec2.RouteTable
 	if xerr := validateAWSString(key, "key", true); xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	if len(values) == 0 {
-		return emptySlice, fail.InvalidParameterError("values", "cannot be empty slice")
+		return nil, fail.InvalidParameterError("values", "cannot be empty slice")
 	}
 
 	req := ec2.DescribeRouteTablesInput{
@@ -545,7 +544,7 @@ func (s stack) rpcDescribeRouteTables(ctx context.Context, key *string, values [
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	return resp.RouteTables, nil
 }
@@ -1452,7 +1451,6 @@ func (s stack) rpcGetProductByID(ctx context.Context, id *string) (aws.JSONValue
 }
 
 func (s stack) rpcDescribeInstanceTypes(ctx context.Context, ids []*string) ([]*ec2.InstanceTypeInfo, fail.Error) {
-	var emptySlice []*ec2.InstanceTypeInfo
 	req := ec2.DescribeInstanceTypesInput{}
 	if len(ids) > 0 {
 		req.InstanceTypes = ids
@@ -1482,14 +1480,14 @@ func (s stack) rpcDescribeInstanceTypes(ctx context.Context, ids []*string) ([]*
 			normalizeError,
 		)
 		if xerr != nil {
-			return emptySlice, xerr
+			return nil, xerr
 		}
 
 		if len(resp.InstanceTypes) == 0 {
 			if len(ids) > 0 {
-				return emptySlice, fail.NotFoundError("failed to find instance types")
+				return nil, fail.NotFoundError("failed to find instance types")
 			}
-			return emptySlice, nil
+			return nil, nil
 		}
 		for _, v := range resp.InstanceTypes {
 			it := strings.ToLower(aws.StringValue(v.InstanceType))
@@ -1526,12 +1524,11 @@ func (s stack) rpcDescribeInstanceTypeByID(ctx context.Context, id *string) (*ec
 }
 
 func (s stack) rpcDescribeSpotPriceHistory(ctx context.Context, zone, templateID *string) ([]*ec2.SpotPrice, fail.Error) {
-	var emptySlice []*ec2.SpotPrice
 	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	if xerr := validateAWSString(templateID, "templateID", true); xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	req := ec2.DescribeSpotPriceHistoryInput{
@@ -1548,10 +1545,10 @@ func (s stack) rpcDescribeSpotPriceHistory(ctx context.Context, zone, templateID
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	if len(resp.SpotPriceHistory) == 0 {
-		return emptySlice, nil
+		return nil, nil
 	}
 	return resp.SpotPriceHistory, nil
 }
@@ -1997,9 +1994,8 @@ func (s stack) rpcRebootInstances(ctx context.Context, ids []*string) fail.Error
 }
 
 func (s stack) rpcDescribeSubnets(ctx context.Context, ids []*string) ([]*ec2.Subnet, fail.Error) {
-	var emptySlice []*ec2.Subnet
 	if len(ids) == 0 {
-		return emptySlice, fail.InvalidParameterError("ids", "cannot be empty slice")
+		return nil, fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
 
 	// FIXME: use NextToken to get all subnets (only the 100 first are currently recovered)
@@ -2017,7 +2013,7 @@ func (s stack) rpcDescribeSubnets(ctx context.Context, ids []*string) ([]*ec2.Su
 			normalizeError,
 		)
 		if xerr != nil {
-			return emptySlice, xerr
+			return nil, xerr
 		}
 		if len(resp.Subnets) == 0 {
 			break
@@ -2032,7 +2028,7 @@ func (s stack) rpcDescribeSubnets(ctx context.Context, ids []*string) ([]*ec2.Su
 	}
 	if len(out) == 0 {
 		if len(ids) > 0 {
-			return emptySlice, fail.NotFoundError("failed to find Subnets")
+			return nil, fail.NotFoundError("failed to find Subnets")
 		}
 	}
 
@@ -2062,7 +2058,6 @@ func (s stack) rpcStopInstances(ctx context.Context, ids []*string, gracefully *
 }
 
 func (s stack) rpcDescribeNetworkInterfacesOfInstance(ctx context.Context, id *string) ([]*ec2.NetworkInterface, fail.Error) {
-	var emptySlice []*ec2.NetworkInterface
 	req := ec2.DescribeNetworkInterfacesInput{
 		Filters: []*ec2.Filter{
 			{
@@ -2080,10 +2075,10 @@ func (s stack) rpcDescribeNetworkInterfacesOfInstance(ctx context.Context, id *s
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	if len(resp.NetworkInterfaces) == 0 {
-		return emptySlice, nil
+		return nil, nil
 	}
 	return resp.NetworkInterfaces, nil
 }

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/dgraph-io/ristretto"
@@ -161,9 +162,18 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		}
 
 		newS := &service{
-			Provider:     providerInstance,
-			tenantName:   tenantName,
-			cacheManager: NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 120 * time.Minute}))),
+			Provider:           providerInstance,
+			tenantName:         tenantName,
+			cacheManager:       NewWrappedCache(cache.New(store.NewRistretto(ristrettoCache, &store.Options{Expiration: 120 * time.Minute}))),
+			mLoadHost:          &sync.Mutex{},
+			mLoadCluster:       &sync.Mutex{},
+			mLoadLabel:         &sync.Mutex{},
+			mLoadNetwork:       &sync.Mutex{},
+			mLoadShare:         &sync.Mutex{},
+			mLoadVolume:        &sync.Mutex{},
+			mLoadBucket:        &sync.Mutex{},
+			mLoadSubnet:        &sync.Mutex{},
+			mLoadSecurityGroup: &sync.Mutex{},
 		}
 
 		if beta := os.Getenv("SAFESCALE_CACHE"); beta != "disabled" {
@@ -365,12 +375,10 @@ func validateRegexps(svc *service, tenant map[string]interface{}) fail.Error {
 
 // validateRegexpsOfKeyword reads the content of the keyword passed as parameter and returns an array of compiled regexps
 func validateRegexpsOfKeyword(keyword string, content interface{}) (out []*regexp.Regexp, _ fail.Error) {
-	var emptySlice []*regexp.Regexp
-
 	if str, ok := content.(string); ok {
 		re, err := regexp.Compile(str)
 		if err != nil {
-			return emptySlice, fail.SyntaxError("invalid value '%s' for keyword '%s': %s", str, keyword, err.Error())
+			return nil, fail.SyntaxError("invalid value '%s' for keyword '%s': %s", str, keyword, err.Error())
 		}
 		out = append(out, re)
 		return out, nil
@@ -380,7 +388,7 @@ func validateRegexpsOfKeyword(keyword string, content interface{}) (out []*regex
 		for _, v := range list {
 			re, err := regexp.Compile(v.(string))
 			if err != nil {
-				return emptySlice, fail.SyntaxError("invalid value '%s' for keyword '%s': %s", v, keyword, err.Error())
+				return nil, fail.SyntaxError("invalid value '%s' for keyword '%s': %s", v, keyword, err.Error())
 			}
 			out = append(out, re)
 		}

@@ -349,7 +349,7 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)
-func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Callback, options ...data.ImmutableKeyValue) (rerr fail.Error) {
+func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
 	}
@@ -399,17 +399,6 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 			}
 
 			doReload := true
-			if len(options) > 0 {
-				for _, v := range options {
-					switch v.Key() {
-					case "Reload":
-						if bv, ok := v.Value().(bool); ok {
-							doReload = bv
-						}
-					default:
-					}
-				}
-			}
 			// Reload reloads data from object storage to be sure to have the last revision
 			if doReload {
 				xerr := myself.unsafeReload(ctx)

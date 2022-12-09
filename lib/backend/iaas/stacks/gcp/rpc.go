@@ -2007,8 +2007,8 @@ func (s stack) rpcStartInstance(ctx context.Context, ref string) fail.Error {
 
 func (s stack) rpcListZones(ctx context.Context) ([]*compute.Zone, fail.Error) {
 	var (
-		resp            *compute.ZoneList
-		out, emptySlice []*compute.Zone
+		resp *compute.ZoneList
+		out  []*compute.Zone
 	)
 	for token := ""; ; {
 		xerr := stacks.RetryableRemoteCall(ctx,
@@ -2030,11 +2030,11 @@ func (s stack) rpcListZones(ctx context.Context) ([]*compute.Zone, fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-				return emptySlice, fail.Wrap(fail.Cause(xerr), "stopping retries")
+				return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-				return emptySlice, fail.Wrap(fail.Cause(xerr), "timeout")
+				return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 			default:
-				return emptySlice, xerr
+				return nil, xerr
 			}
 		}
 		out = append(out, resp.Items...)

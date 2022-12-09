@@ -550,16 +550,6 @@ func (s ProviderProxy) GetHostState(ctx context.Context, parameter stacks.HostPa
 	return host, xerr
 }
 
-func (s ProviderProxy) GetTrueHostState(ctx context.Context, parameter stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	host, xerr := s.Provider.GetTrueHostState(ctx, parameter)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return host, xerr
-}
-
 func (s ProviderProxy) ListHosts(ctx context.Context, b bool) (_ abstract.HostList, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

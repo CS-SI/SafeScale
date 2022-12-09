@@ -611,9 +611,8 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 
 // Dependencies returns a list of features needed as dependencies
 func (instance *Feature) Dependencies(ctx context.Context) (map[string]struct{}, fail.Error) {
-	emptyMap := map[string]struct{}{}
 	if valid.IsNil(instance) {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	return instance.file.getDependencies(), nil
@@ -622,9 +621,8 @@ func (instance *Feature) Dependencies(ctx context.Context) (map[string]struct{},
 // ClusterSizingRequirements returns the cluster sizing requirements for all flavors
 // FIXME: define a type to return instead of a map[string]interface{}
 func (instance *Feature) ClusterSizingRequirements() (map[string]interface{}, fail.Error) {
-	emptyMap := map[string]interface{}{}
 	if instance.IsNull() {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if instance.file == nil {
 		return nil, fail.InvalidInstanceContentError("instance.file", "cannot be nil")
@@ -641,9 +639,8 @@ func (instance *Feature) ClusterSizingRequirements() (map[string]interface{}, fa
 //
 // FIXME: define a type to return instead of a map[string]interface{}
 func (instance *Feature) ClusterSizingRequirementsForFlavor(flavor string) (map[string]interface{}, fail.Error) {
-	emptyMap := map[string]interface{}{}
 	if instance.IsNull() {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if instance.file == nil {
 		return nil, fail.InvalidInstanceContentError("instance.file", "cannot be nil")

@@ -162,9 +162,8 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 
 // ListRouters lists available routers
 func (s stack) ListRouters(ctx context.Context) ([]Router, fail.Error) {
-	var emptySlice []Router
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var ns []Router
@@ -306,9 +305,8 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstra
 
 // ListNetworks lists all the Network/VPC created
 func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error) {
-	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	r := vpcCommonResult{}
@@ -327,7 +325,7 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	var list []*abstract.Network
@@ -335,21 +333,21 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 		for _, v := range vpcs {
 			item, ok := v.(map[string]interface{})
 			if !ok {
-				return emptySlice, fail.InconsistentError("vpc should be a map[string]interface{}")
+				return nil, fail.InconsistentError("vpc should be a map[string]interface{}")
 			}
 
 			an := abstract.NewNetwork()
 			an.Name, ok = item["name"].(string)
 			if !ok {
-				return emptySlice, fail.InconsistentError("name should NOT be empty")
+				return nil, fail.InconsistentError("name should NOT be empty")
 			}
 			an.ID, ok = item["id"].(string)
 			if !ok {
-				return emptySlice, fail.InconsistentError("id should NOT be empty")
+				return nil, fail.InconsistentError("id should NOT be empty")
 			}
 			an.CIDR, ok = item["cidr"].(string)
 			if !ok {
-				return emptySlice, fail.InconsistentError("cidr should NOT be empty")
+				return nil, fail.InconsistentError("cidr should NOT be empty")
 			}
 			if an.Name == "" || an.ID == "" || an.CIDR == "" {
 				continue
@@ -601,9 +599,8 @@ func (s stack) inspectOpenstackSubnet(ctx context.Context, id string) (*abstract
 
 // ListSubnets lists networks
 func (s stack) ListSubnets(ctx context.Context, networkRef string) ([]*abstract.Subnet, fail.Error) {
-	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets" // FIXME: Hardcoded endpoint

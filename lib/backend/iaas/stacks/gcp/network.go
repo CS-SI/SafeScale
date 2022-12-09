@@ -145,9 +145,8 @@ func toAbstractNetwork(in compute.Network) *abstract.Network {
 
 // ListNetworks lists available networks
 func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error) {
-	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
@@ -155,7 +154,7 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 
 	resp, xerr := s.rpcListNetworks(ctx)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	out := make([]*abstract.Network, 0, len(resp))
@@ -405,9 +404,8 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkID string, name s
 
 // ListSubnets lists available subnets
 func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstract.Subnet, ferr fail.Error) {
-	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
@@ -427,10 +425,10 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstrac
 			case *fail.ErrNotFound:
 				an, xerr = s.InspectNetworkByName(ctx, networkRef)
 				if xerr != nil {
-					return emptySlice, fail.Wrap(xerr, "failed to find Network '%s'", networkRef)
+					return nil, fail.Wrap(xerr, "failed to find Network '%s'", networkRef)
 				}
 			default:
-				return emptySlice, fail.Wrap(xerr, "failed to find Network '%s'", networkRef)
+				return nil, fail.Wrap(xerr, "failed to find Network '%s'", networkRef)
 			}
 		}
 
@@ -439,7 +437,7 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstrac
 
 	resp, xerr := s.rpcListSubnets(ctx, filter)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	for _, v := range resp {
