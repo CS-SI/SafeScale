@@ -22,6 +22,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -152,6 +153,26 @@ func kubernetesIsRunning(ctx context.Context, c resources.Cluster, params data.M
 	second := stdout
 
 	if first != second {
+		return fail.NewError("not all k8s nodes are Ready")
+	}
+
+	lm, xerr := c.ListMasters(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	ln, xerr := c.ListNodes(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	numMachines := len(lm) + len(ln)
+	running, err := strconv.Atoi(first)
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
+	if running <= numMachines {
 		return fail.NewError("not all k8s nodes are Ready")
 	}
 
