@@ -119,6 +119,7 @@ type service struct {
 	mLoadBucket        *sync.Mutex
 	mLoadSubnet        *sync.Mutex
 	mLoadSecurityGroup *sync.Mutex
+	mLoadFeature       *sync.Mutex
 }
 
 const (
@@ -186,6 +187,8 @@ func (instance service) GetLock(en abstract.Enum) (*sync.Mutex, fail.Error) {
 		return instance.mLoadShare, nil
 	case abstract.ObjectStorageBucketResource:
 		return instance.mLoadBucket, nil
+	case abstract.FeatureResource:
+		return instance.mLoadFeature, nil
 	default:
 		return nil, fail.InvalidParameterError("en", "wrong enumeration")
 	}
