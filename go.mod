@@ -44,12 +44,12 @@ require (
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
-	golang.org/x/net v0.1.0
+	golang.org/x/net v0.4.0
 	golang.org/x/oauth2 v0.0.0-20220909003341-f21342109be1
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.3.0
 	golang.org/x/term v0.3.0
-	golang.org/x/text v0.4.0
+	golang.org/x/text v0.5.0
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.101.0
 	google.golang.org/grpc v1.50.1
