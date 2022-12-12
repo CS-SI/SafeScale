@@ -66,6 +66,7 @@ type MetadataCore struct {
 
 	loaded            bool
 	committed         bool
+	deleted           bool
 	kindSplittedStore bool // tells if data read/write is done directly from/to folder (when false) or from/to subfolders (when true)
 }
 
@@ -194,6 +195,14 @@ func (myself *MetadataCore) IsValid() (bool, fail.Error) {
 		return false, nil
 	}
 
+	if !myself.loaded && !myself.committed {
+		return false, nil
+	}
+
+	if myself.deleted {
+		return false, nil
+	}
+
 	return true, nil
 }
 
@@ -221,6 +230,10 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 	}()
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
+	}
+
+	if itis, xerr := myself.IsValid(); xerr == nil && !itis {
+		return fail.InconsistentError("the instance is not valid")
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -322,6 +335,10 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 		return fail.InvalidInstanceError()
 	}
 
+	if itis, xerr := myself.IsValid(); xerr == nil && !itis {
+		return fail.InconsistentError("the instance is not valid")
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -376,6 +393,10 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
+	}
+
+	if itis, xerr := myself.IsValid(); xerr == nil && !itis {
+		return fail.InconsistentError("the instance is not valid")
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -447,9 +468,16 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 
 			myself.committed = false
 
+			var aerr fail.Error
+			aerr = debug.InjectPlannedFail(aerr)
+			if aerr != nil {
+				return aerr
+			}
+
 			xerr = myself.write(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				// FIXME: OPP Missing rollback
 				return xerr
 			}
 
@@ -981,6 +1009,12 @@ func (myself *MetadataCore) write(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	var aerr fail.Error
+	aerr = debug.InjectPlannedFail(aerr)
+	if aerr != nil {
+		return aerr
+	}
+
 	type result struct {
 		rErr fail.Error
 	}
@@ -1381,6 +1415,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 
 			myself.loaded = false
 			myself.committed = false
+			myself.deleted = true
 
 			return nil
 		}()
