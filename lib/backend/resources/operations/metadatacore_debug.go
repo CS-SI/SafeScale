@@ -453,6 +453,18 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 				}
 			}
 
+			rollbacked, err := myself.shielded.UnWrap()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
+			defer func() {
+				if ferr != nil {
+					myself.shielded.RollBack(rollbacked)
+					myself.committed = true
+				}
+			}()
+
 			xerr := myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
 				return callback(clonable, myself.properties)
 			})
@@ -477,7 +489,6 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 			xerr = myself.write(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				// FIXME: OPP Missing rollback
 				return xerr
 			}
 

@@ -242,7 +242,7 @@ func TestMetadataCore_CrazyWhatLoveCanDo(t *testing.T) {
 	xerr = mk.Carry(context.Background(), net)
 	require.Nil(t, xerr)
 
-	debug.SetupError("metadatacore_debug.go:472:p:1")
+	debug.SetupError("metadatacore_debug.go:471:p:1")
 	defer func() {
 		debug.SetupError("")
 	}()
