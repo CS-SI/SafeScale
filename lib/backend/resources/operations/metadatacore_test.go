@@ -146,7 +146,7 @@ func TestMetadataCore_TrueInspect(t *testing.T) {
 }
 
 func TestMetadataCore_Darkbloom(t *testing.T) {
-	ol, _ := objectstorage.NewLocation(objectstorage.Config{
+	ol, err := objectstorage.NewLocation(objectstorage.Config{
 		Type:        "s3",
 		EnvAuth:     false,
 		AuthVersion: 0,
@@ -157,6 +157,70 @@ func TestMetadataCore_Darkbloom(t *testing.T) {
 		BucketName:  "bushido",
 		Direct:      true,
 	})
+	if err != nil {
+		t.Skip()
+	}
+	ok, err := ol.CreateBucket(context.Background(), "bushido")
+	if err != nil {
+		ok, _ = ol.InspectBucket(context.Background(), "bushido")
+	}
+
+	sm := &minService{
+		loc: ol,
+		aob: ok,
+	}
+	net := abstract.NewNetwork()
+	net.ID = "Network_ID"
+	net.Name = "Network Name"
+	delete(net.Tags, "CreationDate")
+
+	mk, xerr := NewCore(sm, "network", "networks", net)
+	require.Nil(t, xerr)
+	require.NotNil(t, mk)
+
+	xerr = mk.Carry(context.Background(), net)
+	require.Nil(t, xerr)
+
+	debug.SetupError("metadatacore_debug.go:450:p:1")
+	defer func() {
+		debug.SetupError("")
+	}()
+
+	ctx := context.Background()
+
+	xerr = mk.Alter(ctx, func(clonable data.Clonable, properties *serialize.JSONProperties) fail.Error {
+		an, _ := clonable.(*abstract.Network)
+		an.DNSServers = []string{"1.1.1.1"}
+		an.Name = "cook kids"
+		return nil
+	})
+	require.NotNil(t, xerr)
+
+	xerr = mk.Inspect(context.Background(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		an, ok := clonable.(*abstract.Network)
+		require.True(t, ok)
+		require.EqualValues(t, "Network Name", an.Name)
+
+		return nil
+	})
+	require.Nil(t, xerr)
+}
+
+func TestMetadataCore_CrazyWhatLoveCanDo(t *testing.T) {
+	ol, err := objectstorage.NewLocation(objectstorage.Config{
+		Type:        "s3",
+		EnvAuth:     false,
+		AuthVersion: 0,
+		Endpoint:    "http://192.168.1.100:9000",
+		User:        "admin",
+		SecretKey:   "password",
+		Region:      "stub",
+		BucketName:  "bushido",
+		Direct:      true,
+	})
+	if err != nil {
+		t.Skip()
+	}
 	ok, err := ol.CreateBucket(context.Background(), "bushido")
 	if err != nil {
 		ok, _ = ol.InspectBucket(context.Background(), "bushido")
@@ -179,6 +243,9 @@ func TestMetadataCore_Darkbloom(t *testing.T) {
 	require.Nil(t, xerr)
 
 	debug.SetupError("metadatacore_debug.go:472:p:1")
+	defer func() {
+		debug.SetupError("")
+	}()
 
 	ctx := context.Background()
 
