@@ -64,6 +64,8 @@ func TestNotNulls(t *testing.T) {
 
 	var emptyStrArray []string
 
+	var emptyStrArray []string
+
 	type brand struct {
 		content string
 	}

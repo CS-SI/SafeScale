@@ -22,6 +22,7 @@ package observer
 type Observer interface {
 	GetID() (string, error) // GetID Returns the ID of the instance
 
+	// FIXME: It has to return error too
 	SignalChange(id string)  // is called by Observable to signal an Observer a change occurred
 	MarkAsFreed(id string)   // is called by Observable to signal an Observer the content will not be used anymore (decreasing the counter of uses)
 	MarkAsDeleted(id string) // used to mark the Observable as deleted (allowing to remove the entry from the Observer internals)

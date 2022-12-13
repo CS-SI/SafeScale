@@ -1,5 +1,6 @@
-//go:build (integration && networktests) || allintegration
-// +build integration,networktests allintegration
+//go:build !(allintegration || (integration && ostests))
+// +build !allintegration
+// +build !integration !ostests
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
@@ -17,21 +18,4 @@
  * limitations under the License.
  */
 
-package networks
-
-import (
-	"testing"
-	"time"
-
-	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
-)
-
-func Test_NetworkCreate(t *testing.T) {
-	helpers.InSection("networks").Clear().AddScenario(CreateNetwork)
-	helpers.RunScenarios(t)
-}
-
-func Test_NetworkCreateWithoutSubnet(t *testing.T) {
-	helpers.InSection("networks").Clear().AddScenario(CreateNetworkWithoutSubnet)
-	helpers.RunScenarios(t)
-}
+package viableos

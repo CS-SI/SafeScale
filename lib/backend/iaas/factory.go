@@ -80,6 +80,8 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 	defer fail.OnExitLogError(ctx, &ferr)
 	defer fail.OnPanic(&ferr)
 
+	ctx := context.Background() // FIXME: Check context
+
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return NullService(), err

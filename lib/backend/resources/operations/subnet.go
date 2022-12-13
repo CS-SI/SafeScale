@@ -318,6 +318,7 @@ func LoadSubnet(inctx context.Context, svc iaas.Service, networkRef, subnetRef s
 	case <-inctx.Done():
 		return nil, fail.ConvertError(inctx.Err())
 	}
+	return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
 }
 
 // onSubnetCacheMiss is called when there is no instance in cache of Subnet 'subnetID'

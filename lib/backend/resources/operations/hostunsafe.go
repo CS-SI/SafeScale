@@ -212,6 +212,13 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
+	instance.localCache.RLock()
+	notok := instance.localCache.sshProfile == nil
+	instance.localCache.RUnlock() // nolint
+	if notok {
+		return invalid, "", "", fail.InvalidInstanceContentError("instance.localCache.sshProfile", "cannot be nil")
+	}
+
 	if source == "" {
 		return invalid, "", "", fail.InvalidParameterError("source", "cannot be empty string")
 	}
@@ -251,6 +258,8 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	var finalProfile api.Connector
 
 	retcode := -1
+	timeout = temporal.MaxTimeout(4*(time.Duration(uploadSize)*time.Second/(64*1024)+30*time.Second), timeout)
+
 	timeout = temporal.MaxTimeout(4*(time.Duration(uploadSize)*time.Second/(64*1024)+30*time.Second), timeout)
 
 	xerr = retry.WhileUnsuccessful(

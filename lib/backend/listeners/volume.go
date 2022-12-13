@@ -28,6 +28,16 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	volumefactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/volume"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // safescale volume create v1 --speed="Ssd" --size=2000 (par default Hdd, possible Ssd, Hdd, Cold)
@@ -304,6 +314,9 @@ func (s *VolumeListener) Inspect(inctx context.Context, in *protocol.Reference) 
 	handler := handlers.NewVolumeHandler(job)
 	volumeInstance, xerr := handler.Inspect(ref)
 	if xerr != nil {
+		if _, ok := xerr.(*fail.ErrNotFound); ok {
+			return nil, abstract.ResourceNotFoundError("volume", ref)
+		}
 		return nil, xerr
 	}
 
