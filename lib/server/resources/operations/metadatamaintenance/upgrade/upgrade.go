@@ -17,14 +17,15 @@
 package metadataupgrade
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 )
 
@@ -95,7 +96,7 @@ func Upgrade(svc iaas.Service, from, to string, dryRun, doNotBackup bool) fail.E
 		return xerr
 	}
 
-	xerr = folder.Write("", "version", []byte(to), data.NewImmutableKeyValue("doNotCrypt", true))
+	xerr = folder.Write(context.Background(), "", "version", []byte(to), data.NewImmutableKeyValue("doNotCrypt", true))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to update content of '/version' file in metadata bucket")
@@ -119,5 +120,5 @@ func BackupMetadata(svc iaas.Service, filename string) fail.Error {
 
 	logrus.Warnf("trying to backup metadata into %s", targetFilename)
 
-	return fail.NotImplementedError()
+	return fail.NotImplementedError() // FIXME: Technical debt
 }

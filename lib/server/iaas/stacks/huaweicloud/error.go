@@ -17,6 +17,7 @@
 package huaweicloud
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -24,20 +25,20 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/gophercloud/gophercloud"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // NormalizeError translates gophercloud or openstack error to SafeScale error
 func NormalizeError(err error) fail.Error {
 	if err != nil {
-		tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), " Normalizing error").Entering()
+		tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), " Normalizing error").Entering()
 		defer tracer.Exiting()
 
 		switch e := err.(type) {
@@ -214,7 +215,7 @@ func reduceOpenstackError(errorName string, in []byte) (ferr fail.Error) {
 	}()
 	defer fail.OnPanic(&ferr)
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), ": Normalizing error").Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), ": Normalizing error").Entering()
 	defer tracer.Exiting()
 
 	fn, ok := errorFuncMap[errorName]

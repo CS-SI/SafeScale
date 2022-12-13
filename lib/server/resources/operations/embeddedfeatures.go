@@ -26,9 +26,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 const featureFileExt = ".yml"
@@ -64,7 +64,7 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 
 	v := viper.New()
 	v.SetConfigType("yaml")
-	err = v.ReadConfig(bytes.NewBuffer([]byte(tmplString)))
+	err = v.ReadConfig(bytes.NewBuffer(tmplString))
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", nil, fail.Wrap(err, "syntax error in feature specification file '%s'", name)

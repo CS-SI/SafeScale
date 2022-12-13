@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumestate"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -95,7 +95,7 @@ func TestVolume_Clone(t *testing.T) {
 func TestVolume_Serialize(t *testing.T) {
 
 	var v2 *Volume = nil
-	serial, err := v2.Serialize()
+	_, err := v2.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")
 		t.Fail()
@@ -108,7 +108,7 @@ func TestVolume_Serialize(t *testing.T) {
 	v.Speed = volumespeed.Cold
 	v.State = volumestate.Unknown
 
-	serial, err = v.Serialize()
+	serial, err := v.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -142,15 +142,9 @@ func TestVolume_Deserialize(t *testing.T) {
 
 func TestVolume_GetName(t *testing.T) {
 
-	var v *Volume = nil
-	name := v.GetName()
-	if name != "" {
-		t.Error("Can't get name from nil pointer")
-		t.Fail()
-	}
-	v = NewVolume()
+	v := NewVolume()
 	v.Name = "Volume Name"
-	name = v.GetName()
+	name := v.GetName()
 	if name != v.Name {
 		t.Error("Wrong value restitution")
 		t.Fail()
@@ -160,15 +154,9 @@ func TestVolume_GetName(t *testing.T) {
 
 func TestVolume_GetID(t *testing.T) {
 
-	var v *Volume = nil
-	id := v.GetID()
-	if id != "" {
-		t.Error("Can't get id from nil pointer")
-		t.Fail()
-	}
-	v = NewVolume()
+	v := NewVolume()
 	v.ID = "Volume ID"
-	id = v.GetID()
+	id := v.GetID()
 	if id != v.ID {
 		t.Error("Wrong value restitution")
 		t.Fail()

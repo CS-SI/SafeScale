@@ -23,19 +23,19 @@ import (
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupstate"
-	networkfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/network"
-	securitygroupfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/securitygroup"
-	subnetfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/subnet"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupstate"
+	networkfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/network"
+	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/securitygroup"
+	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 )
 
 // safescale network subnet create --cidr="192.145.0.0/16" --cpu=2 --ram=7 --disk=100 --os="Ubuntu 16.04" net1 subnet-1 (par défault "192.168.0.0/24", on crée une gateway sur chaque réseau: gw-net1)
@@ -173,12 +173,12 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 	var networkID string
 	networkRef, _ := srvutils.GetReference(in.Network)
 	if networkRef == "" {
-		withDefaultNetwork, err := job.Service().HasDefaultNetwork()
+		withDefaultNetwork, err := job.Service().HasDefaultNetwork(ctx)
 		if err != nil {
 			return nil, err
 		}
 		if withDefaultNetwork {
-			an, xerr := job.Service().GetDefaultNetwork()
+			an, xerr := job.Service().GetDefaultNetwork(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -283,7 +283,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetDeleteRe
 
 	force := in.GetForce()
 	jobCtx := job.Context()
-	newCtx := context.WithValue(jobCtx, "force", force)
+	newCtx := context.WithValue(jobCtx, "force", force) // nolint
 
 	var (
 		networkInstance resources.Network

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // Enum represents the flavor of a cluster, in other words what technology is used behind the scene

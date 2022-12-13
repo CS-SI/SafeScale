@@ -22,6 +22,53 @@ package gorules
 import "github.com/quasilyte/go-ruleguard/dsl"
 
 // This is a collection of rules for ruleguard: https://github.com/quasilyte/go-ruleguard
+func repairs1(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
+
+	m.Match("if xerr != nil { return $b }").
+		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*xerr.*")).
+		Report("returning the wrong error?")
+}
+
+func repairs1b(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
+
+	m.Match("if err != nil { return $b }").
+		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*err.*")).
+		Report("returning the wrong error?")
+}
+
+func repairs1c(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
+
+	m.Match("if innerXErr != nil { return $b }").
+		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*innerXErr.*")).
+		Report("returning the wrong error?")
+}
+
+func repairs2(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
+
+	m.Match("if xerr != nil { return nil, $b }").
+		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*xerr.*")).
+		Report("returning the wrong error?")
+}
+
+func repairs2b(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
+
+	m.Match("if err != nil { return nil, $b }").
+		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*err.*")).
+		Report("returning the wrong error?")
+}
+
+func repairs2c(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
+
+	m.Match("if innerXErr != nil { return nil, $b }").
+		Where((m["b"].Type.Is("error") || m["b"].Type.Is("fail.Error")) && !m["b"].Text.Matches(".*innerXErr.*")).
+		Report("returning the wrong error?")
+}
 
 // Remove extra conversions: mdempsky/unconvert
 func unconvert(m dsl.Matcher) {
@@ -58,7 +105,7 @@ func timeeq(m dsl.Matcher) {
 // err but no an error
 func errnoterror(m dsl.Matcher) {
 	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
 	m.Match(
 		"if $*_, err := $x; $err != nil { $*_ } else if $_ { $*_ }",
@@ -84,7 +131,7 @@ func errnoterror(m dsl.Matcher) {
 // err but no an error
 func xerrnoterror(m dsl.Matcher) {
 	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/utils/fail")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/utils/fail")
 
 	m.Match(
 		"if $*_, xerr := $x; $xerr != nil { $*_ } else if $_ { $*_ }",
@@ -471,42 +518,42 @@ func wrongerrcall(m dsl.Matcher) {
 }
 
 func BucketDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.bucket")).Report(`panic danger`)
 }
 
 func ClusterDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.cluster")).Report(`panic danger`)
 }
 
 func HostDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.host")).Report(`panic danger`)
 }
 
 func NetworkDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.network")).Report(`panic danger`)
 }
 
 func SGDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.securitygroup")).Report(`panic danger`)
 }
 
 func ShareDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.share")).Report(`panic danger`)
 }
 
 func SubnetDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.subnet")).Report(`panic danger`)
 }
 
 func VolumeDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v21/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.volume")).Report(`panic danger`)
 }
 

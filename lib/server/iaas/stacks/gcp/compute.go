@@ -17,38 +17,39 @@
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
 	"google.golang.org/api/compute/v1"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
 
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s stack) ListImages(bool) (out []*abstract.Image, ferr fail.Error) {
+func (s stack) ListImages(context.Context, bool) (out []*abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&ferr)
 
 	resp, xerr := s.rpcListImages()
@@ -73,7 +74,7 @@ func toAbstractImage(in compute.Image) *abstract.Image {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
+func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -81,7 +82,7 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&ferr)
 
 	resp, xerr := s.rpcGetImageByID(id)
@@ -94,12 +95,12 @@ func (s stack) InspectImage(id string) (_ *abstract.Image, ferr fail.Error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s stack) ListTemplates(bool) (templates []*abstract.HostTemplate, ferr fail.Error) {
+func (s stack) ListTemplates(context.Context, bool) (templates []*abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&ferr)
 
 	resp, xerr := s.rpcListMachineTypes()
@@ -127,7 +128,7 @@ func toAbstractHostTemplate(in compute.MachineType) *abstract.HostTemplate {
 }
 
 // InspectTemplate ...
-func (s stack) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.Error) {
+func (s stack) InspectTemplate(ctx context.Context, id string) (_ *abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -135,7 +136,7 @@ func (s stack) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.E
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&ferr)
 
 	resp, xerr := s.rpcGetMachineType(id)
@@ -149,7 +150,7 @@ func (s stack) InspectTemplate(id string) (_ *abstract.HostTemplate, ferr fail.E
 
 // CreateKeyPair FIXME: change code to really create a keypair on provider side
 // CreateKeyPair creates and import a key pair
-func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, ferr fail.Error) {
+func (s stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyPair, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -157,34 +158,34 @@ func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, ferr fail.Error)
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&ferr)
 
 	return abstract.NewKeyPair(name)
 }
 
 // InspectKeyPair returns the key pair identified by id
-func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+func (s stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("InspectKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // ListKeyPairs lists available key pairs
-func (s stack) ListKeyPairs() ([]*abstract.KeyPair, fail.Error) {
+func (s stack) ListKeyPairs(context.Context) ([]*abstract.KeyPair, fail.Error) {
 	return nil, fail.NotImplementedError("ListKeyPairs() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s stack) DeleteKeyPair(id string) fail.Error {
+func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 	return fail.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
 // CreateHost creates a host meeting the requirements specified by request
-func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&ferr)
 	defer fail.OnPanic(&ferr)
 
@@ -206,11 +207,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	defaultSubnet := request.Subnets[0]
 	defaultSubnetID := defaultSubnet.ID
-	an, xerr := s.InspectNetwork(defaultSubnet.Network)
+	an, xerr := s.InspectNetwork(ctx, defaultSubnet.Network)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
-			an, xerr = s.InspectNetworkByName(defaultSubnet.Network)
+			an, xerr = s.InspectNetworkByName(ctx, defaultSubnet.Network)
 			if xerr != nil {
 				return nil, nil, fail.NotFoundError("failed to find Network %s", defaultSubnet.Network)
 			}
@@ -239,12 +240,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	}
 
 	// Determine system disk size based on vcpus count
-	template, xerr := s.InspectTemplate(request.TemplateID)
+	template, xerr := s.InspectTemplate(ctx, request.TemplateID)
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to get image")
 	}
 
-	rim, xerr := s.InspectImage(request.ImageID)
+	rim, xerr := s.InspectImage(ctx, request.ImageID)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -282,7 +283,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// Select usable availability zone, the first one in the list
 	if s.GcpConfig.Zone == "" {
-		azList, xerr := s.ListAvailabilityZones()
+		azList, xerr := s.ListAvailabilityZones(ctx)
 		if xerr != nil {
 			return nil, nil, xerr
 		}
@@ -324,7 +325,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				if innerXErr != nil {
 					hostName := ahf.GetName()
 					logrus.Debugf("Clean up on failure, deleting host '%s'", hostName)
-					if derr := s.DeleteHost(ahf); derr != nil {
+					if derr := s.DeleteHost(ctx, ahf); derr != nil {
 						msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", hostName)
 						logrus.Errorf(strprocess.Capitalize(msg))
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, msg))
@@ -335,7 +336,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			}()
 
 			// Wait that Host is ready, not just that the build is started
-			if _, innerXErr = s.WaitHostReady(ahf.GetID(), timings.HostLongOperationTimeout()); innerXErr != nil {
+			if _, innerXErr = s.WaitHostReady(ctx, ahf.GetID(), timings.HostLongOperationTimeout()); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrInvalidRequest:
 					return retry.StopRetryError(innerXErr)
@@ -373,18 +374,18 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 // WaitHostReady waits until a host reaches ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter.
-func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
+func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
@@ -395,7 +396,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			hostComplete, innerErr := s.InspectHost(ahf)
+			hostComplete, innerErr := s.InspectHost(ctx, ahf)
 			if innerErr != nil {
 				return innerErr
 			}
@@ -452,11 +453,11 @@ func (s stack) buildGcpMachine(
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
-func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -467,7 +468,7 @@ func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) (ferr fail
 		)
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
 	defer tracer.Exiting()
 	defer fail.OnPanic(&ferr)
 
@@ -475,12 +476,12 @@ func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) (ferr fail
 }
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.HostFull containing an id
-func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
+func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -491,7 +492,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		)
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
 	defer tracer.Exiting()
 	defer fail.OnPanic(&ferr)
 
@@ -646,16 +647,16 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 }
 
 // DeleteHost deletes the host identified by id
-func (s stack) DeleteHost(hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -689,18 +690,18 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (ferr fail.Error) {
 }
 
 // ResizeHost change the template used by a host
-func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 // ListHosts lists available hosts
-func (s stack) ListHosts(detailed bool) (_ abstract.HostList, ferr fail.Error) {
+func (s stack) ListHosts(ctx context.Context, detailed bool) (_ abstract.HostList, ferr fail.Error) {
 	var emptyList abstract.HostList
 	if valid.IsNil(s) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(detailed=%v)", detailed).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(detailed=%v)", detailed).Entering().Exiting()
 
 	resp, xerr := s.rpcListInstances()
 	if xerr != nil {
@@ -720,7 +721,7 @@ func (s stack) ListHosts(detailed bool) (_ abstract.HostList, ferr fail.Error) {
 		// FIXME: Also populate tags
 		var hostFull *abstract.HostFull
 		if detailed {
-			hostFull, xerr = s.InspectHost(nhost)
+			hostFull, xerr = s.InspectHost(ctx, nhost)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -737,46 +738,46 @@ func (s stack) ListHosts(detailed bool) (_ abstract.HostList, ferr fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Error {
+func (s stack) StopHost(ctx context.Context, hostParam stacks.HostParameter, gracefully bool) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
 
 	return s.rpcStopInstance(ahf.Core.ID)
 }
 
 // StartHost starts the host identified by id
-func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
 
 	return s.rpcStartInstance(ahf.Core.ID)
 }
 
 // RebootHost reboot the host identified by id
-func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
 
 	if xerr := s.rpcStopInstance(ahf.Core.ID); xerr != nil {
 		return xerr
@@ -786,12 +787,12 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // GetHostState returns the host identified by id
-func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Error, fail.InvalidInstanceError()
 	}
 
-	host, xerr := s.InspectHost(hostParam)
+	host, xerr := s.InspectHost(ctx, hostParam)
 	if xerr != nil {
 		return hoststate.Error, xerr
 	}
@@ -802,13 +803,13 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fai
 // -------------Provider Infos-------------------------------------------------------------------------------------------
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s stack) ListAvailabilityZones() (_ map[string]bool, ferr fail.Error) {
+func (s stack) ListAvailabilityZones(context.Context) (_ map[string]bool, ferr fail.Error) {
 	emptyMap := make(map[string]bool)
 	if valid.IsNil(s) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
 	resp, xerr := s.rpcListZones()
 	if xerr != nil {
@@ -823,13 +824,13 @@ func (s stack) ListAvailabilityZones() (_ map[string]bool, ferr fail.Error) {
 }
 
 // ListRegions ...
-func (s stack) ListRegions() (_ []string, ferr fail.Error) {
+func (s stack) ListRegions(context.Context) (_ []string, ferr fail.Error) {
 	var emptySlice []string
 	if valid.IsNil(s) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
 	resp, xerr := s.rpcListRegions()
 	if xerr != nil {
@@ -844,7 +845,7 @@ func (s stack) ListRegions() (_ []string, ferr fail.Error) {
 }
 
 // BindSecurityGroupToHost ...
-func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -852,23 +853,23 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 	if xerr != nil {
 		return xerr
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 	if !ahf.IsConsistent() {
-		if ahf, xerr = s.InspectHost(ahf); xerr != nil {
+		if ahf, xerr = s.InspectHost(ctx, ahf); xerr != nil {
 			return fail.InvalidParameterError("hostParam", "must contain 'ID' field")
 		}
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
 	return s.rpcAddTagsToInstance(ahf.GetID(), []string{asg.GetID()})
 }
 
 // UnbindSecurityGroupFromHost unbinds a Security Group from a Host
-func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
+func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -879,12 +880,12 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	if !asg.IsConsistent() {
 		return fail.InvalidParameterError("sgParam", "must contain 'ID' field")
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
 
 	return s.rpcRemoveTagsFromInstance(ahf.GetID(), []string{asg.GetID()})
 }

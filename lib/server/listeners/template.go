@@ -20,16 +20,16 @@ import (
 	"context"
 	"fmt"
 
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/v21/lib/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // safescale template list --all=false
@@ -64,12 +64,12 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	svc := job.Service()
-	originalList, xerr := svc.ListTemplates(all)
+	originalList, xerr := svc.ListTemplates(ctx, all)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	authOpts, xerr := svc.GetAuthenticationOptions()
+	authOpts, xerr := svc.GetAuthenticationOptions(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -119,20 +119,6 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 				RamFreq:         acpu.RAMFreq,
 				Gpu:             int64(acpu.GPU),
 				GpuModel:        acpu.GPUModel,
-				// DiskSizeGb:           acpu.DiskSize,
-				// MainDiskType:         acpu.MainDiskType,
-				// MainDiskSpeedMbps:    acpu.MainDiskSpeed,
-				// SampleNetSpeedKbps:   acpu.SampleNetSpeed,
-				// EphDiskSize_Gb:       acpu.EphDiskSize,
-				// PriceInDollarsSecond: acpu.PricePerSecond,
-				// PriceInDollarsHour:   acpu.PricePerHour,
-				// Not yet implemented, FIXME: Implement this
-				// Prices: []*protocol.PriceInfo{{
-				// 	Currency:      "euro-fake",
-				// 	DurationLabel: "perMonth",
-				// 	Duration:      1,
-				// 	Price:         30,
-				// }},
 			}
 		}
 		finalList = append(finalList, entry)
@@ -169,7 +155,7 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 		return nil, xerr
 	}
 
-	templates, xerr := job.Service().ListTemplatesBySizing(*ahsr, false)
+	templates, xerr := job.Service().ListTemplatesBySizing(ctx, *ahsr, false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -209,7 +195,7 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	svc := job.Service()
-	authOpts, xerr := svc.GetAuthenticationOptions()
+	authOpts, xerr := svc.GetAuthenticationOptions(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -231,7 +217,7 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 		return nil, fail.ConvertError(err)
 	}
 
-	at, xerr := svc.FindTemplateByName(ref)
+	at, xerr := svc.FindTemplateByName(ctx, ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -266,20 +252,6 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 			RamFreq:         acpu.RAMFreq,
 			Gpu:             int64(acpu.GPU),
 			GpuModel:        acpu.GPUModel,
-			// DiskSizeGb:           acpu.DiskSize,
-			// MainDiskType:         acpu.MainDiskType,
-			// MainDiskSpeedMbps:    acpu.MainDiskSpeed,
-			// SampleNetSpeedKbps:   acpu.SampleNetSpeed,
-			// EphDiskSize_Gb:       acpu.EphDiskSize,
-			// PriceInDollarsSecond: acpu.PricePerSecond,
-			// PriceInDollarsHour:   acpu.PricePerHour,
-			// Not yet implemented, FIXME: Implement this
-			// Prices: []*protocol.PriceInfo{{
-			// 	Currency:      "euro-fake",
-			// 	DurationLabel: "perMonth",
-			// 	Duration:      1,
-			// 	Price:         30,
-			// }},
 		}
 	}
 

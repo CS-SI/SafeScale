@@ -30,11 +30,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 )
 
 func validateAWSString(stringContent *string, stringLabel string, notEmpty bool) fail.Error {
@@ -1611,7 +1611,7 @@ func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *b
 		return nil, xerr
 	}
 	if len(resp.SpotInstanceRequests) == 0 {
-		return nil, nil
+		return nil, fail.NotAvailableError("no spot instances available")
 	}
 	return resp.SpotInstanceRequests[0], nil
 }
@@ -1899,11 +1899,11 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 
 			state, xerr := toHostState(resp[0].State)
 			if xerr != nil {
-				return fail.NewError("failed to convert instance state")
+				return fail.NewErrorWithCause(xerr, "failed to convert instance state")
 			}
 
 			if state != hoststate.Terminated {
-				return fail.NewError(innerXErr, "not in terminated state (current state: %s)", state.String())
+				return fail.NewError("not in terminated state (current state: %s)", state.String())
 			}
 
 			return nil

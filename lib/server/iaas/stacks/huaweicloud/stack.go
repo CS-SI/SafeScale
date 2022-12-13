@@ -17,15 +17,16 @@
 package huaweicloud
 
 import (
+	"context"
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	volumesv2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
@@ -42,9 +43,9 @@ import (
 	"github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // stack is the implementation for huaweicloud cloud stack
@@ -85,6 +86,7 @@ func NullStack() *stack { // nolint
 // New authenticates and return interface stack
 //goland:noinspection GoExportedFuncWithUnexportedType
 func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
+	ctx := context.Background()
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
@@ -242,7 +244,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	}
 
 	// TODO: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
-	validAvailabilityZones, xerr := s.ListAvailabilityZones()
+	validAvailabilityZones, xerr := s.ListAvailabilityZones(ctx)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -254,8 +256,8 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	} else if len(validAvailabilityZones) != 0 {
 		var validZones []string
 		zoneIsValidInput := false
-		for az, valid := range validAvailabilityZones {
-			if valid {
+		for az, isvalid := range validAvailabilityZones {
+			if isvalid {
 				if az == auth.AvailabilityZone {
 					zoneIsValidInput = true
 				}
@@ -295,7 +297,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	}
 
 	// Initializes the VPC
-	xerr = s.initVPC()
+	xerr = s.initVPC(context.Background())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -304,12 +306,12 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 }
 
 // ListRegions ...
-func (s stack) ListRegions() (list []string, ferr fail.Error) {
+func (s stack) ListRegions(context.Context) (list []string, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var allPages pagination.Page
 	xerr := stacks.RetryableRemoteCall(
@@ -339,7 +341,7 @@ func (s stack) ListRegions() (list []string, ferr fail.Error) {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, ferr fail.Error) {
+func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -347,7 +349,7 @@ func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, ferr
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Try to get template
@@ -373,7 +375,7 @@ func (s stack) InspectTemplate(id string) (template *abstract.HostTemplate, ferr
 }
 
 // CreateKeyPair creates and import a key pair
-func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
+func (s stack) CreateKeyPair(ctx context.Context, name string) (*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -381,14 +383,14 @@ func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return abstract.NewKeyPair(name)
 }
 
 // InspectKeyPair returns the key pair identified by id
-func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+func (s stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -396,7 +398,7 @@ func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	kp, err := keypairs.Get(s.ComputeClient, id, nil).Extract()
@@ -413,12 +415,12 @@ func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
-func (s stack) ListKeyPairs() ([]*abstract.KeyPair, fail.Error) {
+func (s stack) ListKeyPairs(context.Context) ([]*abstract.KeyPair, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var kpList []*abstract.KeyPair
 	xerr := stacks.RetryableRemoteCall(
@@ -454,7 +456,7 @@ func (s stack) ListKeyPairs() ([]*abstract.KeyPair, fail.Error) {
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s stack) DeleteKeyPair(id string) fail.Error {
+func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -462,7 +464,7 @@ func (s stack) DeleteKeyPair(id string) fail.Error {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
@@ -477,7 +479,7 @@ func (s stack) DeleteKeyPair(id string) fail.Error {
 }
 
 // BindSecurityGroupToSubnet binds a security group to a subnet
-func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+func (s stack) BindSecurityGroupToSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -496,7 +498,7 @@ func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 }
 
 // UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
-func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+func (s stack) UnbindSecurityGroupFromSubnet(ctx context.Context, sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -515,7 +517,7 @@ func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
+func (s stack) AddPublicIPToVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -524,7 +526,7 @@ func (s stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -575,7 +577,7 @@ func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -626,7 +628,7 @@ func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Er
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
+func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -635,7 +637,7 @@ func (s stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 	}
 
 	for _, v := range vip.Hosts {
-		xerr := s.UnbindHostFromVIP(vip, v.ID)
+		xerr := s.UnbindHostFromVIP(ctx, vip, v.ID)
 		if xerr != nil {
 			return xerr
 		}
@@ -650,20 +652,20 @@ func (s stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
 // Does nothing for OpenStack, userdata cannot be updated
-func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
+func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	return nil
 }
 
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
-func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
-	host, xerr := s.InspectHost(hostParam)
+	host, xerr := s.InspectHost(ctx, hostParam)
 	if xerr != nil {
 		return hoststate.Error, xerr
 	}
@@ -671,16 +673,16 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fai
 }
 
 // StopHost stops the host identified by id
-func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Error {
+func (s stack) StopHost(ctx context.Context, hostParam stacks.HostParameter, gracefully bool) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(
 		func() error {
@@ -691,16 +693,16 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Er
 }
 
 // StartHost starts the host identified by id
-func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(
 		func() error {
@@ -711,16 +713,16 @@ func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // RebootHost reboots unconditionally the host identified by id
-func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
 	return stacks.RetryableRemoteCall(
@@ -740,16 +742,16 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // ResizeHost ...
-func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(ctx context.Context, hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	_ /*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	_ /*ahf*/, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	logrus.Debugf("Trying to resize a Host...")
 	// servers.Resize()
@@ -759,17 +761,17 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
+func (s stack) WaitHostState(ctx context.Context, hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
 		state.String(), timeout).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
@@ -861,17 +863,17 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 
 // WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	server, xerr := s.WaitHostState(hostParam, hoststate.Started, timeout)
+	server, xerr := s.WaitHostState(ctx, hostParam, hoststate.Started, timeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -887,7 +889,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 		}
 	}
 
-	ahf, xerr = s.complementHost(ahf.Core, server)
+	ahf, xerr = s.complementHost(ctx, ahf.Core, server)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -897,11 +899,11 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to Host, returns *fail.ErrDuplicate
-func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -910,7 +912,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 	if xerr != nil {
 		return xerr
 	}
-	asg, xerr = s.InspectSecurityGroup(asg)
+	asg, xerr = s.InspectSecurityGroup(ctx, asg)
 	if xerr != nil {
 		return xerr
 	}
@@ -924,7 +926,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -932,7 +934,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	if xerr != nil {
 		return xerr
 	}
-	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -946,7 +948,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s stack) DeleteVolume(id string) (ferr fail.Error) {
+func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
@@ -956,7 +958,7 @@ func (s stack) DeleteVolume(id string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -1000,7 +1002,7 @@ func (s stack) DeleteVolume(id string) (ferr fail.Error) {
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
-func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -1008,7 +1010,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 		return "", fail.InvalidParameterCannotBeEmptyStringError("request.Name")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
 
 	// Creates the attachment
 	var va *volumeattach.VolumeAttachment
@@ -1028,7 +1030,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by id
-func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
+func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1039,7 +1041,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
 
 	var va *volumeattach.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(
@@ -1061,7 +1063,7 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAtt
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
+func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1069,7 +1071,7 @@ func (s stack) ListVolumeAttachments(serverID string) ([]*abstract.VolumeAttachm
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
 
 	var vs []*abstract.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(
@@ -1101,7 +1103,7 @@ func (s stack) ListVolumeAttachments(serverID string) ([]*abstract.VolumeAttachm
 }
 
 // DeleteVolumeAttachment deletes the volume attachment identified by id
-func (s stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
+func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -1112,7 +1114,7 @@ func (s stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
 		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(context.Background(), tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(
 		func() error {
@@ -1122,7 +1124,7 @@ func (s stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
 	)
 }
 
-func (s stack) Migrate(operation string, params map[string]interface{}) fail.Error {
+func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error {
 	if operation == "networklayers" {
 		abstractSubnet, ok := params["layer"].(*abstract.Subnet)
 		if !ok {
@@ -1147,9 +1149,9 @@ func (s stack) GetStackName() (string, fail.Error) {
 }
 
 // initVPC initializes the instance of the Networking/VPC if one is defined in tenant
-func (s *stack) initVPC() fail.Error {
+func (s *stack) initVPC(ctx context.Context) fail.Error {
 	if s.cfgOpts.DefaultNetworkName != "" {
-		an, xerr := s.InspectNetworkByName(s.cfgOpts.DefaultNetworkName)
+		an, xerr := s.InspectNetworkByName(ctx, s.cfgOpts.DefaultNetworkName)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:

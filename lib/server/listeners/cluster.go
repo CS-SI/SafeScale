@@ -20,21 +20,21 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	clusterfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/cluster"
-	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	clusterfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/cluster"
+	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v3"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // ClusterListener host service server grpc
@@ -117,7 +117,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 		return nil, xerr
 	}
 
-	return instance.ToProtocol()
+	return instance.ToProtocol(job.Context())
 }
 
 // State returns the status of a cluster
@@ -154,7 +154,7 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 		return nil, xerr
 	}
 
-	st, xerr := instance.GetState()
+	st, xerr := instance.GetState(job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -197,7 +197,7 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, xerr
 	}
 
-	return instance.ToProtocol()
+	return instance.ToProtocol(job.Context())
 }
 
 // Start ...

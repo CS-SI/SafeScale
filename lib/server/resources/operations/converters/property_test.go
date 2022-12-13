@@ -20,11 +20,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/subnetstate"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
-	propertiesv3 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
+	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v3"
 	"github.com/stretchr/testify/require"
 )
 

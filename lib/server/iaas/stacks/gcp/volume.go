@@ -24,16 +24,16 @@ import (
 
 	"google.golang.org/api/compute/v1"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // -------------Volumes Management---------------------------------------------------------------------------------------
@@ -42,7 +42,7 @@ import (
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
+func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -53,7 +53,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 		return nil, fail.InvalidParameterError("request.Size", "cannot be negative integer or 0")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// TODO: validate content of request
@@ -94,7 +94,7 @@ func toAbstractVolume(in compute.Disk) (out *abstract.Volume, ferr fail.Error) {
 }
 
 // InspectVolume returns the volume identified by id
-func (s stack) InspectVolume(ref string) (_ *abstract.Volume, ferr fail.Error) {
+func (s stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volume, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -102,7 +102,7 @@ func (s stack) InspectVolume(ref string) (_ *abstract.Volume, ferr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcGetDisk(ref)
@@ -135,12 +135,12 @@ func toAbstractVolumeState(in string) (volumestate.Enum, fail.Error) {
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s stack) ListVolumes() ([]*abstract.Volume, fail.Error) {
+func (s stack) ListVolumes(context.Context) ([]*abstract.Volume, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var out []*abstract.Volume
@@ -185,7 +185,7 @@ func (s stack) rpcListDisks() ([]*compute.Disk, fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s stack) DeleteVolume(ref string) fail.Error {
+func (s stack) DeleteVolume(ctx context.Context, ref string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -193,14 +193,14 @@ func (s stack) DeleteVolume(ref string) fail.Error {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return s.rpcDeleteDisk(ref)
 }
 
 // CreateVolumeAttachment attaches a volume to a host
-func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -211,7 +211,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 		return "", fail.InvalidParameterCannotBeEmptyStringError("request.HostID")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcCreateDiskAttachment(request.VolumeID, request.HostID)
@@ -222,7 +222,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by id
-func (s stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAttachment, fail.Error) {
+func (s stack) InspectVolumeAttachment(ctx context.Context, hostRef, vaID string) (*abstract.VolumeAttachment, fail.Error) {
 	nilA := abstract.NewVolumeAttachment()
 	if valid.IsNil(s) {
 		return nilA, fail.InvalidInstanceError()
@@ -234,7 +234,7 @@ func (s stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAt
 		return nilA, fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", hostRef, vaID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", hostRef, vaID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	serverID, diskID := extractFromAttachmentID(vaID)
@@ -260,7 +260,7 @@ func (s stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAt
 	return nil, abstract.ResourceNotFoundError("attachment", vaID)
 }
 
-func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
+func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr) // too many unchecked casts
 
 	if operation == "tags" {
@@ -319,7 +319,7 @@ func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fa
 }
 
 // DeleteVolumeAttachment ...
-func (s stack) DeleteVolumeAttachment(serverRef, vaID string) fail.Error {
+func (s stack) DeleteVolumeAttachment(ctx context.Context, serverRef, vaID string) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -327,14 +327,14 @@ func (s stack) DeleteVolumeAttachment(serverRef, vaID string) fail.Error {
 		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverRef, vaID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverRef, vaID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return s.rpcDeleteDiskAttachment(vaID)
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s stack) ListVolumeAttachments(serverRef string) ([]*abstract.VolumeAttachment, fail.Error) {
+func (s stack) ListVolumeAttachments(ctx context.Context, serverRef string) ([]*abstract.VolumeAttachment, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -342,7 +342,7 @@ func (s stack) ListVolumeAttachments(serverRef string) ([]*abstract.VolumeAttach
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverRef")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", serverRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", serverRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var vats []*abstract.VolumeAttachment

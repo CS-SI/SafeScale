@@ -20,20 +20,20 @@ import (
 	"path"
 	"reflect"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
-	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
-	sharefactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/share"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
+	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
+	sharefactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/share"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-//go:generate minimock -o ../mocks/mock_nasapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.ShareHandler
+//go:generate minimock -o ../mocks/mock_nasapi.go -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.ShareHandler
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
@@ -174,7 +174,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 			return nil, xerr
 		}
 
-		xerr = host.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = host.Inspect(task.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 				hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 				if !ok {

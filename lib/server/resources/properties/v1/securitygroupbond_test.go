@@ -18,15 +18,18 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 )
 
 func TestSecurityGroupBond_IsNull(t *testing.T) {
 
-	var sgb *SecurityGroupBond = nil
+	var sgb *SecurityGroupBond
 	if !sgb.IsNull() {
 		t.Error("SecurityGroupBond nil pointer is null")
 		t.Fail()
@@ -45,13 +48,26 @@ func TestSecurityGroupBond_IsNull(t *testing.T) {
 
 func TestSecurityGroupBond_Replace(t *testing.T) {
 
-	var sgb *SecurityGroupBond = nil
+	var sgb *SecurityGroupBond
 	sgb2 := NewSecurityGroupBond()
 	result, err := sgb.Replace(sgb2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := sgb2.Replace(network)
+	if xerr == nil {
+		t.Error("SecurityGroupBond.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *SecurityGroupBond") {
+		t.Errorf("Expect error \"p is not a *SecurityGroupBond\", has \"%s\"", xerr.Error())
+	}
 
 }
 
@@ -71,6 +87,7 @@ func TestSecurityGroupBond__Clone(t *testing.T) {
 
 	clonedSgb, ok := cloned.(*SecurityGroupBond)
 	if !ok {
+		t.Error("Cloned SecurityGroupBond not castable to *SecurityGroupBond", err)
 		t.Fail()
 	}
 
@@ -80,7 +97,7 @@ func TestSecurityGroupBond__Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(sgb, clonedSgb)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, sgb, clonedSgb)

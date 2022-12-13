@@ -21,18 +21,18 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/userdata"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/userdata"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 type taskCreateGatewayParameters struct {
@@ -43,7 +43,7 @@ type taskCreateGatewayParameters struct {
 func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -53,6 +53,8 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
+
+	ctx := task.Context()
 
 	castedParams, ok := params.(taskCreateGatewayParameters)
 	if !ok {
@@ -85,7 +87,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	// Set link to Subnet before testing if Host has been successfully created;
 	// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
 	// be able to delete subnet on later safescale command
-	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -135,7 +137,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 				}
 				_ = ferr.AddConsequence(derr)
 			} else {
-				xerr = rgw.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				xerr = rgw.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					as, ok := clonable.(*abstract.HostCore)
 					if !ok {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -153,14 +155,14 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	}()
 
 	// Binds gateway to VIP if needed
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
 		if as != nil && as.VIP != nil {
-			xerr = svc.BindHostToVIP(as.VIP, rgw.GetID())
+			xerr = svc.BindHostToVIP(ctx, as.VIP, rgw.GetID())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -188,7 +190,7 @@ type taskFinalizeGatewayConfigurationParameters struct {
 func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -203,6 +205,11 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		return nil, fail.InconsistentError("failed to cast params to 'taskFinalizeGatewayConfigurationParameters'")
 	}
 
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	objgw := castedParams.host
 	if valid.IsNil(objgw) {
 		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
@@ -212,7 +219,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	gwname := objgw.GetName()
 
 	// Executes userdata phase2 script to finalize host installation
-	tracer := debug.NewTracer(nil, true, "(%s)", gwname).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task.Context(), true, "(%s)", gwname).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 	defer temporal.NewStopwatch().OnExitLogInfo(
@@ -220,8 +227,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 
-	var xerr fail.Error
-	waitingTime := 4 * time.Minute // FIXME: Hardcoded timeout
+	waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())
 
 	if objgw.thePhaseDoesSomething(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData) {
 		xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData, waitingTime)
@@ -254,9 +260,9 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 			return nil, xerr
 		}
 
-		time.Sleep(45 * time.Second)
+		time.Sleep(timings.RebootTimeout())
 
-		_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, 0)
+		_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, waitingTime)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -273,7 +279,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	}
 
 	// By design, phase 5 doesn't  touch network cfg, so no reboot needed
-	_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE5_FINAL, time.Duration(0))
+	_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE5_FINAL, waitingTime)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

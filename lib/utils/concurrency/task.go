@@ -22,13 +22,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	uuid "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 //go:generate stringer -type=TaskStatus
@@ -69,7 +69,7 @@ type TaskResult interface{}
 // }, nil)
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, fail.Error)
 
-//go:generate minimock -o mocks/mock_taskguard.go -i github.com/CS-SI/SafeScale/v21/lib/utils/concurrency.TaskGuard
+//go:generate minimock -o mocks/mock_taskguard.go -i github.com/CS-SI/SafeScale/v22/lib/utils/concurrency.TaskGuard
 
 // TaskGuard ...
 type TaskGuard interface {
@@ -78,7 +78,7 @@ type TaskGuard interface {
 	WaitFor(time.Duration) (bool, TaskResult, fail.Error)
 }
 
-//go:generate minimock -o mocks/mock_taskcore.go -i github.com/CS-SI/SafeScale/v21/lib/utils/concurrency.TaskCore
+//go:generate minimock -o mocks/mock_taskcore.go -i github.com/CS-SI/SafeScale/v22/lib/utils/concurrency.TaskCore
 
 // TaskCore is the interface of core methods to control Task and TaskGroup
 type TaskCore interface {
@@ -100,7 +100,7 @@ type TaskCore interface {
 	StartWithTimeout(fn TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error)
 }
 
-//go:generate minimock -o mocks/mock_task.go -i github.com/CS-SI/SafeScale/v21/lib/utils/concurrency.Task
+//go:generate minimock -o mocks/mock_task.go -i github.com/CS-SI/SafeScale/v22/lib/utils/concurrency.Task
 
 // Task is the interface of a task running in goroutine, allowing to identity (indirectly) goroutines
 type Task interface {
@@ -190,6 +190,7 @@ type taskContextKey = string
 
 const (
 	KeyForTaskInContext taskContextKey = "task"
+	KeyForID            taskContextKey = "ID"
 )
 
 // TaskFromContext extracts the task instance from context
@@ -217,6 +218,10 @@ func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 // returns:
 //    - Task, nil: Task found in 'ctx' or VoidTask() is returned
 func TaskFromContextOrVoid(ctx context.Context) (Task, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
 	nctx, err := TaskFromContext(ctx)
 	if err != nil {
 		return VoidTask()

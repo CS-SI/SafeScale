@@ -21,18 +21,19 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	networkfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/network"
-	subnetfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/subnet"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/v21/lib/utils/net"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	networkfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/network"
+	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/subnet"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 )
 
 const (
@@ -161,7 +162,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	}
 
 	tracer.Trace("Network '%s' successfully created.", networkName)
-	return networkInstance.ToProtocol()
+	return networkInstance.ToProtocol(ctx)
 }
 
 // List existing networks
@@ -192,7 +193,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 
 	var list []*abstract.Network
 	if in.GetAll() {
-		list, xerr = svc.ListNetworks()
+		list, xerr = svc.ListNetworks(ctx)
 	} else {
 		list, xerr = networkfactory.List(job.Context(), svc)
 	}
@@ -244,7 +245,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, xerr
 	}
 
-	return networkInstance.ToProtocol()
+	return networkInstance.ToProtocol(ctx)
 }
 
 // Delete a network
@@ -289,11 +290,11 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			abstractNetwork, xerr := svc.InspectNetworkByName(ref)
+			abstractNetwork, xerr := svc.InspectNetworkByName(ctx, ref)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					abstractNetwork, xerr = svc.InspectNetwork(ref)
+					abstractNetwork, xerr = svc.InspectNetwork(ctx, ref)
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
@@ -307,7 +308,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 				}
 			}
 
-			cfg, cerr := svc.GetConfigurationOptions()
+			cfg, cerr := svc.GetConfigurationOptions(ctx)
 			if cerr != nil {
 				return empty, cerr
 			}
@@ -323,7 +324,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.NetworkDelete
 	}
 
 	// Reload from metadata before sending the response
-	xerr = networkInstance.Reload()
+	xerr = networkInstance.Reload(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

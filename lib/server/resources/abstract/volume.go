@@ -21,17 +21,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumestate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // VolumeRequest represents a volume request
 type VolumeRequest struct {
 	Name  string           `json:"name,omitempty"`
 	Size  int              `json:"size,omitempty"`
-	Speed volumespeed.Enum `json:"speed,omitempty"`
+	Speed volumespeed.Enum `json:"speed"`
 }
 
 // Volume represents a block volume
@@ -39,8 +39,8 @@ type Volume struct {
 	ID    string            `json:"id,omitempty"`
 	Name  string            `json:"name,omitempty"`
 	Size  int               `json:"size,omitempty"`
-	Speed volumespeed.Enum  `json:"speed,omitempty"`
-	State volumestate.Enum  `json:"state,omitempty"`
+	Speed volumespeed.Enum  `json:"speed"`
+	State volumestate.Enum  `json:"state"`
 	Tags  map[string]string `json:"tags,omitempty"`
 }
 
@@ -115,18 +115,12 @@ func (v *Volume) Deserialize(buf []byte) (ferr fail.Error) {
 // GetName returns the name of the volume
 // Satisfies interface data.Identifiable
 func (v *Volume) GetName() string {
-	if v == nil {
-		return ""
-	}
 	return v.Name
 }
 
 // GetID returns the ID of the volume
 // Satisfies interface data.Identifiable
 func (v *Volume) GetID() string {
-	if v == nil {
-		return ""
-	}
 	return v.ID
 }
 

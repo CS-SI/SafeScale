@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -112,7 +115,7 @@ func TestSingleCache_CommitEntry(t *testing.T) {
 
 func TestSingleCache_FreeEntry(t *testing.T) {
 
-	var rc *SingleCache = nil
+	var rc *SingleCache
 	err := rc.FreeEntry(context.Background(), "key")
 	if err == nil {
 		t.Error("Can't Free on nil pointer cache")
@@ -144,7 +147,7 @@ func TestSingleCache_FreeEntry(t *testing.T) {
 func TestSingleCache_AddEntry(t *testing.T) {
 
 	content := newReservation(context.Background(), "store", "content")
-	var rc *SingleCache = nil
+	var rc *SingleCache
 	_, err := rc.AddEntry(context.Background(), content)
 	if err == nil {
 		t.Error("Can't Add on nil pointer cache")

@@ -17,8 +17,8 @@
 package operations
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // FeatureParameter describes a Feature parameter as defined by Feature file content

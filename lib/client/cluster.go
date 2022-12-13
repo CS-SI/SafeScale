@@ -22,23 +22,23 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/utils"
-	clitools "github.com/CS-SI/SafeScale/v21/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
+	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // var sshCfgCache = cache.NewMapCache()
 
-// host is the safescale client part handling hosts
-type cluster struct {
+// clusterConsumer is the safescale client part handling clusters
+type clusterConsumer struct {
 	// session is not used currently
 	session *Session
 }
 
 // List ...
-func (c cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, error) {
+func (c clusterConsumer) List(timeout time.Duration) (*protocol.ClusterListResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 
@@ -56,7 +56,7 @@ func (c cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, err
 		newCtx = aCtx
 	}
 
-	result, err := service.List(newCtx, &protocol.Reference{})
+	result, err := service.List(newCtx, &protocol.Reference{TenantId: c.session.tenant})
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (c cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, err
 }
 
 // Inspect ...
-func (c cluster) Inspect(clusterName string, timeout time.Duration) (*protocol.ClusterResponse, error) {
+func (c clusterConsumer) Inspect(clusterName string, timeout time.Duration) (*protocol.ClusterResponse, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -86,7 +86,7 @@ func (c cluster) Inspect(clusterName string, timeout time.Duration) (*protocol.C
 		newCtx = aCtx
 	}
 
-	result, err := service.Inspect(newCtx, &protocol.Reference{Name: clusterName})
+	result, err := service.Inspect(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (c cluster) Inspect(clusterName string, timeout time.Duration) (*protocol.C
 }
 
 // GetState gets cluster status
-func (c cluster) GetState(clusteName string, timeout time.Duration) (*protocol.ClusterStateResponse, error) {
+func (c clusterConsumer) GetState(clusteName string, timeout time.Duration) (*protocol.ClusterStateResponse, error) {
 	if clusteName == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusteName")
 	}
@@ -115,11 +115,11 @@ func (c cluster) GetState(clusteName string, timeout time.Duration) (*protocol.C
 		newCtx = aCtx
 	}
 
-	return service.State(newCtx, &protocol.Reference{Name: clusteName})
+	return service.State(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusteName})
 }
 
 // Start starts all the hosts of the cluster
-func (c cluster) Start(clusterName string, timeout time.Duration) error {
+func (c clusterConsumer) Start(clusterName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
@@ -136,12 +136,12 @@ func (c cluster) Start(clusterName string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
-	_, err := service.Start(newCtx, &protocol.Reference{Name: clusterName})
+	_, err := service.Start(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
 	return err
 }
 
 // Stop stops all the hosts of the cluster
-func (c cluster) Stop(clusterName string, timeout time.Duration) error {
+func (c clusterConsumer) Stop(clusterName string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewClusterServiceClient(c.session.connection)
@@ -158,12 +158,12 @@ func (c cluster) Stop(clusterName string, timeout time.Duration) error {
 		newCtx = aCtx
 	}
 
-	_, err := service.Stop(newCtx, &protocol.Reference{Name: clusterName})
+	_, err := service.Stop(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
 	return err
 }
 
 // Create ...
-func (c cluster) Create(def *protocol.ClusterCreateRequest, timeout time.Duration) (*protocol.ClusterResponse, error) {
+func (c clusterConsumer) Create(def *protocol.ClusterCreateRequest, timeout time.Duration) (*protocol.ClusterResponse, error) {
 	if def == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("def")
 	}
@@ -184,12 +184,13 @@ func (c cluster) Create(def *protocol.ClusterCreateRequest, timeout time.Duratio
 		newCtx = aCtx
 	}
 
+	def.TenantId = c.session.tenant
 	service := protocol.NewClusterServiceClient(c.session.connection)
 	return service.Create(newCtx, def)
 }
 
 // Delete deletes a cluster
-func (c cluster) Delete(clusterName string, force bool, timeout time.Duration) error {
+func (c clusterConsumer) Delete(clusterName string, force bool, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -212,15 +213,16 @@ func (c cluster) Delete(clusterName string, force bool, timeout time.Duration) e
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
 	req := &protocol.ClusterDeleteRequest{
-		Name:  clusterName,
-		Force: force,
+		Name:     clusterName,
+		Force:    force,
+		TenantId: c.session.tenant,
 	}
 	_, err := service.Delete(newCtx, req)
 	return err
 }
 
 // Expand ...
-func (c cluster) Expand(req *protocol.ClusterResizeRequest, timeout time.Duration) (*protocol.ClusterNodeListResponse, error) {
+func (c clusterConsumer) Expand(req *protocol.ClusterResizeRequest, timeout time.Duration) (*protocol.ClusterNodeListResponse, error) {
 	if req == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("req")
 	}
@@ -241,12 +243,13 @@ func (c cluster) Expand(req *protocol.ClusterResizeRequest, timeout time.Duratio
 		newCtx = aCtx
 	}
 
+	req.TenantId = c.session.tenant
 	service := protocol.NewClusterServiceClient(c.session.connection)
 	return service.Expand(newCtx, req)
 }
 
 // Shrink ...
-func (c cluster) Shrink(req *protocol.ClusterResizeRequest, timeout time.Duration) (*protocol.ClusterNodeListResponse, error) {
+func (c clusterConsumer) Shrink(req *protocol.ClusterResizeRequest, timeout time.Duration) (*protocol.ClusterNodeListResponse, error) {
 	if req == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("req")
 	}
@@ -268,11 +271,12 @@ func (c cluster) Shrink(req *protocol.ClusterResizeRequest, timeout time.Duratio
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
+	req.TenantId = c.session.tenant
 	return service.Shrink(newCtx, req)
 }
 
 // CheckFeature ...
-func (c cluster) CheckFeature(clusterName, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
+func (c clusterConsumer) CheckFeature(clusterName, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -291,7 +295,7 @@ func (c cluster) CheckFeature(clusterName, featureName string, params map[string
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{Name: clusterName},
+		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -310,7 +314,7 @@ func (c cluster) CheckFeature(clusterName, featureName string, params map[string
 }
 
 // AddFeature ...
-func (c cluster) AddFeature(clusterName, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
+func (c clusterConsumer) AddFeature(clusterName, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -328,7 +332,7 @@ func (c cluster) AddFeature(clusterName, featureName string, params map[string]s
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{Name: clusterName},
+		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -347,7 +351,7 @@ func (c cluster) AddFeature(clusterName, featureName string, params map[string]s
 }
 
 // RemoveFeature ...
-func (c cluster) RemoveFeature(clusterName, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
+func (c clusterConsumer) RemoveFeature(clusterName, featureName string, params map[string]string, settings *protocol.FeatureSettings, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterError("clusterName", "cannot be empty string")
 	}
@@ -366,7 +370,7 @@ func (c cluster) RemoveFeature(clusterName, featureName string, params map[strin
 	req := &protocol.FeatureActionRequest{
 		Name:       featureName,
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{Name: clusterName},
+		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
 		Variables:  params,
 		Settings:   settings,
 	}
@@ -385,7 +389,7 @@ func (c cluster) RemoveFeature(clusterName, featureName string, params map[strin
 }
 
 // ListFeatures ...
-func (c cluster) ListFeatures(clusterName string, all bool, timeout time.Duration) (*protocol.FeatureListResponse, error) {
+func (c clusterConsumer) ListFeatures(clusterName string, all bool, timeout time.Duration) (*protocol.FeatureListResponse, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
 	}
@@ -401,7 +405,7 @@ func (c cluster) ListFeatures(clusterName string, all bool, timeout time.Duratio
 	service := protocol.NewFeatureServiceClient(c.session.connection)
 	request := &protocol.FeatureListRequest{
 		TargetType:    protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:     &protocol.Reference{Name: clusterName},
+		TargetRef:     &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
 		InstalledOnly: !all,
 	}
 
@@ -422,7 +426,7 @@ func (c cluster) ListFeatures(clusterName string, all bool, timeout time.Duratio
 }
 
 // InspectFeature ...
-func (c cluster) InspectFeature(clusterName, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureDetailResponse, error) {
+func (c clusterConsumer) InspectFeature(clusterName, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureDetailResponse, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
 	}
@@ -438,7 +442,7 @@ func (c cluster) InspectFeature(clusterName, featureName string, embedded bool, 
 	service := protocol.NewFeatureServiceClient(c.session.connection)
 	request := &protocol.FeatureDetailRequest{
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{Name: clusterName},
+		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
 		Name:       featureName,
 		Embedded:   embedded,
 	}
@@ -460,7 +464,7 @@ func (c cluster) InspectFeature(clusterName, featureName string, embedded bool, 
 }
 
 // ExportFeature recovers content of the feature file and returns it
-func (c cluster) ExportFeature(clusterName, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureExportResponse, error) {
+func (c clusterConsumer) ExportFeature(clusterName, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureExportResponse, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
 	}
@@ -476,7 +480,7 @@ func (c cluster) ExportFeature(clusterName, featureName string, embedded bool, t
 	service := protocol.NewFeatureServiceClient(c.session.connection)
 	request := &protocol.FeatureDetailRequest{
 		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{Name: clusterName},
+		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
 		Name:       featureName,
 		Embedded:   embedded,
 	}
@@ -498,7 +502,7 @@ func (c cluster) ExportFeature(clusterName, featureName string, embedded bool, t
 }
 
 // FindAvailableMaster ...
-func (c cluster) FindAvailableMaster(clusterName string, timeout time.Duration) (*protocol.Host, error) {
+func (c clusterConsumer) FindAvailableMaster(clusterName string, timeout time.Duration) (*protocol.Host, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
 	}
@@ -520,7 +524,7 @@ func (c cluster) FindAvailableMaster(clusterName string, timeout time.Duration) 
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	host, err := service.FindAvailableMaster(newCtx, &protocol.Reference{Name: clusterName})
+	host, err := service.FindAvailableMaster(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
@@ -528,7 +532,7 @@ func (c cluster) FindAvailableMaster(clusterName string, timeout time.Duration) 
 }
 
 // ListNodes ...
-func (c cluster) ListNodes(clusterName string, timeout time.Duration) (*protocol.ClusterNodeListResponse, error) {
+func (c clusterConsumer) ListNodes(clusterName string, timeout time.Duration) (*protocol.ClusterNodeListResponse, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
 	}
@@ -550,7 +554,7 @@ func (c cluster) ListNodes(clusterName string, timeout time.Duration) (*protocol
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	list, err := service.ListNodes(newCtx, &protocol.Reference{Name: clusterName})
+	list, err := service.ListNodes(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
@@ -558,7 +562,7 @@ func (c cluster) ListNodes(clusterName string, timeout time.Duration) (*protocol
 }
 
 // InspectNode ...
-func (c cluster) InspectNode(clusterName string, nodeRef string, timeout time.Duration) (*protocol.Host, error) {
+func (c clusterConsumer) InspectNode(clusterName string, nodeRef string, timeout time.Duration) (*protocol.Host, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -583,11 +587,17 @@ func (c cluster) InspectNode(clusterName string, nodeRef string, timeout time.Du
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.InspectNode(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+	return service.InspectNode(newCtx, &protocol.ClusterNodeRequest{
+		Name: clusterName,
+		Host: &protocol.Reference{
+			TenantId: c.session.tenant,
+			Name:     nodeRef,
+		},
+	})
 }
 
 // DeleteNode ...
-func (c cluster) DeleteNode(clusterName string, nodes []string, timeout time.Duration) error {
+func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -621,11 +631,17 @@ func (c cluster) DeleteNode(clusterName string, nodes []string, timeout time.Dur
 
 	nodeDeleter := func(ref string) {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
 
-		if _, err := service.DeleteNode(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: ref}}); err != nil {
+		_, err := service.DeleteNode(newCtx, &protocol.ClusterNodeRequest{
+			Name: clusterName, Host: &protocol.Reference{
+				TenantId: c.session.tenant,
+				Name:     ref,
+			},
+		})
+		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
 			errs = append(errs, err.Error())
@@ -633,7 +649,7 @@ func (c cluster) DeleteNode(clusterName string, nodes []string, timeout time.Dur
 	}
 
 	if len(nodes) > 1 {
-		// We want to check first if tenant is set when there are more than 1 node, to avoid multiple message claiming there is no tenant set...
+		// We want to check first if tenant is set when there are more than 1 node, to avoid multiple message claiming there is no tenantConsumer set...
 		tenantService := protocol.NewTenantServiceClient(c.session.connection)
 		_, err := tenantService.Get(newCtx, &googleprotobuf.Empty{})
 		if err != nil {
@@ -655,7 +671,7 @@ func (c cluster) DeleteNode(clusterName string, nodes []string, timeout time.Dur
 }
 
 // StartNode ...
-func (c cluster) StartNode(clusterName string, nodeRef string, timeout time.Duration) error {
+func (c clusterConsumer) StartNode(clusterName string, nodeRef string, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -680,12 +696,18 @@ func (c cluster) StartNode(clusterName string, nodeRef string, timeout time.Dura
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StartNode(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+	_, err := service.StartNode(newCtx, &protocol.ClusterNodeRequest{
+		Name: clusterName,
+		Host: &protocol.Reference{
+			TenantId: c.session.tenant,
+			Name:     nodeRef,
+		},
+	})
 	return err
 }
 
 // StopNode ...
-func (c cluster) StopNode(clusterName string, nodeRef string, timeout time.Duration) error {
+func (c clusterConsumer) StopNode(clusterName string, nodeRef string, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -710,12 +732,18 @@ func (c cluster) StopNode(clusterName string, nodeRef string, timeout time.Durat
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StopNode(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+	_, err := service.StopNode(newCtx, &protocol.ClusterNodeRequest{
+		Name: clusterName,
+		Host: &protocol.Reference{
+			TenantId: c.session.tenant,
+			Name:     nodeRef,
+		},
+	})
 	return err
 }
 
 // StateNode ...
-func (c cluster) StateNode(clusterName string, nodeRef string, timeout time.Duration) (*protocol.HostStatus, error) {
+func (c clusterConsumer) StateNode(clusterName string, nodeRef string, timeout time.Duration) (*protocol.HostStatus, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -740,11 +768,17 @@ func (c cluster) StateNode(clusterName string, nodeRef string, timeout time.Dura
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.StateNode(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+	return service.StateNode(newCtx, &protocol.ClusterNodeRequest{
+		Name: clusterName,
+		Host: &protocol.Reference{
+			TenantId: c.session.tenant,
+			Name:     nodeRef,
+		},
+	})
 }
 
 // ListMasters ...
-func (c cluster) ListMasters(clusterName string, timeout time.Duration) (*protocol.ClusterNodeListResponse, error) {
+func (c clusterConsumer) ListMasters(clusterName string, timeout time.Duration) (*protocol.ClusterNodeListResponse, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
 	}
@@ -766,15 +800,16 @@ func (c cluster) ListMasters(clusterName string, timeout time.Duration) (*protoc
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	list, err := service.ListMasters(newCtx, &protocol.Reference{Name: clusterName})
+	list, err := service.ListMasters(newCtx, &protocol.Reference{TenantId: c.session.tenant, Name: clusterName})
 	if err != nil {
 		return nil, err
 	}
+
 	return list, nil
 }
 
 // InspectMaster ...
-func (c cluster) InspectMaster(clusterName string, masterRef string, timeout time.Duration) (*protocol.Host, error) {
+func (c clusterConsumer) InspectMaster(clusterName string, masterRef string, timeout time.Duration) (*protocol.Host, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -799,11 +834,17 @@ func (c cluster) InspectMaster(clusterName string, masterRef string, timeout tim
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.InspectMaster(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
+	return service.InspectMaster(newCtx, &protocol.ClusterNodeRequest{
+		Name: clusterName,
+		Host: &protocol.Reference{
+			TenantId: c.session.tenant,
+			Name:     masterRef,
+		},
+	})
 }
 
 // StartMaster ...
-func (c cluster) StartMaster(clusterName string, masterRef string, timeout time.Duration) error {
+func (c clusterConsumer) StartMaster(clusterName string, masterRef string, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -828,12 +869,18 @@ func (c cluster) StartMaster(clusterName string, masterRef string, timeout time.
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StartMaster(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
+	_, err := service.StartMaster(newCtx, &protocol.ClusterNodeRequest{
+		Name: clusterName,
+		Host: &protocol.Reference{
+			TenantId: c.session.tenant,
+			Name:     masterRef,
+		},
+	})
 	return err
 }
 
 // StopMaster ...
-func (c cluster) StopMaster(clusterName string, masterRef string, timeout time.Duration) error {
+func (c clusterConsumer) StopMaster(clusterName string, masterRef string, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -858,12 +905,18 @@ func (c cluster) StopMaster(clusterName string, masterRef string, timeout time.D
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StopMaster(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
+	_, err := service.StopMaster(newCtx, &protocol.ClusterNodeRequest{
+		Name: clusterName,
+		Host: &protocol.Reference{
+			Name:     masterRef,
+			TenantId: c.session.tenant,
+		},
+	})
 	return err
 }
 
 // StateMaster ...
-func (c cluster) StateMaster(clusterName string, masterRef string, timeout time.Duration) (*protocol.HostStatus, error) {
+func (c clusterConsumer) StateMaster(clusterName string, masterRef string, timeout time.Duration) (*protocol.HostStatus, error) {
 	if clusterName == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -888,5 +941,11 @@ func (c cluster) StateMaster(clusterName string, masterRef string, timeout time.
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.StateMaster(newCtx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
+	return service.StateMaster(newCtx, &protocol.ClusterNodeRequest{
+		Name: clusterName,
+		Host: &protocol.Reference{
+			TenantId: c.session.tenant,
+			Name:     masterRef,
+		},
+	})
 }

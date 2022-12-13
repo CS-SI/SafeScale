@@ -20,26 +20,26 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumeproperty"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	hostfactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/host"
-	volumefactory "github.com/CS-SI/SafeScale/v21/lib/server/resources/factories/volume"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/server"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumeproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	hostfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/host"
+	volumefactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/volume"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
 
-//go:generate minimock -o ../mocks/mock_volumeapi.go -i github.com/CS-SI/SafeScale/v21/lib/server/handlers.VolumeHandler
+//go:generate minimock -o ../mocks/mock_volumeapi.go -i github.com/CS-SI/SafeScale/v22/lib/server/handlers.VolumeHandler
 
 // VolumeHandler defines API to manipulate hosts
 type VolumeHandler interface {
@@ -129,7 +129,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 		}
 	}
 
-	xerr = volumeInstance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = volumeInstance.Inspect(task.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {

@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 )
 
@@ -112,12 +112,7 @@ func Profile(what string) func() {
 			server := listen + ":" + port
 			go func() {
 				var crash error
-				defer func() {
-					if crash != nil {
-						logrus.Error(crash)
-					}
-				}()
-				defer fail.OnPanic(&crash)
+				defer fail.SilentOnPanic(&crash)
 
 				err := http.ListenAndServe(server, nil)
 				if err != nil {

@@ -26,8 +26,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/exportstats"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/exportstats"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/felixge/fgprof"
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
@@ -62,7 +62,7 @@ func expose() {
 	http.DefaultServeMux.Handle("/debug/fgprof", fgprof.Handler())
 	go func() {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		err := http.ListenAndServe(fmt.Sprintf(":%d", expvarPort), http.DefaultServeMux)
 		if err != nil {

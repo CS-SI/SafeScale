@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
@@ -501,7 +501,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 3 {
+			if iter > 1 {
 				break
 			}
 			if enough {
@@ -710,7 +710,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitForLater(t *testin
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 6 {
+			if iter > 1 {
 				break
 			}
 			if enough {
@@ -907,10 +907,8 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWaitFor(t *testing.T) {
 			if iter == 1 {
 				previousErr = xerr
 			} else {
-				// VPL: this kind of test will lead to "before: aborted, now: aborted" and trigger error
-				// if xerr != previousErr {
 				if xerr != nil {
-					switch xerr.(type) {
+					switch xerr.(type) { // nolint
 					case *fail.ErrAborted:
 						if previousErr != nil {
 							switch previousErr.(type) {
@@ -923,35 +921,31 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWaitFor(t *testing.T) {
 							}
 						}
 					}
-				} else {
-					if previousErr != nil {
-						t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-						t.Fail()
-						return
-					}
+				} else if previousErr != nil {
+					t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+					t.Fail()
+					return
 				}
 			}
 
 			// check for error inconsistencies
 			if iter == 1 {
 				previousErr = xerr
-			} else {
-				if xerr != previousErr {
-					if xerr != nil && previousErr != nil {
-						if strings.Compare(xerr.Error(), previousErr.Error()) != 0 {
-							if !strings.Contains(xerr.Error(), "aborted") || !strings.Contains(
-								previousErr.Error(), "aborted",
-							) {
-								t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-								t.Fail()
-								return
-							}
+			} else if xerr != previousErr {
+				if xerr != nil && previousErr != nil {
+					if strings.Compare(xerr.Error(), previousErr.Error()) != 0 {
+						if !strings.Contains(xerr.Error(), "aborted") || !strings.Contains(
+							previousErr.Error(), "aborted",
+						) {
+							t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+							t.Fail()
+							return
 						}
-					} else {
-						t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-						t.Fail()
-						return
 					}
+				} else {
+					t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+					t.Fail()
+					return
 				}
 			}
 

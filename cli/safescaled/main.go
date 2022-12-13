@@ -27,22 +27,22 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/makholm/covertool/pkg/exit"
+	"github.com/oscarpicas/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	_ "github.com/CS-SI/SafeScale/v21/lib/server"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/listeners"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
-	appwide "github.com/CS-SI/SafeScale/v21/lib/utils/app"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/heartbeat"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	_ "github.com/CS-SI/SafeScale/v22/lib/server"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/listeners"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
+	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/heartbeat"
 )
 
 var profileCloseFunc = func() {}
@@ -66,7 +66,7 @@ func work(c *cli.Context) {
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		var crash error
-		defer fail.OnPanic(&crash)
+		defer fail.SilentOnPanic(&crash)
 
 		<-signalCh
 		cleanup(true)
@@ -123,6 +123,7 @@ func work(c *cli.Context) {
 	protocol.RegisterTemplateServiceServer(s, &listeners.TemplateListener{})
 	protocol.RegisterTenantServiceServer(s, &listeners.TenantListener{})
 	protocol.RegisterVolumeServiceServer(s, &listeners.VolumeListener{})
+	protocol.RegisterLabelServiceServer(s, &listeners.LabelListener{})
 
 	// enable heartbeat
 	go heartbeat.RunHeartbeatService(":10102")

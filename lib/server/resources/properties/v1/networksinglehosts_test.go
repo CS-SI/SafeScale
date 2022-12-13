@@ -18,10 +18,13 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 )
 
 func TestNetworkSingleHosts_IsNull(t *testing.T) {
@@ -56,6 +59,20 @@ func TestNetworkSingleHosts_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := nsh2.Replace(network)
+	if xerr == nil {
+		t.Error("NetworkSingleHosts.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *NetworkSingleHosts") {
+		t.Errorf("Expect error \"p is not a *NetworkSingleHosts\", has \"%s\"", xerr.Error())
+	}
+
 }
 
 func TestNetworkSingleHosts_Clone(t *testing.T) {
@@ -69,6 +86,7 @@ func TestNetworkSingleHosts_Clone(t *testing.T) {
 
 	clonedCt, ok := cloned.(*NetworkSingleHosts)
 	if !ok {
+		t.Error("Cloned NetworkSingleHosts not castable to *NetworkSingleHosts", err)
 		t.Fail()
 	}
 
@@ -78,7 +96,7 @@ func TestNetworkSingleHosts_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, ct, clonedCt)

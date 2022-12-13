@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 func TestIsNull(t *testing.T) {
@@ -62,6 +62,8 @@ func TestNotNulls(t *testing.T) {
 	var ourConcreteErr ErrNotFound = *ptrOurConcreteErr
 	var dlbPtrOurConcreteErr **ErrNotFound = &ptrOurConcreteErr
 
+	var emptyStrArray []string
+
 	type brand struct {
 		content string
 	}
@@ -75,7 +77,11 @@ func TestNotNulls(t *testing.T) {
 		want bool
 	}{
 		{"string", args{"whatever"}, false},
-		{"struct", args{brand{}}, false},
+		{"array of string", args{[]string{"whatever"}}, false},
+		{"array of string empty", args{[]string{}}, false},
+		{"array of string empty not initialized", args{emptyStrArray}, false},
+		{"struct 1", args{brand{}}, true},
+		{"struct 2", args{brand{content: ""}}, true},
 		{"ptr struct", args{&brand{}}, false},
 		{"raw errors 1", args{err}, false},
 		{"raw errors 2", args{ptrerr}, false},

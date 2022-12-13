@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +37,7 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaitingWF
 
 	for !enough {
 		iter++
-		if iter > 8 {
+		if iter > 2 {
 			break
 		}
 
@@ -134,7 +134,7 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t
 
 	for !enough {
 		iter++
-		if iter > 8 {
+		if iter > 2 {
 			break
 		}
 

@@ -25,7 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	urfcli "github.com/urfave/cli"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/cmdstatus"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/cmdstatus"
 )
 
 // response define a standard response for most safescale commands
@@ -117,6 +117,10 @@ func (r *response) Display() {
 		logrus.Error("lib/utils/response.go: Response.Display(): failed to marshal the Response")
 		return
 	}
+	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+		fmt.Println("")
+	}
+
 	fmt.Println(string(out))
 }
 

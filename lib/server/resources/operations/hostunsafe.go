@@ -22,26 +22,25 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hostproperty"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hostproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 // unsafeRun is the non goroutine-safe version of Run, with less parameter validation, that does the real work
@@ -51,16 +50,6 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 
 	if cmd == "" {
 		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
-	}
-
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	if task.Aborted() {
-		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	timings, xerr := instance.Service().Timings()
@@ -77,12 +66,12 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 	)
 
 	hostName := instance.GetName()
-	sshProfile, xerr := instance.GetSSHConfig(task.Context())
+	sshProfile, xerr := instance.GetSSHConfig(ctx)
 	if xerr != nil {
 		return retCode, stdOut, stdErr, xerr
 	}
 
-	retCode, stdOut, stdErr, xerr = run(task.Context(), sshProfile, cmd, outs, connTimeout+execTimeout)
+	retCode, stdOut, stdErr, xerr = run(ctx, sshProfile, cmd, outs, connTimeout+execTimeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // == *fail.ErrAborted
@@ -109,38 +98,45 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 // - *fail.ErrNotAvailable: execution with 409 or 404 errors
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
-func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func run(ctx context.Context, sshProfile api.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
 		timeout = temporal.HostLongOperationTimeout()
+	}
+
+	cfg, xerr := sshProfile.Config()
+	if xerr != nil {
+		return 0, "", "", xerr
+	}
+	hn, xerr := cfg.GetHostname()
+	if xerr != nil {
+		return 0, "", "", xerr
 	}
 
 	var (
 		iterations, retcode int
 		stdout, stderr      string
 	)
-	xerr := retry.WhileUnsuccessful(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			iterations++
 			// Create the command
-			sshCmd, innerXErr := ssh.NewCommand(ctx, cmd)
+			var sshCmd api.Command
+			var innerXErr fail.Error
+			defer func() {
+				var ignored error
+				defer fail.IgnoreProblems(&ignored)
+
+				if sshCmd != nil {
+					_ = sshCmd.Close()
+				}
+			}()
+
+			sshCmd, innerXErr = sshProfile.NewCommand(ctx, cmd)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
 				return innerXErr
 			}
-
-			// Do not forget to close the command (allowing to close SSH tunnels and free process)
-			defer func(cmd *system.SSHCommand) {
-				derr := cmd.Close()
-				if derr != nil {
-					if innerXErr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
-					} else {
-						innerXErr = derr
-					}
-				}
-			}(sshCmd)
-
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout)
 			if innerXErr != nil {
 				innerXErr.Annotate("retcode", retcode)
@@ -163,7 +159,7 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "failed to execute command on Host '%s' after %s", ssh.Hostname, temporal.FormatDuration(timeout))
+			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "failed to execute command on Host '%s' after %s", hn, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
 			return retcode, stdout, stderr, fail.ConvertError(fail.Cause(xerr))
 		default:
@@ -188,6 +184,13 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
+	instance.localCache.RLock()
+	notok := instance.localCache.sshProfile == nil
+	instance.localCache.RUnlock() // nolint
+	if notok {
+		return invalid, "", "", fail.InvalidInstanceContentError("instance.localCache.sshProfile", "cannot be nil")
+	}
+
 	if source == "" {
 		return invalid, "", "", fail.InvalidParameterError("source", "cannot be empty string")
 	}
@@ -195,29 +198,19 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		return invalid, "", "", fail.InvalidParameterError("target", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	if task.Aborted() {
-		return invalid, "", "", fail.AbortedError(nil, "aborted")
-	}
-
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
 
-	timeout = temporal.MaxTimeout(timeout, timings.HostOperationTimeout())
-
 	md5hash := ""
+	uploadSize := 0
 	if source != "" {
 		content, err := ioutil.ReadFile(source)
 		if err != nil {
 			return invalid, "", "", fail.AbortedError(err, "aborted")
 		}
+		uploadSize = len(content)
 		md5hash = getMD5Hash(string(content))
 	}
 
@@ -225,17 +218,21 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		stdout, stderr string
 	)
 	retcode := -1
-	sshProfile, xerr := instance.GetSSHConfig(task.Context())
+	sshProfile, xerr := instance.GetSSHConfig(ctx)
 	if xerr != nil {
 		return retcode, stdout, stderr, xerr
 	}
 
+	timeout = temporal.MaxTimeout(4*(time.Duration(uploadSize)*time.Second/(64*1024)+30*time.Second), timeout)
+
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			copyCtx, cancel := context.WithTimeout(task.Context(), timeout)
+			uploadTime := time.Duration(uploadSize)*time.Second/(64*1024) + 30*time.Second
+
+			copyCtx, cancel := context.WithTimeout(ctx, uploadTime)
 			defer cancel()
 
-			iretcode, istdout, istderr, innerXErr := sshProfile.CopyWithTimeout(copyCtx, target, source, true, timeout)
+			iretcode, istdout, istderr, innerXErr := sshProfile.CopyWithTimeout(copyCtx, target, source, true, uploadTime)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -246,12 +243,17 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 				problem.Annotate("retcode", iretcode)
 				return problem
 			}
+			if retcode == 1 && (strings.Contains(stderr, "lost connection") || strings.Contains(stdout, "lost connection")) {
+				problem := fail.NewError(stderr)
+				problem.Annotate("retcode", retcode)
+				return problem
+			}
 
 			crcCheck := func() fail.Error {
-				crcCtx, cancelCrc := context.WithTimeout(task.Context(), timeout)
+				crcCtx, cancelCrc := context.WithTimeout(ctx, uploadTime)
 				defer cancelCrc()
 
-				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, timeout)
+				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, uploadTime)
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
 					finnerXerr.Annotate("retcode", fretcode)
@@ -260,7 +262,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 
 					switch finnerXerr.(type) {
 					case *fail.ErrTimeout:
-						return fail.Wrap(fail.Cause(finnerXerr), "failed to check md5 in %v delay", timeout)
+						return fail.Wrap(fail.Cause(finnerXerr), "failed to check md5 in %v delay", uploadTime)
 					case *retry.ErrStopRetry:
 						return fail.Wrap(fail.Cause(finnerXerr), "stopping retries")
 					default:
@@ -294,7 +296,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 			return nil
 		},
 		timings.NormalDelay(),
-		2*timeout,
+		timeout,
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -320,7 +322,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		iretcode, istdout, istderr, innerXerr := run(task.Context(), sshProfile, cmd, outputs.COLLECT, timeout)
+		iretcode, istdout, istderr, innerXerr := run(ctx, sshProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {
 			innerXerr.Annotate("retcode", iretcode)
@@ -352,9 +354,9 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 
 // unsafeGetVolumes is the not goroutine-safe version of GetVolumes, without parameter validation, that does the real work
 // Note: must be used with wisdom
-func (instance *Host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error) {
+func (instance *Host) unsafeGetVolumes(ctx context.Context) (*propertiesv1.HostVolumes, fail.Error) {
 	var hvV1 *propertiesv1.HostVolumes
-	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			hvV1, ok = clonable.(*propertiesv1.HostVolumes)
@@ -375,8 +377,8 @@ func (instance *Host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error)
 
 // unsafeGetMounts returns the information about the mounts of the host
 // Intended to be used when instance is notoriously not nil (because previously checked)
-func (instance *Host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, ferr fail.Error) {
-	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+func (instance *Host) unsafeGetMounts(ctx context.Context) (mounts *propertiesv1.HostMounts, ferr fail.Error) {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -398,10 +400,6 @@ func (instance *Host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, ferr f
 	return mounts, nil
 }
 
-func (instance *Host) unsafePushStringToFile(ctx context.Context, content string, filename string) (ferr fail.Error) {
-	return instance.unsafePushStringToFileWithOwnership(ctx, content, filename, "", "")
-}
-
 // unsafePushStringToFileWithOwnership is the non goroutine-safe version of PushStringToFIleWithOwnership, that does the real work
 func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -419,27 +417,24 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		return fail.InvalidParameterError("filename", "cannot be empty string")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	timings, xerr := instance.Service().Timings()
 	if xerr != nil {
 		return xerr
 	}
 
 	hostName := instance.GetName()
-	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
+	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")
 	}
+
+	defer func() {
+		rerr := utils.LazyRemove(f.Name())
+		if rerr != nil {
+			logrus.Debugf(rerr.Error())
+		}
+	}()
 
 	to := fmt.Sprintf("%s:%s", hostName, filename)
 	retryErr := retry.WhileUnsuccessful(
@@ -464,7 +459,6 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		timings.SmallDelay(),
 		2*temporal.MaxTimeout(timings.ConnectionTimeout(), timings.ExecutionTimeout()),
 	)
-	_ = os.Remove(f.Name())
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
@@ -484,7 +478,7 @@ func (instance *Host) unsafeGetDefaultSubnet(ctx context.Context) (subnetInstanc
 	defer fail.OnPanic(&ferr)
 
 	svc := instance.Service()
-	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(hostproperty.NetworkV2) {
 			return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				networkV2, ok := clonable.(*propertiesv2.HostNetworking)

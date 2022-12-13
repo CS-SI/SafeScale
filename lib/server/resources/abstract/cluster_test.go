@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -81,17 +81,17 @@ func TestClusterIdentity_Serialize(t *testing.T) {
 
 	// Serialize empty clusterIdentity
 	c1 := NewClusterIdentity()
-	serial, err := c1.Serialize()
+	_, err := c1.Serialize()
 	if err == nil {
 		t.Error("Should throw fail.InvalidInstanceError")
 		t.FailNow()
 	}
 
 	// Junk attributes (broken pointer) for makes fail json.Marshal
-	var fkp *KeyPair = nil
+	var fkp *KeyPair
 	c1 = NewClusterIdentity()
 	c1.Keypair = fkp
-	serial, err = c1.Serialize()
+	_, err = c1.Serialize()
 	if err == nil {
 		t.Error("Should throw a Marshal.json error")
 		t.FailNow()
@@ -107,7 +107,7 @@ func TestClusterIdentity_Serialize(t *testing.T) {
 	}
 
 	// Serialize
-	serial, err = c1.Serialize()
+	serial, err := c1.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -149,7 +149,7 @@ func TestClusterIdentity_Deserialize(t *testing.T) {
 	}
 
 	// Empty cluster
-	var emptyCluster *ClusterIdentity = nil
+	var emptyCluster *ClusterIdentity
 	err = emptyCluster.Deserialize(serial)
 	if err == nil {
 		t.Error("Should throw a fail.InvalidInstanceError")
@@ -192,7 +192,7 @@ func TestClusterIdentity_Deserialize(t *testing.T) {
 
 func TestClusterIdentity_Replace(t *testing.T) {
 
-	var emptyCluster *ClusterIdentity = nil
+	var emptyCluster *ClusterIdentity
 	var emptyData data.Clonable = nil
 
 	cluster := NewClusterIdentity()
@@ -215,6 +215,14 @@ func TestClusterIdentity_Replace(t *testing.T) {
 		t.Errorf("Replace should NOT work with nil")
 	}
 	require.Nil(t, result)
+
+	// Filled cluster, invalid data
+	network := NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, derr := cluster.Replace(network)
+	require.Contains(t, derr.Error(), "p is not a *ClusterIdentity")
 
 	// Filled cluster, filled data
 	cluster2 := NewClusterIdentity()

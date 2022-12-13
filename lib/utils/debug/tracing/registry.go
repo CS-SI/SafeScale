@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 )
 
 var settings map[string]map[string]bool

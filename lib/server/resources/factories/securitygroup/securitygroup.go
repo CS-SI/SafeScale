@@ -19,11 +19,11 @@ package securitygroup
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // List returns a list of available security groups
@@ -36,7 +36,7 @@ func List(ctx context.Context, svc iaas.Service, all bool) ([]*abstract.Security
 	}
 
 	if all {
-		return svc.ListSecurityGroups("")
+		return svc.ListSecurityGroups(ctx, "")
 	}
 
 	sgInstance, xerr := New(svc)
@@ -68,5 +68,5 @@ func New(svc iaas.Service) (_ resources.SecurityGroup, ferr fail.Error) {
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
 func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
-	return operations.LoadSecurityGroup(ctx, svc, ref, operations.WithReloadOption)
+	return operations.LoadSecurityGroup(ctx, svc, ref)
 }

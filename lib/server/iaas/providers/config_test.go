@@ -51,7 +51,7 @@ func TestConfigMap_GetString(t *testing.T) {
 
 func TestConfigMap_GetSliceOfStrings(t *testing.T) {
 
-	var v []string = []string{"a", "b", "c"}
+	var v = []string{"a", "b", "c"}
 	c := ConfigMap{}
 	c.Set("value1", "string")
 	c.Set("value2", v)
@@ -83,7 +83,7 @@ func TestConfigMap_GetSliceOfStrings(t *testing.T) {
 
 func TestConfigMap_GetMapOfStrings(t *testing.T) {
 
-	var v map[string]string = map[string]string{"a": "un", "b": "deux", "c": "trois"}
+	var v = map[string]string{"a": "un", "b": "deux", "c": "trois"}
 	c := ConfigMap{}
 	c.Set("value1", "string")
 	c.Set("value2", v)

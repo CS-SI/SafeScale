@@ -21,14 +21,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installaction"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installaction"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // genericPackager is an object implementing the OS package management
@@ -57,10 +57,10 @@ func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t reso
 
 	yamlKey := "feature.install." + g.keyword + ".check"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
-		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(ctx), yamlKey)
 	}
 
-	worker, xerr := newWorker(f, t, g.method, installaction.Check, g.checkCommand)
+	worker, xerr := newWorker(ctx, f, t, g.method, installaction.Check, g.checkCommand)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -99,10 +99,10 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 
 	yamlKey := "feature.install." + g.keyword + ".add"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
-		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(ctx), yamlKey)
 	}
 
-	worker, xerr := newWorker(f, t, g.method, installaction.Add, g.addCommand)
+	worker, xerr := newWorker(ctx, f, t, g.method, installaction.Add, g.addCommand)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Println(xerr.Error())
@@ -142,10 +142,10 @@ func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t res
 
 	yamlKey := "feature.install." + g.keyword + ".remove"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
-		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(ctx), yamlKey)
 	}
 
-	worker, xerr := newWorker(f, t, g.method, installaction.Remove, g.removeCommand)
+	worker, xerr := newWorker(ctx, f, t, g.method, installaction.Remove, g.removeCommand)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

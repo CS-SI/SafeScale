@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	_ "github.com/quasilyte/go-ruleguard/dsl"
 	"github.com/stretchr/testify/require"
 )
 
@@ -98,6 +99,10 @@ func Test_IsEmpty(t *testing.T) {
 		{
 			value:  []string{"one"},
 			expect: false,
+		},
+		{
+			value:  make([]string, 0),
+			expect: true,
 		},
 		{
 			value:  "one",

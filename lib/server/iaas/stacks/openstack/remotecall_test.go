@@ -1,3 +1,6 @@
+//go:build alltests
+// +build alltests
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -22,7 +25,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
 	"github.com/gophercloud/gophercloud"
 )
 

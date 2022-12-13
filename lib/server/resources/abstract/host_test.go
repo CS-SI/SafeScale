@@ -22,15 +22,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestKeypair_IsNull(t *testing.T) {
 
-	var emptyKeypair *KeyPair = nil
+	var emptyKeypair *KeyPair
 	if !emptyKeypair.IsNull() {
 		t.Error("No, it's null")
 		t.Fail()
@@ -80,6 +80,20 @@ func TestKeyPair_NewKeyPair(t *testing.T) {
 		t.Error("Expect KeyPair generate name from new uuid")
 		t.Fail()
 	}
+
+}
+
+func Test_almostEqual(t *testing.T) {
+
+	require.False(t, almostEqual(14, 15))
+	require.True(t, almostEqual(14, 14+1e-7))
+
+}
+
+func Test_almostEqual64(t *testing.T) {
+
+	require.False(t, almostEqual64(14, 15))
+	require.True(t, almostEqual64(14, 14+1e-7))
 
 }
 
@@ -172,7 +186,7 @@ func Test_NewHostEffectiveSizing(t *testing.T) {
 }
 
 func TestHostEffectiveSizing_IsNull(t *testing.T) {
-	var hse *HostEffectiveSizing = nil
+	var hse *HostEffectiveSizing
 	if !hse.IsNull() {
 		t.Error("No, is null")
 		t.Fail()
@@ -250,7 +264,7 @@ func TestHostCore_Replace(t *testing.T) {
 	hc1.Password = "HostCore Password"
 	hc1.LastState = hoststate.Unknown
 
-	var hc2 *HostCore = nil
+	var hc2 *HostCore
 	replaced, err := hc2.Replace(hc1)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
@@ -267,7 +281,7 @@ func TestHostCore_ReverseReplace(t *testing.T) {
 	hc1.Password = "HostCore Password"
 	hc1.LastState = hoststate.Unknown
 
-	var hc2 *HostCore = nil
+	var hc2 *HostCore
 	replaced, err := hc1.Replace(hc2)
 	if err == nil {
 		t.Errorf("Replace should NOT work with nil")
@@ -277,7 +291,7 @@ func TestHostCore_ReverseReplace(t *testing.T) {
 
 func TestHostCore_Serialize(t *testing.T) {
 
-	var emptyHc *HostCore = nil
+	var emptyHc *HostCore
 	_, err := emptyHc.Serialize()
 	if err == nil {
 		t.Error("Can't serialize nil pointer")
@@ -328,7 +342,7 @@ func TestHostCore_Deserialize(t *testing.T) {
 		t.Fail()
 	}
 
-	var emptyHc *HostCore = nil
+	var emptyHc *HostCore
 	err = emptyHc.Deserialize(serial)
 	if err == nil {
 		t.Error("Can't deserialize nil pointer")
@@ -347,18 +361,10 @@ func TestHostCore_Deserialize(t *testing.T) {
 
 func TestHostCore_GetName(t *testing.T) {
 
-	var hc *HostCore = nil
-
-	name := hc.GetName()
-	if name != "" {
-		t.Error("(nil) *HostCore has no name")
-		t.Fail()
-	}
-
-	hc = &HostCore{
+	hc := &HostCore{
 		Name: "HostCore Name",
 	}
-	name = hc.GetName()
+	name := hc.GetName()
 	if name != hc.Name {
 		t.Error("Wrong GetName value restitution")
 		t.Fail()
@@ -368,18 +374,10 @@ func TestHostCore_GetName(t *testing.T) {
 
 func TestHostCore_GetID(t *testing.T) {
 
-	var hc *HostCore = nil
-
-	id := hc.GetID()
-	if id != "" {
-		t.Error("(nil) *HostCore has no id")
-		t.Fail()
-	}
-
-	hc = &HostCore{
+	hc := &HostCore{
 		ID: "HostCore ID",
 	}
-	id = hc.GetID()
+	id := hc.GetID()
 	if id != hc.ID {
 		t.Error("Wrong GetID value restitution")
 		t.Fail()
@@ -410,7 +408,7 @@ func Test_NewHostFull(t *testing.T) {
 
 func TestHostFull_IsNull(t *testing.T) {
 
-	var hf *HostFull = nil
+	var hf *HostFull
 	if !hf.IsNull() {
 		t.Error("(nil) *Hostfull is null")
 		t.Fail()
@@ -463,7 +461,7 @@ func TestHostFull_GetID_ThatPanics(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		defer fail.OnPanic(&panicked)
-		var hf *HostFull = nil
+		var hf *HostFull
 		id := hf.GetID() // this HAS to panic
 		_ = id
 	}()
@@ -495,7 +493,7 @@ func TestHostFull_GetName_ThatPanics(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		defer fail.OnPanic(&panicked)
-		var hf *HostFull = nil
+		var hf *HostFull
 		name := hf.GetName() // this HAS to panic
 		_ = name
 	}()
@@ -527,7 +525,7 @@ func TestHostFull_SetName_ThatPanics(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		defer fail.OnPanic(&panicked)
-		var hf *HostFull = nil
+		var hf *HostFull
 		hf.SetName("OhMyNilPointerName!!!") // this HAS to panic
 	}()
 	failed := waitTimeout(&wg, 1*time.Second)
@@ -548,10 +546,10 @@ func TestHostFull_SetName(t *testing.T) {
 
 func TestHostSizingRequirements_LowerThan(t *testing.T) {
 
-	var hsr1 *HostSizingRequirements = nil
-	var hsr2 *HostSizingRequirements = nil
+	var hsr1 *HostSizingRequirements
+	var hsr2 *HostSizingRequirements
 
-	isLower, err := hsr1.LowerThan(hsr2)
+	_, err := hsr1.LowerThan(hsr2)
 	if err == nil {
 		t.Error("Can't compare nil HostSizingRequirements")
 		t.Fail()
@@ -568,7 +566,7 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 		Image:       "",
 		Template:    "",
 	}
-	isLower, err = hsr1.LowerThan(hsr2)
+	_, err = hsr1.LowerThan(hsr2)
 	if err == nil {
 		t.Error("Can't compare nil HostSizingRequirements")
 		t.Fail()
@@ -585,7 +583,8 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 		Image:       "",
 		Template:    "",
 	}
-	isLower, err = hsr1.LowerThan(hsr2)
+	isLower, err := hsr1.LowerThan(hsr2)
+	require.Nil(t, err)
 	if isLower {
 		t.Error("no, is greater")
 		t.Fail()
@@ -606,6 +605,7 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 	hsr1.MaxCores = 1
 	hsr2.MaxCores = 0
 	isLower, err = hsr1.LowerThan(hsr2)
+	require.Nil(t, err)
 	if isLower {
 		t.Error("no, is greater")
 		t.Fail()
@@ -615,6 +615,7 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 	hsr1.MinRAMSize = 2
 	hsr2.MinRAMSize = 1
 	isLower, err = hsr1.LowerThan(hsr2)
+	require.Nil(t, err)
 	if isLower {
 		t.Error("no, is greater")
 		t.Fail()
@@ -624,6 +625,7 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 	hsr1.MaxRAMSize = 1
 	hsr2.MaxRAMSize = 0
 	isLower, err = hsr1.LowerThan(hsr2)
+	require.Nil(t, err)
 	if isLower {
 		t.Error("no, is greater")
 		t.Fail()
@@ -633,6 +635,7 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 	hsr1.MinDiskSize = 2
 	hsr2.MinDiskSize = 1
 	isLower, err = hsr1.LowerThan(hsr2)
+	require.Nil(t, err)
 	if isLower {
 		t.Error("no, is greater")
 		t.Fail()
@@ -642,6 +645,7 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 	hsr1.MaxRAMSize = 1
 	hsr2.MaxRAMSize = 0
 	isLower, err = hsr1.LowerThan(hsr2)
+	require.Nil(t, err)
 	if isLower {
 		t.Error("no, is greater")
 		t.Fail()
@@ -651,6 +655,7 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 	hsr1.MinGPU = 1
 	hsr2.MinGPU = 2
 	isLower, err = hsr1.LowerThan(hsr2)
+	require.Nil(t, err)
 	if isLower {
 		t.Error("no, is greater")
 		t.Fail()
@@ -660,6 +665,7 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 	hsr1.MinCPUFreq = 2
 	hsr2.MinCPUFreq = 1
 	isLower, err = hsr1.LowerThan(hsr2)
+	require.Nil(t, err)
 	if isLower {
 		t.Error("no, is greater")
 		t.Fail()
@@ -679,6 +685,7 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 	hsr1.MinCPUFreq = 0
 	hsr2.MinCPUFreq = 1
 	isLower, err = hsr1.LowerThan(hsr2)
+	require.Nil(t, err)
 	if !isLower {
 		t.Error("no, is lower")
 		t.Fail()
@@ -688,10 +695,10 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 
 func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 
-	var hsr1 *HostSizingRequirements = nil
-	var hsr2 *HostSizingRequirements = nil
+	var hsr1 *HostSizingRequirements
+	var hsr2 *HostSizingRequirements
 
-	isLowerOrEqual, err := hsr1.LowerOrEqualThan(hsr2)
+	_, err := hsr1.LowerOrEqualThan(hsr2)
 	if err == nil {
 		t.Error("Can't compare nil HostSizingRequirements")
 		t.Fail()
@@ -708,7 +715,7 @@ func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 		Image:       "",
 		Template:    "",
 	}
-	isLowerOrEqual, err = hsr1.LowerOrEqualThan(hsr2)
+	_, err = hsr1.LowerOrEqualThan(hsr2)
 	if err == nil {
 		t.Error("Can't compare nil HostSizingRequirements")
 		t.Fail()
@@ -725,13 +732,15 @@ func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 		Image:       "",
 		Template:    "",
 	}
-	isLowerOrEqual, err = hsr1.LowerOrEqualThan(hsr2)
+	isLowerOrEqual, err := hsr1.LowerOrEqualThan(hsr2)
+	require.Nil(t, err)
 	if !isLowerOrEqual {
 		t.Error("no, is equal")
 		t.Fail()
 	}
 	hsr1.MinCores = 1
 	isLowerOrEqual, err = hsr1.LowerOrEqualThan(hsr2)
+	require.Nil(t, err)
 	if isLowerOrEqual {
 		t.Error("no, is greater")
 		t.Fail()
@@ -739,6 +748,7 @@ func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 	hsr1.MinCores = 0
 	hsr1.MaxCores = 1
 	isLowerOrEqual, err = hsr1.LowerOrEqualThan(hsr2)
+	require.Nil(t, err)
 	if isLowerOrEqual {
 		t.Error("no, is greater")
 		t.Fail()
@@ -746,6 +756,7 @@ func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 	hsr1.MaxCores = 0
 	hsr1.MinRAMSize = 1
 	isLowerOrEqual, err = hsr1.LowerOrEqualThan(hsr2)
+	require.Nil(t, err)
 	if isLowerOrEqual {
 		t.Error("no, is greater")
 		t.Fail()
@@ -753,6 +764,7 @@ func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 	hsr1.MinRAMSize = 0
 	hsr1.MaxRAMSize = 1
 	isLowerOrEqual, err = hsr1.LowerOrEqualThan(hsr2)
+	require.Nil(t, err)
 	if isLowerOrEqual {
 		t.Error("no, is greater")
 		t.Fail()
@@ -760,6 +772,7 @@ func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 	hsr1.MaxRAMSize = 0
 	hsr1.MinDiskSize = 1
 	isLowerOrEqual, err = hsr1.LowerOrEqualThan(hsr2)
+	require.Nil(t, err)
 	if isLowerOrEqual {
 		t.Error("no, is greater")
 		t.Fail()
@@ -768,6 +781,7 @@ func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 	hsr1.MinGPU = 2
 	hsr2.MinGPU = 1
 	isLowerOrEqual, err = hsr1.LowerOrEqualThan(hsr2)
+	require.Nil(t, err)
 	if isLowerOrEqual {
 		t.Error("no, is greater")
 		t.Fail()
@@ -776,6 +790,7 @@ func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 	hsr2.MinGPU = 0
 	hsr1.MinCPUFreq = 1
 	isLowerOrEqual, err = hsr1.LowerOrEqualThan(hsr2)
+	require.Nil(t, err)
 	if isLowerOrEqual {
 		t.Error("no, is greater")
 		t.Fail()

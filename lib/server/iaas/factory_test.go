@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
@@ -18,8 +18,7 @@ func Test_getTenantsFromCfg(t *testing.T) {
 	r, _, xerr := getTenantsFromViperCfg(v)
 	require.Nil(t, xerr)
 
-	var theRecoveredTiming map[string]interface{}
-	theRecoveredTiming = r[0]["timings"].(map[string]interface{})
+	theRecoveredTiming := r[0]["timings"].(map[string]interface{})
 
 	s := temporal.MutableTimings{}
 	err := mapstructure.Decode(theRecoveredTiming, &s)

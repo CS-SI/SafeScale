@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
@@ -92,6 +92,14 @@ func (l locationcache) InvalidateObject(bucketName string, objectName string) fa
 	time.Sleep(10 * time.Millisecond)
 
 	return nil
+}
+
+func (l locationcache) DownloadBucket(bucketName, decryptionKey string) (_ []byte, ferr fail.Error) {
+	mu := l.getLock(bucketName, "download")
+	mu.RLock()
+	defer mu.RUnlock()
+
+	return l.inner.DownloadBucket(bucketName, decryptionKey)
 }
 
 func (l locationcache) InspectObject(s string, s2 string) (abstract.ObjectStorageItem, fail.Error) {
@@ -196,7 +204,7 @@ func (l locationcache) WriteMultiPartObject(s string, s2 string, reader io.Reade
 
 	var buf bytes.Buffer
 	nr := io.TeeReader(reader, &buf)
-	pedasito, err := l.inner.WriteMultiPartObject(s, s2, nr, i, i2, metadata)
+	chunk, err := l.inner.WriteMultiPartObject(s, s2, nr, i, i2, metadata)
 	if err != nil {
 		return abstract.ObjectStorageItem{}, err
 	}
@@ -205,7 +213,7 @@ func (l locationcache) WriteMultiPartObject(s string, s2 string, reader io.Reade
 	_ = l.cacheManager.Set(context.Background(), fmt.Sprintf("%s:%s", s, s2), buf.Bytes(), nil)
 	time.Sleep(10 * time.Millisecond)
 
-	return pedasito, nil
+	return chunk, nil
 }
 
 func (l locationcache) WriteObject(s string, s2 string, reader io.Reader, i int64, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
@@ -219,7 +227,7 @@ func (l locationcache) WriteObject(s string, s2 string, reader io.Reader, i int6
 	var buf bytes.Buffer
 	nr := io.TeeReader(reader, &buf)
 
-	pedasito, err := l.inner.WriteObject(s, s2, nr, i, metadata)
+	chunk, err := l.inner.WriteObject(s, s2, nr, i, metadata)
 	if err != nil {
 		return abstract.ObjectStorageItem{}, err
 	}
@@ -228,7 +236,7 @@ func (l locationcache) WriteObject(s string, s2 string, reader io.Reader, i int6
 	_ = l.cacheManager.Set(context.Background(), fmt.Sprintf("%s:%s", s, s2), buf.Bytes(), nil)
 	time.Sleep(10 * time.Millisecond)
 
-	return pedasito, nil
+	return chunk, nil
 }
 
 func (l locationcache) DeleteObject(s string, s2 string) fail.Error {

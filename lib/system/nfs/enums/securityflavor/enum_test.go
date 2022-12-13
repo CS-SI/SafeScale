@@ -19,7 +19,7 @@ package securityflavor_test
 import (
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/system/nfs/enums/securityflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/system/nfs/enums/securityflavor"
 	"github.com/stretchr/testify/require"
 )
 

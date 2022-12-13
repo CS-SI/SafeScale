@@ -17,15 +17,16 @@
 package converters
 
 import (
-	"github.com/CS-SI/SafeScale/v21/lib/protocol"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/volumespeed"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v2"
-	"github.com/CS-SI/SafeScale/v21/lib/system"
+	"github.com/CS-SI/SafeScale/v22/lib/protocol"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/volumespeed"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 )
 
 // Contains the function used to convert from abstract structures
@@ -259,13 +260,14 @@ func BucketListFromAbstractToProtocol(in []string) *protocol.BucketListResponse 
 }
 
 // SSHConfigFromAbstractToProtocol ...
-func SSHConfigFromAbstractToProtocol(in system.SSHConfig) *protocol.SshConfig {
+func SSHConfigFromAbstractToProtocol(wc sshapi.Config) *protocol.SshConfig {
 	var pbPrimaryGateway, pbSecondaryGateway *protocol.SshConfig
+	in, _ := ssh.NewConfigFrom(wc)
 	if in.GatewayConfig != nil {
-		pbPrimaryGateway = SSHConfigFromAbstractToProtocol(*in.GatewayConfig)
+		pbPrimaryGateway = SSHConfigFromAbstractToProtocol(in.GatewayConfig)
 	}
 	if in.SecondaryGatewayConfig != nil {
-		pbSecondaryGateway = SSHConfigFromAbstractToProtocol(*in.SecondaryGatewayConfig)
+		pbSecondaryGateway = SSHConfigFromAbstractToProtocol(in.SecondaryGatewayConfig)
 	}
 	if in.Port == 0 {
 		in.Port = 22

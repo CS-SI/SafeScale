@@ -1,3 +1,6 @@
+//go:build !generics
+// +build !generics
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -51,6 +54,7 @@ func FormatStrings(msg ...interface{}) string {
 	if msg == nil {
 		return ""
 	}
+
 	l := len(msg)
 	if l == 0 {
 		return ""

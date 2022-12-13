@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/stretchr/testify/require"
 )
 

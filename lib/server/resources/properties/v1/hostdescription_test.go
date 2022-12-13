@@ -18,11 +18,14 @@ package propertiesv1
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
 )
 
 func TestHostdescription_IsNull(t *testing.T) {
@@ -62,7 +65,8 @@ func TestHostdescription_Clone(t *testing.T) {
 
 	cloneHd, ok := cloned.(*HostDescription)
 	if !ok {
-		t.Fail()
+		t.Error("Cloned HostDescription shoud be castable to *HostDescription")
+		t.FailNow()
 	}
 
 	assert.Equal(t, hd, cloneHd)
@@ -71,7 +75,7 @@ func TestHostdescription_Clone(t *testing.T) {
 
 	areEqual := reflect.DeepEqual(hd, cloneHd)
 	if areEqual {
-		t.Error("It's a shallow clone !")
+		t.Error("Clone deep equal test: swallow clone")
 		t.Fail()
 	}
 	require.NotEqualValues(t, hd, cloneHd)
@@ -107,6 +111,19 @@ func TestHostdescription_Replace(t *testing.T) {
 	if !areEqual {
 		t.Error("Replace does not restitute values")
 		t.Fail()
+	}
+
+	network := abstract.NewNetwork()
+	network.ID = "Network ID"
+	network.Name = "Network Name"
+
+	_, xerr := hd2.Replace(network)
+	if xerr == nil {
+		t.Error("HostDescription.Replace(abstract.Network{}) expect an error")
+		t.FailNow()
+	}
+	if !strings.Contains(xerr.Error(), "p is not a *HostDescription") {
+		t.Errorf("HostDescription expect error \"p is not a *HostDescription\", has \"%s\"", xerr.Error())
 	}
 
 }

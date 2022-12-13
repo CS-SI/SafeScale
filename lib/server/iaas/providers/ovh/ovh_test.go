@@ -17,6 +17,7 @@
 package ovh_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -25,8 +26,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/v21/lib/server/iaas/tests"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/tests"
 )
 
 func getTester() (*tests.ServiceTester, error) {
@@ -61,12 +62,13 @@ func getService() (iaas.Service, error) {
 
 // Test that we have templates, and each template has 1 or more cores
 func Test_GetTemplates(t *testing.T) {
+	ctx := context.Background()
 	cli, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tpls, err := cli.Service.ListTemplates(false)
+	tpls, err := cli.Service.ListTemplates(ctx, false)
 	assert.NoError(t, err)
 	assert.True(t, len(tpls) > 0)
 
@@ -78,12 +80,13 @@ func Test_GetTemplates(t *testing.T) {
 
 // Test that we have templates with GPUs
 func Test_GetGpuTemplates(t *testing.T) {
+	ctx := context.Background()
 	cli, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tpls, err := cli.Service.ListTemplates(true)
+	tpls, err := cli.Service.ListTemplates(ctx, true)
 	assert.NoError(t, err)
 	assert.True(t, len(tpls) > 0)
 
@@ -98,8 +101,9 @@ func Test_GetGpuTemplates(t *testing.T) {
 }
 
 func TemplateExists(name string) bool {
+	ctx := context.Background()
 	cli, _ := getTester()
-	tpls, _ := cli.Service.ListTemplates(false)
+	tpls, _ := cli.Service.ListTemplates(ctx, false)
 
 	find := false
 	for _, tpl := range tpls {
@@ -113,12 +117,13 @@ func TemplateExists(name string) bool {
 }
 
 func Test_GetGpuTemplate(t *testing.T) {
+	ctx := context.Background()
 	cli, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	tpls, err := cli.Service.ListTemplates(false)
+	tpls, err := cli.Service.ListTemplates(ctx, false)
 	assert.NoError(t, err)
 	find := TemplateExists("g3-120")
 
@@ -144,13 +149,14 @@ func Test_Images(t *testing.T) {
 }
 
 func Test_HostTemplates(t *testing.T) {
+	ctx := context.Background()
 	cli, err := getTester()
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
 	cli.HostTemplates(t)
-	tpls, err := cli.Service.ListTemplates(false)
+	tpls, err := cli.Service.ListTemplates(ctx, false)
 	assert.Nil(t, err)
 	assert.NotEmpty(t, tpls)
 	for _, f := range tpls {

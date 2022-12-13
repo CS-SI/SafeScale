@@ -21,32 +21,22 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/networkproperty"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/securitygroupproperty"
-	propertiesv1 "github.com/CS-SI/SafeScale/v21/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/networkproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // delete effectively remove a Security Group
 func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fail.Error {
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	var (
 		abstractSG *abstract.SecurityGroup
 		networkID  string
@@ -62,7 +52,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		networkID = castedValue.ID
 	}
 
-	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var ok bool
 		abstractSG, ok = clonable.(*abstract.SecurityGroup)
 		if !ok {
@@ -101,10 +91,6 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 				return innerXErr
 			}
 
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
-			}
-
 			// check bonds to subnets
 			innerXErr = props.Inspect(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 				subnetsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
@@ -117,10 +103,6 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 				if subnetCount > 0 {
 					keys := make([]string, subnetCount)
 					for k := range subnetsV1.ByName {
-						if task.Aborted() {
-							return fail.AbortedError(nil, "aborted")
-						}
-
 						keys = append(keys, k)
 					}
 					return fail.NotAvailableError("security group is currently bound to %d subnet%s: %s", subnetCount, strprocess.Plural(uint(subnetCount)), strings.Join(keys, ","))
@@ -135,10 +117,6 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 			if innerXErr != nil {
 				return innerXErr
 			}
-		}
-
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
 		}
 
 		// FIXME: how to restore bindings in case of failure or abortion ? This would prevent the use of DisarmAbortSignal here...
@@ -170,14 +148,14 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		}
 
 		// delete SecurityGroup resource
-		return deleteProviderSecurityGroup(instance.Service(), abstractSG)
+		return deleteProviderSecurityGroup(ctx, instance.Service(), abstractSG)
 	})
 	if xerr != nil {
 		return xerr
 	}
 
 	// delete Security Group metadata
-	xerr = instance.MetadataCore.Delete()
+	xerr = instance.MetadataCore.Delete(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -198,7 +176,7 @@ func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(ctx context.Contex
 		return xerr
 	}
 
-	return networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return networkInstance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			nsgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
 			if !ok {
@@ -214,20 +192,20 @@ func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(ctx context.Contex
 
 // unsafeClear is the non goroutine-safe implementation for Clear, that does the real work faster (no locking, less if no parameter validations)
 // Note: must be used wisely
-func (instance *SecurityGroup) unsafeClear() fail.Error {
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+func (instance *SecurityGroup) unsafeClear(ctx context.Context) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		_, innerXErr := instance.Service().ClearSecurityGroup(asg)
+		_, innerXErr := instance.Service().ClearSecurityGroup(ctx, asg)
 		return innerXErr
 	})
 }
 
 // unsafeAddRule adds a rule to a security group
-func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (ferr fail.Error) {
+func (instance *SecurityGroup) unsafeAddRule(ctx context.Context, rule *abstract.SecurityGroupRule) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := rule.Validate()
@@ -235,13 +213,13 @@ func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (
 		return xerr
 	}
 
-	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		_, innerXErr := instance.Service().AddRuleToSecurityGroup(asg, rule)
+		_, innerXErr := instance.Service().AddRuleToSecurityGroup(ctx, asg, rule)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -255,7 +233,7 @@ func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (
 func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, params taskUnbindFromHostsAttachedToSubnetParams) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -279,14 +257,14 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, param
 	}
 
 	// Update instance metadata
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
 				return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(instance.GetID(), params.subnetID)
+			innerXErr := instance.Service().UnbindSecurityGroupFromSubnet(ctx, instance.GetID(), params.subnetID)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -310,7 +288,7 @@ func (instance *SecurityGroup) unsafeUnbindFromSubnet(ctx context.Context, param
 func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractSubnet *abstract.Subnet, subnetHosts *propertiesv1.SubnetHosts, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -323,31 +301,19 @@ func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractS
 		return fail.InvalidParameterCannotBeNilError("subnetProps")
 	}
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
+	var xerr fail.Error
 	switch enable {
 	case resources.SecurityGroupEnable:
-		xerr = instance.enableOnHostsAttachedToSubnet(task, subnetHosts)
+		xerr = instance.enableOnHostsAttachedToSubnet(ctx, subnetHosts)
 	case resources.SecurityGroupDisable:
-		xerr = instance.disableOnHostsAttachedToSubnet(task, subnetHosts)
+		xerr = instance.disableOnHostsAttachedToSubnet(ctx, subnetHosts)
 	}
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if mark == resources.MarkSecurityGroupAsDefault {
 			asg, ok := clonable.(*abstract.SecurityGroup)
 			if !ok {
@@ -390,17 +356,7 @@ func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractS
 func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if mark == resources.MarkSecurityGroupAsDefault {
 			asg, ok := clonable.(*abstract.SecurityGroup)
 			if !ok {
@@ -439,7 +395,7 @@ func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstanc
 			switch enable {
 			case resources.SecurityGroupEnable:
 				// In case the security group is already bound, we must consider a "duplicate" error has a success
-				xerr := instance.Service().BindSecurityGroupToHost(instance.GetID(), hostID)
+				xerr := instance.Service().BindSecurityGroupToHost(ctx, instance.GetID(), hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -452,7 +408,7 @@ func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstanc
 				}
 			case resources.SecurityGroupDisable:
 				// In case the security group has to be disabled, we must consider a "not found" error has a success
-				xerr := instance.Service().UnbindSecurityGroupFromHost(instance.GetID(), hostID)
+				xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, instance.GetID(), hostID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {

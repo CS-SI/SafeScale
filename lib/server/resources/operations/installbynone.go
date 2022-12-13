@@ -19,14 +19,14 @@ package operations
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installaction"
-	"github.com/CS-SI/SafeScale/v21/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installaction"
+	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // noneInstaller is an installer using script to add and remove a Feature
@@ -72,7 +72,7 @@ func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resource
 		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
-	w, xerr := newWorker(f, t, installmethod.None, installaction.Add, nil)
+	w, xerr := newWorker(ctx, f, t, installmethod.None, installaction.Add, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -106,7 +106,7 @@ func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resou
 		return nil, fail.InvalidParameterError("t", "cannot be nil")
 	}
 
-	w, xerr := newWorker(f, t, installmethod.None, installaction.Add, nil)
+	w, xerr := newWorker(ctx, f, t, installmethod.None, installaction.Add, nil)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -19,7 +19,7 @@ package template
 import (
 	txttmpl "text/template"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	sprig "github.com/Masterminds/sprig/v3"
 )
 

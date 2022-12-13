@@ -1,3 +1,6 @@
+//go:build ignore
+// +build ignore
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -21,11 +24,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v21/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v21/lib/utils/valid"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // IdentifiableCache contains the caches for objects that satisfy data.Identifiable interface
@@ -53,7 +56,7 @@ func NewIdentifiableCache(name string, store Store) (*IdentifiableCache, fail.Er
 
 // Get returns the content associated with key
 func (instance *IdentifiableCache) Get(ctx context.Context, key string, options ...data.ImmutableKeyValue) (*Entry, fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -175,7 +178,7 @@ func (instance *IdentifiableCache) unsafeLoadEntry(ctx context.Context, key stri
 
 // ReserveEntry sets a cache entry to reserve the key and returns the Entry associated
 func (instance *IdentifiableCache) ReserveEntry(ctx context.Context, key string, timeout time.Duration) fail.Error {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -198,7 +201,7 @@ func (instance *IdentifiableCache) unsafeReserveEntry(ctx context.Context, key s
 
 // CommitEntry confirms the entry in the cache with the content passed as parameter
 func (instance *IdentifiableCache) CommitEntry(ctx context.Context, key string, content Cacheable) (*Entry, fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -224,7 +227,7 @@ func (instance *IdentifiableCache) unsafeCommitEntry(ctx context.Context, key st
 
 // FreeEntry removes the reservation in cache
 func (instance *IdentifiableCache) FreeEntry(ctx context.Context, key string) fail.Error {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -244,7 +247,7 @@ func (instance *IdentifiableCache) unsafeFreeEntry(ctx context.Context, key stri
 
 // AddEntry ...
 func (instance *IdentifiableCache) AddEntry(ctx context.Context, content Cacheable) (*Entry, fail.Error) {
-	if instance == nil || valid.IsNil(instance) {
+	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if _, ok := content.(data.Identifiable); !ok {
