@@ -743,11 +743,11 @@ func (instance *Host) implCreate(
 				if does, xerr := hc.Exists(ctx); xerr == nil {
 					if !does {
 						logrus.WithContext(ctx).Debugf("Either metadata corruption or cache not properly invalidated")
+					} else {
+						ar := result{nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)}
+						return ar, ar.err
 					}
 				}
-
-				ar := result{nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)}
-				return ar, ar.err
 			}
 
 			// Check if Host exists but is not managed by SafeScale
@@ -2509,6 +2509,15 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 // Delete deletes a Host with its metadata and updates subnet links
 func (instance *Host) Delete(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+
+	defer func() {
+		// drop the cache when we are done creating the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
 
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()

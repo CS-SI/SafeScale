@@ -19,6 +19,10 @@ package operations
 import (
 	"context"
 	"fmt"
+	"net"
+	"reflect"
+	"strings"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -40,9 +44,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
-	"net"
-	"reflect"
-	"strings"
 )
 
 const (
@@ -868,6 +869,15 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
+
+	defer func() {
+		// drop the cache when we are done creating the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
 
 	type result struct {
 		rErr fail.Error

@@ -19,11 +19,12 @@ package operations
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	"reflect"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -404,6 +405,15 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (ferr fai
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
+
+	defer func() {
+		// drop the cache when we are done creating the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
 
 	return instance.unsafeDelete(ctx, force)
 }
