@@ -16,4 +16,5 @@ const (
 	SubnetResource
 	VolumeResource
 	ShareResource
+	FeatureResource
 )

@@ -68,6 +68,12 @@ func (instance *Shielded) UnWrap() (data.Clonable, error) {
 	return ak.witness, nil
 }
 
+func (instance *Shielded) RollBack(in data.Clonable) error {
+	instance.witness = in
+
+	return nil
+}
+
 func (instance *Shielded) Sdump() (string, error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()

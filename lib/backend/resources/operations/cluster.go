@@ -1788,6 +1788,15 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Erro
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
+	defer func() {
+		// drop the cache when we are done creating the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
+
 	if !force {
 		xerr := instance.beingRemoved(ctx)
 		xerr = debug.InjectPlannedFail(xerr)

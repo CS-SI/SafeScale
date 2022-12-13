@@ -346,7 +346,7 @@ func TestBucket_Delete(t *testing.T) {
 		require.Nil(t, xerr)
 
 		xerr = bucket.Delete(ctx)
-		require.Contains(t, xerr.Error(), "failed to find Bucket 'mybucket'")
+		require.Contains(t, xerr.Error(), "the instance is not valid")
 
 	})
 	require.Nil(t, xerr)

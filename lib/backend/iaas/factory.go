@@ -174,6 +174,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 			mLoadBucket:        &sync.Mutex{},
 			mLoadSubnet:        &sync.Mutex{},
 			mLoadSecurityGroup: &sync.Mutex{},
+			mLoadFeature:       &sync.Mutex{},
 		}
 
 		if beta := os.Getenv("SAFESCALE_CACHE"); beta != "disabled" {

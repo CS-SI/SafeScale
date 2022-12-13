@@ -30,7 +30,7 @@ func supernatural() fail.Error {
 }
 
 func TestInjectPlannedFailWithProbability(t *testing.T) {
-	err := setup("errorinjector_debug_test.go:39:p:1") // line 39 (the one with InjectPlannedFail, with probability 1 -> 100%)
+	err := SetupError("errorinjector_debug_test.go:39:p:1") // line 39 (the one with InjectPlannedFail, with probability 1 -> 100%)
 	if err != nil {
 		return
 	}
@@ -43,7 +43,7 @@ func TestInjectPlannedFailWithProbability(t *testing.T) {
 }
 
 func TestInjectPlannedFailWithIteration(t *testing.T) {
-	err := setup("errorinjector_debug_test.go:54:i:4") // line 54 (the one with InjectPlannedFail, iteration, after the 4th time, it always breaks)
+	err := SetupError("errorinjector_debug_test.go:54:i:4") // line 54 (the one with InjectPlannedFail, iteration, after the 4th time, it always breaks)
 	if err != nil {
 		return
 	}
@@ -66,7 +66,7 @@ func TestInjectPlannedFailWithIteration(t *testing.T) {
 }
 
 func TestInjectPlannedFailOnceWithIteration(t *testing.T) {
-	err := setup("errorinjector_debug_test.go:77:o:4") // line 60 (the one with InjectPlannedFail, iterating ONLY the 4th time breaks)
+	err := SetupError("errorinjector_debug_test.go:77:o:4") // line 60 (the one with InjectPlannedFail, iterating ONLY the 4th time breaks)
 	if err != nil {
 		return
 	}

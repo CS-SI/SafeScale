@@ -19,19 +19,16 @@ package operations
 import (
 	"context"
 	"fmt"
+	"github.com/farmergreg/rfsnotify"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"gopkg.in/fsnotify.v1"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
-
-	"github.com/eko/gocache/v2/store"
-	"github.com/farmergreg/rfsnotify"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	"gopkg.in/fsnotify.v1"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
@@ -164,108 +161,6 @@ func (ff *FeatureFile) Specs() *viper.Viper {
 
 	roSpecs := *(ff.specs)
 	return &roSpecs
-}
-
-// LoadFeatureFile searches for a spec file named 'name' and initializes a new FeatureFile object
-// with its content
-// 'xerr' may contain:
-//   - nil: everything worked as expected
-//   - fail.ErrNotFound: no FeatureFile is found with the name
-//   - fail.ErrSyntax: FeatureFile contains syntax error
-func LoadFeatureFile(inctx context.Context, svc iaas.Service, name string, embeddedOnly bool) (*FeatureFile, fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  *FeatureFile
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		ga, gerr := func() (_ *FeatureFile, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			if svc == nil {
-				return nil, fail.InvalidParameterCannotBeNilError("svc")
-			}
-			if name == "" {
-				return nil, fail.InvalidParameterError("name", "cannot be empty string")
-			}
-
-			// trick to avoid collisions
-			var kt *FeatureFile
-			cachename := fmt.Sprintf("%T/%s", kt, name)
-
-			cache, xerr := svc.GetCache(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-					casted, ok := val.(*FeatureFile)
-					if ok {
-						incrementExpVar("newhost.cache.hit")
-						return casted, nil
-					}
-				}
-			}
-
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onFeatureFileCacheMiss(svc, name, embeddedOnly) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			featureFileInstance, ok := anon.(*FeatureFile)
-			if !ok {
-				return nil, fail.InconsistentError("cache content for key '%s' is not a resources.Feature", name)
-			}
-			if featureFileInstance == nil {
-				return nil, fail.InconsistentError("nil value found in Feature cache for key '%s'", name)
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, featureFileInstance.GetName()), featureFileInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-				hid, err := featureFileInstance.GetID()
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), featureFileInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-					casted, ok := val.(*FeatureFile)
-					if ok {
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.FeatureFile")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("feature cache response (%s): %v", cachename, xerr)
-				}
-			}
-
-			return featureFileInstance, nil
-		}()
-		chRes <- result{ga, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
 }
 
 // onFeatureFileCacheMiss is called when host 'ref' is not found in cache

@@ -19,13 +19,14 @@ package operations
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
-	"reflect"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -251,6 +252,15 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 	if ctx == nil {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
+
+	defer func() {
+		// drop the cache when we are done creating the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume")).Entering()
 	defer tracer.Exiting()

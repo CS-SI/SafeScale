@@ -19,14 +19,15 @@ package operations
 import (
 	"context"
 	"fmt"
+	"path"
+	"reflect"
+	"strings"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
-	"path"
-	"reflect"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -994,6 +995,15 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
+
+	defer func() {
+		// drop the cache when we are done creating the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
 
 	var (
 		shareID, shareName string
