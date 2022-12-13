@@ -3044,11 +3044,6 @@ func Test_AbortedErrorWithCauseAndConsequences(t *testing.T) {
 	require.Contains(t, err.Error(), "aborted")
 }
 
-func Test_AbortedErrorWithCauseAndConsequences(t *testing.T) {
-	err := AbortedErrorWithCauseAndConsequences(errors.New("math: can't divide by zero"), []error{}, "any error")
-	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrAborted")
-}
-
 func TestErrAborted_IsNull(t *testing.T) {
 
 	var err *ErrAborted = nil

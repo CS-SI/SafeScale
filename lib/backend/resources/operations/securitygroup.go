@@ -236,12 +236,6 @@ func (instance *SecurityGroup) Exists(ctx context.Context) (_ bool, ferr fail.Er
 	return true, nil
 }
 
-// Exists checks if the resource actually exists in provider side (not in stow metadata)
-func (instance *SecurityGroup) Exists(ctx context.Context) (bool, fail.Error) {
-	// FIXME: Not so easy, securitygroups are in some cases a metadata-only construct -> we need to turn those into tags (provider ones) 1st
-	return true, nil
-}
-
 // Carry overloads rv.core.Carry() to add Volume to service cache
 func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {

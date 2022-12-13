@@ -82,55 +82,6 @@ func TestMutableTimings_Update(t *testing.T) {
 
 }
 
-func TestMutableTimings_Update(t *testing.T) {
-
-	a := NewTimings()
-	a.Timeouts.Communication = 0
-	a.Timeouts.Connection = 0
-	a.Timeouts.Context = 0
-	a.Timeouts.HostCleanup = 0
-	a.Timeouts.HostCreation = 0
-	a.Timeouts.HostLongOperation = 0
-	a.Timeouts.HostOperation = 0
-	a.Timeouts.Metadata = 0
-	a.Timeouts.MetadataReadAfterWrite = 0
-	a.Timeouts.Operation = 0
-	a.Delays.Small = 0
-	a.Delays.Normal = 0
-	a.Delays.Big = 0
-	b := NewTimings()
-	b.Timeouts.Communication = 1
-	b.Timeouts.Connection = 2
-	b.Timeouts.Context = 3
-	b.Timeouts.HostCleanup = 4
-	b.Timeouts.HostCreation = 5
-	b.Timeouts.HostLongOperation = 6
-	b.Timeouts.HostOperation = 7
-	b.Timeouts.Metadata = 8
-	b.Timeouts.MetadataReadAfterWrite = 9
-	b.Timeouts.Operation = 10
-	b.Delays.Small = 11
-	b.Delays.Normal = 12
-	b.Delays.Big = 13
-
-	_ = a.Update(b)
-
-	require.EqualValues(t, a.Communication, 1)
-	require.EqualValues(t, a.Connection, 2)
-	require.EqualValues(t, a.Context, 3)
-	require.EqualValues(t, a.HostCleanup, 4)
-	require.EqualValues(t, a.HostCreation, 5)
-	require.EqualValues(t, a.HostLongOperation, 6)
-	require.EqualValues(t, a.HostOperation, 7)
-	require.EqualValues(t, a.Metadata, 8)
-	require.EqualValues(t, a.MetadataReadAfterWrite, 9)
-	require.EqualValues(t, a.Operation, 10)
-	require.EqualValues(t, a.Small, 11)
-	require.EqualValues(t, a.Normal, 12)
-	require.EqualValues(t, a.Big, 13)
-
-}
-
 func Test_CarryAfterYou(t *testing.T) {
 	type Foo struct {
 		Thing MutableTimings

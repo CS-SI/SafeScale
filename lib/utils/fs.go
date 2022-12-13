@@ -17,7 +17,6 @@
 package utils
 
 import (
-	"io/ioutil"
 	"os"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
