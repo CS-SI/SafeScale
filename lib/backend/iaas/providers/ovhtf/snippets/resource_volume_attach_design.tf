@@ -8,7 +8,7 @@ resource "openstack_compute_volume_attach_v2" "{{ .Resource.Name }}" {
     lifecycle {
 {{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
-{{ end }}
+{{- end }}
     }
 }
 

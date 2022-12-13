@@ -12,7 +12,7 @@ terraform {
 {{- end }}
 
 {{ if .ConsulBackendConfig }}
-    {{ .ConsulBackendConfig }}
+{{   .ConsulBackendConfig }}
 {{ end }}
 }
 

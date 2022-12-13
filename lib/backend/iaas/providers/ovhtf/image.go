@@ -24,21 +24,27 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-const (
-	imageResourceSnippetPath = "snippets/resource_image.tf"
-)
-
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
 func (p *provider) ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error) {
 	if valid.IsNull(p) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	return nil, fail.NotImplementedError()
-	// return p.StackDriver.(providers.StackReservedForProviderUse).ListImages(ctx, all)
+	return p.MiniStack.ListImages(ctx, all)
 }
 
 func (p *provider) InspectImage(ctx context.Context, id string) (*abstract.Image, fail.Error) {
-	// TODO implement me
-	return nil, fail.NotImplementedError()
+	if valid.IsNull(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	ai, xerr := p.MiniStack.InspectImage(ctx, id)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return ai, nil
 }

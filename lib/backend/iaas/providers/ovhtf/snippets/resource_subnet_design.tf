@@ -10,7 +10,7 @@ resource "openstack_networking_subnet_v2" "{{ .Resource.Name }}" {
     lifecycle {
 {{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
-{{ end }}
+{{- end }}
     }
 }
 
@@ -29,7 +29,7 @@ resource "openstack_networking_router_v2" "{{ .Resource.Name }}" {
     lifecycle {
 {{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
-{{ end }}
+{{- end }}
     }
 }
 
@@ -40,7 +40,7 @@ resource "openstack_networking_router_interface_v2" "router_interface_1" {
     lifecycle {
 {{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
-{{ end }}
+{{- end }}
     }
 }
 

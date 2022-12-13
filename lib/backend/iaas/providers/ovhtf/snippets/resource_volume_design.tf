@@ -7,15 +7,15 @@ resource "openstack_blockstorage_volume_v2" "{{ .Resource.Name }}" {
     tenant_id   = "{{ .Provider.Authentication.TenantID }}"
 
     metadata = {
-{{ range $t, $v := .Resource.Tags }}
+{{- range $t, $v := .Resource.Tags }}
         {{ $t }} = "{{ $v }}"
-{{ end }}
+{{- end }}
     }
 
     lifecycle {
 {{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
-{{ end }}
+{{- end }}
     }
 }
 

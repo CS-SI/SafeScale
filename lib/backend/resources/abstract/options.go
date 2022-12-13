@@ -80,3 +80,11 @@ func MarkForCreation() Option {
 func MarkForDestruction() Option {
 	return WithExtraData(ExtraMarkedForDestruction, true)
 }
+
+func MarkAsStarted() Option {
+	return WithExtraData("WantedHostState", "started")
+}
+
+func MarkAsStopped() Option {
+	return WithExtraData("WantedHostState", "stopped")
+}

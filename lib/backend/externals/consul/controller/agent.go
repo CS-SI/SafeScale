@@ -49,6 +49,7 @@ var (
 
 	currentConsulProc atomic.Value
 	cancelAgent       context.CancelFunc
+	legitimateExit    atomic.Value
 )
 
 // StartAgent creates consul configuration file if needed and starts consul agent in server mode
@@ -139,6 +140,8 @@ func StartAgent(ctx context.Context) (startedCh chan bool, doneCh chan Result[co
 	var agentCtx context.Context
 	agentCtx, cancelAgent = context.WithCancel(ctx)
 
+	legitimateExit.Store(false)
+
 	// starts a goroutine to start consul server as long as it's needed, depending on the termination reason
 	go func() {
 		defer func() {
@@ -148,7 +151,7 @@ func StartAgent(ctx context.Context) (startedCh chan bool, doneCh chan Result[co
 
 		const maxRetries = 5
 		for i := 0; i < maxRetries; i++ {
-			// Runs consul agent
+			// Starts consul agent
 			cmdDoneCh, xerr := startCommand(agentCtx, cliArgs)
 			if xerr != nil {
 				// Do not try again when binary cannot be started
@@ -169,6 +172,9 @@ func StartAgent(ctx context.Context) (startedCh chan bool, doneCh chan Result[co
 			// }
 
 			// reacts based on termination reason
+			if legitimateExit.Load().(bool) {
+				return
+			}
 			switch out.Output().ExitCode() {
 			case 0:
 				logrus.Debugf("consul ends with status '%d'", out.Output().ExitCode())
@@ -214,6 +220,7 @@ func killRemainingConsul(rootDir string) {
 }
 
 func StopAgent() {
+	legitimateExit.Store(true)
 	if cancelAgent != nil {
 		cancelAgent()
 	}

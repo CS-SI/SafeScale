@@ -20,7 +20,11 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
+
+	"github.com/hashicorp/terraform-exec/tfexec"
+	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	terraformer "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer"
@@ -30,13 +34,13 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -52,7 +56,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		return nil, nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	defer debug.NewTracer(inctx, tracing.ShouldTrace("stack.ovhtf") || tracing.ShouldTrace("stacks.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(inctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
@@ -63,6 +67,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 
 	// The Default Networking is the first of the provided list, by convention
 	defaultSubnet := request.Subnets[0]
+	defaultSubnetID := defaultSubnet.ID
 
 	xerr := stacks.ProvideCredentialsIfNeeded(&request)
 	if xerr != nil {
@@ -93,10 +98,14 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		return nil, nil, fail.Wrap(xerr, "failed to get image")
 	}
 
+	request.TemplateRef = template.Name
+
 	rim, xerr := p.InspectImage(inctx, request.ImageID)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
+
+	request.ImageRef = rim.Name
 
 	diskSize := request.DiskSize
 	if diskSize > template.DiskSize {
@@ -132,7 +141,6 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 	if xerr != nil {
 		return nil, nil, fail.Wrap(xerr, "failed to select availability zone")
 	}
-	_ = azone
 
 	// --- Initializes abstract.HostFull ---
 	ahf, xerr := p.designHostFull(request.ResourceName)
@@ -164,8 +172,9 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 	}
 
 	xerr = ahf.AddOptions(
-		abstract.WithExtraData("Request", request),
 		abstract.MarkForCreation(),
+		abstract.WithExtraData("Request", request),
+		abstract.WithExtraData("AvailabilityZone", azone),
 	)
 	if xerr != nil {
 		return nil, nil, xerr
@@ -198,12 +207,6 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 	logrus.WithContext(inctx).Debugf("Creating host resource '%s' ...", request.ResourceName)
 
 	// Retry creation until success, for 10 minutes
-	var (
-		server *servers.Server
-		// hostNets     []servers.Network
-		// hostPorts    []ports.Port
-		// createdPorts []string
-	)
 	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
 	if xerr != nil {
 		return nil, nil, xerr
@@ -232,51 +235,31 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		return nil, nil, xerr
 	}
 
+	var outputs map[string]tfexec.OutputMeta
 	xerr = retry.WhileUnsuccessful(
 		func() (innerFErr error) {
-			// hostNets, hostPorts, createdPorts, innerXErr = p.identifyOpenstackSubnetsAndPorts(inctx, request, defaultSubnet)
-			// if innerXErr != nil {
-			// 	switch innerXErr.(type) {
-			// 	case *fail.ErrDuplicate, *fail.ErrNotFound: // This kind of error means actually there is no more Ip address available
-			// 		return retry.StopRetryError(innerXErr)
-			// 	default:
-			// 		return fail.Wrap(xerr, "failed to construct list of Subnets for the Host")
-			// 	}
-			// }
+			select {
+			case <-inctx.Done():
+				return retry.StopRetryError(inctx.Err())
+			default:
+			}
 
-			// // Starting from here, delete created ports if exiting with error
-			// defer func() {
-			// 	if innerXErr != nil {
-			// 		derr := p.deletePortsInSlice(jobapi.NewContextPropagatingJob(inctx), createdPorts)
-			// 		if derr != nil {
-			// 			_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
-			// 		}
-			// 	}
-			// }()
-			//
-			// server, innerXErr = p.rpcCreateServer(inctx, request.ResourceName, hostNets, request.TemplateID, request.ImageID, diskSize, userDataPhase1, azone)
-			// if innerXErr != nil {
-			// 	switch innerXErr.(type) {
-			// 	case *retry.ErrStopRetry:
-			// 		return fail.Wrap(fail.Cause(innerXErr), "stopping retries")
-			// 	case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it'instance going to fail anyway
-			// 		return retry.StopRetryError(innerXErr)
-			// 	}
-			// 	if server != nil && server.ID != "" {
-			// 		rerr := p.DeleteHost(inctx, server.ID)
-			// 		if rerr != nil {
-			// 			_ = innerXErr.AddConsequence(fail.Wrap(rerr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName))
-			// 		}
-			// 	}
-			// 	return innerXErr
-			// }
-			// if server == nil || server.ID == "" { // TODO: this should be a validation method
-			// 	innerXErr = fail.NewError("failed to create server")
-			// 	return innerXErr
-			// }
-
-			outputs, innerXErr := renderer.Apply(inctx, def)
+			var innerXErr fail.Error
+			outputs, innerXErr = renderer.Apply(inctx, def)
 			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrSyntax, *fail.ErrNotFound:
+					return retry.StopRetryError(innerXErr)
+				case fail.Error:
+					lowered := strings.ToLower(innerXErr.Error())
+					if strings.Contains(lowered, "overlaps with another subnet") {
+						return retry.StopRetryError(fail.DuplicateError("requested CIDR overlaps with existing Subnet"))
+					}
+					if strings.Contains(lowered, "unable to find flavor with name") {
+						return retry.StopRetryError(fail.NotFoundError(innerXErr.Error()))
+					}
+				default:
+				}
 				return fail.Wrap(innerXErr, "failed to create Host '%s'", ahf.Name)
 			}
 
@@ -294,7 +277,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 
 			ahf.ID, innerXErr = unmarshalOutput[string](outputs["host"+request.ResourceName+"_id"])
 			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to recover Host id")
+				return retry.StopRetryError(fail.Wrap(innerXErr, "failed to recover Host id"))
 			}
 
 			// // Starting from here, delete host if exiting with error
@@ -353,28 +336,24 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		case *retry.ErrStopRetry, *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it'instance going to fail anyway
 			return nil, nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		default:
-			cause := fail.Cause(xerr)
-			if _, ok := cause.(*fail.ErrNotAvailable); ok {
-				if server != nil {
-					ahf.ID = server.ID
-					ahf.Name = server.Name
-					ahf.LastState = hoststate.Error
-				}
-			}
 			return nil, nil, xerr
 		}
 	}
 
 	// FIXME: restore that
-	// newHost, xerr := p.complementHost(inctx, ahf.HostCore, *server, hostNets, hostPorts)
+	newHost, xerr := p.complementHost(inctx, ahf.HostCore, outputs)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
+	newHost.Sizing, xerr = p.toHostSize(template)
 	// if xerr != nil {
-	// 	return nil, nil, xerr
+	// 	return nil, xerr
 	// }
-	// newHost.Networking.DefaultSubnetID = defaultSubnetID
-	// // newHost.Networking.DefaultGatewayID = defaultGatewayID
-	// // newHost.Networking.DefaultGatewayPrivateIP = request.DefaultRouteIP
-	// newHost.Networking.IsGateway = request.IsGateway
-	// newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
+
+	newHost.Networking.DefaultSubnetID = defaultSubnetID
+	newHost.Networking.IsGateway = request.IsGateway
+	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	// FIXME: reimplement this, with new resource type PublicIP?
 	// // if Floating IP are used and public address is requested
@@ -421,7 +400,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 	// }
 
 	logrus.Infoln(msgSuccess)
-	return ahf /*newHost*/, userData, nil
+	return newHost, userData, nil
 }
 
 func (p *provider) designHostFull(name string) (*abstract.HostFull, fail.Error) {
@@ -429,9 +408,8 @@ func (p *provider) designHostFull(name string) (*abstract.HostFull, fail.Error) 
 	if xerr != nil {
 		return nil, xerr
 	}
-	p.ConsolidateHostSnippet(ahf.HostCore)
 
-	return ahf, nil
+	return ahf, p.ConsolidateHostSnippet(ahf.HostCore)
 }
 
 // SelectedAvailabilityZone returns the selected availability zone
@@ -462,21 +440,18 @@ func (p *provider) selectedAvailabilityZone(ctx context.Context) (string, fail.E
 	return p.availabilityZone, nil
 }
 
-/*// complementHost complements Host data with content of server parameter
-func (p provider) complementHost(ctx context.Context, hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (_ *abstract.HostFull, ferr fail.Error) {
+// complementHost complements Host data with content of server parameter
+func (p *provider) complementHost(ctx context.Context, hostCore *abstract.HostCore, outputs map[string]tfexec.OutputMeta) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// Updates intrinsic data of host if needed
+	var err error
+	hostResourceIdField := "host_" + hostCore.Name + "_id"
 	if hostCore.ID == "" {
-		hostCore.ID = server.ID
-	}
-	if hostCore.Name == "" {
-		hostCore.Name = server.Name
-	}
-
-	state := toHostState(server.Status)
-	if state == hoststate.Error || state == hoststate.Starting {
-		logrus.WithContext(ctx).Warnf("[TRACE] Unexpected host'instance last state: %v", state)
+		hostCore.ID, err = lang.Cast[string](outputs[hostResourceIdField])
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
 	}
 
 	host, xerr := abstract.NewHostFull(abstract.WithName(hostCore.Name))
@@ -484,77 +459,119 @@ func (p provider) complementHost(ctx context.Context, hostCore *abstract.HostCor
 		return nil, xerr
 	}
 
+	// FIXME: restore this
+	// state := toHostState(server.Status)
+	// if state == hoststate.Error || state == hoststate.Starting {
+	// 	logrus.WithContext(ctx).Warnf("[TRACE] Unexpected host'instance last state: %v", state)
+	// }
+
 	host.HostCore = hostCore
-	host.CurrentState, hostCore.LastState = state, state
-	host.Description = &abstract.HostDescription{
-		Created: server.Created,
-		Updated: server.Updated,
+	// FIXME: restore this
+	// host.CurrentState, hostCore.LastState = state, state
+	// host.Description = &abstract.HostDescription{
+	// 	Created: server.Created,
+	// 	Updated: server.Updated,
+	// }
+
+	host.Tags["Template"], err = lang.Cast[string](outputs["flavor_id"])
+	if err != nil {
+		return nil, fail.Wrap(err)
 	}
 
-	host.Tags["Template"], _ = server.Image["id"].(string) // nolint
-	host.Tags["Image"], _ = server.Flavor["id"].(string)   // nolint
+	host.Tags["Image"], err = lang.Cast[string](outputs["image_id"])
 
-	// recover metadata
-	for k, v := range server.Metadata {
+	// recover OpenStack metadata into Tags
+	metadata, err := lang.Cast[map[string]string](outputs["metadata"])
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	for k, v := range metadata {
 		host.Tags[k] = v
 	}
 
-	ct, ok := host.Tags["CreationDate"]
-	if !ok || ct == "" {
-		host.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
-	}
-
-	host.Sizing, xerr = instance.toHostSize(ctx, server.Flavor)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if len(hostNets) > 0 {
-		if len(hostPorts) != len(hostNets) {
-			return nil, fail.InconsistentError("count of host ports must be equal to the count of host subnets")
+	if ct, ok := host.Tags["CreationDate"]; !ok || ct == "" {
+		// FIXME: no such created field?
+		ct, err = lang.Cast[string](outputs["created"])
+		if err != nil {
+			return nil, fail.Wrap(err)
 		}
 
+		convertedTime, err := time.Parse(ct, "")
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
+
+		host.Tags["CreationDate"] = convertedTime.Format(time.RFC3339)
+	}
+
+	networks, err := lang.Cast[[]interface{}](outputs["host"+hostCore.Name+"_networks"])
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	if len(networks) > 0 {
 		var ipv4, ipv6 string
 		subnetsByID := map[string]string{}
 		subnetsByName := map[string]string{}
-
-		// Fill the ID of subnets
-		for k := range hostNets {
-			port := hostPorts[k]
-			if port.NetworkID != instance.ProviderNetworkID {
-				subnetsByID[port.FixedIPs[0].SubnetID] = ""
-			} else {
-				for _, ip := range port.FixedIPs {
-					if valid.IsIPv6(ip.IPAddress) {
-						ipv6 = ip.IPAddress
-					} else {
-						ipv4 = ip.IPAddress
-					}
-				}
-			}
-		}
-
-		// Fill the name of subnets
-		for k := range subnetsByID {
-			as, xerr := instance.InspectSubnet(ctx, k)
-			if xerr != nil {
-				return nil, xerr
-			}
-			subnetsByID[k] = as.Name
-			subnetsByName[as.Name] = k
-		}
-
-		// Now fills the ip addresses
 		ipv4Addresses := map[string]string{}
 		ipv6Addresses := map[string]string{}
-		for k := range hostNets {
-			port := hostPorts[k]
-			for _, ip := range port.FixedIPs {
-				subnetID := ip.SubnetID
-				if valid.IsIPv6(ip.IPAddress) {
-					ipv6Addresses[subnetID] = ip.IPAddress
+
+		// gather subnets data
+		for _, v := range networks {
+			entry, err := lang.Cast[map[string]any](v)
+			if err != nil {
+				return nil, fail.Wrap(err)
+			}
+
+			uuid, err := lang.Cast[string](entry["uuid"])
+			if err != nil {
+				return nil, fail.Wrap(err)
+			}
+
+			name, err := lang.Cast[string](entry["name"])
+			if err != nil {
+				return nil, fail.Wrap(err)
+			}
+
+			subnetsByID[uuid] = name
+			subnetsByName[name] = uuid
+
+			ip, err := lang.Cast[string](entry["fixed_ip_v4"])
+			if err == nil && ip != "" {
+				if name == "Ext-Net" {
+					ipv4 = ip
 				} else {
-					ipv4Addresses[subnetID] = ip.IPAddress
+					ipv4Addresses[uuid] = ip
+				}
+				continue
+			}
+
+			ip, err = lang.Cast[string](entry["fixed_ip_v6"])
+			if err == nil && ip != "" {
+				if name == "Ext-Net" {
+					ipv6 = ip
+				} else {
+					ipv6Addresses[uuid] = ip
+				}
+				continue
+			}
+
+			ip, err = lang.Cast[string](entry["floating_ip"])
+			if err == nil && ip != "" {
+				if valid.IsIPv6(ip) {
+					if name == "Ext-Net" {
+						ipv6 = ip
+					} else {
+						ipv6Addresses[uuid] = ip
+					}
+					continue
+				}
+
+				if name == "Ext-Net" {
+					ipv4 = ip
+				} else {
+					ipv4Addresses[uuid] = ip
 				}
 			}
 		}
@@ -568,11 +585,19 @@ func (p provider) complementHost(ctx context.Context, hostCore *abstract.HostCor
 	}
 	return host, nil
 }
-*/
+
+// toHostSize converts flavor attributes returned by OpenStack driver into abstract.HostEffectiveSizing
+func (p *provider) toHostSize(tpl *abstract.HostTemplate) (_ *abstract.HostEffectiveSizing, ferr fail.Error) {
+	hostSizing := abstract.NewHostEffectiveSizing()
+	hostSizing.Cores = tpl.Cores
+	hostSizing.DiskSize = tpl.DiskSize
+	hostSizing.RAMSize = tpl.RAMSize
+	return hostSizing, nil
+}
 
 func (p *provider) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	// TODO implement me
-	panic("implement me")
+	return fail.NotImplementedError("ClearHostStartupScript() not yet implemented")
 }
 
 // InspectHost ...
@@ -585,14 +610,19 @@ func (p *provider) InspectHost(ctx context.Context, hostParam iaasapi.HostIdenti
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
-	return p.MiniStack.InspectHost(ctx, hostParam)
+	ahf, xerr := p.MiniStack.InspectHost(ctx, hostParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return ahf, p.ConsolidateHostSnippet(ahf.HostCore)
 }
 
 func (p *provider) GetHostState(ctx context.Context, hostParam iaasapi.HostIdentifier) (hoststate.Enum, fail.Error) {
 	// TODO implement me
-	panic("implement me")
+	return hoststate.Unknown, fail.NotImplementedError("GetHostState() not yet implemented")
 }
 
 // ListHosts ...
@@ -601,7 +631,7 @@ func (p *provider) ListHosts(ctx context.Context, b bool) (abstract.HostList, fa
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.ovhtf") || tracing.ShouldTrace("stacks.compute"), "()").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.compute"), "()").WithStopwatch().Entering().Exiting()
 
 	return p.MiniStack.ListHosts(ctx, b)
 }
@@ -615,7 +645,7 @@ func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostIdentif
 		return xerr
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", hostLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.compute"), "(%s)", hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	ahf, xerr = p.InspectHost(ctx, ahf)
@@ -623,10 +653,7 @@ func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostIdentif
 		return xerr
 	}
 
-	xerr = ahf.AddOptions(
-		abstract.UseTerraformSnippet(hostDesignResourceSnippetPath),
-		abstract.MarkForDestruction(),
-	)
+	xerr = ahf.AddOptions(abstract.MarkForDestruction())
 	if xerr != nil {
 		return xerr
 	}
@@ -664,7 +691,7 @@ func (p *provider) StopHost(ctx context.Context, hostParam iaasapi.HostIdentifie
 		return xerr
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", hostLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.compute"), "(%s)", hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	ahf, xerr = p.InspectHost(ctx, ahf)
@@ -672,10 +699,8 @@ func (p *provider) StopHost(ctx context.Context, hostParam iaasapi.HostIdentifie
 		return xerr
 	}
 
-	xerr = ahf.AddOptions(
-		abstract.UseTerraformSnippet(hostDesignResourceSnippetPath),
-		abstract.WithExtraData("MarkedForStop", true),
-	)
+	// FIXME: change this to abstract.MarkForStop()
+	xerr = ahf.AddOptions(abstract.WithExtraData("MarkedForStop", true))
 	if xerr != nil {
 		return xerr
 	}
@@ -714,7 +739,7 @@ func (p *provider) StartHost(ctx context.Context, hostParam iaasapi.HostIdentifi
 		return xerr
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", hostLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.compute"), "(%s)", hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	ahf, xerr = p.InspectHost(ctx, ahf)
@@ -722,10 +747,8 @@ func (p *provider) StartHost(ctx context.Context, hostParam iaasapi.HostIdentifi
 		return xerr
 	}
 
-	xerr = ahf.AddOptions(
-		abstract.UseTerraformSnippet(hostDesignResourceSnippetPath),
-		abstract.WithExtraData("MarkedForStop", false),
-	)
+	// FIXME: change this to abstract.MarkForStart()
+	xerr = ahf.AddOptions(abstract.WithExtraData("MarkedForStop", false))
 	if xerr != nil {
 		return xerr
 	}
@@ -756,28 +779,32 @@ func (p *provider) StartHost(ctx context.Context, hostParam iaasapi.HostIdentifi
 }
 
 func (p *provider) RebootHost(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
-	// TODO implement me
-	panic("implement me")
+	xerr := p.StartHost(ctx, hostParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	return p.StartHost(ctx, hostParam)
 }
 
 func (p *provider) ResizeHost(ctx context.Context, hostParam iaasapi.HostIdentifier, requirements abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	// TODO implement me
-	panic("implement me")
+	return nil, fail.NotImplementedError("ResizeHost() not yet implemented")
 }
 
 func (p *provider) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIdentifier, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	// TODO implement me
-	panic("implement me")
+	return nil, fail.NotImplementedError("WaitHostReady() not yet implemented")
 }
 
 func (p *provider) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
 	// TODO implement me
-	panic("implement me")
+	return fail.NotImplementedError("BindSecurityGroupToHost() not yet implemented")
 }
 
 func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
 	// TODO implement me
-	panic("implement me")
+	return fail.NotImplementedError("UnbindSecurityGroupFromHost() not yet implemented")
 }
 
 func (p *provider) ConsolidateHostSnippet(ahc *abstract.HostCore) fail.Error {

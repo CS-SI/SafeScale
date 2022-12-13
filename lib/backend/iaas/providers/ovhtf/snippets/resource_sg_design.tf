@@ -9,41 +9,52 @@ resource "openstack_networking_secgroup_v2" "{{ .Resource.Name }}" {
     lifecycle {
 {{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
-{{ end }}
+{{- end }}
     }
 }
 
 output "sg_{{ .Resource.Name }}_id" {
-    value                   = ["${openstack_networking_secgroup_v2.{{ .Resource.Name }}.id}"]
+    value = "${openstack_networking_secgroup_v2.{{ .Resource.Name }}.id}"
 }
 
-{{- range $k, $v := .Resource.Rules }}
-resource "openstack_networking_secgroup_rule_v2" "{{ .Resource.Name }}-rule-{{ $k }}" {
+{{- $rsc := .Resource }}
+{{- $tenantId := .Provider.Authentication.TenantID }}
+{{- $tenantName := .Provider.Authentication.TenantName }}
+{{- $extra := .Extra }}
+{{- range $k, $v := $rsc.Rules }}
+{{-   $target := "" }}
+{{-   if eq $v.Direction 1 }}
+{{-     $target = $v.Sources }}
+{{-   else if eq $v.Direction 2 }}
+{{-     $target = $v.Targets }}
+{{-   end }}
+{{-   range $i, $t := $target }}
+{{-     $target_keyword := "remote_group_id"}}
+{{-     if regexMatch `^([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})|([0-9A-Fa-f]{0,4}:){2,7}([0-9A-Fa-f]{0,4})` $t }}
+{{-       $target_keyword = "remote_ip_prefix" }}
+{{-     end }}
+resource "openstack_networking_secgroup_rule_v2" "{{ $rsc.Name }}_rule_{{ $k }}_{{ $i }}" {
     provider                = openstack.ovh
-    description             = "{{ $v.Description }}
-    direction               = "{{ $v.Direction }}
+    description             = "{{ $v.Description }}"
+    direction               = "{{ $v.Direction }}"
     ethertype               = "{{ $v.EtherType }}"
     protocol                = "{{ $v.Protocol }}"
     port_range_min          = {{ $v.PortFrom }}
-    port_range_max          = {{ or $v.PortTo 0 }}
-    remote_ip_prefix        = "{{ $v.Remote }}"
-    tenant_id               = "{{ or .Provider.Authentication.TenantId .Provider.Authentication.TenantName }}"
-    security_group_id       = ${openstack_networking_secgroup_v2.{{ .Resource.Name }}.id}
-
-    tags = {
-{{ range $t, $v := .Resource.Tags }}
-        {{ $t }} = "{{ $v }}"
-{{ end }}
-    }
+    port_range_max          = {{ or $v.PortTo $v.PortFrom }}
+    {{ $target_keyword }}   = "{{ $t }}"
+    tenant_id               = "{{ or $tenantId $tenantName }}"
+    security_group_id       = "${openstack_networking_secgroup_v2.{{ $rsc.Name }}.id}"
 
     lifecycle {
-{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
+{{-     if and (not $extra.MarkedForCreation) (not $extra.MarkedForDestruction) }}
         prevent_destroy = true
-{{ end }}
+{{-     end }}
     }
 }
 
-output "sg_{{ .Resource.Name }}_rule_{{ $k }}_id" {
-    value = "${openstack_networking_secgroup_rule_v2.{{ .Resource.Name }}-rule-{{ $k }}.id}"]
+output "sg_{{ $rsc.Name }}_rule_{{ $k }}_{{ $i }}_id" {
+    value = "${openstack_networking_secgroup_rule_v2.{{ $rsc.Name }}_rule_{{ $k }}_{{ $i }}.id}"
 }
-{{ end }}
+
+{{-   end }}
+{{- end }}

@@ -440,6 +440,13 @@ func (instance *renderer) Apply(ctx context.Context, def string) (_ map[string]t
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
+	// Allow context cancellation
+	select {
+	case <-ctx.Done():
+		return nil, fail.AbortedError(ctx.Err())
+	default:
+	}
+
 	// Creates main.tf file
 	xerr := instance.createMainFile(def)
 	if xerr != nil {
@@ -468,7 +475,7 @@ func (instance *renderer) Apply(ctx context.Context, def string) (_ map[string]t
 
 	err = instance.executor.Init(ctx, tfexec.Upgrade(false))
 	if err != nil {
-		return nil, fail.Wrap(err, "failed to init terraform executor")
+		return nil, fail.AbortedError(err, "failed to init terraform executor")
 	}
 	logrus.Trace("terraform init ran successfully.")
 
@@ -486,17 +493,18 @@ func (instance *renderer) Apply(ctx context.Context, def string) (_ map[string]t
 		if rerr != nil {
 			switch rerr.(type) {
 			case *exec.ExitError:
-				if strings.Contains(err.Error(), "Your query returned no results") {
+				lowered := strings.ToLower(err.Error())
+				if strings.Contains(lowered, "your query returned no results") {
 					return nil, fail.NotFoundError(err.Error())
 				}
-				if strings.Contains(err.Error(), "Your query returned more than one result") {
+				if strings.Contains(lowered, "your query returned more than one result") {
 					return nil, fail.DuplicateError(err.Error())
 				}
-				if strings.Contains(err.Error(), "Incorrect attribute value type") {
+				if strings.Contains(lowered, "incorrect attribute value type") {
 					return nil, fail.SyntaxError(err.Error())
 				}
-				if strings.Contains(err.Error(), "overlaps with another subnet") {
-					return nil, fail.DuplicateError("requested CIDR overlaps with existing Subnet")
+				if strings.Contains(lowered, "configuration is invalid") {
+					return nil, fail.SyntaxError(err.Error())
 				}
 			default:
 			}

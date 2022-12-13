@@ -41,9 +41,11 @@ type MiniStack interface {
 	ListRegions(ctx context.Context) ([]string, fail.Error)
 
 	// ListImages lists available images
-	ListImages(ctx context.Context, all bool) (_ []*abstract.Image, ferr fail.Error)
+	ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error)
+	InspectImage(ctx context.Context, id string) (*abstract.Image, fail.Error)
 
-	ListTemplates(ctx context.Context, _ bool) (templates []*abstract.HostTemplate, ferr fail.Error)
+	ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTemplate, fail.Error)
+	InspectTemplate(ctx context.Context, id string) (*abstract.HostTemplate, fail.Error)
 
 	// ListKeyPairs lists available key pairs
 	ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fail.Error)

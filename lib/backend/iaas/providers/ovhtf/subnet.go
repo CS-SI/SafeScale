@@ -211,10 +211,14 @@ func (p *provider) InspectSubnet(ctx context.Context, id string) (_ *abstract.Su
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("providers.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-	// FIXME: implement like InspectNetwork or use MiniStack?
-	return p.MiniStack.InspectSubnet(ctx, id)
+	as, xerr := p.MiniStack.InspectSubnet(ctx, id)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return as, p.ConsolidateSubnetSnippet(as)
 }
 
 // InspectSubnetByName ...
@@ -228,7 +232,12 @@ func (p *provider) InspectSubnetByName(ctx context.Context, networkRef, name str
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
-	return p.MiniStack.InspectSubnetByName(ctx, networkRef, name)
+	as, xerr := p.MiniStack.InspectSubnetByName(ctx, networkRef, name)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return as, p.ConsolidateSubnetSnippet(as)
 }
 
 // ListSubnets lists available subnets in a network
@@ -260,11 +269,6 @@ func (p *provider) DeleteSubnet(ctx context.Context, subnetParam iaasapi.SubnetI
 	} else {
 		as, xerr = p.InspectSubnetByName(ctx, as.Network, as.Name)
 	}
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = p.ConsolidateSubnetSnippet(as)
 	if xerr != nil {
 		return xerr
 	}

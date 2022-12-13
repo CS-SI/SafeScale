@@ -44,6 +44,10 @@ const (
 
 	ExtraMarkedForDestruction = "MarkedForDestruction"
 	ExtraMarkedForCreation    = "MarkedForCreation"
+	ExtraWantedHostState      = "WantedHostState"
+
+	wantedHostStopped = "stopped"
+	wantedHostStarted = "started"
 )
 
 // newCore initializes a new instance of Network
@@ -202,6 +206,9 @@ func (c *core) Extra() map[string]any {
 	}
 	if _, ok := c.extra[ExtraMarkedForCreation]; !ok {
 		c.extra[ExtraMarkedForCreation] = false
+	}
+	if _, ok := c.extra[ExtraWantedHostState]; !ok {
+		c.extra[ExtraWantedHostState] = wantedHostStarted
 	}
 
 	return c.extra

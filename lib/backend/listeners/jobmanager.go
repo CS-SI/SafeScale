@@ -27,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -109,19 +108,13 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 		return empty, fail.InvalidRequestError("cannot stop job: job id not set")
 	}
 
-	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	tracer := debug.NewTracer(task, true, "('%s')", uuid).Entering()
+	tracer := debug.NewTracer(ctx, true, "('%s')", uuid).Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 
-	xerr = job.AbortByID(uuid)
+	xerr := job.AbortByID(uuid)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -147,12 +140,7 @@ func (s *JobManagerListener) List(inctx context.Context, _ *emptypb.Empty) (jl *
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	task, xerr := concurrency.NewTaskWithContext(inctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	tracer := debug.NewTracer(task, true, "").Entering()
+	tracer := debug.NewTracer(inctx, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(inctx, &err, tracer.TraceMessage())
 
@@ -160,10 +148,10 @@ func (s *JobManagerListener) List(inctx context.Context, _ *emptypb.Empty) (jl *
 	jobMap := job.List()
 	var pbProcessList []*protocol.JobDefinition
 	for uuid, info := range jobMap {
-		status, _ := task.Status()
-		if status == concurrency.ABORTED {
-			return nil, fail.AbortedError(nil)
-		}
+		// status, _ := task.Status()
+		// if status == concurrency.ABORTED {
+		// 	return nil, fail.AbortedError(nil)
+		// }
 		pbProcessList = append(pbProcessList, &protocol.JobDefinition{Uuid: uuid, Info: info})
 	}
 	return &protocol.JobList{List: pbProcessList}, nil

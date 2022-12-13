@@ -210,7 +210,7 @@ func (p *provider) AddPublicIPToVIP(ctx context.Context, vip *abstract.VirtualIP
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
 
-// BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
+// BindHostToVIP does nothing because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p *provider) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
@@ -218,54 +218,14 @@ func (p *provider) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, h
 	if vip == nil {
 		return fail.InvalidParameterCannotBeNilError("vip")
 	}
-	if hostID = strings.TrimSpace(hostID); hostID == "" {
-		return fail.InvalidParameterError("host", "cannot be empty string")
+	if hostID == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("host")
 	}
 
-	return fail.NotImplementedError()
-
-	/*
-		var vipPort *ports.Port
-		xerr := stacks.RetryableRemoteCall(ctx,
-			func() (innerErr error) {
-				vipPort, innerErr = ports.Get(s.NetworkClient, vip.ID).Extract()
-				return innerErr
-			},
-			NormalizeError,
-		)
-		if xerr != nil {
-			return xerr
-		}
-		hostPorts, xerr := s.rpcListPorts(ctx, ports.ListOpts{
-			DeviceID:  hostID,
-			NetworkID: vip.NetworkID,
-		})
-		if xerr != nil {
-			return xerr
-		}
-		addressPair := ports.AddressPair{
-			MACAddress: vipPort.MACAddress,
-			IPAddress:  vip.PrivateIP,
-		}
-		for _, p := range hostPorts {
-			p := p
-			p.AllowedAddressPairs = append(p.AllowedAddressPairs, addressPair)
-			xerr = stacks.RetryableRemoteCall(ctx,
-				func() error {
-					_, innerErr := ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &p.AllowedAddressPairs}).Extract()
-					return innerErr
-				},
-				NormalizeError,
-			)
-			if xerr != nil {
-				return xerr
-			}
-		}
-		return nil
-	*/
+	return nil
 }
 
-// UnbindHostFromVIP removes the bind between the VIP and a host
+// UnbindHostFromVIP does nothing  because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p *provider) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, hostID string) fail.Error {
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
@@ -273,51 +233,11 @@ func (p *provider) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualI
 	if vip == nil {
 		return fail.InvalidParameterCannotBeNilError("vip")
 	}
-	if hostID = strings.TrimSpace(hostID); hostID == "" {
-		return fail.InvalidParameterError("host", "cannot be empty string")
+	if hostID == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("host")
 	}
 
-	return fail.NotImplementedError()
-
-	/*
-		var vipPort *ports.Port
-		xerr := stacks.RetryableRemoteCall(ctx,
-			func() (innerErr error) {
-				vipPort, innerErr = ports.Get(s.NetworkClient, vip.ID).Extract()
-				return innerErr
-			},
-			NormalizeError,
-		)
-		if xerr != nil {
-			return xerr
-		}
-		hostPorts, xerr := s.rpcListPorts(ctx, ports.ListOpts{
-			DeviceID:  hostID,
-			NetworkID: vip.NetworkID,
-		})
-		if xerr != nil {
-			return xerr
-		}
-		for _, p := range hostPorts {
-			var newAllowedAddressPairs []ports.AddressPair
-			for _, a := range p.AllowedAddressPairs {
-				if a.MACAddress != vipPort.MACAddress {
-					newAllowedAddressPairs = append(newAllowedAddressPairs, a)
-				}
-			}
-			xerr = stacks.RetryableRemoteCall(ctx,
-				func() error {
-					_, innerErr := ports.Update(s.NetworkClient, p.ID, ports.UpdateOpts{AllowedAddressPairs: &newAllowedAddressPairs}).Extract()
-					return innerErr
-				},
-				NormalizeError,
-			)
-			if xerr != nil {
-				return xerr
-			}
-		}
-		return nil
-	*/
+	return nil
 }
 
 // DeleteVIP deletes the port corresponding to the VIP

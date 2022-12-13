@@ -1,77 +1,89 @@
-{{- range $k, $v := .Resource.Networking.SubnetByName }}
-resource "openstack_networking_port_v2" "port_{{ .Resource.Name }}_$k" {
+{{- $rsc := .Resource }}
+{{- $provider := .Provider }}
+{{- $extra := .Extra }}
+{{- range $v := $extra.Request.Subnets }}
+resource "openstack_networking_port_v2" "port_{{ $rsc.Name }}_{{ $v.Name }}" {
     provider           = openstack.ovh
-    name               = "port-{{ .Resource.Name }}-$k"
-    network_id         = "{{ .Resource.NetworkID }}"
+    name               = "port-{{ $rsc.Name }}-{{ $v.Name }}"
+    network_id         = "{{ $v.Network }}"
     admin_state_up     = true
-    region             = "{{ .Provider.Authentication.Region }}"
+    region             = "{{ $provider.Authentication.Region }}"
     # security_group_ids = var.request.ports[count.index].SecurityGroupIDs
     fixed_ip {
-        subnet_id = "{{ $v }}"
+        subnet_id = "{{ $v.ID }}"
     }
 
     lifecycle {
-{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
+{{-   if and (not $extra.MarkedForCreation) (not $extra.MarkedForDestruction) }}
         prevent_destroy = true
-{{ end }}
+{{-   end }}
     }
 }
 
-output "port_{{ .Resource.Name}}_$k_id" {
-    value = "${openstack_networking_port_v2.port_{{ .Resource.Name }}_$k.id}"
-}
-output "port_{{ .Resource.Name}}_$k_ip" {
-    value = "${openstack_networking_port_v2.port_{{ .Resource.Name }}_$k.fixed_ip}"
-}
-{{ end }}
+#output "port_{{ $rsc.Name}}_{{ $v.Name }}_id" {
+#    value = "${openstack_networking_port_v2.port_{{ $rsc.Name }}_{{ $v.Name }}.id}"
+#}
+#output "port_{{ $rsc.Name}}_{{ $v.Name }}_networks" {
+#    value = ["${openstack_networking_port_v2.port_{{ $rsc.Name }}_{{ $v.Name }}.network"]
+#}
+{{- end }}
 
-resource "openstack_compute_instance_v2" "{{ .Resource.Name }}" {
-    provider        = openstack.ovh
-    name            = "{{ .Resource.Name }}"
-    # key_pair        = var.request.hosts[count.index].KeyPairID
-    flavor_name     = "{{ .Resource.TemplateID }}"
-    image_id        = "{{ .Resource.ImageID }}"
-    security_groups = [ "default" ]
-    region          = "{{ .Provider.Authentication.Region }}"
-    availability_zone = "{{ .Extra.AvailabilityZone }}"
-    power_state = "{{ or .Extra.WantedHostState active }}"
+resource "openstack_compute_instance_v2" "{{ $rsc.Name }}" {
+    provider          = openstack.ovh
+    name              = "{{ $rsc.Name }}"
+    flavor_name       = "{{ $extra.Request.TemplateRef }}"
+    image_id          = "{{ $rsc.Sizing.ImageID }}"
+    security_groups   = [ "default" ]
+    region            = "{{ $provider.Authentication.Region }}"
+    availability_zone = "{{ $extra.AvailabilityZone }}"
+{{- if eq $extra.WantedHostState "started" }}
+    power_state       = "active"
+{{- else if eq $extra.WantedHostState "stopped" }}
+    power_state       = "shutoff"
+{{- end }}
 
-{{- range $k := .Resource.Networking.SubnetByName }}
-    network {
-        port = openstack_networking_port_v2.port_{{ .Resource.Name }}_$k.id
-    }
-{{ end }}
-{{- if or .Resource.Networking.IsGateway .Supplemental.PublicIP }}
+{{- if or $rsc.Networking.IsGateway $extra.Request.PublicIP }}
     network {
         name = "Ext-Net"
+    }
+{{- end }}
+{{- range $v := $extra.Request.Subnets }}
+    network {
+        port = "${openstack_networking_port_v2.port_{{ $rsc.Name }}_{{ $v.Name }}.id}"
     }
 {{ end }}
 
     block_device {
-        uuid                  = {{ .Resource.Sizing.ImageID }}
+        uuid                  = "{{ $rsc.Sizing.ImageID }}"
         source_type           = "image"
         destination_type      = "local"
-        volume_size           = {{ .Resource.Sizing.DiskSize }}
+        volume_size           = {{ $rsc.Sizing.DiskSize }}
         boot_index            = 0
         delete_on_termination = true
     }
 
-    user_data = "${file("{{ .Resource.Name }}_userdata")}"
+    user_data = "${file("{{ $rsc.Name }}_userdata")}"
 
     metadata = {
-{{ range $t, $v := .Resource.Tags }}
+{{- range $t, $v := $rsc.Tags }}
         {{ $t }} = "{{ $v }}"
-{{ end }}
+{{- end }}
     }
 
     lifecycle {
-        ignore = [block_device, user_data]
-{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
+        ignore_changes = [block_device, user_data]
+{{- if and (not $extra.MarkedForCreation) (not $extra.MarkedForDestruction) }}
         prevent_destroy = true
-{{ end }}
+{{- end }}
     }
 }
 
-output "host_{{ .Resource.Name }}_id" {
-    value = "${openstack_compute_instance_v2.{{ .Resource.Name }}.id}"
+output "host_{{ $rsc.Name }}" {
+    value = "${openstack_compute_instance_v2.{{ $rsc.Name }}}"
+}
+output "host_{{ $rsc.Name }}_id" {
+    value = "${openstack_compute_instance_v2.{{ $rsc.Name }}.id}"
+}
+output "host_{{ $rsc.Name}}_networks" {
+    value = "${openstack_compute_instance_v2.{{ $rsc.Name }}.network.*}"
 }

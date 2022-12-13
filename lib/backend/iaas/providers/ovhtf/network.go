@@ -243,7 +243,12 @@ func (p *provider) InspectNetworkByName(ctx context.Context, name string) (*abst
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
-	return p.MiniStack.InspectNetworkByName(ctx, name)
+	an, xerr := p.MiniStack.InspectNetworkByName(ctx, name)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return an, p.ConsolidateNetworkSnippet(an)
 }
 
 func unmarshalOutput[T any](in tfexec.OutputMeta) (T, fail.Error) {
@@ -350,7 +355,12 @@ func (p *provider) InspectNetwork(ctx context.Context, id string) (*abstract.Net
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
-	return p.MiniStack.InspectNetwork(ctx, id)
+	an, xerr := p.MiniStack.InspectNetwork(ctx, id)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return an, p.ConsolidateNetworkSnippet(an)
 }
 
 // ListNetworks lists available networks
@@ -425,11 +435,6 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkI
 
 		return nil
 	*/
-
-	xerr = p.ConsolidateNetworkSnippet(an)
-	if xerr != nil {
-		return xerr
-	}
 
 	xerr = an.AddOptions(abstract.MarkForDestruction())
 	if xerr != nil {

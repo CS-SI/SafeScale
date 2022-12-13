@@ -105,7 +105,6 @@ func cleanup(cmd *cobra.Command) {
 
 	// cleans up accordingly with the first argument
 	pName := precursor.Name()
-	fmt.Printf("precursor name=%s\n", pName)
 	switch pName {
 	case global.BackendCmdLabel:
 		fmt.Println("calling backend.Cleanup()...")

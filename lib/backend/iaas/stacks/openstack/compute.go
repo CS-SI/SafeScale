@@ -403,7 +403,7 @@ func (instance *stack) DeleteKeyPair(ctx context.Context, id string) fail.Error 
 }
 
 // toHostSize converts flavor attributes returned by OpenStack driver into abstract.HostEffectiveSizing
-func (instance *stack) toHostSize(ctx context.Context, flavor map[string]interface{}) (ahes *abstract.HostEffectiveSizing, ferr fail.Error) {
+func (instance *stack) toHostSize(ctx context.Context, flavor map[string]interface{}) (_ *abstract.HostEffectiveSizing, ferr fail.Error) {
 	hostSizing := abstract.NewHostEffectiveSizing()
 	if i, ok := flavor["id"]; ok {
 		fid, ok := i.(string)

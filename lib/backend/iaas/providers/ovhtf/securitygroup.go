@@ -111,20 +111,32 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 		return nil, xerr
 	}
 
-	values, xerr := unmarshalOutput[[]string](outputs["sg_"+asg.Name+"_id"])
+	// FIXME: same code than in AddRulesToSecurityGroup...
+	asg.ID, xerr = unmarshalOutput[string](outputs["sg_"+asg.Name+"_id"])
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	asg.ID = values[0]
-
 	for k, v := range rules {
-		id, xerr := unmarshalOutput[string](outputs[fmt.Sprintf("sg_%s_rule_%d_id", asg.Name, k)])
-		if xerr != nil {
-			return nil, xerr
-		}
+		if len(v.Sources) > 0 {
+			for i := range v.Sources {
+				id, xerr := unmarshalOutput[string](outputs[fmt.Sprintf("sg_%s_rule_%d_%d_id", asg.Name, k, i)])
+				if xerr != nil {
+					return nil, xerr
+				}
 
-		v.IDs = append(v.IDs, id)
+				v.IDs = append(v.IDs, id)
+			}
+		} else if len(v.Targets) > 0 {
+			for i := range v.Sources {
+				id, xerr := unmarshalOutput[string](outputs[fmt.Sprintf("sg_%s_rule_%d_%d_id", asg.Name, k, i)])
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				v.IDs = append(v.IDs, id)
+			}
+		}
 	}
 	asg.Rules = rules
 
@@ -186,7 +198,12 @@ func (p *provider) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Sec
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup"), "(%s)", sgLabel).WithStopwatch().Entering().Exiting()
 
-	return p.MiniStack.InspectSecurityGroup(ctx, sgParam)
+	asg, xerr := p.MiniStack.InspectSecurityGroup(ctx, sgParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return asg, p.ConsolidateSecurityGroupSnippet(asg)
 }
 
 func (p *provider) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error) {
@@ -210,8 +227,7 @@ func (p *provider) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Secu
 		return xerr
 	}
 
-	// Make sure the Snippet data is here...
-	xerr = asg.AddOptions(abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
+	xerr = asg.AddOptions(abstract.MarkForDestruction())
 	if xerr != nil {
 		return xerr
 	}
@@ -270,10 +286,10 @@ func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.
 		return nil, fail.Wrap(xerr)
 	}
 
-	xerr = p.ConsolidateSecurityGroupSnippet(newAsg)
-	if xerr != nil {
-		return nil, xerr
-	}
+	// xerr = p.ConsolidateSecurityGroupSnippet(newAsg)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	newAsg.Rules = append(newAsg.Rules, rules...)
 
@@ -289,7 +305,7 @@ func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.
 	}
 
 	// FIXME: should be necessary to create local Resource for SG rules and add them to assemble, to be able to remove SG AND its rules with Destroy...
-	def, xerr := renderer.Assemble(asg)
+	def, xerr := renderer.Assemble(newAsg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -299,20 +315,31 @@ func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.
 		return nil, xerr
 	}
 
-	values, xerr := unmarshalOutput[[]string](outputs["sg_"+asg.Name+"_id"])
+	asg.ID, xerr = unmarshalOutput[string](outputs["sg_"+asg.Name+"_id"])
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	asg.ID = values[0]
-
 	for k, v := range rules {
-		id, xerr := unmarshalOutput[string](outputs[fmt.Sprintf("sg_%s_rule_%d_id", asg.Name, k)])
-		if xerr != nil {
-			return nil, xerr
-		}
+		if len(v.Sources) > 0 {
+			for i := range v.Sources {
+				id, xerr := unmarshalOutput[string](outputs[fmt.Sprintf("sg_%s_rule_%d_%d_id", asg.Name, k, i)])
+				if xerr != nil {
+					return nil, xerr
+				}
 
-		v.IDs = append(v.IDs, id)
+				v.IDs = append(v.IDs, id)
+			}
+		} else if len(v.Targets) > 0 {
+			for i := range v.Sources {
+				id, xerr := unmarshalOutput[string](outputs[fmt.Sprintf("sg_%s_rule_%d_%d_id", asg.Name, k, i)])
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				v.IDs = append(v.IDs, id)
+			}
+		}
 	}
 	asg.Rules = rules
 

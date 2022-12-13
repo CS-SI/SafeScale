@@ -171,11 +171,11 @@ func (n networkConsumer) Create(
 
 	// finally, using context
 	newCtx := ctx
-	if timeout != 0 {
-		aCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		newCtx = aCtx
-	}
+	// if timeout != 0 {
+	// 	aCtx, cancel := context.WithTimeout(ctx, timeout)
+	// 	defer cancel()
+	// 	newCtx = aCtx
+	// }
 
 	req := &protocol.NetworkCreateRequest{
 		Organization:  n.session.currentOrganization,
