@@ -17,11 +17,7 @@
 package utils
 
 import (
-	"io/ioutil"
 	"os"
-	"reflect"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
@@ -34,7 +30,6 @@ func LazyRemove(path string) fail.Error {
 		case *os.PathError:
 			// File not found, that's ok because we wanted to remove it...
 		default:
-			logrus.Errorf("LazyRemove(): err is type '%s'", reflect.TypeOf(err).String())
 			return fail.Wrap(err, "failed to remove file '%s'", path)
 		}
 	}
@@ -45,7 +40,7 @@ func LazyRemove(path string) fail.Error {
 func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, fail.Error) {
 	defaultTmpDir := os.TempDir()
 
-	f, err := ioutil.TempFile(defaultTmpDir, "")
+	f, err := os.CreateTemp(defaultTmpDir, "")
 	if err != nil {
 		return nil, fail.ExecutionError(err, "failed to create temporary file")
 	}
@@ -63,8 +58,6 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, f
 	if err != nil {
 		return nil, fail.ExecutionError(err, "failed to close temporary file")
 	}
-
-	// logrus.Tracef("New temporary file %s", f.Name())
 
 	return f, nil
 }

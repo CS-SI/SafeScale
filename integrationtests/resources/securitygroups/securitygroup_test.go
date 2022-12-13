@@ -21,10 +21,11 @@ package securitygroups
 
 import (
 	"testing"
+
+	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
 )
 
 func Test_SecurityGroupCreate(t *testing.T) {
-	t.Skip("not implemented")
-	// helpers.InSection("securitygroups").Clear().AddScenario(CreateNetwork)
-	// helpers.RunScenarios(t)
+	helpers.InSection("securitygroups").Clear().AddScenario(OpenPortClosedByDefaultInGateway).AddScenario(GwFirewallWorks)
+	helpers.RunScenarios(t)
 }

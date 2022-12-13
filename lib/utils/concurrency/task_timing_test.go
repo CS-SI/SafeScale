@@ -22,7 +22,7 @@ package concurrency
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	"os"
 	"reflect"
@@ -97,7 +97,7 @@ func TestLikeBeforeWithoutAbortButContextWF(t *testing.T) {
 	time.Sleep(time.Duration(100) * time.Millisecond)
 
 	_ = w.Close()
-	_, _ = ioutil.ReadAll(r)
+	_, _ = io.ReadAll(r)
 	os.Stdout = rescueStdout
 }
 
@@ -163,7 +163,7 @@ func TestLikeBeforeWithoutAbortButContext(t *testing.T) {
 	time.Sleep(time.Duration(100) * time.Millisecond)
 
 	_ = w.Close()
-	_, _ = ioutil.ReadAll(r)
+	_, _ = io.ReadAll(r)
 	os.Stdout = rescueStdout
 }
 

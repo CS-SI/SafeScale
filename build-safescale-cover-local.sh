@@ -39,6 +39,10 @@ make force_sdk_python
 
 sleep 4
 
+make force_sdk_js
+
+sleep 4
+
 make generate
 
 sleep 4
@@ -55,10 +59,12 @@ echo "Export"
 export CIBIN=/exported
 mkdir -p /exported
 
-CIBIN=/exported make installci
+CIBIN=/exported make installci force_sdk_python force_sdk_js
 [ $? -ne 0 ] && echo "Export failure" && exit 1
 
 cp ${WRKDIR}/SafeScale/go.mod /exported
 cp ${WRKDIR}/SafeScale/go.sum /exported
+cp ${WRKDIR}/SafeScale/lib/protocol/javascript/* /exported
+cp ${WRKDIR}/SafeScale/lib/protocol/python3/* /exported
 
 exit 0

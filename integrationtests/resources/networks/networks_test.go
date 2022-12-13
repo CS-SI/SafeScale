@@ -21,6 +21,7 @@ package networks
 
 import (
 	"testing"
+	"time"
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
 )

@@ -123,17 +123,30 @@ func executeScript(
 
 		defer func() {
 			if derr := utils.LazyRemove(f.Name()); derr != nil {
-				logrus.Debugf("Error deleting file: %v", derr)
+				logrus.WithContext(ctx).Debugf("Error deleting file: %v", derr)
 			}
 		}()
 
-		transferTime := 30 * time.Second
+		transferTime := 30 * time.Second // FIXME: OPP Hardcoded time
 		filename := utils.TempFolder + "/" + name
 		xerr = retry.WhileUnsuccessful(
 			func() error {
-				fin, err := f.Stat()
+				select {
+				case <-ctx.Done():
+					return retry.StopRetryError(ctx.Err())
+				default:
+				}
+
+				// FIXME: It seems that f.Stat() works only on opened file... and utils.CreateTempFileFromString() returns a closed *os.File.
+				//        maybe utils.CreateTempFileFromString() should return only a path instead?
+				fin, err := os.Stat(f.Name())
 				if err != nil {
-					return err
+					switch err.(type) {
+					case *os.PathError:
+						return retry.StopRetryError(err)
+					default:
+						return err
+					}
 				}
 
 				transferTime = time.Duration(fin.Size())*time.Second/(64*1024) + 30*time.Second
@@ -177,9 +190,9 @@ func executeScript(
 		)
 
 		if !hidesOutput {
-			cmd = fmt.Sprintf("sync; chmod u+rwx %s; bash -x -c %s; exit ${PIPESTATUS}", filename, filename)
+			cmd = fmt.Sprintf("sync; chmod u+rwx %s; sudo bash -x -c %s; exit ${PIPESTATUS}", filename, filename)
 		} else {
-			cmd = fmt.Sprintf("sync; chmod u+rwx %s; captf=$(mktemp); export BASH_XTRACEFD=7; bash -x -c %s 7>$captf 2>&1; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}", filename, filename)
+			cmd = fmt.Sprintf("sync; chmod u+rwx %s; captf=$(mktemp); export BASH_XTRACEFD=7; sudo bash -x -c %s 7>$captf 2>&1; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}", filename, filename)
 		}
 
 		xerr = retry.Action(
@@ -196,6 +209,7 @@ func executeScript(
 				if innerXErr != nil {
 					return fail.ExecutionError(xerr)
 				}
+
 				if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(currentCtx, outputs.COLLECT, timings.ConnectionTimeout()+timings.HostOperationTimeout()); innerXErr != nil {
 					return fail.Wrap(innerXErr, "ssh operation failed")
 				}

@@ -34,8 +34,8 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/commands"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/client"
-	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -43,7 +43,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 
 	// Autoload embedded provider drivers
-	_ "github.com/CS-SI/SafeScale/v22/lib/server"
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend"
 )
 
 var profileCloseFunc = func() {}
@@ -63,7 +63,7 @@ func cleanup(clientSession *client.Session, onAbort *uint32) {
 	text, err := reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("failed to read the input : ", err.Error())
-		text = "y"
+		os.Exit(1)
 	}
 	if strings.TrimRight(text, "\n") == "y" {
 		err = clientSession.JobManager.Stop(utils.GetUUID(), temporal.ExecutionTimeout())

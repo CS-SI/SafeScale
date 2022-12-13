@@ -9,7 +9,7 @@
 ![Stars](https://img.shields.io/github/stars/CS-SI/SafeScale)
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/CS-SI/SafeScale/v22)](https://goreportcard.com/report/github.com/CS-SI/SafeScale/v22)
-![Go Versions](https://img.shields.io/badge/go-1.16%2C1.17%2C1.18-brightgreen)
+![Go Versions](https://img.shields.io/badge/go-1.17%2C1.18%2C1.19-brightgreen)
 ![CodeSizeInBytes](https://img.shields.io/github/languages/code-size/CS-SI/SafeScale)
 
 [![Packages Documentation](https://img.shields.io/badge/go-documentation-blue.svg?label=packages)](https://pkg.go.dev/github.com/CS-SI/SafeScale/v22/lib)
@@ -128,7 +128,6 @@ SafeScale is currently under active development and does not yet offer all the a
     - OpenTelekom
     - CloudFerro
     - Generic OpenStack
-    - local provider (unstable, not compiled by default)
     - AWS
     - GCP (Google Cloud Platform)
     - Outscale

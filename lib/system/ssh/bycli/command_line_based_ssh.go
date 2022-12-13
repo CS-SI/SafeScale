@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -30,14 +29,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/app"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -45,13 +46,13 @@ import (
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // VPL: SSH ControlMaster options: -oControlMaster=auto -oControlPath=/tmp/safescale-%C -oControlPersist=5m
-//      To make profit of this multiplexing functionality, we have to change the way we manage ports for tunnels: we have to always
-//      use the same port for all access to a same host (not the case currently)
-//      May not be used for interactive ssh connection...
+//
+//	To make profit of this multiplexing functionality, we have to change the way we manage ports for tunnels: we have to always
+//	use the same port for all access to a same host (not the case currently)
+//	May not be used for interactive ssh connection...
 const (
 	sshOptions = "-q -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no"
 )
@@ -69,7 +70,7 @@ type Profile struct {
 	SecondaryGatewayConfig sshapi.Config `json:"secondary_gateway_config,omitempty"`
 }
 
-func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig *Profile, secondaryGatewayConfig *Profile) *Profile {
+func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig sshapi.Config, secondaryGatewayConfig sshapi.Config) *Profile {
 	return &Profile{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
@@ -88,7 +89,7 @@ func NewConnector(ac sshapi.Config) (*Profile, fail.Error) {
 	gatewayConfig, _ := ac.GetPrimaryGatewayConfig()
 	secondaryGatewayConfig, _ := ac.GetSecondaryGatewayConfig()
 
-	return &Profile{Hostname: hostname, IPAddress: IPAddress, Port: int(port), User: user, PrivateKey: privateKey, LocalPort: int(localPort), LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}, nil
+	return NewProfile(hostname, IPAddress, int(port), user, privateKey, int(localPort), localHost, gatewayConfig, secondaryGatewayConfig), nil
 }
 
 func (sconf *Profile) Config() (sshapi.Config, fail.Error) {
@@ -212,12 +213,8 @@ type Tunnels []*Tunnel
 
 // Close closes ssh tunnel
 func (stun *Tunnel) Close() fail.Error {
-	defer debug.NewTracer(context.Background(), true).Entering().Exiting()
-
 	defer func() {
-		if lazyErr := utils.LazyRemove(stun.keyFile.Name()); lazyErr != nil {
-			logrus.Error(lazyErr)
-		}
+		_ = utils.LazyRemove(stun.keyFile.Name())
 	}()
 
 	xerr := killProcess(stun.cmd.Process)
@@ -233,11 +230,9 @@ func (stun *Tunnel) Close() fail.Error {
 			return fail.Wrap(err, "unable to close tunnel, running pgrep")
 		}
 		if code == 1 { // no process found
-			debug.IgnoreError(err)
 			return nil
 		}
 		if code == 127 { // pgrep not installed
-			debug.IgnoreError(fmt.Errorf("pgrep not installed"))
 			return nil
 		}
 		return fail.Wrap(err, "unable to close tunnel, unexpected errorcode running pgrep: %d", code)
@@ -265,17 +260,13 @@ func killProcess(proc *os.Process) fail.Error {
 			switch cerr {
 			case syscall.ESRCH:
 				// process not found, continue
-				debug.IgnoreError(err)
 			default:
-				logrus.Errorf("proc.Kill() failed: %s", cerr.Error())
 				return fail.Wrap(err, "unable to send kill signal to process")
 			}
 		default:
 			switch err.Error() {
 			case "os: process already finished":
-				debug.IgnoreError(err)
 			default:
-				logrus.Errorf("proc.Kill() failed: %s", err.Error())
 				return fail.Wrap(err, "unable to send kill signal to process")
 			}
 		}
@@ -291,9 +282,7 @@ func killProcess(proc *os.Process) fail.Error {
 		switch err {
 		case syscall.ESRCH, syscall.ECHILD:
 			// process not found or has no child, continue
-			debug.IgnoreError(err)
 		default:
-			logrus.Error(err.Error())
 			return fail.Wrap(err, "unable to wait on SSH tunnel process")
 		}
 	}
@@ -322,7 +311,7 @@ func getFreePort() (uint, fail.Error) {
 	defer func() {
 		clErr := listener.Close()
 		if clErr != nil {
-			logrus.Error(clErr)
+			logrus.WithContext(context.Background()).Error(clErr)
 		}
 	}()
 	if err != nil {
@@ -347,7 +336,7 @@ func isTunnelReady(port int) bool {
 	}
 	err = server.Close()
 	if err != nil {
-		logrus.Warnf("Error closing server: %v", err)
+		logrus.WithContext(context.Background()).Warnf("Error closing server: %v", err)
 	}
 	return false
 }
@@ -359,16 +348,27 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("scfg")
 	}
 
-	gwCfg, _ := scfg.GetPrimaryGatewayConfig()
+	gwCfg, xerr := scfg.GetPrimaryGatewayConfig()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	// Creates temporary file with private key
-	scpk, _ := gwCfg.GetPrivateKey()
+	scpk, xerr := gwCfg.GetPrivateKey()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	f, err := utils.CreateTempFileFromString(scpk, 0400)
 	if err != nil {
 		return nil, err
 	}
 
-	localPort, _ := scfg.GetLocalPort()
+	localPort, xerr := scfg.GetLocalPort()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if localPort == 0 {
 		localPort, err = getFreePort()
 		if err != nil {
@@ -376,8 +376,15 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		}
 	}
 
-	targetPort, _ := scfg.GetPort()
-	gwPort, _ := gwCfg.GetPort()
+	targetPort, xerr := scfg.GetPort()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	gwPort, xerr := gwCfg.GetPort()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	if targetPort == 0 {
 		targetPort = ssh.SSHPort
@@ -391,11 +398,25 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 	// 	scfg.SecondaryGatewayConfig.Port = 22
 	// }
 
-	targetHost, _ := scfg.GetHostname()
-	targetIPAddr, _ := scfg.GetIPAddress()
+	targetHost, xerr := scfg.GetHostname()
+	if xerr != nil {
+		return nil, xerr
+	}
 
-	gwUser, _ := gwCfg.GetUser()
-	gwIPAddr, _ := gwCfg.GetIPAddress()
+	targetIPAddr, xerr := scfg.GetIPAddress()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	gwUser, xerr := gwCfg.GetUser()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	gwIPAddr, xerr := gwCfg.GetIPAddress()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
@@ -412,8 +433,6 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		gwPort,
 	)
 
-	logrus.Debugf("Creating SSH tunnel with '%s'", cmdString)
-
 	cmd := exec.Command("bash", "-c", cmdString)
 	cmd.SysProcAttr = getSyscallAttrs()
 	cerr := cmd.Start()
@@ -421,13 +440,13 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		return nil, fail.ConvertError(cerr)
 	}
 
-	// gives 10s to build a tunnel, 1s is not enough as the number of tunnels keeps growing
-	for nbiter := 0; !isTunnelReady(int(localPort)) && nbiter < 100; nbiter++ {
+	// gives 60s to build a tunnel, 1s is not enough as the number of tunnels keeps growing
+	for nbiter := 0; !isTunnelReady(int(localPort)) && nbiter < 600; nbiter++ {
 		time.Sleep(100 * time.Millisecond)
 	}
 
 	if !isTunnelReady(int(localPort)) {
-		xerr := fail.NotAvailableError("the tunnel is not ready")
+		xerr := fail.NotAvailableError("the tunnel is not ready after waiting for port %d 60 sec", localPort)
 		derr := killProcess(cmd.Process)
 		if derr != nil {
 			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to kill SSH process"))
@@ -443,7 +462,7 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 	}, nil
 }
 
-// Command defines a SSH command
+// CliCommand defines a SSH command
 type CliCommand struct {
 	hostname     string
 	runCmdString string
@@ -599,238 +618,286 @@ func (scmd *CliCommand) Start() fail.Error {
 
 // RunWithTimeout ...
 // returns:
-// - retcode int
-// - stdout string
-// - stderr string
-// - xerr fail.Error
-//   . *fail.ErrNotAvailable if remote SSH is not available
-//   . *fail.ErrTimeout if 'timeout' is reached
+//   - retcode int
+//   - stdout string
+//   - stderr string
+//   - xerr fail.Error
+//     . *fail.ErrNotAvailable if remote SSH is not available
+//     . *fail.ErrTimeout if 'timeout' is reached
+//
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
-//       you risk to call twice os/exec.Wait, which may panic
-// FIXME: maybe we should move this method inside sshconfig directly with systematically created scmd...
-func (scmd *CliCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+//
+//	you risk to call twice os/exec.Wait, which may panic
+func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
 	const invalid = -1
-	if scmd == nil {
-		return invalid, "", "", fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
-	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
-	tracer.Trace("host='%s', command=\n%s\n", scmd.hostname, scmd.runCmdString)
-	defer tracer.Exiting()
-
-	subtask, xerr := concurrency.NewTaskWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/ssh/run"))
-	if xerr != nil {
-		return invalid, "", "", xerr
+	type result struct {
+		ra   int
+		rb   string
+		rc   string
+		rErr fail.Error
 	}
-
-	if timeout == 0 {
-		timeout = 1200 * time.Second // upper bound of 20 min
-	} else if timeout > 1200*time.Second {
-		timeout = 1200 * time.Second // nothing should take more than 20 min
-	}
-
-	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	_, r, xerr := subtask.WaitFor(timeout)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrTimeout:
-			xerr = fail.Wrap(fail.Cause(xerr), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
-		default:
-			debug.IgnoreError(xerr)
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		if scmd == nil {
+			chRes <- result{invalid, "", "", fail.InvalidInstanceError()}
+			return
+		}
+		if ctx == nil {
+			chRes <- result{invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")}
+			return
 		}
 
-		// FIXME: This kind of resource exhaustion deserves its own handling and its own kind of error
-		{
-			if strings.Contains(xerr.Error(), "annot allocate memory") {
-				return invalid, "", "", fail.AbortedError(xerr, "problem allocating memory, pointless to retry")
-			}
+		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
+		tracer.Trace("host='%s', command=%s", scmd.hostname, scmd.runCmdString)
+		defer tracer.Exiting()
 
-			if strings.Contains(xerr.Error(), "esource temporarily unavailable") {
-				return invalid, "", "", fail.AbortedError(xerr, "not enough resources, pointless to retry")
-			}
+		subtask := new(errgroup.Group)
+
+		if timeout == 0 {
+			timeout = 1200 * time.Second // upper bound of 20 min
+		} else if timeout > 1200*time.Second {
+			timeout = 1200 * time.Second // nothing should take more than 20 min
 		}
 
-		tracer.Trace("run failed: %v", xerr)
-		return invalid, "", "", xerr
-	}
+		trch := make(chan data.Map, 1)
+		subtask.Go(func() error {
+			defer close(trch)
+			tctx, cat := context.WithTimeout(ctx, timeout)
+			defer cat()
+			tr, xerr := scmd.taskExecute(tctx, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY})
+			trch <- tr
+			return xerr
+		})
 
-	if result, ok := r.(data.Map); ok {
-		tracer.Trace("run succeeded, retcode=%d", result["retcode"].(int))
-		return result["retcode"].(int), result["stdout"].(string), result["stderr"].(string), nil
+		xerr := fail.ConvertError(subtask.Wait())
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrTimeout:
+				xerr = fail.Wrap(fail.Cause(xerr), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
+			default:
+			}
+
+			// FIXME: This kind of resource exhaustion deserves its own handling and its own kind of error
+			{
+				if strings.Contains(xerr.Error(), "annot allocate memory") {
+					chRes <- result{invalid, "", "", fail.AbortedError(xerr, "problem allocating memory, pointless to retry")}
+					return
+				}
+
+				if strings.Contains(xerr.Error(), "esource temporarily unavailable") {
+					chRes <- result{invalid, "", "", fail.AbortedError(xerr, "not enough resources, pointless to retry")}
+					return
+				}
+			}
+
+			logrus.WithContext(ctx).Errorf("run failed: %v", xerr)
+			chRes <- result{invalid, "", "", xerr}
+			return
+		}
+
+		res := <-trch
+		if app.Release {
+			logrus.WithContext(ctx).Debugf("run succeeded, retcode=%d", res["retcode"].(int))
+		} else {
+			logrus.WithContext(ctx).Debugf("run succeeded, retcode=%d, out=%s, err=%s", res["retcode"].(int), res["stdout"].(string), res["stderr"].(string))
+		}
+		chRes <- result{res["retcode"].(int), res["stdout"].(string), res["stderr"].(string), nil}
+	}()
+	select {
+	case res := <-chRes:
+		return res.ra, res.rb, res.rc, res.rErr
+	case <-ctx.Done():
+		return invalid, "", "", fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return invalid, "", "", fail.ConvertError(inctx.Err())
 	}
-	return invalid, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")
 }
 
 type taskExecuteParameters struct {
-	// stdout, stderr io.ReadCloser
 	collectOutputs bool
 }
 
-func (scmd *CliCommand) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (data.Map, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rRes data.Map
+		rErr fail.Error
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		gres, gerr := func() (_ data.Map, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-	params, ok := p.(taskExecuteParameters)
-	if !ok {
-		return nil, fail.InvalidParameterError("p", "must be a 'taskExecuteParameters'")
-	}
+			params, ok := p.(taskExecuteParameters)
+			if !ok {
+				return nil, fail.InvalidParameterError("p", "must be a 'taskExecuteParameters'")
+			}
 
-	var (
-		stdoutBridge, stderrBridge cli.PipeBridge
-		pipeBridgeCtrl             *cli.PipeBridgeController
-		msgOut, msgErr             []byte
-		xerr                       fail.Error
-		err                        error
-	)
+			var (
+				stdoutBridge, stderrBridge cli.PipeBridge
+				pipeBridgeCtrl             *cli.PipeBridgeController
+				msgOut, msgErr             []byte
+				xerr                       fail.Error
+				err                        error
+			)
 
-	result := data.Map{
-		"retcode": -1,
-		"stdout":  "",
-		"stderr":  "",
-	}
+			remap := data.Map{
+				"retcode": -1,
+				"stdout":  "",
+				"stderr":  "",
+			}
 
-	ctx := task.Context()
+			// Prepare command
+			scmd.cmd = exec.CommandContext(ctx, "bash", "-c", scmd.runCmdString)
+			scmd.cmd.SysProcAttr = getSyscallAttrs()
 
-	// Prepare command
-	scmd.cmd = exec.CommandContext(ctx, "bash", "-c", scmd.runCmdString)
-	scmd.cmd.SysProcAttr = getSyscallAttrs()
+			// Set up the outputs (std and err)
+			stdoutPipe, xerr := scmd.getStdoutPipe()
+			if xerr != nil {
+				return remap, xerr
+			}
 
-	// Set up the outputs (std and err)
-	stdoutPipe, xerr := scmd.getStdoutPipe()
-	if xerr != nil {
-		return result, xerr
-	}
+			stderrPipe, xerr := scmd.getStderrPipe()
+			if xerr != nil {
+				return remap, xerr
+			}
 
-	stderrPipe, xerr := scmd.getStderrPipe()
-	if xerr != nil {
-		return result, xerr
-	}
-
-	if !params.collectOutputs {
-		if stdoutBridge, xerr = cli.NewStdoutBridge(stdoutPipe); xerr != nil {
-			return result, xerr
-		}
-
-		if stderrBridge, xerr = cli.NewStderrBridge(stderrPipe); xerr != nil {
-			return result, xerr
-		}
-
-		if pipeBridgeCtrl, xerr = cli.NewPipeBridgeController(stdoutBridge, stderrBridge); xerr != nil {
-			return result, xerr
-		}
-
-		// Starts pipebridge if needed
-		if xerr = pipeBridgeCtrl.Start(task); xerr != nil {
-			return result, xerr
-		}
-	}
-
-	// Launch the command and wait for its completion
-	if xerr = scmd.Start(); xerr != nil {
-		return result, xerr
-	}
-
-	if params.collectOutputs {
-		if msgOut, err = ioutil.ReadAll(stdoutPipe); err != nil {
-			return result, fail.ConvertError(err)
-		}
-
-		if msgErr, err = ioutil.ReadAll(stderrPipe); err != nil {
-			return result, fail.ConvertError(err)
-		}
-	}
-
-	var pbcErr error
-	runErr := scmd.Wait()
-	_ = stdoutPipe.Close()
-	_ = stderrPipe.Close()
-
-	if runErr != nil {
-		xerr = fail.ExecutionError(runErr)
-		// If error doesn't contain outputs and return code of the process, stop the pipe bridges and return error
-		var (
-			rc     int
-			note   data.Annotation
-			stderr string
-			ok     bool
-		)
-		if note, ok = xerr.Annotation("retcode"); !ok {
 			if !params.collectOutputs {
-				if derr := pipeBridgeCtrl.Stop(); derr != nil {
-					_ = xerr.AddConsequence(derr)
+				if stdoutBridge, xerr = cli.NewStdoutBridge(stdoutPipe); xerr != nil {
+					return remap, xerr
+				}
+
+				if stderrBridge, xerr = cli.NewStderrBridge(stderrPipe); xerr != nil {
+					return remap, xerr
+				}
+
+				if pipeBridgeCtrl, xerr = cli.NewPipeBridgeController(stdoutBridge, stderrBridge); xerr != nil {
+					return remap, xerr
+				}
+
+				// Starts pipebridge if needed
+				if xerr = pipeBridgeCtrl.Start(ctx); xerr != nil {
+					return remap, xerr
 				}
 			}
-			return result, xerr
-		} else if rc, ok = note.(int); ok && rc == -1 {
-			if !params.collectOutputs {
-				if derr := pipeBridgeCtrl.Stop(); derr != nil {
-					_ = xerr.AddConsequence(derr)
+
+			// Launch the command and wait for its completion
+			if xerr = scmd.Start(); xerr != nil {
+				return remap, xerr
+			}
+
+			if params.collectOutputs {
+				if msgOut, err = io.ReadAll(stdoutPipe); err != nil {
+					return remap, fail.ConvertError(err)
+				}
+
+				if msgErr, err = io.ReadAll(stderrPipe); err != nil {
+					return remap, fail.ConvertError(err)
 				}
 			}
-			return result, xerr
-		}
 
-		result["retcode"], ok = note.(int)
-		if !ok {
-			logrus.Warnf("Unable to recover 'retcode' because 'note' is not an integer: %v", note)
-		}
+			var pbcErr error
+			runErr := scmd.Wait()
+			_ = stdoutPipe.Close()
+			_ = stderrPipe.Close()
 
-		// Make sure all outputs have been processed
-		if !params.collectOutputs {
-			if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
-				logrus.Error(pbcErr.Error())
-			}
+			if runErr != nil {
+				xerr = fail.ExecutionError(runErr)
+				// If error doesn't contain outputs and return code of the process, stop the pipe bridges and return error
+				var (
+					rc     int
+					note   data.Annotation
+					stderr string
+					ok     bool
+				)
+				if note, ok = xerr.Annotation("retcode"); !ok {
+					if !params.collectOutputs {
+						if derr := pipeBridgeCtrl.Stop(); derr != nil {
+							_ = xerr.AddConsequence(derr)
+						}
+					}
+					return remap, xerr
+				} else if rc, ok = note.(int); ok && rc == -1 {
+					if !params.collectOutputs {
+						if derr := pipeBridgeCtrl.Stop(); derr != nil {
+							_ = xerr.AddConsequence(derr)
+						}
+					}
+					return remap, xerr
+				}
 
-			if note, ok = xerr.Annotation("stderr"); ok {
-				result["stderr"], ok = note.(string)
+				remap["retcode"], ok = note.(int)
 				if !ok {
-					logrus.Warnf("Unable to recover 'stederr' because 'note' is not an string: %v", note)
+					logrus.WithContext(ctx).Warnf("Unable to recover 'retcode' because 'note' is not an integer: %v", note)
+				}
+
+				// Make sure all outputs have been processed
+				if !params.collectOutputs {
+					if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
+						logrus.WithContext(ctx).Error(pbcErr.Error())
+					}
+
+					if note, ok = xerr.Annotation("stderr"); ok {
+						remap["stderr"], ok = note.(string)
+						if !ok {
+							logrus.WithContext(ctx).Warnf("Unable to recover 'stederr' because 'note' is not an string: %v", note)
+						}
+					}
+				} else {
+					remap["stdout"] = string(msgOut)
+					remap["stderr"] = fmt.Sprint(string(msgErr), stderr)
+				}
+			} else {
+				remap["retcode"] = 0
+				if params.collectOutputs {
+					remap["stdout"] = string(msgOut)
+					remap["stderr"] = string(msgErr)
+				} else if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
+					logrus.WithContext(ctx).Error(pbcErr.Error())
 				}
 			}
-		} else {
-			result["stdout"] = string(msgOut)
-			result["stderr"] = fmt.Sprint(string(msgErr), stderr)
-		}
-	} else {
-		result["retcode"] = 0
-		if params.collectOutputs {
-			result["stdout"] = string(msgOut)
-			result["stderr"] = string(msgErr)
-		} else if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
-			logrus.Error(pbcErr.Error())
-		}
-	}
 
-	return result, nil
+			return remap, nil
+
+		}()
+		chRes <- result{gres, gerr}
+	}()
+	select {
+	case res := <-chRes:
+		return res.rRes, res.rErr
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return nil, fail.ConvertError(inctx.Err())
+	}
 }
 
 // Close is called to clean Command (close tunnel(s), remove temporary files, ...)
-func (scmd *CliCommand) Close() fail.Error {
+func (scmd *CliCommand) Close() (ferr fail.Error) {
+	defer fail.SilentOnPanic(&ferr)
+	if scmd == nil {
+		return fail.NewError("another problem with nil interfaces")
+	}
+
 	var err1 error
 
 	if len(scmd.tunnels) > 0 {
 		err1 = scmd.tunnels.Close()
 	}
 	if err1 != nil {
-		logrus.Errorf("Command.closeTunnels() failed: %s (%s)", err1.Error(), reflect.TypeOf(err1).String())
 		defer func() { // lazy removal
-			ierr := utils.LazyRemove(scmd.keyFile.Name())
-			if ierr != nil {
-				debug.IgnoreError(ierr)
-			}
+			_ = utils.LazyRemove(scmd.keyFile.Name())
 		}()
 		return fail.Wrap(err1, "failed to close SSH tunnels")
 	}
@@ -859,14 +926,26 @@ func createConsecutiveTunnels(sc sshapi.Config, tunnels *Tunnels) (*Tunnel, fail
 		}
 
 		if gwConf != nil {
-			gwi, _ := gwConf.GetIPAddress()
-			gwp, _ := gwConf.GetPort()
+			gwi, xerr := gwConf.GetIPAddress()
+			if xerr != nil {
+				return nil, xerr
+			}
+			gwp, xerr := gwConf.GetPort()
+			if xerr != nil {
+				return nil, xerr
+			}
 
 			if !netutils.CheckRemoteTCP(gwi, int(gwp)) {
 				if !valid.IsNil(sgwConf) {
 					gwConf = sgwConf
-					gwi, _ := sgwConf.GetIPAddress()
-					gwp, _ := sgwConf.GetPort()
+					gwi, xerr := sgwConf.GetIPAddress()
+					if xerr != nil {
+						return nil, xerr
+					}
+					gwp, xerr := sgwConf.GetPort()
+					if xerr != nil {
+						return nil, xerr
+					}
 					if !netutils.CheckRemoteTCP(gwi, int(gwp)) {
 						return nil, fail.NotAvailableError("no gateway is available to establish a SSH tunnel")
 					}
@@ -950,6 +1029,7 @@ func (sconf *Profile) CreateTunneling() (_ Tunnels, _ *Profile, ferr fail.Error)
 
 	var tunnels Tunnels
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			derr := tunnels.Close()
 			if derr != nil {
@@ -1021,7 +1101,7 @@ func createSSHCommand(
 		sshCmdString += fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
 	}
 
-	logrus.Debugf("Created SSH command '%s'", sshCmdString)
+	// logrus.WithContext(context.Background()).Debugf("Created SSH command '%s'", strings.Replace(sshCmdString, "\n", "\t", -1))
 
 	return sshCmdString, f, nil
 }
@@ -1141,10 +1221,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().Exiting()
-	defer fail.OnExitTraceError(
-		&ferr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname,
-		temporal.FormatDuration(timeout),
-	)
+	defer fail.OnExitTraceError(ctx, &ferr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname, temporal.FormatDuration(timeout))
 
 	originalPhase := phase
 	if phase == "ready" {
@@ -1165,6 +1242,12 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 	begins := time.Now()
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
+			select {
+			case <-time.After(temporal.DefaultDelay()):
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			}
+
 			iterations++
 
 			var sshCmd sshapi.Command
@@ -1178,6 +1261,9 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			// -- Try to see if 'phase' file exists... --
 			sshCmd, innerXErr = sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
 			if innerXErr != nil {
+				if phase == "init" {
+					logrus.WithContext(ctx).Debugf("SSH still not ready for %s, phase %s", sconf.Hostname, phase)
+				}
 				return innerXErr
 			}
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
@@ -1185,6 +1271,9 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 				return innerXErr
 			}
 			if retcode != 0 { // nolint
+				if phase == "init" {
+					logrus.WithContext(ctx).Debugf("SSH still not ready for %s, phase %s", sconf.Hostname, phase)
+				}
 				switch phase {
 				case "final":
 					var sshCmd sshapi.Command
@@ -1219,7 +1308,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 
 			return nil
 		},
-		temporal.DefaultDelay(),
+		0,
 		timeout+time.Minute,
 	)
 	if retryErr != nil {
@@ -1238,7 +1327,7 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			temporal.FormatDuration(time.Since(begins)), stdout)
 	}
 
-	logrus.Debugf(
+	logrus.WithContext(ctx).WithContext(ctx).Debugf(
 		"host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sconf.Hostname, originalPhase,
 		temporal.FormatDuration(time.Since(begins)), stdout)
 	return stdout, nil
@@ -1246,9 +1335,49 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 
 // CopyWithTimeout copies a file/directory from/to local to/from remote, and fails after 'timeout'
 func (sconf *Profile) CopyWithTimeout(
-	ctx context.Context, remotePath, localPath string, isUpload bool, timeout time.Duration,
+	inctx context.Context, remotePath, localPath string, isUpload bool, timeout time.Duration,
 ) (int, string, string, fail.Error) {
-	return sconf.copy(ctx, remotePath, localPath, isUpload, timeout)
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	const invalid = -1
+
+	type result struct {
+		a    int
+		b    string
+		c    string
+		rErr fail.Error
+	}
+
+	chRes := make(chan result)
+
+	go func() {
+		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+
+			a, b, c, d := sconf.copy(ctx, remotePath, localPath, isUpload, timeout)
+			ar := result{
+				a:    a,
+				b:    b,
+				c:    c,
+				rErr: d,
+			}
+
+			return ar, ar.rErr
+		}() // nolint
+		chRes <- gres
+	}()
+	select {
+	case res := <-chRes:
+		return res.a, res.b, res.c, res.rErr
+	case <-ctx.Done():
+		<-chRes
+		return invalid, "", "", fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		<-chRes
+		return invalid, "", "", fail.ConvertError(inctx.Err())
+	}
 }
 
 // copy copies a file/directory from/to local to/from remote, and fails after 'timeout' (if timeout > 0)
@@ -1269,12 +1398,15 @@ func (sconf *Profile) copy(
 
 	// Do not forget to close sshCommand, allowing the SSH tunnel close and corresponding process cleanup
 	defer func() {
-		derr := sshCommand.Close()
-		if derr != nil {
-			if ferr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
-			} else {
-				ferr = derr
+		if sshCommand != nil {
+			derr := sshCommand.Close()
+			if derr != nil {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
+				} else {
+					ferr = derr
+				}
 			}
 		}
 	}()
@@ -1283,7 +1415,7 @@ func (sconf *Profile) copy(
 }
 
 // Enter to interactive shell, aka 'safescale ssh connect'
-func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
+func (sconf *Profile) Enter(ctx context.Context, username string, shell string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	tunnels, sshConfig, xerr := sconf.CreateTunneling()
@@ -1301,6 +1433,7 @@ func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
 	defer func() {
 		derr := tunnels.Close()
 		if derr != nil {
+			ferr = debug.InjectPlannedFail(ferr)
 			if ferr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
 			} else {
@@ -1313,12 +1446,12 @@ func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
 	if xerr != nil {
 		for _, t := range tunnels {
 			if nerr := t.Close(); nerr != nil {
-				logrus.Warnf("Error closing SSH tunnel: %v", nerr)
+				logrus.WithContext(ctx).Warnf("Error closing SSH tunnel: %v", nerr)
 			}
 		}
 		if keyFile != nil {
 			if nerr := utils.LazyRemove(keyFile.Name()); nerr != nil {
-				logrus.Warnf("Error removing file %v", nerr)
+				logrus.WithContext(ctx).Warnf("Error removing file %v", nerr)
 			}
 		}
 		return fail.Wrap(xerr, "unable to create command")
@@ -1327,7 +1460,7 @@ func (sconf *Profile) Enter(username, shell string) (ferr fail.Error) {
 	defer func() {
 		derr := utils.LazyRemove(keyFile.Name())
 		if derr != nil {
-			logrus.Warnf("Error removing temporary file: %v", derr)
+			logrus.WithContext(ctx).Warnf("Error removing temporary file: %v", derr)
 		}
 	}()
 

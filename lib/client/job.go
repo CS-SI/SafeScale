@@ -22,8 +22,8 @@ import (
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
 )
 
 // jobConsumer is the part of the safescale client handling jobs

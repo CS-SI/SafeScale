@@ -17,8 +17,9 @@
 package temporal
 
 import (
+	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -163,7 +164,7 @@ func TestStartStopDurationWithPauseDefaultFormatting(t *testing.T) {
 
 func printSomething(sw *Stopwatch) {
 	logrus.SetOutput(os.Stdout)
-	defer (*sw).OnExitLogInfo("Foo", "Bar")
+	defer (*sw).OnExitLogInfo(context.Background(), "Foo", "Bar")
 }
 
 func TestStartStopDurationWithPauseDefaultFormattingLogWithLevel(t *testing.T) {
@@ -194,7 +195,7 @@ func TestStartStopDurationWithPauseDefaultFormattingLogWithLevel(t *testing.T) {
 	printSomething(&stowa)
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	if !strings.Contains(string(out), "Foo") {
@@ -206,24 +207,24 @@ func TestOnExitLogWithLevel(t *testing.T) {
 
 	stowa := NewStopwatch()
 	// wrong in
-	f := stowa.OnExitLogWithLevel("", "out", logrus.TraceLevel)
+	f := stowa.OnExitLogWithLevel(context.Background(), "", "out", logrus.TraceLevel)
 	log := tests.LogrusCapture(func() {
 		f()
 	})
 	require.EqualValues(t, log, "")
 
 	// wrong logruslevel
-	f = stowa.OnExitLogWithLevel("in", "out", 8)
+	f = stowa.OnExitLogWithLevel(context.Background(), "in", "out", 8)
 	log = tests.LogrusCapture(func() {
 		f()
 	})
-	require.Contains(t, log, "level=info msg")
+	require.EqualValues(t, log, "")
 
 	// valid call
-	f = stowa.OnExitLogWithLevel("in", "out", logrus.PanicLevel)
+	f = stowa.OnExitLogWithLevel(context.Background(), "in", "out", logrus.PanicLevel)
 	log = tests.LogrusCapture(func() {
 		f()
 	})
-	require.Contains(t, log, "level=info msg")
+	require.EqualValues(t, log, "")
 
 }

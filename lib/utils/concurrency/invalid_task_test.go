@@ -84,7 +84,9 @@ func TestInvalidTask(t *testing.T) {
 
 	got.Aborted()
 
-	_ = got.DisarmAbortSignal()
+	fu, xerr := got.DisarmAbortSignal()
+	require.NotNil(t, xerr)
+	fu()
 
 	_, err = got.ID()
 	require.NotNil(t, err)
@@ -142,7 +144,9 @@ func TestInvalidTaskGroup(t *testing.T) {
 
 	got.Aborted()
 
-	_ = got.DisarmAbortSignal()
+	fu, xerr := got.DisarmAbortSignal()
+	require.NotNil(t, xerr)
+	fu()
 
 	_, err = got.ID()
 	require.NotNil(t, err)

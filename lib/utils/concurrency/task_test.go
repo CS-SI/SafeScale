@@ -19,7 +19,7 @@ package concurrency
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	"os"
 	"reflect"
@@ -55,11 +55,11 @@ func TestCreateTaskWithParent(t *testing.T) {
 	require.NotNil(t, ta)
 	require.Nil(t, err)
 
-	tb, err := NewTaskWithParent(ta)
+	tb, err := NewTaskWithContext(ta.Context())
 	require.NotNil(t, tb)
 	require.Nil(t, err)
 
-	tc, err := NewTaskWithParent(nil)
+	tc, err := NewTaskWithContext(nil)
 	require.Nil(t, tc)
 	require.NotNil(t, err)
 }
@@ -988,6 +988,38 @@ func TestSingleTaskRunThatFails(t *testing.T) {
 	require.NotNil(t, res)
 }
 
+func TestSingleTaskRunWithCancel(t *testing.T) {
+	kublai, culture := context.WithCancel(context.Background())
+
+	single, err := NewTaskWithContext(kublai)
+	require.NotNil(t, single)
+	require.Nil(t, err)
+
+	time.AfterFunc(50*time.Millisecond, func() {
+		culture()
+	})
+
+	res, err := single.Run(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			ahh := make(chan error)
+			go func() {
+				time.Sleep(time.Duration(400) * time.Millisecond)
+				ahh <- fail.NewError("issues")
+			}()
+			select {
+			case ar := <-ahh:
+				return struct{}{}, fail.ConvertError(ar)
+			case <-t.Context().Done():
+				return nil, fail.ConvertError(t.Context().Err())
+			}
+		}, nil,
+	)
+	require.NotNil(t, err)
+	require.Nil(t, res)
+
+	t.Log(err)
+}
+
 func TestSingleTaskTryWaitKO(t *testing.T) {
 	single, err := NewUnbreakableTask()
 	require.NotNil(t, single)
@@ -1170,7 +1202,7 @@ func TestStartWithTimeoutTask(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+		t.Errorf("Where is the timeout ?? (%d), that's the textbook definition", stat)
 	}
 
 	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
@@ -1196,7 +1228,7 @@ func TestStartWithTimeoutTaskAndPanic(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+		t.Errorf("Where is the timeout ?? (%d), that's the textbook definition", stat)
 	}
 
 	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
@@ -1222,7 +1254,7 @@ func TestStartWithTimeoutTaskAndHandledPanic(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+		t.Errorf("Where is the timeout ?? (%d), that's the textbook definition", stat)
 	}
 
 	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
@@ -1281,7 +1313,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		}
 
 		if stat != TIMEOUT { // FIXME: CI Failed with macos build, see https://github.com/CS-SI/SafeScale/suites/3973786152/artifacts/99924716
-			t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+			t.Errorf("Where is the timeout ?? (%d), that's the textbook definition", stat)
 		}
 
 		xerr = single.SetID("small changes")
@@ -1309,7 +1341,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		case *fail.ErrInconsistent:
 			// expected
 		default:
-			t.Errorf("Unesxpected error: %v", xerr)
+			t.Errorf("Unexpected error: %v", xerr)
 			t.FailNow()
 		}
 
@@ -1344,7 +1376,7 @@ func TestLikeBeforeChangingWaitForTimingWithoutAbort(t *testing.T) {
 			t.Errorf("Problem retrieving status ?")
 		}
 		if stat != TIMEOUT {
-			t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+			t.Errorf("Where is the timeout ?? (%d), that's the textbook definition", stat)
 		}
 
 		// We are in timeout state, so this should return false, nil, *fail.ErrTimeout
@@ -1363,6 +1395,8 @@ func TestLikeBeforeChangingWaitForTimingWithoutAbort(t *testing.T) {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
 			// expected
+		case *fail.ErrAborted:
+			// aborted by timeout, also expected
 		default:
 			t.Errorf(
 				"Where are the timeout errors ??: %s", spew.Sdump(xerr),
@@ -1419,7 +1453,7 @@ func TestLikeBeforeWithoutLettingFinish(t *testing.T) {
 	time.Sleep(time.Duration(100) * time.Millisecond)
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	// Here, last 2 lines of the output should be:
@@ -1612,7 +1646,7 @@ func TestAbortButThisTimeUsingTrueAbortChannel(t *testing.T) {
 	require.NotNil(t, xerr)
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	// Here, last 3 lines of the output should be:

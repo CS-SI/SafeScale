@@ -17,6 +17,7 @@
 package sshtunnel
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -61,9 +62,9 @@ func OnPanic(err *error) {
 func SilentOnPanic(err *error) {
 	if x := recover(); x != nil {
 		if anError, ok := x.(error); ok {
-			logrus.Errorf("runtime panic occurred: %v", anError)
+			logrus.WithContext(context.Background()).Errorf("runtime panic occurred: %v", anError)
 		} else {
-			logrus.Errorf("runtime panic occurred: %v", x)
+			logrus.WithContext(context.Background()).Errorf("runtime panic occurred: %v", x)
 		}
 	}
 }
@@ -148,7 +149,9 @@ func (tunnel *SSHTunnel) GetLogger() Printfer {
 	return tunnel.log
 }
 
-func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.Conn, end chan interface{}) (ferr error) {
+func (tunnel *SSHTunnel) newConnectionWaiter(
+	listener net.Listener, c chan net.Conn, end chan interface{},
+) (ferr error) {
 	defer OnPanic(&ferr)
 
 	type result struct {
@@ -156,14 +159,14 @@ func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.C
 		err error
 	}
 
-	rCh := make(chan result)
+	chRes := make(chan result)
 
 	go func() {
-		defer close(rCh)
+		defer close(chRes)
 		conn, err := listener.Accept()
 		if err != nil {
 			err = convertErrorToTunnelError(err)
-			rCh <- result{
+			chRes <- result{
 				nil,
 				fmt.Errorf("error in listener waiting for a connection: %w", err),
 			}
@@ -172,7 +175,7 @@ func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.C
 		if tunnel.withKeepAlive {
 			conn, _ = setConnectionDeadlines(conn, tunnel.timeKeepAliveRead, tunnel.timeKeepAliveWrite)
 		}
-		rCh <- result{
+		chRes <- result{
 			cha: conn,
 			err: nil,
 		}
@@ -182,9 +185,9 @@ func (tunnel *SSHTunnel) newConnectionWaiter(listener net.Listener, c chan net.C
 	case <-end:
 		tunnel.logf("connection waiting is over")
 		_ = listener.Close()
-		<-rCh // drain channel
+		<-chRes // drain channel
 		return nil
-	case kc := <-rCh:
+	case kc := <-chRes:
 		if kc.err != nil {
 			return kc.err
 		}
@@ -218,7 +221,7 @@ func (tunnel *SSHTunnel) netListenWithTimeout(network, address string, timeout t
 			resLis: theCli,
 			resErr: theErr,
 		}
-		return // nolint
+
 	}()
 
 	if timeout != 0 {
@@ -302,7 +305,6 @@ func (tunnel *SSHTunnel) Start() (err error) {
 				cwErr = convertErrorToTunnelError(cwErr)
 				errCh <- cwErr
 			}
-			return // nolint
 		}()
 
 		tunnel.logf("listening for new ssh connections...")
@@ -352,7 +354,6 @@ func (tunnel *SSHTunnel) Start() (err error) {
 					tunnel.errorf("closing tunnel due to failure forwarding tunnel: %s", litter.Sdump(quittingErr))
 					tunnel.quit()
 				}
-				return // nolint
 			}()
 		}
 	}
@@ -381,8 +382,10 @@ func (tunnel *SSHTunnel) Start() (err error) {
 	tunnel.logf("[%d/%d] closing the listener", total, total)
 	err = listener.Close()
 	if err != nil {
-		err = convertErrorToTunnelError(err)
-		return fmt.Errorf("error closing the listener: %w", err)
+		if !strings.Contains(err.Error(), "use of closed") {
+			err = convertErrorToTunnelError(err)
+			return fmt.Errorf("error closing the listener: %w", err)
+		}
 	}
 
 	tunnel.logf("exiting tunnel Start")
@@ -455,7 +458,7 @@ func (tunnel *SSHTunnel) dialSSHWithTimeout(
 			resCli: theCli,
 			resErr: theErr,
 		}
-		return // nolint
+
 	}()
 
 	if timeout != 0 {
@@ -508,7 +511,7 @@ func (tunnel *SSHTunnel) dialSSHConnectionWithTimeout(
 			resConn: theConn,
 			resErr:  theErr,
 		}
-		return // nolint
+
 	}()
 
 	if timeout != 0 {
@@ -611,7 +614,6 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 				updown <- true
 			}
 			tunnel.logf("quitting copy routine")
-			return // nolint
 		}()
 		select {
 		case <-endCopy:
@@ -674,7 +676,6 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 
 func (tunnel *SSHTunnel) Close() { // kept for compatibility issues
 	tunnel.quit()
-	return // nolint
 }
 
 func (tunnel *SSHTunnel) quit() {
@@ -689,8 +690,6 @@ func (tunnel *SSHTunnel) quit() {
 
 	tunnel.closer <- struct{}{}
 	close(tunnel.closer)
-
-	return // nolint
 }
 
 func NewSSHTunnelFromCfg(gw SSHJump, target Endpoint, local Entrypoint, options ...Option) (_ *SSHTunnel, err error) {
@@ -706,7 +705,9 @@ func NewSSHTunnelFromCfg(gw SSHJump, target Endpoint, local Entrypoint, options 
 }
 
 // NewSSHTunnel creates a SSH tunnel through localhost:0
-func NewSSHTunnel(tunnel string, auth ssh.AuthMethod, destination string, options ...Option) (_ *SSHTunnel, err error) { // nolint
+func NewSSHTunnel(tunnel string, auth ssh.AuthMethod, destination string, options ...Option) (
+	_ *SSHTunnel, err error,
+) { // nolint
 	return NewSSHTunnelWithLocalBinding(tunnel, auth, destination, "localhost:0", options...)
 }
 

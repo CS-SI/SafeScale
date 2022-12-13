@@ -17,7 +17,8 @@
 package fail
 
 import (
-	"io/ioutil"
+	"context"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -30,7 +31,7 @@ import (
 // -------- tests for log helpers ---------
 
 func getNotFoundErrorWithLog() (err error) {
-	defer OnExitLogError(&err)
+	defer OnExitLogError(context.Background(), &err)
 	return NotFoundError("not there !!!")
 }
 
@@ -107,7 +108,7 @@ func TestExitLogError(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)
@@ -122,12 +123,12 @@ func callToSomethingThatReturnsErr() error {
 }
 
 func callToSomethingThatReturnsErrButLogsIt() (err error) {
-	defer OnExitLogErrorWithLevel(&err, logrus.WarnLevel)
+	defer OnExitLogErrorWithLevel(context.Background(), &err, logrus.WarnLevel)
 	return getNotFoundError()
 }
 
 func callToSomethingThatReturnsErrButLogItWithWarning() (err error) {
-	defer OnExitLogError(&err)
+	defer OnExitLogError(context.Background(), &err)
 	return getNotFoundError()
 }
 
@@ -144,7 +145,7 @@ func TestOnExit(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)
@@ -167,7 +168,7 @@ func TestOnExitAndLog(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)
@@ -190,7 +191,7 @@ func TestOnExitAndLogWithWarning(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)

@@ -19,7 +19,7 @@ package bucketfs
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 

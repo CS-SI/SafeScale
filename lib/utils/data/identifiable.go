@@ -16,10 +16,15 @@
 
 package data
 
+//go:generate minimock -o mocks/mock_named.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data.Named
+
+// Named proposes methods to identify a struct
+type Named interface {
+	GetName() string // GetName Returns the name of the instance
+}
+
 //go:generate minimock -o mocks/mock_identifyable.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data.Identifiable
 
-// Identifiable proposes methods to identify a struct
 type Identifiable interface {
-	GetName() string // GetName Returns the name of the instance
-	GetID() string   // GetID Returns the ID of the instance
+	GetID() (string, error) // GetID Returns the ID of the instance
 }

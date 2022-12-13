@@ -15,7 +15,7 @@ generate: sdk
 
 sdk:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building using $(GOMODPATH)/pkg/mod, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;
-	@ln -f -s $(GOMODPATH)/pkg/mod/github.com/golang/protobuf@v1.3.2 $(GOMODPATH)/pkg/mod/github.com/golang/protobuf 2> /dev/null || true
+	@ln -f -s $(GOMODPATH)/pkg/mod/google.golang.org/protobuf@v1.28.1 $(GOMODPATH)/pkg/mod/google.golang.org/protobuf 2> /dev/null || true
 	@protoc -I. -I$(GOMODPATH)/pkg/mod --go_out=. --go-grpc_out=. safescale.proto
 
 has_python:
@@ -35,10 +35,18 @@ sdk_python: has_python sdk
 	@sed -i 's/github.com\/golang\/protobuf\/ptypes\/empty\/empty.proto/google\/protobuf\/empty.proto/g' safescale.proto
 	@pipenv run python3 -m grpc_tools.protoc -I. -I$(GOMODPATH)/pkg/mod --python_out=python3/ --grpc_python_out=python3/ safescale.proto
 	@mv safescale.proto.backup safescale.proto
-	@protoc -I. -I$(GOMODPATH)/pkg/mod --go_out=plugins=grpc:. safescale.proto
+	@protoc -I. -I$(GOMODPATH)/pkg/mod --go-grpc_out=. safescale.proto
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Finished creating python3 protobuf, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;
 
 force_sdk_python: prepare_python sdk_python
 
+sdk_js: sdk
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Creating javascript protobuf, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;
+	@mkdir -p ./javascript
+	@protoc -I. -I$(GOMODPATH)/pkg/mod --js_out=import_style=commonjs,binary:./javascript --grpc-web_out=import_style=commonjs,mode=grpcwebtext:./javascript safescale.proto
+	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Finished creating javascript protobuf, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;
+
+force_sdk_js: sdk_js
+
 clean:
-	@($(RM) safescale.pb.go safescale_pb2.py ./python3/safescale_pb2.py ./python3/safescale_pb2_grpc.py || true)
+	@($(RM) safescale.pb.go safescale_pb2.py ./python3/safescale_pb2.py ./python3/safescale_pb2_grpc.py ./javascript/* || true)

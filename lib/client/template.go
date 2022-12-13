@@ -20,8 +20,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/utils"
 )
 
 // templateConsumer is the safescale client part handling templates

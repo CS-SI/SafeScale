@@ -18,7 +18,7 @@ package fail
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -493,7 +493,7 @@ func TestUncategorizedError(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)
@@ -550,7 +550,7 @@ func TestNotUncategorizedError(t *testing.T) {
 	}
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	tk := string(out)
@@ -734,7 +734,7 @@ func TestNotNilCheckCastNoProblems(t *testing.T) {
 		}
 	}()
 
-	var origin Error = noProblems() //nolint
+	var origin = noProblems() // nolint
 	var nilErrTimeout *ErrTimeout = nil
 	if origin != nil { // this test work well, when we return something that is NOT a pointer to an interface, no problems...
 		if origin == nilErrTimeout { // nil and nilErrTimeout, are not the same
@@ -819,7 +819,7 @@ func TestPanicLogs(t *testing.T) {
 }
 
 func TestPanicLogsPlayed(t *testing.T) {
-	var err error = fmt.Errorf("disaster") // nolint
+	var err = fmt.Errorf("disaster") // nolint
 	defer func() {
 		if err != nil {
 			fmt.Println("The perfect creatures: " + err.Error())
@@ -868,7 +868,7 @@ func TestPanicLogsBisPlayed(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		var err *ErrNotFound = NotFoundErrorWithCause(nil, nil, "disaster")
+		var err = NotFoundErrorWithCause(nil, nil, "disaster")
 		defer func() {
 			if err != nil {
 				fmt.Println("The perfect creatures: " + err.Error())
@@ -883,7 +883,7 @@ func TestPanicLogsBisPlayed(t *testing.T) {
 	}
 
 	_ = w.Close()
-	mehBytes, err := ioutil.ReadAll(r)
+	mehBytes, err := io.ReadAll(r)
 	if err != nil {
 		t.FailNow()
 	}
@@ -919,7 +919,7 @@ func TestPanicBizarro(t *testing.T) {
 	}
 
 	_ = w.Close()
-	mehBytes, err := ioutil.ReadAll(r)
+	mehBytes, err := io.ReadAll(r)
 	if err != nil {
 		t.FailNow()
 	}
@@ -957,7 +957,7 @@ func TestPanicBizarroButCleaner(t *testing.T) {
 	}
 
 	_ = w.Close()
-	mehBytes, err := ioutil.ReadAll(r)
+	mehBytes, err := io.ReadAll(r)
 	if err != nil {
 		t.FailNow()
 	}
@@ -994,7 +994,7 @@ func TestPanicLogsAlt(t *testing.T) {
 }
 
 func TestPanicLogsPlayedAlt(t *testing.T) {
-	var err error = fmt.Errorf("disaster") // nolint
+	var err = fmt.Errorf("disaster") // nolint
 	defer func() {
 		if err != nil {
 			fmt.Println("The perfect creatures: " + err.Error())

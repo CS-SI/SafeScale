@@ -28,7 +28,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -43,7 +43,6 @@ var bucketfsScripts embed.FS
 // executeScript executes a script template with parameters in data map
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
-// func executeScript(task concurrency.Task, sshconfig ssh.Profile, name string, data map[string]interface{}) (int, string, string, fail.Error) {
 func executeScript(ctx context.Context, host resources.Host, name string, data map[string]interface{}) fail.Error {
 	timings, xerr := host.Service().Timings()
 	if xerr != nil {
@@ -120,7 +119,7 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 	if xerr != nil {
 		switch cErr := xerr.(type) {
 		case *fail.ErrTimeout:
-			logrus.Errorf("ErrTimeout running remote script '%s'", name)
+			logrus.WithContext(ctx).Errorf("ErrTimeout running remote script '%s'", name)
 			xerr := fail.ExecutionError(cErr)
 			return xerr
 		case *fail.ErrExecution:
@@ -162,9 +161,7 @@ func realizeTemplate(name string, data interface{}) (string, fail.Error) {
 	return content, nil
 }
 
-func uploadContentToFile(
-	ctx context.Context, content, name, owner, rights string, host resources.Host,
-) (string, fail.Error) {
+func uploadContentToFile(ctx context.Context, content, name, owner, rights string, host resources.Host) (string, fail.Error) {
 	// Copy script to remote host with retries if needed
 	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
@@ -173,7 +170,7 @@ func uploadContentToFile(
 
 	defer func() {
 		if derr := utils.LazyRemove(f.Name()); derr != nil {
-			logrus.Warnf("Error deleting file: %v", derr)
+			logrus.WithContext(ctx).Warnf("Error deleting file: %v", derr)
 		}
 	}()
 
@@ -188,6 +185,12 @@ func uploadContentToFile(
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, timings.OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to upload content to remote")

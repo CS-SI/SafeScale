@@ -19,7 +19,7 @@ package nfs
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -133,9 +133,7 @@ func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
 }
 
 // MountBlockDevice mounts a block device in the remote system
-func (s *Server) MountBlockDevice(
-	ctx context.Context, deviceName, mountPoint, format string, doNotFormat bool,
-) (string, fail.Error) {
+func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, format string, doNotFormat bool) (string, fail.Error) {
 	data := map[string]interface{}{
 		"Device":      deviceName,
 		"MountPoint":  mountPoint,
@@ -151,10 +149,16 @@ func (s *Server) MountBlockDevice(
 	var stdout string
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		select {
+		case <-ctx.Done():
+			return retry.StopRetryError(ctx.Err())
+		default:
+		}
+
 		istdout, xerr := executeScript(ctx, timings, s.SSHConfig, "block_device_mount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", istdout)
-			return fail.Wrap(xerr, "error executing script to mount block device")
+			return xerr
 		}
 		stdout = istdout
 		return nil // we are done, break the retry
@@ -164,7 +168,6 @@ func (s *Server) MountBlockDevice(
 	}
 
 	return stdout, nil
-
 }
 
 // UnmountBlockDevice unmounts a local block device on the remote system
@@ -180,10 +183,16 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 
 	// FIXME: Add a retry here only if we catch an ExecutionError or a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		select {
+		case <-ctx.Done():
+			return retry.StopRetryError(ctx.Err())
+		default:
+		}
+
 		stdout, xerr := executeScript(ctx, timings, s.SSHConfig, "block_device_unmount.sh", data)
 		if xerr != nil {
 			xerr.Annotate("stdout", stdout)
-			return fail.Wrap(xerr, "error executing script to unmount block device")
+			return xerr
 		}
 		return nil
 	}, temporal.MinDelay(), 0, 4) // 4 retries and that's it

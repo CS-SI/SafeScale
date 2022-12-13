@@ -21,15 +21,16 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/client"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
@@ -94,12 +95,33 @@ var sshRun = cli.Command{
 	},
 }
 
-func normalizeFileName(fileName string) string {
-	absPath, _ := filepath.Abs(fileName)
-	if _, err := os.Stat(absPath); err != nil {
-		return fileName
+func normalizeExistingFileName(fileName string) (string, error) {
+	if strings.Contains(fileName, ":") { // it's a remote reference, no need to normalize
+		return fileName, nil
 	}
-	return absPath
+
+	absPath, err := filepath.Abs(fileName)
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(absPath); err != nil {
+		return "", err
+	}
+
+	return absPath, nil
+}
+
+func normalizeFileName(fileName string) (string, error) {
+	if strings.Contains(fileName, ":") { // it's a remote reference, no need to normalize
+		return fileName, nil
+	}
+
+	absPath, err := filepath.Abs(fileName)
+	if err != nil {
+		return "", err
+	}
+
+	return absPath, nil
 }
 
 var sshCopy = cli.Command{
@@ -148,7 +170,20 @@ var sshCopy = cli.Command{
 			}()
 		}
 
-		retcode, _, _, err := ClientSession.SSH.Copy(normalizeFileName(c.Args().Get(0)), normalizeFileName(c.Args().Get(1)), temporal.ConnectionTimeout(), timeout)
+		first, err := normalizeExistingFileName(c.Args().Get(0))
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))
+		}
+
+		// the second file name (destination) might not exist
+		second, err := normalizeFileName(c.Args().Get(1))
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))
+		}
+
+		retcode, _, _, err := ClientSession.SSH.Copy(first, second, temporal.ConnectionTimeout(), timeout)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh copy", true).Error())))

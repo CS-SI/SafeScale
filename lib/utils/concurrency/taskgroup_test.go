@@ -19,7 +19,6 @@ package concurrency
 import (
 	"fmt"
 	"math"
-	"math/rand"
 	"strings"
 	"sync"
 	"testing"
@@ -396,7 +395,7 @@ func TestStatesWF(t *testing.T) {
 	st, xerr := overlord.Status()
 	require.Nil(t, xerr)
 	if st != DONE {
-		t.Errorf("We should be DONE but we are: %s", st)
+		t.Errorf("We should be DONE but we are: %d", st)
 	}
 
 	// VPL: (status == DONE) + (xerr is ErrorList) = TaskGroup finished normally with TaskAction(s) in TIMEOUT error(s)
@@ -454,7 +453,7 @@ func TestTimeoutStateWF(t *testing.T) {
 	require.NotNil(t, st)
 	if st != RUNNING {
 		t.Errorf(
-			"This should be a RUNNING and it's not: %s", st,
+			"This should be a RUNNING and it's not: %d", st,
 		) // VPL: overlord in itself never timed out... expected value is RUNNING
 	} // To make TaskGroup times out, you have to use a Deadline on its parent context
 
@@ -466,7 +465,7 @@ func TestTimeoutStateWF(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotNil(t, st)
 	if st != DONE {
-		t.Errorf("This should be a DONE and it's not: %s", st)
+		t.Errorf("This should be a DONE and it's not: %d", st)
 	}
 }
 
@@ -781,155 +780,4 @@ func TestChildrenWaitingGameWithTimeoutsWF(t *testing.T) {
 	if waited {
 		t.Errorf("It shouldn't happen")
 	}
-}
-
-func TestChildrenWaitingGameWithTimeoutsButAbortingWF(t *testing.T) {
-	for j := 0; j < 100; j++ {
-		overlord, xerr := NewTaskGroup()
-		require.NotNil(t, overlord)
-		require.Nil(t, xerr)
-
-		theID, xerr := overlord.GetID()
-		require.Nil(t, xerr)
-		require.NotEmpty(t, theID)
-
-		for ind := 0; ind < 10; ind++ {
-			_, xerr := overlord.Start(taskgen(30, 50, 10, 0, 0, 0, false), nil)
-			if xerr != nil {
-				t.Errorf("Unexpected error: %v", xerr)
-				t.FailNow()
-			}
-		}
-
-		time.Sleep(10 * time.Millisecond)
-		begin := time.Now()
-		xerr = overlord.Abort()
-		require.Nil(t, xerr)
-
-		// did we abort ?
-		aborted := overlord.Aborted()
-		if !aborted {
-			t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
-		}
-
-		_, _, xerr = overlord.WaitFor(5 * time.Second)
-		require.NotNil(t, xerr)
-		end := time.Since(begin)
-
-		if end >= (time.Millisecond * 200) { // this is 4x the maximum time... // FIXME: Move to another testset
-			t.Logf("Abort() lasted %v\n", end)
-			t.Logf("Wait() lasted %v\n", end)
-			t.Errorf("It should have finished near 200 ms but it didn't!!")
-			t.FailNow()
-		}
-	}
-}
-
-func TestChildrenWaitingGameWithTimeoutsButAbortingInParallelWF(t *testing.T) {
-	defer func() { // sometimes this test panics, breaking coverage collection..., so no more panics
-		if r := recover(); r != nil {
-			t.Errorf("Test panicked")
-			t.FailNow()
-		}
-	}()
-
-	failure := false
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		overlord, xerr := NewTaskGroup()
-		require.NotNil(t, overlord)
-		require.Nil(t, xerr)
-
-		theID, xerr := overlord.GetID()
-		require.Nil(t, xerr)
-		require.NotEmpty(t, theID)
-
-		fmt.Println("Begin")
-
-		for ind := 0; ind < 100; ind++ {
-			fmt.Println("Iterating...")
-			rint := time.Duration(rand.Intn(20)+30) * 10 * time.Millisecond
-			_, xerr := overlord.Start(
-				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-					delay := parameters.(time.Duration)
-					fmt.Printf("Entering (waiting %v)\n", delay)
-					defer fmt.Println("Exiting")
-
-					dur := delay / 100
-					for i := 0; i < 100; i++ {
-						if t.Aborted() {
-							break
-						}
-						time.Sleep(dur)
-					}
-					return "waiting game", nil
-				}, rint,
-			)
-			if xerr != nil {
-				t.Errorf("Unexpected: %s", xerr)
-			}
-		}
-
-		begin := time.Now()
-		go func() {
-			time.Sleep(310 * time.Millisecond)
-			if xerr := overlord.Abort(); xerr != nil {
-				t.Fail()
-			}
-			// did we abort ?
-			aborted := overlord.Aborted()
-			if !aborted {
-				t.Logf("We just aborted without error above..., why Aborted() says it's not ?")
-			}
-		}()
-
-		if _, _, xerr := overlord.WaitGroupFor(5 * time.Second); xerr != nil {
-			switch xerr.(type) { // nolint
-			case *fail.ErrAborted:
-				// Wanted situation, continue
-			case *fail.ErrorList:
-				el, _ := xerr.(*fail.ErrorList)
-				for _, ae := range el.ToErrorSlice() {
-					if _, ok := ae.(*fail.ErrAborted); !ok {
-						t.Errorf("everything should be aborts in this test")
-						failure = true
-						return
-					}
-				}
-			default:
-				t.Errorf("waitgroup failed with an unexpected error: %v", xerr)
-				failure = true
-				return
-			}
-		} else {
-			t.Errorf("WaitGroup didn't fail and it should")
-			failure = true
-			return
-		}
-
-		end := time.Since(begin)
-
-		fmt.Println("Here we are")
-
-		if end >= (time.Millisecond * 1200) {
-			t.Errorf("It should have finished near 1200 ms but it didn't, it was %v !!", end)
-		}
-	}()
-
-	runOutOfTime := waitTimeout(&wg, 60*time.Second)
-	if runOutOfTime {
-		if failure {
-			t.FailNow()
-		}
-		t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallelWF !")
-		t.FailNow()
-	}
-	if failure {
-		t.FailNow()
-	}
-
-	time.Sleep(3 * time.Second)
 }

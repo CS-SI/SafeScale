@@ -505,6 +505,20 @@ func badlock(m dsl.Matcher) {
 		Report(`maybe defer $mu1.RUnlock() was intended?`)
 }
 
+func lockchain(m dsl.Matcher) {
+	m.Match(`$mu.Lock(); $*_; $mu.Lock()`).Report(`maybe $mu.Unlock() was intended?`)
+	m.Match(`$mu.RLock(); $*_; $mu.RLock()`).Report(`maybe $mu.RUnLock() was intended?`)
+	m.Match(`$mu.localcache.Lock(); $*_; $mu.localcache.Lock()`).Report(`maybe $mu.localcache.Unlock() was intended?`)
+	m.Match(`$mu.localcache.RLock(); $*_; $mu.localcache.RLock()`).Report(`maybe $mu.localcache.RUnLock() was intended?`)
+}
+
+func nodefer(m dsl.Matcher) {
+	m.Match(`$mu.Lock(); $mu.Unlock()`).Report(`maybe you forgot a defer for $mu.Unlock() ?`)
+	m.Match(`$mu.RLock(); $mu.RUnlock()`).Report(`maybe you forgot a defer for $mu.RUnlock() ?`)
+	m.Match(`$mu.localcache.Lock(); $mu.localcache.Unlock()`).Report(`maybe you forgot a defer for $mu.localcache.Unlock() ?`)
+	m.Match(`$mu.localcache.RLock(); $mu.localcache.RUnlock()`).Report(`maybe you forgot a defer $mu.localcache.RUnlock() ?`)
+}
+
 func contextTODO(m dsl.Matcher) {
 	m.Match(`context.TODO()`).Report(`consider to use well-defined context`)
 }
@@ -518,42 +532,42 @@ func wrongerrcall(m dsl.Matcher) {
 }
 
 func BucketDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.bucket")).Report(`panic danger`)
 }
 
 func ClusterDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.cluster")).Report(`panic danger`)
 }
 
 func HostDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.host")).Report(`panic danger`)
 }
 
 func NetworkDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.network")).Report(`panic danger`)
 }
 
 func SGDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.securitygroup")).Report(`panic danger`)
 }
 
 func ShareDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.share")).Report(`panic danger`)
 }
 
 func SubnetDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.subnet")).Report(`panic danger`)
 }
 
 func VolumeDanger(m dsl.Matcher) {
-	m.Import("github.com/CS-SI/SafeScale/v22/lib/server/resources")
+	m.Import("github.com/CS-SI/SafeScale/v22/lib/backend/resources")
 	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.volume")).Report(`panic danger`)
 }
 
@@ -579,14 +593,16 @@ func intermediateCastWithFunc(m dsl.Matcher) {
 		Report(`unchecked cast to $z, then calling a function, it's a panic waiting to happen... and adding 3 lines of code to prevent a panic is always, always, worthy`)
 }
 
-func jsonUnMarshalIgnored(m dsl.Matcher) {
-	m.Match(`_ = json.UnMarshal($*_)`).Where(!m.File().Name.Matches(`.*test.go`)).
-		Report("json marshalling errors cannot be ignored, log the error or handle it, never ignore")
-}
-
 func jsonMarshalIgnored(m dsl.Matcher) {
 	m.Match(`$x, _ = json.Marshal($*_)`,
 		`$x, _ := json.Marshal($*_)`,
 	).Where(!m.File().Name.Matches(`.*test.go`)).
 		Report("json unmarshalling errors cannot be ignored, log the error or handle it, never ignore")
+}
+
+func jsonUnMarshalIgnored(m dsl.Matcher) {
+	m.Match(`$x, _ = json.UnMarshal($*_)`,
+		`$x, _ := json.UnMarshal($*_)`,
+	).
+		Report("json unmarshalling errors cannot be ignored")
 }

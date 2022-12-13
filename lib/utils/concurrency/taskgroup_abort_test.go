@@ -18,7 +18,7 @@ package concurrency
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -326,7 +326,6 @@ func TestBadTaskActionCitizen(t *testing.T) {
 	}
 }
 
-// VPL: as coded, this test never stop... There is no way to kill the goroutines
 func TestAwfulTaskActionCitizen(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -361,16 +360,18 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 	time.Sleep(60 * time.Millisecond)
 
 	// VPL: waiting on a taskgroup running task that cannot end will deadlock... As expected...
-	ended, _, xerr := overlord.WaitGroupFor(2 * time.Second)
+	ended, _, xerr := overlord.WaitGroupFor(3 * time.Second)
 	if xerr == nil { // It should fail because it's an aborted task...
 		t.Fail()
 	}
 	if !ended {
-		t.Logf("TaskGroup hasn't ended after 2s")
+		t.Logf("TaskGroup hasn't ended well")
 	}
 	switch xerr.(type) {
 	case *fail.ErrTimeout:
 		t.Logf("timeout occurred as expected, TaskGroup cannot end because of the way TaskActions have been coded")
+	case *fail.ErrAborted:
+		t.Logf("context cancellation improves this")
 	default:
 		t.Errorf("unexpected error occurred: %v", xerr)
 	}
@@ -379,7 +380,7 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 
 	_ = w.Close()
 
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 	_ = out
 

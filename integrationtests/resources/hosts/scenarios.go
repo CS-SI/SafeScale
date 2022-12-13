@@ -339,10 +339,13 @@ func StopStart(t *testing.T) {
 	require.Nil(t, err)
 	_ = out
 
-	out = ""
-	for !strings.Contains(out, "STOPPED") {
+	for !strings.Contains(out, "Stopped") {
 		out, err = helpers.GetOutput("safescale host status " + names.Hosts[0])
-		require.NotNil(t, err)
+		if err != nil {
+			t.Log(err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
 	}
 
 	out, err = helpers.GetOutput("safescale host start " + names.Hosts[0])

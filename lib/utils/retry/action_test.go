@@ -20,14 +20,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	mrand "math/rand"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/tests"
@@ -38,13 +39,13 @@ import (
 func Test_NewAction(t *testing.T) {
 
 	var (
-		officer *Officer     = BackoffSelector()(100 * time.Millisecond)
-		arbiter Arbiter      = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
-		run     func() error = func() (nested error) {
+		officer = BackoffSelector()(100 * time.Millisecond)
+		arbiter = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
+		run     = func() (nested error) {
 			return nil
 		}
 		notify  Notify
-		timeout time.Duration = 5 * time.Second
+		timeout = 5 * time.Second
 	)
 
 	action := NewAction(officer, arbiter, run, notify, timeout)
@@ -55,15 +56,15 @@ func Test_NewAction(t *testing.T) {
 func Test_Action(t *testing.T) {
 
 	var (
-		run func() error = func() (nested error) {
+		run = func() (nested error) {
 			return nil
 		}
-		arbiter Arbiter      = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
-		officer *Officer     = BackoffSelector()(100 * time.Millisecond)
-		first   func() error = func() (nested error) {
+		arbiter = PrevailDone(Unsuccessful(), Timeout(5*time.Second))
+		officer = BackoffSelector()(100 * time.Millisecond)
+		first   = func() (nested error) {
 			return nil
 		}
-		last func() error = func() (nested error) {
+		last = func() (nested error) {
 			return nil
 		}
 		notify Notify
@@ -705,6 +706,7 @@ func JustThrowComplexError() (ferr fail.Error) {
 
 func CreateDeferredErrorWithNConsequences(n uint) (ferr fail.Error) {
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")
@@ -719,6 +721,7 @@ func CreateDeferredErrorWithNConsequences(n uint) (ferr fail.Error) {
 
 func CreateWrappedDeferredErrorWithNConsequences(n uint) (ferr fail.Error) {
 	defer func() {
+		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			for loop := uint(0); loop < n; loop++ {
 				nerr := fmt.Errorf("random cleanup problem")
@@ -1343,88 +1346,6 @@ func TestOtherCustomActionWithTimeout(t *testing.T) {
 	}
 }
 
-func TestAwfulSimpleTaskActionWithSoftRetry(t *testing.T) {
-	single, xerr := concurrency.NewTask()
-	require.NotNil(t, single)
-	require.Nil(t, xerr)
-
-	begin := time.Now()
-	stCh := make(chan string, 100)
-	_, xerr = single.StartWithTimeout(
-		func(t concurrency.Task, parameters concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
-			xerr := WhileUnsuccessful(
-				func() error {
-					time.Sleep(900 * time.Millisecond)
-					return fmt.Errorf("nope")
-				}, 0, 40*time.Millisecond,
-			)
-			return "", xerr
-		}, stCh, 200*time.Millisecond,
-	)
-	if xerr != nil { // It should fail because it's an aborted task...
-		t.Errorf("Failed to start")
-	}
-
-	_, _, xerr = single.WaitFor(700 * time.Millisecond)
-	if xerr == nil { // It should fail with a timeout
-		t.Errorf("This should have failed with a timeout")
-		t.Fail()
-	}
-	if time.Since(begin) > 700*time.Millisecond {
-		t.Logf("The timeouts didn't worked and this is expected")
-	} else {
-		t.Errorf("This somehow failed")
-	}
-
-	switch xerr.(type) {
-	case *fail.ErrTimeout:
-		t.Logf("timeout occurred as expected, Task cannot end the goroutine never returns and also ignores the timeout parameter")
-	default:
-		t.Errorf("unexpected error occurred: %v", xerr)
-	}
-}
-
-func TestAwfulSimpleTaskActionWithHardRetry(t *testing.T) {
-	single, xerr := concurrency.NewTask()
-	require.NotNil(t, single)
-	require.Nil(t, xerr)
-
-	begin := time.Now()
-	stCh := make(chan string, 100)
-	_, xerr = single.StartWithTimeout(
-		func(t concurrency.Task, parameters concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
-			xerr := WhileUnsuccessfulWithHardTimeout(
-				func() error {
-					time.Sleep(900 * time.Millisecond)
-					return fmt.Errorf("nope")
-				}, 0, 40*time.Millisecond,
-			)
-			return "", xerr
-		}, stCh, 200*time.Millisecond,
-	)
-	if xerr != nil { // It should fail because it's an aborted task...
-		t.Errorf("Failed to start")
-	}
-
-	_, _, xerr = single.WaitFor(700 * time.Millisecond)
-	if xerr == nil { // It should fail with a timeout
-		t.Errorf("This should have failed with a timeout")
-		t.Fail()
-	}
-	if time.Since(begin) > 700*time.Millisecond {
-		t.Logf("The timeouts didn't worked")
-	}
-
-	switch xerr.(type) {
-	case *fail.ErrTimeout:
-		t.Logf("timeout occurred as expected, Task cannot end the goroutine never returns and also ignores the timeout parameter")
-	default:
-		t.Errorf("unexpected error occurred: %v", xerr)
-	}
-
-	time.Sleep(1 * time.Second)
-}
-
 func TestDontComplainWhenWeHaveATimeoutButItsOK(t *testing.T) {
 	begin := time.Now()
 
@@ -1451,5 +1372,85 @@ func TestDontComplainWhenWeHaveATimeoutButItsOK(t *testing.T) {
 	if delta > 450*time.Millisecond {
 		t.Errorf("There was a retry and it should have been none, timeout shoudn't be able to dictate when the retry finishes")
 		t.FailNow()
+	}
+}
+
+func TestRepeat(at *testing.T) {
+	chErr := make(chan error)
+	go func() {
+		for { // the end of test kills this
+			num := mrand.Intn(123)
+			if num > 3 {
+				chErr <- fmt.Errorf("ouch")
+			} else {
+				chErr <- nil
+			}
+		}
+	}()
+
+	iterations := 0
+	innerIterations := 0
+
+	// Outer retry will write the metadata at most 3 times
+	xerr := Action(
+		func() error {
+			iterations++
+
+			// inner retry does read-after-write; if timeout consider write has failed, then retry write
+			innerXErr := Action(
+				func() error {
+					innerIterations++
+
+					innerErr := <-chErr
+					if innerErr != nil {
+						return innerErr
+					}
+
+					return nil
+				},
+				PrevailDone(Unsuccessful(), Timeout(300), Max(3)),
+				Linear(1),
+				nil,
+				nil,
+				func(t Try, v verdict.Enum) {
+					switch v { // nolint
+					case verdict.Retry:
+						at.Log("Retrying...")
+					default:
+						at.Logf("%v", v)
+					}
+				},
+			)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *ErrStopRetry, *ErrTimeout:
+					return fail.Wrap(innerXErr.Cause(), "stopping retries: %d, %d", iterations, innerIterations)
+				default:
+					return innerXErr
+				}
+			}
+			return nil
+		},
+		PrevailDone(Unsuccessful(), Max(6)),
+		Constant(0),
+		nil,
+		nil,
+		func(t Try, v verdict.Enum) {
+			switch v { // nolint
+			case verdict.Retry:
+				at.Log("External Retrying...")
+			}
+		},
+	)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *ErrTimeout:
+			at.Log(xerr)
+		case *ErrStopRetry:
+			at.Log(xerr)
+		default:
+			at.Log(xerr)
+		}
 	}
 }

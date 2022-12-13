@@ -18,7 +18,7 @@ package concurrency
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -80,7 +80,7 @@ func TestWaitingGameWF(t *testing.T) {
 }
 
 func TestChangeIdAfterAbortWF(t *testing.T) {
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 6; i++ {
 		got, err := NewTask()
 		require.NotNil(t, got)
 		require.Nil(t, err)
@@ -246,7 +246,7 @@ func TestLikeBeforeWithoutLettingFinishWF(t *testing.T) {
 	time.Sleep(time.Duration(100) * time.Millisecond)
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	// Here, last 2 lines of the output should be:
@@ -421,7 +421,7 @@ func TestAbortButThisTimeUsingTrueAbortChannelWF(t *testing.T) {
 	require.NotNil(t, xerr)
 
 	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
+	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 
 	// Here, last 3 lines of the output should be:

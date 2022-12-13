@@ -23,26 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_AnonymousMapToStringMap(t *testing.T) {
-
-	v := AnonymousMap{
-		0: "first",
-		1: "second",
-		2: "third",
-	}
-	am := AnonymousMapToStringMap(v)
-	require.EqualValues(t, reflect.TypeOf(am).String(), "map[string]interface {}")
-
-}
-
-/*
-func Test_MapIsCloneable(t *testing.T) {
-	var aclo Clonable
-	aclo = NewMap()
-	_ = aclo
-}
-*/
-
 func Test_NewMap(t *testing.T) {
 
 	m := NewMap()
@@ -57,7 +37,7 @@ func TestMap_Clone(t *testing.T) {
 		"1": "second",
 		"2": "third",
 	}
-	c, err := m.FakeClone()
+	c, err := FromMap(m)
 	if err != nil {
 		t.Error(err)
 	}
@@ -71,28 +51,6 @@ func TestMap_Clone(t *testing.T) {
 	areEqual = reflect.DeepEqual(m, c)
 	if areEqual {
 		t.Error("It's a shallow clone !")
-		t.Fail()
-	}
-
-}
-
-func TestMap_Replace(t *testing.T) {
-
-	m := Map{
-		"0": "first",
-		"1": "second",
-		"2": "third",
-	}
-	m1 := Map{
-		"0": "new first",
-		"1": "second",
-		"2": "third",
-	}
-	_, xerr := m.Replace(&m1)
-	require.Nil(t, xerr)
-	areEqual := reflect.DeepEqual(m, m1)
-	if !areEqual {
-		t.Error("Replace not restitute values")
 		t.Fail()
 	}
 

@@ -32,13 +32,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/client"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clustercomplexity"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
@@ -1080,7 +1080,7 @@ var clusterHelmCommand = cli.Command{
 
 		err = executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
 		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 
 		return clitools.SuccessResponse(nil)
@@ -1239,7 +1239,8 @@ var clusterNodeListCommand = cli.Command{
 
 		var formatted []map[string]interface{}
 
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
+		beta := os.Getenv("SAFESCALE_BETA")
+		if beta != "" {
 			pb := progressbar.Default(-1, "Listing cluster nodes")
 			go func() {
 				for {
@@ -2251,7 +2252,7 @@ var clusterAnsibleInventoryCommands = cli.Command{
 			switch arg {
 			case "-i":
 			case "--inventory":
-			case "--inventory-file": // Deprecated
+			case "--inventory-file": // DEPRECATED: deprecated
 				/* Expect here
 				[-i INVENTORY]
 				*/
@@ -2383,7 +2384,7 @@ var clusterAnsibleRunCommands = cli.Command{
 			switch arg {
 			case "-i":
 			case "--inventory":
-			case "--inventory-file": // Deprecated
+			case "--inventory-file": // DEPRECATED: deprecated
 				/* Expect here
 				[-i INVENTORY]
 				*/
@@ -2529,7 +2530,7 @@ var clusterAnsiblePlaybookCommands = cli.Command{
 			switch arg {
 			case "-i":
 			case "--inventory":
-			case "--inventory-file": // Deprecated
+			case "--inventory-file": // DEPRECATED: deprecated
 				/* Expect here
 				[-i INVENTORY]
 				*/

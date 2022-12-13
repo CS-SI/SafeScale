@@ -27,7 +27,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/server/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -142,6 +142,10 @@ func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // n
 	}()
 
 	if in != nil {
+		if strings.Contains(in.Error(), "context canceled") {
+			return retry.StopRetryError(in)
+		}
+
 		switch realErr := in.(type) {
 		case *url.Error:
 			if realErr.Temporary() {
@@ -157,7 +161,7 @@ func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // n
 			}
 			return retry.StopRetryError(realErr)
 		case net.Error:
-			if realErr.Temporary() {
+			if realErr.Temporary() || realErr.Timeout() { // nolint
 				return realErr
 			}
 			return retry.StopRetryError(realErr)
@@ -168,7 +172,7 @@ func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // n
 			cause := fail.Cause(realErr)
 			switch thecause := cause.(type) {
 			case *url.Error:
-				// errors here (*url.Error), are very low-level, its .Err should be at most an errors.New() kind of error
+				// errors here (*url.Error), are very low-level, its .err should be at most an errors.New() kind of error
 				// if we have something more complex, we are talking about hand-crafted errors that won't happen in real world
 				if thecause.Temporary() && isRaw(thecause) {
 					return realErr
@@ -178,7 +182,7 @@ func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // n
 				}
 				return realErr
 			case net.Error:
-				if thecause.Temporary() {
+				if thecause.Temporary() || thecause.Timeout() { // nolint
 					return realErr
 				}
 				if strict {

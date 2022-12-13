@@ -103,6 +103,11 @@ func DecorateWith(prefix, what, why string, ignoreCount uint) string {
 	return msg
 }
 
+func WhereIsThis() string {
+	recovered, _ := getStack(godebug.Stack(), "/src/runtime", LastOccurrence)
+	return recovered[2].file
+}
+
 func getStack(callTrace interface{}, search string, stop Enum) ([]call, error) {
 	if callTrace == nil {
 		callTrace = godebug.Stack()

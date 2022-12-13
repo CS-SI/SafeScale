@@ -76,11 +76,20 @@ function sfFinishPreviousInstall() {
 }
 export -f sfFinishPreviousInstall
 
+function sfKillApt(){
+  sudo pkill -9 apt || true
+  sudo pkill -9 aptitude || true
+  sudo pkill -9 dpkg || true
+  sudo rm -f /var/{lib/{dpkg,apt/lists},cache/apt/archives}/{lock,lock-frontend}
+}
+export -f sfKillApt
+
 # sfWaitForApt waits an already running apt-like command to finish
 function sfWaitForApt() {
+  sfKillApt || true
   sfFinishPreviousInstall || true
   [ $? -ne 0 ] && return $?
-  sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
+  sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/{lock,lock-frontend}
   [ $? -ne 0 ] && return $?
   return 0
 }
@@ -789,10 +798,10 @@ function sfDoesDockerRunContainer() {
       FOUND=yes
     elif [ "$INSTANCE_2" != "$INSTANCE" ]; then
       if [ "$INSTANCE_2" == "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE_2" | uniq)" ]; then
-        found=y
+        FOUND=yes
       fi
     fi
-    [ "$FOUND" != "y"] && return 1
+    [ "$FOUND" != "yes"] && return 1
   fi
   echo $LIST | cut -d'|' -f3 | grep -i "^up" &> /dev/null || return 1
   return 0

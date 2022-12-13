@@ -15,9 +15,9 @@ COVEREXECS=cli/safescale/safescale-cover$(EXT) cli/safescaled/safescaled-cover$(
 
 # Code generation
 STRINGER := golang.org/x/tools/cmd/stringer
-PROTOC := github.com/golang/protobuf
-PROTOBUF := github.com/golang/protobuf/protoc-gen-go
-PROTOVER := v1.28.0
+PROTOC := google.golang.org/protobuf
+PROTOBUF := google.golang.org/protobuf/protoc-gen-go
+PROTOVER := v1.28.1
 
 # Build tools
 CONVEY := github.com/smartystreets/goconvey
@@ -26,7 +26,7 @@ COVER := golang.org/x/tools/cmd/cover
 LINTER := golang.org/x/lint/golint
 ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
-COVERTOOL := github.com/dlespiau/covertool
+COVERTOOL := github.com/oscarpicas/covertool
 RULES := github.com/quasilyte/go-ruleguard/cmd/ruleguard
 RULES_DSL := github.com/quasilyte/go-ruleguard/dsl
 GOENUM := github.com/abice/go-enum
@@ -34,6 +34,7 @@ GOWRAP := github.com/hexdigest/gowrap
 MAINT := github.com/yagipy/maintidx/cmd/maintidx
 IRETURN := github.com/butuzov/ireturn/cmd/ireturn
 CTXCHECK := github.com/sylvia7788/contextcheck/cmd/contextcheck
+LINTVER := v1.47.3
 
 # CI tools
 BATS := github.com/sstephenson/bats
@@ -166,7 +167,7 @@ common: begin ground getdevdeps mod sdk generate
 
 versioncut:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Go version check$(NO_COLOR)\n";
-	@(($(GO) version | grep go1.18) || ($(GO) version | grep go1.17) ||($(GO) version | grep go1.16)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.16 ! $(NO_COLOR)\n" && false);
+	@(($(GO) version | grep go1.19) || ($(GO) version | grep go1.18) || ($(GO) version | grep go1.17)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.17 ! $(NO_COLOR)\n" && false);
 
 begin: versioncut
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins, branch $$(git rev-parse --abbrev-ref HEAD), commit $$(git log --format="%H" -n 1), go '$$($(GO) version)', protoc '$$(protoc --version)' ...$(NO_COLOR)\n";
@@ -230,7 +231,7 @@ ground: begin
 cideps: begin ground
 	@$(WHICH) gojq > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gojq...$(NO_COLOR)\n"; \
-		$(GO) install $(GOJQ)@v0.12.6 &>/dev/null || true; \
+		$(GO) install $(GOJQ)@v0.12.9 &>/dev/null || true; \
 	fi
 	@$(WHICH) gron > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gron...$(NO_COLOR)\n";
@@ -284,12 +285,12 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n"; \
-		$(GO) install github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null; \
+		$(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@latest &>/dev/null; \
 	fi
 	@sleep 2
 	@$(WHICH) protoc-gen-go-grpc > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go-grpc...\n"; \
-		$(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0 &>/dev/null; \
+        $(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest &>/dev/null; \
 	fi
 	@sleep 2
 	@$(WHICH) minimock > /dev/null; if [ $$? -ne 0 ]; then \
@@ -300,7 +301,7 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) errcheck > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n"; \
-		$(GO) install $(ERRCHECK)@v1.6.0 &>/dev/null || true; \
+		$(GO) install $(ERRCHECK)@v1.6.2 &>/dev/null || true; \
 	fi
 	@sleep 2
 	@$(WHICH) goconvey > /dev/null; if [ $$? -ne 0 ]; then \
@@ -325,7 +326,7 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) gowrap > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gowrap...\n"; \
-		$(GO) install $(GOWRAP)/cmd/gowrap@v1.2.2 &>/dev/null || true; \
+		$(GO) install $(GOWRAP)/cmd/gowrap@v1.2.5 &>/dev/null || true; \
 	fi
 	@sleep 2
 	@$(WHICH) ruleguard > /dev/null; if [ $$? -ne 0 ]; then \
@@ -351,7 +352,7 @@ getdevdeps: begin ground
 	@sleep 2
 	@$(WHICH) golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.42.1 || true; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin $(LINTVER) || true; \
 	fi
 	@sleep 5
 
@@ -365,6 +366,12 @@ sdk: getdevdeps unmerged
 	@(cd lib && $(MAKE) $(@))
 
 force_sdk_python: sdk
+	@(cd lib && $(MAKE) $(@))
+
+force_sdk_js: sdk
+	@$(WHICH) protoc-gen-grpc-web > /dev/null; if [ $$? -ne 0 ]; then \
+  		printf "%b" "$(ERROR_COLOR)$(INFO_STRING) Cannot run protoc-gen-grpc-web: protoc-gen-grpc-web is not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; \
+	fi
 	@(cd lib && $(MAKE) $(@))
 
 lib: common
@@ -490,8 +497,8 @@ validtest: vettest
 	@mv ./integrationtests/integration_results.log .
 	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID, with compilation issues ! Take a look at ./integration_results.log $(NO_COLOR)\n";fi;
 	@if [ -s ./integration_results.log ] && grep -e without -e malformed -e undefined -e redeclared ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;
-	@if [ -s ./integration_results.log ] && grep -e FAIL -e '--- PASS' ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
-	@if [ -s ./integration_results.log ] && grep -e FAIL -e '--- PASS' ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;
+	@if [ -s ./integration_results.log ] && grep -e '--- FAIL' -e '--- PASS' -e 'panic: test timed out' ./integration_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) integration tests INVALID ! Take a look at ./integration_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) Integration tests not finished yet ! $(NO_COLOR)\n";fi;
+	@if [ -s ./integration_results.log ] && grep -e '--- FAIL' -e '--- PASS' -e 'panic: test timed out' ./integration_results.log 2>&1 > /dev/null; then exit 1;fi;
 
 checkforpr: testclean validtest
 
@@ -500,22 +507,19 @@ mintest: begin
 	@$(RM) ./test_results.log || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/backend/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
-	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
-	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
+	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
+	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
 precommittest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running precommit unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
-	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
-	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
-	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
+	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
+	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
 test: begin coverdeps # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -523,11 +527,11 @@ test: begin coverdeps # Run unit tests
 	@$(GO) clean -testcache
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp 2>/dev/null || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/server/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/backend/resources/... -parallel 8 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp 2>/dev/null || true
 	@$(MV) ./cover.tmp ./cover.out 2>/dev/null || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
-	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
+	@if [ -s ./test_results.log ] && grep -e '--- FAIL' -e 'panic: test timed out' ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 
 gofmt: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running gofmt checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -545,7 +549,6 @@ vet: begin generate
 
 semgrep: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running semgrep checks with '$(CERR)' ruleset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(GO) version | grep go1.18) && (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Semgrep don't work with go1.18 yet ! $(NO_COLOR)\n" && false) || true;
 	@$(GO) get -d $(RULES_DSL)@v0.3.21 &>/dev/null || true;
 	@($(WHICH) ruleguard > /dev/null || (echo "ruleguard not installed in your system" && exit 1))
 ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
@@ -566,7 +569,7 @@ metalint: begin
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
 ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) metalint_results.log || true
-	@golangci-lint --color never --timeout=16m --no-config --disable=unused --disable=goconst --disable=maligned --enable=unparam --enable=deadcode --disable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --disable=typecheck --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --disable=funlen --disable=gochecknoglobals --enable=depguard run ./... 2>/dev/null | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | grep -v "\s*^\s*" | $(TEE) metalint_results.log
+	@golangci-lint --color never --timeout=16m --no-config --disable=unused --disable=goconst --disable=maligned --enable=unparam --enable=deadcode --disable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --disable=typecheck --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --disable=funlen --disable=gochecknoglobals --enable=depguard run ./lib/... 2>/dev/null | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | grep -v "\s*^\s*" | grep -v ^[[:space:]]*$ | $(TEE) metalint_results.log
 	@if [ -s ./metalint_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) metalint FAILED, look at metalint_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -606,6 +609,8 @@ endif
 
 badpractices: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running bad practices checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@($(GO) version | grep go1.18) && (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) ireturn don't work with go1.18 yet ! $(NO_COLOR)\n" && false) || true;
+	@($(GO) version | grep go1.19) && (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) ireturn don't work with go1.19 yet ! $(NO_COLOR)\n" && false) || true;
 	@($(WHICH) ireturn > /dev/null || (echo "ireturn not installed in your system" && exit 1))
 ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) practices_results.log || true
@@ -617,10 +622,12 @@ endif
 
 ctxcheck: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running context checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@($(GO) version | grep go1.18) && (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) contextcheck don't work with go1.18 yet ! $(NO_COLOR)\n" && false) || true;
+	@($(GO) version | grep go1.19) && (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) contextcheck don't work with go1.19 yet ! $(NO_COLOR)\n" && false) || true;
 	@($(WHICH) contextcheck > /dev/null || (echo "contextcheck not installed in your system" && exit 1))
 ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) ctxcheck_results.log || true
-	@contextcheck ./lib/server/resources/operations/... 2>&1 | grep -v mock_ | grep -v fail.Error | grep -v nolint | $(TEE) ctxcheck_results.log
+	@contextcheck ./lib/backend/resources/operations/... 2>&1 | grep -v mock_ | grep -v fail.Error | grep -v nolint | $(TEE) ctxcheck_results.log
 	@if [ -s ./ctxcheck_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at ctxcheck_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

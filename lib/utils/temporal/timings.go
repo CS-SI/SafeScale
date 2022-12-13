@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/pelletier/go-toml/v2"
 )
 
 const (
@@ -28,10 +27,13 @@ const (
 	defaultContextTimeout = 1 * time.Minute
 
 	// defaultHostOperationTimeout default timeout to handle operations
-	defaultHostOperationTimeout = 120 * time.Second
+	defaultHostOperationTimeout = 150 * time.Second
 
-	// defaultHostCreationTimeout timeout for grpc command relative to host creation
-	defaultHostCreationTimeout = 8 * time.Minute
+	// defaultHostBootTimeout default boot timeout
+	defaultHostBootTimeout = 3 * time.Minute
+
+	// defaultHostCreationTimeout timeout for grpc command relative to host creation (3x boot + 1)
+	defaultHostCreationTimeout = 10 * time.Minute
 
 	// defaultHostLongOperationTimeout is a Long timeout
 	defaultHostLongOperationTimeout = 14 * time.Minute
@@ -60,17 +62,17 @@ const (
 	// defaultExecutionTimeout is the default linux command operation timeout
 	defaultExecutionTimeout = 8 * time.Minute
 
-	// DefaultMetadataReadAfterWriteTimeout is the default timeout applied to validate metadata write is effective
-	defaultMetadataReadAfterWriteTimeout = 90 * time.Second
+	// defaultMetadataReadAfterWriteTimeout is the default timeout applied to validate metadata write is effective
+	defaultMetadataReadAfterWriteTimeout = 30 * time.Second
 
 	// defaultSmallDelay is the predefined small delay
 	defaultSmallDelay = 1 * time.Second
 
 	// defaultNormalDelay is the default delay
-	defaultNormalDelay = 10 * time.Second
+	defaultNormalDelay = 2 * time.Second
 
 	// defaultBigDelay is a big delay
-	defaultBigDelay = 30 * time.Second
+	defaultBigDelay = 5 * time.Second
 )
 
 //go:generate minimock -o mocks/mock_timings.go -i github.com/CS-SI/SafeScale/v22/lib/utils/temporal.Timings
@@ -87,6 +89,9 @@ type Timings interface {
 
 	// HostCreationTimeout ...
 	HostCreationTimeout() time.Duration
+
+	// HostBootTimeout ...
+	HostBootTimeout() time.Duration
 
 	// HostCleanupTimeout ...
 	HostCleanupTimeout() time.Duration
@@ -109,7 +114,7 @@ type Timings interface {
 	// MetadataTimeout ...
 	MetadataTimeout() time.Duration
 
-	// RebootTimeout
+	// RebootTimeout ...
 	RebootTimeout() time.Duration
 
 	// MetadataReadAfterWriteTimeout ...
@@ -128,6 +133,7 @@ type Timeouts struct {
 	Connection             time.Duration `json:"timeout_connection,omitempty" mapstructure:"connection"`
 	Context                time.Duration `json:"timeout_context,omitempty" mapstructure:"context"`
 	HostCreation           time.Duration `json:"timeout_host_creation,omitempty" mapstructure:"hostcreation"`
+	HostBoot               time.Duration `json:"timeout_host_boot,omitempty" mapstructure:"hostboot"`
 	HostCleanup            time.Duration `json:"timeout_host_cleanup,omitempty" mapstructure:"hostcleanup"`
 	HostOperation          time.Duration `json:"timeout_host_operation,omitempty" mapstructure:"hostoperation"`
 	HostLongOperation      time.Duration `json:"timeout_host_long_operation,omitempty" mapstructure:"hostlongoperation"`
@@ -158,6 +164,7 @@ func NewTimings() *MutableTimings {
 			Context:                ContextTimeout(),
 			HostCreation:           HostCreationTimeout(),
 			HostCleanup:            HostCleanupTimeout(),
+			HostBoot:               HostBootTimeout(),
 			HostOperation:          HostOperationTimeout(),
 			HostLongOperation:      HostLongOperationTimeout(),
 			Operation:              OperationTimeout(),
@@ -185,6 +192,7 @@ func (t *MutableTimings) Update(a *MutableTimings) error {
 	t.Timeouts.Connection = a.Timeouts.Connection
 	t.Timeouts.Context = a.Timeouts.Context
 	t.Timeouts.HostCreation = a.HostCreation
+	t.Timeouts.HostBoot = a.HostBoot
 	t.Timeouts.HostCleanup = a.Timeouts.HostCleanup
 	t.Timeouts.HostOperation = a.HostOperation
 	t.Timeouts.HostLongOperation = a.Timeouts.HostLongOperation
@@ -207,14 +215,6 @@ func (t *MutableTimings) ContextTimeout() time.Duration {
 	}
 
 	return t.Timeouts.Context
-}
-
-func (t MutableTimings) ToToml() (string, error) {
-	barr, err := toml.Marshal(t)
-	if err != nil {
-		return "", err
-	}
-	return string(barr), nil
 }
 
 // ConnectionTimeout returns the configured timeout for connection
@@ -251,6 +251,15 @@ func (t *MutableTimings) HostCreationTimeout() time.Duration {
 	}
 
 	return t.Timeouts.HostCreation
+}
+
+// HostBootTimeout ...
+func (t *MutableTimings) HostBootTimeout() time.Duration {
+	if t == nil {
+		return HostBootTimeout()
+	}
+
+	return t.Timeouts.HostBoot
 }
 
 // HostCleanupTimeout returns the configured timeout for host cleanup
@@ -365,7 +374,6 @@ func MetadataReadAfterWriteTimeout() time.Duration {
 }
 
 func RebootTimeout() time.Duration {
-	//FIXME: add env var doc
 	return getFromEnv(defaultWaitAfterReboot, "SAFESCALE_REBOOT_TIMEOUT")
 }
 
@@ -403,6 +411,11 @@ func OperationTimeout() time.Duration {
 func HostCreationTimeout() time.Duration {
 	//FIXME: add env var doc
 	return getFromEnv(defaultHostCreationTimeout, "SAFESCALE_HOST_CREATION_TIMEOUT")
+}
+
+// HostBootTimeout ...
+func HostBootTimeout() time.Duration {
+	return getFromEnv(defaultHostBootTimeout, "SAFESCALE_HOST_BOOT_TIMEOUT")
 }
 
 // HostCleanupTimeout ...

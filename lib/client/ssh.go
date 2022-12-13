@@ -21,7 +21,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"reflect"
 	"strconv"
@@ -30,10 +30,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
+	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	sshfactory "github.com/CS-SI/SafeScale/v22/lib/server/resources/factories/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
-	srvutils "github.com/CS-SI/SafeScale/v22/lib/server/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
@@ -69,10 +69,13 @@ func (s sshConsumer) Run(hostName, command string, outs outputs.Enum, connection
 		connectionTimeout = DefaultConnectionTimeout
 	}
 
-	ctx, xerr := srvutils.GetContext(true)
+	rootCtx, xerr := srvutils.GetContext(true)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
+
+	ctx, cancel := context.WithCancel(rootCtx)
+	defer cancel()
 
 	sshConn, xerr := sshfactory.NewConnector(sshCfg)
 	if xerr != nil {
@@ -270,7 +273,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
-	ctx := task.Context()
+	ctx := task
 
 	var (
 		stdout, stderr string
@@ -279,11 +282,18 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 	extendedTimeout := connectionTimeout + 2*executionTimeout
 	if executionTimeout == 0 {
 		extendedTimeout = connectionTimeout + 2*temporal.HostOperationTimeout()
+		executionTimeout = extendedTimeout / 2
 	}
 
 	retcode := -1
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
 			iretcode, istdout, istderr, xerr := sshConn.CopyWithTimeout(
 				ctx, remotePath, localPath, upload, executionTimeout,
 			)
@@ -367,7 +377,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 				crcCheck := func() fail.Error {
 					md5hash := ""
 					if localPath != "" {
-						content, err := ioutil.ReadFile(localPath)
+						content, err := os.ReadFile(localPath)
 						if err != nil {
 							return fail.WarningError(err, "unable ro read file %s", localPath)
 						}
@@ -480,7 +490,7 @@ func (s sshConsumer) Connect(hostname, username, shell string, timeout time.Dura
 				return xerr
 			}
 
-			return sshConn.Enter(username, shell)
+			return sshConn.Enter(context.Background(), username, shell)
 		},
 		temporal.DefaultDelay(),
 		temporal.SSHConnectionTimeout(),

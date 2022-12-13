@@ -27,7 +27,6 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -58,6 +57,7 @@ type tracer struct {
 	inDone       bool
 	outDone      bool
 	sw           temporal.Stopwatch
+	context      context.Context
 }
 
 const (
@@ -75,8 +75,6 @@ func NewTracer(thing interface{}, enable bool, msg ...interface{}) Tracer {
 	switch casted := thing.(type) {
 	case context.Context:
 		return NewTracerFromCtx(casted, enable, msg...)
-	case concurrency.Task:
-		return NewTracerFromTask(casted, enable, msg...)
 	default:
 		return nil
 	}
@@ -86,9 +84,10 @@ func NewTracer(thing interface{}, enable bool, msg ...interface{}) Tracer {
 func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Tracer {
 	t := tracer{
 		enabled: enable,
+		context: ctx,
 	}
 
-	if aID := ctx.Value(concurrency.KeyForID); aID != nil { // nolint
+	if aID := ctx.Value("ID"); aID != nil { // nolint
 		var ok bool
 		t.taskSig, ok = aID.(string) // nolint
 		if !ok {
@@ -98,37 +97,6 @@ func NewTracerFromCtx(ctx context.Context, enable bool, msg ...interface{}) Trac
 	} else {
 		nID, _ := uuid.NewV4() // nolint
 		t.taskSig = nID.String()
-	}
-
-	message := strprocess.FormatStrings(msg...)
-	if message == "" {
-		message = "()"
-	}
-	t.callerParams = strings.TrimSpace(message)
-
-	if pc, file, _, ok := runtime.Caller(2); ok {
-		t.fileName = callstack.SourceFilePathUpdater()(file)
-		if f := runtime.FuncForPC(pc); f != nil {
-			t.funcName = filepath.Base(f.Name())
-		}
-	}
-	if t.funcName == "" {
-		t.funcName = unknownFunction
-	}
-	if t.fileName == "" {
-		t.funcName = unknownFile
-	}
-
-	return &t
-}
-
-// NewTracerFromTask creates a new Tracer instance
-func NewTracerFromTask(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
-	t := tracer{
-		enabled: enable,
-	}
-	if task != nil {
-		t.taskSig = task.Signature()
 	}
 
 	message := strprocess.FormatStrings(msg...)
@@ -185,7 +153,7 @@ func (instance *tracer) Entering() Tracer {
 			instance.inDone = true
 			msg := goingInPrefix + instance.buildMessage(0)
 			if msg != "" {
-				logrus.Tracef(msg)
+				logrus.WithContext(instance.context).Tracef(msg)
 			}
 		}
 	}
@@ -214,7 +182,7 @@ func (instance *tracer) Exiting() Tracer {
 				msg += " (duration: " + instance.sw.String() + ")"
 			}
 			if msg != "" {
-				logrus.Tracef(msg)
+				logrus.WithContext(instance.context).Tracef(msg)
 			}
 		}
 	}
@@ -231,24 +199,27 @@ func (instance *tracer) buildMessage(extra uint) string {
 	//       badly set, and you will get a line number that does not match with the one corresponding to the call
 	skipCallers := 2 + int(extra)
 
-	message := instance.taskSig
+	message := ""
 	if _, _, line, ok := runtime.Caller(skipCallers); ok {
-		message += " " + instance.funcName + instance.callerParams + " [" + instance.fileName + ":" + strconv.Itoa(line) + "]"
+		message += instance.funcName + instance.callerParams + " [" + instance.fileName + ":" + strconv.Itoa(line) + "]"
 	}
 	return message
 }
 
 // TraceMessage returns a string containing a trace message
 func (instance *tracer) TraceMessage(msg ...interface{}) string {
-	return "--- " + instance.buildMessage(1) + ": " + strprocess.FormatStrings(msg...)
+	amsg := "--- " + instance.buildMessage(1) + ": " + strprocess.FormatStrings(msg...)
+	amsg = strings.ReplaceAll(amsg, "\n", "\t")
+	return amsg
 }
 
 // Trace traces a message
 func (instance *tracer) Trace(msg ...interface{}) Tracer {
 	if !valid.IsNil(instance) && instance.enabled {
 		message := "--- " + instance.buildMessage(0) + ": " + strprocess.FormatStrings(msg...)
+		message = strings.ReplaceAll(message, "\n", "\t")
 		if message != "" {
-			logrus.Tracef(message)
+			logrus.WithContext(instance.context).Tracef(message)
 		}
 	}
 	return instance
@@ -258,8 +229,9 @@ func (instance *tracer) Trace(msg ...interface{}) Tracer {
 func (instance *tracer) TraceAsError(msg ...interface{}) Tracer {
 	if !valid.IsNil(instance) && instance.enabled {
 		message := "--- " + instance.buildMessage(0) + ": " + strprocess.FormatStrings(msg...)
+		message = strings.ReplaceAll(message, "\n", "\t")
 		if message != "" {
-			logrus.Errorf(message)
+			logrus.WithContext(instance.context).Errorf(message)
 		}
 	}
 	return instance

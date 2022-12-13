@@ -1,3 +1,6 @@
+//go:build !debug
+// +build !debug
+
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
  *
@@ -21,4 +24,5 @@ var (
 	Debug = false
 	// Verbose if set to true, increase verbosity
 	Verbose = false
+	Release = true
 )

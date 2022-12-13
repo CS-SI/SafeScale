@@ -20,6 +20,7 @@
 package helpers
 
 import (
+	"fmt"
 	"reflect"
 	"runtime"
 	"strings"
@@ -41,7 +42,13 @@ type (
 var scenarios = NewScenarios()
 
 func InSection(label string) section {
-	return section(label)
+	validScenarios := definedScenarios()
+	for _, v := range validScenarios {
+		if string(v) == label {
+			return section(label)
+		}
+	}
+	panic(fmt.Sprintf("we forget enabling section %s in function definedScenarios", label))
 }
 
 // Clear can be used to clean already registered scenario from section
@@ -68,19 +75,27 @@ func (section section) AddScenario(scenario ScenarioFunc) section {
 	return section
 }
 
+func definedScenarios() []section {
+	return []section{
+		"networks",
+		"subnets",
+		"hosts",
+		"volumes",
+		"shares",
+		"features",
+		"buckets",
+		"labels",
+		"clusters",
+		"securitygroups",
+		"ostests",
+		"validprovider",
+		"sshs",
+	}
+}
+
 func NewScenarios() Scenarios {
 	out := Scenarios{
-		sectionsOrder: []section{
-			"networks",
-			"subnets",
-			"hosts",
-			"volumes",
-			"shares",
-			"features",
-			"buckets",
-			"labels",
-			"clusters",
-		},
+		sectionsOrder:  definedScenarios(),
 		scenariosOrder: make(map[section][]string),
 		scenarios:      make(map[section]map[string]ScenarioFunc),
 	}

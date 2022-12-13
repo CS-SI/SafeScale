@@ -30,13 +30,6 @@ func Test_NewTimings(t *testing.T) {
 	require.EqualValues(t, reflect.TypeOf(result).String(), "*temporal.MutableTimings")
 }
 
-func Test_NewTimingsToml(t *testing.T) {
-	result := NewTimings()
-	ct, err := result.ToToml()
-	require.Nil(t, err)
-	t.Logf(ct)
-}
-
 func TestMutableTimings_Update(t *testing.T) {
 
 	a := NewTimings()
@@ -50,6 +43,7 @@ func TestMutableTimings_Update(t *testing.T) {
 	a.Timeouts.Metadata = 0
 	a.Timeouts.MetadataReadAfterWrite = 0
 	a.Timeouts.Operation = 0
+	a.Timeouts.HostBoot = 0
 	a.Delays.Small = 0
 	a.Delays.Normal = 0
 	a.Delays.Big = 0
@@ -67,6 +61,7 @@ func TestMutableTimings_Update(t *testing.T) {
 	b.Delays.Small = 11
 	b.Delays.Normal = 12
 	b.Delays.Big = 13
+	b.Timeouts.HostBoot = 14
 
 	_ = a.Update(b)
 
@@ -83,6 +78,7 @@ func TestMutableTimings_Update(t *testing.T) {
 	require.EqualValues(t, a.Small, 11)
 	require.EqualValues(t, a.Normal, 12)
 	require.EqualValues(t, a.Big, 13)
+	require.EqualValues(t, a.HostBoot, 14)
 
 }
 
@@ -109,27 +105,6 @@ func TestMutableTimings_ContextTimeout(t *testing.T) {
 	mt = NewTimings()
 	mt.Timeouts.Context = 42 * time.Second
 	require.EqualValues(t, mt.ContextTimeout(), 42*time.Second)
-
-}
-
-func TestMutableTimings_ToToml(t *testing.T) {
-
-	mt := NewTimings()
-	result, err := mt.ToToml()
-	require.Nil(t, err)
-	require.Contains(t, result, "Big")
-	require.Contains(t, result, "Communication")
-	require.Contains(t, result, "Connection")
-	require.Contains(t, result, "Context")
-	require.Contains(t, result, "HostCleanup")
-	require.Contains(t, result, "HostCreation")
-	require.Contains(t, result, "HostLongOperation")
-	require.Contains(t, result, "Metadata")
-	require.Contains(t, result, "MetadataReadAfterWrite")
-	require.Contains(t, result, "Operation")
-	require.Contains(t, result, "Small")
-	require.Contains(t, result, "Normal")
-	require.Contains(t, result, "Big")
 
 }
 
@@ -169,7 +144,7 @@ func TestMutableTimings_OperationTimeout(t *testing.T) {
 func TestMutableTimings_HostCreationTimeout(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.HostCreationTimeout(), 8*time.Minute)
+	require.EqualValues(t, mt.HostCreationTimeout(), 10*time.Minute)
 
 	mt = NewTimings()
 	mt.Timeouts.HostCreation = 42 * time.Second
@@ -191,7 +166,7 @@ func TestMutableTimings_HostCleanupTimeout(t *testing.T) {
 func TestMutableTimings_HostOperationTimeout(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.HostOperationTimeout(), 2*time.Minute)
+	require.EqualValues(t, mt.HostOperationTimeout(), 150*time.Second)
 
 	mt = NewTimings()
 	mt.Timeouts.HostOperation = 42 * time.Second
@@ -246,7 +221,7 @@ func TestMutableTimings_MetadataTimeout(t *testing.T) {
 func TestMutableTimings_MetadataReadAfterWriteTimeout(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.MetadataReadAfterWriteTimeout(), 90*time.Second)
+	require.EqualValues(t, mt.MetadataReadAfterWriteTimeout(), 30*time.Second)
 
 	mt = NewTimings()
 	mt.Timeouts.MetadataReadAfterWrite = 42 * time.Second
@@ -279,7 +254,7 @@ func TestMutableTimings_SmallDelay(t *testing.T) {
 func TestMutableTimings_NormalDelay(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.NormalDelay(), 10*time.Second)
+	require.EqualValues(t, mt.NormalDelay(), 2*time.Second)
 
 	mt = NewTimings()
 	mt.Delays.Normal = 42 * time.Second
@@ -303,7 +278,7 @@ func TestMutableTimings_DefaultDelay(t *testing.T) {
 func TestMutableTimings_BigDelay(t *testing.T) {
 
 	var mt *MutableTimings
-	require.EqualValues(t, mt.BigDelay(), 30*time.Second)
+	require.EqualValues(t, mt.BigDelay(), 5*time.Second)
 
 	mt = NewTimings()
 	mt.Delays.Big = 42 * time.Second

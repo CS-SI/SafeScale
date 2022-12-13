@@ -23,12 +23,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
@@ -395,17 +396,6 @@ func DefaultNotifierWithContext(ctx context.Context) (func(t Try, v verdict.Enum
 
 	ctxID := ""
 
-	task, xerr := concurrency.TaskFromContextOrVoid(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var err fail.Error
-	ctxID, err = task.ID()
-	if err != nil {
-		return nil, err
-	}
-
 	if ctxID == "" {
 		return func(t Try, v verdict.Enum) {
 			switch v {
@@ -426,7 +416,7 @@ func DefaultNotifierWithContext(ctx context.Context) (func(t Try, v verdict.Enum
 	}
 
 	ctxID = fmt.Sprintf("[%s]", ctxID)
-	ctxLog := logrus.WithField(concurrency.KeyForTaskInContext, ctxID)
+	ctxLog := logrus.WithField("ID", ctxID)
 
 	return func(t Try, v verdict.Enum) {
 		switch v {
@@ -532,11 +522,15 @@ func (a action) loopWithSoftTimeout() (ferr fail.Error) {
 
 		if a.Timeout != 0 {
 			if !all {
+				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil {
 					switch ferr.(type) {
 					case *fail.ErrAborted:
 						return
 					default:
+						if strings.Contains(ferr.Error(), "context canceled") {
+							return
+						}
 					}
 				}
 			}
@@ -552,6 +546,7 @@ func (a action) loopWithSoftTimeout() (ferr fail.Error) {
 				}
 			} else if duration > 55*a.Timeout/100 {
 				if count <= minNumRetries {
+					ferr = debug.InjectPlannedFail(ferr)
 					if count == 1 {
 						msg := callstack.DecorateWith(
 							"wrong retry-timeout cfg: ",
@@ -646,6 +641,9 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 				case *fail.ErrAborted:
 					return
 				default:
+					if strings.Contains(ferr.Error(), "context canceled") {
+						return
+					}
 				}
 			}
 
@@ -660,6 +658,7 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 				}
 			} else if duration > 55*a.Timeout/100 {
 				if count <= minNumRetries {
+					ferr = debug.InjectPlannedFail(ferr)
 					if count == 1 {
 						msg := callstack.DecorateWith(
 							"wrong retry-timeout cfg: ",

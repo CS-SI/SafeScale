@@ -17,6 +17,7 @@
 package fail
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -39,29 +40,30 @@ type BrokenError struct {
 	grpcCode uint
 }
 
-//data.Annotatable
+// data.Annotatable
 func (e *BrokenError) Annotate(key string, value data.Annotation) data.Annotatable { return nil }
 func (e *BrokenError) Annotations() data.Annotations                               { return nil }
 func (e *BrokenError) Annotation(key string) (data.Annotation, bool)               { return nil, false }
+func (e *BrokenError) WithContext(ctx context.Context)                             { return }
 
-//causer
+// causer
 func (e *BrokenError) Cause() error     { return nil }
 func (e *BrokenError) RootCause() error { return nil }
 
-//consequencer
+// consequencer
 func (e *BrokenError) Consequences() []error      { return make([]error, 0) }
 func (e *BrokenError) AddConsequence(error) Error { return nil }
 
-//error
+// error
 func (e *BrokenError) Error() string { return e.msg }
 
-//NullValue
+// NullValue
 func (e *BrokenError) IsNull() bool { return e.msg == "" }
 
-//ToGRPCStatus
+// ToGRPCStatus
 func (e *BrokenError) Valid() bool { return e.msg != "" }
 
-//Error
+// Error
 func (e *BrokenError) UnformattedError() string { return e.msg }
 func (e *BrokenError) ToGRPCStatus() error      { return nil }
 
@@ -688,6 +690,34 @@ func TestErrorCore_AddConsequence(t *testing.T) {
 
 }
 
+func TestErrorCore_WithContext(t *testing.T) {
+
+	errCore := errorCore{
+		message:             "houston, we have a problem",
+		cause:               errors.New("math: can't divide by zero"),
+		consequences:        nil,
+		annotations:         make(data.Annotations),
+		grpcCode:            codes.Unknown,
+		causeFormatter:      defaultCauseFormatter,
+		annotationFormatter: defaultAnnotationFormatter,
+		lock:                &sync.RWMutex{},
+	}
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		errCore.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		errCore.WithContext(context.Background())
+	}()
+}
+
 func TestErrorCore_Consequences(t *testing.T) {
 
 	errCore := errorCore{
@@ -872,6 +902,24 @@ func TestErrorCore_ToGRPCStatus(t *testing.T) {
 func Test_WarningError(t *testing.T) {
 	err := WarningError(errors.New("math: can't divide by zero"), "Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrWarning")
+}
+
+func Test_WarningErrorWithContext(t *testing.T) {
+	err := WarningError(errors.New("math: can't divide by zero"), "Any message")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
 }
 
 func Test_WarningErrorWithCauseAndConsequences(t *testing.T) {
@@ -1087,10 +1135,26 @@ func TestErrWarning_GRPCCode(t *testing.T) {
 }
 
 func Test_TimeoutError(t *testing.T) {
-
 	err := TimeoutError(errors.New("math: can't divide by zero"), 30*time.Second, "Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrTimeout")
+}
 
+func Test_TimeoutErrorWithContext(t *testing.T) {
+	err := TimeoutError(errors.New("math: can't divide by zero"), 30*time.Second, "Any message")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
 }
 
 func TestErrTimeout_IsNull(t *testing.T) {
@@ -1302,17 +1366,49 @@ func TestErrTimeout_GRPCCode(t *testing.T) {
 }
 
 func Test_ErrNotFound(t *testing.T) {
-
 	err := NotFoundError("Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotFound")
+}
 
+func Test_ErrNotFoundWithCtx(t *testing.T) {
+	err := NotFoundErrorWithCause(errors.New("math: can't divide by zero"), nil, "Any message")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithCtx(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithCtx(context.Background())
+	}()
+}
+
+func Test_ErrNotFoundWithContext(t *testing.T) {
+	err := NotFoundErrorWithCause(errors.New("math: can't divide by zero"), nil, "Any message")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
 }
 
 func Test_NotFoundErrorWithCause(t *testing.T) {
-
 	err := NotFoundErrorWithCause(errors.New("math: can't divide by zero"), nil, "Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotFound")
-
 }
 
 func TestErrNotFound_AddConsequence(t *testing.T) {
@@ -1488,16 +1584,31 @@ func TestErrNotFound_GRPCCode(t *testing.T) {
 }
 
 func Test_ErrNotAvailable(t *testing.T) {
-
 	err := NotAvailableError("Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotAvailable")
-
 }
-func Test_NotAvailableErrorWithCause(t *testing.T) {
 
+func Test_ErrNotAvailableWithContext(t *testing.T) {
+	err := NotAvailableError("Any message")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
+}
+
+func Test_NotAvailableErrorWithCause(t *testing.T) {
 	err := NotAvailableErrorWithCause(errors.New("math: can't divide by zero"), nil, "Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotAvailable")
-
 }
 
 func TestErrNotAvailable_IsNull(t *testing.T) {
@@ -1708,16 +1819,31 @@ func TestErrNotAvailable_GRPCCode(t *testing.T) {
 }
 
 func Test_DuplicateError(t *testing.T) {
-
 	err := DuplicateError("Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrDuplicate")
-
 }
-func Test_DuplicateErrorWithCause(t *testing.T) {
 
+func Test_DuplicateErrorWithContext(t *testing.T) {
+	err := DuplicateError(errors.New("math: can't divide by zero"), "Any message")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
+}
+
+func Test_DuplicateErrorWithCause(t *testing.T) {
 	err := DuplicateErrorWithCause(errors.New("math: can't divide by zero"), nil, "Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrDuplicate")
-
 }
 
 func TestDuplicateError_IsNull(t *testing.T) {
@@ -1931,6 +2057,24 @@ func TestErrDuplicate_GRPCCode(t *testing.T) {
 func Test_InvalidRequestError(t *testing.T) {
 	err := InvalidRequestError("Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidRequest")
+}
+
+func Test_InvalidRequestErrorWithContext(t *testing.T) {
+	err := InvalidRequestError("Any message")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
 }
 
 func Test_InvalidRequestErrorWithCause(t *testing.T) {
@@ -2147,10 +2291,26 @@ func TestErrInvalidRequest__GRPCCode(t *testing.T) {
 }
 
 func Test_SyntaxError(t *testing.T) {
-
 	err := SyntaxError("Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrSyntax")
+}
 
+func Test_SyntaxErrorWithContext(t *testing.T) {
+	err := SyntaxError("Any message")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
 }
 
 func Test_SyntaxErrorWithCause(t *testing.T) {
@@ -2379,6 +2539,24 @@ func Test_NotAuthenticatedError(t *testing.T) {
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotAuthenticated")
 }
 
+func Test_NotAuthenticatedErrorWithContext(t *testing.T) {
+	err := NotAuthenticatedError("Any message")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
+}
+
 func Test_NotAuthenticatedErrorWithCause(t *testing.T) {
 	err := NotAuthenticatedErrorWithCause(errors.New("houston, we have a problem"), []error{}, "Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotAuthenticated")
@@ -2600,6 +2778,24 @@ func Test_ForbiddenError(t *testing.T) {
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrForbidden")
 }
 
+func Test_ForbiddenErrorWithContext(t *testing.T) {
+	err := ForbiddenError("Any message")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
+}
+
 func Test_ForbiddenErrorWithCause(t *testing.T) {
 	err := ForbiddenErrorWithCause(errors.New("houston, we have a problem"), []error{}, "Any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrForbidden")
@@ -2817,18 +3013,35 @@ func TestErrForbidden_GRPCCode(t *testing.T) {
 }
 
 func Test_AbortedError(t *testing.T) {
-
 	err := AbortedError(errors.New("math: can't divide by zero"), "any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrAborted")
-
 	err = AbortedError(errors.New(""))
 	require.EqualValues(t, err.Error(), "aborted")
+}
 
+func Test_AbortedErrorWithContext(t *testing.T) {
+	err := AbortedError(errors.New("math: can't divide by zero"), "any error")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
 }
 
 func Test_AbortedErrorWithCauseAndConsequences(t *testing.T) {
 	err := AbortedErrorWithCauseAndConsequences(errors.New("math: can't divide by zero"), []error{}, "any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrAborted")
+	err = AbortedErrorWithCauseAndConsequences(errors.New("math: can't divide by zero"), []error{})
+	require.Contains(t, err.Error(), "aborted")
 }
 
 func TestErrAborted_IsNull(t *testing.T) {
@@ -3044,6 +3257,24 @@ func TestErrAborted_GRPCCode(t *testing.T) {
 func Test_OverflowError(t *testing.T) {
 	err := OverflowError(errors.New("math: can't divide by zero"), 30, "any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrOverflow")
+}
+
+func Test_OverflowErrorWithContext(t *testing.T) {
+	err := OverflowError(errors.New("math: can't divide by zero"), 30, "any error")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
 }
 
 func Test_OverflowErrorWithCause(t *testing.T) {
@@ -3267,6 +3498,24 @@ func Test_OverloadError(t *testing.T) {
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrOverload")
 }
 
+func Test_OverloadErrorWithContext(t *testing.T) {
+	err := OverloadError("any error")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
+}
+
 func Test_OverloadErrorWithCause(t *testing.T) {
 	err := OverloadErrorWithCause(errors.New("houston, we have a problem"), []error{}, "any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrOverload")
@@ -3483,6 +3732,24 @@ func TestErrOverload_GRPCCode(t *testing.T) {
 func Test_NotImplementedError(t *testing.T) {
 	err := NotImplementedError("any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotImplemented")
+}
+
+func Test_NotImplementedErrorWithContext(t *testing.T) {
+	err := NotImplementedError("any error")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
 }
 
 func Test_NotImplementedErrorWithReason(t *testing.T) {
@@ -3923,6 +4190,24 @@ func Test_InvalidInstanceError(t *testing.T) {
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
 }
 
+func Test_InvalidInstanceErrorWithContext(t *testing.T) {
+	err := InvalidInstanceError()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
+}
+
 func Test_InvalidInstanceErrorWithCause(t *testing.T) {
 	err := InvalidInstanceErrorWithCause(errors.New("houston, we have a problem"), []error{}, "any message")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
@@ -4139,6 +4424,24 @@ func TestErrInvalidInstance_GRPCCode(t *testing.T) {
 func Test_InvalidParameterError(t *testing.T) {
 	err := InvalidParameterError("what is it", "any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
+}
+
+func Test_InvalidParameterErrorWithContext(t *testing.T) {
+	err := InvalidParameterError("what is it", "any error")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
 }
 
 func Test_InvalidParameterErrorWithCauseAndConsequences(t *testing.T) {
@@ -4373,6 +4676,24 @@ func Test_InvalidInstanceContentError(t *testing.T) {
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
 }
 
+func Test_InvalidInstanceContentErrorWithContext(t *testing.T) {
+	err := InvalidInstanceContentError("what is it", "any error")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
+}
+
 func Test_InvalidInstanceContentErrorWithCause(t *testing.T) {
 	err := InvalidInstanceContentErrorWithCause(errors.New("houston, we have a problem"), []error{}, "what is it", "any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
@@ -4589,6 +4910,24 @@ func TestErrInvalidInstanceContent_GRPCCode(t *testing.T) {
 func Test_InconsistentError(t *testing.T) {
 	err := InconsistentError("any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInconsistent")
+}
+
+func Test_InconsistentErrorWithContext(t *testing.T) {
+	err := InconsistentError("any error")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
 }
 
 func Test_InconsistentErrorWithCause(t *testing.T) {
@@ -4838,6 +5177,24 @@ func Test_ExecutionError(t *testing.T) {
 	}
 }
 
+func Test_ExecutionErrorWithContext(t *testing.T) {
+	xerr := ExecutionError(errors.New("exit error"), "any error")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		xerr.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		xerr.WithContext(context.Background())
+	}()
+}
+
 func Test_ExecutionErrorWithCause(t *testing.T) {
 	xerr := ExecutionErrorWithCause(errors.New("exit error"), []error{}, "any error")
 	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrExecution")
@@ -5061,6 +5418,24 @@ func Test_AlteredNothingError(t *testing.T) {
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrAlteredNothing")
 }
 
+func Test_AlteredNothingErrorWithContext(t *testing.T) {
+	err := AlteredNothingError("any error")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
+}
+
 func Test_AlteredNothingErrorWithCause(t *testing.T) {
 	err := AlteredNothingErrorWithCause(errors.New("houston, we have a problem"), []error{}, "any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrAlteredNothing")
@@ -5277,6 +5652,24 @@ func TestErrAlteredNothing_GRPCCode(t *testing.T) {
 func Test_UnknownError(t *testing.T) {
 	err := UnknownError("any error")
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrUnknown")
+}
+
+func Test_UnknownErrorWithContext(t *testing.T) {
+	err := UnknownError("any error")
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(nil)
+	}()
+	func() {
+		defer func() {
+			r := recover()
+			require.Nil(t, r)
+		}()
+		err.WithContext(context.Background())
+	}()
 }
 
 func Test_UnknownErrorWithCause(t *testing.T) {

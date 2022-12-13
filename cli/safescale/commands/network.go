@@ -27,12 +27,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/client"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/securitygroupruledirection"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/enums/subnetstate"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -258,12 +258,6 @@ var networkInspect = cli.Command{
 					}
 					mapped[k] = v
 				}
-
-				// Deprecated
-				// stnum, ok := mapped["state"].(float64)
-				// if ok {
-				// 	mapped["state_label"] = protocol.NetworkState_name[int32(stnum)]
-				// }
 
 				staltnum, ok := mapped["subnet_state"].(float64)
 				if ok {

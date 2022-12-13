@@ -34,15 +34,15 @@ import (
 
 // HostInfo ...
 type HostInfo struct {
-	ID         string
-	Name       string
-	CPU        int
-	RAM        int
-	Disk       int
-	PublicIP   string
-	PrivateIP  string
-	State      int
-	PrivateKey string
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	CPU        int    `json:"cpu"`
+	RAM        int    `json:"ram"`
+	Disk       int    `json:"disk"`
+	PublicIP   string `json:"public_ip"`
+	PrivateIP  string `json:"private_ip"`
+	State      int    `json:"state"`
+	PrivateKey string `json:"private_key"`
 }
 
 // IsSafescaledLaunched ...
@@ -120,7 +120,7 @@ func ExtractResult(in string) (interface{}, error) {
 
 	result, ok := jsoned["result"]
 	if !ok || result == nil {
-		return nil, nil
+		return nil, fmt.Errorf("failed to retrieve 'result' from json")
 	}
 
 	return result, nil
@@ -137,7 +137,7 @@ func RunOnlyInIntegrationTest(key string) error {
 }
 
 func RunJq(input string, query string) (string, error) {
-	jqQuery, err := gojq.Parse(".result.provider")
+	jqQuery, err := gojq.Parse(query)
 	if err != nil {
 		return "", err
 	}

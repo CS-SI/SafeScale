@@ -30,13 +30,13 @@ debug
 
 #ignore generated files
 *.pb.go
+*.pb.js
 *_pb2*.py
 rice-box.go
 *_string.go
 mock_*.go
 gomock_reflect*
 lib/utils/data/consts.go
-lib/utils/valid/consts.go
 
 #ignore coverage files
 cover.goconvey
@@ -58,7 +58,7 @@ lib/Pipfile.lock
 cli/safescale/version.go
 cli/safescaled/version.go
 cli/scanner/version.go
-lib/server/resources/operations/iaas/userdata/version.go
+lib/backend/resources/operations/iaas/userdata/version.go
 
 vendor
 Gopkg.lock
@@ -103,7 +103,7 @@ cli/safescaled/__debug_bin
 
 .atom/
 
-lib/server/iaas/userdata/version.go
+lib/backend/iaas/userdata/version.go
 
 .run/
 

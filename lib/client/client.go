@@ -17,18 +17,19 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
@@ -54,7 +55,7 @@ type Session struct {
 	tenant     string // contains the tenant to use (flag --tenantConsumer); if not set, server will use current default tenant (safescale tenant set)
 	connection *grpc.ClientConn
 
-	task concurrency.Task
+	clientCtx context.Context
 }
 
 // DefaultTimeout tells to use the timeout by default depending on context
@@ -108,10 +109,12 @@ func New(server, tenantID string) (_ *Session, ferr fail.Error) {
 	}
 
 	s := &Session{server: server, tenant: tenantID}
-	s.task, xerr = concurrency.VoidTask()
-	if xerr != nil {
-		return nil, xerr
+
+	u, err := uuid.NewV4()
+	if err != nil {
+		return nil, fail.Wrap(err, "uuid generation failed")
 	}
+	s.clientCtx = context.WithValue(context.Background(), "ID", u.String()) // nolint
 
 	s.Bucket = bucketConsumer{session: s}
 	s.Cluster = clusterConsumer{session: s}
@@ -186,30 +189,30 @@ func (s *Session) Disconnect() {
 }
 
 // SetTask set the task the session must use
-func (s *Session) SetTask(task concurrency.Task) fail.Error {
+func (s *Session) SetTask(inctx context.Context) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
+
+	select {
+	case <-inctx.Done():
+		return fail.AbortedError(inctx.Err(), "aborted")
+	default:
 	}
 
-	s.task = task
+	s.clientCtx = inctx
 	return nil
 }
 
 // GetTask ...
-func (s *Session) GetTask() (concurrency.Task, fail.Error) {
+func (s *Session) GetTask() (context.Context, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if s.task == nil {
-		return nil, fail.InvalidInstanceContentError("s.task", "cannot be nil")
+	if s.clientCtx == nil {
+		return nil, fail.InvalidInstanceContentError("s.clientCtx", "cannot be nil")
 	}
-	return s.task, nil
+	return s.clientCtx, nil
 }
 
 // DecorateTimeoutError changes the error to something more comprehensible when

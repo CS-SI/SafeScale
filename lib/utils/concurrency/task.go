@@ -18,12 +18,14 @@ package concurrency
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	uuid "github.com/gofrs/uuid"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -46,27 +48,32 @@ const (
 )
 
 // TaskParameters ...
-type TaskParameters interface{}
+type TaskParameters = interface{}
 
 // TaskResult ...
-type TaskResult interface{}
+type TaskResult = interface{}
+
+type TaskAdaptor = interface{}
 
 // TaskAction defines the type of the function that can be started by a Task.
 // NOTE: you have to check if task is aborted inside this function using method t.ErrAborted(),
-//       to be able to stop the process when task is aborted (no matter what
-//       the abort reason is), and permit ending properly. Otherwise, this may lead to goroutine leak
-//       (there is no good way to stop forcibly a goroutine).
+//
+//	to be able to stop the process when task is aborted (no matter what
+//	the abort reason is), and permit ending properly. Otherwise, this may lead to goroutine leak
+//	(there is no good way to stop forcibly a goroutine).
+//
 // Example:
 // task.Start(func(task concurrency.Task, p TaskParameters) (concurrency.TaskResult, fail.Error) {
 // ...
-//    for {
-//        if task.ErrAborted() {
-//            break // or return
-//        }
-//        ...
-//    }
-//    return nil
-// }, nil)
+//
+//	   for {
+//	       if task.ErrAborted() {
+//	           break // or return
+//	       }
+//	       ...
+//	   }
+//	   return nil
+//	}, nil)
 type TaskAction func(t Task, parameters TaskParameters) (TaskResult, fail.Error)
 
 //go:generate minimock -o mocks/mock_taskguard.go -i github.com/CS-SI/SafeScale/v22/lib/utils/concurrency.TaskGuard
@@ -86,7 +93,7 @@ type TaskCore interface {
 	AbortWithCause(fail.Error) fail.Error
 	Abortable() (bool, fail.Error)
 	Aborted() bool
-	DisarmAbortSignal() func()
+	DisarmAbortSignal() (func(), fail.Error)
 	ID() (string, fail.Error)
 	Signature() string
 	Status() (TaskStatus, fail.Error)
@@ -195,10 +202,10 @@ const (
 
 // TaskFromContext extracts the task instance from context
 // returns:
-//    - Task, nil: Task found in 'ctx'
-//    - nil, *fail.ErrNotAvailable: there is no Task value in 'ctx'
-//    - nil, *fail.ErrInconsistent: value stored as Task in "ctx' is not of type Task
-//    - nil, *ErrInvalidParameter: 'ctx' is nil
+//   - Task, nil: Task found in 'ctx'
+//   - nil, *fail.ErrNotAvailable: there is no Task value in 'ctx'
+//   - nil, *fail.ErrInconsistent: value stored as Task in "ctx' is not of type Task
+//   - nil, *ErrInvalidParameter: 'ctx' is nil
 func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 	if ctx != nil {
 		if ctxValue := ctx.Value(KeyForTaskInContext); ctxValue != nil {
@@ -216,7 +223,7 @@ func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 // TaskFromContextOrVoid extracts the task instance from context.
 // If there is no task in the context, returns a VoidTask()
 // returns:
-//    - Task, nil: Task found in 'ctx' or VoidTask() is returned
+//   - Task, nil: Task found in 'ctx' or VoidTask() is returned
 func TaskFromContextOrVoid(ctx context.Context) (Task, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
@@ -247,20 +254,16 @@ func NewUnbreakableTask() (Task, fail.Error) {
 	return nt, nil
 }
 
-// NewTaskWithParent creates a subtask
-// Such a task can be aborted if the parent one can be
-func NewTaskWithParent(parentTask Task, options ...data.ImmutableKeyValue) (Task, fail.Error) {
-	if parentTask == nil {
-		return nil, fail.InvalidParameterError("parentTask", "must not be nil")
-	}
-
-	return newTask(context.Background(), parentTask, options...)
-}
-
 // NewTaskWithContext creates an instance of Task with context
 func NewTaskWithContext(ctx context.Context, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	select {
+	case <-ctx.Done():
+		return nil, fail.AbortedError(ctx.Err())
+	default:
 	}
 
 	return newTask(ctx, nil, options...)
@@ -336,6 +339,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 	}
 
 	instance.ctx = context.WithValue(childContext, KeyForTaskInContext, instance) // nolint
+	instance.ctx = context.WithValue(ctx, KeyForID, instance.id)                  // nolint
 
 	return instance, nil
 }
@@ -482,6 +486,12 @@ func (instance *task) Start(action TaskAction, params TaskParameters, options ..
 		return nil, fail.InvalidInstanceError()
 	}
 
+	select {
+	case <-instance.Context().Done():
+		return nil, fail.AbortedError(instance.Context().Err())
+	default:
+	}
+
 	return instance.StartWithTimeout(action, params, 0, options...)
 }
 
@@ -568,7 +578,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 		var failure error
 		defer fail.OnPanic(&failure) // this prevents the os.Exit, but we lack communication outside the func -> the task will be unaware
 
-		instance.lock.Lock()
+		instance.lock.Lock() // nolint
 		instance.stats.runBegin = time.Now()
 		instance.lock.Unlock() // nolint
 
@@ -1003,6 +1013,12 @@ func (instance *task) Run(action TaskAction, params TaskParameters, options ...d
 		return nil, fail.InvalidInstanceError()
 	}
 
+	select {
+	case <-instance.Context().Done():
+		return nil, fail.AbortedError(instance.Context().Err())
+	default:
+	}
+
 	_, err := instance.Start(action, params, options...)
 	if err != nil {
 		return nil, err
@@ -1094,7 +1110,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			instance.lock.Unlock() // Note: Do not defer this, the loop continue
 
 		case RUNNING:
-			instance.lock.Lock()
+			instance.lock.Lock() // nolint
 			runTerminated := instance.runTerminated
 			instance.lock.Unlock() // nolint
 
@@ -1176,7 +1192,18 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 		return false, nil, nil
 
 	case ABORTED:
-		fallthrough
+		instance.lock.Lock()
+		defer instance.lock.Unlock()
+
+		if instance.resultObtained {
+			if instance.ctx.Err() != nil && instance.err == nil {
+				instance.err = fail.AbortedError(instance.ctx.Err())
+			}
+			return true, instance.result, instance.err
+		}
+
+		// result has not been returned yet by TaskAction
+		return false, nil, nil
 	case TIMEOUT:
 		fallthrough
 	case RUNNING:
@@ -1195,10 +1222,10 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 
 // WaitFor waits for the task to end, for 'duration' duration.
 // Note: if timeout occurred, the task is not aborted. You have to abort then wait for it explicitly if needed.
-// - true, TaskResult, fail.Error: Task terminates, but TaskAction returned an error
-// - true, TaskResult, *failErrAborted: Task terminates on Abort
-// - false, nil, *fail.ErrTimeout: WaitFor has timed out; Task is aborted in this case (and eventual error after
-//                                 abort signal has been received would be attached to the error as consequence)
+//   - true, TaskResult, fail.Error: Task terminates, but TaskAction returned an error
+//   - true, TaskResult, *failErrAborted: Task terminates on Abort
+//   - false, nil, *fail.ErrTimeout: WaitFor has timed out; Task is aborted in this case (and eventual error after
+//     abort signal has been received would be attached to the error as consequence)
 func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return false, nil, fail.InvalidInstanceError()
@@ -1244,7 +1271,20 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, fer
 					for !t.Aborted() && !done {
 						done, result, innerXErr = instance.TryWait()
 						if innerXErr != nil {
+							if _, ok := innerXErr.(*fail.ErrAborted); ok {
+								doneWaitingCh <- struct{}{}
+								return nil, fail.AbortedError(innerXErr)
+							}
+							ctErr := spew.Sdump(innerXErr)
+							if strings.Contains(ctErr, "aborted") {
+								doneWaitingCh <- struct{}{}
+								return nil, fail.AbortedError(innerXErr)
+							}
 							logrus.Warnf("ignoring internal error: %v", innerXErr)
+						}
+						if done {
+							doneWaitingCh <- struct{}{}
+							return nil, nil
 						}
 						if !done {
 							time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
@@ -1449,10 +1489,9 @@ func (instance *task) Abortable() (bool, fail.Error) {
 // If on call the abort signal is already disarmed, does nothing and returned function does nothing also.
 // If on call the abort signal is not disarmed, disarms it and returned function will rearm it.
 // Note: the disarm state is not propagated to subtasks. It's possible to disarm abort signal in a task and want to Abort() explicitly a subtask.
-func (instance *task) DisarmAbortSignal() func() {
+func (instance *task) DisarmAbortSignal() (func(), fail.Error) {
 	if valid.IsNil(instance) {
-		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.") // FIXME: return error
-		return func() {}
+		return func() {}, fail.InvalidInstanceError()
 	}
 
 	instance.lock.Lock()
@@ -1472,9 +1511,9 @@ func (instance *task) DisarmAbortSignal() func() {
 			defer instance.lock.Unlock()
 
 			instance.abortDisengaged = false
-		}
+		}, nil
 	}
 
 	// If abort signal is already disengaged, does nothing and returns a func that does nothing also
-	return func() {}
+	return func() {}, nil
 }

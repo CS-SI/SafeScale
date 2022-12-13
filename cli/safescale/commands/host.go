@@ -30,9 +30,9 @@ import (
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/client"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/server/resources/operations/converters"
 	clitools "github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -56,10 +56,10 @@ var HostCommand = cli.Command{
 		hostReboot,
 		hostStart,
 		hostStop,
-		hostCheckFeatureCommand,  // Deprecated
-		hostAddFeatureCommand,    // Deprecated
-		hostRemoveFeatureCommand, // Deprecated
-		hostListFeaturesCommand,  // Deprecated
+		hostCheckFeatureCommand,  // DEPRECATED: deprecated
+		hostAddFeatureCommand,    // DEPRECATED: deprecated
+		hostRemoveFeatureCommand, // DEPRECATED: deprecated
+		hostListFeaturesCommand,  // DEPRECATED: deprecated
 		hostSecurityCommands,
 		hostFeatureCommands,
 		hostTagCommands,

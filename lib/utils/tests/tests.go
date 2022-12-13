@@ -30,7 +30,7 @@ import (
 
 var preservedOutput = os.Stdout
 
-// Used for tests to capture logrus output
+// LogrusCapture Used for tests to capture logrus output
 func LogrusCapture(routine func()) string {
 	log := ""
 	r, w, _ := os.Pipe()
@@ -56,7 +56,7 @@ func LogrusCapture(routine func()) string {
 	return log
 }
 
-// Used for tests to run code segment with timelimit
+// TimelimitCapture Used for tests to run code segment with timelimit
 // return status of (true: in time, false: timeouted)
 func TimelimitCapture(routine func(), timeout time.Duration) bool {
 
@@ -83,19 +83,6 @@ func TimelimitCapture(routine func(), timeout time.Duration) bool {
 
 }
 
-// Check if Minio is locally online
-/*
-	Fragment TOML
-
-[[tenants]]
-    [tenants.objectstorage]
-        Type        = "s3"
-        Region      = "stub"
-        Endpoint    = "http://localhost:9000"
-        AccessKey   = "accessKey"
-        SecretKey   = "secretKey"
-
-*/
 func MinioOnline() bool {
 
 	endpoint := func() string {

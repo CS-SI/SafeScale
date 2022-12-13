@@ -27,7 +27,7 @@ run:
   # on Windows.
   skip-files:
     - ".*/rice-box.go$"
-    - "lib/server/resources/operations/rice-box.go"
+    - "lib/backend/resources/operations/rice-box.go"
     - ".*/retry_test.go"
 
   # Allow multiple parallel golangci-lint instances running.
@@ -315,7 +315,7 @@ linters-settings:
 
   gofumpt:
     # Select the Go version to target. The default is `1.15`.
-    lang-version: "1.16"
+    lang-version: "1.17"
 
     # Choose whether or not to use the extra rules that are disabled
     # by default
@@ -430,7 +430,7 @@ linters-settings:
 
   gosimple:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.16"
+    go: "1.17"
     # https://staticcheck.io/docs/options#checks
     checks: [ "all" ]
 
@@ -850,13 +850,13 @@ linters-settings:
 
   staticcheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.16"
+    go: "1.17"
     # https://staticcheck.io/docs/options#checks
     checks: [ "all" ]
 
   stylecheck:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.16"
+    go: "1.17"
     # https://staticcheck.io/docs/options#checks
     checks: [ "all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022" ]
     # https://staticcheck.io/docs/options#dot_import_whitelist
@@ -916,7 +916,7 @@ linters-settings:
 
   unused:
     # Select the Go version to target. The default is '1.13'.
-    go: "1.16"
+    go: "1.17"
 
   varnamelen:
     # The longest distance, in source lines, that is being considered a "small scope." (defaults to 5)
