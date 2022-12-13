@@ -363,11 +363,13 @@ func (t *MutableTimings) BigDelay() time.Duration {
 
 // CommunicationTimeout ...
 func CommunicationTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultCommunicationTimeout, "SAFESCALE_COMMUNICATION_TIMEOUT")
 }
 
 // MetadataReadAfterWriteTimeout ...
 func MetadataReadAfterWriteTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultMetadataReadAfterWriteTimeout, "SAFESCALE_METADATA_READ_AFTER_WRITE_TIMEOUT")
 }
 
@@ -377,31 +379,37 @@ func RebootTimeout() time.Duration {
 
 // HostLongOperationTimeout ...
 func HostLongOperationTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultHostLongOperationTimeout, "SAFESCALE_HOST_LONG_OPERATION_TIMEOUT")
 }
 
 // ContextTimeout ...
 func ContextTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultContextTimeout, "SAFESCALE_CONTEXT_TIMEOUT")
 }
 
 // MetadataTimeout ...
 func MetadataTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultMetadataTimeout, "SAFESCALE_METADATA_TIMEOUT")
 }
 
 // HostOperationTimeout ...
 func HostOperationTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultHostOperationTimeout, "SAFESCALE_HOST_TIMEOUT")
 }
 
 // OperationTimeout ...
 func OperationTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultOperationTimeout, "SAFESCALE_OP_TIMEOUT", "SAFESCALE_OPERATION_TIMEOUT")
 }
 
 // HostCreationTimeout ...
 func HostCreationTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultHostCreationTimeout, "SAFESCALE_HOST_CREATION_TIMEOUT")
 }
 
@@ -412,26 +420,31 @@ func HostBootTimeout() time.Duration {
 
 // HostCleanupTimeout ...
 func HostCleanupTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultHostCleanupTimeout, "SAFESCALE_HOST_CLEANUP_TIMEOUT")
 }
 
 // SSHConnectionTimeout ...
 func SSHConnectionTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultSSHConnectionTimeout, "SAFESCALE_SSH_CONNECTION_TIMEOUT", "SAFESCALE_SSH_CONNECT_TIMEOUT")
 }
 
 // ConnectionTimeout ...
 func ConnectionTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultConnectionTimeout, "SAFESCALE_CONNECTION_TIMEOUT", "SAFESCALE_CONNECT_TIMEOUT")
 }
 
 // ExecutionTimeout ...
 func ExecutionTimeout() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultExecutionTimeout, "SAFESCALE_EXECUTION_TIMEOUT")
 }
 
 // MinDelay ...
 func MinDelay() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultSmallDelay, "SAFESCALE_MIN_DELAY", "SAFESCALE_SMALL_DELAY")
 }
 
@@ -442,6 +455,7 @@ func SmallDelay() time.Duration {
 
 // NormalDelay returns the duration for a normal delay
 func NormalDelay() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultNormalDelay, "SAFESCALE_DEFAULT_DELAY", "SAFESCALE_NORMAL_DELAY")
 }
 
@@ -452,5 +466,6 @@ func DefaultDelay() time.Duration {
 
 // BigDelay returns the duration for a big delay
 func BigDelay() time.Duration {
+	//FIXME: add env var doc
 	return getFromEnv(defaultBigDelay, "SAFESCALE_BIG_DELAY")
 }

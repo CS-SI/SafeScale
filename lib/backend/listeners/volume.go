@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
@@ -304,6 +305,9 @@ func (s *VolumeListener) Inspect(inctx context.Context, in *protocol.Reference) 
 	handler := handlers.NewVolumeHandler(job)
 	volumeInstance, xerr := handler.Inspect(ref)
 	if xerr != nil {
+		if _, ok := xerr.(*fail.ErrNotFound); ok {
+			return nil, abstract.ResourceNotFoundError("volume", ref)
+		}
 		return nil, xerr
 	}
 
