@@ -34,9 +34,8 @@ import (
 
 // ListSecurityGroups lists existing security groups
 func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
-	var emptySlice []*abstract.SecurityGroup
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
@@ -44,14 +43,14 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*ab
 
 	resp, xerr := s.rpcDescribeSecurityGroups(ctx, aws.String(networkRef), nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	out := make([]*abstract.SecurityGroup, 0, len(resp))
 	for k, v := range resp {
 		item, xerr := toAbstractSecurityGroup(v)
 		if xerr != nil {
-			return emptySlice, fail.Wrap(xerr, "failed to convert rule #%d", k)
+			return nil, fail.Wrap(xerr, "failed to convert rule #%d", k)
 		}
 		out = append(out, item)
 	}

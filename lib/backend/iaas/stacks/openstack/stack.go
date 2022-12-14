@@ -61,7 +61,7 @@ type stack struct {
 
 // NullStack returns a null value of the stack
 func NullStack() *stack { // nolint
-	return &stack{}
+	return nil
 }
 
 // New authenticates and returns a stack pointer

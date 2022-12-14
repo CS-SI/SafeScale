@@ -312,9 +312,8 @@ func (p provider) GetCapabilities(context.Context) (providers.Capabilities, fail
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
-	var emptySlice []*regexp.Regexp
 	if valid.IsNil(p) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var (
@@ -323,7 +322,7 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice, fail.ConvertError(err)
+			return nil, fail.ConvertError(err)
 		}
 		out = append(out, re)
 	}

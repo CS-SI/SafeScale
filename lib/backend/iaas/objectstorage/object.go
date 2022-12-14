@@ -98,22 +98,17 @@ func newObject(bucket *bucket, objectName string) (object, fail.Error) {
 	return o, nil
 }
 
-// nullObject returns an instance of object corresponding to null value
-func nullObject() object {
-	return object{}
-}
-
 // IsNull tells if the instance correspond to null value
 func (instance *object) IsNull() bool {
 	return instance == nil || instance.name == ""
 }
 
 // newObjectFromStow ...
-func newObjectFromStow(b *bucket, item stow.Item) object {
+func newObjectFromStow(b *bucket, item stow.Item) *object {
 	if valid.IsNil(b) || item == nil {
-		return nullObject()
+		return nil
 	}
-	return object{
+	return &object{
 		bucket: b,
 		item:   item,
 		name:   item.Name(),

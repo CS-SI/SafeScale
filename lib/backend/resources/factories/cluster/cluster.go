@@ -28,13 +28,11 @@ import (
 
 // List returns a list of available hosts
 func List(ctx context.Context, svc iaas.Service) (list []abstract.ClusterIdentity, ferr fail.Error) {
-	var emptyList []abstract.ClusterIdentity
-
 	if ctx == nil {
-		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if svc == nil {
-		return emptyList, fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	instance, xerr := New(ctx, svc)

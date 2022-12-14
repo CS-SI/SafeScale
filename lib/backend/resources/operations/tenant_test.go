@@ -22,8 +22,30 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	mapset "github.com/deckarep/golang-set"
 )
+
+func Test_MapSet(t *testing.T) {
+	joder := mapset.NewSet()
+
+	var cap []string
+
+	var rey []string = []string{"a", "b", "brother", "cholera", "b", "brother"}
+	for _, v := range rey {
+		joder.Add(v)
+	}
+
+	ite := joder.Iter()
+	for v := range ite {
+		cap = append(cap, v.(string))
+	}
+
+	assert.Equal(t, 4, joder.Cardinality())
+	assert.Equal(t, 4, len(cap))
+}
 
 func Test_CurrentTenant(t *testing.T) {
 

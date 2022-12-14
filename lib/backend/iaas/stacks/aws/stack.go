@@ -52,7 +52,7 @@ type stack struct {
 
 // NullStack is not exposed through API, is needed essentially by tests
 func NullStack() *stack { // nolint
-	return &stack{}
+	return nil
 }
 
 // IsNull tells if the instance represents a null value

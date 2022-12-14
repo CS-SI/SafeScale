@@ -1238,24 +1238,8 @@ func (s stack) complementHost(ctx context.Context, ahf *abstract.HostFull, vm os
 	return xerr
 }
 
-// GetHostState returns the current state of the host identified by id
-func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
-	if valid.IsNil(s) {
-		return hoststate.Unknown, fail.InvalidInstanceError()
-	}
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
-	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
-	if xerr != nil {
-		return hoststate.Unknown, xerr
-	}
-
-	return s.hostState(ctx, ahf.Core.ID)
-}
-
 // GetTrueHostState returns the current state of the host identified by id
-func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
+func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
@@ -1272,9 +1256,8 @@ func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParame
 
 // ListHosts lists all hosts
 func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList, ferr fail.Error) {
-	emptyList := abstract.HostList{}
 	if valid.IsNil(s) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
@@ -1282,7 +1265,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList
 
 	resp, xerr := s.rpcReadVMs(ctx, nil)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	var hosts abstract.HostList
@@ -1304,7 +1287,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList
 		} else {
 			tags, xerr := s.rpcReadTagsOfResource(ctx, vm.VmId)
 			if xerr != nil {
-				return emptyList, xerr
+				return nil, xerr
 			}
 
 			if tag, ok := tags["name"]; ok {

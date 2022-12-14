@@ -15,4 +15,6 @@ const (
 	SecurityGroupResource
 	SubnetResource
 	VolumeResource
+	ShareResource
+	FeatureResource
 )

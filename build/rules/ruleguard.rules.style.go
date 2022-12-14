@@ -82,3 +82,13 @@ func removeDebugCode(m dsl.Matcher) {
 	).
 		Report("REMOVE debug code before a release")
 }
+
+func removeMoreDebugCode(m dsl.Matcher) {
+	m.Match(
+		"logrus.WithContext($*_).Warningf($*_, $*_)",
+		"logrus.WithContext($*_).Warning($*_, $x)",
+		"logrus.WithContext($*_).Warningf($*_)",
+		"logrus.WithContext($*_).Warning($*_)",
+	).
+		Report("REMOVE ctx debug code before a release")
+}
