@@ -419,17 +419,28 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 				}
 			}
 
-			doReload := true
-			// Reload reloads data from object storage to be sure to have the last revision
-			if doReload {
-				xerr := myself.unsafeReload(ctx)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return fail.Wrap(xerr, "failed to unsafeReload metadata")
-				}
+			xerr := myself.unsafeReload(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return fail.Wrap(xerr, "failed to unsafeReload metadata")
 			}
 
-			xerr := myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
+			rollbacked, err := myself.shielded.UnWrap()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
+			defer func() {
+				if ferr != nil {
+					err := myself.shielded.RollBack(rollbacked)
+					if err != nil {
+						return
+					}
+					myself.committed = true
+				}
+			}()
+
+			xerr = myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
 				return callback(clonable, myself.properties)
 			})
 			xerr = debug.InjectPlannedFail(xerr)
@@ -453,7 +464,6 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 			xerr = myself.write(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				// FIXME: OPP Missing rollback
 				return xerr
 			}
 
