@@ -427,9 +427,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 			return
 		}
 
-		// instance.lock.Lock()
-		// defer instance.lock.Unlock()
-
+		// FIXME: Any metadata problem blocks resource destruction... great !!
 		xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			abstractNetwork, ok := clonable.(*abstract.Network)
 			if !ok {
