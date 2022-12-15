@@ -21,7 +21,7 @@ require (
 	github.com/gophercloud/gophercloud v0.25.0
 	github.com/itchyny/gojq v0.12.9
 	github.com/json-iterator/go v1.1.12
-	github.com/magiconair/properties v1.8.6
+	github.com/magiconair/properties v1.8.7
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/oscarpicas/covertool v0.4.1
