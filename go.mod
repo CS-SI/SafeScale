@@ -51,7 +51,7 @@ require (
 	golang.org/x/term v0.3.0
 	golang.org/x/text v0.5.0
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.104.0
+	google.golang.org/api v0.105.0
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/fsnotify.v1 v1.4.7
