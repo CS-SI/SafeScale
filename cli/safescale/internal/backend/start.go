@@ -265,20 +265,19 @@ func buildGRPCWebServer(grpcServer *grpc.Server) (*grpcweb.Mux, fail.Error) {
 
 	options := []improbablegrpcweb.Option{
 		improbablegrpcweb.WithCorsForRegisteredEndpointsOnly(false),
+		improbablegrpcweb.WithOriginFunc(func(string) bool {
+			return true
+		}),
 	}
-
-	// VPL: still need to figure out if I want to be able to limit origins...
-	// allowedOrigins := makeAllowedOrigins(*flagAllowedOrigins)
-	//	options = append(options, grpcweb.WithOriginFunc(makeHttpOriginFunc(common.Settings.Backend.AllowedOrigins)))
 
 	// VPL: still need to figure out why I would want to use WebSockets...
 	// if *useWebsockets {
-	logrus.Println("using websockets")
+	// logrus.Println("using websockets")
 	options = append(options,
 		improbablegrpcweb.WithWebsockets(true),
-	// grpcweb.WithWebsocketOriginFunc(makeWebsocketOriginFunc(allowedOrigins)),
+		// improbablegrpcweb.WithWebsocketOriginFunc(makeWebsocketOriginFunc(allowedOrigins)),
 	)
-	// 	if *websocketPingInterval >= time.Second {
+	//	if *websocketPingInterval >= time.Second {
 	// 		logrus.Infof("websocket keepalive pinging enabled, the timeout interval is %s", websocketPingInterval.String())
 	// 	}
 	// 	if *websocketReadLimit > 0 {
@@ -289,28 +288,6 @@ func buildGRPCWebServer(grpcServer *grpc.Server) (*grpcweb.Mux, fail.Error) {
 		options,
 		improbablegrpcweb.WithWebsocketPingInterval(5*time.Second),
 	)
-
-	// 	var compressionMode websocket.CompressionMode
-	// 	switch *websocketCompressionMode {
-	// 	case "no_context_takeover":
-	// 		compressionMode = websocket.CompressionNoContextTakeover
-	// 	case "context_takeover":
-	// 		compressionMode = websocket.CompressionContextTakeover
-	// 	case "disabled":
-	// 		compressionMode = websocket.CompressionDisabled
-	// 	default:
-	// 		logrus.Fatalf("unknown param for websocket compression mode: %s", *websocketCompressionMode)
-	// 	}
-	//
-	// 	options = append(
-	// 		options,
-	// 		grpcweb.WithWebsocketCompressionMode(compressionMode),
-	// 	)
-	// }
-
-	// if len(*flagAllowedHeaders) > 0 {
-	// 	options = append(options, grpcweb.WithAllowedRequestHeaders(*flagAllowedHeaders))
-	// }
 
 	return grpcweb.NewHandler(grpcServer, options...)
 }

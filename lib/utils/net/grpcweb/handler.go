@@ -2,10 +2,12 @@ package grpcweb
 
 import (
 	"net/http"
+	"strings"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"google.golang.org/grpc"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 type Mux struct {
@@ -29,13 +31,16 @@ func (m *Mux) Handler(next http.Handler) http.Handler {
 		}
 
 		if m.IsGrpcWebRequest(r) || m.IsAcceptableGrpcCorsRequest(r) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-			w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-User-Agent, X-Grpc-Web")
-			w.Header().Set("grpc-status", "")
-			w.Header().Set("grpc-message", "")
-			m.ServeHTTP(w, r)
-			return
+			origins, ok := r.Header["Origin"]
+			if ok && len(origins) > 0 {
+				w.Header().Set("Access-Control-Allow-Origin", strings.Join(origins, ","))
+				w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+				w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-User-Agent, X-Grpc-Web")
+				w.Header().Set("grpc-status", "")
+				w.Header().Set("grpc-message", "")
+				m.ServeHTTP(w, r)
+				return
+			}
 		}
 
 		if next != nil {
