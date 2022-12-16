@@ -47,7 +47,7 @@ func TestClusterNetwork_IsNull(t *testing.T) {
 }
 
 func TestClusterNetwork_Replace(t *testing.T) {
-	var cn *ClusterNetwork
+	var cn *ClusterNetwork = nil
 	cn2 := newClusterNetwork()
 	result, err := cn.Replace(cn2)
 	if err == nil {

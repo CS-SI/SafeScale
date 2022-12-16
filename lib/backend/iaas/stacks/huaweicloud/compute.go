@@ -643,7 +643,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 						if server != nil && server.ID != "" {
 							derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
-								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
+								_ = xerr.AddConsequence(
+									fail.Wrap(
+										derr, "cleaning up on failure, failed to delete host",
+									),
+								)
 							}
 						}
 						switch xerr.(type) {
@@ -708,7 +712,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 				case *fail.ErrNotAvailable:
 					_ = s.DeleteHost(cleanupContextFrom(ctx), finalServer.ID)
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
-
 				default:
 					_ = s.DeleteHost(cleanupContextFrom(ctx), finalServer.ID)
 					return innerXErr
@@ -725,25 +728,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 		timings.NormalDelay(),
 		timings.HostLongOperationTimeout(),
 	)
-
-	// Starting from here, delete host if exiting with error
-	defer func() {
-		if ferr != nil && ahc.ID != "" {
-			derr := s.DeleteHost(ctx, ahc.ID)
-			if derr != nil {
-				switch derr.(type) {
-				case *fail.ErrNotFound:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr)
-				case *fail.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
-				default:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
-				}
-				_ = ferr.AddConsequence(derr)
-			}
-		}
-	}()
-
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry: // here it should never happen

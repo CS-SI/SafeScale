@@ -665,6 +665,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 				if finnerXerr != nil {
 					return fail.WarningError(finnerXerr, "cannot create md5 command")
 				}
+
 				fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, timings.HostLongOperationTimeout())
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
