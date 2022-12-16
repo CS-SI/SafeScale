@@ -1130,6 +1130,7 @@ message SecurityGroupListRequest{
 	string organization = 2;
 	string project = 3;
 	string tenant_id = 4;
+	string network = 5;
 }
 
 message SecurityGroupListResponse {

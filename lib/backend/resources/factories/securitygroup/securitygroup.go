@@ -22,12 +22,13 @@ import (
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	networkfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/network"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // List returns a list of available security groups
-func List(ctx context.Context, all bool) ([]*abstract.SecurityGroup, fail.Error) {
+func List(ctx context.Context, networkRef string, all bool) ([]*abstract.SecurityGroup, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -41,16 +42,43 @@ func List(ctx context.Context, all bool) ([]*abstract.SecurityGroup, fail.Error)
 		return myjob.Service().ListSecurityGroups(ctx, "")
 	}
 
+	var networkID string
+	if networkRef != "" {
+		networkInstance, xerr := networkfactory.Load(ctx, networkRef)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		var err error
+		networkID, err = networkInstance.GetID()
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
+	}
+
 	sgInstance, xerr := New(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	var list []*abstract.SecurityGroup
-	xerr = sgInstance.Browse(ctx, func(asg *abstract.SecurityGroup) fail.Error {
-		list = append(list, asg)
-		return nil
-	})
+	var (
+		list     []*abstract.SecurityGroup
+		callback func(asg *abstract.SecurityGroup) fail.Error
+	)
+	if networkID == "" {
+		callback = func(asg *abstract.SecurityGroup) fail.Error {
+			list = append(list, asg)
+			return nil
+		}
+	} else {
+		callback = func(asg *abstract.SecurityGroup) fail.Error {
+			if networkID == asg.Network {
+				list = append(list, asg)
+			}
+			return nil
+		}
+	}
+	xerr = sgInstance.Browse(ctx, callback)
 	return list, xerr
 }
 

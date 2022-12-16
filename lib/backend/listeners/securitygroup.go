@@ -63,12 +63,12 @@ func (s *SecurityGroupListener) List(inctx context.Context, in *protocol.Securit
 
 	all := in.GetAll()
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.securitygroup"), "(%s, %v)", in.GetNetwork(), all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
-	list, xerr := handler.List(all)
+	list, xerr := handler.List(in.GetNetwork(), all)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -41,7 +41,7 @@ type SecurityGroupHandler interface {
 	Delete(sgRef string, force bool) fail.Error
 	DeleteRule(sgRef string, rule *abstract.SecurityGroupRule) (resources.SecurityGroup, fail.Error)
 	Inspect(sgRef string) (resources.SecurityGroup, fail.Error)
-	List(all bool) ([]*abstract.SecurityGroup, fail.Error)
+	List(networkRef string, all bool) ([]*abstract.SecurityGroup, fail.Error)
 	Reset(sgRef string) fail.Error
 	// Sanitize(sgRef string) (ferr fail.Error)
 }
@@ -56,7 +56,7 @@ func NewSecurityGroupHandler(job jobapi.Job) SecurityGroupHandler {
 }
 
 // List lists hosts managed by SafeScale only, or all hosts.
-func (handler *securityGroupHandler) List(all bool) (_ []*abstract.SecurityGroup, ferr fail.Error) {
+func (handler *securityGroupHandler) List(networkRef string, all bool) (_ []*abstract.SecurityGroup, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -72,7 +72,7 @@ func (handler *securityGroupHandler) List(all bool) (_ []*abstract.SecurityGroup
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	return securitygroupfactory.List(handler.job.Context(), all)
+	return securitygroupfactory.List(handler.job.Context(), networkRef, all)
 }
 
 // Create creates a new Security Group

@@ -419,12 +419,22 @@ func networkSecurityGroupListCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, hostSecurityCmdLabel, groupCmdLabel, c.Name(), strings.Join(args, ", "))
 
+			var networkRef string
+			switch len(args) {
+			case 0:
+			case 1:
+				networkRef = args[0]
+			default:
+				_ = c.Usage()
+				return cli.FailureResponse(cli.ExitOnInvalidArgument("Cannot list Security Groups of multiple Networks"))
+			}
+
 			all, err := c.Flags().GetBool("all")
 			if err != nil {
 				return cli.FailureResponse(err)
 			}
 
-			list, err := ClientSession.SecurityGroup.List(all, 0)
+			list, err := ClientSession.SecurityGroup.List(networkRef, all, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnRPC(strprocess.Capitalize(cmdline.DecorateTimeoutError(err, "list of Security Groups", false).Error())))

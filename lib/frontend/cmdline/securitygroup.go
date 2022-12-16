@@ -38,7 +38,7 @@ type securityGroupConsumer struct {
 }
 
 // List ...
-func (sg securityGroupConsumer) List(all bool, timeout time.Duration) (*protocol.SecurityGroupListResponse, error) {
+func (sg securityGroupConsumer) List(networkRef string, all bool, timeout time.Duration) (*protocol.SecurityGroupListResponse, error) {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -59,6 +59,7 @@ func (sg securityGroupConsumer) List(all bool, timeout time.Duration) (*protocol
 		Organization: sg.session.currentOrganization,
 		Project:      sg.session.currentProject,
 		TenantId:     sg.session.currentTenant,
+		Network:      networkRef,
 		All:          all,
 	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
