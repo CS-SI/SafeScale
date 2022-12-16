@@ -288,7 +288,7 @@ func (instance MetadataFolder) Read(ctx context.Context, path string, name strin
 		decrypted, err := crypt.Decrypt(datas, instance.cryptKey)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
-			return fail.NotFoundError("failed to decrypt metadata '%s/%s': %v", path, name, err)
+			return fail.NotAvailableError("failed to decrypt metadata '%s/%s': %v", path, name, err)
 		}
 		datas = decrypted
 	}
@@ -296,7 +296,7 @@ func (instance MetadataFolder) Read(ctx context.Context, path string, name strin
 	xerr = callback(datas)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.NotFoundError("failed to decode metadata '%s/%s': %v", path, name, xerr)
+		return fail.NotAvailableError("failed to decode metadata '%s/%s': %v", path, name, xerr)
 	}
 
 	return nil

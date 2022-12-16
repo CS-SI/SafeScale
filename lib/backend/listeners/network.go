@@ -119,7 +119,7 @@ func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCrea
 	}
 
 	handler := handlers.NewNetworkHandler(job)
-	networkInstance, xerr := handler.Create(networkReq, subnetReq, "", gwSizing)
+	networkInstance, xerr := handler.Create(networkReq, subnetReq, in.GetGateway().Name, gwSizing)
 	if xerr != nil {
 		return nil, xerr
 	}
