@@ -1,6 +1,4 @@
 //go:build !(allintegration || (integration && ostests))
-// +build !allintegration
-// +build !integration !ostests
 
 /*
  * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu

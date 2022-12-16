@@ -24,12 +24,10 @@ import (
 	"os"
 	"os/user"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
@@ -98,17 +96,6 @@ func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
 		MetadataCore: coreInstance,
 	}
 	return instance, nil
-}
-
-func Stack() []byte {
-	buf := make([]byte, 1024)
-	for {
-		n := runtime.Stack(buf, false)
-		if n < len(buf) {
-			return buf[:n]
-		}
-		buf = make([]byte, 2*len(buf))
-	}
 }
 
 // onHostCacheMiss is called when host 'ref' is not found in cache
@@ -618,40 +605,6 @@ func (instance *Host) GetState(ctx context.Context) (hoststate.Enum, fail.Error)
 	}
 
 	return state, nil
-}
-
-// GetView returns a view of the Host, without forced inspect
-func (instance *Host) GetView(ctx context.Context) (*abstract.HostCore, *serialize.JSONProperties, fail.Error) {
-	if valid.IsNil(instance) {
-		return nil, nil, fail.InvalidInstanceError()
-	}
-
-	state := abstract.NewHostCore()
-	var propos *serialize.JSONProperties
-	var netInfo *propertiesv2.HostNetworking
-
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		ahc, ok := clonable.(*abstract.HostCore)
-		if !ok {
-			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		*state = *ahc
-		propos = props
-		return nil
-	})
-	if xerr != nil {
-		return nil, nil, xerr
-	}
-
-	netInfo, xerr = propertiesv2.NewHostNetworkingFromProperty(propos)
-	if xerr != nil {
-		return nil, nil, xerr
-	}
-
-	logrus.WithContext(ctx).Debugf("%s", spew.Sdump(netInfo))
-
-	return state, propos, nil
 }
 
 // Create creates a new Host and its metadata
@@ -3511,7 +3464,7 @@ func (instance *Host) hardReboot(ctx context.Context) (ferr fail.Error) {
 }
 
 // GetPublicIP returns the public IP address of the Host
-func (instance *Host) GetPublicIP(ctx context.Context) (_ string, ferr fail.Error) {
+func (instance *Host) GetPublicIP(_ context.Context) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -3540,7 +3493,7 @@ func (instance *Host) GetPublicIP(ctx context.Context) (_ string, ferr fail.Erro
 }
 
 // GetPrivateIP returns the private IP of the Host on its default Networking
-func (instance *Host) GetPrivateIP(ctx context.Context) (_ string, ferr fail.Error) {
+func (instance *Host) GetPrivateIP(_ context.Context) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
