@@ -287,9 +287,8 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstra
 
 // ListNetworks lists all networks
 func (s stack) ListNetworks(ctx context.Context) (_ []*abstract.Network, ferr fail.Error) {
-	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
@@ -297,7 +296,7 @@ func (s stack) ListNetworks(ctx context.Context) (_ []*abstract.Network, ferr fa
 
 	resp, xerr := s.rpcReadNets(ctx, nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	var nets []*abstract.Network
@@ -496,9 +495,8 @@ func toAbstractSubnet(subnet osc.Subnet) *abstract.Subnet {
 
 // ListSubnets lists all subnets
 func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstract.Subnet, ferr fail.Error) {
-	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
@@ -516,16 +514,16 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstrac
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			if an, xerr = s.InspectNetworkByName(ctx, networkRef); xerr != nil {
-				return emptySlice, xerr
+				return nil, xerr
 			}
 		default:
-			return emptySlice, xerr
+			return nil, xerr
 		}
 	}
 
 	resp, xerr := s.rpcReadSubnets(ctx, an.ID, nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	var subnets []*abstract.Subnet
 	for _, v := range resp {
@@ -536,20 +534,15 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstrac
 }
 
 func (s stack) listSubnetsByHost(ctx context.Context, hostID string) ([]*abstract.Subnet, []osc.Nic, fail.Error) {
-	var (
-		emptySubnetSlice []*abstract.Subnet
-		emptyNicSlice    []osc.Nic
-	)
-
 	resp, xerr := s.rpcReadNics(ctx, "", hostID)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
 			// No nics found, considered as a success and returns empty slices
 			debug.IgnoreError2(ctx, xerr)
-			return emptySubnetSlice, emptyNicSlice, nil
+			return nil, nil, nil
 		}
-		return emptySubnetSlice, emptyNicSlice, xerr
+		return nil, nil, xerr
 	}
 
 	var list []*abstract.Subnet
@@ -560,7 +553,7 @@ func (s stack) listSubnetsByHost(ctx context.Context, hostID string) ([]*abstrac
 			case *fail.ErrNotFound:
 				continue
 			default:
-				return emptySubnetSlice, emptyNicSlice, xerr
+				return nil, nil, xerr
 			}
 		}
 

@@ -801,7 +801,7 @@ function sfDoesDockerRunContainer() {
         FOUND=yes
       fi
     fi
-    [ "$FOUND" != "yes"] && return 1
+    [ "$FOUND" != "yes" ] && return 1
   fi
   echo $LIST | cut -d'|' -f3 | grep -i "^up" &> /dev/null || return 1
   return 0

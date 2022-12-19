@@ -332,9 +332,8 @@ func (instance *Cluster) UnregisterFeature(inctx context.Context, feat string) (
 func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptySlice []resources.Feature
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	// instance.lock.RLock()

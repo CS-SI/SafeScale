@@ -350,7 +350,7 @@ func (instance *task) IsNull() bool {
 		return true
 	}
 	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	defer instance.lock.RUnlock() // nolint
 	return instance.id == ""
 }
 

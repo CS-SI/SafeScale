@@ -66,6 +66,7 @@ type MetadataCore struct {
 
 	loaded            bool
 	committed         bool
+	deleted           bool
 	kindSplittedStore bool // tells if data read/write is done directly from/to folder (when false) or from/to subfolders (when true)
 }
 
@@ -194,6 +195,14 @@ func (myself *MetadataCore) IsValid() (bool, fail.Error) {
 		return false, nil
 	}
 
+	if !myself.loaded && !myself.committed {
+		return false, nil
+	}
+
+	if myself.deleted {
+		return false, nil
+	}
+
 	return true, nil
 }
 
@@ -215,12 +224,16 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Inspection of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Inspection of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
+	}
+
+	if itis, xerr := myself.IsValid(); xerr == nil && !itis {
+		return fail.InconsistentError("the instance is not valid")
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -313,13 +326,17 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Review of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Review of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()
 
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
+	}
+
+	if itis, xerr := myself.IsValid(); xerr == nil && !itis {
+		return fail.InconsistentError("the instance is not valid")
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -365,17 +382,21 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)
-func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Callback, options ...data.ImmutableKeyValue) (rerr fail.Error) {
+func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Alter of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Alter of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()
 
 	if valid.IsNil(myself) {
 		return fail.InvalidInstanceError()
+	}
+
+	if itis, xerr := myself.IsValid(); xerr == nil && !itis {
+		return fail.InconsistentError("the instance is not valid")
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -422,28 +443,28 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 				}
 			}
 
-			doReload := true
-			if len(options) > 0 {
-				for _, v := range options {
-					switch v.Key() {
-					case "Reload":
-						if bv, ok := v.Value().(bool); ok {
-							doReload = bv
-						}
-					default:
-					}
-				}
-			}
-			// Reload reloads data from object storage to be sure to have the last revision
-			if doReload {
-				xerr := myself.unsafeReload(ctx)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return fail.Wrap(xerr, "failed to unsafeReload metadata")
-				}
+			xerr := myself.unsafeReload(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return fail.Wrap(xerr, "failed to unsafeReload metadata")
 			}
 
-			xerr := myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
+			rollbacked, err := myself.shielded.UnWrap()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
+			defer func() {
+				if ferr != nil {
+					err := myself.shielded.RollBack(rollbacked)
+					if err != nil {
+						return
+					}
+					myself.committed = true
+				}
+			}()
+
+			xerr = myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
 				return callback(clonable, myself.properties)
 			})
 			xerr = debug.InjectPlannedFail(xerr)
@@ -457,6 +478,12 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 			}
 
 			myself.committed = false
+
+			var aerr fail.Error
+			aerr = debug.InjectPlannedFail(aerr)
+			if aerr != nil {
+				return aerr
+			}
 
 			xerr = myself.write(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -491,7 +518,7 @@ func (myself *MetadataCore) Carry(inctx context.Context, clonable data.Clonable)
 	defer func() {
 		if rerr != nil {
 			if myself != nil {
-				logrus.WithContext(inctx).Warningf("Carry of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
+				logrus.WithContext(inctx).Debugf("Carry of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
 			}
 		}
 	}()
@@ -992,6 +1019,12 @@ func (myself *MetadataCore) write(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	var aerr fail.Error
+	aerr = debug.InjectPlannedFail(aerr)
+	if aerr != nil {
+		return aerr
+	}
+
 	type result struct {
 		rErr fail.Error
 	}
@@ -1392,6 +1425,7 @@ func (myself *MetadataCore) Delete(inctx context.Context) (_ fail.Error) {
 
 			myself.loaded = false
 			myself.committed = false
+			myself.deleted = true
 
 			return nil
 		}()

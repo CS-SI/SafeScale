@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -97,6 +98,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			}
 
 			// this is the real constructor of the cluster, the one that populates the cluster with meaningful data
+			// FIXME: OPP Having this function here is a severe problem, this function should be IN LoadCluster
 			// Create first metadata of Cluster after initialization
 			xerr = instance.firstLight(ctx, req)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -224,8 +226,15 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 				return nil, xerr
 			}
 
+			mas := mapset.NewSet()
 			for _, agw := range gws {
-				instance.gateways = append(instance.gateways, agw.Core.ID)
+				mas.Add(agw.Core.ID)
+			}
+
+			instance.gateways = []string{}
+			mi := mas.Iter()
+			for v := range mi {
+				instance.gateways = append(instance.gateways, v.(string))
 			}
 
 			// Starting from here, exiting with error deletes hosts if req.keepOnFailure is false
@@ -2175,6 +2184,7 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 			res, err := runner(treeCtx, data)
 			if err != nil {
 				// log the error
+				// FIXME: OPP, If it IS a cancelled context, it is NOT an error
 				logrus.WithContext(treeCtx).Errorf("window runner failed with: %s", err)
 				return
 			}

@@ -66,20 +66,19 @@ func BuildBashLibraryDefinition(
 
 // ToMap transforms bld to a map
 func (bld *BashLibraryDefinition) ToMap() (map[string]interface{}, fail.Error) {
-	empty := map[string]interface{}{}
 	if bld == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("bld")
+		return nil, fail.InvalidParameterCannotBeNilError("bld")
 	}
 
 	out := map[string]interface{}{}
 	jsoned, err := json.Marshal(*bld)
 	if err != nil {
-		return empty, fail.Wrap(err, "failed to convert BashLibraryDefinition to JSON")
+		return nil, fail.Wrap(err, "failed to convert BashLibraryDefinition to JSON")
 	}
 
 	err = json.Unmarshal(jsoned, &out)
 	if err != nil {
-		return empty, fail.Wrap(err, "failed to convert BashLibraryDefinition from JSON to map")
+		return nil, fail.Wrap(err, "failed to convert BashLibraryDefinition from JSON to map")
 	}
 
 	return out, nil

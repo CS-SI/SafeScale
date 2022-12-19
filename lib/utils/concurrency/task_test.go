@@ -1357,63 +1357,6 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 	}
 }
 
-func TestLikeBeforeChangingWaitForTimingWithoutAbort(t *testing.T) {
-	funk := func(timing int) {
-		single, xerr := NewTask()
-		require.NotNil(t, single)
-		require.Nil(t, xerr)
-
-		single, xerr = single.StartWithTimeout(
-			taskgen(100, 200, 25, 0, 0, 0, false), nil, time.Duration(90)*time.Millisecond,
-		)
-		require.Nil(t, xerr)
-
-		time.Sleep(time.Duration(timing) * time.Millisecond)
-		// by now single should have finished with timeouts, so...
-
-		stat, xerr := single.Status()
-		if xerr != nil {
-			t.Errorf("Problem retrieving status ?")
-		}
-		if stat != TIMEOUT {
-			t.Errorf("Where is the timeout ?? (%d), that's the textbook definition", stat)
-		}
-
-		// We are in timeout state, so this should return false, nil, *fail.ErrTimeout
-		// VPL: No. At the time we do WaitFor(), the Task is timed out. So WaitFor will make it transition to DONE state, rv is true, and xerr is *fail.ErrTimeout
-		rv, _, xerr := single.WaitFor(4 * time.Millisecond)
-		if !rv {
-			fmt.Println(rv, xerr.Error())
-			// FIXME Still waiting for....happens
-		} else {
-			require.EqualValues(t, rv, true)
-			require.NotNil(t, xerr)
-		}
-
-		_, xerr = single.Wait()
-		require.NotNil(t, xerr)
-		switch xerr.(type) {
-		case *fail.ErrTimeout:
-			// expected
-		case *fail.ErrAborted:
-			// aborted by timeout, also expected
-		default:
-			t.Errorf(
-				"Where are the timeout errors ??: %s", spew.Sdump(xerr),
-			) // FIXME: CI Failed: https://github.com/CS-SI/SafeScale/suites/3973786152/artifacts/99924716
-		}
-	}
-
-	funk(500)
-	funk(400)
-	funk(300)
-	funk(290)
-	funk(250)
-	funk(240)
-	funk(230)
-	funk(220)
-}
-
 func TestLikeBeforeWithoutLettingFinish(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()

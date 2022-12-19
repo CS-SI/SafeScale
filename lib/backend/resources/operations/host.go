@@ -24,12 +24,10 @@ import (
 	"os"
 	"os/user"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
@@ -98,133 +96,6 @@ func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
 		MetadataCore: coreInstance,
 	}
 	return instance, nil
-}
-
-// LoadHost ...
-func LoadHost(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Host, fail.Error) {
-	defer elapsed(fmt.Sprintf("LoadHost of %s", ref))()
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		a    resources.Host
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		ga, gerr := func() (_ resources.Host, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			if svc == nil {
-				return nil, fail.InvalidParameterCannotBeNilError("svc")
-			}
-			if ref == "" {
-				return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-			}
-
-			// trick to avoid collisions
-			var kt *Host
-			refcache := fmt.Sprintf("%T/%s", kt, ref)
-
-			cache, xerr := svc.GetCache(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				if val, xerr := cache.Get(ctx, refcache); xerr == nil {
-					casted, ok := val.(resources.Host)
-					if ok {
-						incrementExpVar("host.cache.hit")
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("loadhost host cache response (%s): %v", refcache, xerr)
-				}
-			}
-
-			anon, xerr := onHostCacheMiss(ctx, svc, ref)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			incrementExpVar("newhost.cache.hit")
-			hostInstance, ok := anon.(*Host)
-			if !ok {
-				return nil, fail.InconsistentError("cache content for key %s is not a resources.Host", ref)
-			}
-			if hostInstance == nil {
-				return nil, fail.InconsistentError("nil value found in Host cache for key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = hostInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				hid, err := hostInstance.GetID()
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-
-				err = cache.Set(ctx, refcache, hostInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hostInstance.GetName()), hostInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), hostInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(100 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, refcache); xerr == nil {
-					casted, ok := val.(resources.Host)
-					if ok {
-						incrementExpVar("host.cache.hit")
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("host cache response (%s): %v", refcache, xerr)
-				}
-
-			}
-
-			return hostInstance, nil
-		}()
-		chRes <- result{ga, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.a, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
-}
-
-func Stack() []byte {
-	buf := make([]byte, 1024)
-	for {
-		n := runtime.Stack(buf, false)
-		if n < len(buf) {
-			return buf[:n]
-		}
-		buf = make([]byte, 2*len(buf))
-	}
 }
 
 // onHostCacheMiss is called when host 'ref' is not found in cache
@@ -432,7 +303,6 @@ func (instance *Host) updateCachedInformation(ctx context.Context) (sshapi.Conne
 			return innerXErr
 		}
 
-		// FIXME: OPP, Ha !!, this is the true problem !!
 		cfg := ssh.NewConfig(instance.GetName(), gaip, int(ahc.SSHPort), opUser, ahc.PrivateKey, 0, "", primaryGatewayConfig, secondaryGatewayConfig)
 		aconn, innerXErr := sshfactory.NewConnector(cfg)
 		if innerXErr != nil {
@@ -552,7 +422,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 		return state, fail.ConvertError(err)
 	}
 
-	state, xerr := instance.Service().GetTrueHostState(ctx, hid)
+	state, xerr := instance.Service().GetHostState(ctx, hid)
 	if xerr != nil {
 		return state, xerr
 	}
@@ -737,40 +607,6 @@ func (instance *Host) GetState(ctx context.Context) (hoststate.Enum, fail.Error)
 	return state, nil
 }
 
-// GetView returns a view of the Host, without forced inspect
-func (instance *Host) GetView(ctx context.Context) (*abstract.HostCore, *serialize.JSONProperties, fail.Error) {
-	if valid.IsNil(instance) {
-		return nil, nil, fail.InvalidInstanceError()
-	}
-
-	state := abstract.NewHostCore()
-	var propos *serialize.JSONProperties
-	var netInfo *propertiesv2.HostNetworking
-
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		ahc, ok := clonable.(*abstract.HostCore)
-		if !ok {
-			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		*state = *ahc
-		propos = props
-		return nil
-	})
-	if xerr != nil {
-		return nil, nil, xerr
-	}
-
-	netInfo, xerr = propertiesv2.NewHostNetworkingFromProperty(propos)
-	if xerr != nil {
-		return nil, nil, xerr
-	}
-
-	logrus.WithContext(ctx).Debugf("%s", spew.Sdump(netInfo))
-
-	return state, propos, nil
-}
-
 // Create creates a new Host and its metadata
 // If the metadata is already carrying a Host, returns fail.ErrNotAvailable
 // In case of error occurring after Host resource creation, 'instance' still contains ID of the Host created. This can be used to
@@ -859,12 +695,12 @@ func (instance *Host) implCreate(
 			} else {
 				if does, xerr := hc.Exists(ctx); xerr == nil {
 					if !does {
-						logrus.WithContext(ctx).Warningf("Either metadata corruption or cache not properly invalidated")
+						logrus.WithContext(ctx).Debugf("Either metadata corruption or cache not properly invalidated")
+					} else {
+						ar := result{nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)}
+						return ar, ar.err
 					}
 				}
-
-				ar := result{nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)}
-				return ar, ar.err
 			}
 
 			// Check if Host exists but is not managed by SafeScale
@@ -1035,7 +871,7 @@ func (instance *Host) implCreate(
 				if ferr != nil && !hostReq.KeepOnFailure {
 					if ahf.IsConsistent() {
 						aname, aid := ahf.Core.Name, ahf.Core.ID
-						logrus.WithContext(ctx).Warningf("Trying to delete failed instance: %s, %s", ahf.Core.Name, ahf.Core.ID)
+						logrus.WithContext(ctx).Debugf("Trying to delete failed instance: %s, %s", ahf.Core.Name, ahf.Core.ID)
 						if derr := svc.DeleteHost(cleanupContextFrom(ctx), ahf.Core.ID); derr != nil {
 							logrus.WithContext(ctx).Errorf(
 								"cleaning up on %s, failed to delete Host '%s' instance: %v", ActionFromError(ferr), ahf.Core.Name,
@@ -1062,9 +898,9 @@ func (instance *Host) implCreate(
 							}
 						}
 
-						logrus.WithContext(ctx).Warningf("Now the instance: %s, %s, should be deleted", aname, aid)
+						logrus.WithContext(ctx).Debugf("Now the instance: %s, %s, should be deleted", aname, aid)
 					} else {
-						logrus.WithContext(ctx).Warningf("We should NOT trust consistency")
+						logrus.WithContext(ctx).Debugf("We should NOT trust consistency")
 					}
 				}
 			}()
@@ -1399,7 +1235,7 @@ func (instance *Host) implCreate(
 				return ar, ar.err
 			}
 
-			trueState, err = svc.GetTrueHostState(ctx, hostID)
+			trueState, err = svc.GetHostState(ctx, hostID)
 			if err != nil {
 				ar := result{nil, fail.ConvertError(err)}
 				return ar, ar.err
@@ -2627,6 +2463,15 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 func (instance *Host) Delete(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
+	defer func() {
+		// drop the cache when we are done creating the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
+
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -3020,7 +2865,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					default:
 					}
 
-					state, stateErr := svc.GetTrueHostState(ctx, hid)
+					state, stateErr := svc.GetHostState(ctx, hid)
 					if stateErr != nil {
 						switch stateErr.(type) {
 						case *fail.ErrNotFound:
@@ -3382,7 +3227,16 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 			default:
 			}
 
-			return svc.WaitHostState(ctx, hostID, hoststate.Started, timings.HostOperationTimeout())
+			hs, err := instance.GetState(ctx)
+			if err != nil {
+				return err
+			}
+
+			if hs != hoststate.Started {
+				return fail.NewError("%s not started yet: %s", hostName, hs.String())
+			}
+
+			return nil
 		},
 		timings.NormalDelay(),
 		timings.ExecutionTimeout(),
@@ -3458,7 +3312,16 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 			default:
 			}
 
-			return svc.WaitHostState(ctx, hostID, hoststate.Stopped, timings.HostOperationTimeout())
+			hs, err := instance.GetState(ctx)
+			if err != nil {
+				return err
+			}
+
+			if hs != hoststate.Stopped {
+				return fail.NewError("%s not stopped yet: %s", hostName, hs.String())
+			}
+
+			return nil
 		},
 		timings.NormalDelay(),
 		timings.ExecutionTimeout(),
@@ -3601,7 +3464,7 @@ func (instance *Host) hardReboot(ctx context.Context) (ferr fail.Error) {
 }
 
 // GetPublicIP returns the public IP address of the Host
-func (instance *Host) GetPublicIP(ctx context.Context) (_ string, ferr fail.Error) {
+func (instance *Host) GetPublicIP(_ context.Context) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -3630,7 +3493,7 @@ func (instance *Host) GetPublicIP(ctx context.Context) (_ string, ferr fail.Erro
 }
 
 // GetPrivateIP returns the private IP of the Host on its default Networking
-func (instance *Host) GetPrivateIP(ctx context.Context) (_ string, ferr fail.Error) {
+func (instance *Host) GetPrivateIP(_ context.Context) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -4169,9 +4032,8 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 func (instance *Host) ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptySlice []*propertiesv1.SecurityGroupBond
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	// instance.RLock()
@@ -4190,7 +4052,7 @@ func (instance *Host) ListSecurityGroups(ctx context.Context, state securitygrou
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	return list, nil
