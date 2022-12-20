@@ -604,8 +604,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 }
 
 func (s stack) updateDefaultSecurityRules(ctx context.Context, sg osc.SecurityGroup) fail.Error {
-	rules := append(s.createTCPPermissions(), s.createUDPPermissions()...)
-	rules = append(rules, s.createICMPPermissions()...)
+	rules := generatePermissions()
 	xerr := s.rpcCreateSecurityGroupRules(ctx, sg.SecurityGroupId, "Inbound", rules)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to add Network ingress rules to Security Group %s", sg.SecurityGroupId)
@@ -618,30 +617,26 @@ func (s stack) updateDefaultSecurityRules(ctx context.Context, sg osc.SecurityGr
 	return nil
 }
 
-// open all ports, ingress is controlled by the vm firewall
-func (s stack) createTCPPermissions() []osc.SecurityGroupRule {
+// generate default rules for network
+func generatePermissions() []osc.SecurityGroupRule {
+	rules := createSSHPermissions()
+	rules = append(rules, createICMPPermissions()...)
+	return rules
+}
+
+// open ssh port
+func createSSHPermissions() []osc.SecurityGroupRule {
 	rule := osc.SecurityGroupRule{
-		FromPortRange: 1,
-		ToPortRange:   65535,
+		FromPortRange: 22,
+		ToPortRange:   22,
 		IpRanges:      []string{"0.0.0.0/0"},
 		IpProtocol:    "tcp",
 	}
 	return []osc.SecurityGroupRule{rule}
 }
 
-// open all ports, ingress is controlled by the vm firewall
-func (s stack) createUDPPermissions() []osc.SecurityGroupRule {
-	rule := osc.SecurityGroupRule{
-		FromPortRange: 1,
-		ToPortRange:   65535,
-		IpRanges:      []string{"0.0.0.0/0"},
-		IpProtocol:    "udp",
-	}
-	return []osc.SecurityGroupRule{rule}
-}
-
 // ingress is controlled by the vm firewall
-func (s stack) createICMPPermissions() []osc.SecurityGroupRule {
+func createICMPPermissions() []osc.SecurityGroupRule {
 	var rules []osc.SecurityGroupRule
 	// Echo reply
 	rules = append(rules, osc.SecurityGroupRule{
