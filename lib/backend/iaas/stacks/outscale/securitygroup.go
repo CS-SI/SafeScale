@@ -19,9 +19,6 @@ package outscale
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/outscale/osc-sdk-go/osc"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -29,6 +26,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/outscale/osc-sdk-go/osc"
 )
 
 // ListSecurityGroups lists existing security groups
@@ -278,15 +277,15 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ 
 	switch in.Direction {
 	case securitygroupruledirection.Ingress:
 		flow = "Inbound"
-		involved = in.Targets
-		usesGroups, xerr = in.TargetsConcernGroups()
+		involved = in.Sources
+		usesGroups, xerr = in.SourcesConcernGroups()
 		if xerr != nil {
 			return "", rule, xerr
 		}
 	case securitygroupruledirection.Egress:
 		flow = "Outbound"
-		involved = in.Sources
-		usesGroups, xerr = in.SourcesConcernGroups()
+		involved = in.Targets
+		usesGroups, xerr = in.TargetsConcernGroups()
 		if xerr != nil {
 			return "", rule, xerr
 		}
