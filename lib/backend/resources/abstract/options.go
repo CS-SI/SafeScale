@@ -32,7 +32,6 @@ func withKind(kind string) Option {
 	}
 }
 
-// UseTerraformSnippet ...
 // UseTerraformSnippet allows to attach a snippet to the abstract resource
 func UseTerraformSnippet(snippet string) Option {
 	return func(c *core) fail.Error {

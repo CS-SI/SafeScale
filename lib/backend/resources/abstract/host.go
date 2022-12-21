@@ -167,24 +167,24 @@ func (i Image) OK() bool {
 
 // HostRequest represents requirements to create host
 type HostRequest struct {
-	ResourceName     string              // ResourceName contains the name of the compute resource
-	HostName         string              // HostName contains the hostname on the system (if empty, will use ResourceName)
-	Subnets          []*Subnet           // lists the Subnets the host must be connected to
-	DefaultRouteIP   string              // DefaultRouteIP is the IP used as default route
-	TemplateID       string              // TemplateID is ID of the template used to size the host (see SelectTemplates)
-	TemplateRef      string              // TemplateRef is the name or ID of the template used to size the host (see SelectTemplates)
-	ImageID          string              // ImageID is the ID of the image that contains the server's OS and initial state.
-	ImageRef         string              // ImageRef is the original reference of the image requested
-	KeyPair          *KeyPair            // KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
-	SSHPort          uint32              // contains the port to use for SSH
-	Password         string              // Password contains the password of OperatorUsername account, usable on host console only
-	DiskSize         int                 // DiskSize allows asking for a specific size for system disk (in GB)
-	Single           bool                // Single tells if the Host is single
-	PublicIP         bool                // PublicIP a flag telling if the host must have a public IP
-	IsGateway        bool                // IsGateway tells if the host will act as a gateway
-	KeepOnFailure    bool                // KeepOnFailure tells if resource must be kept on failure
-	Preemptible      bool                // Use spot-like instance
-	SecurityGroupIDs map[string]struct{} // List of Security Groups to attach to Host (using map as dict)
+	ResourceName      string            // ResourceName contains the name of the compute resource
+	HostName          string            // HostName contains the hostname on the system (if empty, will use ResourceName)
+	Subnets           []*Subnet         // lists the Subnets the host must be connected to
+	DefaultRouteIP    string            // DefaultRouteIP is the IP used as default route
+	TemplateID        string            // TemplateID is ID of the template used to size the host (see SelectTemplates)
+	TemplateRef       string            // TemplateRef is the name or ID of the template used to size the host (see SelectTemplates)
+	ImageID           string            // ImageID is the ID of the image that contains the server's OS and initial state.
+	ImageRef          string            // ImageRef is the original reference of the image requested
+	KeyPair           *KeyPair          // KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
+	SSHPort           uint32            // contains the port to use for SSH
+	Password          string            // Password contains the password of OperatorUsername account, usable on host console only
+	DiskSize          int               // DiskSize allows asking for a specific size for system disk (in GB)
+	Single            bool              // Single tells if the Host is single
+	PublicIP          bool              // PublicIP a flag telling if the host must have a public IP
+	IsGateway         bool              // IsGateway tells if the host will act as a gateway
+	KeepOnFailure     bool              // KeepOnFailure tells if resource must be kept on failure
+	Preemptible       bool              // Use spot-like instance
+	SecurityGroupByID map[string]string // List of Security Groups to attach to Host (using map as dict)
 }
 
 // CleanOnFailure tells if request asks for cleaning created ressource on failure

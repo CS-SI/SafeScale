@@ -726,25 +726,24 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 					return fail.Wrap(innerErr)
 				}
 
-				var err error
 				as.VIP = avip
 				as.State = subnetstate.GatewayCreation
-				as.GWSecurityGroupID, err = subnetGWSG.GetID()
-				if err != nil {
-					return fail.ConvertError(err)
-				}
-				as.InternalSecurityGroupID, err = subnetInternalSG.GetID()
-				if err != nil {
-					return fail.ConvertError(err)
-				}
-				as.PublicIPSecurityGroupID, err = subnetPublicIPSG.GetID()
-				if err != nil {
-					return fail.ConvertError(err)
+				as.GWSecurityGroupName = subnetGWSG.GetName()
+				as.GWSecurityGroupID, innerErr = subnetGWSG.GetID()
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
-				a, err := subnetGWSG.GetID()
-				if err != nil {
-					return fail.ConvertError(err)
+				as.InternalSecurityGroupName = subnetInternalSG.GetName()
+				as.InternalSecurityGroupID, innerErr = subnetInternalSG.GetID()
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				as.PublicIPSecurityGroupName = subnetPublicIPSG.GetName()
+				as.PublicIPSecurityGroupID, innerErr = subnetPublicIPSG.GetID()
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
 				// Creates the bind between the Subnet default security group and the Subnet
@@ -754,22 +753,27 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 						return fail.Wrap(innerErr)
 					}
 
+					subnetID, innerErr := subnetGWSG.GetID()
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
+					}
+
 					item := &propertiesv1.SecurityGroupBond{
-						ID:       a,
-						Name:     subnetGWSG.GetName(),
+						ID:       subnetID,
+						Name:     as.GWSecurityGroupName,
 						Disabled: false,
 					}
 					ssgV1.ByID[item.ID] = item
-					ssgV1.ByName[subnetGWSG.GetName()] = item.ID
+					ssgV1.ByName[as.GWSecurityGroupName] = item.ID
 
-					a, err := subnetInternalSG.GetID()
-					if err != nil {
-						return fail.ConvertError(err)
+					subnetID, innerErr = subnetInternalSG.GetID()
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
 					}
 
 					item = &propertiesv1.SecurityGroupBond{
-						ID:       a,
-						Name:     subnetInternalSG.GetName(),
+						ID:       subnetID,
+						Name:     as.InternalSecurityGroupName,
 						Disabled: false,
 					}
 					ssgV1.ByID[item.ID] = item
@@ -936,7 +940,7 @@ func (instance *Subnet) unsafeFinalizeSubnetCreation(inctx context.Context) fail
 	}
 }
 
-func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]struct{}) (_ fail.Error) {
+func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]string) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1052,11 +1056,11 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 
 				// IDs of Security Groups to attach to Host used as gateway
 				if len(sgs) == 0 {
-					sgs = map[string]struct{}{}
+					sgs = map[string]string{}
 				}
-				sgs[as.GWSecurityGroupID] = struct{}{}
-				sgs[as.InternalSecurityGroupID] = struct{}{}
-				sgs[as.PublicIPSecurityGroupID] = struct{}{}
+				sgs[as.GWSecurityGroupID] = as.GWSecurityGroupName
+				sgs[as.InternalSecurityGroupID] = as.InternalSecurityGroupName
+				sgs[as.PublicIPSecurityGroupID] = as.PublicIPSecurityGroupName
 				return nil
 			})
 			if xerr != nil {
@@ -1065,15 +1069,15 @@ func (instance *Subnet) unsafeCreateGateways(inctx context.Context, req abstract
 			}
 
 			gwRequest := abstract.HostRequest{
-				ImageID:          gwSizing.Image,
-				ImageRef:         imageQuery,
-				Subnets:          []*abstract.Subnet{as},
-				SSHPort:          req.DefaultSSHPort,
-				TemplateID:       template.ID,
-				KeepOnFailure:    req.KeepOnFailure,
-				SecurityGroupIDs: sgs,
-				IsGateway:        true,
-				DiskSize:         gwSizing.MinDiskSize,
+				ImageID:           gwSizing.Image,
+				ImageRef:          imageQuery,
+				Subnets:           []*abstract.Subnet{as},
+				SSHPort:           req.DefaultSSHPort,
+				TemplateID:        template.ID,
+				KeepOnFailure:     req.KeepOnFailure,
+				SecurityGroupByID: sgs,
+				IsGateway:         true,
+				DiskSize:          gwSizing.MinDiskSize,
 			}
 
 			var (

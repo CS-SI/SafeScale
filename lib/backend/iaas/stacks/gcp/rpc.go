@@ -1215,7 +1215,7 @@ func (s stack) rpcListInstances(ctx context.Context) ([]*compute.Instance, fail.
 	return out, nil
 }
 
-func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}, extra interface{}) (_ *compute.Instance, ferr fail.Error) {
+func (s stack) rpcCreateInstance(ctx context.Context, name string, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]string, extra interface{}) (_ *compute.Instance, ferr fail.Error) {
 	var xerr fail.Error
 	var tags []string
 	for k := range sgs {

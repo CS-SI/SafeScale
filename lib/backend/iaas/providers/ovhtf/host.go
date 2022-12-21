@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
@@ -182,28 +181,6 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 
 	// --- query provider for host creation ---
 
-	// Starting from here, delete host if exiting with error
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			if ahf.IsConsistent() {
-				logrus.WithContext(inctx).Infof("Cleaning up on failure, deleting host '%s'", ahf.Name)
-				derr := p.DeleteHost(jobapi.NewContextPropagatingJob(inctx), ahf.ID)
-				if derr != nil {
-					switch derr.(type) {
-					case *fail.ErrNotFound:
-						logrus.WithContext(inctx).Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
-					case *fail.ErrTimeout:
-						logrus.WithContext(inctx).Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
-					default:
-						logrus.WithContext(inctx).Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
-					}
-					_ = fail.AddConsequence(ferr, derr)
-				}
-			}
-		}
-	}()
-
 	logrus.WithContext(inctx).Debugf("Creating host resource '%s' ...", request.ResourceName)
 
 	// Retry creation until success, for 10 minutes
@@ -230,12 +207,32 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		return nil, nil, xerr
 	}
 
+	// // Starting from here, delete host if exiting with error
+	// defer func() {
+	// 	ferr = debug.InjectPlannedFail(ferr)
+	// 	if ferr != nil && ahf.IsConsistent() {
+	// 		logrus.WithContext(inctx).Infof("Cleaning up on failure, deleting host '%s'", ahf.Name)
+	// 		derr := p.DeleteHost(jobapi.NewContextPropagatingJob(inctx), ahf.ID)
+	// 		if derr != nil {
+	// 			switch derr.(type) {
+	// 			case *fail.ErrNotFound:
+	// 				logrus.WithContext(inctx).Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
+	// 			case *fail.ErrTimeout:
+	// 				logrus.WithContext(inctx).Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
+	// 			default:
+	// 				logrus.WithContext(inctx).Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
+	// 			}
+	// 			_ = fail.AddConsequence(ferr, derr)
+	// 		}
+	// 	}
+	// }()
+
 	def, xerr := renderer.Assemble(ahf)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 
-	var outputs map[string]tfexec.OutputMeta
+	var hostOutputs map[string]any
 	xerr = retry.WhileUnsuccessful(
 		func() (innerFErr error) {
 			select {
@@ -244,8 +241,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 			default:
 			}
 
-			var innerXErr fail.Error
-			outputs, innerXErr = renderer.Apply(inctx, def)
+			outputs, innerXErr := renderer.Apply(inctx, def)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrSyntax, *fail.ErrNotFound:
@@ -258,6 +254,9 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 					if strings.Contains(lowered, "unable to find flavor with name") {
 						return retry.StopRetryError(fail.NotFoundError(innerXErr.Error()))
 					}
+					if strings.Contains(lowered, "bad request with") {
+						return retry.StopRetryError(fail.InvalidRequestError(innerXErr.Error()))
+					}
 				default:
 				}
 				return fail.Wrap(innerXErr, "failed to create Host '%s'", ahf.Name)
@@ -266,63 +265,39 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 			// Starting from here, delete server if exit with error
 			defer func() {
 				if innerFErr != nil && request.CleanOnFailure() {
-					logrus.WithContext(inctx).Infof("Cleaning up on failure, deleting Host '%s'", ahf.Name)
-					derr := renderer.Destroy(inctx, def, terraformerapi.WithTarget(ahf))
+					logrus.WithContext(inctx).Debugf("deleting unresponsive server '%s'...", request.ResourceName)
+
+					// Recreates def without host to destroy what has been created
+					def, derr := renderer.Assemble()
 					if derr != nil {
-						logrus.WithContext(inctx).Errorf("failed to delete Network '%s': %v", request.ResourceName, derr)
-						_ = ferr.AddConsequence(derr)
+						innerFErr = fail.Wrap(innerFErr).AddConsequence(derr)
+						return
+					}
+
+					derr = renderer.Destroy(jobapi.NewContextPropagatingJob(inctx), def)
+					if derr != nil {
+						logrus.WithContext(inctx).Errorf("failed to delete Host '%s': %v", request.ResourceName, derr)
+						innerFErr = fail.Wrap(innerFErr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName))
+					} else {
+						logrus.WithContext(inctx).Debugf("unresponsive server '%s' deleted", request.ResourceName)
 					}
 				}
 			}()
 
-			ahf.ID, innerXErr = unmarshalOutput[string](outputs["host"+request.ResourceName+"_id"])
+			hostOutputs, innerXErr = unmarshalOutput[map[string]any](outputs["host_"+request.ResourceName])
 			if innerXErr != nil {
-				return retry.StopRetryError(fail.Wrap(innerXErr, "failed to recover Host id"))
+				return retry.StopRetryError(innerXErr)
 			}
 
-			// // Starting from here, delete host if exiting with error
-			// defer func() {
-			// 	if innerXErr != nil {
-			// 		if ahf.IsConsistent() {
-			// 			logrus.WithContext(inctx).Debugf("deleting unresponsive server '%s'...", request.ResourceName)
-			// 			derr := p.DeleteHost(jobapi.NewContextPropagatingJob(inctx), ahf.ID)
-			// 			if derr != nil {
-			// 				logrus.WithContext(inctx).Debugf(derr.Error())
-			// 				_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName))
-			// 				return
-			// 			}
-			//
-			// 			logrus.WithContext(inctx).Debugf("unresponsive server '%s' deleted", request.ResourceName)
-			// 		}
-			// 	}
-			// }()
-
-			state, innerXErr := renderer.State(inctx)
-			_ = state
-
-			// creationZone, innerXErr := p.GetAvailabilityZoneOfServer(inctx, ahf.ID)
-			// if innerXErr != nil {
-			// 	logrus.WithContext(inctx).Tracef("Host '%s' successfully created but cannot confirm AZ: %s", ahf.Name, innerXErr)
-			// } else {
-			// 	logrus.WithContext(inctx).Tracef("Host '%s' successfully created in requested AZ '%s'", ahf.Name, creationZone)
-			// 	if creationZone != azone && azone != "" {
-			// 		logrus.WithContext(inctx).Warnf("Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'", ahf.Name, azone, creationZone)
-			// 	}
-			// }
-
-			// Wait that host is ready, not just that the build is started
-			// FIXME: restore this check
-			// timeout := timings.HostOperationTimeout()
-			// server, innerXErr = p.WaitHostState(inctx, ahf.HostCore, hoststate.Started, timeout)
-			// if innerXErr != nil {
-			// 	logrus.WithContext(inctx).Errorf("failed to reach server '%s' after %s; deleting it and trying again", request.ResourceName, temporal.FormatDuration(timeout))
-			// 	switch innerXErr.(type) {
-			// 	case *fail.ErrNotAvailable:
-			// 		return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
-			// 	default:
-			// 		return innerXErr
-			// 	}
-			// }
+			creationZone, innerErr := lang.Cast[string](hostOutputs["availability_zone"])
+			if innerErr != nil {
+				logrus.WithContext(inctx).Tracef("Host '%s' successfully created but cannot confirm AZ: %s", ahf.Name, innerErr)
+			} else {
+				logrus.WithContext(inctx).Tracef("Host '%s' successfully created in requested AZ '%s'", ahf.Name, creationZone)
+				if creationZone != azone && azone != "" {
+					logrus.WithContext(inctx).Warnf("Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'", ahf.Name, azone, creationZone)
+				}
+			}
 
 			return nil
 		},
@@ -340,22 +315,44 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		}
 	}
 
+	defer func() {
+		if ferr != nil && request.CleanOnFailure() {
+			logrus.WithContext(inctx).Infof("Cleaning up on failure, deleting Host '%s'", ahf.Name)
+
+			// Recreates def without host to destroy what has been created
+			def, derr := renderer.Assemble()
+			if derr != nil {
+				_ = ferr.AddConsequence(derr)
+				return
+			}
+
+			derr = renderer.Destroy(jobapi.NewContextPropagatingJob(inctx), def)
+			if derr != nil {
+				logrus.WithContext(inctx).Errorf("failed to delete Host '%s': %v", ahf.Name, derr)
+				_ = ferr.AddConsequence(derr)
+			} else {
+				logrus.WithContext(inctx).Infof("Cleaning up on failure, deleted Host '%s'", ahf.Name)
+			}
+		}
+	}()
+
 	// FIXME: restore that
-	newHost, xerr := p.complementHost(inctx, ahf.HostCore, outputs)
+	newHost, xerr := p.complementHost(inctx, ahf.HostCore, hostOutputs)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 
 	newHost.Sizing, xerr = p.toHostSize(template)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
+	if xerr != nil {
+		return nil, nil, xerr
+	}
 
 	newHost.Networking.DefaultSubnetID = defaultSubnetID
 	newHost.Networking.IsGateway = request.IsGateway
 	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
-	// FIXME: reimplement this, with new resource type PublicIP?
+	// FIXME: reimplement this, with new resource type PublicIP? And may be moved in previous renderer.Assemble to
+	//        make a single call to terraform...
 	// // if Floating IP are used and public address is requested
 	// if cfgOpts.UseFloatingIP && request.PublicIP {
 	// 	// Create the floating IP
@@ -403,6 +400,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 	return newHost, userData, nil
 }
 
+// designHostFull ...
 func (p *provider) designHostFull(name string) (*abstract.HostFull, fail.Error) {
 	ahf, xerr := abstract.NewHostFull(abstract.WithName(name))
 	if xerr != nil {
@@ -441,20 +439,12 @@ func (p *provider) selectedAvailabilityZone(ctx context.Context) (string, fail.E
 }
 
 // complementHost complements Host data with content of server parameter
-func (p *provider) complementHost(ctx context.Context, hostCore *abstract.HostCore, outputs map[string]tfexec.OutputMeta) (_ *abstract.HostFull, ferr fail.Error) {
+func (p *provider) complementHost(ctx context.Context, hostCore *abstract.HostCore, outputs map[string]any) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Updates intrinsic data of host if needed
 	var err error
-	hostResourceIdField := "host_" + hostCore.Name + "_id"
-	if hostCore.ID == "" {
-		hostCore.ID, err = lang.Cast[string](outputs[hostResourceIdField])
-		if err != nil {
-			return nil, fail.Wrap(err)
-		}
-	}
 
-	host, xerr := abstract.NewHostFull(abstract.WithName(hostCore.Name))
+	host, xerr := abstract.NewHostFullFromCore(hostCore)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -462,10 +452,8 @@ func (p *provider) complementHost(ctx context.Context, hostCore *abstract.HostCo
 	// FIXME: restore this
 	// state := toHostState(server.Status)
 	// if state == hoststate.Error || state == hoststate.Starting {
-	// 	logrus.WithContext(ctx).Warnf("[TRACE] Unexpected host'instance last state: %v", state)
+	// 	logrus.WithContext(ctx).Warnf("[TRACE] Unexpected host last state: %v", state)
 	// }
-
-	host.HostCore = hostCore
 	// FIXME: restore this
 	// host.CurrentState, hostCore.LastState = state, state
 	// host.Description = &abstract.HostDescription{
@@ -473,39 +461,37 @@ func (p *provider) complementHost(ctx context.Context, hostCore *abstract.HostCo
 	// 	Updated: server.Updated,
 	// }
 
+	if host.ID == "" {
+		host.ID, err = lang.Cast[string](outputs["id"])
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
+	}
+
+	// recover OpenStack metadata into Tags
+	metadata, err := lang.Cast[map[string]any](outputs["metadata"])
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	for k, v := range metadata {
+		host.Tags[k], err = lang.Cast[string](v)
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
+	}
+
 	host.Tags["Template"], err = lang.Cast[string](outputs["flavor_id"])
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
 
 	host.Tags["Image"], err = lang.Cast[string](outputs["image_id"])
-
-	// recover OpenStack metadata into Tags
-	metadata, err := lang.Cast[map[string]string](outputs["metadata"])
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
 
-	for k, v := range metadata {
-		host.Tags[k] = v
-	}
-
-	if ct, ok := host.Tags["CreationDate"]; !ok || ct == "" {
-		// FIXME: no such created field?
-		ct, err = lang.Cast[string](outputs["created"])
-		if err != nil {
-			return nil, fail.Wrap(err)
-		}
-
-		convertedTime, err := time.Parse(ct, "")
-		if err != nil {
-			return nil, fail.Wrap(err)
-		}
-
-		host.Tags["CreationDate"] = convertedTime.Format(time.RFC3339)
-	}
-
-	networks, err := lang.Cast[[]interface{}](outputs["host"+hostCore.Name+"_networks"])
+	networks, err := lang.Cast[[]interface{}](outputs["network"])
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
@@ -814,8 +800,8 @@ func (p *provider) ConsolidateHostSnippet(ahc *abstract.HostCore) fail.Error {
 
 	return ahc.AddOptions(
 		abstract.UseTerraformSnippet(hostDesignResourceSnippetPath),
-		abstract.WithResourceType("openstack_networking_port_v2"),
+		// abstract.WithResourceType("openstack_networking_port_v2"),
 		abstract.WithResourceType("openstack_compute_instance_v2"),
-		abstract.WithResourceType("openstack_images_image_v2"),
+		// abstract.WithResourceType("openstack_images_image_v2"),
 	)
 }

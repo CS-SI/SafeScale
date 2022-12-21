@@ -225,7 +225,7 @@ func buildServer() *http.Server {
 
 	httpServer := &http.Server{
 		Handler:      h2c.NewHandler(grpcwebWrapper.Handler(router), &http2.Server{}),
-		WriteTimeout: 10 * time.Second,
+		WriteTimeout: 0,
 		ReadTimeout:  10 * time.Second,
 	}
 	return httpServer

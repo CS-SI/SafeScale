@@ -344,10 +344,10 @@ func TestCluster_Create(t *testing.T) {
 			IsGateway:     true,
 			KeepOnFailure: false,
 			Preemptible:   false,
-			SecurityGroupIDs: map[string]struct{}{
-				"PublicIPSecurityGroupID": {},
-				"GWSecurityGroupID":       {},
-				"InternalSecurityGroupID": {},
+			SecurityGroupByID: map[string]string{
+				"PublicIPSecurityGroupID": "PublicIPSecurityGroupID",
+				"GWSecurityGroupID":       "GWSecurityGroupID",
+				"InternalSecurityGroupID": "InternalSecurityGroupID",
 			},
 		})
 		require.Nil(t, xerr)
@@ -371,7 +371,7 @@ func TestCluster_Create(t *testing.T) {
 			IsGateway:     true,
 			KeepOnFailure: false,
 			Preemptible:   false,
-			SecurityGroupIDs: map[string]struct{}{
+			SecurityGroupByID: map[string]struct{}{
 				"PublicIPSecurityGroupID": {},
 				"GWSecurityGroupID":       {},
 				"InternalSecurityGroupID": {},

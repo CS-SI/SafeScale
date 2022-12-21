@@ -315,7 +315,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 			}
 
 			var innerXErr fail.Error
-			ahf, innerXErr = s.buildGcpMachine(ctx, request.ResourceName, an, defaultSubnet, *template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs, extra)
+			ahf, innerXErr = s.buildGcpMachine(ctx, request.ResourceName, an, defaultSubnet, *template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupByID, extra)
 			if innerXErr != nil {
 				captured := normalizeError(innerXErr)
 				switch captured.(type) {
@@ -454,7 +454,7 @@ func (s stack) buildGcpMachine(
 	diskSize int,
 	userData string,
 	isPublic bool,
-	securityGroups map[string]struct{},
+	securityGroups map[string]string,
 	extra interface{},
 ) (*abstract.HostFull, fail.Error) {
 	resp, xerr := s.rpcCreateInstance(ctx, instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(diskSize), userData, isPublic, securityGroups, extra)

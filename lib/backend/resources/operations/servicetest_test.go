@@ -27,7 +27,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"io"
 	"io/ioutil"
 	"os"
@@ -38,6 +37,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
@@ -2672,7 +2673,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			IsGateway:     true,
 			KeepOnFailure: false,
 			Preemptible:   false,
-			SecurityGroupIDs: map[string]struct{}{
+			SecurityGroupByID: map[string]struct{}{
 				"PublicIPSecurityGroupID": {},
 				"GWSecurityGroupID":       {},
 				"InternalSecurityGroupID": {},
@@ -2730,7 +2731,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			IsGateway:     true,
 			KeepOnFailure: false,
 			Preemptible:   false,
-			SecurityGroupIDs: map[string]struct{}{
+			SecurityGroupByID: map[string]struct{}{
 				"PublicIPSecurityGroupID": {},
 				"GWSecurityGroupID":       {},
 				"InternalSecurityGroupID": {},
@@ -2832,7 +2833,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				IsGateway:     false,
 				KeepOnFailure: false,
 				Preemptible:   false,
-				SecurityGroupIDs: map[string]struct{}{
+				SecurityGroupByID: map[string]struct{}{
 					"PublicIPSecurityGroupID": {},
 					"GWSecurityGroupID":       {},
 					"InternalSecurityGroupID": {},
@@ -2901,7 +2902,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				IsGateway:     false,
 				KeepOnFailure: false,
 				Preemptible:   false,
-				SecurityGroupIDs: map[string]struct{}{
+				SecurityGroupByID: map[string]struct{}{
 					"PublicIPSecurityGroupID": {},
 					"GWSecurityGroupID":       {},
 					"InternalSecurityGroupID": {},

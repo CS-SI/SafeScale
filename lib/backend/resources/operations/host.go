@@ -816,39 +816,6 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 	go func() {
 		defer close(chRes)
 
-		a, err := instance.implCreate(ctx, hostReq, hostDef, extra)
-		chRes <- result{
-			ct:  a,
-			err: err,
-		}
-	}()
-
-	select {
-	case res := <-chRes: // if it works return the result
-		if res.ct == nil && res.err == nil {
-			return nil, fail.NewError("creation failed unexpectedly")
-		}
-		return res.ct, res.err
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done(): // if not because parent context was canceled
-		return nil, fail.Wrap(inctx.Err(), "canceled by parent")
-	}
-}
-
-func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements, extra interface{}) (_ *userdata.Content, gerr fail.Error) {
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
-	type result struct {
-		ct  *userdata.Content
-		err fail.Error
-	}
-
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
 		gres, _ := func() (_ result, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 			svc := instance.Service()
@@ -956,9 +923,9 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 
 				xerr = metadata.Inspect(ctx, defaultSubnet, func(as *abstract.Subnet, _ *serialize.JSONProperties) fail.Error {
 					hostReq.Subnets = append(hostReq.Subnets, as)
-					hostReq.SecurityGroupIDs = map[string]struct{}{
-						as.PublicIPSecurityGroupID: {},
-						as.GWSecurityGroupID:       {},
+					hostReq.SecurityGroupByID = map[string]string{
+						as.PublicIPSecurityGroupID: as.PublicIPSecurityGroupName,
+						as.GWSecurityGroupID:       as.GWSecurityGroupName,
 					}
 					hostReq.PublicIP = true
 					return nil
@@ -992,10 +959,10 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 				}
 
 				// list IDs of Security Groups to apply to Host
-				if len(hostReq.SecurityGroupIDs) == 0 {
-					hostReq.SecurityGroupIDs = make(map[string]struct{}, len(hostReq.Subnets)+1)
+				if len(hostReq.SecurityGroupByID) == 0 {
+					hostReq.SecurityGroupByID = make(map[string]string, len(hostReq.Subnets)+1)
 					for _, v := range hostReq.Subnets {
-						hostReq.SecurityGroupIDs[v.InternalSecurityGroupID] = struct{}{}
+						hostReq.SecurityGroupByID[v.InternalSecurityGroupID] = v.InternalSecurityGroupName
 					}
 
 					opts, xerr := svc.ConfigurationOptions()
@@ -1008,7 +975,7 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 					if hostReq.PublicIP || opts.UseNATService {
 						xerr = metadata.Inspect(ctx, defaultSubnet, func(as *abstract.Subnet, _ *serialize.JSONProperties) fail.Error {
 							if as.PublicIPSecurityGroupID != "" {
-								hostReq.SecurityGroupIDs[as.PublicIPSecurityGroupID] = struct{}{}
+								hostReq.SecurityGroupByID[as.PublicIPSecurityGroupID] = as.PublicIPSecurityGroupName
 							}
 							return nil
 						})
@@ -1392,10 +1359,14 @@ func (instance *Host) implCreate(ctx context.Context, hostReq abstract.HostReque
 
 	select {
 	case res := <-chRes: // if it works return the result
+		if res.ct == nil && res.err == nil {
+			return nil, fail.NewError("creation failed unexpectedly")
+		}
 		return res.ct, res.err
-	case <-ctx.Done(): // if not because parent context was canceled
-		<-chRes // wait for cleanup
-		return nil, fail.Wrap(ctx.Err(), "canceled by parent")
+	case <-ctx.Done():
+		return nil, fail.ConvertError(ctx.Err())
+	case <-inctx.Done(): // if not because parent context was canceled
+		return nil, fail.Wrap(inctx.Err(), "canceled by parent")
 	}
 }
 
@@ -1480,24 +1451,28 @@ func determineImageID(ctx context.Context, svc iaasapi.Service, imageRef string)
 // setSecurityGroups sets the Security Groups for the host
 func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRequest, defaultSubnet resources.Subnet) fail.Error {
 	svc := instance.Service()
-	if req.Single {
-		hostID, err := instance.GetID()
-		if err != nil {
-			return fail.ConvertError(err)
-		}
-		for k := range req.SecurityGroupIDs {
-			if k != "" {
-				logrus.WithContext(ctx).Infof("Binding security group with id %s to host %s", k, hostID)
-				xerr := svc.BindSecurityGroupToHost(ctx, k, hostID)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return xerr
+	// In case of use of terraform, the security groups have already been set
+	if !svc.Capabilities().UseTerraformer {
+		if req.Single {
+			hostID, err := instance.GetID()
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+			for k := range req.SecurityGroupByID {
+				if k != "" {
+					logrus.WithContext(ctx).Infof("Binding security group with id %s to host %s", k, hostID)
+					xerr := svc.BindSecurityGroupToHost(ctx, k, hostID)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						return xerr
+					}
 				}
 			}
+			return nil
 		}
-		return nil
 	}
 
+	// Updates metadata about SG bonds
 	xerr := metadata.AlterProperty(ctx, instance, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) (finnerXErr fail.Error) {
 		// get default Subnet core data
 		var (
@@ -1556,7 +1531,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 			hsgV1.ByName[item.Name] = item.ID
 		}
 
-		// Apply Security Group for hosts with public IP in default Subnet
+		// Bound Security Group for hosts with public IP in default Subnet
 		if (req.IsGateway || req.PublicIP) && defaultAbstractSubnet.PublicIPSecurityGroupID != "" {
 			pubipsg, innerXErr = LoadSecurityGroup(ctx, defaultAbstractSubnet.PublicIPSecurityGroupID)
 			if innerXErr != nil {

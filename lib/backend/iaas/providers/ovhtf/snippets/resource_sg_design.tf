@@ -13,6 +13,10 @@ resource "openstack_networking_secgroup_v2" "{{ .Resource.Name }}" {
     }
 }
 
+output "sg_{{ .Resource.Name }}" {
+    value = "${openstack_networking_secgroup_v2.{{ .Resource.Name }}}"
+    sensitive = true
+}
 output "sg_{{ .Resource.Name }}_id" {
     value = "${openstack_networking_secgroup_v2.{{ .Resource.Name }}.id}"
 }

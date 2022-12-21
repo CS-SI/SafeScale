@@ -286,11 +286,6 @@ func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.
 		return nil, fail.Wrap(xerr)
 	}
 
-	// xerr = p.ConsolidateSecurityGroupSnippet(newAsg)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-
 	newAsg.Rules = append(newAsg.Rules, rules...)
 
 	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
@@ -407,7 +402,7 @@ func (p *provider) DisableSecurityGroup(ctx context.Context, group *abstract.Sec
 }
 
 func (p *provider) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, s string, s2 string) fail.Error {
-	return fail.NotImplementedError("ChangeSecurityGroupSecurity() not implemented")
+	return nil
 }
 
 func (p *provider) ConsolidateSecurityGroupSnippet(asg *abstract.SecurityGroup) fail.Error {
@@ -418,5 +413,6 @@ func (p *provider) ConsolidateSecurityGroupSnippet(asg *abstract.SecurityGroup) 
 	return asg.AddOptions(
 		abstract.UseTerraformSnippet(securityGroupDesignResourceSnippetPath),
 		abstract.WithResourceType("openstack_networking_secgroup_v2"),
+		abstract.WithResourceType("openstack_networking_secgroup_rule_v2"),
 	)
 }

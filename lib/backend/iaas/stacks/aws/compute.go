@@ -522,9 +522,7 @@ func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequ
 	// hostMustHavePublicIP := request.PublicIP
 
 	if len(subnets) == 0 {
-		return nil, nil, fail.InvalidRequestError(
-			"the Host '%s' must be on at least one Subnet (even if public)", resourceName,
-		)
+		return nil, nil, fail.InvalidRequestError("the Host '%s' must be on at least one Subnet (even if public)", resourceName)
 	}
 
 	// If no credentials (KeyPair and/or Password) are supplied create ones
@@ -545,13 +543,9 @@ func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequ
 
 	if defaultSubnet == nil {
 		if !request.PublicIP {
-			return nil, nil, abstract.ResourceInvalidRequestError(
-				"host creation", "cannot create a host without public IP or attached network",
-			)
+			return nil, nil, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or attached network")
 		}
-		return nil, nil, abstract.ResourceInvalidRequestError(
-			"host creation", "cannot create a host without default subnet",
-		)
+		return nil, nil, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without default subnet")
 	}
 
 	// --- prepares data structures for Provider usage ---
@@ -652,7 +646,8 @@ func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequ
 		PublicKey:  userData.FirstPublicKey,
 		PrivateKey: userData.FirstPrivateKey,
 	}
-	if xerr = instance.ImportKeyPair(ctx, &keypair); xerr != nil {
+	xerr = instance.ImportKeyPair(ctx, &keypair)
+	if xerr != nil {
 		return nil, nil, xerr
 	}
 
@@ -826,6 +821,7 @@ func (instance *stack) buildAwsMachine(
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	hostCore.ID = aws.StringValue(server.InstanceId)
 	return hostCore, nil
 }
@@ -899,6 +895,9 @@ func (instance *stack) inspectInstance(ctx context.Context, ahf *abstract.HostFu
 	}
 	ahf.Tags["Template"] = instanceType
 	ahf.Tags["Image"] = aws.StringValue(server.ImageId)
+	if ahf.Name == "" && instanceName != "" {
+		ahf.Name = instanceName
+	}
 
 	var subnets []IPInSubnet
 	for _, ni := range server.NetworkInterfaces {
@@ -947,7 +946,6 @@ func (instance *stack) inspectInstance(ctx context.Context, ahf *abstract.HostFu
 	ahf.Sizing.Cores = sizing.Cores
 	ahf.Sizing.RAMSize = sizing.RAMSize
 	ahf.Sizing.DiskSize = sizing.DiskSize
-	ahf.Name = instanceName
 	return nil
 }
 

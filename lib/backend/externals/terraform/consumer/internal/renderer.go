@@ -154,11 +154,6 @@ func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fa
 		return "", xerr
 	}
 
-	// providerSuperset, err := lang.Cast[ProviderUsingTerraform](instance.provider)
-	// if err != nil {
-	// 	return "", fail.Wrap(err)
-	// }
-
 	variables := data.NewMap[string, any]()
 	variables["Provider"] = map[string]any{
 		"Name":           instance.provider.Name(),

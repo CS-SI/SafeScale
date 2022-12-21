@@ -946,6 +946,7 @@ func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance reso
 }
 
 // UnbindFromHost unbinds the security group from a host
+// FIXME: does not work as-is for provider using terraform
 func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance resources.Host) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -966,11 +967,13 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 
 	return metadata.AlterProperty(ctx, instance, securitygroupproperty.HostsV1, func(sgphV1 *propertiesv1.SecurityGroupHosts) fail.Error {
 		// Unbind security group on provider side; if not found, considered as a success
-		hostID, err := hostInstance.GetID()
-		if err != nil {
-			return fail.ConvertError(err)
+		hostID, innerErr := hostInstance.GetID()
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
-		if innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgid, hostID); innerXErr != nil {
+
+		innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgid, hostID)
+		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				debug.IgnoreErrorWithContext(ctx, innerXErr)
