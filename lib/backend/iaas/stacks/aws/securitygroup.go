@@ -402,6 +402,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 		return asg, xerr
 	}
 
+	asg.Rules = append(asg.Rules, rule)
 	return s.InspectSecurityGroup(ctx, asg)
 }
 
