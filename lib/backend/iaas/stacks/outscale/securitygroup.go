@@ -253,6 +253,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 	if xerr := s.rpcCreateSecurityGroupRules(ctx, asg.ID, flow, []osc.SecurityGroupRule{oscRule}); xerr != nil {
 		return asg, xerr
 	}
+	asg.Rules = append(asg.Rules, rule)
 	return s.InspectSecurityGroup(ctx, asg.ID)
 }
 
