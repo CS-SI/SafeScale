@@ -353,6 +353,11 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		return asg, nil
 	}
 
+	index, xerr := asg.Rules.IndexOfEquivalentRule(rule)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	flow, oscRule, xerr := fromAbstractSecurityGroupRule(rule)
 	if xerr != nil {
 		return nil, xerr
@@ -367,6 +372,11 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		default:
 			return nil, xerr
 		}
+	}
+
+	innerXErr := asg.RemoveRuleByIndex(index)
+	if innerXErr != nil {
+		return nil, innerXErr
 	}
 
 	return s.InspectSecurityGroup(ctx, asg.ID)
