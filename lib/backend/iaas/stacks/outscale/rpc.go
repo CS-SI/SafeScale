@@ -19,12 +19,11 @@ package outscale
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/antihax/optional"
 	"github.com/outscale/osc-sdk-go/osc"
-
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 func (s stack) rpcReadSecurityGroups(ctx context.Context, networkID string, sgIDs []string) ([]osc.SecurityGroup, fail.Error) {
