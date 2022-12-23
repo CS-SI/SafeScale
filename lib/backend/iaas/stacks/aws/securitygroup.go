@@ -402,6 +402,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 		return asg, xerr
 	}
 
+	asg.Rules = append(asg.Rules, rule)
 	return s.InspectSecurityGroup(ctx, asg)
 }
 
@@ -448,8 +449,18 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		return asg, xerr
 	}
 
+	index, xerr := asg.Rules.IndexOfEquivalentRule(rule)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if xerr = s.deleteRules(ctx, asg, ingressPermissions, egressPermissions); xerr != nil {
 		return asg, xerr
+	}
+
+	innerXErr := asg.RemoveRuleByIndex(index)
+	if innerXErr != nil {
+		return nil, innerXErr
 	}
 
 	return s.InspectSecurityGroup(ctx, asg)

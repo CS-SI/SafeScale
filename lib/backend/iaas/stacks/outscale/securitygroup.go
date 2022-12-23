@@ -19,9 +19,6 @@ package outscale
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/outscale/osc-sdk-go/osc"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -29,6 +26,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/outscale/osc-sdk-go/osc"
 )
 
 // ListSecurityGroups lists existing security groups
@@ -254,6 +253,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 	if xerr := s.rpcCreateSecurityGroupRules(ctx, asg.ID, flow, []osc.SecurityGroupRule{oscRule}); xerr != nil {
 		return asg, xerr
 	}
+	asg.Rules = append(asg.Rules, rule)
 	return s.InspectSecurityGroup(ctx, asg.ID)
 }
 
@@ -278,15 +278,15 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ 
 	switch in.Direction {
 	case securitygroupruledirection.Ingress:
 		flow = "Inbound"
-		involved = in.Targets
-		usesGroups, xerr = in.TargetsConcernGroups()
+		involved = in.Sources
+		usesGroups, xerr = in.SourcesConcernGroups()
 		if xerr != nil {
 			return "", rule, xerr
 		}
 	case securitygroupruledirection.Egress:
 		flow = "Outbound"
-		involved = in.Sources
-		usesGroups, xerr = in.SourcesConcernGroups()
+		involved = in.Targets
+		usesGroups, xerr = in.TargetsConcernGroups()
 		if xerr != nil {
 			return "", rule, xerr
 		}
@@ -353,6 +353,11 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		return asg, nil
 	}
 
+	index, xerr := asg.Rules.IndexOfEquivalentRule(rule)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	flow, oscRule, xerr := fromAbstractSecurityGroupRule(rule)
 	if xerr != nil {
 		return nil, xerr
@@ -367,6 +372,11 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		default:
 			return nil, xerr
 		}
+	}
+
+	innerXErr := asg.RemoveRuleByIndex(index)
+	if innerXErr != nil {
+		return nil, innerXErr
 	}
 
 	return s.InspectSecurityGroup(ctx, asg.ID)
