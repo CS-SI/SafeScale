@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,11 +65,11 @@ type HostHandler interface {
 
 // hostHandler is an implementation of interface HostHandler
 type hostHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewHostHandler is the constructor for HostHandler
-func NewHostHandler(job server.Job) HostHandler {
+func NewHostHandler(job backend.Job) HostHandler {
 	return &hostHandler{job}
 }
 

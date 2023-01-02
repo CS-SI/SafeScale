@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,11 @@ package operations
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/farmergreg/rfsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -28,14 +33,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"sync"
-
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 var (
@@ -54,18 +51,16 @@ var (
 
 // FeatureFile contains the information about an installable Feature
 type FeatureFile struct {
-	displayName               string                       // is the name of the feature
-	fileName                  string                       // is the name of the specification file
-	displayFileName           string                       // is the 'pretty' name of the specification file
-	embedded                  bool                         // tells if the Feature is embedded in SafeScale
-	specs                     *viper.Viper                 // is the Viper instance containing Feature file content
-	observersLock             *sync.RWMutex                // lock to access field 'observers'
-	observers                 map[string]observer.Observer // contains the Observers of the FeatureFile
-	suitableFor               map[string]struct{}          // tells for what the Feature is suitable
-	parameters                map[string]FeatureParameter  // contains all the parameters defined in Feature file
-	versionControl            map[string]string            // contains the templated bash code to determine version of a component used in the FeatureFile
-	dependencies              map[string]struct{}          // contains the list of features required to install the Feature described by the file
-	clusterSizingRequirements map[string]interface{}       // contains the cluster sizing requirements to allow install
+	displayName               string                      // is the name of the feature
+	fileName                  string                      // is the name of the specification file
+	displayFileName           string                      // is the 'pretty' name of the specification file
+	embedded                  bool                        // tells if the Feature is embedded in SafeScale
+	specs                     *viper.Viper                // is the Viper instance containing Feature file content
+	suitableFor               map[string]struct{}         // tells for what the Feature is suitable
+	parameters                map[string]FeatureParameter // contains all the parameters defined in Feature file
+	versionControl            map[string]string           // contains the templated bash code to determine version of a component used in the FeatureFile
+	dependencies              map[string]struct{}         // contains the list of features required to install the Feature described by the file
+	clusterSizingRequirements map[string]interface{}      // contains the cluster sizing requirements to allow install
 	installers                map[string]interface{}
 }
 
@@ -73,8 +68,6 @@ func newFeatureFile(fileName, displayName string, embedded bool, specs *viper.Vi
 	instance := &FeatureFile{
 		parameters:      map[string]FeatureParameter{},
 		versionControl:  map[string]string{},
-		observersLock:   &sync.RWMutex{},
-		observers:       map[string]observer.Observer{},
 		fileName:        fileName,
 		displayName:     displayName,
 		displayFileName: fileName,
@@ -117,9 +110,6 @@ func (ff *FeatureFile) Replace(p data.Clonable) (data.Clonable, error) {
 	ff.displayFileName = src.displayFileName
 	ff.specs = src.specs // Note: using same pointer here is wanted; do not raise an alert in UT on this
 	ff.embedded = src.embedded
-	for k, v := range src.observers {
-		ff.observers[k] = v
-	}
 	return ff, nil
 }
 
