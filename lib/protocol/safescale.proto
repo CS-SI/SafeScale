@@ -814,8 +814,8 @@ enum ClusterComplexity {
 
 enum ClusterFlavor {
 	CF_UNKNOWN = 0;
-	CF_BOH = 1;
 	CF_K8S = 2;
+	CF_BOH = 4;
 }
 
 message ClusterListResponse {
