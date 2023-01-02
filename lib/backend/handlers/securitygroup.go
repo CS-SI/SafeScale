@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,11 +47,11 @@ type SecurityGroupHandler interface {
 }
 
 type securityGroupHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewSecurityGroupHandler returns an instance of SecurityGroupHandler
-func NewSecurityGroupHandler(job server.Job) SecurityGroupHandler {
+func NewSecurityGroupHandler(job backend.Job) SecurityGroupHandler {
 	return &securityGroupHandler{job}
 }
 

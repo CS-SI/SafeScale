@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -334,7 +334,6 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool,
 		}
 	}
 
-	// VPL: what's the point if there ios
 	if len(azList) == 0 {
 		logrus.WithContext(ctx).Warnf("no Availability Zones detected !")
 	}
@@ -1457,7 +1456,7 @@ func (s stack) getFloatingIPOfHost(ctx context.Context, hostID string) (*floatin
 	if commRetryErr != nil {
 		return nil, commRetryErr
 	}
-	// VPL: fip not found is not an abnormal situation, do not log or raise error
+	// fip not found is not an abnormal situation, do not log or raise error
 	if len(fips) > 1 {
 		return nil, fail.InconsistentError("configuration error, more than one Floating IP associated to host '%s'", hostID)
 	}

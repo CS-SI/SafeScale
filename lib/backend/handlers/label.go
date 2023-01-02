@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,11 +38,11 @@ type LabelHandler interface {
 
 // labelHandler Label service
 type labelHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewTagHandler creates a Label service
-func NewTagHandler(job server.Job) LabelHandler {
+func NewTagHandler(job backend.Job) LabelHandler {
 	return &labelHandler{job: job}
 }
 
