@@ -128,7 +128,7 @@ func (c bucketConsumer) Clear(name string, timeout time.Duration) error {
 	return err
 }
 
-// Download ...
+// Upload ...
 func (c bucketConsumer) Upload(name string, dirct string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()

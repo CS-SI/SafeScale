@@ -64,12 +64,6 @@ message TenantCleanupRequest {
 	bool force = 2;
 }
 
-message TenantUpgradeRequest {
-	string name = 1;
-	bool force = 2;
-	bool dry_run = 3;
-}
-
 message TenantScanRequest {
 	string name = 1;
 	bool dry_run = 2;
@@ -150,10 +144,6 @@ message TenantInspectResponse {
 	TenantMetadata metadata = 6;
 }
 
-message TenantUpgradeResponse {
-	repeated string actions = 1;
-}
-
 service TenantService{
 	rpc Cleanup (TenantCleanupRequest) returns (google.protobuf.Empty){}
 	rpc Get (google.protobuf.Empty) returns (TenantName){}
@@ -161,7 +151,6 @@ service TenantService{
 	rpc List (google.protobuf.Empty) returns (TenantList){}
 	rpc Scan (TenantScanRequest) returns (ScanResultList){}
 	rpc Set (TenantName) returns (google.protobuf.Empty){}
-	rpc Upgrade (TenantUpgradeRequest) returns (TenantUpgradeResponse){}
 }
 
 // Image
@@ -814,8 +803,8 @@ enum ClusterComplexity {
 
 enum ClusterFlavor {
 	CF_UNKNOWN = 0;
-	CF_BOH = 1;
 	CF_K8S = 2;
+	CF_BOH = 4;
 }
 
 message ClusterListResponse {

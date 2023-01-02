@@ -124,51 +124,6 @@ func DockerNotGateway(t *testing.T) {
 	require.False(t, strings.Contains(out, "CONTAINER"))
 }
 
-// VPL: no Feature called docker-compose; integrated in docker.yml
-// func DockerCompose(t *testing.T) {
-// 	names := helpers.GetNames("DockerCompose", 0, 0, 0, 0, 1, 0, 0, 0)
-// 	names.TearDown()
-// 	defer names.TearDown()
-//
-// 	out, err := helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.102.0/24")
-// 	require.Nil(t, err)
-// 	_ = out
-//
-// 	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"uptime\"")
-// 	fmt.Print(out)
-// 	require.Nil(t, err)
-// 	require.True(t, strings.Contains(out, " user"))
-//
-// 	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker-compose")
-// 	require.NotNil(t, err)
-// 	_ = out
-//
-// 	out, err = helpers.GetOutput("safescale host feature add gw-" + names.Networks[0] + " docker-compose")
-// 	require.Nil(t, err)
-// 	_ = out
-//
-// 	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker-compose -v\"")
-// 	fmt.Print(out)
-// 	require.Nil(t, err)
-// 	_ = out
-//
-// 	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker-compose")
-// 	require.Nil(t, err)
-// 	_ = out
-//
-// 	out, err = helpers.GetOutput("safescale host feature delete gw-" + names.Networks[0] + " docker-compose")
-// 	require.Nil(t, err)
-// 	_ = out
-//
-// 	out, err = helpers.GetOutput("safescale host feature check gw-" + names.Networks[0] + " docker-compose")
-// 	require.NotNil(t, err)
-// 	_ = out
-//
-// 	out, err = helpers.GetOutput("safescale ssh run gw-" + names.Networks[0] + " -c \"docker-compose -v\"")
-// 	fmt.Print(out)
-// 	require.NotNil(t, err)
-// }
-
 func RemoteDesktopOnSingleHost(t *testing.T) {
 	names := helpers.GetNames("RemoteDesktop", 0, 0, 0, 1, 1, 0, 0, 0)
 	names.TearDown()

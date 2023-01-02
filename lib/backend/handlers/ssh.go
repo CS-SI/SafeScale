@@ -67,11 +67,11 @@ type SSHHandler interface {
 
 // sshHandler SSH service
 type sshHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewSSHHandler ...
-func NewSSHHandler(job server.Job) SSHHandler {
+func NewSSHHandler(job backend.Job) SSHHandler {
 	return &sshHandler{job: job}
 }
 

@@ -47,11 +47,11 @@ type SecurityGroupHandler interface {
 }
 
 type securityGroupHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewSecurityGroupHandler returns an instance of SecurityGroupHandler
-func NewSecurityGroupHandler(job server.Job) SecurityGroupHandler {
+func NewSecurityGroupHandler(job backend.Job) SecurityGroupHandler {
 	return &securityGroupHandler{job}
 }
 

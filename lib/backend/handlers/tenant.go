@@ -152,13 +152,13 @@ type TenantHandler interface {
 
 // tenantHandler service
 type tenantHandler struct {
-	job              server.Job
+	job              backend.Job
 	abstractSubnet   *abstract.Subnet
 	scannedHostImage *abstract.Image
 }
 
 // NewTenantHandler creates a scanner service
-func NewTenantHandler(job server.Job) TenantHandler {
+func NewTenantHandler(job backend.Job) TenantHandler {
 	return &tenantHandler{job: job}
 }
 

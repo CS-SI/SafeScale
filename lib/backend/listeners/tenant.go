@@ -233,34 +233,3 @@ func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName)
 
 	return tenantInfo, nil
 }
-
-// Upgrade upgrades metadata of a tenant if needed
-func (s *TenantListener) Upgrade(inctx context.Context, in *protocol.TenantUpgradeRequest) (_ *protocol.TenantUpgradeResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot upgrade tenant")
-
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
-	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	name := in.GetName()
-	job, xerr := PrepareJobWithoutService(inctx, fmt.Sprintf("/tenant/%s/metadata/upgrade", name))
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
-	return nil, fail.NewError("metadata upgrade no longer supported")
-}

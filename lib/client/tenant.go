@@ -168,29 +168,3 @@ func (t tenantConsumer) Scan(name string, dryRun bool, templates []string, timeo
 	results, err := service.Scan(newCtx, &protocol.TenantScanRequest{Name: name, DryRun: dryRun, Templates: templates})
 	return results, err
 }
-
-// Upgrade ...
-func (t tenantConsumer) Upgrade(name string, dryRun bool, timeout time.Duration) ([]string, error) {
-	t.session.Connect()
-	defer t.session.Disconnect()
-
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// finally, using context
-	newCtx := ctx
-	if timeout != 0 {
-		aCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		newCtx = aCtx
-	}
-
-	service := protocol.NewTenantServiceClient(t.session.connection)
-	results, err := service.Upgrade(newCtx, &protocol.TenantUpgradeRequest{Name: name, DryRun: dryRun, Force: false})
-	if results != nil && len(results.Actions) > 0 {
-		return results.Actions, err
-	}
-	return nil, err
-}

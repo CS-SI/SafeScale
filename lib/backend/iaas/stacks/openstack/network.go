@@ -628,7 +628,7 @@ func (s stack) ListSubnets(ctx context.Context, networkID string) ([]*abstract.S
 	if xerr != nil {
 		return nil, xerr
 	}
-	// VPL: empty subnet list is not an abnormal situation, do not log
+	// empty subnet list is not an abnormal situation, do not log
 	return subnetList, nil
 }
 

@@ -45,11 +45,11 @@ type BucketHandler interface {
 
 // bucketHandler bucket service
 type bucketHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewBucketHandler creates a BucketHandler
-func NewBucketHandler(job server.Job) BucketHandler {
+func NewBucketHandler(job backend.Job) BucketHandler {
 	return &bucketHandler{job: job}
 }
 
@@ -153,7 +153,7 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 	return rb.Delete(handler.job.Context())
 }
 
-// Uploads a bucket
+// Upload a bucket
 func (handler *bucketHandler) Upload(bucketName, directoryName string) (ferr fail.Error) {
 	defer func() {
 		if ferr != nil {

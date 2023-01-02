@@ -396,6 +396,12 @@ func DefaultNotifierWithContext(ctx context.Context) (func(t Try, v verdict.Enum
 
 	ctxID := ""
 
+	if aID := ctx.Value("ID"); aID != nil {
+		if aVal, ok := aID.(string); ok {
+			ctxID = aVal
+		}
+	}
+
 	if ctxID == "" {
 		return func(t Try, v verdict.Enum) {
 			switch v {

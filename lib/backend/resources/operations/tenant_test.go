@@ -31,7 +31,7 @@ import (
 func Test_MapSet(t *testing.T) {
 	joder := mapset.NewSet()
 
-	var cap []string
+	var caps []string
 
 	var rey []string = []string{"a", "b", "brother", "cholera", "b", "brother"}
 	for _, v := range rey {
@@ -40,11 +40,11 @@ func Test_MapSet(t *testing.T) {
 
 	ite := joder.Iter()
 	for v := range ite {
-		cap = append(cap, v.(string))
+		caps = append(caps, v.(string))
 	}
 
 	assert.Equal(t, 4, joder.Cardinality())
-	assert.Equal(t, 4, len(cap))
+	assert.Equal(t, 4, len(caps))
 }
 
 func Test_CurrentTenant(t *testing.T) {

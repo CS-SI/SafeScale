@@ -35,11 +35,11 @@ type TemplateHandler interface {
 
 // templateHandler image service
 type templateHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewTemplateHandler creates a host service
-func NewTemplateHandler(job server.Job) TemplateHandler {
+func NewTemplateHandler(job backend.Job) TemplateHandler {
 	return &templateHandler{job: job}
 }
 

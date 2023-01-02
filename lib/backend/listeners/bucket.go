@@ -191,7 +191,7 @@ func (s *BucketListener) Download(
 	return empty, nil
 }
 
-// Download a bucket
+// Clear a bucket
 func (s *BucketListener) Clear(inctx context.Context, in *protocol.BucketRequest) (
 	empty *googleprotobuf.Empty, err error,
 ) {

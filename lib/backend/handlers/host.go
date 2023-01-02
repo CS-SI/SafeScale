@@ -65,11 +65,11 @@ type HostHandler interface {
 
 // hostHandler is an implementation of interface HostHandler
 type hostHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewHostHandler is the constructor for HostHandler
-func NewHostHandler(job server.Job) HostHandler {
+func NewHostHandler(job backend.Job) HostHandler {
 	return &hostHandler{job}
 }
 

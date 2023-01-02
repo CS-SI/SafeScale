@@ -29,7 +29,7 @@ import (
 )
 
 // PrepareJob creates a new job
-func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ server.Job, ferr fail.Error) {
+func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ backend.Job, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -56,25 +56,7 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 		}
 	}
 	newctx, cancel := context.WithCancel(ctx)
-	job, xerr := server.NewJob(newctx, cancel, tenant.Service, jobDescription)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return job, nil
-}
-
-// PrepareJobWithoutService creates a new job without service instanciation (for example to be used with metadata upgrade)
-func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ server.Job, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	newctx, cancel := context.WithCancel(ctx)
-
-	job, xerr := server.NewJob(newctx, cancel, nil, jobDescription)
+	job, xerr := backend.NewJob(newctx, cancel, tenant.Service, jobDescription)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -118,7 +100,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 
 	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 
-	xerr := server.AbortJobByID(uuid)
+	xerr := backend.AbortJobByID(uuid)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -149,7 +131,7 @@ func (s *JobManagerListener) List(inctx context.Context, _ *googleprotobuf.Empty
 	defer fail.OnExitLogError(inctx, &err, tracer.TraceMessage())
 
 	// handler := JobManagerHandler(tenant.Service)
-	jobMap := server.ListJobs()
+	jobMap := backend.ListJobs()
 	var pbProcessList []*protocol.JobDefinition
 	for uuid, info := range jobMap {
 		select {

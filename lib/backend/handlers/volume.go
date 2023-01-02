@@ -57,11 +57,11 @@ type VolumeHandler interface {
 
 // volumeHandler volume service
 type volumeHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewVolumeHandler creates a Volume service
-func NewVolumeHandler(job server.Job) VolumeHandler {
+func NewVolumeHandler(job backend.Job) VolumeHandler {
 	return &volumeHandler{job: job}
 }
 

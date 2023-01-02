@@ -50,10 +50,10 @@ type SubnetHandler interface {
 
 // SubnetHandler ...
 type subnetHandler struct {
-	job server.Job
+	job backend.Job
 }
 
-func NewSubnetHandler(job server.Job) SubnetHandler {
+func NewSubnetHandler(job backend.Job) SubnetHandler {
 	return &subnetHandler{job}
 }
 

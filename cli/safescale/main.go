@@ -254,8 +254,6 @@ func main() {
 		}
 	*/
 
-	// VPL: there is no RunContext in urfave/cli/v1
-	// err := app.RunContext(mainCtx, os.Args)
 	err := app.Run(os.Args)
 	if err != nil {
 		fmt.Println("Error Running App : " + err.Error())
