@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,11 +57,11 @@ type VolumeHandler interface {
 
 // volumeHandler volume service
 type volumeHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewVolumeHandler creates a Volume service
-func NewVolumeHandler(job server.Job) VolumeHandler {
+func NewVolumeHandler(job backend.Job) VolumeHandler {
 	return &volumeHandler{job: job}
 }
 

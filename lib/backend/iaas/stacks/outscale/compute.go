@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -496,7 +496,7 @@ func (s stack) hostState(ctx context.Context, id string) (hoststate.Enum, fail.E
 }
 
 // WaitHostReady waits a host achieve ready state
-// hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
+// hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return a utils.ErrInvalidParameter
 func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	if valid.IsNil(s) {
 		return abstract.NewHostCore(), fail.InvalidInstanceError()
@@ -1238,7 +1238,7 @@ func (s stack) complementHost(ctx context.Context, ahf *abstract.HostFull, vm os
 	return xerr
 }
 
-// GetTrueHostState returns the current state of the host identified by id
+// GetHostState returns the current state of the host identified by id
 func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()

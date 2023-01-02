@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/antihax/optional v1.0.0
-	github.com/aws/aws-sdk-go v1.44.155
+	github.com/aws/aws-sdk-go v1.44.171
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/denisbrodbeck/machineid v1.0.1
@@ -21,7 +21,7 @@ require (
 	github.com/gophercloud/gophercloud v0.25.0
 	github.com/itchyny/gojq v0.12.9
 	github.com/json-iterator/go v1.1.12
-	github.com/magiconair/properties v1.8.6
+	github.com/magiconair/properties v1.8.7
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/oscarpicas/covertool v0.4.1
@@ -43,7 +43,6 @@ require (
 	github.com/urfave/cli v1.22.10
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
-	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
 	golang.org/x/net v0.4.0
 	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783
 	golang.org/x/sync v0.1.0
@@ -51,7 +50,7 @@ require (
 	golang.org/x/term v0.3.0
 	golang.org/x/text v0.5.0
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.104.0
+	google.golang.org/api v0.105.0
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/fsnotify.v1 v1.4.7

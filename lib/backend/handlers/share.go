@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,11 +49,11 @@ type ShareHandler interface {
 
 // shareHandler nas service
 type shareHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewShareHandler creates a ShareHandler
-func NewShareHandler(job server.Job) ShareHandler {
+func NewShareHandler(job backend.Job) ShareHandler {
 	return &shareHandler{job: job}
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,6 +71,9 @@ type Profile struct {
 }
 
 func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig sshapi.Config, secondaryGatewayConfig sshapi.Config) *Profile {
+	if port <= 0 {
+		port = 22
+	}
 	return &Profile{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
@@ -1076,7 +1079,7 @@ func createSSHCommand(
 		// it works this way for those reasons:
 		//	 a direct ssh to the user would force the host admin to tweak ssh and weaken the security by mistake
 		//   sudo can not be forced to ask the password unless you modify the sudoers file to do so
-		//	 su may be used to ask password then launch a command but it launches a shell without tty (sudo for example would refuse to work)
+		//	 su may be used to ask password then launch a command, but it launches a shell without tty (sudo for example would refuse to work)
 		cmd = "su " + username + " -c exit && " + sshCmdString + " -t sudo -u " + username
 		withTty = true
 	}

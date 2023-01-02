@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -395,6 +395,12 @@ func DefaultNotifierWithContext(ctx context.Context) (func(t Try, v verdict.Enum
 	}
 
 	ctxID := ""
+
+	if aID := ctx.Value("ID"); aID != nil {
+		if aVal, ok := aID.(string); ok {
+			ctxID = aVal
+		}
+	}
 
 	if ctxID == "" {
 		return func(t Try, v verdict.Enum) {
