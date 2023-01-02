@@ -23,7 +23,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/require"
@@ -708,45 +707,4 @@ func TestMetadataCore_Deserialize(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-}
-
-type SomeObserver struct {
-	observer.Observer
-	ID     string
-	Name   string
-	States map[string]string
-}
-
-func (e *SomeObserver) GetID() (string, error) {
-	if e == nil {
-		return "", nil
-	}
-	return e.ID, nil
-}
-func (e *SomeObserver) GetName() string {
-	if e == nil {
-		return ""
-	}
-	return e.Name
-}
-func (e *SomeObserver) GetStates() map[string]string {
-	if e == nil {
-		return map[string]string{}
-	}
-	return e.States
-}
-
-// is called by Observable to signal an Observer a change occurred
-func (e *SomeObserver) SignalChange(id string) {
-	e.States[id] = "changed"
-}
-
-// is called by Observable to signal an Observer the content will not be used anymore (decreasing the counter of uses)
-func (e *SomeObserver) MarkAsFreed(id string) {
-	e.States[id] = "markasreed"
-}
-
-// used to mark the Observable as deleted (allowing to remove the entry from the Observer internals)
-func (e *SomeObserver) MarkAsDeleted(id string) {
-	e.States[id] = "markasdeleted"
 }
