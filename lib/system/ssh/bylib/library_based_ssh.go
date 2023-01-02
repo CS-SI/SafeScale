@@ -66,6 +66,9 @@ func (sconf *Profile) CreatePersistentTunneling() fail.Error {
 }
 
 func NewProfile(hostname string, ipAddress string, port int, user string, privateKey string, localPort int, localHost string, gatewayConfig sshapi.Config, secondaryGatewayConfig sshapi.Config) *Profile {
+	if port <= 0 {
+		port = 22
+	}
 	return &Profile{Hostname: hostname, IPAddress: ipAddress, Port: port, User: user, PrivateKey: privateKey, LocalPort: localPort, LocalHost: localHost, GatewayConfig: gatewayConfig, SecondaryGatewayConfig: secondaryGatewayConfig}
 }
 
@@ -667,7 +670,7 @@ func (sconf *Profile) NewSudoCommand(_ context.Context, cmdString string) (sshap
 	return sconf.command(cmdString, false, true)
 }
 
-func (sconf *Profile) command(cmdString string, withTty, withSudo bool) (*LibCommand, fail.Error) {
+func (sconf *Profile) command(cmdString string, _, withSudo bool) (*LibCommand, fail.Error) {
 	cmd := exec.Command(cmdString)
 	sshCommand := LibCommand{
 		withSudo: withSudo,
@@ -978,7 +981,7 @@ func (sconf *Profile) copy(ctx context.Context, remotePath string, localPath str
 }
 
 // Enter runs interactive shell
-func (sconf *Profile) Enter(ctx context.Context, username string, shell string) (ferr fail.Error) {
+func (sconf *Profile) Enter(ctx context.Context, username string, _ string) (ferr fail.Error) {
 	userPass := ""
 	if username != "" && username != sconf.User {
 		fmt.Printf("Password: ")

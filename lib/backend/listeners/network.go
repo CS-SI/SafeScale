@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -119,7 +119,7 @@ func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCrea
 	}
 
 	handler := handlers.NewNetworkHandler(job)
-	networkInstance, xerr := handler.Create(networkReq, subnetReq, "", gwSizing)
+	networkInstance, xerr := handler.Create(networkReq, subnetReq, in.GetGateway().Name, gwSizing)
 	if xerr != nil {
 		return nil, xerr
 	}

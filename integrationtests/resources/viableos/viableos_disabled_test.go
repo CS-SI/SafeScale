@@ -1,5 +1,7 @@
+//go:build !(allintegration || (integration && ostests))
+
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,13 +16,12 @@
  * limitations under the License.
  */
 
-package serialize
+package viableos
 
-//go:generate minimock -o mocks/mock_serializable.go -i github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize.Serializable
+import (
+	"testing"
+)
 
-// Serializable is the interface allowing the conversion of satisfying struct to []byte (Serialize()
-// and reverse operation (Deserialize()
-type Serializable interface {
-	Serialize() ([]byte, error)
-	Deserialize([]byte) error
+func Test_Nop(t *testing.T) {
+	t.Skip("viableos tests disabled")
 }

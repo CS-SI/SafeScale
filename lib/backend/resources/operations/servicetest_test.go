@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,7 +68,6 @@ import (
 	"github.com/eko/gocache/v2/store"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/taskqueue"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -129,7 +128,6 @@ type ServiceTestCacheDataMap struct {
 type ServiceTestCacheData struct {
 	svc  *ServiceTest
 	data ServiceTestCacheDataMap
-	tq   *taskqueue.TaskQueue
 }
 
 func (e *ServiceTestCacheData) Get(ctx context.Context, key interface{}) (interface{}, error) {
@@ -156,50 +154,9 @@ func (e *ServiceTestCacheData) Get(ctx context.Context, key interface{}) (interf
 	//	return value, nil
 	// }, 10*time.Second)
 }
-func (e *ServiceTestCacheData) Set(ctx context.Context, key interface{}, object interface{}, options *store.Options) error {
-	skey, ok := key.(string)
-	if !ok {
-		return fail.InvalidParameterCannotBeEmptyStringError("key")
-	}
-	e.svc._surveyf("ServiceTestCacheData::Set { key: \"%s\" }", skey)
-	_, err := e.tq.Push(func() (interface{}, fail.Error) {
-		e.data.mu.Lock()
-		defer e.data.mu.Unlock()
-		e.data.data[skey] = object
-		return nil, nil
-	}, 10*time.Second)
-	return err
-}
-func (e *ServiceTestCacheData) Delete(ctx context.Context, key interface{}) error {
-	skey, ok := key.(string)
-	if !ok {
-		return fail.InvalidParameterCannotBeEmptyStringError("key")
-	}
-	e.svc._surveyf("ServiceTestCacheData::Delete { key: \"%s\" }", skey)
-	_, err := e.tq.Push(func() (interface{}, fail.Error) {
-		e.data.mu.Lock()
-		defer e.data.mu.Unlock()
-		_, ok := e.data.data[skey]
-		if ok {
-			delete(e.data.data, skey)
-		}
-		return nil, nil
-	}, 10*time.Second)
-	return err
-}
 func (e *ServiceTestCacheData) Invalidate(ctx context.Context, options store.InvalidateOptions) error {
 	e.svc._survey("ServiceTestCacheData::Invalidate (not implemented)")
 	return nil
-}
-func (e *ServiceTestCacheData) Clear(ctx context.Context) error {
-	e.svc._survey("ServiceTestCacheData::Clear")
-	_, err := e.tq.Push(func() (interface{}, fail.Error) {
-		e.data.mu.Lock()
-		defer e.data.mu.Unlock()
-		e.data.data = make(map[string]interface{})
-		return nil, nil
-	}, 10*time.Second)
-	return err
 }
 func (e *ServiceTestCacheData) GetType() string {
 	return "ServiceTestCacheData"
@@ -562,14 +519,6 @@ func NewServiceTest(t *testing.T, routine func(svc *ServiceTest)) error {
 				data: make(map[string]string),
 				mu:   sync.Mutex{},
 			},
-			cache: &ServiceTestCacheData{
-				svc: nil,
-				tq:  taskqueue.CreateTaskQueue(32),
-				data: ServiceTestCacheDataMap{
-					data: make(map[string]interface{}),
-					mu:   &sync.RWMutex{},
-				},
-			},
 			nocache: &ServiceTestNoCacheData{
 				svc: nil,
 			},
@@ -590,7 +539,6 @@ func NewServiceTest(t *testing.T, routine func(svc *ServiceTest)) error {
 			mu: &sync.RWMutex{},
 		},
 	}
-	svc.internals.cache.svc = svc
 	svc.internals.nocache.svc = svc
 	svc._reset()
 
@@ -609,8 +557,6 @@ func (e *ServiceTest) _reset() {
 	e.internals.bucketData.mu.Lock()
 	e.internals.bucketData.data = make(map[string]string) // Empty bucket data
 	e.internals.bucketData.mu.Unlock()
-
-	e.internals.cache.Clear(context.Background())
 
 	e.internals.fsCache.mu.Lock()
 	e.internals.fsCache.data = make(map[string][]byte)
@@ -1088,9 +1034,6 @@ func (e *ServiceTest) GetCache(ctx context.Context) (cache.CacheInterface, fail.
 	e.options.mu.RUnlock()
 
 	e._logf("ServiceTest::GetCache { enabled: %t }", enablecache)
-	if e.options.enablecache {
-		return e.internals.cache, nil
-	}
 	return e.internals.nocache, nil
 }
 

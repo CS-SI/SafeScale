@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,11 +37,11 @@ type ImageHandler interface {
 
 // imageHandler image service
 type imageHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewImageHandler creates a host service
-func NewImageHandler(job server.Job) ImageHandler {
+func NewImageHandler(job backend.Job) ImageHandler {
 	return &imageHandler{job: job}
 }
 

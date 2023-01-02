@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,12 +19,11 @@ package outscale
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/antihax/optional"
 	"github.com/outscale/osc-sdk-go/osc"
-
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 func (s stack) rpcReadSecurityGroups(ctx context.Context, networkID string, sgIDs []string) ([]osc.SecurityGroup, fail.Error) {

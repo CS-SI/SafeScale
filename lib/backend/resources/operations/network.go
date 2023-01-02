@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -427,9 +427,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 			return
 		}
 
-		// instance.lock.Lock()
-		// defer instance.lock.Unlock()
-
+		// FIXME: Any metadata problem blocks resource destruction... great !!
 		xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			abstractNetwork, ok := clonable.(*abstract.Network)
 			if !ok {
