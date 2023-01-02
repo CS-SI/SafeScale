@@ -2,7 +2,7 @@
 // +build debug
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -443,14 +443,10 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 				}
 			}
 
-			doReload := true
-			// Reload reloads data from object storage to be sure to have the last revision
-			if doReload {
-				xerr := myself.unsafeReload(ctx)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return fail.Wrap(xerr, "failed to unsafeReload metadata")
-				}
+			xerr := myself.unsafeReload(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return fail.Wrap(xerr, "failed to unsafeReload metadata")
 			}
 
 			rollbacked, err := myself.shielded.UnWrap()
@@ -460,12 +456,15 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 
 			defer func() {
 				if ferr != nil {
-					myself.shielded.RollBack(rollbacked)
+					err := myself.shielded.RollBack(rollbacked)
+					if err != nil {
+						return
+					}
 					myself.committed = true
 				}
 			}()
 
-			xerr := myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
+			xerr = myself.shielded.Alter(func(clonable data.Clonable) fail.Error {
 				return callback(clonable, myself.properties)
 			})
 			xerr = debug.InjectPlannedFail(xerr)

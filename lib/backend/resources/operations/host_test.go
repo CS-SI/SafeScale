@@ -2,7 +2,7 @@
 // +build ignored
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -697,8 +697,6 @@ func TestHost_setSecurityGroups(t *testing.T) {
 		host, xerr := LoadHost(ctx, svc, "MyHostTest")
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*operations.Host")
-
-		host.GetView(ctx)
 
 		ohost := host.(*Host)
 

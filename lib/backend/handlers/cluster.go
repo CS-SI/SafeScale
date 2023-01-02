@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,11 +60,11 @@ type ClusterHandler interface {
 
 // clusterHandler bucket service
 type clusterHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewClusterHandler creates a ClusterHandler
-func NewClusterHandler(job server.Job) ClusterHandler {
+func NewClusterHandler(job backend.Job) ClusterHandler {
 	return &clusterHandler{job: job}
 }
 

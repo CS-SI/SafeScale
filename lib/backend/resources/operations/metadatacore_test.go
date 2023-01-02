@@ -1,5 +1,5 @@
-//go:build testable
-// +build testable
+//go:build testable && debug
+// +build testable,debug
 
 package operations
 
@@ -146,6 +146,7 @@ func TestMetadataCore_TrueInspect(t *testing.T) {
 }
 
 func TestMetadataCore_Darkbloom(t *testing.T) {
+	// FIXME: This test requires minio check and also the debug flag
 	ol, err := objectstorage.NewLocation(objectstorage.Config{
 		Type:        "s3",
 		EnvAuth:     false,
@@ -207,6 +208,7 @@ func TestMetadataCore_Darkbloom(t *testing.T) {
 }
 
 func TestMetadataCore_CrazyWhatLoveCanDo(t *testing.T) {
+	// FIXME: This test requires minio check
 	ol, err := objectstorage.NewLocation(objectstorage.Config{
 		Type:        "s3",
 		EnvAuth:     false,
@@ -268,6 +270,7 @@ func TestMetadataCore_CrazyWhatLoveCanDo(t *testing.T) {
 }
 
 func TestMetadataCore_Doctor(t *testing.T) {
+	// FIXME: This test requires minio check
 	ol, _ := objectstorage.NewLocation(objectstorage.Config{
 		Type:        "s3",
 		EnvAuth:     false,
@@ -322,4 +325,39 @@ func TestMetadataCore_Doctor(t *testing.T) {
 	default:
 		t.Errorf("wrong error type")
 	}
+}
+
+func TestMetadataCore_Versioning(t *testing.T) {
+	// FIXME: This test requires minio check
+	ol, _ := objectstorage.NewLocation(objectstorage.Config{
+		Type:        "s3",
+		EnvAuth:     false,
+		AuthVersion: 0,
+		Endpoint:    "http://192.168.1.100:9000",
+		User:        "admin",
+		SecretKey:   "password",
+		Region:      "stub",
+		BucketName:  "bushido",
+		Direct:      true,
+	})
+	ok, err := ol.CreateBucket(context.Background(), "bushido")
+	if err != nil {
+		ok, _ = ol.InspectBucket(context.Background(), "bushido")
+	}
+
+	sm := &minService{
+		loc: ol,
+		aob: ok,
+	}
+	net := abstract.NewNetwork()
+	net.ID = "Network_ID"
+	net.Name = "Network Name"
+	delete(net.Tags, "CreationDate")
+
+	mk, xerr := NewCore(sm, "network", "networks", net)
+	require.Nil(t, xerr)
+	require.NotNil(t, mk)
+
+	xerr = mk.Carry(context.Background(), net)
+	require.Nil(t, xerr)
 }

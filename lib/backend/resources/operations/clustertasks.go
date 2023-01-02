@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -866,7 +866,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrInvalidRequest:
-					// Some cloud providers do not allow to create a Subnet with the same CIDR than the Network; try with a sub-CIDR once
+					// Some cloud providers do not allow to create a Subnet with the same CIDR as the Network; try with a sub-CIDR once
 					logrus.WithContext(ctx).Warnf("Cloud Provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
 					_, ipNet, err := net.ParseCIDR(subnetReq.CIDR)
 					err = debug.InjectPlannedError(err)
