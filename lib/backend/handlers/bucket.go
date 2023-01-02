@@ -153,7 +153,7 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 	return rb.Delete(handler.job.Context())
 }
 
-// Uploads a bucket
+// Upload a bucket
 func (handler *bucketHandler) Upload(bucketName, directoryName string) (ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
