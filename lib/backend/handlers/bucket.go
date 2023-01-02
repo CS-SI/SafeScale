@@ -45,11 +45,11 @@ type BucketHandler interface {
 
 // bucketHandler bucket service
 type bucketHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewBucketHandler creates a BucketHandler
-func NewBucketHandler(job server.Job) BucketHandler {
+func NewBucketHandler(job backend.Job) BucketHandler {
 	return &bucketHandler{job: job}
 }
 

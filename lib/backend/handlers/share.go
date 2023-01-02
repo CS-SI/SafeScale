@@ -49,11 +49,11 @@ type ShareHandler interface {
 
 // shareHandler nas service
 type shareHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewShareHandler creates a ShareHandler
-func NewShareHandler(job server.Job) ShareHandler {
+func NewShareHandler(job backend.Job) ShareHandler {
 	return &shareHandler{job: job}
 }
 

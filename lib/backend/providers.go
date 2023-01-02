@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package server
+package backend
 
 // TODO: NOTICE Side-effects imports here
 

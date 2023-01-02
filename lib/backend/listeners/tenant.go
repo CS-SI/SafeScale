@@ -233,10 +233,3 @@ func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName)
 
 	return tenantInfo, nil
 }
-
-// Upgrade upgrades metadata of a tenant if needed
-func (s *TenantListener) Upgrade(inctx context.Context, in *protocol.TenantUpgradeRequest) (_ *protocol.TenantUpgradeResponse, err error) {
-	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-
-	return nil, fail.NewError("metadata upgrade no longer supported")
-}

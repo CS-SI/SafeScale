@@ -37,11 +37,11 @@ type ImageHandler interface {
 
 // imageHandler image service
 type imageHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewImageHandler creates a host service
-func NewImageHandler(job server.Job) ImageHandler {
+func NewImageHandler(job backend.Job) ImageHandler {
 	return &imageHandler{job: job}
 }
 

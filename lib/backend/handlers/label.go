@@ -38,11 +38,11 @@ type LabelHandler interface {
 
 // labelHandler Label service
 type labelHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewTagHandler creates a Label service
-func NewTagHandler(job server.Job) LabelHandler {
+func NewTagHandler(job backend.Job) LabelHandler {
 	return &labelHandler{job: job}
 }
 

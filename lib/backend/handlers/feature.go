@@ -45,10 +45,10 @@ type FeatureHandler interface {
 
 // featureHandler is an implementation of FeatureHandler
 type featureHandler struct {
-	job server.Job
+	job backend.Job
 }
 
-func NewFeatureHandler(job server.Job) FeatureHandler {
+func NewFeatureHandler(job backend.Job) FeatureHandler {
 	return &featureHandler{job: job}
 }
 

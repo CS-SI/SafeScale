@@ -60,11 +60,11 @@ type ClusterHandler interface {
 
 // clusterHandler bucket service
 type clusterHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewClusterHandler creates a ClusterHandler
-func NewClusterHandler(job server.Job) ClusterHandler {
+func NewClusterHandler(job backend.Job) ClusterHandler {
 	return &clusterHandler{job: job}
 }
 

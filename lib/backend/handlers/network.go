@@ -48,11 +48,11 @@ type NetworkHandler interface {
 
 // networkHandler is one implementation of NetworkHandler interface
 type networkHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewNetworkHandler returns an instance of *networkHandler that satisfies interface NetworkHandler
-func NewNetworkHandler(job server.Job) NetworkHandler {
+func NewNetworkHandler(job backend.Job) NetworkHandler {
 	return &networkHandler{job}
 }
 

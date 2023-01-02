@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package server
+package backend
 
 import (
 	"context"
@@ -29,6 +29,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/metadata"
 )
+
+//go:generate minimock -o mocks/mock_job.go -i github.com/CS-SI/SafeScale/v22/lib/backend.Job
 
 // Job is the interface of a daemon job
 type Job interface {
