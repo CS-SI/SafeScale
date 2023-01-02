@@ -1079,7 +1079,7 @@ func createSSHCommand(
 		// it works this way for those reasons:
 		//	 a direct ssh to the user would force the host admin to tweak ssh and weaken the security by mistake
 		//   sudo can not be forced to ask the password unless you modify the sudoers file to do so
-		//	 su may be used to ask password then launch a command but it launches a shell without tty (sudo for example would refuse to work)
+		//	 su may be used to ask password then launch a command, but it launches a shell without tty (sudo for example would refuse to work)
 		cmd = "su " + username + " -c exit && " + sshCmdString + " -t sudo -u " + username
 		withTty = true
 	}

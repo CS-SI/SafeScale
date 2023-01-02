@@ -114,7 +114,6 @@ func IsCIDRRoutable(cidr string) (bool, fail.Error) {
 	return true, nil
 }
 
-// CIDROverlap VPL: Not used ? duplicate with DoCIDRsIntersect
 // CIDROverlap tells if the 2 CIDR passed as parameter intersect
 func CIDROverlap(n1, n2 net.IPNet) bool {
 	return n2.Contains(n1.IP) || n1.Contains(n2.IP)

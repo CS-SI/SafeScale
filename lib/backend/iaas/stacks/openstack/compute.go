@@ -124,7 +124,6 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool,
 		}
 	}
 
-	// VPL: what's the point if there ios
 	if len(azList) == 0 {
 		logrus.WithContext(ctx).Warnf("no Availability Zones detected !")
 	}

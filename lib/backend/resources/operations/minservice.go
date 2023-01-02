@@ -393,7 +393,7 @@ func (m minService) DeleteVolumeAttachment(ctx context.Context, serverID, id str
 	panic("implement me")
 }
 
-var FUCKING_TIMINGS = &temporal.MutableTimings{
+var MINTIMINGS = &temporal.MutableTimings{
 	Timeouts: temporal.Timeouts{
 		Communication:          100 * time.Millisecond,
 		Connection:             100 * time.Millisecond,
@@ -416,7 +416,7 @@ var FUCKING_TIMINGS = &temporal.MutableTimings{
 }
 
 func (m minService) Timings() (temporal.Timings, fail.Error) {
-	return FUCKING_TIMINGS, nil
+	return MINTIMINGS, nil
 }
 
 func (m minService) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {

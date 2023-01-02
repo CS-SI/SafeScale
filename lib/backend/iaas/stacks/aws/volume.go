@@ -85,8 +85,6 @@ func (s stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volum
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", ref).WithStopwatch().Entering().Exiting()
-	// VPL: caller must log; sometimes InspectVolume() returned error is to be considered as an information, not a real error
-	// defer fail.OnExitLogError(&xerr)
 
 	var name string
 	resp, xerr := s.rpcDescribeVolumeByName(ctx, aws.String(ref))
@@ -368,8 +366,6 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string)
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	// VPL: caller MUST log; sometimes, InspectVolumeAttachment returned error may be considered as an information of non-existence, not a real error
-	// defer fail.OnExitLogError(&xerr)
 
 	query := ec2.DescribeVolumesInput{
 		VolumeIds: []*string{aws.String(id)},
