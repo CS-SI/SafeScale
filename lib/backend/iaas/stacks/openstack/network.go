@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -628,7 +628,7 @@ func (s stack) ListSubnets(ctx context.Context, networkID string) ([]*abstract.S
 	if xerr != nil {
 		return nil, xerr
 	}
-	// VPL: empty subnet list is not an abnormal situation, do not log
+	// empty subnet list is not an abnormal situation, do not log
 	return subnetList, nil
 }
 

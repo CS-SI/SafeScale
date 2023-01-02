@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,11 +48,11 @@ type NetworkHandler interface {
 
 // networkHandler is one implementation of NetworkHandler interface
 type networkHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewNetworkHandler returns an instance of *networkHandler that satisfies interface NetworkHandler
-func NewNetworkHandler(job server.Job) NetworkHandler {
+func NewNetworkHandler(job backend.Job) NetworkHandler {
 	return &networkHandler{job}
 }
 
