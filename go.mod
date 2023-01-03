@@ -18,7 +18,7 @@ require (
 	github.com/gojuno/minimock/v3 v3.0.10
 	github.com/golang/protobuf v1.5.2
 	github.com/google/gofuzz v1.2.0
-	github.com/gophercloud/gophercloud v0.25.0
+	github.com/gophercloud/gophercloud v1.1.1
 	github.com/itchyny/gojq v0.12.9
 	github.com/json-iterator/go v1.1.12
 	github.com/magiconair/properties v1.8.7
@@ -42,7 +42,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli v1.22.10
 	github.com/zserge/metric v0.1.0
-	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
+	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
 	golang.org/x/net v0.4.0
 	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783
 	golang.org/x/sync v0.1.0
