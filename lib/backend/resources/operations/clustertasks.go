@@ -394,9 +394,6 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 						featuresV1.Disabled["proxycache"] = struct{}{}
 						// ENDVPL
 
-						// FIXME: Also disable remotedesktop by default
-						// featuresV1.Disabled["remotedesktop"] = struct{}{}
-
 						for k := range req.DisabledDefaultFeatures {
 							featuresV1.Disabled[k] = struct{}{}
 						}
@@ -2393,8 +2390,6 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
-
-	// FIXME: OPP perhaps we should return something Identifiable, that's what really need
 
 	type result struct {
 		rTr  *propertiesv3.ClusterNode

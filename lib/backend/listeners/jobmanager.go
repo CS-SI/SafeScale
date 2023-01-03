@@ -69,9 +69,6 @@ type JobManagerListener struct {
 	protocol.UnimplementedJobServiceServer
 }
 
-// // VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
-// func (s *JobManagerListener) mustEmbedUnimplementedJobServiceServer() {}
-
 // Stop specified process
 func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(ctx, &ferr)

@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
@@ -277,11 +278,9 @@ func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (
 		return nil, xerr
 	}
 
-	// VPL: operations.Host should filter these behavioral differences
-	// // DEFENSIVE CODING: this _must not_ happen, but InspectShare has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
-	// if shareInstance == nil {
-	//	return nil, abstract.ResourceNotFoundError("share", shareRef)
-	// }
+	if shareInstance == nil {
+		return nil, abstract.ResourceNotFoundError("share", shareRef)
+	}
 
 	return shareInstance.ToProtocol(ctx)
 }
