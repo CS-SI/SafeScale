@@ -64,7 +64,6 @@ Each `tenants` section contains specific authentication parameters for each Clou
 >    - gcp
 >    - openstack (pure OpenStack support)
 >    - outscale
->    - opentelekom
 >    - outscale
 >    - ovh
 > - `name` is a logical name representing the tenant
