@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/CS-SI/SafeScale/v22/integrationtests/helpers"
 	"github.com/stretchr/testify/require"
@@ -159,18 +160,36 @@ func OpenPortClosedByDefaultInGateway(t *testing.T) {
 	require.NotNil(t, err)
 
 	fmt.Println("Listing security groups")
-	out, err = helpers.GetOutput(fmt.Sprintf("safescale host security group list %s", tn))
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group list %s", names.Networks[0]))
 	require.Nil(t, err)
+
+	out = strings.TrimSpace(out)
 	fmt.Println(out)
 
 	var good string
-	first, err := helpers.RunJq(out, ".result[0].name")
+	first, err := helpers.RunJq(out, ".result[0].description")
 	require.Nil(t, err)
 
-	if strings.Contains(first, "publicip") {
+	if strings.Contains(first, "gateways") {
 		good = ".result[0].id"
-	} else {
-		good = ".result[1].id"
+	}
+
+	if good == "" {
+		first, err := helpers.RunJq(out, ".result[1].description")
+		require.Nil(t, err)
+
+		if strings.Contains(first, "gateways") {
+			good = ".result[1].id"
+		}
+	}
+
+	if good == "" {
+		first, err := helpers.RunJq(out, ".result[2].description")
+		require.Nil(t, err)
+
+		if strings.Contains(first, "gateways") {
+			good = ".result[2].id"
+		}
 	}
 
 	theID, err := helpers.RunJq(out, good)
@@ -185,6 +204,8 @@ func OpenPortClosedByDefaultInGateway(t *testing.T) {
 	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group rule add --direction ingress --port-from 7777 --port-to 7777 --cidr \"0.0.0.0/0\" --cidr \"%s/32\" %s %s", pubip, tn, theID))
 	fmt.Println(out)
 	require.Nil(t, err)
+
+	time.Sleep(5 * time.Second)
 
 	// if it's open won't fail
 	resp, err = http.Get(fmt.Sprintf("http://%s:7777", pubip))
