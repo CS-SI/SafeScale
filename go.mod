@@ -121,5 +121,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apimachinery v0.23.5 // indirect
 )
-
-replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4
