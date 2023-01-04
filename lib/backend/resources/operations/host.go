@@ -3867,6 +3867,23 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		labels = append(labels, item)
 	}
 
+	var kvlist []*protocol.KeyValue
+	hostkvs, err := instance.shielded.UnWrap()
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+	casted, ok := hostkvs.(*abstract.HostCore)
+	if !ok {
+		return nil, fail.InconsistentError("hostkvs should be a HostCore")
+	}
+	for k, v := range casted.Tags {
+		k, v := k, v
+		kvlist = append(kvlist, &protocol.KeyValue{
+			Key:   k,
+			Value: v,
+		})
+	}
+
 	ph = &protocol.Host{
 		Cpu:                 int32(hostSizingV2.AllocatedSize.Cores),
 		Disk:                int32(hostSizingV2.AllocatedSize.DiskSize),
@@ -3883,6 +3900,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		AttachedVolumeNames: volumes,
 		Template:            hostSizingV2.Template,
 		Labels:              labels,
+		Kvs:                 kvlist,
 	}
 	return ph, nil
 }
