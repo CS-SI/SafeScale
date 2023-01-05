@@ -303,8 +303,6 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (*abstract.KeyPai
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	// FIXME: OPP Look at CreateKeyPair from aws/compute.go
-
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 

@@ -2069,3 +2069,15 @@ func (s stack) rpcReadNicsOfVM(ctx context.Context, id string) ([]osc.Nic, fail.
 	}
 	return resp.Nics, nil
 }
+
+func (s stack) rpcReadPublicIP(ctx context.Context, id string) (interface{}, fail.Error) {
+	panic("not implemented")
+}
+
+func (s stack) rpcLinkPublicIPToNic(ctx context.Context, id string, id2 string) fail.Error {
+	panic("not implemented")
+}
+
+func (s stack) rpcUnlinkPublicIP(ctx context.Context, id string) fail.Error {
+	panic("not implemented")
+}

@@ -263,7 +263,6 @@ It defines the "driver" to communicate with the provider. Valid values are:
 > | `"gcp"` |
 > | `"local"` |
 > | `"openstack"` |
-> | `"opentelekom"` |
 > | `"outscale"` |
 > | `"ovh"` |
 
@@ -386,7 +385,6 @@ Is meaningful for some drivers only:
 > | |
 > | --- |
 > | `flexibleengine` |
-> | `opentelekom` |
 
 ### `VPCName`
 
@@ -396,7 +394,6 @@ Is meaningful for some drivers only:
 > | |
 > | --- |
 > | `flexibleengine` |
-> | `opentelekom` |
 
 
 ### GCP-specific

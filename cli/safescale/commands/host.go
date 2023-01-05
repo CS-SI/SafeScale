@@ -221,8 +221,17 @@ var hostInspect = cli.Command{
 				}
 			}
 		}
+
+		kvs := make(map[string]string)
+		for _, v := range resp.Kvs {
+			kvs[v.Key] = v.Value
+		}
+
 		output["labels"] = labels
 		output["tags"] = tags
+		output["kvs"] = kvs
+		// delete(output, "kvs")
+
 		return clitools.SuccessResponse(output)
 	},
 }

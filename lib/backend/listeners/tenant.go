@@ -35,8 +35,6 @@ type TenantListener struct {
 	protocol.UnimplementedTenantServiceServer
 }
 
-// VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
-
 // List lists registered tenants
 func (s *TenantListener) List(inctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)

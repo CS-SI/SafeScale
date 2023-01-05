@@ -2131,6 +2131,24 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, hr abstract.Host
 		return xerr
 	}
 
+	safe := false
+
+	// Fix for Stein
+	{
+		st, xerr := svc.GetProviderName()
+		if xerr != nil {
+			return xerr
+		}
+		if st != "ovh" {
+			safe = true
+		}
+	}
+
+	// Fix for Stein and firewalld
+	if !safe {
+		userdataContent.WithoutFirewall = true
+	}
+
 	if userdataContent.Debug {
 		if _, err := os.Stat("/tmp/tss"); !errors.Is(err, os.ErrNotExist) {
 			_, _, _, xerr = instance.unsafePush(ctx, "/tmp/tss", fmt.Sprintf("/home/%s/tss", userdataContent.Username), userdataContent.Username, "755", 10*time.Second)
@@ -3849,6 +3867,23 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		labels = append(labels, item)
 	}
 
+	var kvlist []*protocol.KeyValue
+	hostkvs, err := instance.shielded.UnWrap()
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+	casted, ok := hostkvs.(*abstract.HostCore)
+	if !ok {
+		return nil, fail.InconsistentError("hostkvs should be a HostCore")
+	}
+	for k, v := range casted.Tags {
+		k, v := k, v
+		kvlist = append(kvlist, &protocol.KeyValue{
+			Key:   k,
+			Value: v,
+		})
+	}
+
 	ph = &protocol.Host{
 		Cpu:                 int32(hostSizingV2.AllocatedSize.Cores),
 		Disk:                int32(hostSizingV2.AllocatedSize.DiskSize),
@@ -3865,6 +3900,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		AttachedVolumeNames: volumes,
 		Template:            hostSizingV2.Template,
 		Labels:              labels,
+		Kvs:                 kvlist,
 	}
 	return ph, nil
 }
