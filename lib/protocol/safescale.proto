@@ -212,6 +212,7 @@ message Network {
 	NetworkState state = 8;             // Deprecated: moved to Subnet
 	repeated string subnets = 9;
 	repeated string dns_servers = 10;
+	repeated KeyValue kvs = 11;
 }
 
 message NetworkList {
@@ -301,6 +302,7 @@ message Subnet {
 	bool failover = 6;
 	SubnetState state = 7;
 	string network_id = 8;
+	repeated KeyValue kvs = 9;
 }
 
 message SubnetList {
@@ -400,6 +402,7 @@ message Host {
 	bool managed = 17;
 	string template = 18;
 	repeated HostLabelResponse labels = 19;
+	repeated KeyValue kvs = 20;
 }
 
 message HostStatus {
@@ -580,6 +583,7 @@ message VolumeInspectResponse {
 	string format = 7; // Deprecated: replaced by attachments field
 	string device = 8; // Deprecated: replaced by attachments field
 	repeated VolumeAttachmentResponse attachments = 10;
+	repeated KeyValue kvs = 11;
 }
 
 message VolumeAttachmentRequest {
@@ -1190,6 +1194,7 @@ message LabelInspectResponse {
 	repeated LabelHostResponse hosts = 3;
 	bool has_default = 4;
 	string default_value = 5;
+	string value = 6;
 }
 
 message LabelListRequest {

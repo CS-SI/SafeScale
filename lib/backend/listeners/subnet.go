@@ -45,8 +45,6 @@ type SubnetListener struct {
 	protocol.UnimplementedSubnetServiceServer
 }
 
-// VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
-
 // Create a new subnet
 func (s *SubnetListener) Create(inctx context.Context, in *protocol.SubnetCreateRequest) (_ *protocol.Subnet, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)

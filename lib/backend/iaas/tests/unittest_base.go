@@ -329,19 +329,6 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 	assert.Equal(t, network1.Name, net1Name)
 	assert.Equal(t, network1.CIDR, net1CIDR)
 
-	// VPL: properties are not inside stack instances anymore
-	// TODO: see if there is something to test at this level
-	// gw1NetworkV1 := propertiesv1.NewHostSubnet()
-	// err = gw1.properties.Inspect(HostProperty.NetworkV1, func(clonable interface{}) error {
-	// 	gw1NetworkV1 = clonable.(*propertiesv1.HostNetworking)
-	// 	return nil
-	// })
-	// assert.Nil(t, err)
-	// assert.Empty(t, gw1NetworkV1.DefaultGatewayID)
-	// assert.Equal(t, gw1NetworkV1.SubnetsByName[net1Name], network1.ID)
-	// assert.Equal(t, gw1NetworkV1.SubnetsByID[network1.ID], net1Name)
-	// assert.Equal(t, gw1NetworkV1.IsGateway, true)
-
 	net2CIDR := "10.1.2.0/24"
 	net2Name := "unit_test_networks_2"
 	fmt.Println("Creating " + net2Name)
@@ -434,19 +421,6 @@ func (tester *ServiceTester) Subnets(t *testing.T) {
 	assert.Equal(t, subnet1.GatewayIDs[0], gw1.Core.ID)
 	assert.Equal(t, gw1.Core.Name, "gw-"+subnet1.Name)
 	assert.NotEmpty(t, gw1.Networking.PublicIPv4)
-
-	// VPL: properties are not inside stack instances anymore
-	// TODO: see if there is something to test at this level
-	// gw1NetworkV1 := propertiesv1.NewHostSubnet()
-	// err = gw1.properties.Inspect(HostProperty.NetworkV1, func(clonable interface{}) error {
-	// 	gw1NetworkV1 = clonable.(*propertiesv1.HostNetworking)
-	// 	return nil
-	// })
-	// assert.Nil(t, err)
-	// assert.Empty(t, gw1NetworkV1.DefaultGatewayID)
-	// assert.Equal(t, gw1NetworkV1.SubnetsByName[subnet1Name], network1.ID)
-	// assert.Equal(t, gw1NetworkV1.SubnetsByID[network1.ID], subnet1Name)
-	// assert.Equal(t, gw1NetworkV1.IsGateway, true)
 
 	subnet2CIDR := "10.2.2.0/24"
 	subnet2Name := "unit_test_subnets_2"

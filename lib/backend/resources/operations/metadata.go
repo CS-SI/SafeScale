@@ -35,7 +35,6 @@ const (
 	// FirstMetadataVersion corresponds to the first metadata format version
 	FirstMetadataVersion = "v20.06.0"
 
-	// MustUpgradeMessage  = "the current version of SafeScale binaries cannot use safely the current tenant metadata; you should consider upgrading the metadata using the command 'safescale tenant metadata upgrade %s'. Note that previous version of binaries would not be able to read safely the newly upgraded metadata and should be upgraded everywhere to at least version %s."
 	MustUpgradeMessage  = "the current version of SafeScale binaries cannot use safely the current tenant metadata; you should consider upgrading the metadata using the command 'safescale tenant metadata upgrade %s'."
 	MustUpgradeBinaries = "the current version of SafeScale binaries requires the use of at least release %s to work correctly. Please upgrade your binaries"
 )
@@ -56,13 +55,8 @@ func CheckMetadataVersion(ctx context.Context, svc iaas.Service) (string, fail.E
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// continue
-			debug.IgnoreError2(ctx, xerr)
-		default:
-			return "", fail.Wrap(xerr, "failed to read content of 'version' file in metadata bucket")
-		}
+		debug.IgnoreError2(ctx, xerr)
+		return "", nil
 	}
 	if currentMetadataVersion == "" {
 		currentMetadataVersion = FirstMetadataVersion
@@ -79,7 +73,7 @@ func CheckMetadataVersion(ctx context.Context, svc iaas.Service) (string, fail.E
 	case -1:
 		return currentMetadataVersion, fail.ForbiddenError(MustUpgradeMessage, svcName)
 	case 1:
-		return currentMetadataVersion, fail.ForbiddenError(MustUpgradeBinaries, MinimumMetadataVersion)
+		return currentMetadataVersion, nil
 	}
 
 	// everything is ok

@@ -18,7 +18,6 @@ package ovh
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -377,56 +376,14 @@ func (p provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.Host
 	}
 
 	// check flavor availability through OVH-API
-	authOpts, err := p.GetAuthenticationOptions(ctx)
+	_, err := p.GetAuthenticationOptions(ctx)
 	if err != nil {
 		logrus.WithContext(context.Background()).Warnf("failed to get Authentication options, flavors availability will not be checked: %v", err)
 		return allTemplates, nil
 	}
-	service := authOpts.GetString("TenantID")
-	region := authOpts.GetString("Region")
 
 	var listAvailableTemplates []*abstract.HostTemplate
-	restURL := fmt.Sprintf("/cloud/project/%s/flavor?region=%s", service, region)
-	flavors, xerr := p.requestOVHAPI(ctx, restURL, "GET")
-	if xerr != nil {
-		logrus.WithContext(context.Background()).Infof("Unable to request OVH API, flavors availability will not be checked: %v", xerr)
-		listAvailableTemplates = allTemplates
-	} else {
-		flavorMap := map[string]map[string]interface{}{}
-		for _, flavor := range flavors.([]interface{}) {
-			// Removal of all the unavailable templates
-			if flavmap, ok := flavor.(map[string]interface{}); ok {
-				if val, ok := flavmap["available"].(bool); ok {
-					if val {
-						if aflav, ok := flavmap["id"]; ok {
-							if key, ok := aflav.(string); ok {
-								flavorMap[key] = flavmap
-							}
-						}
-					}
-				}
-			}
-		}
-
-		for _, template := range allTemplates {
-			if _, ok := flavorMap[template.ID]; ok {
-				// update incomplete disk size of some templates
-				if strings.HasPrefix(template.Name, "i1-") {
-					template.DiskSize = 2000000
-				} else {
-					switch template.Name {
-					case "t1-180", "t2-180":
-						template.DiskSize = 2000000
-					default:
-					}
-				}
-
-				listAvailableTemplates = append(listAvailableTemplates, template)
-			} else {
-				logrus.WithContext(context.Background()).WithContext(ctx).Warnf("Flavor %s@%s is not available at the moment, ignored", template.Name, template.ID)
-			}
-		}
-	}
+	listAvailableTemplates = allTemplates
 
 	// update incomplete disk size of some templates
 	for k, template := range listAvailableTemplates {

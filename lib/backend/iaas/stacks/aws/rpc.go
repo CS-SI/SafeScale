@@ -2381,3 +2381,11 @@ func (s stack) rpcDeleteVolume(ctx context.Context, id *string) fail.Error {
 		normalizeError,
 	)
 }
+
+func (s stack) rpcAssociateAddressWithInstance(ctx context.Context, s2 *string, s3 *string) (interface{}, fail.Error) {
+	panic("not implemented")
+}
+
+func (s stack) rpcGetAddress(ctx context.Context, id string) (interface{}, fail.Error) {
+	panic("not implemented")
+}

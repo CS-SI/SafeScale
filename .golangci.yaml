@@ -374,7 +374,6 @@ linters-settings:
     # List of allowed `replace` directives. Default is empty.
     replace-allow-list:
       - launchpad.net/gocheck
-      - gomodules.xyz/stow
     # Allow to not explain why the version has been retracted in the `retract` directives. Default is false.
     retract-allow-no-explanation: false
     # Forbid the use of the `exclude` directives. Default is false.

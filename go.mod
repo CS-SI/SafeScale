@@ -29,7 +29,6 @@ require (
 	github.com/oscarpicas/scribble v1.0.4
 	github.com/oscarpicas/smetrics v0.1.0
 	github.com/outscale/osc-sdk-go/osc v0.0.0-20200515123036-c82ce4912c6b
-	github.com/ovh/go-ovh v1.3.0
 	github.com/pelletier/go-toml/v2 v2.0.6
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.13.5
@@ -121,5 +120,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apimachinery v0.23.5 // indirect
 )
-
-replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4
