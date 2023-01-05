@@ -85,12 +85,14 @@ func GwFirewallWorks(t *testing.T) {
 			_ = Body.Close()
 		}(resp.Body)
 
-		// make sure it works reading the content
-		body, err := io.ReadAll(resp.Body)
-		require.Nil(t, err)
-		if strings.Contains(string(body), "miniserve") {
-			fmt.Println("We don't have a working firewall")
-			t.Errorf("We don't have a working firewall")
+		if resp.StatusCode <= 299 {
+			// make sure it works reading the content
+			body, err := io.ReadAll(resp.Body)
+			require.Nil(t, err)
+			if strings.Contains(string(body), "miniserve") {
+				fmt.Println("We don't have a working firewall")
+				t.Errorf("We don't have a working firewall")
+			}
 		}
 	}
 }
@@ -149,12 +151,14 @@ func OpenPortClosedByDefaultInGateway(t *testing.T) {
 			_ = Body.Close()
 		}(resp.Body)
 
-		// make sure it works reading the content
-		body, err := io.ReadAll(resp.Body)
-		require.Nil(t, err)
-		if strings.Contains(string(body), "miniserve") {
-			fmt.Println("We don't have a working firewall")
-			t.Errorf("We don't have a working firewall")
+		if resp.StatusCode <= 299 {
+			// make sure it works reading the content
+			body, err := io.ReadAll(resp.Body)
+			require.Nil(t, err)
+			if strings.Contains(string(body), "miniserve") {
+				fmt.Println("We don't have a working firewall")
+				t.Errorf("We don't have a working firewall")
+			}
 		}
 	}
 	require.NotNil(t, err)
