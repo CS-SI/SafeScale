@@ -1,4 +1,5 @@
-//go:build allintegration || integration
+//go:build ignore && (allintegration || integration)
+// +build ignore
 // +build allintegration integration
 
 /*
