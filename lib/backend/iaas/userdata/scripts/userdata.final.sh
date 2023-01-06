@@ -138,11 +138,6 @@ function install_drivers_nvidia() {
 install_drivers_nvidia
 # ---- EndMain
 
-{{- if .WithoutFirewall }}
-sfService stop firewalld &> /dev/null || true
-sfService disable firewalld &> /dev/null || true
-{{- end }}
-
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.final.done
 # For compatibility with previous user_data implementation (until v19.03.x)...
 ln -s ${SF_VARDIR}/state/user_data.final.done /var/tmp/user_data.done
