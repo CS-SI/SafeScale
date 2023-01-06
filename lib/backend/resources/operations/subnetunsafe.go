@@ -46,7 +46,7 @@ import (
 // unsafeGetDefaultRouteIP ...
 func (instance *Subnet) unsafeGetDefaultRouteIP(ctx context.Context) (_ string, ferr fail.Error) {
 	var ip string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -77,7 +77,7 @@ func (instance *Subnet) unsafeGetDefaultRouteIP(ctx context.Context) (_ string, 
 
 // unsafeGetVirtualIP returns an abstract.VirtualIP used by gateway HA
 func (instance *Subnet) unsafeGetVirtualIP(ctx context.Context) (vip *abstract.VirtualIP, ferr fail.Error) {
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -102,7 +102,7 @@ func (instance *Subnet) unsafeGetVirtualIP(ctx context.Context) (vip *abstract.V
 // Intended to be used when instance is notoriously not nil (because previously checked)
 func (instance *Subnet) unsafeGetCIDR(ctx context.Context) (_ string, ferr fail.Error) {
 	var cidr string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -118,7 +118,7 @@ func (instance *Subnet) unsafeGetCIDR(ctx context.Context) (_ string, ferr fail.
 // Intended to be used when rs is notoriously not null (because previously checked)
 func (instance *Subnet) unsafeGetState(ctx context.Context) (_ subnetstate.Enum, ferr fail.Error) {
 	var state subnetstate.Enum
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -151,7 +151,7 @@ func (instance *Subnet) unsafeAbandonHost(props *serialize.JSONProperties, hostI
 // unsafeHasVirtualIP tells if the Subnet uses a VIP a default route
 func (instance *Subnet) unsafeHasVirtualIP(ctx context.Context) (bool, fail.Error) {
 	var found bool
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -974,7 +974,7 @@ func (instance *Subnet) unsafeCreateGateways(
 			}
 
 			var as *abstract.Subnet
-			xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr = instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				as, ok = clonable.(*abstract.Subnet)
 				if !ok {
@@ -1391,6 +1391,10 @@ func (instance *Subnet) unsafeCreateGateways(
 			if xerr != nil {
 				ar := result{xerr}
 				return ar, ar.rErr
+			}
+
+			if primaryGateway != nil && secondaryGateway != nil {
+				logrus.WithContext(ctx).Warnf("Surreal")
 			}
 
 			egFinalizer := new(errgroup.Group)
