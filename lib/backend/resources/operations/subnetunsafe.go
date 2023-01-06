@@ -1393,10 +1393,6 @@ func (instance *Subnet) unsafeCreateGateways(
 				return ar, ar.rErr
 			}
 
-			if primaryGateway != nil && secondaryGateway != nil {
-				logrus.WithContext(ctx).Warnf("Surreal")
-			}
-
 			egFinalizer := new(errgroup.Group)
 			egFinalizer.Go(func() error {
 				_, err := instance.taskFinalizeGatewayConfiguration(ctx, taskFinalizeGatewayConfigurationParameters{
