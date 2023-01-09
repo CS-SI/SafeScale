@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        host: yes
+        host: all
         cluster: all
 
     parameters:
@@ -50,7 +50,7 @@ feature:
                 steps:
                     pkg:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
                             masters: all
                             nodes: all
@@ -103,7 +103,7 @@ feature:
                 steps:
                     cleanup:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
                             masters: all
                             nodes: all
@@ -132,7 +132,7 @@ feature:
                             sfExit
                     docker-ce:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
                             masters: all
                             nodes: all
@@ -199,7 +199,7 @@ feature:
                             sfExit
                     docker-compose:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
                             masters: all
                             nodes: all
@@ -217,7 +217,7 @@ feature:
                             sfExit
                     config:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
                             masters: all
                             nodes: all
@@ -273,7 +273,7 @@ feature:
                     firewall:
                         targets:
                             gateways: all
-                            hosts: yes
+                            hosts: all
                             masters: all
                             nodes: all
                         run: |
@@ -292,7 +292,7 @@ feature:
                     enable:
                         targets:
                             gateways: all
-                            hosts: yes
+                            hosts: all
                             masters: all
                             nodes: all
                         run: |
@@ -306,7 +306,7 @@ feature:
                     verify:
                         targets:
                             gateways: all
-                            hosts: yes
+                            hosts: all
                             masters: all
                             nodes: all
                         run: |
@@ -323,7 +323,7 @@ feature:
                     docker-login:
                         targets:
                             gateways: all
-                            hosts: yes
+                            hosts: all
                             masters: all
                             nodes: all
                         run: |
@@ -342,7 +342,7 @@ feature:
                     docker-logout:
                         targets:
                             gateways: all
-                            hosts: yes
+                            hosts: all
                             masters: all
                             nodes: all
                         run: |
@@ -353,7 +353,7 @@ feature:
                     cleanup:
                         targets:
                             gateways: all
-                            hosts: yes
+                            hosts: all
                             masters: all
                             nodes: all
                         run: |

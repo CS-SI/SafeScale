@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        host: yes
+        host: all
         cluster: all
 
     parameters:
@@ -30,9 +30,9 @@ feature:
                 steps:
                     pkg:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
-                            masters: no
+                            masters: none
                             nodes: all
                         run: |
                             case $LINUX_KIND in
@@ -57,9 +57,9 @@ feature:
                 steps:
                     ntpdate:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
-                            masters: no
+                            masters: none
                             nodes: all
                         run: |
                           case $LINUX_KIND in
@@ -84,9 +84,9 @@ feature:
 
                     config:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
-                            masters: no
+                            masters: none
                             nodes: all
                         run: |
                             case $LINUX_KIND in
@@ -162,9 +162,9 @@ feature:
 
                     ready:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
-                            masters: no
+                            masters: none
                             nodes: all
                         run: |
                             case $LINUX_KIND in
@@ -206,9 +206,9 @@ feature:
                 steps:
                     ntpdate:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
-                            masters: no
+                            masters: none
                             nodes: all
                         run: |
                             case $LINUX_KIND in

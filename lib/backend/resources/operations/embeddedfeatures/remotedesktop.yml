@@ -19,7 +19,7 @@ feature:
             - docker
 
     suitableFor:
-        host: yes
+        host: all
         cluster: all
 
     parameters:
@@ -43,7 +43,7 @@ feature:
                 steps:
                     image:
                         targets:
-                            hosts: yes
+                            hosts: all
                             masters: all
                         run: |
                             if ! docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'safescale/remotedesktop:latest' &>/dev/null; then
@@ -57,7 +57,7 @@ feature:
                 steps:
                     user:
                         targets:
-                            hosts: yes
+                            hosts: all
                         run: |
                             {{ if not .ClusterFlavor }}
                             id {{ .Username }} &>/dev/null && sfExit
@@ -69,7 +69,7 @@ feature:
 
                     desktop:
                         targets:
-                            hosts: yes
+                            hosts: all
                             masters: all
                         timeout: 15
                         run: |
@@ -109,7 +109,7 @@ feature:
 
                     tigervnc:
                         targets:
-                            hosts: yes
+                            hosts: all
                             masters: all
                         timeout: 15
                         run: |
@@ -293,7 +293,7 @@ feature:
 
                     deps:
                         targets:
-                            hosts: yes
+                            hosts: all
                             masters: all
                         run: |
                             mkdir -p ${SF_ETCDIR}/remotedesktop/build
@@ -307,7 +307,7 @@ feature:
 
                     guacamole:
                         targets:
-                            hosts: yes
+                            hosts: all
                             masters: all
                         timeout: 20
                         run: |
@@ -515,7 +515,7 @@ feature:
 
                     start:
                         targets:
-                            hosts: yes
+                            hosts: all
                             masters: all
                         run: |
                             # Guacd need sshd to authorize password authentication...
@@ -582,7 +582,7 @@ feature:
                 steps:
                     image:
                         targets:
-                            hosts: yes
+                            hosts: all
                             masters: all
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true

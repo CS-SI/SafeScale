@@ -398,7 +398,7 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 					},
 				)
 				if innerXErr != nil {
-					return fail.Wrap(innerXErr, "failed to disable feature 'proxycache'")
+					return fail.Wrap(innerXErr, "failed to disable features")
 				}
 
 				// Sets initial state of the new Cluster and create metadata
