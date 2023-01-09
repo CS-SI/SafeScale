@@ -105,14 +105,13 @@ func Test_HostTemplateFromAbstractToProtocol(t *testing.T) {
 func Test_HostEffectiveSizingFromAbstractToProtocol(t *testing.T) {
 
 	ahes := &abstract.HostEffectiveSizing{
-		Cores:       4,
-		RAMSize:     8192,
-		DiskSize:    512,
-		GPUNumber:   1,
-		GPUType:     "NVIDIA 1080 TI",
-		CPUFreq:     2133,
-		ImageID:     "HostTemplate ImageID",
-		Replaceable: false,
+		Cores:     4,
+		RAMSize:   8192,
+		DiskSize:  512,
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1080 TI",
+		CPUFreq:   2133,
+		ImageID:   "HostTemplate ImageID",
 	}
 	hd := HostEffectiveSizingFromAbstractToProtocol(ahes)
 
@@ -202,7 +201,6 @@ func Test_HostSizingRequirementsFromAbstractToProtocol(t *testing.T) {
 		MinDiskSize: 384,
 		MinGPU:      1,
 		MinCPUFreq:  2133,
-		Replaceable: false,
 		Image:       "Image",
 		Template:    "Template",
 	}
@@ -228,7 +226,6 @@ func Test_HostSizingRequirementsFromAbstractToPropertyV2(t *testing.T) {
 		MinDiskSize: 384,
 		MinGPU:      1,
 		MinCPUFreq:  2133,
-		Replaceable: false,
 		Image:       "Image",
 		Template:    "Template",
 	}
@@ -241,8 +238,6 @@ func Test_HostSizingRequirementsFromAbstractToPropertyV2(t *testing.T) {
 	require.EqualValues(t, hsz.MinDiskSize, hz.MinDiskSize)
 	require.EqualValues(t, hsz.MinGPU, hz.MinGPU)
 	require.EqualValues(t, hsz.MinCPUFreq, hz.MinCPUFreq)
-	require.EqualValues(t, hsz.Replaceable, hz.Replaceable)
-
 }
 
 func Test_VirtualIPFromAbstractToProtocol(t *testing.T) {
@@ -270,14 +265,13 @@ func Test_VirtualIPFromAbstractToProtocol(t *testing.T) {
 func Test_HostEffectiveSizingFromAbstractToPropertyV2(t *testing.T) {
 
 	ahes := &abstract.HostEffectiveSizing{
-		Cores:       4,
-		RAMSize:     8192,
-		DiskSize:    512,
-		GPUNumber:   1,
-		GPUType:     "NVIDIA 1080 TI",
-		CPUFreq:     2133,
-		ImageID:     "HostTemplate ImageID",
-		Replaceable: false,
+		Cores:     4,
+		RAMSize:   8192,
+		DiskSize:  512,
+		GPUNumber: 1,
+		GPUType:   "NVIDIA 1080 TI",
+		CPUFreq:   2133,
+		ImageID:   "HostTemplate ImageID",
 	}
 	phes := HostEffectiveSizingFromAbstractToPropertyV2(ahes)
 
@@ -325,7 +319,6 @@ func Test_HostFullFromAbstractToProtocol(t *testing.T) {
 	ahf.Sizing.GPUType = "NVIDIA 1080 TI"
 	ahf.Sizing.CPUFreq = 2133
 	ahf.Sizing.ImageID = "HostTemplate ImageID"
-	ahf.Sizing.Replaceable = false
 	ahf.Networking.IsGateway = false
 	ahf.Networking.DefaultGatewayID = "Networking DefaultGatewayID"
 	ahf.Networking.DefaultGatewayPrivateIP = "Networking DefaultGatewayPrivateIP"

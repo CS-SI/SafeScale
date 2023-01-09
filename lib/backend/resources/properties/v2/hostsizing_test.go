@@ -117,7 +117,6 @@ func TestHostSizing_Clone(t *testing.T) {
 			MinDiskSize: 0,
 			MinGPU:      0,
 			MinCPUFreq:  0.0,
-			Replaceable: false,
 		},
 		Template: "HostSizing Template",
 		AllocatedSize: &HostEffectiveSizing{

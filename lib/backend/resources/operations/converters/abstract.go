@@ -140,7 +140,6 @@ func HostSizingRequirementsFromAbstractToPropertyV2(src abstract.HostSizingRequi
 		MinDiskSize: src.MinDiskSize,
 		MinGPU:      src.MinGPU,
 		MinCPUFreq:  src.MinCPUFreq,
-		Replaceable: src.Replaceable,
 	}
 }
 
