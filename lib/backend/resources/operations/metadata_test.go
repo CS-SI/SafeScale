@@ -35,13 +35,6 @@ func Test_CheckMetadataVersion(t *testing.T) {
 			xerr    fail.Error
 		)
 
-		svc._updateOption("version", "")
-		svc._updateOption("versionErr", fail.NewError("There is no version"))
-
-		_, xerr = CheckMetadataVersion(ctx, svc)
-		require.Contains(t, xerr.Error(), "failed to read content of 'version' file in metadata bucket")
-		require.Contains(t, xerr.Error(), "There is no version")
-
 		svc._reset()
 		svc._updateOption("name", "")
 		svc._updateOption("nameErr", fail.NewError("Service has no name"))

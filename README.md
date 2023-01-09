@@ -125,7 +125,6 @@ SafeScale is currently under active development and does not yet offer all the a
  - Supported Cloud providers:
     - OVH Public Cloud
     - FlexibleEngine
-    - OpenTelekom
     - CloudFerro
     - Generic OpenStack
     - AWS

@@ -147,7 +147,7 @@ func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, f
 	}
 
 	var stdout string
-	// FIXME: Add a retry here only if we catch an executionerror of a connection error
+	// FIXME: Add a retry here only if we catch an execution error or a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
 		select {
 		case <-ctx.Done():

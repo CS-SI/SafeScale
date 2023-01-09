@@ -588,3 +588,7 @@ func (s stack) rpcDeleteFloatingIP(ctx context.Context, id string) fail.Error {
 		NormalizeError,
 	)
 }
+
+func (s stack) rpcGetFloatingIP(ctx context.Context, id string) (interface{}, fail.Error) {
+	panic("not implemented")
+}
