@@ -319,10 +319,19 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 	}
 }
 
-// Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
+// Review just calls Inspect
+func (myself *MetadataCore) Review(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
+	if valid.IsNil(myself) {
+		return fail.InvalidInstanceError()
+	}
+
+	return myself.Inspect(inctx, callback)
+}
+
+// OldReview allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change through time).
-func (myself *MetadataCore) Review(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
+func (myself *MetadataCore) OldReview(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
 	defer func() {
 		if rerr != nil {
 			if myself != nil {

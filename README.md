@@ -86,8 +86,8 @@ A "SafeScale `Feature`" is a file in YAML format that describes the operations t
 A `Feature` can describe operations using different methods:
 - `package`: just define the package(s) concerned
 - `bash`: uses bash snippets
-- `helm` (coming soon): uses helm chart, the "package" engine for Kubernetes
-- `ansible` (coming soon): defines playbook to run, SafeScale provising inventory
+- `helm`: uses helm chart, the "package" engine for Kubernetes
+- `ansible`: defines playbook to run, SafeScale provising inventory
 
 Additionally, a `Feature` is able to apply:
 - reverse proxy rules
@@ -134,9 +134,14 @@ SafeScale is currently under active development and does not yet offer all the a
 
 ## Contributing
 
-We are strongly interested by new contributions.
+We are looking for new contributors.
 
 If you wish to contribute you can [fork the project](https://help.github.com/forking/), make your changes, commit to your repository, and then [create a pull request](https://help.github.com/articles/creating-a-pull-request-from-a-fork/). The development team can then review your contribution and commit it upstream as appropriate.
+
+As much as possible, try following these guides:
+- [godoc documentation tool formalism](https://blog.golang.org/godoc-documenting-go-code).
+- [Go style guide](https://github.com/golang/go/wiki/CodeReviewComments)
+- [Effective Go](https://golang.org/doc/effective_go)
 
 For bugs and feature requests, [please create an issue](../../issues/new).
 
