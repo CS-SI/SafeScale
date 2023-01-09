@@ -390,9 +390,6 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 								reflect.TypeOf(clonable).String(),
 							)
 						}
-						// VPL: For now, always disable addition of feature proxycache
-						featuresV1.Disabled["proxycache"] = struct{}{}
-						// ENDVPL
 
 						for k := range req.DisabledDefaultFeatures {
 							featuresV1.Disabled[k] = struct{}{}
