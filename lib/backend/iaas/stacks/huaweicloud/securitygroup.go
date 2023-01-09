@@ -256,10 +256,6 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 	if xerr != nil {
 		return nil, xerr
 	}
-	asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
-	if xerr != nil {
-		return asg, xerr
-	}
 
 	// delete security group rules
 	for _, v := range asg.Rules {
