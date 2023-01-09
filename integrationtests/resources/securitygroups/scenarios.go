@@ -20,6 +20,7 @@
 package securitygroups
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -223,6 +224,85 @@ func OpenPortClosedByDefaultInGateway(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	require.Nil(t, err)
 	require.Contains(t, string(body), "miniserve")
+}
+
+func CreateAndDeleteNetworkSecurityGroup(t *testing.T) {
+	names := helpers.GetNames("sgtest", 0, 0, 0, 1, 1, 0, 0, 0)
+	defer names.TearDown()
+
+	out, err := helpers.GetOutput("safescale network list")
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	fmt.Println("Creating network " + names.Networks[0])
+
+	out, err = helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.40.0/24")
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	fmt.Println("Creating VM " + names.Hosts[0])
+
+	out, err = helpers.GetOutput("safescale host create " + names.Hosts[0] + " --net " + names.Networks[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput("safescale host inspect " + names.Hosts[0])
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	host0 := helpers.HostInfo{}
+	_ = json.Unmarshal([]byte(out), &host0)
+
+	sgName := fmt.Sprintf("%s-custom-sg", names.Networks[0])
+
+	fmt.Println("Creating security group " + sgName)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group create --description \"Custom test sg\" %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group create --description \"Custom test sg\" %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "already exist"))
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group inspect %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	sgDesc, err := helpers.RunJq(out, ".result.description")
+	require.Nil(t, err)
+	require.Contains(t, string(sgDesc), "Custom test sg")
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group bonds %s %s", names.Networks[0], sgName))
+	require.Nil(t, err)
+	require.Contains(t, out, "{\"result\":null,\"status\":\"success\"}")
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale host security group bind %s %s", names.Hosts[0], sgName))
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group bonds %s %s", names.Networks[0], sgName))
+	require.Nil(t, err)
+
+	bonds, err := helpers.RunJq(out, ".result.hosts[0].name")
+	require.Nil(t, err)
+	require.Contains(t, bonds, names.Hosts[0])
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale host security group unbind %s %s", names.Hosts[0], sgName))
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group bonds %s %s", names.Networks[0], sgName))
+	require.Nil(t, err)
+	require.Contains(t, out, "{\"result\":null,\"status\":\"success\"}")
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group delete %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "success"))
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group delete %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.NotNil(t, err)
 }
 
 func init() {
