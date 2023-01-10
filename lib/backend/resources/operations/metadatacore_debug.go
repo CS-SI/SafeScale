@@ -328,66 +328,6 @@ func (myself *MetadataCore) Review(inctx context.Context, callback resources.Cal
 	return myself.Inspect(inctx, callback)
 }
 
-// OldReview allows to access data contained in the instance, without reloading from the Object Storage; it's intended
-// to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
-// change through time).
-func (myself *MetadataCore) OldReview(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
-	defer func() {
-		if rerr != nil {
-			if myself != nil {
-				logrus.WithContext(inctx).Debugf("Review of %s failed with: %s", litter.Sdump(myself.shielded), rerr)
-			}
-		}
-	}()
-
-	if valid.IsNil(myself) {
-		return fail.InvalidInstanceError()
-	}
-
-	if itis, xerr := myself.IsValid(); xerr == nil && !itis {
-		return fail.InconsistentError("the instance is not valid")
-	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	myself.RLock()
-	defer myself.RUnlock()
-
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		gerr := func() (ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			if callback == nil {
-				return fail.InvalidParameterCannotBeNilError("callback")
-			}
-			if myself.properties == nil {
-				return fail.InvalidInstanceContentError("myself.properties", "cannot be nil")
-			}
-
-			return myself.shielded.Inspect(func(clonable data.Clonable) fail.Error {
-				return callback(clonable, myself.properties)
-			})
-		}()
-		chRes <- result{gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rErr
-	case <-ctx.Done():
-		<-chRes
-		return fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		<-chRes
-		return fail.ConvertError(inctx.Err())
-	}
-}
-
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)

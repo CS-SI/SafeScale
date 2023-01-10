@@ -367,6 +367,9 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 			return asg, xerr
 		}
 	}
+
+	asg.Rules = abstract.SecurityGroupRules{}
+
 	return s.InspectSecurityGroup(ctx, asg)
 }
 

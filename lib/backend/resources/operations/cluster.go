@@ -2226,30 +2226,41 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 	go func() {
 		defer close(chRes)
 
+		parameters := ExtractFeatureParameters(req.FeatureParameters)
+
 		// FIXME: OPP This should use instance.AddFeature instead
 
 		// Install reverse-proxy feature on Cluster (gateways)
-		parameters := ExtractFeatureParameters(req.FeatureParameters)
-		xerr := instance.installReverseProxy(ctx, parameters, req)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
 
-		// Install remote-desktop feature on Cluster (all masters)
-		xerr = instance.installRemoteDesktop(ctx, parameters, req)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
-			if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
+		// FIXME: Enable this ONLY after kong feature is UPDATED AND TESTED
+		// Reverse proxy disabled by default: EOL, unsafe, undocumented
+		/*
+			xerr := instance.installReverseProxy(ctx, parameters, req)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
 				chRes <- result{xerr}
 				return
 			}
-		}
+		*/
+
+		// Install remote-desktop feature on Cluster (all masters)
+
+		// FIXME: Enable this ONLY after remotedesktop feature is UPDATED AND TESTED
+		// Also, EOL, unsafe, undocumented, 4 releases have passed since 1.0.0 was published
+		/*
+			xerr := instance.installRemoteDesktop(ctx, parameters, req)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
+				if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
+					chRes <- result{xerr}
+					return
+				}
+			}
+		*/
 
 		// Install ansible feature on Cluster (all masters)
-		xerr = instance.installAnsible(ctx, parameters)
+		xerr := instance.installAnsible(ctx, parameters)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}

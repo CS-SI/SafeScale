@@ -2,6 +2,7 @@
 
 - [How to build Safecale on Ubuntu](UBUNTU_BUILD.md)
 - [How to build SafeScale on Debian](DEBIAN_BUILD.md)
+- [How to build SafeScale with Docker](DOCKER_BUILD.md)
 
 ## Following binaries will be produced :
 

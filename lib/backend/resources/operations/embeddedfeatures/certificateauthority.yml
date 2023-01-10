@@ -15,7 +15,7 @@
 ---
 feature:
     suitableFor:
-        host: yes
+        host: all
         cluster: all
 
     parameters:
@@ -33,7 +33,7 @@ feature:
                 steps:
                     cert:
                         targets:
-                            hosts: yes
+                            hosts: all
                             masters: all
                         run: |
                             [ ! -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ] && sfFail 192 "Certificate not found"
@@ -44,7 +44,7 @@ feature:
                 steps:
                     config:
                         targets:
-                            hosts: yes
+                            hosts: all
                             masters: one
                         run: |
                             case $LINUX_KIND in
@@ -187,7 +187,7 @@ feature:
 
                     rootca:
                         targets:
-                            hosts: yes
+                            hosts: all
                             masters: one
                         run: |
                             if [ ! -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ]; then
@@ -234,7 +234,7 @@ feature:
 
                     spread:
                         targets:
-                            hosts: no
+                            hosts: none
                             gateways: all
                             masters: all
                             nodes: all
@@ -255,7 +255,7 @@ feature:
 
                     register:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
                             masters: all
                             nodes: all
@@ -292,7 +292,7 @@ feature:
                 steps:
                     clean:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
                             masters: all
                             nodes: all

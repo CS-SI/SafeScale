@@ -256,7 +256,7 @@ func (instance *SecurityGroup) Create(
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotImplemented:
-					// not all providers implement security groups, and I do not want to see it even in !release mode, so no debug.IgnoreError()
+					debug.IgnoreError2(ctx, xerr)
 				case *fail.ErrNotFound:
 					// continue
 					debug.IgnoreError2(ctx, xerr)

@@ -1148,7 +1148,7 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 	const yamlKey = "feature.suitableFor.host"
 	if w.feature.Specs().IsSet(yamlKey) {
 		value := strings.ToLower(w.feature.Specs().GetString(yamlKey))
-		ok = value == "ok" || value == "yes" || value == "true" || value == "1"
+		ok = value == "ok" || value == "yes" || value == "true" || value == "1" || value == "all" || value == "one"
 	}
 	if ok {
 		return nil

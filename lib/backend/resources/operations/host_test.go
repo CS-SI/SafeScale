@@ -687,7 +687,6 @@ func TestHost_setSecurityGroups(t *testing.T) {
 			PublicIP: false,
 			// IsGateway        bool                // IsGateway tells if the host will act as a gateway
 			// KeepOnFailure    bool                // KeepOnFailure tells if resource must be kept on failure
-			// Preemptible      bool                // Use spot-like instance
 			// SecurityGroupIDs map[string]struct{} // List of Security Groups to attach to Host (using map as dict)
 		}
 
