@@ -305,5 +305,54 @@ func CreateAndDeleteNetworkSecurityGroup(t *testing.T) {
 	require.NotNil(t, err)
 }
 
+func AddAndClearRuleNetworkSecurityGroup(t *testing.T) {
+	names := helpers.GetNames("sgtest", 0, 0, 0, 0, 1, 0, 0, 0)
+	defer names.TearDown()
+
+	out, err := helpers.GetOutput("safescale network list")
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	fmt.Println("Creating network " + names.Networks[0])
+
+	out, err = helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.40.0/24")
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	sgName := fmt.Sprintf("%s-test-sg", names.Networks[0])
+
+	fmt.Println("Create security group " + sgName)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group create --description \"Custom test sg\" %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group rule add -D ingress --port-from 8000 --port-to 8000 --cidr \"0.0.0.0/0\" %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group inspect %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	sg0 := helpers.SgInspect{}
+	_ = json.Unmarshal([]byte(out), &sg0)
+	res, _ := json.Marshal(sg0)
+	fmt.Println("Sg : " + string(res))
+	require.NotNil(t, sg0.Result.Rules)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group clear %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group inspect %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	sg1 := helpers.SgInspect{}
+	_ = json.Unmarshal([]byte(out), &sg1)
+	require.True(t, len(sg1.Result.Rules) == 0)
+}
+
 func init() {
 }
