@@ -15,7 +15,7 @@
 ---
 feature:
     suitableFor:
-        host: no
+        host: none
         cluster: k8s
 
     requirements:
@@ -44,7 +44,7 @@ feature:
                 steps:
                     certs:
                         targets:
-                            masters: any
+                            masters: one
                         run: |
                             mkdir -p ${SF_ETCDIR}/helm/pki
                             cd ${SF_TMPDIR}

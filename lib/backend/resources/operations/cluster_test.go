@@ -65,7 +65,6 @@ func createClusterRequest() abstract.ClusterRequest {
 			MinDiskSize: 1024,
 			MinGPU:      1,
 			MinCPUFreq:  2033,
-			Replaceable: false,
 			Image:       "HostSizingRequirements Image",
 			Template:    "HostSizingRequirements Template",
 		},
@@ -77,7 +76,6 @@ func createClusterRequest() abstract.ClusterRequest {
 			MinDiskSize: 1024,
 			MinGPU:      1,
 			MinCPUFreq:  2033,
-			Replaceable: false,
 			Image:       "HostSizingRequirements Image",
 			Template:    "HostSizingRequirements Template",
 		},
@@ -89,7 +87,6 @@ func createClusterRequest() abstract.ClusterRequest {
 			MinDiskSize: 1024,
 			MinGPU:      1,
 			MinCPUFreq:  2033,
-			Replaceable: false,
 			Image:       "HostSizingRequirements Image",
 			Template:    "HostSizingRequirements Template",
 		},
@@ -326,7 +323,6 @@ func TestCluster_Create(t *testing.T) {
 			PublicIP:      true,
 			IsGateway:     true,
 			KeepOnFailure: false,
-			Preemptible:   false,
 			SecurityGroupIDs: map[string]struct{}{
 				"PublicIPSecurityGroupID": {},
 				"GWSecurityGroupID":       {},
@@ -353,7 +349,6 @@ func TestCluster_Create(t *testing.T) {
 			PublicIP:      true,
 			IsGateway:     true,
 			KeepOnFailure: false,
-			Preemptible:   false,
 			SecurityGroupIDs: map[string]struct{}{
 				"PublicIPSecurityGroupID": {},
 				"GWSecurityGroupID":       {},
@@ -852,7 +847,6 @@ func TestCluster_AddNodes(t *testing.T) {
 		MinDiskSize: 1024,
 		MinGPU:      1,
 		MinCPUFreq:  2033,
-		Replaceable: false,
 		Image:       "HostSizingRequirements Image",
 		Template:    "HostSizingRequirements Template",
 	}

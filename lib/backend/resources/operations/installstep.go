@@ -124,6 +124,8 @@ func (st stepTargets) parse() (string, string, string, string, fail.Error) {
 			hostT = "0"
 		case "yes":
 			fallthrough
+		case "all":
+			fallthrough
 		case "true":
 			fallthrough
 		case "1":

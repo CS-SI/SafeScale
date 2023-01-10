@@ -119,7 +119,6 @@ func Test_HostSizingRequirementsFromPropertyToProtocol(t *testing.T) {
 		MinDiskSize: 50,
 		MinGPU:      1,
 		MinCPUFreq:  1833,
-		Replaceable: false,
 	}
 	hs := HostSizingRequirementsFromPropertyToProtocol(hsr)
 	if reflect.TypeOf(hs).String() != "*protocol.HostSizing" {
@@ -181,7 +180,6 @@ func Test_ClusterDefaultsFromPropertyV2ToProtocol(t *testing.T) {
 			MinDiskSize: 50,
 			MinGPU:      1,
 			MinCPUFreq:  3200,
-			Replaceable: false,
 		},
 		GatewayTemplateID: "",
 		MasterSizing: propertiesv2.HostSizingRequirements{
@@ -192,7 +190,6 @@ func Test_ClusterDefaultsFromPropertyV2ToProtocol(t *testing.T) {
 			MinDiskSize: 50,
 			MinGPU:      1,
 			MinCPUFreq:  3200,
-			Replaceable: false,
 		},
 		MasterTemplateID: "",
 		NodeSizing: propertiesv2.HostSizingRequirements{
@@ -203,7 +200,6 @@ func Test_ClusterDefaultsFromPropertyV2ToProtocol(t *testing.T) {
 			MinDiskSize: 50,
 			MinGPU:      1,
 			MinCPUFreq:  3200,
-			Replaceable: false,
 		},
 		NodeTemplateID: "NodeTemplateID",
 		Image:          "Image",
@@ -227,7 +223,6 @@ func Test_ClusterDefaultsFromPropertyV3ToProtocol(t *testing.T) {
 			MinDiskSize: 50,
 			MinGPU:      1,
 			MinCPUFreq:  3200,
-			Replaceable: false,
 		},
 		GatewayTemplateID: "",
 		MasterSizing: propertiesv2.HostSizingRequirements{
@@ -238,7 +233,6 @@ func Test_ClusterDefaultsFromPropertyV3ToProtocol(t *testing.T) {
 			MinDiskSize: 50,
 			MinGPU:      1,
 			MinCPUFreq:  3200,
-			Replaceable: false,
 		},
 		MasterTemplateID: "",
 		NodeSizing: propertiesv2.HostSizingRequirements{
@@ -249,7 +243,6 @@ func Test_ClusterDefaultsFromPropertyV3ToProtocol(t *testing.T) {
 			MinDiskSize: 50,
 			MinGPU:      1,
 			MinCPUFreq:  3200,
-			Replaceable: false,
 		},
 		NodeTemplateID: "NodeTemplateID",
 		Image:          "Image",
@@ -427,34 +420,31 @@ func Test_ClusterDefaultsPropertyV1ToV2(t *testing.T) {
 
 	cdv1 := &propertiesv1.ClusterDefaults{
 		GatewaySizing: abstract.HostEffectiveSizing{
-			Cores:       1,
-			RAMSize:     1024,
-			DiskSize:    64,
-			GPUNumber:   1,
-			GPUType:     "RTX 3080 TI",
-			CPUFreq:     4800,
-			ImageID:     "ImageID",
-			Replaceable: false,
+			Cores:     1,
+			RAMSize:   1024,
+			DiskSize:  64,
+			GPUNumber: 1,
+			GPUType:   "RTX 3080 TI",
+			CPUFreq:   4800,
+			ImageID:   "ImageID",
 		},
 		MasterSizing: abstract.HostEffectiveSizing{
-			Cores:       1,
-			RAMSize:     1024,
-			DiskSize:    64,
-			GPUNumber:   1,
-			GPUType:     "RTX 3080 TI",
-			CPUFreq:     4800,
-			ImageID:     "ImageID",
-			Replaceable: false,
+			Cores:     1,
+			RAMSize:   1024,
+			DiskSize:  64,
+			GPUNumber: 1,
+			GPUType:   "RTX 3080 TI",
+			CPUFreq:   4800,
+			ImageID:   "ImageID",
 		},
 		NodeSizing: abstract.HostEffectiveSizing{
-			Cores:       1,
-			RAMSize:     1024,
-			DiskSize:    64,
-			GPUNumber:   1,
-			GPUType:     "RTX 3080 TI",
-			CPUFreq:     4800,
-			ImageID:     "ImageID",
-			Replaceable: false,
+			Cores:     1,
+			RAMSize:   1024,
+			DiskSize:  64,
+			GPUNumber: 1,
+			GPUType:   "RTX 3080 TI",
+			CPUFreq:   4800,
+			ImageID:   "ImageID",
 		},
 		Image: "Image",
 	}
@@ -465,20 +455,16 @@ func Test_ClusterDefaultsPropertyV1ToV2(t *testing.T) {
 	require.EqualValues(t, cdv1.GatewaySizing.GPUNumber, cdv2.GatewaySizing.MinGPU)
 	require.EqualValues(t, cdv1.GatewaySizing.RAMSize, cdv2.GatewaySizing.MinRAMSize)
 	require.EqualValues(t, cdv1.GatewaySizing.DiskSize, cdv2.GatewaySizing.MinDiskSize)
-	require.EqualValues(t, cdv1.GatewaySizing.Replaceable, cdv2.GatewaySizing.Replaceable)
 
 	require.EqualValues(t, cdv1.MasterSizing.Cores, cdv2.MasterSizing.MinCores)
 	require.EqualValues(t, cdv1.MasterSizing.CPUFreq, cdv2.MasterSizing.MinCPUFreq)
 	require.EqualValues(t, cdv1.MasterSizing.GPUNumber, cdv2.MasterSizing.MinGPU)
 	require.EqualValues(t, cdv1.MasterSizing.RAMSize, cdv2.MasterSizing.MinRAMSize)
 	require.EqualValues(t, cdv1.MasterSizing.DiskSize, cdv2.MasterSizing.MinDiskSize)
-	require.EqualValues(t, cdv1.MasterSizing.Replaceable, cdv2.MasterSizing.Replaceable)
 
 	require.EqualValues(t, cdv1.NodeSizing.Cores, cdv2.NodeSizing.MinCores)
 	require.EqualValues(t, cdv1.NodeSizing.CPUFreq, cdv2.NodeSizing.MinCPUFreq)
 	require.EqualValues(t, cdv1.NodeSizing.GPUNumber, cdv2.NodeSizing.MinGPU)
 	require.EqualValues(t, cdv1.NodeSizing.RAMSize, cdv2.NodeSizing.MinRAMSize)
 	require.EqualValues(t, cdv1.NodeSizing.DiskSize, cdv2.NodeSizing.MinDiskSize)
-	require.EqualValues(t, cdv1.NodeSizing.Replaceable, cdv2.NodeSizing.Replaceable)
-
 }

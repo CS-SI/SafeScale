@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        host: yes
+        host: all
         cluster: all
 
     requirements:
@@ -31,7 +31,7 @@ feature:
                 steps:
                     state:
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
                             masters: all
                             nodes: all
@@ -44,10 +44,10 @@ feature:
                 steps:
                     init:
                         targets:
-                            hosts: yes
-                            gateways: no
+                            hosts: all
+                            gateways: none
                             masters: one
-                            nodes: no
+                            nodes: none
                         run: |
                             sfIsDockerSwarmInit || {
                                 docker swarm init || sfFail 192
@@ -93,10 +93,10 @@ feature:
 
                     join-managers:
                         targets:
-                            hosts: no
-                            gateways: no
+                            hosts: none
+                            gateways: none
                             masters: all
-                            nodes: no
+                            nodes: none
                         run: |
                             sfIsDockerSwarmInit || {
                                 sfDropzonePop ${SF_TMPDIR} || sfFail 200
@@ -123,9 +123,9 @@ feature:
 
                     join-workers:
                         targets:
-                            hosts: no
+                            hosts: none
                             gateways: all
-                            masters: no
+                            masters: none
                             nodes: all
                         run: |
                             sfIsDockerSwarmInit || {
@@ -154,9 +154,9 @@ feature:
                 steps:
                     workers:
                         targets:
-                            hosts: no
+                            hosts: none
                             gateways: all
-                            masters: no
+                            masters: none
                             nodes: all
                         run: |
                             sfIsDockerSwarmInit && {
@@ -166,10 +166,10 @@ feature:
 
                     managers:
                         targets:
-                            hosts: yes
-                            gateways: no
+                            hosts: all
+                            gateways: none
                             masters: all
-                            nodes: no
+                            nodes: none
                         run: |
                             sfIsDockerSwarmInit && {
                                 docker swarm leave --force || sfExit 193

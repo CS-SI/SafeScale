@@ -23,7 +23,6 @@ import (
 	"expvar"
 	"fmt"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -671,70 +670,6 @@ func (instance *Cluster) installNodeRequirements(
 			}
 			params["reserved_TenantJSON"] = string(jsoned)
 
-			// Finds the MetadataFolder where the current binary resides
-			var (
-				binaryDir string
-				path      string
-			)
-			exe, _ := os.Executable()
-			if exe != "" {
-				binaryDir = filepath.Dir(exe)
-			}
-
-			_, _ = binaryDir, path
-			/* FIXME: VPL: disable binaries upload until proper solution (does not work with different architectures between client and remote),
-			               probably a feature safescale-binaries to build SafeScale from source...
-					// Uploads safescale binary
-					if binaryDir != "" {
-						path = binaryDir + "/safescale"
-					}
-					if path == "" {
-						path, err = exec.LookPath("safescale")
-						err = debug.InjectPlannedError((err)
-			if err != nil {
-							return fail.Wrap(err, "failed to find local binary 'safescale', make sure its path is in environment variable PATH")
-						}
-					}
-
-					retcode, stdout, stderr, xerr := host.Push(task, path, "/opt/safescale/bin/safescale", "root:root", "0755", temporal.ExecutionTimeout())
-					if xerr != nil {
-						return fail.Wrap(xerr, "failed to upload 'safescale' binary")
-					}
-					if retcode != 0 {
-						output := stdout
-						if output != "" && stderr != "" {
-							output += "\n" + stderr
-						} else if stderr != "" {
-							output = stderr
-						}
-						return fail.NewError("failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.GetName(), retcode, output)
-					}
-
-					// Uploads safescaled binary
-					path = ""
-					if binaryDir != "" {
-						path = binaryDir + "/safescaled"
-					}
-					if path == "" {
-						path, err = exec.LookPath("safescaled")
-						err = debug.InjectPlannedError((err)
-			if err != nil {
-							return fail.Wrap(err, "failed to find local binary 'safescaled', make sure its path is in environment variable PATH")
-						}
-					}
-					if retcode, stdout, stderr, xerr = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.ExecutionTimeout()); xerr != nil {
-						return fail.Wrap(xerr, "failed to submit content of 'safescaled' binary to host '%s'", host.GetName())
-					}
-					if retcode != 0 {
-						output := stdout
-						if output != "" && stderr != "" {
-							output += "\n" + stderr
-						} else if stderr != "" {
-							output = stderr
-						}
-						return fail.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.GetName(), retcode, output)
-					}
-			*/
 			// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
 			if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
 				cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"

@@ -1970,14 +1970,13 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 			},
 		},
 		Sizing: &abstract.HostEffectiveSizing{
-			Cores:       1,
-			RAMSize:     1024.0,
-			DiskSize:    request.DiskSize,
-			GPUNumber:   1,
-			GPUType:     "Nvidia RTX 3080",
-			CPUFreq:     4033.0,
-			ImageID:     "",
-			Replaceable: false,
+			Cores:     1,
+			RAMSize:   1024.0,
+			DiskSize:  request.DiskSize,
+			GPUNumber: 1,
+			GPUType:   "Nvidia RTX 3080",
+			CPUFreq:   4033.0,
+			ImageID:   "",
 		},
 		Networking: &abstract.HostNetworking{
 			IsGateway:               request.IsGateway,
@@ -2093,7 +2092,6 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 				MinDiskSize: ahf.Sizing.DiskSize,
 				MinGPU:      ahf.Sizing.GPUNumber,
 				MinCPUFreq:  ahf.Sizing.CPUFreq,
-				Replaceable: ahf.Sizing.Replaceable,
 			}
 			hostSizingV2.Template = request.TemplateRef
 			return nil
@@ -2221,7 +2219,6 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 			ahf.Sizing.GPUType = hostSizingV2.AllocatedSize.GPUType
 			ahf.Sizing.CPUFreq = hostSizingV2.AllocatedSize.CPUFreq
 			ahf.Sizing.ImageID = ""
-			ahf.Sizing.Replaceable = false
 			return nil
 		})
 		if xerr != nil {
@@ -2551,7 +2548,6 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			PublicIP:      true,
 			IsGateway:     true,
 			KeepOnFailure: false,
-			Preemptible:   false,
 			SecurityGroupIDs: map[string]struct{}{
 				"PublicIPSecurityGroupID": {},
 				"GWSecurityGroupID":       {},
@@ -2609,7 +2605,6 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			PublicIP:      true,
 			IsGateway:     true,
 			KeepOnFailure: false,
-			Preemptible:   false,
 			SecurityGroupIDs: map[string]struct{}{
 				"PublicIPSecurityGroupID": {},
 				"GWSecurityGroupID":       {},
@@ -2711,7 +2706,6 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				PublicIP:      false,
 				IsGateway:     false,
 				KeepOnFailure: false,
-				Preemptible:   false,
 				SecurityGroupIDs: map[string]struct{}{
 					"PublicIPSecurityGroupID": {},
 					"GWSecurityGroupID":       {},
@@ -2780,7 +2774,6 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				PublicIP:      false,
 				IsGateway:     false,
 				KeepOnFailure: false,
-				Preemptible:   false,
 				SecurityGroupIDs: map[string]struct{}{
 					"PublicIPSecurityGroupID": {},
 					"GWSecurityGroupID":       {},
@@ -2851,7 +2844,6 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 					MinDiskSize: 1,
 					MinGPU:      0,
 					MinCPUFreq:  4033,
-					Replaceable: true,
 				}
 				defaultsV3.Image = ""
 				return nil

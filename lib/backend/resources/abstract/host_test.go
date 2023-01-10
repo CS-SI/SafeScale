@@ -107,7 +107,6 @@ func TestHostSizingRequirements_Equals(t *testing.T) {
 		MinDiskSize: 1024,
 		MinGPU:      1,
 		MinCPUFreq:  2033,
-		Replaceable: false,
 		Image:       "HostSizingRequirements Image",
 		Template:    "HostSizingRequirements Template",
 	}
@@ -562,7 +561,6 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 		MinDiskSize: 0,
 		MinGPU:      0,
 		MinCPUFreq:  0,
-		Replaceable: false,
 		Image:       "",
 		Template:    "",
 	}
@@ -579,7 +577,6 @@ func TestHostSizingRequirements_LowerThan(t *testing.T) {
 		MinDiskSize: 0,
 		MinGPU:      0,
 		MinCPUFreq:  0,
-		Replaceable: false,
 		Image:       "",
 		Template:    "",
 	}
@@ -711,7 +708,6 @@ func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 		MinDiskSize: 0,
 		MinGPU:      0,
 		MinCPUFreq:  0,
-		Replaceable: false,
 		Image:       "",
 		Template:    "",
 	}
@@ -728,7 +724,6 @@ func TestHostSizingRequirements_LowerOrEqualThan(t *testing.T) {
 		MinDiskSize: 0,
 		MinGPU:      0,
 		MinCPUFreq:  0,
-		Replaceable: false,
 		Image:       "",
 		Template:    "",
 	}
