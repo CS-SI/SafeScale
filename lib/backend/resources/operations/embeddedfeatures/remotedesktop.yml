@@ -17,6 +17,7 @@ feature:
     requirements:
         features:
             - docker
+            - edgeproxy4subnet
 
     suitableFor:
         host: all
