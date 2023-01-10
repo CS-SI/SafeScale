@@ -2131,24 +2131,6 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, hr abstract.Host
 		return xerr
 	}
 
-	safe := false
-
-	// Fix for Stein
-	{
-		st, xerr := svc.GetProviderName()
-		if xerr != nil {
-			return xerr
-		}
-		if st != "ovh" {
-			safe = true
-		}
-	}
-
-	// Fix for Stein and firewalld
-	if !safe {
-		userdataContent.WithoutFirewall = true
-	}
-
 	if userdataContent.Debug {
 		if _, err := os.Stat("/tmp/tss"); !errors.Is(err, os.ErrNotExist) {
 			_, _, _, xerr = instance.unsafePush(ctx, "/tmp/tss", fmt.Sprintf("/home/%s/tss", userdataContent.Username), userdataContent.Username, "755", 10*time.Second)

@@ -681,17 +681,10 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 				server    *abstract.HostCore
 				innerXErr fail.Error
 			)
-			if request.Preemptible {
-				server, innerXErr = s.buildAwsSpotMachine( // FIXME: Disk size
-					ctx, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
-					string(userDataPhase1), publicIP, *template, extra,
-				)
-			} else {
-				server, innerXErr = s.buildAwsMachine( // FIXME: Disk size
-					ctx, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
-					string(userDataPhase1), publicIP, *template, extra,
-				)
-			}
+			server, innerXErr = s.buildAwsMachine( // FIXME: Disk size
+				ctx, keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
+				string(userDataPhase1), publicIP, *template, extra,
+			)
 			if innerXErr != nil {
 				captured := normalizeError(innerXErr)
 
