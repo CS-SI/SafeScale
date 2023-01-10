@@ -259,6 +259,9 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 			v.IDs = []string{}
 		}
 	}
+
+	asg.Rules = abstract.SecurityGroupRules{}
+
 	return asg, nil
 }
 
