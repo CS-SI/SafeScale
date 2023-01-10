@@ -688,7 +688,7 @@ func (s *HostListener) DisableSecurityGroup(inctx context.Context, in *protocol.
 // ListSecurityGroups applies a Security Group already attached (if not already applied)
 func (s *HostListener) ListSecurityGroups(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot disable security group on host")
+	defer fail.OnExitWrapError(inctx, &err, "cannot list security group on host")
 	defer fail.OnPanic(&err)
 
 	if s == nil {

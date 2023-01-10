@@ -844,8 +844,8 @@ func reformatHostGroups(in []*protocol.SecurityGroupBond) ([]interface{}, fail.E
 var hostSecurityGroupEnableCommand = cli.Command{
 	Name:      "enable",
 	Aliases:   []string{"activate"},
-	Usage:     "enable NETWORKNAME GROUPNAME",
-	ArgsUsage: "NETWORKNAME GROUPNAME",
+	Usage:     "enable HOSTNAME GROUPNAME",
+	ArgsUsage: "HOSTNAME GROUPNAME",
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
