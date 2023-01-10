@@ -26,6 +26,6 @@ import (
 )
 
 func Test_SecurityGroupCreate(t *testing.T) {
-	helpers.InSection("securitygroups").Clear().AddScenario(CreateAndDeleteNetworkSecurityGroup).AddScenario(AddAndClearRuleNetworkSecurityGroup).AddScenario(OpenPortClosedByDefaultInGateway).AddScenario(GwFirewallWorks)
+	helpers.InSection("securitygroups").Clear().AddScenario(CreateAndDeleteNetworkSecurityGroup).AddScenario(AddAndClearRuleNetworkSecurityGroup).AddScenario(OpenPortClosedByDefaultInGateway).AddScenario(GwFirewallWorks).AddScenario(CreateAndDeleteSubnetSecurityGroup)
 	helpers.RunScenarios(t)
 }
