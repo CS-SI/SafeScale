@@ -86,8 +86,8 @@ A "SafeScale `Feature`" is a file in YAML format that describes the operations t
 A `Feature` can describe operations using different methods:
 - `package`: just define the package(s) concerned
 - `bash`: uses bash snippets
-- `helm` (coming soon): uses helm chart, the "package" engine for Kubernetes
-- `ansible` (coming soon): defines playbook to run, SafeScale provising inventory
+- `helm`: uses helm chart, the "package" engine for Kubernetes
+- `ansible`: defines playbook to run, SafeScale provising inventory
 
 Additionally, a `Feature` is able to apply:
 - reverse proxy rules
