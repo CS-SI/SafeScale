@@ -354,5 +354,87 @@ func AddAndClearRuleNetworkSecurityGroup(t *testing.T) {
 	require.True(t, len(sg1.Result.Rules) == 0)
 }
 
+func CreateAndDeleteSubnetSecurityGroup(t *testing.T) {
+	names := helpers.GetNames("sgtest", 0, 0, 0, 0, 1, 0, 0, 0)
+	defer names.TearDown()
+
+	out, err := helpers.GetOutput("safescale network list")
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	fmt.Println("Creating network " + names.Networks[0])
+
+	out, err = helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.40.0/24")
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	subnetName := fmt.Sprintf("%s-subnet", names.Networks[0])
+
+	fmt.Println("Creating subnet " + subnetName)
+
+	out, err = helpers.GetOutput("safescale network subnet create --cidr \"192.168.40.144/25\" " + names.Networks[0] + " " + subnetName)
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput("safescale network subnet inspect " + names.Networks[0] + " " + subnetName)
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	sgName := fmt.Sprintf("%s-custom-sg", subnetName)
+
+	fmt.Println("Creating security group " + sgName)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group create --description \"Custom test sg for subnet\" %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group create --description \"Custom test sg for subnet\" %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.NotNil(t, err)
+	require.True(t, strings.Contains(out, "already exist"))
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group inspect %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.Nil(t, err)
+
+	sgDesc, err := helpers.RunJq(out, ".result.description")
+	require.Nil(t, err)
+	require.Contains(t, string(sgDesc), "Custom test sg")
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group bonds %s %s", names.Networks[0], sgName))
+	require.Nil(t, err)
+	require.Contains(t, out, "{\"result\":null,\"status\":\"success\"}")
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network subnet security group bind %s %s %s", names.Networks[0], subnetName, sgName))
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group bonds %s %s", names.Networks[0], sgName))
+	require.Nil(t, err)
+
+	bonds, err := helpers.RunJq(out, ".result.subnets[0].name")
+	require.Nil(t, err)
+	require.Contains(t, bonds, subnetName)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network subnet security group unbind %s %s %s", names.Networks[0], subnetName, sgName))
+	require.Nil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group bonds %s %s", names.Networks[0], sgName))
+	require.Nil(t, err)
+	require.Contains(t, out, "{\"result\":null,\"status\":\"success\"}")
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group delete %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.Nil(t, err)
+	require.True(t, strings.Contains(out, "success"))
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group delete %s %s", names.Networks[0], sgName))
+	fmt.Println(out)
+	require.NotNil(t, err)
+
+	out, err = helpers.GetOutput(fmt.Sprintf("safescale network subnet delete %s %s", names.Networks[0], subnetName))
+	fmt.Println(out)
+	require.Nil(t, err)
+}
+
 func init() {
 }
