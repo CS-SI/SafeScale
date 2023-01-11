@@ -161,8 +161,9 @@ func OpenPortClosedByDefaultInGateway(t *testing.T) {
 				t.Errorf("We don't have a working firewall")
 			}
 		}
+	} else {
+		require.NotNil(t, err)
 	}
-	require.NotNil(t, err)
 
 	fmt.Println("Listing security groups")
 	out, err = helpers.GetOutput(fmt.Sprintf("safescale network security group list %s", names.Networks[0]))
