@@ -158,7 +158,8 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) (map[stri
 		delete(config, "last_state")
 		delete(config, "last_state_label")
 	} else {
-		remotedesktopInstalled := true
+		// FIXME: There is no actual check for features, the check is implicit, this is wrong, ALL checks MUST be EXPLICIT
+		remotedesktopInstalled := false
 		disabledFeatures, ok := config["disabled_features"].(*protocol.FeatureListResponse)
 		if ok {
 			for _, v := range disabledFeatures.Features {

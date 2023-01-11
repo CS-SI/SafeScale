@@ -59,8 +59,7 @@ func (m minService) GetMetadataKey() (*crypt.Key, fail.Error) {
 }
 
 func (m minService) GetCache(ctx context.Context) (cache.CacheInterface, fail.Error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, nil
 }
 
 func (m minService) InspectSecurityGroupByName(ctx context.Context, networkID string, name string) (*abstract.SecurityGroup, fail.Error) {
@@ -94,9 +93,7 @@ func (m minService) TenantCleanup(ctx context.Context, b bool) fail.Error {
 }
 
 func (m minService) GetLock(enum abstract.Enum) (*sync.Mutex, fail.Error) {
-
-	//TODO implement me
-	panic("implement me")
+	return &sync.Mutex{}, nil
 }
 
 func (m minService) GetStackName() (string, fail.Error) {
