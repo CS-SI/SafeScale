@@ -259,7 +259,7 @@ func (instance *Feature) Applicable(ctx context.Context, tg resources.Targetable
 // Check is ok if error is nil and Results.Successful() is true
 func (instance *Feature) Check(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("Feature.Check")()
+	defer elapsed(ctx, "Feature.Check")()
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -385,7 +385,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 //   - nil: everything went well
 //   - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
 func (instance Feature) prepareParameters(ctx context.Context, externals data.Map, target resources.Targetable) (data.Map, fail.Error) {
-	defer elapsed("prepareParameters")()
+	defer elapsed(ctx, "prepareParameters")()
 	xerr := instance.conditionParameters(ctx, externals, target)
 	if xerr != nil {
 		return nil, xerr
@@ -407,7 +407,7 @@ func (instance Feature) prepareParameters(ctx context.Context, externals data.Ma
 //   - nil: everything went well
 //   - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
 func (instance *Feature) conditionParameters(ctx context.Context, externals data.Map, target resources.Targetable) fail.Error {
-	defer elapsed("conditionParameters")()
+	defer elapsed(ctx, "conditionParameters")()
 	if instance.conditionedParameters == nil {
 		var xerr fail.Error
 		instance.conditionedParameters = make(ConditionedFeatureParameters)

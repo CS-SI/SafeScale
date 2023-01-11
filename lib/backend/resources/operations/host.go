@@ -100,7 +100,7 @@ func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
 
 // onHostCacheMiss is called when host 'ref' is not found in cache
 func onHostCacheMiss(inctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
-	defer elapsed(fmt.Sprintf("onHostCacheMiss of %s", ref))()
+	defer elapsed(inctx, fmt.Sprintf("onHostCacheMiss of %s", ref))()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -174,7 +174,7 @@ func (instance *Host) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 		return false, fail.InvalidInstanceError()
 	}
 
-	defer elapsed(fmt.Sprintf("Exist of %s", instance.name.Load().(string)))()
+	defer elapsed(ctx, fmt.Sprintf("Exist of %s", instance.name.Load().(string)))()
 	theID, err := instance.GetID()
 	if err != nil {
 		return false, fail.ConvertError(err)
@@ -195,7 +195,7 @@ func (instance *Host) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
 func (instance *Host) updateCachedInformation(ctx context.Context) (sshapi.Connector, fail.Error) {
-	defer elapsed(fmt.Sprintf("updateCachedInformation of %s", instance.name.Load().(string)))()
+	defer elapsed(ctx, fmt.Sprintf("updateCachedInformation of %s", instance.name.Load().(string)))()
 	svc := instance.Service()
 
 	opUser, opUserErr := getOperatorUsernameFromCfg(ctx, svc)
@@ -406,7 +406,7 @@ func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCo
 
 // ForceGetState returns the current state of the provider Host then alter metadata
 func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, ferr fail.Error) {
-	defer elapsed(fmt.Sprintf("ForceGetState of %s", instance.name.Load().(string)))()
+	defer elapsed(ctx, fmt.Sprintf("ForceGetState of %s", instance.name.Load().(string)))()
 	defer fail.OnPanic(&ferr)
 
 	state = hoststate.Unknown

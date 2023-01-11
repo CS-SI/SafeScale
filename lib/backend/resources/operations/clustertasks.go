@@ -541,7 +541,11 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 					}
 				}
 			}
-			makers, _ := instance.getMaker(ctx)
+			makers, xerr := instance.getMaker(ctx)
+			if xerr != nil {
+				return result{nil, nil, nil, xerr}, xerr
+			}
+
 			if imageQuery == "" && makers.DefaultImage != nil {
 				imageQuery = makers.DefaultImage(ctx, instance)
 			}
@@ -2859,7 +2863,11 @@ func (instance *Cluster) taskConfigureNode(inctx context.Context, params interfa
 			}
 
 			// Now configures node specifically for Cluster flavor
-			makers, _ := instance.getMaker(ctx)
+			makers, xerr := instance.getMaker(ctx)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
+
 			if makers.ConfigureNode == nil {
 				return result{nil, nil}, nil
 			}

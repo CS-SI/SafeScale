@@ -1446,7 +1446,7 @@ func (instance *Cluster) ListMasters(ctx context.Context) (list resources.Indexe
 // satisfies interface Cluster.Cluster.Controller
 func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("FindAvailableMaster")()
+	defer elapsed(ctx, "FindAvailableMaster")()
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -1738,7 +1738,11 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 					return result{xerr}, xerr
 				}
 
-				makers, _ := instance.getMaker(ctx)
+				makers, xerr := instance.getMaker(ctx)
+				if xerr != nil {
+					return result{xerr}, xerr
+				}
+
 				incrementExpVar("cluster.cache.hit")
 				if makers.UnconfigureNode != nil {
 					xerr = makers.UnconfigureNode(ctx, instance, hostInstance, master)
@@ -2232,16 +2236,25 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 
 		// Install reverse-proxy feature on Cluster (gateways)
 
-		// FIXME: Enable this ONLY after kong feature is UPDATED AND TESTED
-		// Reverse proxy disabled by default: EOL, unsafe, undocumented
-		/*
+		fla, xerr := instance.unsafeGetFlavor(inctx)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+
+		switch fla {
+		case clusterflavor.K8S:
+			// Reverse proxy disabled by default: EOL, unsafe, undocumented
+			// FIXME: k8s has an UNDOCUMENTED dependency on reverse proxy...
+			// reverseproxy CANNOT be disabled on K8S and expect K8S to work...
 			xerr := instance.installReverseProxy(ctx, parameters, req)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{xerr}
 				return
 			}
-		*/
+		default:
+		}
 
 		// Install remote-desktop feature on Cluster (all masters)
 
@@ -2260,7 +2273,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 		*/
 
 		// Install ansible feature on Cluster (all masters)
-		xerr := instance.installAnsible(ctx, parameters)
+		xerr = instance.installAnsible(ctx, parameters)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -2268,7 +2281,13 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 		}
 
 		// configure what has to be done Cluster-wide
-		makers, _ := instance.getMaker(ctx)
+		makers, xerr := instance.getMaker(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+
 		incrementExpVar("cluster.cache.hit")
 		if makers.ConfigureCluster != nil {
 			chRes <- result{makers.ConfigureCluster(ctx, instance, parameters, false)}
@@ -2288,7 +2307,10 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 }
 
 func (instance *Cluster) determineRequiredNodes(ctx context.Context) (uint, uint, uint, fail.Error) {
-	makers, _ := instance.getMaker(ctx)
+	makers, xerr := instance.getMaker(ctx)
+	if xerr != nil {
+		return 0, 0, 0, xerr
+	}
 	if makers.MinimumRequiredServers != nil {
 		g, m, n, xerr := makers.MinimumRequiredServers(ctx, *instance.cluID)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2658,7 +2680,10 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 
 	// Joins to Cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending on the Cluster Flavor)
-	makers, _ := instance.getMaker(ctx)
+	makers, xerr := instance.getMaker(ctx)
+	if xerr != nil {
+		return xerr
+	}
 	if makers.JoinNodeToCluster != nil {
 		for _, v := range nodes {
 			hostInstance, xerr := LoadHost(ctx, instance.Service(), v.ID)
@@ -2684,7 +2709,10 @@ func (instance *Cluster) leaveNodesFromList(ctx context.Context, hosts []resourc
 
 	// Un-joins from Cluster are done sequentially, experience shows too many (un)join at the same time
 	// may fail (depending on the Cluster Flavor)
-	makers, _ := instance.getMaker(ctx)
+	makers, xerr := instance.getMaker(ctx)
+	if xerr != nil {
+		return xerr
+	}
 	if makers.LeaveNodeFromCluster != nil {
 		var xerr fail.Error
 		for _, node := range hosts {

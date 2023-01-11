@@ -61,7 +61,7 @@ func (instance *Cluster) unsafeGetState(inctx context.Context) (_ clusterstate.E
 // unsafeListMasters is the not goroutine-safe equivalent of ListMasters, that does the real work
 // Note: must be used with wisdom
 func (instance *Cluster) unsafeListMasters(inctx context.Context) (_ resources.IndexedListOfClusterNodes, _ fail.Error) {
-	defer elapsed("unsafeListMasters")()
+	defer elapsed(inctx, "unsafeListMasters")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -152,7 +152,7 @@ func (instance *Cluster) unsafeListMasterIPs(inctx context.Context) (_ data.Inde
 
 // unsafeListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
 func (instance *Cluster) newunsafeListMasterIPs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
-	defer elapsed("newunsafeListMasterIPs")()
+	defer elapsed(inctx, "newunsafeListMasterIPs")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -232,7 +232,7 @@ func (instance *Cluster) newunsafeListMasterIPs(inctx context.Context) (_ data.I
 
 // unsafeListNodeIPs lists the IPs of the nodes in the Cluster
 func (instance *Cluster) newunsafeListNodeIPs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
-	defer elapsed("newunsafeListNodeIPs")()
+	defer elapsed(inctx, "newunsafeListNodeIPs")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -318,7 +318,7 @@ func (instance *Cluster) newunsafeListNodeIPs(inctx context.Context) (_ data.Ind
 // unsafeFindAvailableMaster is the not go-routine-safe version of FindAvailableMaster, that does the real work
 // Must be used with wisdom
 func (instance *Cluster) unsafeFindAvailableMaster(inctx context.Context) (_ resources.Host, _ fail.Error) {
-	defer elapsed("unsafeFindAvailableMaster")()
+	defer elapsed(inctx, "unsafeFindAvailableMaster")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -417,7 +417,7 @@ func (instance *Cluster) trueListNodes(inctx context.Context) (_ []*abstract.Hos
 }
 
 func (instance *Cluster) trueListMasters(inctx context.Context) (_ []*abstract.HostFull, _ fail.Error) {
-	defer elapsed("trueListMasters")()
+	defer elapsed(inctx, "trueListMasters")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 

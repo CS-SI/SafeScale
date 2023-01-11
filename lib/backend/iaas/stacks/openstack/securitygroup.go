@@ -128,6 +128,11 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 		}
 	}()
 
+	asg, xerr = s.InspectSecurityGroup(ctx, asg)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// In OpenStack, freshly created security group may contain default rules; we do not want them
 	asg, xerr = s.ClearSecurityGroup(ctx, asg)
 	if xerr != nil {
@@ -255,10 +260,6 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 	if xerr != nil {
 		return nil, xerr
 	}
-	asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
-	if xerr != nil {
-		return asg, xerr
-	}
 
 	// delete security group rules
 	for _, v := range asg.Rules {
@@ -284,7 +285,8 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 		}
 	}
 	asg.Rules = abstract.SecurityGroupRules{}
-	return asg, nil
+	//return asg, nil
+	return s.InspectSecurityGroup(ctx, asg)
 }
 
 // toAbstractSecurityGroupRules

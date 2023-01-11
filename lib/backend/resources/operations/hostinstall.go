@@ -373,7 +373,7 @@ func (instance *Host) InstalledFeatures(ctx context.Context) ([]string, fail.Err
 // satisfies interface install.Targetable
 func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("ComplementFeatureParameters")()
+	defer elapsed(ctx, "ComplementFeatureParameters")()
 
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()

@@ -39,7 +39,7 @@ func LoadHost(inctx context.Context, svc iaas.Service, ref string) (resources.Ho
 
 // LoadHost ...
 func loadHost(inctx context.Context, svc iaas.Service, ref string) (resources.Host, fail.Error) {
-	defer elapsed(fmt.Sprintf("LoadHost of %s", ref))()
+	defer elapsed(inctx, fmt.Sprintf("LoadHost of %s", ref))()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -407,7 +407,7 @@ func LoadCluster(inctx context.Context, svc iaas.Service, ref string) (resources
 
 // LoadCluster loads cluster information from metadata
 func loadCluster(inctx context.Context, svc iaas.Service, name string) (_ resources.Cluster, ferr fail.Error) {
-	defer elapsed("LoadCluster")()
+	defer elapsed(inctx, "LoadCluster")()
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {

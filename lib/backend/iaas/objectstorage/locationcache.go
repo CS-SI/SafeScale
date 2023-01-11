@@ -14,7 +14,6 @@ import (
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
-	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
 )
 
@@ -136,14 +135,6 @@ func incrementExpVar(name string) {
 		case metric.Metric:
 			casted.Add(1)
 		}
-	}
-}
-
-func elapsed(what string) func() { // nolint
-	start := time.Now()
-	logrus.Tracef("starting %s", what)
-	return func() {
-		logrus.Tracef("%s took %v\n", what, time.Since(start))
 	}
 }
 
