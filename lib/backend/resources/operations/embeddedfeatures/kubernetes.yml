@@ -22,8 +22,8 @@ feature:
         features:
             - docker
             - certificateauthority
+            - edgeproxy4subnet
 
-        # "clusterSizing" not honored currently
         clusterSizing:
             boh:
                 small:
@@ -77,7 +77,7 @@ feature:
           description: |-
               tells if hardening is wanted (default: true)
         - name: KubeVersion
-          value: 1.25.5
+          value: 1.20.9
           description: defines the Kubernetes version to use
         #- name: CalicoVersion
         #  value: 3.19.1
