@@ -62,11 +62,11 @@ type cloak struct { // FIXME: OPP The one problem
 
 func TestNewEmbeddedFeature(t *testing.T) {
 	itIs, err := minioIsRunning()
-	if err != nil {
-		t.Error(err)
-	}
 	if !itIs {
 		t.Skip()
+	}
+	if err != nil {
+		t.Error(err)
 	}
 
 	// FIXME: This test requires minio check and also the debug flag
@@ -135,11 +135,11 @@ func TestNewEmbeddedFeature(t *testing.T) {
 
 func TestNewEmbeddedFeatureFunction(t *testing.T) {
 	itIs, err := minioIsRunning()
-	if err != nil {
-		t.Error(err)
-	}
 	if !itIs {
 		t.Skip()
+	}
+	if err != nil {
+		t.Error(err)
 	}
 
 	ol, err := objectstorage.NewLocation(objectstorage.Config{
