@@ -4334,7 +4334,7 @@ func getPhase2Timeout(timings temporal.Timings) time.Duration {
 	theType, _ := getDefaultConnectorType()
 	switch theType {
 	case "cli":
-		return timings.HostOperationTimeout()
+		return timings.HostCreationTimeout()
 	default:
 		return timings.ContextTimeout()
 	}
