@@ -154,7 +154,6 @@ func TestMetadataCore_Darkbloom(t *testing.T) {
 		Endpoint:    "http://192.168.1.100:9000",
 		User:        "admin",
 		SecretKey:   "password",
-		Region:      "stub",
 		BucketName:  "bushido",
 		Direct:      true,
 	})
@@ -163,7 +162,10 @@ func TestMetadataCore_Darkbloom(t *testing.T) {
 	}
 	ok, err := ol.CreateBucket(context.Background(), "bushido")
 	if err != nil {
-		ok, _ = ol.InspectBucket(context.Background(), "bushido")
+		ok, err = ol.InspectBucket(context.Background(), "bushido")
+		if err != nil {
+			t.Error(err)
+		}
 	}
 
 	sm := &minService{
@@ -216,7 +218,6 @@ func TestMetadataCore_CrazyWhatLoveCanDo(t *testing.T) {
 		Endpoint:    "http://192.168.1.100:9000",
 		User:        "admin",
 		SecretKey:   "password",
-		Region:      "stub",
 		BucketName:  "bushido",
 		Direct:      true,
 	})
@@ -225,7 +226,10 @@ func TestMetadataCore_CrazyWhatLoveCanDo(t *testing.T) {
 	}
 	ok, err := ol.CreateBucket(context.Background(), "bushido")
 	if err != nil {
-		ok, _ = ol.InspectBucket(context.Background(), "bushido")
+		ok, err = ol.InspectBucket(context.Background(), "bushido")
+		if err != nil {
+			t.Error(err)
+		}
 	}
 
 	sm := &minService{
@@ -278,13 +282,15 @@ func TestMetadataCore_Doctor(t *testing.T) {
 		Endpoint:    "http://192.168.1.100:9000",
 		User:        "admin",
 		SecretKey:   "password",
-		Region:      "stub",
 		BucketName:  "bushido",
 		Direct:      true,
 	})
 	ok, err := ol.CreateBucket(context.Background(), "bushido")
 	if err != nil {
-		ok, _ = ol.InspectBucket(context.Background(), "bushido")
+		ok, err = ol.InspectBucket(context.Background(), "bushido")
+		if err != nil {
+			t.Error(err)
+		}
 	}
 
 	sm := &minService{
@@ -336,13 +342,15 @@ func TestMetadataCore_Versioning(t *testing.T) {
 		Endpoint:    "http://192.168.1.100:9000",
 		User:        "admin",
 		SecretKey:   "password",
-		Region:      "stub",
 		BucketName:  "bushido",
 		Direct:      true,
 	})
 	ok, err := ol.CreateBucket(context.Background(), "bushido")
 	if err != nil {
-		ok, _ = ol.InspectBucket(context.Background(), "bushido")
+		ok, err = ol.InspectBucket(context.Background(), "bushido")
+		if err != nil {
+			t.Error(err)
+		}
 	}
 
 	sm := &minService{

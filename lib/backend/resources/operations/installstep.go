@@ -394,7 +394,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 
 	clonedV["ShortHostname"] = host.GetName()
 	domain := ""
-	xerr = host.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 			if !ok {
@@ -449,7 +449,7 @@ type runOnHostParameters struct {
 
 func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("taskRunOnHostWithLoop")()
+	defer elapsed(inctx, "taskRunOnHostWithLoop")()
 
 	if params == nil {
 		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")
@@ -478,7 +478,7 @@ func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{})
 // taskRunOnHost ...
 func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("taskRunOnHost")()
+	defer elapsed(inctx, "taskRunOnHost")()
 
 	if params == nil {
 		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")

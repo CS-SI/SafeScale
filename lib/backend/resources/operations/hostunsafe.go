@@ -532,7 +532,7 @@ func (instance *Host) unsafeGetDefaultSubnet(ctx context.Context) (subnetInstanc
 	defer fail.OnPanic(&ferr)
 
 	svc := instance.Service()
-	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(hostproperty.NetworkV2) {
 			return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				networkV2, ok := clonable.(*propertiesv2.HostNetworking)

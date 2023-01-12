@@ -204,11 +204,6 @@ func DeleteVolumeMounted(t *testing.T) {
 	require.Nil(t, err)
 	_ = out
 
-	// Note: should be in networks if not already the case
-	// out, err = helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.45.0/24")
-	// require.NotNil(t, err)
-	// require.True(t, strings.Contains(out, "already exist"))
-
 	fmt.Println("Creating VM " + names.Hosts[0])
 
 	out, err = helpers.GetOutput("safescale host create " + names.Hosts[0] + " --net " + names.Networks[0])

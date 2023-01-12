@@ -473,41 +473,6 @@ func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duratio
 	)
 }
 
-// WhileSuccessfulWithNotify retries while 'run' is successful (ie 'run' returns an error == nil),
-// waiting a duration of 'delay' after each try, expiring after a duration of 'timeout'.
-// 'notify' is called after each try for feedback.
-func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
-	if delay > timeout && timeout != 0 {
-		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
-		delay = timeout / 2
-	}
-
-	if notify == nil {
-		return fail.InvalidParameterError("notify", "cannot be nil!")
-	}
-
-	if delay <= 0 {
-		delay = time.Second
-	}
-	var arbiter Arbiter
-	if timeout <= 0 {
-		arbiter = Successful()
-	} else {
-		arbiter = PrevailDone(Successful(), Timeout(timeout))
-	}
-	selector := DefaultTimeoutSelector()
-	return selector(
-		action{
-			Arbiter: arbiter,
-			Officer: BackoffSelector()(delay),
-			Run:     run,
-			Notify:  notify,
-			Timeout: timeout,
-			Other:   make(map[string]interface{}),
-		},
-	)
-}
-
 // loopWithSoftTimeout executes the tries and stops if the elapsed time is gone beyond the timeout (hence the "soft timeout")
 func (a action) loopWithSoftTimeout() (ferr fail.Error) {
 	arbiter := a.Arbiter

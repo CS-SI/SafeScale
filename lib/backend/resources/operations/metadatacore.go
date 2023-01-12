@@ -311,14 +311,6 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 	}
 }
 
-func (myself *MetadataCore) Review(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
-	if valid.IsNil(myself) {
-		return fail.InvalidInstanceError()
-	}
-
-	return myself.Inspect(inctx, callback)
-}
-
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)

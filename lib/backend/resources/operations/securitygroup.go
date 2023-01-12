@@ -594,7 +594,7 @@ func (instance *SecurityGroup) unbindFromSubnets(
 						}
 					}
 
-					xerr = subnetInstance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+					xerr = subnetInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 						return inspectFunc(props)
 					})
 					if xerr != nil {
@@ -1028,7 +1028,7 @@ func (instance *SecurityGroup) BindToSubnet(
 		return fail.InvalidParameterCannotBeNilError("rh")
 	}
 
-	xerr := subnetInstance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := subnetInstance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var subnetHosts *propertiesv1.SubnetHosts
 		innerXErr := props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
@@ -1189,7 +1189,7 @@ func (instance *SecurityGroup) UnbindFromSubnet(
 	}
 
 	var subnetHosts *propertiesv1.SubnetHosts
-	xerr := subnetInstance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := subnetInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)

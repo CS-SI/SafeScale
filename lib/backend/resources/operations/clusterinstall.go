@@ -125,7 +125,7 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("ComplementFeatureParameters")()
+	defer elapsed(inctx, "ComplementFeatureParameters")()
 
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()

@@ -19,6 +19,8 @@
 
 package operations
 
-func elapsed(what string) func() { // nolint
+import "context"
+
+func elapsed(inctx context.Context, what string) func() { // nolint
 	return func() {}
 }

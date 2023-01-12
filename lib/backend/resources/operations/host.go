@@ -100,7 +100,7 @@ func NewHost(svc iaas.Service) (_ *Host, ferr fail.Error) {
 
 // onHostCacheMiss is called when host 'ref' is not found in cache
 func onHostCacheMiss(inctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
-	defer elapsed(fmt.Sprintf("onHostCacheMiss of %s", ref))()
+	defer elapsed(inctx, fmt.Sprintf("onHostCacheMiss of %s", ref))()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -174,7 +174,7 @@ func (instance *Host) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 		return false, fail.InvalidInstanceError()
 	}
 
-	defer elapsed(fmt.Sprintf("Exist of %s", instance.name.Load().(string)))()
+	defer elapsed(ctx, fmt.Sprintf("Exist of %s", instance.name.Load().(string)))()
 	theID, err := instance.GetID()
 	if err != nil {
 		return false, fail.ConvertError(err)
@@ -195,7 +195,7 @@ func (instance *Host) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
 func (instance *Host) updateCachedInformation(ctx context.Context) (sshapi.Connector, fail.Error) {
-	defer elapsed(fmt.Sprintf("updateCachedInformation of %s", instance.name.Load().(string)))()
+	defer elapsed(ctx, fmt.Sprintf("updateCachedInformation of %s", instance.name.Load().(string)))()
 	svc := instance.Service()
 
 	opUser, opUserErr := getOperatorUsernameFromCfg(ctx, svc)
@@ -268,7 +268,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) (sshapi.Conne
 						return xerr
 					}
 				} else {
-					gwErr = gwInstance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					gwErr = gwInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 						gwahc, ok := clonable.(*abstract.HostCore)
 						if !ok {
 							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -406,7 +406,7 @@ func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCo
 
 // ForceGetState returns the current state of the provider Host then alter metadata
 func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, ferr fail.Error) {
-	defer elapsed(fmt.Sprintf("ForceGetState of %s", instance.name.Load().(string)))()
+	defer elapsed(ctx, fmt.Sprintf("ForceGetState of %s", instance.name.Load().(string)))()
 	defer fail.OnPanic(&ferr)
 
 	state = hoststate.Unknown
@@ -591,7 +591,7 @@ func (instance *Host) GetState(ctx context.Context) (hoststate.Enum, fail.Error)
 		return state, fail.InvalidInstanceError()
 	}
 
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -782,7 +782,7 @@ func (instance *Host) implCreate(
 					}
 				}()
 
-				xerr = defaultSubnet.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				xerr = defaultSubnet.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					as, ok := clonable.(*abstract.Subnet)
 					if !ok {
 						return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -840,7 +840,7 @@ func (instance *Host) implCreate(
 					anon, ok := opts.Get("UseNATService")
 					useNATService := ok && anon.(bool)
 					if hostReq.PublicIP || useNATService {
-						xerr = defaultSubnet.Review(ctx,
+						xerr = defaultSubnet.Inspect(ctx,
 							func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 								as, ok := clonable.(*abstract.Subnet)
 								if !ok {
@@ -1393,7 +1393,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				defaultAbstractSubnet *abstract.Subnet
 				defaultSubnetID       string
 			)
-			innerXErr := defaultSubnet.Review(ctx,
+			innerXErr := defaultSubnet.Inspect(ctx,
 				func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					var ok bool
 					defaultAbstractSubnet, ok = clonable.(*abstract.Subnet)
@@ -1503,7 +1503,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 						}
 
 						sgName := sg.GetName()
-						deeperXErr = subnetInstance.Review(cleanupContextFrom(ctx), func(
+						deeperXErr = subnetInstance.Inspect(cleanupContextFrom(ctx), func(
 							clonable data.Clonable, _ *serialize.JSONProperties,
 						) fail.Error {
 							abstractSubnet, ok := clonable.(*abstract.Subnet)
@@ -1548,7 +1548,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				}
 
 				var otherAbstractSubnet *abstract.Subnet
-				innerXErr = otherSubnetInstance.Review(ctx, func(
+				innerXErr = otherSubnetInstance.Inspect(ctx, func(
 					clonable data.Clonable, _ *serialize.JSONProperties,
 				) fail.Error {
 					var ok bool
@@ -4209,7 +4209,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 			}
 
 			var asg *abstract.SecurityGroup
-			xerr := sgInstance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr := sgInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
 					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -4334,7 +4334,7 @@ func getPhase2Timeout(timings temporal.Timings) time.Duration {
 	theType, _ := getDefaultConnectorType()
 	switch theType {
 	case "cli":
-		return timings.HostOperationTimeout()
+		return timings.HostCreationTimeout()
 	default:
 		return timings.ContextTimeout()
 	}
@@ -4468,7 +4468,7 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 		return xerr
 	}
 
-	lmap, err := labelToMap(labelInstance)
+	lmap, err := labelToMap(labelInstance, value)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
@@ -4482,14 +4482,10 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 	return nil
 }
 
-func labelToMap(labelInstance resources.Label) (map[string]string, error) {
+func labelToMap(labelInstance resources.Label, value string) (map[string]string, error) {
 	sad := make(map[string]string)
 	k := labelInstance.GetName()
-	v, err := labelInstance.DefaultValue(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	sad[k] = v
+	sad[k] = value
 
 	return sad, nil
 }

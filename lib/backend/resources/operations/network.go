@@ -399,7 +399,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 		var outprops *serialize.JSONProperties
 		var networkAbstract *abstract.Network
 
-		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			var ok bool
 			networkAbstract, ok = clonable.(*abstract.Network)
 			if !ok {
@@ -649,7 +649,7 @@ func (instance *Network) GetCIDR(ctx context.Context) (cidr string, ferr fail.Er
 	// defer instance.lock.RUnlock()
 
 	cidr = ""
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -672,7 +672,7 @@ func (instance *Network) ToProtocol(ctx context.Context) (out *protocol.Network,
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())

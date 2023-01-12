@@ -43,6 +43,16 @@ feature:
           description: |-
               Password to use to authenticate DockerHub (default: empty, useless if DockerHubUsername is empty)
               Note: not handle yet...
+        - name: DockerExperimentUsername
+          value: ''
+          description: |-
+              Username to use to authenticate DockerHub (default: empty, disabling authentication)
+              Note: not handled yet
+        - name: DockerExperimentPassword
+          value: ''
+          description: |-
+              Password to use to authenticate DockerHub (default: empty, useless if DockerHubUsername is empty)
+              Note: not handle yet...
     install:
         bash:
             check:
@@ -328,6 +338,12 @@ feature:
                             nodes: all
                         run: |
                             rm -f /tmp/docker-fail.txt || true
+                            if [[ "{{.DockerExperimentUsername}}" != "" ]]; then
+                                echo "Detected 1st env var"
+                            fi
+                            if [[ "{{.DockerExperimentPassword}}" != "" ]]; then
+                                echo "Detected 2nd env var"
+                            fi
                             if [[ "{{.DockerHubUsername}}" != "" ]]; then
                                 docker login --username="{{.DockerHubUsername}}" --password-stdin <<< "{{.DockerHubPassword}}" > /tmp/docker-fail.txt
                                 if [[ "$(cat /tmp/docker-fail.txt)" != "Login Succeeded" ]]; then

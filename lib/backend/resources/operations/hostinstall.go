@@ -350,7 +350,7 @@ func (instance *Host) InstalledFeatures(ctx context.Context) ([]string, fail.Err
 	}
 
 	var out []string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
@@ -373,7 +373,7 @@ func (instance *Host) InstalledFeatures(ctx context.Context) ([]string, fail.Err
 // satisfies interface install.Targetable
 func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("ComplementFeatureParameters")()
+	defer elapsed(ctx, "ComplementFeatureParameters")()
 
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -390,7 +390,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 	v["ShortHostname"] = instance.GetName()
 	domain := ""
 
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 			if !ok {

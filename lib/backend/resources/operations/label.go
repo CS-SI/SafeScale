@@ -186,7 +186,7 @@ func (instance *label) Delete(inctx context.Context) fail.Error {
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 					lhV1, ok := clonable.(*propertiesv1.LabelHosts)
 					if !ok {
@@ -364,7 +364,7 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 // IsTag tells of the Label represents a Tag (ie a Label that does not carry a default value)
 func (instance label) IsTag(ctx context.Context) (bool, fail.Error) {
 	var out bool
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		alabel, ok := clonable.(*abstract.Label)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -383,7 +383,7 @@ func (instance label) IsTag(ctx context.Context) (bool, fail.Error) {
 // DefaultValue returns the default value of the Label
 func (instance label) DefaultValue(ctx context.Context) (string, fail.Error) {
 	var out string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		alabel, ok := clonable.(*abstract.Label)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())

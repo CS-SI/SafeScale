@@ -1,6 +1,6 @@
 # Building instructions for SafeScale
 
-- [How to build Safecale on Ubuntu](UBUNTU_BUILD.md)
+- [How to build SafeScale on Ubuntu](UBUNTU_BUILD.md)
 - [How to build SafeScale on Debian](DEBIAN_BUILD.md)
 - [How to build SafeScale with Docker](DOCKER_BUILD.md)
 

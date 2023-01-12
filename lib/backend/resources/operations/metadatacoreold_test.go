@@ -276,7 +276,7 @@ func TestMetadataCore_Review(t *testing.T) {
 	ctx := context.Background()
 
 	var amc *MetadataCore = nil
-	xerr := amc.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := amc.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return nil
 	})
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
@@ -297,10 +297,10 @@ func TestMetadataCore_Review(t *testing.T) {
 		xerr = mc.Carry(ctx, network)
 		require.Nil(t, xerr)
 
-		xerr = mc.Review(ctx, callback)
+		xerr = mc.Inspect(ctx, callback)
 		require.Contains(t, xerr.Error(), "cannot be nil")
 
-		xerr = mc.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = mc.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
 
 			an, ok := clonable.(*abstract.Network)

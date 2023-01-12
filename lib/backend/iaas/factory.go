@@ -83,7 +83,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
-		return NullService(), err
+		return nullService(), err
 	}
 
 	var (
@@ -149,7 +149,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		// Initializes Provider
 		providerInstance, xerr := svc.Build(tenant)
 		if xerr != nil {
-			return NullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
+			return nullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
 		}
 
 		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
@@ -183,7 +183,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 
 		authOpts, xerr := providerInstance.GetAuthenticationOptions(ctx)
 		if xerr != nil {
-			return NullService(), xerr
+			return nullService(), xerr
 		}
 
 		// Validate region parameter in compute section
@@ -191,7 +191,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		// computeRegion := authOpts.GetString("Region")
 		// xerr = validateRegionName(computeRegion, allRegions)
 		// if xerr != nil {
-		// 	return NullService(), fail.Wrap(xerr, "invalid region in section 'compute'")
+		// 	return nullService(), fail.Wrap(xerr, "invalid region in section 'compute'")
 		// }
 
 		// Initializes Object Storage
@@ -199,7 +199,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		if tenantObjectStorageFound {
 			objectStorageConfig, xerr := initObjectStorageLocationConfig(authOpts, tenant)
 			if xerr != nil {
-				return NullService(), xerr
+				return nullService(), xerr
 			}
 
 			// VPL: disable region validation, may need to update allRegions for objectstorage/metadata)
@@ -210,7 +210,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 
 			objectStorageLocation, xerr = objectstorage.NewLocation(objectStorageConfig)
 			if xerr != nil {
-				return NullService(), fail.Wrap(xerr, "error connecting to Object Storage location")
+				return nullService(), fail.Wrap(xerr, "error connecting to Object Storage location")
 			}
 		} else {
 			logrus.WithContext(ctx).Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
@@ -224,7 +224,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		if tenantMetadataFound || tenantObjectStorageFound {
 			metadataLocationConfig, err := initMetadataLocationConfig(authOpts, tenant)
 			if err != nil {
-				return NullService(), err
+				return nullService(), err
 			}
 
 			// VPL: disable region validation, may need to update allRegions for objectstorage/metadata)
@@ -235,41 +235,41 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 
 			metadataLocation, xerr := objectstorage.NewLocation(metadataLocationConfig)
 			if xerr != nil {
-				return NullService(), fail.Wrap(xerr, "error connecting to Object Storage location to store metadata")
+				return nullService(), fail.Wrap(xerr, "error connecting to Object Storage location to store metadata")
 			}
 
 			if metadataLocationConfig.BucketName == "" {
 				serviceCfg, xerr := providerInstance.GetConfigurationOptions(ctx)
 				if xerr != nil {
-					return NullService(), xerr
+					return nullService(), xerr
 				}
 
 				anon, there := serviceCfg.Get("MetadataBucketName")
 				if !there {
-					return NullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
+					return nullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
 				}
 
 				var ok bool
 				metadataLocationConfig.BucketName, ok = anon.(string)
 				if !ok {
-					return NullService(), fail.InvalidRequestError("invalid bucket name, it's not a string")
+					return nullService(), fail.InvalidRequestError("invalid bucket name, it's not a string")
 				}
 			}
 			found, err = metadataLocation.FindBucket(ctx, metadataLocationConfig.BucketName)
 			if err != nil {
-				return NullService(), fail.Wrap(err, "error accessing metadata location: %s", metadataLocationConfig.BucketName)
+				return nullService(), fail.Wrap(err, "error accessing metadata location: %s", metadataLocationConfig.BucketName)
 			}
 
 			if found {
 				metadataBucket, err = metadataLocation.InspectBucket(ctx, metadataLocationConfig.BucketName)
 				if err != nil {
-					return NullService(), err
+					return nullService(), err
 				}
 			} else {
 				// create bucket
 				metadataBucket, err = metadataLocation.CreateBucket(ctx, metadataLocationConfig.BucketName)
 				if err != nil {
-					return NullService(), err
+					return nullService(), err
 				}
 
 				// Creates metadata version file
@@ -277,7 +277,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 					content := bytes.NewBuffer([]byte(metadataVersion))
 					_, xerr := metadataLocation.WriteObject(ctx, metadataLocationConfig.BucketName, "version", content, int64(content.Len()), nil)
 					if xerr != nil {
-						return NullService(), fail.Wrap(xerr, "failed to create version object in metadata Bucket")
+						return nullService(), fail.Wrap(xerr, "failed to create version object in metadata Bucket")
 					}
 				}
 			}
@@ -285,14 +285,14 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 				if key, ok := metadataConfig["CryptKey"].(string); ok {
 					ek, err := crypt.NewEncryptionKey([]byte(key))
 					if err != nil {
-						return NullService(), fail.ConvertError(err)
+						return nullService(), fail.ConvertError(err)
 					}
 					metadataCryptKey = ek
 				}
 			}
 			logrus.WithContext(ctx).Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", tenantName, metadataBucket.GetName())
 		} else {
-			return NullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
+			return nullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
 		}
 
 		// service is ready
@@ -301,7 +301,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		newS.metadataKey = metadataCryptKey
 
 		if xerr := validateRegexps(newS, tenant); xerr != nil {
-			return NullService(), xerr
+			return nullService(), xerr
 		}
 
 		// increase tenant counter
@@ -317,9 +317,9 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 	}
 
 	if !tenantInCfg {
-		return NullService(), fail.NotFoundError("tenant '%s' not found in configuration", tenantName)
+		return nullService(), fail.NotFoundError("tenant '%s' not found in configuration", tenantName)
 	}
-	return NullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
+	return nullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
 }
 
 // validateRegionName validates the availability of the region passed as parameter
