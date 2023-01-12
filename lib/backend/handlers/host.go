@@ -542,7 +542,7 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 	}
 
 	var list []*protocol.LabelInspectResponse
-	xerr = hostInstance.Review(handler.job.Context(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = hostInstance.Inspect(handler.job.Context(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
 			hlV1, ok := clonable.(*propertiesv1.HostLabels)
 			if !ok {
@@ -599,7 +599,7 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 	}
 
 	var outValue string
-	xerr = labelInstance.Review(handler.job.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = labelInstance.Inspect(handler.job.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			lhV1, ok := clonable.(*propertiesv1.LabelHosts)
 			if !ok {

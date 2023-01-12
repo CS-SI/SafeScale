@@ -333,7 +333,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
 		}
 
-		xerr := castedTarget.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr := castedTarget.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
 				if !ok {
@@ -364,7 +364,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
 		}
 
-		xerr := castedTarget.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr := castedTarget.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 				clufea, ok := clonable.(*propertiesv1.ClusterFeatures)
 				if !ok {

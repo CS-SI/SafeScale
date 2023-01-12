@@ -270,7 +270,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 				return nil, xerr
 			}
 
-			xerr = subnetInstance.Review(ctx,
+			xerr = subnetInstance.Inspect(ctx,
 				func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					as, ok := clonable.(*abstract.Subnet)
 					if !ok {
@@ -294,7 +294,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 			return nil, xerr
 		}
 
-		xerr = subnetInstance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		xerr = subnetInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())

@@ -268,7 +268,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context) (sshapi.Conne
 						return xerr
 					}
 				} else {
-					gwErr = gwInstance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					gwErr = gwInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 						gwahc, ok := clonable.(*abstract.HostCore)
 						if !ok {
 							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -591,7 +591,7 @@ func (instance *Host) GetState(ctx context.Context) (hoststate.Enum, fail.Error)
 		return state, fail.InvalidInstanceError()
 	}
 
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -782,7 +782,7 @@ func (instance *Host) implCreate(
 					}
 				}()
 
-				xerr = defaultSubnet.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				xerr = defaultSubnet.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					as, ok := clonable.(*abstract.Subnet)
 					if !ok {
 						return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -840,7 +840,7 @@ func (instance *Host) implCreate(
 					anon, ok := opts.Get("UseNATService")
 					useNATService := ok && anon.(bool)
 					if hostReq.PublicIP || useNATService {
-						xerr = defaultSubnet.Review(ctx,
+						xerr = defaultSubnet.Inspect(ctx,
 							func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 								as, ok := clonable.(*abstract.Subnet)
 								if !ok {
@@ -1393,7 +1393,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				defaultAbstractSubnet *abstract.Subnet
 				defaultSubnetID       string
 			)
-			innerXErr := defaultSubnet.Review(ctx,
+			innerXErr := defaultSubnet.Inspect(ctx,
 				func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					var ok bool
 					defaultAbstractSubnet, ok = clonable.(*abstract.Subnet)
@@ -1503,7 +1503,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 						}
 
 						sgName := sg.GetName()
-						deeperXErr = subnetInstance.Review(cleanupContextFrom(ctx), func(
+						deeperXErr = subnetInstance.Inspect(cleanupContextFrom(ctx), func(
 							clonable data.Clonable, _ *serialize.JSONProperties,
 						) fail.Error {
 							abstractSubnet, ok := clonable.(*abstract.Subnet)
@@ -1548,7 +1548,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				}
 
 				var otherAbstractSubnet *abstract.Subnet
-				innerXErr = otherSubnetInstance.Review(ctx, func(
+				innerXErr = otherSubnetInstance.Inspect(ctx, func(
 					clonable data.Clonable, _ *serialize.JSONProperties,
 				) fail.Error {
 					var ok bool
@@ -4209,7 +4209,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 			}
 
 			var asg *abstract.SecurityGroup
-			xerr := sgInstance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr := sgInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
 					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
