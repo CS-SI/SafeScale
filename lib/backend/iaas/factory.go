@@ -186,14 +186,6 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 			return nullService(), xerr
 		}
 
-		// Validate region parameter in compute section
-		// VPL: does not work with Outscale "cloudgouv"...
-		// computeRegion := authOpts.GetString("Region")
-		// xerr = validateRegionName(computeRegion, allRegions)
-		// if xerr != nil {
-		// 	return nullService(), fail.Wrap(xerr, "invalid region in section 'compute'")
-		// }
-
 		// Initializes Object Storage
 		var objectStorageLocation objectstorage.Location
 		if tenantObjectStorageFound {
@@ -201,12 +193,6 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 			if xerr != nil {
 				return nullService(), xerr
 			}
-
-			// VPL: disable region validation, may need to update allRegions for objectstorage/metadata)
-			// xerr = validateRegionName(objectStorageConfig.Region, allRegions)
-			// if xerr != nil {
-			// 	return nil, fail.Wrap(xerr, "invalid region in section 'objectstorage")
-			// }
 
 			objectStorageLocation, xerr = objectstorage.NewLocation(objectStorageConfig)
 			if xerr != nil {
@@ -226,12 +212,6 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 			if err != nil {
 				return nullService(), err
 			}
-
-			// VPL: disable region validation, may need to update allRegions for objectstorage/metadata)
-			// xerr = validateRegionName(metadataLocationConfig.Region, allRegions)
-			// if xerr != nil {
-			// 	return nil, fail.Wrap(xerr, "invalid region in section 'metadata'")
-			// }
 
 			metadataLocation, xerr := objectstorage.NewLocation(metadataLocationConfig)
 			if xerr != nil {

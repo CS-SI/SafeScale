@@ -396,11 +396,6 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		gwPort = ssh.SSHPort
 	}
 
-	// VPL: never used
-	// if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
-	// 	scfg.SecondaryGatewayConfig.Port = 22
-	// }
-
 	targetHost, xerr := scfg.GetHostname()
 	if xerr != nil {
 		return nil, xerr
