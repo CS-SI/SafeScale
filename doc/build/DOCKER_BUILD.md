@@ -8,3 +8,5 @@ $ git clone https://github.com/CS-SI/SafeScale --depth 1 -b develop
 $ cd SafeScale
 $ ./create-local-docker.sh
 ```
+
+This will create the binaries in a new directory: ./exported
