@@ -31,6 +31,10 @@ import (
 type ResourceCallback[T clonable.Clonable] func(T, *serialize.JSONProperties) fail.Error
 type AnyResourceCallback = ResourceCallback[clonable.Clonable]
 
+// CarriedCallback ...
+type CarriedCallback[T clonable.Clonable] func(T) fail.Error
+type AnyCarriedCallback = CarriedCallback[clonable.Clonable]
+
 // PropertyCallback describes the function prototype to use to inspect metadata
 type PropertyCallback[T clonable.Clonable] func(T) fail.Error
 type AnyPropertyCallback = PropertyCallback[clonable.Clonable]
@@ -54,4 +58,16 @@ type Metadata interface {
 
 type Consistent interface {
 	Exists(context.Context) (bool, fail.Error) // Exists checks if the resource actually exists in provider side (not in stow metadata)
+}
+
+type Transaction[T clonable.Clonable] interface {
+	Alter(ctx context.Context, callback ResourceCallback[T], opts ...options.Option) fail.Error                            // protects the data for exclusive write
+	AlterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error   // protects the data for exclusive write
+	Close() fail.Error                                                                                                     // closes the transaction
+	Commit(ctx context.Context) fail.Error                                                                                 // commits the changes
+	Rollback(ctx context.Context) fail.Error                                                                               // ignores the changes
+	Inspect(ctx context.Context, callback AnyResourceCallback, opts ...options.Option) fail.Error                          // protects the data for shared read with first reloading data from Object Storage
+	InspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error // protects the data for shared read with first reloading data from Object Storage
+	Review(ctx context.Context, callback AnyResourceCallback, opts ...options.Option) fail.Error                           // protects the data for shared read without reloading first (uses in-memory data); use with caution
+	ReviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error  // protects the data for shared read with first reloading data from Object Storage
 }

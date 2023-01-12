@@ -20,6 +20,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -290,8 +292,7 @@ func (instance *SecurityGroup) unsafeClear(inctx context.Context) fail.Error {
 				return fail.Wrap(innerErr)
 			}
 
-			_, innerXErr := instance.Service().ClearSecurityGroup(ctx, asg)
-			return innerXErr
+			return instance.Service().ClearSecurityGroup(ctx, asg)
 		})
 		chRes <- result{xerr}
 	}()
@@ -339,12 +340,7 @@ func (instance *SecurityGroup) unsafeAddRules(inctx context.Context, rules ...*a
 				return fail.Wrap(innerErr)
 			}
 
-			_, innerXErr := instance.Service().AddRulesToSecurityGroup(ctx, asg, rules...)
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			return nil
+			return instance.Service().AddRulesToSecurityGroup(ctx, asg, rules...)
 		})
 		chRes <- result{xerr}
 	}()
@@ -520,88 +516,83 @@ func (instance *SecurityGroup) unsafeBindToHost(inctx context.Context, hostInsta
 	go func() {
 		defer close(chRes)
 
-		sgid, err := instance.GetID()
-		if err != nil {
-			chRes <- result{fail.ConvertError(err)}
-			return
-		}
+		hostName := hostInstance.GetName()
+		logrus.WithContext(ctx).Infof("Binding Security Group '%s' to Host '%s'", instance.GetName(), hostName)
 
-		hn := hostInstance.GetName()
-		logrus.WithContext(ctx).Infof("Binding security group %s to host %s", sgid, hn)
-
-		xerr := instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr := metadata.Alter(ctx, instance, func(asg *abstract.SecurityGroup, props *serialize.JSONProperties) fail.Error {
 			if mark == resources.MarkSecurityGroupAsDefault {
-				asg, innerErr := clonable.Cast[*abstract.SecurityGroup](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
 				if asg.DefaultForHost != "" {
 					return fail.InvalidRequestError("security group is already marked as default for host %s", asg.DefaultForHost)
 				}
 
-				var err error
-				asg.DefaultForHost, err = hostInstance.GetID()
-				if err != nil {
-					return fail.ConvertError(err)
+				var lvl1err error
+				asg.DefaultForHost, lvl1err = hostInstance.GetID()
+				if lvl1err != nil {
+					return fail.Wrap(lvl1err)
 				}
 			}
 
 			return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-				sghV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
+				sghV1, lvl2err := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
+				if lvl2err != nil {
+					return fail.Wrap(lvl2err)
 				}
 
-				// First check if host is present; if not present or state is different, replace the entry
-				hostID, err := hostInstance.GetID()
-				if err != nil {
-					return fail.ConvertError(err)
-				}
-
-				hostName := hostInstance.GetName()
-				disable := !bool(enable)
-				if item, ok := sghV1.ByID[hostID]; !ok || item.Disabled == disable {
-					item = &propertiesv1.SecurityGroupBond{
-						ID:   hostID,
-						Name: hostName,
+				return metadata.Alter(ctx, hostInstance, func(ahc *abstract.HostCore, _ *serialize.JSONProperties) fail.Error {
+					entry, lvl3xerr := hostInstance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
+					if lvl3xerr != nil {
+						return lvl3xerr
 					}
-					sghV1.ByID[hostID] = item
-					sghV1.ByName[hostName] = hostID
-				}
 
-				// update the state
-				sghV1.ByID[hostID].Disabled = disable
+					ahf, lvl3err := lang.Cast[*abstract.HostFull](entry)
+					if lvl3err != nil {
+						return fail.Wrap(lvl3err)
+					}
 
-				switch enable {
-				case resources.SecurityGroupEnable:
-					// In case the security group is already bound, we must consider a "duplicate" error has a success
-					xerr := instance.Service().BindSecurityGroupToHost(ctx, sgid, hostID)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						switch xerr.(type) {
-						case *fail.ErrDuplicate:
-							debug.IgnoreErrorWithContext(ctx, xerr)
-							// continue
-						default:
-							return xerr
+					switch enable {
+					case resources.SecurityGroupEnable:
+						// In case the security group is already bound, we must consider a "duplicate" error has a success
+						lvl3xerr = instance.Service().BindSecurityGroupToHost(ctx, asg, ahf)
+						lvl3xerr = debug.InjectPlannedFail(lvl3xerr)
+						if lvl3xerr != nil {
+							switch lvl3xerr.(type) {
+							case *fail.ErrDuplicate:
+								debug.IgnoreErrorWithContext(ctx, lvl3xerr)
+								// continue
+							default:
+								return lvl3xerr
+							}
+						}
+					case resources.SecurityGroupDisable:
+						// In case the security group has to be disabled, we must consider a "not found" error has a success
+						lvl3xerr = instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahf)
+						lvl3xerr = debug.InjectPlannedFail(lvl3xerr)
+						if lvl3xerr != nil {
+							switch lvl3xerr.(type) {
+							case *fail.ErrNotFound:
+								debug.IgnoreErrorWithContext(ctx, lvl3xerr)
+								// continue
+							default:
+								return lvl3xerr
+							}
 						}
 					}
-				case resources.SecurityGroupDisable:
-					// In case the security group has to be disabled, we must consider a "not found" error has a success
-					xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgid, hostID)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						switch xerr.(type) {
-						case *fail.ErrNotFound:
-							debug.IgnoreErrorWithContext(ctx, xerr)
-							// continue
-						default:
-							return xerr
+
+					disable := !bool(enable)
+					item, ok := sghV1.ByID[ahf.ID]
+					if !ok || item.Disabled == disable {
+						item = &propertiesv1.SecurityGroupBond{
+							ID:   ahf.ID,
+							Name: hostName,
 						}
+						sghV1.ByID[ahf.ID] = item
+						sghV1.ByName[hostName] = ahf.ID
 					}
-				}
-				return nil
+
+					// update the state
+					sghV1.ByID[ahf.ID].Disabled = disable
+					return nil
+				})
 			})
 		})
 		chRes <- result{xerr}

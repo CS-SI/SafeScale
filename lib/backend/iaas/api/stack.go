@@ -68,13 +68,13 @@ type Stack interface {
 	// InspectSecurityGroup returns information about a security group
 	InspectSecurityGroup(ctx context.Context, sgParam SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error)
 	// ClearSecurityGroup removes rules from group
-	ClearSecurityGroup(ctx context.Context, sgParam SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error)
+	ClearSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error
 	// DeleteSecurityGroup deletes a security group and all its rules
 	DeleteSecurityGroup(ctx context.Context, sgParam SecurityGroupIdentifier) fail.Error
 	// AddRulesToSecurityGroup adds a rule to an existing security group
-	AddRulesToSecurityGroup(ctx context.Context, sgParam SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+	AddRulesToSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) fail.Error
 	// DeleteRulesFromSecurityGroup deletes a rule identified by ID from a security group
-	DeleteRulesFromSecurityGroup(ctx context.Context, sgParam SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
+	DeleteRulesFromSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) fail.Error
 	// GetDefaultSecurityGroupName returns the name of the default security group automatically bound to new host
 	GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error)
 	// EnableSecurityGroup enables a Security Group
@@ -143,9 +143,9 @@ type Stack interface {
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
 	WaitHostReady(ctx context.Context, hostParam HostIdentifier, timeout time.Duration) (*abstract.HostCore, fail.Error)
 	// BindSecurityGroupToHost attaches a security group to a host
-	BindSecurityGroupToHost(ctx context.Context, sgParam SecurityGroupIdentifier, hostParam HostIdentifier) fail.Error
+	BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error
 	// UnbindSecurityGroupFromHost detaches a security group from a host
-	UnbindSecurityGroupFromHost(ctx context.Context, sgParam SecurityGroupIdentifier, hostParam HostIdentifier) fail.Error
+	UnbindSecurityGroupFromHost(ctx context.Context, sasg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error
 
 	// CreateVolume creates a block volume
 	CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error)

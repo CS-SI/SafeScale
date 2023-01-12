@@ -103,7 +103,7 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 
 	for k, v := range asg.Rules {
 		var xerr fail.Error
-		asg, xerr = s.AddRulesToSecurityGroup(ctx, asg, v)
+		xerr = s.AddRulesToSecurityGroup(ctx, asg, v)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed adding rule #%d", k)
 		}
@@ -233,19 +233,19 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Securit
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (s stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) ClearSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
 	if valid.IsNil(s) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
-		return nil, xerr
+		return xerr
 	}
 	if !asg.IsComplete() {
-		return nil, fail.InvalidParameterError("sgParam", "must be complete")
+		return fail.InconsistentError("asg is not complete")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp"), "(%s)", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if len(asg.Rules) > 0 {
@@ -258,7 +258,7 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityG
 						debug.IgnoreErrorWithContext(ctx, xerr)
 						continue
 					default:
-						return asg, fail.Wrap(xerr, "failed to delete rule %d", k)
+						return fail.Wrap(xerr, "failed to delete rule %d", k)
 					}
 				}
 				logrus.WithContext(ctx).Debugf("Deleted rule: %s", r)
@@ -266,20 +266,20 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityG
 			v.IDs = []string{}
 		}
 	}
-	return asg, nil
+	return nil
 }
 
 // AddRulesToSecurityGroup adds a rule to a security group
-func (s stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) AddRulesToSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) fail.Error {
 	if valid.IsNil(s) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
-		return nil, xerr
+		return xerr
 	}
 	if !asg.IsComplete() {
-		return nil, fail.InvalidParameterError("sgParam", "must be complete")
+		return fail.InconsistentError("asg is not complete")
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp"), "(%s)", sgLabel).WithStopwatch().Entering()
@@ -288,18 +288,18 @@ func (s stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.Secu
 	for _, currentRule := range rules {
 		if currentRule.EtherType == ipversion.IPv6 {
 			// No IPv6 at Outscale (?)
-			return asg, nil
+			return nil
 		}
 
 		direction, sourcesUseGroups, sources, targetsUseGroups, destinations, allowed, xerr := fromAbstractSecurityGroupRule(currentRule)
 		if xerr != nil {
-			return asg, xerr
+			return xerr
 		}
 
 		ruleName := fmt.Sprintf("%s-%d", asg.ID, len(asg.Rules))
 		resp, xerr := s.rpcCreateFirewallRule(ctx, ruleName, asg.Network, currentRule.Description, direction, sourcesUseGroups, sources, targetsUseGroups, destinations, allowed, nil)
 		if xerr != nil {
-			return asg, xerr
+			return xerr
 		}
 
 		logrus.WithContext(ctx).Debugf("Created rule: %d with name %s", resp.Id, resp.Name)
@@ -307,27 +307,27 @@ func (s stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.Secu
 		asg.Rules = append(asg.Rules, currentRule)
 	}
 
-	return asg, nil
+	return nil
 }
 
 // DeleteRulesFromSecurityGroup deletes rules from a security group
 // For now, this function does nothing in GCP context (have to figure out how to identify Firewall rule corresponding to abstract Security Group rule
-func (s stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) DeleteRulesFromSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) fail.Error {
 	if valid.IsNil(s) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
-		return nil, xerr
+		return xerr
 	}
 	if !asg.IsComplete() {
-		return nil, fail.InvalidParameterError("sgParam", "must contain Security Group ID")
+		return fail.InconsistentError("asg is not complete")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp"), "(%s, <rules>", sgLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp"), "(%s, <rules>)", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return nil, fail.NotImplementedError() // FIXME: Technical debt
+	return fail.NotImplementedError() // FIXME: Technical debt
 }
 
 // DisableSecurityGroup disables the rules of a Security Group

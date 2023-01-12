@@ -1,3 +1,4 @@
+{{- if not .Extra.MarkedForDestruction }}
 resource "openstack_networking_network_v2" "{{ .Resource.Name }}" {
     provider              = openstack.ovh
     name                  = "{{ .Resource.Name }}"
@@ -8,12 +9,13 @@ resource "openstack_networking_network_v2" "{{ .Resource.Name }}" {
     region                = "{{ .Provider.Authentication.Region }}"
 
     lifecycle {
-{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
+{{-   if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
         prevent_destroy = true
-{{ end }}
+{{-   end }}
     }
 }
 
 output "network_{{ .Resource.Name }}_id" {
     value = "${openstack_networking_network_v2.{{ .Resource.Name }}.id}"
 }
+{{- end }}

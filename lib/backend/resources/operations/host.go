@@ -546,9 +546,6 @@ func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCo
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	// instance.RLock()
-	// defer instance.RUnlock()
-
 	return instance.BrowseFolder(ctx, func(buf []byte) (innerXErr fail.Error) {
 		ahc, _ := abstract.NewHostCore()
 		innerXErr = ahc.Deserialize(buf)
@@ -735,9 +732,6 @@ func (instance *Host) GetState(ctx context.Context) (hoststate.Enum, fail.Error)
 	if valid.IsNil(instance) {
 		return state, fail.InvalidInstanceError()
 	}
-
-	// instance.RLock()
-	// defer instance.RUnlock()
 
 	xerr := metadata.Inspect(ctx, instance, func(ahc *abstract.HostCore, _ *serialize.JSONProperties) fail.Error {
 		state = ahc.LastState
@@ -1009,13 +1003,25 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			ahf, userdataContent, xerr := svc.CreateHost(ctx, hostReq, extra)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
+				switch xerr.(type) {
+				case *fail.ErrInvalidRequest:
 					ar := result{nil, xerr}
 					return ar, ar.err
+				default:
+					ar := result{nil, fail.Wrap(xerr, "failed to create Host '%s'", hostReq.ResourceName)}
+					return ar, ar.err
 				}
-				ar := result{nil, fail.Wrap(xerr, "failed to create Host '%s'", hostReq.ResourceName)}
-				return ar, ar.err
 			}
+
+			defer func() {
+				if ferr != nil && hostReq.CleanOnFailure() {
+					derr := svc.DeleteHost(ctx, ahf)
+					if derr != nil {
+						logrus.WithContext(ctx).Errorf("cleaning up on %s, failed to delete Host '%s': %v", ActionFromError(ferr), ahf.Name, derr)
+						_ = ferr.AddConsequence(derr)
+					}
+				}
+			}()
 
 			// Make sure ssh port wanted is set
 			if !userdataContent.IsGateway {
@@ -1452,23 +1458,32 @@ func determineImageID(ctx context.Context, svc iaasapi.Service, imageRef string)
 func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRequest, defaultSubnet resources.Subnet) fail.Error {
 	svc := instance.Service()
 	// In case of use of terraform, the security groups have already been set
-	if !svc.Capabilities().UseTerraformer {
+	useTerraformer := svc.Capabilities().UseTerraformer
+	if !useTerraformer {
 		if req.Single {
-			hostID, err := instance.GetID()
-			if err != nil {
-				return fail.ConvertError(err)
-			}
-			for k := range req.SecurityGroupByID {
-				if k != "" {
-					logrus.WithContext(ctx).Infof("Binding security group with id %s to host %s", k, hostID)
-					xerr := svc.BindSecurityGroupToHost(ctx, k, hostID)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return xerr
+			hostName := instance.GetName()
+			xerr := metadata.Alter(ctx, instance, func(ahf *abstract.HostFull, _ *serialize.JSONProperties) fail.Error {
+				for k := range req.SecurityGroupByID {
+					if k != "" {
+						sg, innerXErr := LoadSecurityGroup(ctx, k)
+						if innerXErr != nil {
+							return fail.Wrap(innerXErr, "failed to load Security Group with id '%s'", k)
+						}
+
+						innerXErr = metadata.Alter(ctx, sg, func(asg *abstract.SecurityGroup, _ *serialize.JSONProperties) fail.Error {
+							logrus.WithContext(ctx).Infof("Binding security group with id %s to host '%s'", asg.Name, hostName)
+							return svc.BindSecurityGroupToHost(ctx, asg, ahf)
+						})
+						if innerXErr != nil {
+							return innerXErr
+						}
 					}
 				}
+				return nil
+			})
+			if xerr != nil {
+				return xerr
 			}
-			return nil
 		}
 	}
 
@@ -1518,7 +1533,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 			gwid, err := gwsg.GetID()
 			if err != nil {
-				return fail.ConvertError(err)
+				return fail.Wrap(err)
 			}
 
 			item := &propertiesv1.SecurityGroupBond{
@@ -1658,7 +1673,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", otherAbstractSubnet.Name, otherAbstractSubnet.InternalSecurityGroupID)
 				}
 
-				if !safe {
+				if !safe && !useTerraformer {
 					innerXErr = svc.ChangeSecurityGroupSecurity(ctx, false, true, otherAbstractSubnet.Network, "")
 					if innerXErr != nil {
 						return fail.Wrap(innerXErr, "failed to change security group")
@@ -1670,7 +1685,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.Name, lansg.GetName(), req.ResourceName)
 				}
 
-				if !safe {
+				if !safe && !useTerraformer {
 					innerXErr = svc.ChangeSecurityGroupSecurity(ctx, true, false, otherAbstractSubnet.Network, "")
 					if innerXErr != nil {
 						return fail.Wrap(innerXErr, "failed to change security group")
@@ -1679,7 +1694,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 				langID, err := lansg.GetID()
 				if err != nil {
-					return fail.ConvertError(err)
+					return fail.Wrap(err)
 				}
 
 				// register security group in properties
@@ -1743,34 +1758,49 @@ func (instance *Host) undoSetSecurityGroups(ctx context.Context, errorPtr *fail.
 // UnbindDefaultSecurityGroupIfNeeded unbinds "default" Security Group from Host if it is bound
 func (instance *Host) unbindDefaultSecurityGroupIfNeeded(ctx context.Context, networkID string) fail.Error {
 	svc := instance.Service()
-
-	hostID, err := instance.GetID()
-	if err != nil {
-		return fail.ConvertError(err)
+	if svc.Capabilities().UseTerraformer {
+		return nil
 	}
 
 	sgName, err := svc.GetDefaultSecurityGroupName(ctx)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
+
 	if sgName != "" {
-		adsg, innerXErr := svc.InspectSecurityGroupByName(ctx, networkID, sgName)
-		if innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				// ignore this error
-				debug.IgnoreErrorWithContext(ctx, innerXErr)
-			default:
-				return innerXErr
-			}
-		} else if innerXErr = svc.UnbindSecurityGroupFromHost(ctx, adsg, hostID); innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				// Consider a security group not found as a successful unbind
-				debug.IgnoreErrorWithContext(ctx, innerXErr)
-			default:
-				return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
-			}
+		sgInstance, xerr := LoadSecurityGroup(ctx, sgName)
+		if xerr != nil {
+			return xerr
+		}
+
+		xerr = metadata.Alter(ctx, sgInstance, func(asg *abstract.SecurityGroup, _ *serialize.JSONProperties) fail.Error {
+			return metadata.Alter(ctx, instance, func(ahc *abstract.HostCore, _ *serialize.JSONProperties) fail.Error {
+				entry, innerXErr := instance.Job().Scope().Resource("host", ahc.Name)
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				innerXErr = svc.UnbindSecurityGroupFromHost(ctx, asg, ahf)
+				if innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						// Consider a security group not found as a successful unbind
+						debug.IgnoreErrorWithContext(ctx, innerXErr)
+					default:
+						return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
+					}
+				}
+
+				return nil
+			})
+		})
+		if xerr != nil {
+			return xerr
 		}
 	}
 	return nil
@@ -3958,66 +3988,67 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 		return fail.InvalidParameterError("sg", "cannot be null value of 'SecurityGroup'")
 	}
 
-	hid, err := instance.GetID()
-	if err != nil {
-		return fail.Wrap(err)
-	}
-
 	sgName := sg.GetName()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(%s)", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	xerr := metadata.AlterProperty(ctx, instance, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
-		var asg *abstract.SecurityGroup
-		xerr := metadata.Inspect(ctx, sg, func(p *abstract.SecurityGroup, _ *serialize.JSONProperties) fail.Error {
-			asg = p
-			return nil
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
+	return metadata.Alter(ctx, instance, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
+		entry, innerXErr := instance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
+		if innerXErr != nil {
+			return innerXErr
 		}
 
-		// First check if the security group is not already registered for the Host with the exact same state
-		var found bool
-		for k := range hsgV1.ByID {
-			if k == asg.ID {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, hid)
+		ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
-		caps := instance.Service().Capabilities()
-		if caps.CanDisableSecurityGroup {
-			xerr = instance.Service().EnableSecurityGroup(ctx, asg)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
+		return props.Alter(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+			hsgV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
-		} else {
-			// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), considered as a success
-			xerr = instance.Service().BindSecurityGroupToHost(ctx, asg, hid)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrDuplicate:
-					debug.IgnoreErrorWithContext(ctx, xerr)
-				default:
-					return xerr
+
+			return metadata.Inspect(ctx, sg, func(asg *abstract.SecurityGroup, _ *serialize.JSONProperties) fail.Error {
+				// First check if the security group is not already registered for the Host with the exact same state
+				var found bool
+				for k := range hsgV1.ByID {
+					if k == asg.ID {
+						found = true
+						break
+					}
 				}
-			}
-		}
+				if !found {
+					return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, instance.GetName())
+				}
 
-		// found and updated, update metadata
-		hsgV1.ByID[asg.ID].Disabled = false
-		return nil
+				caps := instance.Service().Capabilities()
+				if caps.CanDisableSecurityGroup {
+					innerXErr := instance.Service().EnableSecurityGroup(ctx, asg)
+					innerXErr = debug.InjectPlannedFail(innerXErr)
+					if innerXErr != nil {
+						return innerXErr
+					}
+				} else {
+					// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), considered as a success
+					innerXErr := instance.Service().BindSecurityGroupToHost(ctx, asg, ahf)
+					innerXErr = debug.InjectPlannedFail(innerXErr)
+					if innerXErr != nil {
+						switch innerXErr.(type) {
+						case *fail.ErrDuplicate:
+							debug.IgnoreErrorWithContext(ctx, innerXErr)
+						default:
+							return innerXErr
+						}
+					}
+				}
+
+				// found and updated, update metadata
+				hsgV1.ByID[asg.ID].Disabled = false
+				return nil
+			})
+		})
 	})
-	if xerr != nil {
-		return xerr
-	}
 
 	return nil
 }
@@ -4037,67 +4068,66 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 	}
 
 	sgName := sgInstance.GetName()
-	sgID, err := sgInstance.GetID()
-	if err != nil {
-		return fail.ConvertError(err)
-	}
-
-	hid, err := instance.GetID()
-	if err != nil {
-		return fail.Wrap(err)
-	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(sgInstance='%s')", sgName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return metadata.AlterProperty(ctx, instance, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
-		var asg *abstract.SecurityGroup
-		xerr := metadata.Inspect(ctx, sgInstance, func(p *abstract.SecurityGroup, _ *serialize.JSONProperties) fail.Error {
-			asg = p
-			return nil
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
+	return metadata.Alter(ctx, instance, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
+		entry, innerXErr := instance.Job().Scope().Resource("host", ahc.Name)
+		if innerXErr != nil {
+			return innerXErr
 		}
 
-		// First check if the security group is not already registered for the Host with the exact same state
-		var found bool
-		for k := range hsgV1.ByID {
-			if k == asg.ID {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgID)
+		ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
 		}
 
-		caps := instance.Service().Capabilities()
-		if caps.CanDisableSecurityGroup {
-			xerr = instance.Service().DisableSecurityGroup(ctx, asg)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
+		return props.Alter(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+			hsgV1, innerErr := lang.Cast[*propertiesv1.HostSecurityGroups](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
 			}
-		} else {
-			// Bind the security group on provider side; if security group not binded, considered as a success
-			xerr = instance.Service().UnbindSecurityGroupFromHost(ctx, asg, hid)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					debug.IgnoreErrorWithContext(ctx, xerr)
-					// continue
-				default:
-					return xerr
+
+			return metadata.Inspect(ctx, sgInstance, func(asg *abstract.SecurityGroup, _ *serialize.JSONProperties) fail.Error {
+				// First check if the security group is not already registered for the Host with the exact same state
+				var found bool
+				for k := range hsgV1.ByID {
+					if k == asg.ID {
+						found = true
+						break
+					}
 				}
-			}
-		}
+				if !found {
+					return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, instance.GetName())
+				}
 
-		// found, update properties
-		hsgV1.ByID[asg.ID].Disabled = true
-		return nil
+				caps := instance.Service().Capabilities()
+				if caps.CanDisableSecurityGroup {
+					innerXErr := instance.Service().DisableSecurityGroup(ctx, asg)
+					innerXErr = debug.InjectPlannedFail(innerXErr)
+					if innerXErr != nil {
+						return innerXErr
+					}
+				} else {
+					// Bind the security group on provider side; if security group not binded, considered as a success
+					innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahf)
+					innerXErr = debug.InjectPlannedFail(innerXErr)
+					if innerXErr != nil {
+						switch innerXErr.(type) {
+						case *fail.ErrNotFound:
+							debug.IgnoreErrorWithContext(ctx, innerXErr)
+							// continue
+						default:
+							return innerXErr
+						}
+					}
+				}
+
+				// found, update properties
+				hsgV1.ByID[asg.ID].Disabled = true
+				return nil
+			})
+		})
 	})
 }
 

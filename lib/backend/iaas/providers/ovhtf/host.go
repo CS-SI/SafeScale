@@ -27,7 +27,6 @@ import (
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	terraformer "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer"
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
@@ -174,6 +173,8 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		abstract.MarkForCreation(),
 		abstract.WithExtraData("Request", request),
 		abstract.WithExtraData("AvailabilityZone", azone),
+		abstract.WithExtraData("Subnets", request.Subnets),
+		abstract.WithExtraData("SecurityGroupByID", request.SecurityGroupByID),
 	)
 	if xerr != nil {
 		return nil, nil, xerr
@@ -227,7 +228,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 	// 	}
 	// }()
 
-	def, xerr := renderer.Assemble(ahf)
+	def, xerr := renderer.Assemble(inctx, ahf)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -257,6 +258,9 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 					if strings.Contains(lowered, "bad request with") {
 						return retry.StopRetryError(fail.InvalidRequestError(innerXErr.Error()))
 					}
+					if strings.Contains(lowered, "no suitable endpoint could be found in the service catalog") {
+						return retry.StopRetryError(fail.InvalidRequestError(innerXErr.Error()))
+					}
 				default:
 				}
 				return fail.Wrap(innerXErr, "failed to create Host '%s'", ahf.Name)
@@ -268,7 +272,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 					logrus.WithContext(inctx).Debugf("deleting unresponsive server '%s'...", request.ResourceName)
 
 					// Recreates def without host to destroy what has been created
-					def, derr := renderer.Assemble()
+					def, derr := renderer.Assemble(inctx)
 					if derr != nil {
 						innerFErr = fail.Wrap(innerFErr).AddConsequence(derr)
 						return
@@ -320,7 +324,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 			logrus.WithContext(inctx).Infof("Cleaning up on failure, deleting Host '%s'", ahf.Name)
 
 			// Recreates def without host to destroy what has been created
-			def, derr := renderer.Assemble()
+			def, derr := renderer.Assemble(inctx)
 			if derr != nil {
 				_ = ferr.AddConsequence(derr)
 				return
@@ -351,7 +355,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 	newHost.Networking.IsGateway = request.IsGateway
 	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
-	// FIXME: reimplement this, with new resource type PublicIP? And may be moved in previous renderer.Assemble to
+	// FIXME: Now that OVH supports FloatingIP, reimplement this, with new resource type PublicIP? And may be moved in previous renderer.Assemble to
 	//        make a single call to terraform...
 	// // if Floating IP are used and public address is requested
 	// if cfgOpts.UseFloatingIP && request.PublicIP {
@@ -581,6 +585,7 @@ func (p *provider) toHostSize(tpl *abstract.HostTemplate) (_ *abstract.HostEffec
 	return hostSizing, nil
 }
 
+// ClearHostStartupScript ...
 func (p *provider) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	// TODO implement me
 	return fail.NotImplementedError("ClearHostStartupScript() not yet implemented")
@@ -606,6 +611,7 @@ func (p *provider) InspectHost(ctx context.Context, hostParam iaasapi.HostIdenti
 	return ahf, p.ConsolidateHostSnippet(ahf.HostCore)
 }
 
+// GetHostState ...
 func (p *provider) GetHostState(ctx context.Context, hostParam iaasapi.HostIdentifier) (hoststate.Enum, fail.Error) {
 	// TODO implement me
 	return hoststate.Unknown, fail.NotImplementedError("GetHostState() not yet implemented")
@@ -622,6 +628,7 @@ func (p *provider) ListHosts(ctx context.Context, b bool) (abstract.HostList, fa
 	return p.MiniStack.ListHosts(ctx, b)
 }
 
+// DeleteHost ...
 func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
@@ -655,12 +662,12 @@ func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostIdentif
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(ahf)
+	def, xerr := renderer.Assemble(ctx, ahf)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(ahf))
+	xerr = renderer.Destroy(ctx, def /*, terraformerapi.WithTarget(ahf)*/)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to delete Network '%s'", ahf.Name)
 	}
@@ -702,7 +709,7 @@ func (p *provider) StopHost(ctx context.Context, hostParam iaasapi.HostIdentifie
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(ahf)
+	def, xerr := renderer.Assemble(ctx, ahf)
 	if xerr != nil {
 		return xerr
 	}
@@ -750,7 +757,7 @@ func (p *provider) StartHost(ctx context.Context, hostParam iaasapi.HostIdentifi
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(ahf)
+	def, xerr := renderer.Assemble(ctx, ahf)
 	if xerr != nil {
 		return xerr
 	}
@@ -783,16 +790,122 @@ func (p *provider) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIden
 	return nil, fail.NotImplementedError("WaitHostReady() not yet implemented")
 }
 
-func (p *provider) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
-	// TODO implement me
-	return fail.NotImplementedError("BindSecurityGroupToHost() not yet implemented")
+// BindSecurityGroupToHost ...
+func (p *provider) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
+	if valid.IsNull(p) {
+		return fail.InvalidInstanceError()
+	}
+	if asg == nil {
+		return fail.InvalidParameterCannotBeNilError("asg")
+	}
+	if !asg.IsConsistent() {
+		return fail.InvalidParameterError("asg", "is not consistent")
+	}
+	if ahf == nil {
+		return fail.InvalidParameterCannotBeNilError("ahf")
+	}
+	if !ahf.IsConsistent() {
+		return fail.InvalidParameterError("ahf", "is not consistent")
+	}
+
+	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
+	if xerr != nil {
+		return xerr
+	}
+	defer func() { _ = renderer.Close() }()
+
+	xerr = renderer.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
+	if xerr != nil {
+		return xerr
+	}
+
+	var sgs map[string]string
+	entry, ok := ahf.Extra()["SecurityGroupByID"]
+	if !ok {
+		sgs = map[string]string{}
+	} else {
+		sgs = entry.(map[string]string)
+	}
+	sgs[asg.ID] = asg.Name
+	xerr = ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", sgs))
+	if xerr != nil {
+		return xerr
+	}
+
+	def, xerr := renderer.Assemble(ctx, ahf)
+	if xerr != nil {
+		return xerr
+	}
+
+	_, xerr = renderer.Apply(ctx, def)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to delete Network '%s'", ahf.Name)
+	}
+
+	return nil
 }
 
-func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
-	// TODO implement me
-	return fail.NotImplementedError("UnbindSecurityGroupFromHost() not yet implemented")
+// UnbindSecurityGroupFromHost ...
+func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
+	if valid.IsNull(p) {
+		return fail.InvalidInstanceError()
+	}
+	if asg == nil {
+		return fail.InvalidParameterCannotBeNilError("asg")
+	}
+	if !asg.IsConsistent() {
+		return fail.InvalidParameterError("asg", "is not consistent")
+	}
+	if ahf == nil {
+		return fail.InvalidParameterCannotBeNilError("ahf")
+	}
+	if !ahf.IsConsistent() {
+		return fail.InvalidParameterError("ahf", "is not consistent")
+	}
+
+	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
+	if xerr != nil {
+		return xerr
+	}
+	defer func() { _ = renderer.Close() }()
+
+	xerr = renderer.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
+	if xerr != nil {
+		return xerr
+	}
+
+	currentSGs := map[string]string{}
+	state, xerr := renderer.State(ctx)
+	if xerr != nil {
+		return xerr
+	}
+	_ = state
+
+	newSGs := map[string]string{}
+	for k, v := range currentSGs {
+		if v != asg.Name {
+			newSGs[k] = v
+		}
+	}
+	xerr = ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", newSGs))
+	if xerr != nil {
+		return xerr
+	}
+
+	def, xerr := renderer.Assemble(ctx, ahf)
+	if xerr != nil {
+		return xerr
+	}
+
+	_, xerr = renderer.Apply(ctx, def)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to delete Network '%s'", ahf.Name)
+	}
+
+	return nil
 }
 
+// ConsolidateHostSnippet ensures the abstract HostCore contains necessary options
 func (p *provider) ConsolidateHostSnippet(ahc *abstract.HostCore) fail.Error {
 	if valid.IsNil(p) || ahc == nil {
 		return nil
@@ -800,8 +913,7 @@ func (p *provider) ConsolidateHostSnippet(ahc *abstract.HostCore) fail.Error {
 
 	return ahc.AddOptions(
 		abstract.UseTerraformSnippet(hostDesignResourceSnippetPath),
-		// abstract.WithResourceType("openstack_networking_port_v2"),
+		abstract.WithResourceType("openstack_networking_port_v2"),
 		abstract.WithResourceType("openstack_compute_instance_v2"),
-		// abstract.WithResourceType("openstack_images_image_v2"),
 	)
 }

@@ -125,11 +125,15 @@ func (instance *renderer) AddEnv(key, value string) fail.Error {
 }
 
 // Assemble creates a main.tf file in the appropriate folder
-func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fail.Error) {
+func (instance *renderer) Assemble(ctx context.Context, resources ...api.Resource) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+	defer fail.OnExitLogError(ctx, &ferr)
 
 	if valid.IsNull(instance) {
 		return "", fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if valid.IsNull(resources) {
 		return "", fail.InvalidParameterCannotBeNilError("resources")
@@ -170,7 +174,7 @@ func (instance *renderer) Assemble(resources ...api.Resource) (_ string, ferr fa
 		return "", xerr
 	}
 
-	allAbstracts, xerr := instance.scope.AllAbstracts()
+	allAbstracts, xerr := instance.scope.AllResources()
 	if xerr != nil {
 		return "", xerr
 	}
@@ -435,6 +439,12 @@ func (instance *renderer) Apply(ctx context.Context, def string) (_ map[string]t
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
+	return instance.apply(ctx, def)
+}
+
+// apply is the real function that calls terraform Apply command to operate changes, without instance lock
+// Called by Apply() and Destroy()
+func (instance *renderer) apply(ctx context.Context, def string) (_ map[string]tfexec.OutputMeta, ferr fail.Error) {
 	// Allow context cancellation
 	select {
 	case <-ctx.Done():
@@ -473,13 +483,6 @@ func (instance *renderer) Apply(ctx context.Context, def string) (_ map[string]t
 		return nil, fail.AbortedError(err, "failed to init terraform executor")
 	}
 	logrus.Trace("terraform init ran successfully.")
-
-	// output, err := executor.Validate(ctx)
-	// if err != nil {
-	// 	return nil, fail.Wrap(err, "failed to validate terraform file")
-	// }
-	// _ = output
-	// logrus.Trace("terraform validate ran successfully.")
 
 	err = instance.executor.Apply(ctx)
 	if err != nil {
@@ -540,47 +543,8 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
-	// Creates main.tf file
-	xerr = instance.createMainFile(def)
-	if xerr != nil {
-		return xerr
-	}
-
-	err := instance.executor.SetEnv(instance.env)
-	if err != nil {
-		return fail.Wrap(err, "failed to set terraform environment")
-	}
-
-	xerr = instance.copyTerraformLockFile()
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		derr := instance.saveTerraformLockFile()
-		if derr != nil {
-			if ferr != nil {
-				_ = ferr.AddConsequence(derr)
-			} else {
-				ferr = derr
-			}
-		}
-	}()
-
-	err = instance.executor.Init(ctx, tfexec.Upgrade(false))
-	if err != nil {
-		return fail.Wrap(err, "failed to init terraform executor")
-	}
-
-	logrus.Trace("terraform init ran successfully.")
-
-	// output, err := executor.Validate(ctx)
-	// if err != nil {
-	// 	return fail.Wrap(err, "failed to validate terraform file")
-	// }
-	// _ = output
-	// logrus.Trace("terraform validate ran successfully.")
-
 	// If targets are passed as options, we need to narrow the destruct to these targets only
+	var err error
 	targets := []string{}
 	value, xerr := o.Load(api.OptionTargets)
 	if xerr != nil {
@@ -604,15 +568,55 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 		}
 	}
 
-	tfOpts := []tfexec.DestroyOption{}
-	for _, v := range targets {
-		tfOpts = append(tfOpts, tfexec.Target(v))
+	if len(targets) == 0 {
+		_, err = instance.apply(ctx, def)
+		if err != nil {
+			return fail.Wrap(err, "failed to apply terraform")
+		}
+	} else {
+		// Creates main.tf file
+		xerr = instance.createMainFile(def)
+		if xerr != nil {
+			return xerr
+		}
+
+		err := instance.executor.SetEnv(instance.env)
+		if err != nil {
+			return fail.Wrap(err, "failed to set terraform environment")
+		}
+
+		xerr = instance.copyTerraformLockFile()
+		if xerr != nil {
+			return xerr
+		}
+		defer func() {
+			derr := instance.saveTerraformLockFile()
+			if derr != nil {
+				if ferr != nil {
+					_ = ferr.AddConsequence(derr)
+				} else {
+					ferr = derr
+				}
+			}
+		}()
+
+		err = instance.executor.Init(ctx, tfexec.Upgrade(false))
+		if err != nil {
+			return fail.Wrap(err, "failed to init terraform executor")
+		}
+
+		logrus.Trace("terraform init ran successfully.")
+
+		tfOpts := []tfexec.DestroyOption{}
+		for _, v := range targets {
+			tfOpts = append(tfOpts, tfexec.Target(v))
+		}
+		err = instance.executor.Destroy(ctx, tfOpts...)
+		if err != nil {
+			return fail.Wrap(err, "failed to apply terraform")
+		}
+		logrus.Trace("terraform destroy ran successfully.")
 	}
-	err = instance.executor.Destroy(ctx, tfOpts...)
-	if err != nil {
-		return fail.Wrap(err, "failed to apply terraform")
-	}
-	logrus.Trace("terraform destroy ran successfully.")
 
 	return nil
 }

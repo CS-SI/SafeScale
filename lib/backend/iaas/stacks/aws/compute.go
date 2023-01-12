@@ -1384,35 +1384,37 @@ func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostIde
 // BindSecurityGroupToHost ...
 // Returns:
 // - *fail.ErrNotFound if the Host is not found
-func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
+func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
 		return xerr
 	}
-	if !ahf.IsConsistent() {
-		if ahf, xerr = instance.InspectHost(ctx, ahf); xerr != nil {
-			return xerr
-		}
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam) // nolint
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
 	if xerr != nil {
 		return xerr
 	}
-	if !asg.IsConsistent() {
-		if asg, xerr = instance.InspectSecurityGroup(ctx, asg); xerr != nil {
-			return xerr
-		}
+	if !ahf.IsComplete() {
+		return fail.InconsistentError("ahf is not complete")
 	}
 
-	ahfi, err := ahf.GetID()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
+	defer fail.OnExitTraceError(ctx, &ferr)
+
+	hostID, err := ahf.GetID()
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
-	resp, xerr := instance.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
+	resp, xerr := instance.rpcDescribeInstanceByID(ctx, aws.String(hostID))
 	if xerr != nil {
 		return xerr
 	}
@@ -1432,7 +1434,7 @@ func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaas
 	if len(sgs) == len(resp.SecurityGroups) {
 		return nil
 	}
-	if xerr = instance.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahfi), sgs); xerr != nil {
+	if xerr = instance.rpcModifyInstanceSecurityGroups(ctx, aws.String(hostID), sgs); xerr != nil {
 		return xerr
 	}
 
@@ -1443,40 +1445,38 @@ func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaas
 // Returns:
 // - nil means success
 // - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
-func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier,
-) fail.Error {
+func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
 		return xerr
 	}
-	if !ahf.IsConsistent() {
-		ahf, xerr = instance.InspectHost(ctx, ahf)
-		if xerr != nil {
-			return xerr
-		}
-	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam) // nolint
-	if xerr != nil {
-		return xerr
-	}
-
 	if !asg.IsComplete() {
-		asg, xerr = instance.InspectSecurityGroup(ctx, asg)
-		if xerr != nil {
-			return xerr
-		}
+		return fail.InconsistentError("asg is not complete")
+	}
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	if xerr != nil {
+		return xerr
+	}
+	if !ahf.IsComplete() {
+		return fail.InconsistentError("ahf is not complete")
 	}
 
-	ahfi, err := ahf.GetID()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
+	defer fail.OnExitTraceError(ctx, &ferr)
+
+	hostID, err := ahf.GetID()
 	if err != nil {
 		return fail.ConvertError(err)
 	}
 
 	// query the instance to get its current Security Groups
-	resp, xerr := instance.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
+	resp, xerr := instance.rpcDescribeInstanceByID(ctx, aws.String(hostID))
 	if xerr != nil {
 		return xerr
 	}
@@ -1491,11 +1491,13 @@ func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam 
 		if err != nil {
 			return err
 		}
+
 		defaultSG.Network = asg.Network
 		defaultSG, xerr := instance.InspectSecurityGroup(ctx, defaultSG)
 		if xerr != nil {
 			return xerr
 		}
+
 		sgs = append(sgs, aws.String(defaultSG.ID))
 	}
 
@@ -1513,5 +1515,5 @@ func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam 
 		return nil
 	}
 
-	return instance.rpcModifyInstanceSecurityGroups(ctx, aws.String(ahfi), sgs)
+	return instance.rpcModifyInstanceSecurityGroups(ctx, aws.String(hostID), sgs)
 }

@@ -51,7 +51,7 @@ const (
 
 // Core contains the core functions of a persistent object
 type Core struct {
-	sync.RWMutex
+	lock              *sync.RWMutex
 	id                atomic.Value
 	name              atomic.Value
 	taken             atomic.Value
@@ -262,9 +262,9 @@ func (instance *Core) Inspect(inctx context.Context, callback AnyResourceCallbac
 						default:
 						}
 
-						instance.Lock()
+						instance.lock.Lock()
 						xerr = instance.unsafeReload(ctx)
-						instance.Unlock() // nolint
+						instance.lock.Unlock() // nolint
 						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
 							return fail.Wrap(xerr, "failed to reload metadata")
@@ -281,8 +281,118 @@ func (instance *Core) Inspect(inctx context.Context, callback AnyResourceCallbac
 				}
 			}
 
-			instance.RLock()
-			defer instance.RUnlock()
+			instance.lock.RLock()
+			defer instance.lock.RUnlock()
+
+			xerr = retry.WhileUnsuccessfulWithLimitedRetries(
+				func() error {
+					select {
+					case <-ctx.Done():
+						return retry.StopRetryError(ctx.Err())
+					default:
+					}
+
+					return instance.shielded.Inspect(func(p clonable.Clonable) fail.Error {
+						return callback(p, instance.properties)
+					})
+				},
+				timings.SmallDelay(),
+				timings.ConnectionTimeout(),
+				6,
+			)
+			if xerr != nil {
+				return fail.ConvertError(xerr.Cause())
+			}
+			return nil
+		}()
+		chRes <- result{gerr}
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
+	}
+}
+
+// Inspect protects the data for shared read
+func (instance *Core) inspect(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
+	if valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if callback == nil {
+		return fail.InvalidParameterCannotBeNilError("callback")
+	}
+	if instance.properties == nil {
+		return fail.InvalidInstanceContentError("instance.properties", "cannot be nil")
+	}
+
+	o, xerr := options.New(opts...)
+	if xerr != nil {
+		return xerr
+	}
+
+	noReload, xerr := options.Value[bool](o, OptionWithoutReloadKey)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return xerr
+		}
+	}
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		gerr := func() (ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			var xerr fail.Error
+
+			timings, xerr := instance.Service().Timings()
+			if xerr != nil {
+				return xerr
+			}
+
+			if !noReload {
+				// Reload reloads data from Object Storage to be sure to have the last revision
+				xerr = retry.WhileUnsuccessfulWithLimitedRetries(
+					func() error {
+						select {
+						case <-ctx.Done():
+							return retry.StopRetryError(ctx.Err())
+						default:
+						}
+
+						instance.lock.Lock()
+						xerr = instance.unsafeReload(ctx)
+						instance.lock.Unlock() // nolint
+						xerr = debug.InjectPlannedFail(xerr)
+						if xerr != nil {
+							return fail.Wrap(xerr, "failed to reload metadata")
+						}
+
+						return nil
+					},
+					timings.SmallDelay(),
+					timings.ContextTimeout(),
+					6,
+				)
+				if xerr != nil {
+					return fail.Wrap(xerr.Cause())
+				}
+			}
+
+			instance.lock.RLock()
+			defer instance.lock.RUnlock()
 
 			xerr = retry.WhileUnsuccessfulWithLimitedRetries(
 				func() error {
@@ -381,8 +491,8 @@ func (instance *Core) Alter(inctx context.Context, callback AnyResourceCallback,
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	instance.Lock()
-	defer instance.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
 	type result struct {
 		rErr fail.Error
@@ -447,6 +557,86 @@ func (instance *Core) Alter(inctx context.Context, callback AnyResourceCallback,
 	}
 }
 
+// alter protects the data for exclusive write
+// Valid options are :
+// - WithoutReload() = disable reloading from metadata storage
+func (instance *Core) alter(inctx context.Context, callback AnyResourceCallback, _ ...options.Option) (_ fail.Error) {
+	if valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if callback == nil {
+		return fail.InvalidParameterCannotBeNilError("callback")
+	}
+	if instance.shielded == nil {
+		return fail.InvalidInstanceContentError("instance.shielded", "cannot be nil")
+	}
+	name, err := instance.getName()
+	if err != nil {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
+	}
+	if name == "" {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
+	}
+	id, err := instance.getID()
+	if err != nil {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
+	}
+	if id == "" {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
+	}
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	type result struct {
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		gerr := func() (ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			var xerr fail.Error
+
+			// Make sure myself.properties is populated
+			if instance.properties == nil {
+				instance.properties, xerr = serialize.NewJSONProperties("resources." + instance.kind)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return xerr
+				}
+			}
+
+			xerr = instance.shielded.Alter(func(p clonable.Clonable) fail.Error {
+				return callback(p, instance.properties)
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrAlteredNothing:
+					return nil
+				default:
+					return xerr
+				}
+			}
+
+			return nil
+		}()
+		chRes <- result{gerr}
+	}()
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
+	}
+}
+
 // AlterProperty allows to alter directly a single property
 func (instance *Core) AlterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
 	return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -481,8 +671,8 @@ func (instance *Core) Carry(inctx context.Context, abstractResource clonable.Clo
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	instance.Lock()
-	defer instance.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
 	type result struct {
 		rErr fail.Error
@@ -607,8 +797,8 @@ func (instance *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	instance.RLock()
-	defer instance.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	type result struct {
 		rErr fail.Error
@@ -730,8 +920,8 @@ func (instance *Core) ReadByID(inctx context.Context, id string) (_ fail.Error) 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	instance.RLock()
-	defer instance.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	type result struct {
 		rErr fail.Error
@@ -1076,8 +1266,8 @@ func (instance *Core) Reload(inctx context.Context) (ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	instance.Lock()
-	defer instance.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
 	type result struct {
 		rErr fail.Error
@@ -1248,8 +1438,8 @@ func (instance *Core) BrowseFolder(inctx context.Context, callback func(buf []by
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	instance.RLock()
-	defer instance.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	type result struct {
 		rErr fail.Error
@@ -1296,8 +1486,8 @@ func (instance *Core) LookupByName(inctx context.Context, name string) (_ fail.E
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	instance.RLock()
-	defer instance.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	type result struct {
 		rErr fail.Error
@@ -1332,8 +1522,8 @@ func (instance *Core) Delete(inctx context.Context) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	instance.Lock()
-	defer instance.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
 	type result struct {
 		rErr fail.Error
@@ -1485,8 +1675,8 @@ func (instance *Core) String(inctx context.Context) (string, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	instance.RLock()
-	defer instance.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	type result struct {
 		rTr  string
@@ -1602,8 +1792,8 @@ func (instance *Core) Deserialize(inctx context.Context, buf []byte) fail.Error 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	instance.Lock()
-	defer instance.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
 	type result struct {
 		rErr fail.Error

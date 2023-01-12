@@ -34,6 +34,8 @@ import (
 	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
 	exbfv "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/startstop"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
@@ -1601,4 +1603,320 @@ func toHostState(status string) hoststate.Enum {
 	default:
 		return hoststate.Error
 	}
+}
+
+// GetHostState returns the current state of host identified by id
+// hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
+func (instance *stack) GetHostState(ctx context.Context, hostParam iaasapi.HostIdentifier) (hoststate.Enum, fail.Error) {
+	if valid.IsNil(instance) {
+		return hoststate.Unknown, fail.InvalidInstanceError()
+	}
+	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return hoststate.Unknown, xerr
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+
+	var (
+		server *servers.Server
+		err    error
+	)
+	if ahf.ID != "" {
+		server, err = instance.rpcGetHostByID(ctx, ahf.ID)
+	} else {
+		server, err = instance.rpcGetHostByName(ctx, ahf.Name)
+	}
+	if err != nil {
+		return hoststate.Unknown, fail.Wrap(err)
+	}
+
+	return toHostState(server.Status), nil
+}
+
+// StopHost stops the host identified by id
+func (instance *stack) StopHost(ctx context.Context, hostParam iaasapi.HostIdentifier, gracefully bool) fail.Error {
+	if valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+
+	return stacks.RetryableRemoteCall(ctx,
+		func() error {
+			return startstop.Stop(instance.ComputeClient, ahf.ID).ExtractErr()
+		},
+		NormalizeError,
+	)
+}
+
+// StartHost starts the host identified by id
+func (instance *stack) StartHost(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
+	if valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+
+	return stacks.RetryableRemoteCall(ctx,
+		func() error {
+			return startstop.Start(instance.ComputeClient, ahf.ID).ExtractErr()
+		},
+		NormalizeError,
+	)
+}
+
+// RebootHost reboots unconditionally the host identified by id
+func (instance *stack) RebootHost(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
+	if valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+
+	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
+	return stacks.RetryableRemoteCall(ctx,
+		func() error {
+			innerErr := servers.Reboot(instance.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
+			if innerErr != nil {
+				innerErr = servers.Reboot(instance.ComputeClient, ahf.ID, servers.RebootOpts{Type: servers.HardReboot}).ExtractErr()
+			}
+			return innerErr
+		},
+		NormalizeError,
+	)
+}
+
+// ResizeHost ...
+func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostIdentifier, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+	_ /*ahf*/, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+
+	logrus.WithContext(ctx).Debugf("Trying to resize a Host...")
+	// servers.Resize()
+
+	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
+}
+
+// WaitHostState waits a host achieve defined state
+// hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
+func (instance *stack) WaitHostState(ctx context.Context, hostParam iaasapi.HostIdentifier, state hoststate.Enum, timeout time.Duration) (server *servers.Server, ferr fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	ahf, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel, state.String(), timeout).WithStopwatch().Entering().Exiting()
+
+	timings, xerr := instance.Timings()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	retryErr := retry.WhileUnsuccessful(
+		func() (innerErr error) {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
+			if ahf.ID != "" {
+				server, innerErr = instance.rpcGetHostByID(ctx, ahf.ID)
+			} else {
+				server, innerErr = instance.rpcGetHostByName(ctx, ahf.Name)
+			}
+
+			if innerErr != nil {
+				switch innerErr.(type) {
+				case *fail.ErrNotFound:
+					// If error is "resource not found", we want to return error as-is to be able
+					// to behave differently in this special case. To do so, stop the retry
+					return retry.StopRetryError(abstract.ResourceNotFoundError("host", ahf.Name), "")
+				case *fail.ErrInvalidRequest:
+					// If error is "invalid request", no need to retry, it will always be so
+					return retry.StopRetryError(innerErr, "error getting Host %s", hostLabel)
+				case *fail.ErrNotAvailable:
+					return innerErr
+				default:
+					if errorMeansServiceUnavailable(innerErr) {
+						return innerErr
+					}
+
+					// Any other error stops the retry
+					return retry.StopRetryError(innerErr, "error getting Host %s", hostLabel)
+				}
+			}
+
+			if server == nil {
+				return fail.NotFoundError("provider did not send information for Host %s", hostLabel)
+			}
+
+			ahf.ID = server.ID // makes sure that on next turn we get Host by ID
+			lastState := toHostState(server.Status)
+
+			// If we had a response, and the target state is Any, this is a success no matter what
+			if state == hoststate.Any {
+				return nil
+			}
+
+			// If state matches, we consider this a success no matter what
+			switch lastState {
+			case state:
+				return nil
+			case hoststate.Error:
+				return retry.StopRetryError(fail.NotAvailableError("state of Host '%s' is 'ERROR'", hostLabel))
+			case hoststate.Starting, hoststate.Stopping:
+				return fail.NewError("host '%s' not ready yet", hostLabel)
+			default:
+				return retry.StopRetryError(
+					fail.NewError(
+						"host status of '%s' is in state '%s'", hostLabel, lastState.String(),
+					),
+				)
+			}
+		},
+		timings.SmallDelay(),
+		timeout,
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case *fail.ErrTimeout:
+			return nil, fail.Wrap(
+				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostLabel, timeout,
+			)
+		case *fail.ErrAborted:
+			cause := retryErr.Cause()
+			if cause != nil {
+				retryErr = fail.ConvertError(cause)
+			}
+			return server, retryErr // Not available error keeps the server info, good
+		default:
+			return nil, retryErr
+		}
+	}
+	if server == nil {
+		return nil, fail.NotFoundError("failed to query Host '%s'", hostLabel)
+	}
+	return server, nil
+}
+
+// WaitHostReady waits a host achieve ready state
+// hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
+func (instance *stack) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIdentifier, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	ahf, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	server, xerr := instance.WaitHostState(ctx, hostParam, hoststate.Started, timeout)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			if server != nil {
+				ahf.ID = server.ID
+				ahf.Name = server.Name
+				ahf.LastState = hoststate.Error
+				return ahf.HostCore, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
+			}
+			return nil, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
+		default:
+			return nil, xerr
+		}
+	}
+
+	ahf, xerr = instance.complementHost(ctx, ahf.HostCore, server)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return ahf.HostCore, nil
+}
+
+// BindSecurityGroupToHost binds a security group to a host
+// If Security Group is already bound to Host, returns *fail.ErrDuplicate
+func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
+	if valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
+	}
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	if xerr != nil {
+		return xerr
+	}
+	if !ahf.IsComplete() {
+		return fail.InconsistentError("ahf is not complete")
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
+
+	return stacks.RetryableRemoteCall(ctx,
+		func() error {
+			return secgroups.AddServer(instance.ComputeClient, ahf.ID, asg.ID).ExtractErr()
+		},
+		NormalizeError,
+	)
+}
+
+// UnbindSecurityGroupFromHost unbinds a security group from a host
+func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
+	if valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
+	}
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	if xerr != nil {
+		return xerr
+	}
+	if !ahf.IsComplete() {
+		return fail.InconsistentError("ahf is not complete")
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
+
+	return stacks.RetryableRemoteCall(ctx,
+		func() error {
+			return secgroups.RemoveServer(instance.ComputeClient, ahf.ID, asg.ID).ExtractErr()
+		},
+		NormalizeError,
+	)
 }

@@ -891,67 +891,71 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 }
 
 // BindSecurityGroupToHost ...
-func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
+func (s stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
 		return xerr
 	}
-	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
+	}
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
 	if xerr != nil {
 		return xerr
 	}
-	if !ahf.IsConsistent() {
-		if ahf, xerr = s.InspectHost(ctx, ahf); xerr != nil {
-			return fail.InvalidParameterError("hostParam", "must contain 'ID' field")
-		}
+	if !ahf.IsComplete() {
+		return fail.InconsistentError("ahf is not complete")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).Entering().Exiting()
 
-	ahfid, err := ahf.GetID()
+	hostID, err := ahf.GetID()
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
-	asgid, err := asg.GetID()
+	sgID, err := asg.GetID()
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
-	return s.rpcAddTagsToInstance(ctx, ahfid, []string{asgid})
+	return s.rpcAddTagsToInstance(ctx, hostID, []string{sgID})
 }
 
 // UnbindSecurityGroupFromHost unbinds a Security Group from a Host
-func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
+func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
 		return xerr
 	}
-	if !asg.IsConsistent() {
-		return fail.InvalidParameterError("sgParam", "must contain 'ID' field")
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
 	}
-	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
 	if xerr != nil {
 		return xerr
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-
-	ahfid, err := ahf.GetID()
-	if err != nil {
-		return fail.ConvertError(err)
+	if !ahf.IsComplete() {
+		return fail.InconsistentError("ahf is nort complete")
 	}
 
-	asgid, err := asg.GetID()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).Entering().Exiting()
+
+	hostID, err := ahf.GetID()
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
-	return s.rpcRemoveTagsFromInstance(ctx, ahfid, []string{asgid})
+	sgID, err := asg.GetID()
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
+	return s.rpcRemoveTagsFromInstance(ctx, hostID, []string{sgID})
 }

@@ -25,12 +25,18 @@ import (
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
 	labelfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/label"
 	networkfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/network"
 	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/securitygroup"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/subnet"
 	volumefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/volume"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/puzpuzpuz/xsync"
 	"github.com/sirupsen/logrus"
 
@@ -351,7 +357,7 @@ func (s *scope) loadNetworks(ctx context.Context, provider providerUsingTerrafor
 			return innerXErr
 		}
 
-		innerXErr = s.unsafeRegisterResource(an)
+		innerXErr = s.registerResource(an)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -410,7 +416,7 @@ func (s *scope) loadSubnets(ctx context.Context, provider providerUsingTerraform
 			return innerXErr
 		}
 
-		innerXErr = s.unsafeRegisterResource(as)
+		innerXErr = s.registerResource(as)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -435,7 +441,7 @@ func (s *scope) loadSecurityGroups(ctx context.Context, provider providerUsingTe
 			return innerXErr
 		}
 
-		innerXErr = s.unsafeRegisterResource(asg)
+		innerXErr = s.registerResource(asg)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -447,12 +453,14 @@ func (s *scope) loadSecurityGroups(ctx context.Context, provider providerUsingTe
 
 func (s *scope) loadHosts(ctx context.Context, provider providerUsingTerraform) (ferr fail.Error) {
 	count := 0
-	defer s.loadLogHelper("Networks", &ferr, &count)()
+	defer s.loadLogHelper("Hosts", &ferr, &count)()
 
 	browser, xerr := hostfactory.New(ctx)
 	if xerr != nil {
 		return xerr
 	}
+
+	svc := browser.Service()
 
 	return browser.Browse(ctx, func(ahc *abstract.HostCore) fail.Error {
 		innerXErr := provider.ConsolidateHostSnippet(ahc)
@@ -460,7 +468,66 @@ func (s *scope) loadHosts(ctx context.Context, provider providerUsingTerraform) 
 			return innerXErr
 		}
 
-		innerXErr = s.unsafeRegisterResource(ahc)
+		ahf, innerXErr := svc.InspectHost(ctx, ahc)
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		// -- Need to add bound Security Groups of the Host as Extra data to abstract.HostFull
+		host, innerXErr := hostfactory.Load(ctx, ahc.ID)
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		innerXErr = host.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+			inspectXErr := props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
+				networkV2, inspectErr := clonable.Cast[*propertiesv2.HostNetworking](p)
+				if inspectErr != nil {
+					return fail.Wrap(inspectErr)
+				}
+
+				subnetList := make([]*abstract.Subnet, 0, len(networkV2.SubnetsByName))
+				for k := range networkV2.SubnetsByName {
+					entry, found := s.resources.Load("subnet:" + k)
+					if !found {
+						logrus.WithContext(ctx).Errorf("inconsistency detected in metadata: Host '%s' is bound to Subnet '%s', which does not exist", ahc.Name, k)
+						continue
+					}
+
+					casted, inspectErr := lang.Cast[*abstract.Subnet](entry)
+					if inspectErr != nil {
+						return fail.Wrap(inspectErr)
+					}
+
+					cloned, inspectErr := clonable.CastedClone[*abstract.Subnet](casted)
+					if inspectErr != nil {
+						return fail.Wrap(inspectErr)
+					}
+
+					subnetList = append(subnetList, cloned)
+				}
+				return ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", subnetList))
+			})
+			if inspectXErr != nil {
+				return inspectXErr
+			}
+
+			return props.Inspect(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+				sgsV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				list := make(map[string]string, len(sgsV1.ByName))
+				for k, v := range sgsV1.ByName {
+					list[v] = k
+				}
+				return ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", list))
+			})
+		})
+
+		// -- register resource in scope
+		innerXErr = s.registerResource(ahf)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -481,7 +548,7 @@ func (s *scope) loadLabels(ctx context.Context, _ providerUsingTerraform) (ferr 
 
 	return browser.Browse(ctx, func(al *abstract.Label) fail.Error {
 		// provider.ConsolidateLabelSnippet(al)
-		innerXErr := s.unsafeRegisterResource(al)
+		innerXErr := s.registerResource(al)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -506,7 +573,7 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 			return innerXErr
 		}
 
-		innerXErr = s.unsafeRegisterResource(av)
+		innerXErr = s.registerResource(av)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -527,7 +594,7 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 // 	}
 //
 // 	return browser.Browse(ctx, func(ac *abstract.Cluster) fail.Error {
-// 		innerXErr := s.unsafeRegisterResource(ac)
+// 		innerXErr := s.registerResource(ac)
 // 		if innerXErr != nil {
 // 			return innerXErr
 // 		}
@@ -547,7 +614,7 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 // 	}
 //
 // 	return browser.Browse(ctx, func(ab *abstract.Bucket) fail.Error {
-// 		innerXErr := s.unsafeRegisterResource(ab)
+// 		innerXErr := s.registerResource(ab)
 // 		if innerXErr != nil {
 // 			return innerXErr
 // 		}
@@ -557,7 +624,8 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 // 	})
 // }
 
-func (s *scope) AllAbstracts() (map[string]terraformerapi.Resource, fail.Error) {
+// AllResources returns all abstracts registered in Scope
+func (s *scope) AllResources() (map[string]terraformerapi.Resource, fail.Error) {
 	if valid.IsNull(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -574,6 +642,41 @@ func (s *scope) AllAbstracts() (map[string]terraformerapi.Resource, fail.Error) 
 	return list, nil
 }
 
+// Resource returns the resource with kind and name
+func (s *scope) Resource(kind, name string) (terraformerapi.Resource, fail.Error) {
+	if valid.IsNull(s) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if kind == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("kind")
+	}
+	if name == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
+	}
+
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	queryName := kind + ":" + name
+	entry, found := s.resources.Load(queryName)
+	if !found {
+		return nil, fail.NotFoundError("failed to find %s resource '%s' in Scope", kind, name)
+	}
+
+	value, ok := entry.(clonable.Clonable)
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast resource to 'clonable.Clonable'")
+	}
+
+	cloned, err := clonable.CastedClone[terraformerapi.Resource](value)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	return cloned, nil
+}
+
+// RegisterResource ...
 func (s *scope) RegisterResource(rsc terraformerapi.Resource) fail.Error {
 	if valid.IsNull(s) {
 		return fail.InvalidInstanceError()
@@ -585,10 +688,11 @@ func (s *scope) RegisterResource(rsc terraformerapi.Resource) fail.Error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	return s.unsafeRegisterResource(rsc)
+	return s.registerResource(rsc)
 }
 
-func (s *scope) unsafeRegisterResource(rsc terraformerapi.Resource) fail.Error {
+// registerResource ...
+func (s *scope) registerResource(rsc terraformerapi.Resource) fail.Error {
 	kind, name, queryName, xerr := s.extractResourceIndex(rsc)
 	if xerr != nil {
 		return xerr
@@ -605,6 +709,21 @@ func (s *scope) unsafeRegisterResource(rsc terraformerapi.Resource) fail.Error {
 	return nil
 }
 
+// ReplaceResource does replace a resource already there, or register it if not present
+func (s *scope) ReplaceResource(rsc terraformerapi.Resource) fail.Error {
+	_, _, queryName, xerr := s.extractResourceIndex(rsc)
+	if xerr != nil {
+		return xerr
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.resources.Store(queryName, rsc)
+	return nil
+}
+
+// UnregisterResource unregisters a resource from Scope
 func (s *scope) UnregisterResource(rsc terraformerapi.Resource) fail.Error {
 	if valid.IsNull(s) {
 		return fail.InvalidInstanceError()
@@ -618,7 +737,6 @@ func (s *scope) UnregisterResource(rsc terraformerapi.Resource) fail.Error {
 		return xerr
 	}
 
-	// Check duplicate by name
 	s.lock.Lock()
 	defer s.lock.Unlock()
 

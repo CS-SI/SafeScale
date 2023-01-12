@@ -122,7 +122,7 @@ func (instance *stack) CreateSecurityGroup(ctx context.Context, networkRef, name
 	}
 
 	asg = toAbstractSecurityGroup(resp)
-	asg, xerr = instance.AddRulesToSecurityGroup(ctx, asg, rules...)
+	xerr = instance.AddRulesToSecurityGroup(ctx, asg, rules...)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -183,19 +183,16 @@ func (instance *stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (instance *stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error) {
+func (instance *stack) ClearSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
 	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := iaasapi.ValidateSecurityGroupIdentifier(asg)
 	if xerr != nil {
-		return nil, xerr
+		return xerr
 	}
-	if !asg.IsConsistent() {
-		asg, xerr = instance.InspectSecurityGroup(ctx, asg.ID)
-		if xerr != nil {
-			return asg, xerr
-		}
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.outscale"), "(%s)", sgLabel).WithStopwatch().Entering()
@@ -203,38 +200,37 @@ func (instance *stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.S
 
 	group, xerr := instance.rpcReadSecurityGroupByID(ctx, asg.ID)
 	if xerr != nil {
-		return asg, xerr
+		return xerr
 	}
 
 	if len(group.InboundRules) > 0 {
-		if xerr = instance.rpcDeleteSecurityGroupRules(ctx, asg.ID, "Inbound", group.InboundRules); xerr != nil {
-			return asg, xerr
+		xerr = instance.rpcDeleteSecurityGroupRules(ctx, asg.ID, "Inbound", group.InboundRules)
+		if xerr != nil {
+			return xerr
 		}
 	}
 	if len(group.OutboundRules) > 0 {
-		if xerr = instance.rpcDeleteSecurityGroupRules(ctx, asg.ID, "Outbound", group.OutboundRules); xerr != nil {
-			return asg, xerr
+		xerr = instance.rpcDeleteSecurityGroupRules(ctx, asg.ID, "Outbound", group.OutboundRules)
+		if xerr != nil {
+			return xerr
 		}
 	}
 
 	asg.Rules = abstract.SecurityGroupRules{}
-	return asg, nil
+	return nil
 }
 
 // AddRulesToSecurityGroup adds rules to a security group
-func (instance *stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (instance *stack) AddRulesToSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) fail.Error {
 	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
-		return nil, xerr
+		return xerr
 	}
-	if !asg.IsConsistent() {
-		asg, xerr = instance.InspectSecurityGroup(ctx, asg.ID)
-		if xerr != nil {
-			return asg, xerr
-		}
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.outscale"), "(%s)", sgLabel).WithStopwatch().Entering()
@@ -253,21 +249,24 @@ func (instance *stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaas
 	for i := 0; i < len(rules); i++ {
 		if rules[i].EtherType == ipversion.IPv6 {
 			// No IPv6 at Outscale (?)
-			return asg, nil
+			return nil
 		}
 
 		flow, oscRule, xerr := fromAbstractSecurityGroupRule(rules[i])
 		if xerr != nil {
-			return asg, xerr
+			return xerr
 		}
 
 		xerr = instance.rpcCreateSecurityGroupRules(ctx, asg.ID, flow, []osc.SecurityGroupRule{oscRule})
 		if xerr != nil {
-			return asg, fail.Wrap(xerr, "failed to create rule #%d", i)
+			return fail.Wrap(xerr, "failed to create rule #%d", i)
 		}
+
+		asg.Rules = append(asg.Rules, rules[i])
 	}
 
-	return instance.InspectSecurityGroup(ctx, asg)
+	asg, xerr = instance.InspectSecurityGroup(ctx, asg)
+	return xerr
 }
 
 func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ osc.SecurityGroupRule, ferr fail.Error) {
@@ -343,19 +342,16 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ 
 
 // DeleteRulesFromSecurityGroup deletes rules from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (instance *stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (instance *stack) DeleteRulesFromSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) fail.Error {
 	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
-		return nil, xerr
+		return xerr
 	}
-	if !asg.IsConsistent() {
-		asg, xerr = instance.InspectSecurityGroup(ctx, asg.ID)
-		if xerr != nil {
-			return asg, xerr
-		}
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.outscale"), "(%s, <rules>)", sgLabel).WithStopwatch().Entering()
@@ -364,12 +360,17 @@ func (instance *stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam
 	for _, currentRule := range rules {
 		// IPv6 not supported at Outscale (?)
 		if currentRule.EtherType == ipversion.IPv6 {
-			return asg, nil
+			return nil
 		}
 
 		flow, oscRule, xerr := fromAbstractSecurityGroupRule(currentRule)
 		if xerr != nil {
-			return nil, xerr
+			return xerr
+		}
+
+		index, xerr := asg.Rules.IndexOfEquivalentRule(currentRule)
+		if xerr != nil {
+			return xerr
 		}
 
 		xerr = instance.rpcDeleteSecurityGroupRules(ctx, asg.ID, flow, []osc.SecurityGroupRule{oscRule})
@@ -379,12 +380,17 @@ func (instance *stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam
 				// consider a missing rule as a successful deletion and continue
 				debug.IgnoreError(xerr)
 			default:
-				return nil, xerr
+				return xerr
 			}
+		}
+
+		xerr = asg.RemoveRuleByIndex(index)
+		if xerr != nil {
+			return xerr
 		}
 	}
 
-	return instance.InspectSecurityGroup(ctx, asg)
+	return nil
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts

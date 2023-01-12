@@ -1361,25 +1361,26 @@ func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostIde
 }
 
 // BindSecurityGroupToHost ...
-func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
+func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
 		return xerr
 	}
-	if !asg.IsConsistent() {
-		asg, xerr = instance.InspectSecurityGroup(ctx, asg.ID)
-		if xerr != nil {
-			return xerr
-		}
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
+	}
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	if xerr != nil {
+		return xerr
+	}
+	if !ahf.IsComplete() {
+		return fail.InconsistentError("ahf is not complete")
 	}
 
-	ahf, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
-	if xerr != nil {
-		return xerr
-	}
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.compute"), "(%s, *s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
 
 	vm, xerr := instance.rpcReadVMByID(ctx, ahf.ID)
 	if xerr != nil {
@@ -1406,18 +1407,26 @@ func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaas
 }
 
 // UnbindSecurityGroupFromHost ...
-func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
+func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
 		return xerr
 	}
-	ahf, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
+	}
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
 	if xerr != nil {
 		return xerr
 	}
+	if !ahf.IsComplete() {
+		return fail.InconsistentError("ahf is not complete")
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.compute"), "(%s, *s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
 
 	vm, xerr := instance.rpcReadVMByID(ctx, ahf.ID)
 	if xerr != nil {

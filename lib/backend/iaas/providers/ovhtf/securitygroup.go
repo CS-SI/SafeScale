@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	terraformer "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer"
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
@@ -101,7 +100,7 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 		return nil, xerr
 	}
 
-	def, xerr := renderer.Assemble(asg)
+	def, xerr := renderer.Assemble(ctx, asg)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -206,8 +205,8 @@ func (p *provider) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Sec
 	return asg, p.ConsolidateSecurityGroupSnippet(asg)
 }
 
-func (p *provider) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error) {
-	return nil, fail.NotImplementedError()
+func (p *provider) ClearSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
+	return fail.NotImplementedError()
 }
 
 func (p *provider) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) fail.Error {
@@ -246,13 +245,13 @@ func (p *provider) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Secu
 	}
 
 	// Creates the terraform definition file
-	def, xerr := renderer.Assemble(asg)
+	def, xerr := renderer.Assemble(ctx, asg)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Instruct terraform to destroy the Security Group
-	xerr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(asg))
+	xerr = renderer.Destroy(ctx, def /*, terraformerapi.WithTarget(asg)*/)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to delete network %s", asg.ID)
 	}
@@ -260,59 +259,46 @@ func (p *provider) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Secu
 	return nil
 }
 
-func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (p *provider) AddRulesToSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) fail.Error {
 	if valid.IsNil(p) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := iaasapi.ValidateSecurityGroupIdentifier(sgParam)
+	_, sgLabel, xerr := iaasapi.ValidateSecurityGroupIdentifier(asg)
 	if xerr != nil {
-		return nil, xerr
+		return xerr
+	}
+	if !asg.IsConsistent() {
+		return fail.InconsistentError("asg is not consistent")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.securitygroup"), "(%s)", sgLabel).WithStopwatch().Entering().Exiting()
 
-	asg, xerr = p.InspectSecurityGroup(ctx, asg)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-		default:
-			return nil, xerr
-		}
-	}
-
 	newAsg, err := clonable.CastedClone[*abstract.SecurityGroup](asg)
 	if err != nil {
-		return nil, fail.Wrap(xerr)
+		return fail.Wrap(xerr)
 	}
 
 	newAsg.Rules = append(newAsg.Rules, rules...)
 
 	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
 	if xerr != nil {
-		return nil, xerr
+		return xerr
 	}
 	defer func() { _ = renderer.Close() }()
 
 	xerr = renderer.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
 	if xerr != nil {
-		return nil, xerr
+		return xerr
 	}
 
-	// FIXME: should be necessary to create local Resource for SG rules and add them to assemble, to be able to remove SG AND its rules with Destroy...
-	def, xerr := renderer.Assemble(newAsg)
+	def, xerr := renderer.Assemble(ctx, newAsg)
 	if xerr != nil {
-		return nil, xerr
+		return xerr
 	}
 
 	outputs, xerr := renderer.Apply(ctx, def)
 	if xerr != nil {
-		return nil, xerr
-	}
-
-	asg.ID, xerr = unmarshalOutput[string](outputs["sg_"+asg.Name+"_id"])
-	if xerr != nil {
-		return nil, xerr
+		return xerr
 	}
 
 	for k, v := range rules {
@@ -320,7 +306,7 @@ func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.
 			for i := range v.Sources {
 				id, xerr := unmarshalOutput[string](outputs[fmt.Sprintf("sg_%s_rule_%d_%d_id", asg.Name, k, i)])
 				if xerr != nil {
-					return nil, xerr
+					return xerr
 				}
 
 				v.IDs = append(v.IDs, id)
@@ -329,7 +315,7 @@ func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.
 			for i := range v.Sources {
 				id, xerr := unmarshalOutput[string](outputs[fmt.Sprintf("sg_%s_rule_%d_%d_id", asg.Name, k, i)])
 				if xerr != nil {
-					return nil, xerr
+					return xerr
 				}
 
 				v.IDs = append(v.IDs, id)
@@ -382,22 +368,22 @@ func (p *provider) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.
 	// 	}
 	// }
 
-	return asg, nil
+	return nil
 }
 
-func (p *provider) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
-	return nil, fail.NotImplementedError("DeleteRulesFromSecurityGroup() not implemented")
+func (p *provider) DeleteRulesFromSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) fail.Error {
+	return fail.NotImplementedError("DeleteRulesFromSecurityGroup() not implemented")
 }
 
 func (p *provider) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
 	return "", fail.NotImplementedError("GetDefaultSecurityGroupName() not implemented")
 }
 
-func (p *provider) EnableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) fail.Error {
+func (p *provider) EnableSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
 	return fail.NotImplementedError("EnableSecurityGroup() not implemented")
 }
 
-func (p *provider) DisableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) fail.Error {
+func (p *provider) DisableSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
 	return fail.NotImplementedError("DisableSecurityGroup() not implemented")
 }
 

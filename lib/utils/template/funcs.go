@@ -17,24 +17,33 @@
 package template
 
 import (
+	"reflect"
 	txttmpl "text/template"
-
-	sprig "github.com/Masterminds/sprig/v3"
-
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// Parse returns a text template with default funcs declared
-func Parse(title, content string) (*txttmpl.Template, fail.Error) {
-	if title == "" {
-		return nil, fail.InvalidParameterError("title", "cannot be empty string")
+var internalFuncMap = txttmpl.FuncMap{
+	"hasField": hasField,
+}
+
+// hasField tells if value 'v' has a field named 'name"
+// Works with v as struct or map
+func hasField(v interface{}, name string) bool {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
 	}
-	if content == "" {
-		return nil, fail.InvalidParameterError("content", "cannot be empty string")
+	switch rv.Kind() {
+	case reflect.Struct:
+		return rv.FieldByName(name).IsValid()
+	case reflect.Map:
+		m, ok := v.(map[string]interface{})
+		if !ok {
+			return false
+		}
+
+		_, ok = m[name]
+		return ok
+	default:
+		return false
 	}
-	r, err := txttmpl.New(title).Funcs(sprig.TxtFuncMap()).Funcs(internalFuncMap).Parse(content)
-	if err != nil {
-		return nil, fail.ConvertError(err)
-	}
-	return r, nil
 }

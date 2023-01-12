@@ -118,7 +118,7 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 		return nil, xerr
 	}
 
-	def, xerr := renderer.Assemble(abstractNetwork)
+	def, xerr := renderer.Assemble(ctx, abstractNetwork)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -452,12 +452,12 @@ func (p *provider) DeleteNetwork(ctx context.Context, parameter iaasapi.NetworkI
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(an)
+	def, xerr := renderer.Assemble(ctx, an)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(an))
+	xerr = renderer.Destroy(ctx, def /*, terraformerapi.WithTarget(an)*/)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to delete network %s", an.ID)
 	}

@@ -1791,23 +1791,26 @@ func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostIde
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to IPAddress, returns *fail.ErrDuplicate
-func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
+func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
 	if xerr != nil {
 		return xerr
+	}
+	if !ahf.IsComplete() {
+		return fail.InconsistentError("ahf is not complete")
+	}
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
 	}
 
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return xerr
-	}
-	asg, xerr = instance.InspectSecurityGroup(ctx, asg)
-	if xerr != nil {
-		return xerr
-	}
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
@@ -1851,18 +1854,26 @@ func (instance *stack) BindSecurityGroupToHost(ctx context.Context, sgParam iaas
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) fail.Error {
+func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
 		return xerr
 	}
-	ahf, _, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
+	}
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
 	if xerr != nil {
 		return xerr
 	}
+	if !ahf.IsComplete() {
+		return fail.InconsistentError("ahf is not complete")
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {

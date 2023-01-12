@@ -299,6 +299,14 @@ func (hc *HostCore) IsConsistent() bool {
 	return hc.ID != ""
 }
 
+func (hc *HostCore) IsComplete() bool {
+	if hc == nil {
+		return false
+	}
+
+	return hc.core.IsComplete() && hc.ID != ""
+}
+
 // SetID is used to set ID field
 func (hc *HostCore) SetID(id string) *HostCore {
 	hc.ID = id
@@ -558,15 +566,24 @@ func (hf *HostFull) IsNull() bool {
 
 // IsConsistent returns true if the struct is consistent
 func (hf *HostFull) IsConsistent() bool {
+	if hf == nil {
+		return false
+	}
+
 	return hf != nil && hf.HostCore.IsConsistent() // && hc.Description.OK() && hc.Sizing.OK() && hc.Networking.OK()
 }
 
 // OK is a synonym to IsConsistent
 func (hf *HostFull) OK() bool {
+	return hf.IsConsistent()
+}
+
+func (hf *HostFull) IsComplete() bool {
 	if hf == nil {
 		return false
 	}
-	return hf.IsConsistent()
+
+	return hf.HostCore.IsComplete()
 }
 
 // GetID returns the ID of the host

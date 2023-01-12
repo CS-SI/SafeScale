@@ -166,7 +166,7 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 	}
 
 	// FIXME: should be necessary to add local Resource for router, and add it to Assemble... Otherwise it will be difficult to remove routers during Destroy...
-	def, xerr := renderer.Assemble(abstractSubnet)
+	def, xerr := renderer.Assemble(ctx, abstractSubnet)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -289,12 +289,12 @@ func (p *provider) DeleteSubnet(ctx context.Context, subnetParam iaasapi.SubnetI
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(as)
+	def, xerr := renderer.Assemble(ctx, as)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(as))
+	xerr = renderer.Destroy(ctx, def /*, terraformerapi.WithTarget(as)*/)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to delete Network '%s'", as.Name)
 	}

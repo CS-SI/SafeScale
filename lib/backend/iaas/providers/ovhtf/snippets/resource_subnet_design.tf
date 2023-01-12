@@ -1,3 +1,4 @@
+{{- if not .Extra.MarkedForDestruction }}
 resource "openstack_networking_subnet_v2" "{{ .Resource.Name }}" {
     provider                = openstack.ovh
     name                    = "{{ .Resource.Name }}"
@@ -8,9 +9,9 @@ resource "openstack_networking_subnet_v2" "{{ .Resource.Name }}" {
     enable_dhcp             = true
 
     lifecycle {
-{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
+{{-   if not .Extra.MarkedForCreation }}
         prevent_destroy = true
-{{- end }}
+{{-   end }}
     }
 }
 
@@ -18,7 +19,7 @@ output "subnet_{{ .Resource.Name }}_id" {
     value = "${openstack_networking_subnet_v2.{{ .Resource.Name }}.id}"
 }
 
-{{- if .Provider.Configuration.UseLayer3Networking }}
+{{-   if .Provider.Configuration.UseLayer3Networking }}
 resource "openstack_networking_router_v2" "{{ .Resource.Name }}" {
     provider                = openstack.ovh
     name                    = "{{ .Resource.Name }}"
@@ -27,9 +28,9 @@ resource "openstack_networking_router_v2" "{{ .Resource.Name }}" {
     region                  = "{{ .Provider.Authentication.Region }}"
 
     lifecycle {
-{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
+{{-   if not .Extra.MarkedForCreation }}
         prevent_destroy = true
-{{- end }}
+{{-   end }}
     }
 }
 
@@ -38,14 +39,15 @@ resource "openstack_networking_router_interface_v2" "router_interface_1" {
     subnet_id = "${openstack_networking_subnet_v2.{{ .Resource.Name }}.id}"
 
     lifecycle {
-{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
+{{-   if not .Extra.MarkedForCreation }}
         prevent_destroy = true
-{{- end }}
+{{-   end }}
     }
 }
 
 output "router_{{ .Resource.Name }}_id" {
     value = "${openstack_networking_router_v2.{{ .Resource.Name }}.id}"
 }
+{{-   end }}
 {{- end }}
 

@@ -134,14 +134,15 @@ func (instance stack) CreateSecurityGroup(ctx context.Context, networkRef, name,
 	}()
 
 	// In OpenStack, freshly created security group may contain default rules; we do not want them
-	asg, xerr = instance.ClearSecurityGroup(ctx, asg)
+	xerr = instance.ClearSecurityGroup(ctx, asg)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// now adds security rules
 	asg.Rules = make(abstract.SecurityGroupRules, 0, len(rules))
-	if asg, xerr = instance.AddRulesToSecurityGroup(ctx, asg, rules...); xerr != nil {
+	xerr = instance.AddRulesToSecurityGroup(ctx, asg, rules...)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -254,25 +255,28 @@ func (instance stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (instance stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (*abstract.SecurityGroup, fail.Error) {
+func (instance stack) ClearSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
 	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
-	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
-		return nil, xerr
+		return xerr
 	}
-	asg, xerr = instance.InspectSecurityGroup(ctx, asg.ID)
-	if xerr != nil {
-		return asg, xerr
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
 	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.huaweicloud"), "(%s)", sgLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
 	// delete security group rules
 	for _, v := range asg.Rules {
 		xerr = stacks.RetryableRemoteCall(ctx,
 			func() error {
 				for _, id := range v.IDs {
-					if innerErr := secrules.Delete(instance.NetworkClient, id).ExtractErr(); innerErr != nil {
+					innerErr := secrules.Delete(instance.NetworkClient, id).ExtractErr()
+					if innerErr != nil {
 						return innerErr
 					}
 				}
@@ -285,12 +289,12 @@ func (instance stack) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.Se
 			case *fail.ErrNotFound:
 				continue
 			default:
-				return asg, xerr
+				return xerr
 			}
 		}
 	}
 	asg.Rules = abstract.SecurityGroupRules{}
-	return asg, nil
+	return nil
 }
 
 // toAbstractSecurityGroupRules
@@ -382,38 +386,36 @@ func convertEtherTypeFromAbstract(in ipversion.Enum) secrules.RuleEtherType {
 
 // AddRulesToSecurityGroup adds rules to a security group
 // On success, return Security Group with added rule
-func (instance stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
+func (instance stack) AddRulesToSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) (ferr fail.Error) {
 	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
-
-	var xerr fail.Error
-	asg, _, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
-		return nil, xerr
+		return xerr
+	}
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not complete")
 	}
 
-	if !asg.IsConsistent() {
-		asg, xerr = instance.InspectSecurityGroup(ctx, asg.ID)
-		if xerr != nil {
-			return asg, xerr
-		}
-	}
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.huaweicloud"), "(%s)", sgLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
 	for k, currentRule := range rules {
-		if _, xerr = asg.Rules.IndexOfEquivalentRule(currentRule); xerr != nil {
+		_, xerr = asg.Rules.IndexOfEquivalentRule(currentRule)
+		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
 				debug.IgnoreError(xerr)
 			default:
-				return asg, xerr
+				return xerr
 			}
 		}
 
 		direction := convertDirectionFromAbstract(currentRule.Direction)
 		if direction == "" { // Invalid direction is not permitted
-			return asg, fail.InvalidRequestError("invalid value '%s' in 'Direction' field of rule #%d", currentRule.Direction, k)
+			return fail.InvalidRequestError("invalid value '%s' in 'Direction' field of rule #%d", currentRule.Direction, k)
 		}
 
 		var (
@@ -425,16 +427,16 @@ func (instance stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasa
 			involved = currentRule.Sources
 			usesGroups, xerr = currentRule.SourcesConcernGroups()
 			if xerr != nil {
-				return nil, xerr
+				return xerr
 			}
 		case securitygroupruledirection.Egress:
 			involved = currentRule.Targets
 			usesGroups, xerr = currentRule.TargetsConcernGroups()
 			if xerr != nil {
-				return nil, xerr
+				return xerr
 			}
 		default:
-			return nil, fail.InvalidParameterError("in.Direction", "contains an unsupported value")
+			return fail.InvalidParameterError("in.Direction", "contains an unsupported value")
 		}
 
 		etherType := convertEtherTypeFromAbstract(currentRule.EtherType)
@@ -481,7 +483,7 @@ func (instance stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasa
 					NormalizeError,
 				)
 				if xerr != nil {
-					return asg, xerr
+					return xerr
 				}
 			}
 		} else {
@@ -500,33 +502,31 @@ func (instance stack) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasa
 					NormalizeError,
 				)
 				if xerr != nil {
-					return asg, xerr
+					return xerr
 				}
 			}
 		}
 		asg.Rules = append(asg.Rules, currentRule)
 	}
-	return asg, nil
+	return nil
 }
 
 // DeleteRulesFromSecurityGroup deletes rules from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (instance stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, ferr fail.Error) {
+func (instance stack) DeleteRulesFromSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) (ferr fail.Error) {
 	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
+	}
+	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
+	if xerr != nil {
+		return xerr
+	}
+	if !asg.IsComplete() {
+		return fail.InconsistentError("asg is not cmplete")
 	}
 
-	var xerr fail.Error
-	asg, _, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if !asg.IsConsistent() {
-		asg, xerr = instance.InspectSecurityGroup(ctx, asg.ID)
-		if xerr != nil {
-			return asg, xerr
-		}
-	}
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.huaweicloud"), "(%s)", sgLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
 	for idx, currentRule := range rules {
 		index, xerr := asg.Rules.IndexOfEquivalentRule(currentRule)
@@ -537,7 +537,7 @@ func (instance stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam 
 				debug.IgnoreError(xerr)
 				continue
 			}
-			return asg, xerr
+			return xerr
 		}
 
 		ruleIDs := asg.Rules[index].IDs
@@ -566,11 +566,11 @@ func (instance stack) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam 
 			NormalizeError,
 		)
 		if xerr != nil {
-			return asg, fail.Wrap(xerr, "failed to delete rule #%d", idx)
+			return fail.Wrap(xerr, "failed to delete rule #%d", idx)
 		}
 	}
 
-	return asg, nil
+	return nil
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts

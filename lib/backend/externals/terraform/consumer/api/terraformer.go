@@ -42,7 +42,7 @@ type (
 
 	Terraformer interface {
 		Apply(ctx context.Context, def string) (map[string]tfexec.OutputMeta, fail.Error)
-		Assemble(resources ...Resource) (string, fail.Error)
+		Assemble(ctx context.Context, resources ...Resource) (string, fail.Error)
 		Close() fail.Error
 		Destroy(ctx context.Context, def string, opts ...options.Option) fail.Error
 		// Import(ctx context.Context, resourceAddress, id string) fail.Error
@@ -62,7 +62,7 @@ type (
 	RequiredProviders data.Map[string, RequiredProvider]
 
 	ScopeLimitedToTerraformerUse interface {
-		AllAbstracts() (map[string]Resource, fail.Error)
+		AllResources() (map[string]Resource, fail.Error)
 		IsLoaded() bool
 		LoadAbstracts(ctx context.Context) fail.Error
 	}

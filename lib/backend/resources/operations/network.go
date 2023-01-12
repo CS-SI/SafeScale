@@ -215,10 +215,11 @@ func (instance *Network) IsNull() bool {
 	return instance == nil || valid.IsNull(instance.Core)
 }
 
-// Kind returns the kind of resource
-func (instance *Network) Kind() string {
-	return networkKind
-}
+// VPL: Kind(à comes from *metadata.Core
+// // Kind returns the kind of resource
+// func (instance *Network) Kind() string {
+// 	return networkKind
+// }
 
 // Exists checks if the resource actually exists in provider side (not in metadata)
 func (instance *Network) Exists(ctx context.Context) (bool, fail.Error) {

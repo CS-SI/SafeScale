@@ -237,14 +237,14 @@ func (s Remediator) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Se
 	return groups, xerr
 }
 
-func (s Remediator) ClearSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) ClearSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	groups, xerr := s.Provider.ClearSecurityGroup(ctx, sgParam)
+	xerr := s.Provider.ClearSecurityGroup(ctx, asg)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
-	return groups, xerr
+	return xerr
 }
 
 func (s Remediator) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) (ferr fail.Error) {
@@ -257,24 +257,24 @@ func (s Remediator) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.Sec
 	return xerr
 }
 
-func (s Remediator) AddRulesToSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) AddRulesToSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	group, xerr := s.Provider.AddRulesToSecurityGroup(ctx, sgParam, rules...)
+	xerr := s.Provider.AddRulesToSecurityGroup(ctx, asg, rules...)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
-	return group, xerr
+	return xerr
 }
 
-func (s Remediator) DeleteRulesFromSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, rules ...*abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Remediator) DeleteRulesFromSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup, rules ...*abstract.SecurityGroupRule) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	group, xerr := s.Provider.DeleteRulesFromSecurityGroup(ctx, sgParam, rules...)
+	xerr := s.Provider.DeleteRulesFromSecurityGroup(ctx, asg, rules...)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
-	return group, xerr
+	return xerr
 }
 
 func (s Remediator) GetDefaultSecurityGroupName(ctx context.Context) (_ string, ferr fail.Error) {
@@ -575,20 +575,20 @@ func (s Remediator) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIde
 	return host, xerr
 }
 
-func (s Remediator) BindSecurityGroupToHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
+func (s Remediator) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Provider.BindSecurityGroupToHost(ctx, sgParam, hostParam)
+	xerr := s.Provider.BindSecurityGroupToHost(ctx, asg, ahf)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
 	return xerr
 }
 
-func (s Remediator) UnbindSecurityGroupFromHost(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier, hostParam iaasapi.HostIdentifier) (ferr fail.Error) {
+func (s Remediator) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Provider.UnbindSecurityGroupFromHost(ctx, sgParam, hostParam)
+	xerr := s.Provider.UnbindSecurityGroupFromHost(ctx, asg, ahf)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}

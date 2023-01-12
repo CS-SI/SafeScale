@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -803,13 +804,7 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules ...*abstract.
 			}
 		}
 
-		svc := instance.Service()
-		_, inErr := svc.AddRulesToSecurityGroup(ctx, asg, rules...)
-		if inErr != nil {
-			return inErr
-		}
-
-		return nil
+		return instance.Service().AddRulesToSecurityGroup(ctx, asg, rules...)
 	})
 }
 
@@ -840,7 +835,7 @@ func (instance *SecurityGroup) DeleteRules(ctx context.Context, rules ...*abstra
 			return fail.Wrap(innerErr)
 		}
 
-		_, innerXErr := instance.Service().DeleteRulesFromSecurityGroup(ctx, asg, rules...)
+		innerXErr := instance.Service().DeleteRulesFromSecurityGroup(ctx, asg, rules...)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
@@ -960,33 +955,47 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 		return fail.InvalidParameterError("hostInstance", "cannot be nil")
 	}
 
-	sgid, err := instance.GetID()
-	if err != nil {
-		return fail.ConvertError(err)
-	}
+	return metadata.Alter(ctx, hostInstance, func(ahc *abstract.HostCore, _ *serialize.JSONProperties) fail.Error {
+		entry, innerXErr := instance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
+		if innerXErr != nil {
+			return innerXErr
+		}
 
-	return metadata.AlterProperty(ctx, instance, securitygroupproperty.HostsV1, func(sgphV1 *propertiesv1.SecurityGroupHosts) fail.Error {
-		// Unbind security group on provider side; if not found, considered as a success
-		hostID, innerErr := hostInstance.GetID()
+		ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
 
-		innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgid, hostID)
-		if innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				debug.IgnoreErrorWithContext(ctx, innerXErr)
-				return nil
-			default:
-				return innerXErr
-			}
-		}
+		return metadata.Alter(ctx, instance, func(asg *abstract.SecurityGroup, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+				sgphV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
 
-		// updates security group properties
-		delete(sgphV1.ByID, hostID)
-		delete(sgphV1.ByName, hostInstance.GetName())
-		return nil
+				// Unbind security group on provider side; if not found, considered as a success
+				hostID, innerErr := hostInstance.GetID()
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahf)
+				if innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						debug.IgnoreErrorWithContext(ctx, innerXErr)
+						return nil
+					default:
+						return innerXErr
+					}
+				}
+
+				// updates security group properties
+				delete(sgphV1.ByID, hostID)
+				delete(sgphV1.ByName, hostInstance.GetName())
+				return nil
+			})
+		})
 	})
 }
 
@@ -1001,45 +1010,68 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if hostRef == "" {
-		return fail.InvalidParameterError("hostRef", "cannot be empty string")
+		return fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 
-	sgid, err := instance.GetID()
-	if err != nil {
-		return fail.ConvertError(err)
+	hostInstance, xerr := LoadHost(ctx, hostRef)
+	if xerr != nil {
+		return xerr
 	}
 
-	return instance.AlterProperty(ctx, securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-		sgphV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
-		}
+	return metadata.Alter(ctx, instance, func(asg *abstract.SecurityGroup, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+			sgphV1, err := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
+			if err != nil {
+				return fail.Wrap(err)
+			}
 
-		var hostID, hostName string
-		b, ok := sgphV1.ByID[hostRef]
-		if ok {
-			hostID = hostRef
-			hostName = b.Name
-		} else if hostID, ok = sgphV1.ByName[hostRef]; ok {
-			hostName = hostRef
-		}
-		if hostID != "" {
-			// Unbind security group on provider side; if not found, considered as a success
-			if innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgid, hostID); innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-					debug.IgnoreError(innerXErr)
+			var hostID, hostName string
+			b, ok := sgphV1.ByID[hostRef]
+			if ok {
+				hostID = hostRef
+				hostName = b.Name
+			} else {
+				hostID, ok = sgphV1.ByName[hostRef]
+				if ok {
+					hostName = hostRef
+				}
+			}
+			if hostID != "" {
+				innerXErr := metadata.Alter(ctx, hostInstance, func(ahc *abstract.HostCore, _ *serialize.JSONProperties) fail.Error {
+					entry, innerXErr := instance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
+					if innerXErr != nil {
+						return innerXErr
+					}
+
+					ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
+					}
+
+					// Unbind security group on provider side; if not found, considered as a success
+					innerXErr = instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahf)
+					if innerXErr != nil {
+						switch innerXErr.(type) {
+						case *fail.ErrNotFound:
+							debug.IgnoreError(innerXErr)
+							return nil
+						default:
+							return innerXErr
+						}
+					}
+
 					return nil
-				default:
+				})
+				if innerXErr != nil {
 					return innerXErr
 				}
 			}
-		}
 
-		// updates security group properties
-		delete(sgphV1.ByID, hostID)
-		delete(sgphV1.ByName, hostName)
-		return nil
+			// updates security group properties
+			delete(sgphV1.ByID, hostID)
+			delete(sgphV1.ByName, hostName)
+			return nil
+		})
 	})
 }
 

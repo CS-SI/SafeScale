@@ -472,6 +472,7 @@ func (instance *SecurityGroup) IsConsistent() bool {
 	if instance.IsNull() {
 		return false
 	}
+
 	return true
 }
 
@@ -481,7 +482,7 @@ func (instance *SecurityGroup) IsComplete() bool {
 		return false
 	}
 
-	return instance.ID != "" && (instance.Name != "" && instance.Name != Unnamed) && instance.Network != ""
+	return instance.core.IsComplete() && instance.ID != "" && instance.Network != ""
 }
 
 // SetID sets the value of field ID in sg

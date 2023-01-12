@@ -19,6 +19,10 @@ package operations
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -51,11 +55,6 @@ func (instance *SecurityGroup) taskUnbindFromHost(inctx context.Context, params 
 		return nil, fail.ConvertError(err)
 	}
 
-	hid, err := hostInstance.GetID()
-	if err != nil {
-		return nil, fail.ConvertError(err)
-	}
-
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -67,30 +66,43 @@ func (instance *SecurityGroup) taskUnbindFromHost(inctx context.Context, params 
 	go func() {
 		defer close(chRes)
 
-		// Unbind Security Group from Host on provider side
-		xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, sgID, hid)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// if the security group is not bound to the host, considered as a success and continue
-				debug.IgnoreErrorWithContext(ctx, xerr)
-			default:
-				chRes <- result{nil, xerr}
-				return
+		xerr := metadata.Alter(ctx, hostInstance, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
+			entry, innerXErr := instance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
+			if innerXErr != nil {
+				return innerXErr
 			}
-		}
 
-		// Updates host metadata regarding Security Groups
-		xerr = hostInstance.AlterProperty(ctx, hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-			hsgV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
+			ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
 
-			delete(hsgV1.ByID, sgID)
-			delete(hsgV1.ByName, instance.GetName())
-			return nil
+			return metadata.Alter(ctx, instance, func(asg *abstract.SecurityGroup, _ *serialize.JSONProperties) fail.Error {
+				// Unbind Security Group from Host on provider side
+				innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahf)
+				innerXErr = debug.InjectPlannedFail(innerXErr)
+				if innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						// if the security group is not bound to the host, considered as a success and continue
+						debug.IgnoreErrorWithContext(ctx, innerXErr)
+					default:
+						return innerXErr
+					}
+				}
+
+				// Updates host metadata regarding Security Groups
+				return props.Alter(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+					hsgV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
+					}
+
+					delete(hsgV1.ByID, sgID)
+					delete(hsgV1.ByName, instance.GetName())
+					return nil
+				})
+			})
 		})
 		chRes <- result{nil, xerr}
 	}()

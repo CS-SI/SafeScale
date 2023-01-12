@@ -88,6 +88,23 @@ func (c *core) IsNull() bool {
 	return c == nil || len(c.Tags) == 0
 }
 
+// IsComplete tells if the content of instance is sufficient to be considered complete, ie can be used confidently
+func (c *core) IsComplete() bool {
+	if c == nil {
+		return false
+	}
+
+	if c.Name == "" || c.Name == Unnamed || c.kind == "" {
+		return false
+	}
+
+	if c.useTerraform && c.terraformSnippet == "" {
+		return false
+	}
+
+	return true
+}
+
 // Clone ...
 // satisfies interface clonable.Clonable
 func (c *core) Clone() (clonable.Clonable, error) {
@@ -119,6 +136,14 @@ func (c *core) Replace(p clonable.Clonable) error {
 	}
 
 	*c = *src
+	c.Tags = src.Tags.Clone()
+	c.terraformTypes = make([]string, 0, len(src.terraformTypes))
+	copy(c.terraformTypes, src.terraformTypes)
+	c.extra = make(map[string]any, len(src.extra))
+	for k, v := range src.extra {
+		c.extra[k] = v
+	}
+
 	return nil
 }
 
@@ -161,8 +186,8 @@ func (c *core) TerraformTypes() []string {
 // 	return nil
 // }
 
-// // AllAbstracts returns the scope
-// func (c *Core) AllAbstracts(ctx context.Context) ([]terraformerapi.Resource, fail.Error) {
+// // AllResources returns the scope
+// func (c *Core) AllResources(ctx context.Context) ([]terraformerapi.Resource, fail.Error) {
 // 	if valid.IsNull(c) {
 // 		return nil, fail.InvalidInstanceError()
 // 	}
@@ -177,7 +202,7 @@ func (c *core) TerraformTypes() []string {
 // 		return nil, fail.InconsistentError("failed to cast '%s' to 'ScopeLimitedToAbstractUse'", reflect.TypeOf(scope).String())
 // 	}
 //
-// 	return castedScope.AllAbstracts()
+// 	return castedScope.AllResources()
 // }
 
 func (c *core) GetName() string {

@@ -1,3 +1,4 @@
+{{- if not .Extra.MarkedForDestruction }}
 resource "openstack_compute_volume_attach_v2" "{{ .Resource.Name }}" {
     provider    = openstack.ovh
     instance_id = "{{ .Resource.HostID }}"
@@ -6,12 +7,13 @@ resource "openstack_compute_volume_attach_v2" "{{ .Resource.Name }}" {
     tenant_id   = "{{ .Provider.Authentication.TenantID }}"
 
     lifecycle {
-{{- if and (not .Extra.MarkedForCreation) (not .Extra.MarkedForDestruction) }}
+{{-   if not .Extra.MarkedForCreation }}
         prevent_destroy = true
-{{- end }}
+{{-   end }}
     }
 }
 
 output "volume_attach_{{ .Username.Name }}_id" {
     value = "${openstack_compute_volume_attach_v2.{{ .Resource.Name }}.id}"
 }
+{{- end }}
