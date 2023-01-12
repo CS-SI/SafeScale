@@ -115,7 +115,7 @@ func RenderFeature(inctx context.Context, feat Feature) (string, fail.Error) {
 			merged = append(merged, "\n")
 
 			for _, v := range strings.Split(boo, ",") {
-				sk := foo[v].(map[string]interface{})
+				sk, _ := foo[v].(map[string]interface{}) // nolint
 				choices := strings.ReplaceAll(sk["run"].(string), "sfExit\n", "\n")
 				merged = append(merged, choices)
 			}
