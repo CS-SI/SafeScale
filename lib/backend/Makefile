@@ -4,6 +4,8 @@ include ../../common.mk
 
 all:	lib/backend/iaas lib/backend/resources
 
+minimock: generate
+
 generate: clean
 	@(mkdir -p mocks) || true
 	@(cd iaas && $(MAKE) $@)
