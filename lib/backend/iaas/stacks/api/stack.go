@@ -166,6 +166,9 @@ type Stack interface {
 	// UpdateTags updates provider's tags
 	UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error
 
+	// ListTags list provider's tags
+	ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error)
+
 	// DeleteTags removes provider's tags
 	DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error
 }

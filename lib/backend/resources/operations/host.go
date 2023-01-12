@@ -4468,7 +4468,7 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 		return xerr
 	}
 
-	lmap, err := labelToMap(labelInstance)
+	lmap, err := labelToMap(labelInstance, value)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
@@ -4482,14 +4482,10 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 	return nil
 }
 
-func labelToMap(labelInstance resources.Label) (map[string]string, error) {
+func labelToMap(labelInstance resources.Label, value string) (map[string]string, error) {
 	sad := make(map[string]string)
 	k := labelInstance.GetName()
-	v, err := labelInstance.DefaultValue(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	sad[k] = v
+	sad[k] = value
 
 	return sad, nil
 }
