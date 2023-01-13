@@ -28,11 +28,11 @@ As a Security Group is owned by a Network, the command to create/delete/add rule
 - safescale network security group inspect my-net my-security-group
 - safescale network security group bonds my-net my-security-group
 
-## What happens when a Security Group is bound to a Subnet
+## What happen when a Security Group is bound to a Subnet
 
 The Security Group is bound to all the Hosts registered as attached to the Subnet (using SafeScale metadata).
 
-## What happens when a Security Group is bound to a Host
+## What happen when a Security Group is bound to a Host
 
 The Security Group is registered as used by the Host, and its rules are applied to the Host.
 
@@ -44,9 +44,9 @@ When a Security Group is bound to a Host, the rules contained in the Security Gr
 
 ### Open and close port in the gateway
 
-Imagine you want to accept traffic on gateway on port 8000 from internet :
+Imagine you want to accept traffic on gataway on port 8000 from internet :
 
-First create a network with subnet and gateway :
+First create a network with subnet and gataway :
 
 ```bash
 $ safescale network create my-net
