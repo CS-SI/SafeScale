@@ -1597,7 +1597,6 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 		return fail.ConvertError(err)
 	}
 
-	svc := instance.Service()
 	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractSubnet, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -1647,16 +1646,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 				return fail.NotFoundError("security group '%s' is not binded to Subnet '%s'", sgInstance.GetName(), snid)
 			}
 
-			// Do security group stuff to enable it
-			caps, xerr := svc.GetCapabilities(ctx)
-			if xerr != nil {
-				return xerr
-			}
-			if caps.CanDisableSecurityGroup {
-				if innerXErr = svc.EnableSecurityGroup(ctx, asg); innerXErr != nil {
-					return innerXErr
-				}
-			} else {
+			{
 				sgInstanceImpl, ok := sgInstance.(*SecurityGroup)
 				if !ok {
 					return fail.InconsistentError("failed to cast sgInstance to '*SecurityGroup'")
@@ -1699,7 +1689,6 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 		return fail.ConvertError(err)
 	}
 
-	svc := instance.Service()
 	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractSubnet, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -1743,15 +1732,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance res
 				return fail.NotFoundError("security group '%s' is not bound to Subnet '%s'", sgInstance.GetName(), snid)
 			}
 
-			caps, xerr := svc.GetCapabilities(ctx)
-			if xerr != nil {
-				return xerr
-			}
-			if caps.CanDisableSecurityGroup {
-				if innerXErr = svc.DisableSecurityGroup(ctx, abstractSG); innerXErr != nil {
-					return innerXErr
-				}
-			} else {
+			{
 				// Do security group stuff to disable it
 				sgInstanceImpl, ok := sgInstance.(*SecurityGroup)
 				if !ok {

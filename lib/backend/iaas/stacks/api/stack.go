@@ -71,10 +71,6 @@ type Stack interface {
 	DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// GetDefaultSecurityGroupName returns the name of the default security group automatically bound to new host
 	GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error)
-	// EnableSecurityGroup enables a Security Group
-	EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error
-	// DisableSecurityGroup disables a Security Group
-	DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error
 
 	// CreateNetwork creates a network named name
 	CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (*abstract.Network, fail.Error)

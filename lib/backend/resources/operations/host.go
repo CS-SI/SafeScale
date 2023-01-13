@@ -4136,17 +4136,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, hid)
 			}
 
-			caps, xerr := svc.GetCapabilities(ctx)
-			if xerr != nil {
-				return xerr
-			}
-			if caps.CanDisableSecurityGroup {
-				xerr = svc.EnableSecurityGroup(ctx, asg)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return xerr
-				}
-			} else {
+			{
 				// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), considered as a success
 				xerr = svc.BindSecurityGroupToHost(ctx, asg, hid)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -4234,17 +4224,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgID)
 			}
 
-			caps, xerr := svc.GetCapabilities(ctx)
-			if xerr != nil {
-				return xerr
-			}
-			if caps.CanDisableSecurityGroup {
-				xerr = svc.DisableSecurityGroup(ctx, asg)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return xerr
-				}
-			} else {
+			{
 				// Bind the security group on provider side; if security group not binded, considered as a success
 				xerr = svc.UnbindSecurityGroupFromHost(ctx, asg, hid)
 				xerr = debug.InjectPlannedFail(xerr)
