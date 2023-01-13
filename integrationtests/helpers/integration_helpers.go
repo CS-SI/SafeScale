@@ -66,6 +66,16 @@ type SgRule struct {
 	PortTo      int      `json:"port_to"`
 }
 
+type HostSgLs struct {
+	Result []SgLs `json:"result"`
+	Status string `json:"status"`
+}
+
+type SgLs struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // IsSafescaledLaunched ...
 func IsSafescaledLaunched() (bool, error) {
 	cmd := "ps -ef | grep safescaled | grep -v grep"
