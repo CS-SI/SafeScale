@@ -1643,36 +1643,6 @@ REVIEW_ME:
       </pre>
   </td>
 </tr>
-<tr>
-  <td><code>safescale [global_options] host security group disable &lt;host_name_or_id&gt; &lt;securitygroup_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Disables a Security Group bound to an Host, the rules of the Security Group are then not being appliedd.<br><br>
-      example:
-      <pre>$ safescale host security group disable example_host sg_for_some_hosts</pre>
-      response on success:
-      <pre>
-{
-      </pre>
-      response on failure:
-      <pre>
-{
-      </pre>
-  </td>
-</tr>
-<tr>
-  <td><code>safescale [global_options] host security group enable &lt;host_name_or_id&gt; &lt;securitygroup_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Enables a Security Group bound to an Host, the rules of the Security Group are then being applied.<br><br>
-      example:
-      <pre>$ safescale host security group enable example_host sg-for-some-hosts</pre>
-      response on success:
-      <pre>
-{
-      </pre>
-      response on failure:
-      <pre>
-{
-      </pre>
-  </td>
-</tr>
 </tbody>
 </table>
 
