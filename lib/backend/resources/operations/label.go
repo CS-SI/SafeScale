@@ -414,7 +414,23 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "('%s', '%s')", instance.GetName(), hostInstance.GetName()).Entering()
 	defer tracer.Exiting()
 
-	xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := hostInstance.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		ahc, ok := clonable.(*abstract.HostCore)
+		if !ok {
+			return fail.InconsistentError(
+				"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
+			)
+		}
+
+		ahc.Tags[instance.GetName()] = value
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		alabel, ok := clonable.(*abstract.Label)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -469,7 +485,23 @@ func (instance *label) UnbindFromHost(ctx context.Context, hostInstance resource
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "(label='%s', host='%s')", instance.GetName(), hostInstance.GetName()).Entering()
 	defer tracer.Exiting()
 
-	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := hostInstance.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		ahc, ok := clonable.(*abstract.HostCore)
+		if !ok {
+			return fail.InconsistentError(
+				"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
+			)
+		}
+
+		delete(ahc.Tags, instance.GetName())
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			labelHostsV1, ok := clonable.(*propertiesv1.LabelHosts)
 			if !ok {
