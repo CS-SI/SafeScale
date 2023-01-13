@@ -582,12 +582,6 @@ func EnableDisableListHostSecurityGroup(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	out, err = helpers.GetOutput(fmt.Sprintf("safescale host security group enable %s %s", tn, sgName))
-	fmt.Println(out)
-	require.Nil(t, err)
-
-	time.Sleep(5 * time.Second)
-
 	// if it's open won't fail
 	resp, err = http.Get(fmt.Sprintf("http://%s:7777", pubip))
 	require.Nil(t, err)
