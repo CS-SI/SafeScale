@@ -384,6 +384,6 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
 func (s stack) GetDefaultSecurityGroupName(context.Context) (string, fail.Error) {
-	// FIXME: OPP Are you fucking kidding me ??
+	// TODO, check this
 	return "", nil
 }
