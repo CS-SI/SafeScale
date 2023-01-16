@@ -41,6 +41,9 @@ type AnyPropertyCallback = PropertyCallback[clonable.Clonable]
 
 // Metadata contains the core functions of a persistent object
 type Metadata interface {
+	clonable.Clonable
+
+	core() (*Core, fail.Error)
 	IsNull() bool
 	Alter(ctx context.Context, callback AnyResourceCallback, opts ...options.Option) fail.Error                            // protects the data for exclusive write
 	AlterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error   // protects the data for exclusive write

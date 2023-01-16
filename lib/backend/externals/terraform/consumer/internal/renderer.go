@@ -21,7 +21,6 @@ import (
 	"context"
 	"embed"
 	"errors"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -270,7 +269,7 @@ const mainFilename = "main.tf"
 // createFile creates the file in the appropriate path for terraform to execute it
 func (instance *renderer) createMainFile(content string) fail.Error {
 	instance.lastFilename = filepath.Join(instance.buildPath, mainFilename)
-	err := ioutil.WriteFile(instance.lastFilename, []byte(content), 0600)
+	err := os.WriteFile(instance.lastFilename, []byte(content), 0600)
 	if err != nil {
 		return fail.Wrap(err, "failed to create terraform file '%s'", instance.lastFilename)
 	}

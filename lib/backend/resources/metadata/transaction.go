@@ -26,24 +26,25 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/result"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 )
 
-type transaction[T clonable.Clonable] struct {
-	mu             *sync.Mutex // used for concurrency-safety
-	original       T           // contains the original instance on which the transaction applies
-	castedOriginal *Core       // is used to propagate some methods of 'original' to transaction
-	changes        T           // contains the instance with changes
-	castedChanges  *Core
-	dirty          bool // tells there have been changes
-	closed         bool // tells the transaction is closed
+type transaction[T Metadata] struct {
+	mu           *sync.Mutex // used for concurrency-safety
+	original     T           // contains the original instance on which the transaction applies
+	coreOriginal *Core       // is used to propagate some methods of 'original' to transaction
+	changes      T           // contains the instance with changes
+	coreChanges  *Core
+	dirty        bool // tells there have been changes
+	closed       bool // tells the transaction is closed
 }
 
 // NewTransaction creates a transaction
-func NewTransaction[T clonable.Clonable](ctx context.Context, original T) (*transaction[T], fail.Error) {
+func NewTransaction[T Metadata](ctx context.Context, original T) (*transaction[T], fail.Error) {
 	if valid.IsNil(original) {
 		return nil, fail.InvalidParameterCannotBeNilError("original")
 	}
@@ -52,20 +53,20 @@ func NewTransaction[T clonable.Clonable](ctx context.Context, original T) (*tran
 	}
 
 	// -- make sure the parameter is correctly composed
-	castedOriginal, err := lang.Cast[*Core](original)
-	if err != nil {
-		return nil, fail.InvalidParameterError("original must be composed with '*metadata.Core'")
+	coreOriginal, xerr := original.core()
+	if xerr != nil {
+		return nil, xerr
 	}
-	if castedOriginal.properties == nil {
+	if coreOriginal.properties == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("original.properties")
 	}
 
 	// -- RLock original instance to prevent other concurrent changes (but still allowing inspection)
-	castedOriginal.lock.RLock()
+	coreOriginal.lock.RLock()
 
 	// -- Reload reloads data from object storage to be sure to have the last revision
 
-	xerr := castedOriginal.unsafeReload(ctx)
+	xerr = coreOriginal.reload(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to reload metadata")
@@ -73,20 +74,17 @@ func NewTransaction[T clonable.Clonable](ctx context.Context, original T) (*tran
 
 	// -- creates transaction instance
 	trx := &transaction[T]{
-		mu:             &sync.Mutex{},
-		original:       original,
-		castedOriginal: castedOriginal,
+		mu:           &sync.Mutex{},
+		original:     original,
+		coreOriginal: coreOriginal,
 	}
+	var err error
 	trx.changes, err = clonable.CastedClone[T](original)
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
 
-	trx.castedChanges, err = lang.Cast[*Core](trx.changes)
-	if err != nil {
-		return nil, fail.Wrap(err)
-	}
-
+	trx.coreChanges, _ = trx.changes.core()
 	return trx, nil
 }
 
@@ -118,19 +116,19 @@ func (trx *transaction[T]) Commit(ctx context.Context) fail.Error {
 		return nil
 	}
 
-	trx.castedOriginal.lock.RUnlock()
-	trx.castedOriginal.lock.Lock()
+	trx.coreOriginal.lock.RUnlock()
+	trx.coreOriginal.lock.Lock()
 	err := trx.original.Replace(trx.changes)
 	if err != nil {
-		trx.castedOriginal.lock.Unlock()
-		trx.castedOriginal.lock.RLock()
+		trx.coreOriginal.lock.Unlock()
+		trx.coreOriginal.lock.RLock()
 		return fail.Wrap(err)
 	}
 
-	trx.castedOriginal.committed = false
-	xerr := trx.castedOriginal.write(ctx)
-	trx.castedOriginal.lock.Unlock()
-	trx.castedOriginal.lock.RLock()
+	trx.coreOriginal.committed = false
+	xerr := trx.coreOriginal.write(ctx)
+	trx.coreOriginal.lock.Unlock()
+	trx.coreOriginal.lock.RLock()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -172,7 +170,7 @@ func (trx *transaction[T]) Close(ctx context.Context) fail.Error {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
-	trx.castedOriginal.lock.RUnlock()
+	trx.coreOriginal.lock.RUnlock()
 	if trx.closed {
 		return nil
 	}
@@ -187,6 +185,14 @@ func (trx *transaction[T]) Close(ctx context.Context) fail.Error {
 	return nil
 }
 
+// SilentClose is identical to Close() except it does not return any error, only log it
+func (trx *transaction[T]) SilentClose(ctx context.Context) {
+	xerr := trx.Close(ctx)
+	if xerr != nil {
+		logrus.WithContext(ctx).Error(xerr.Error())
+	}
+}
+
 // Service returns the iaasapi.Service used to create/load the persistent object
 func (trx *transaction[T]) Service() iaasapi.Service {
 	if trx == nil {
@@ -196,7 +202,7 @@ func (trx *transaction[T]) Service() iaasapi.Service {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
-	return trx.castedOriginal.Service()
+	return trx.coreOriginal.Service()
 }
 
 func (trx *transaction[T]) Job() jobapi.Job {
@@ -207,7 +213,7 @@ func (trx *transaction[T]) Job() jobapi.Job {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
-	return trx.castedOriginal.Job()
+	return trx.coreOriginal.Job()
 }
 
 // GetID returns the id of the data protected
@@ -220,7 +226,7 @@ func (trx *transaction[T]) GetID() (string, error) {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
-	return trx.castedOriginal.GetID()
+	return trx.coreOriginal.GetID()
 }
 
 // GetName returns the name of the data protected
@@ -234,7 +240,7 @@ func (trx *transaction[T]) GetName() string {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
-	return trx.castedOriginal.GetName()
+	return trx.coreOriginal.GetName()
 }
 
 func (trx *transaction[T]) IsTaken() bool {
@@ -245,7 +251,7 @@ func (trx *transaction[T]) IsTaken() bool {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
-	return trx.castedOriginal.IsTaken()
+	return trx.coreOriginal.IsTaken()
 }
 
 // Kind returns the kind of object served
@@ -258,7 +264,7 @@ func (trx *transaction[T]) Kind() string {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
-	return trx.castedOriginal.Kind()
+	return trx.coreOriginal.Kind()
 }
 
 // Inspect protects the data for shared read
@@ -277,7 +283,68 @@ func (trx *transaction[T]) Inspect(inctx context.Context, callback AnyResourceCa
 		return fail.NotAvailableError("transaction is closed")
 	}
 
-	return trx.castedChanges.inspect(inctx, callback, opts...)
+	return trx.inspect(inctx, callback, opts...)
+}
+
+// inspect ...
+func (trx *transaction[T]) inspect(inctx context.Context, callback AnyResourceCallback, _ ...options.Option) (_ fail.Error) {
+	if trx.coreChanges.properties == nil {
+		return fail.InvalidInstanceContentError("trx.coreChanges.properties", "cannot be nil")
+	}
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	// type result struct {
+	// 	rErr fail.Error
+	// }
+	chRes := make(chan result.Holder[struct{}])
+	go func() {
+		defer close(chRes)
+		gerr := func() (ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			var xerr fail.Error
+
+			timings, xerr := trx.coreChanges.Service().Timings()
+			if xerr != nil {
+				return xerr
+			}
+
+			trx.coreChanges.lock.RLock()
+			defer trx.coreChanges.lock.RUnlock()
+
+			xerr = retry.WhileUnsuccessfulWithLimitedRetries(
+				func() error {
+					select {
+					case <-ctx.Done():
+						return retry.StopRetryError(ctx.Err())
+					default:
+					}
+
+					return trx.coreChanges.shielded.Inspect(func(p clonable.Clonable) fail.Error {
+						return callback(p, trx.coreChanges.properties)
+					})
+				},
+				timings.SmallDelay(),
+				timings.ConnectionTimeout(),
+				6,
+			)
+			if xerr != nil {
+				return fail.ConvertError(xerr.Cause())
+			}
+			return nil
+		}()
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
+	}()
+	select {
+	case res := <-chRes:
+		return fail.Wrap(res.Error())
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
+	}
 }
 
 // InspectCarried ...
@@ -308,7 +375,7 @@ func (trx *transaction[T]) Review(inctx context.Context, callback AnyResourceCal
 	}
 
 	opts = append(opts, WithoutReload())
-	return trx.castedChanges.inspect(inctx, callback, opts...)
+	return trx.inspect(inctx, callback, opts...)
 }
 
 // ReviewCarried ...
@@ -343,7 +410,7 @@ func (trx *transaction[T]) Alter(inctx context.Context, callback AnyResourceCall
 		return fail.NotAvailableError("transaction is closed")
 	}
 
-	xerr := trx.castedChanges.alter(inctx, callback, opts...)
+	xerr := trx.alter(inctx, callback, opts...)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
@@ -356,6 +423,78 @@ func (trx *transaction[T]) Alter(inctx context.Context, callback AnyResourceCall
 
 	trx.dirty = true
 	return nil
+}
+
+// alter protects the data for exclusive write
+// Valid options are :
+// - WithoutReload() = disable reloading from metadata storage
+func (trx *transaction[T]) alter(inctx context.Context, callback AnyResourceCallback, _ ...options.Option) (_ fail.Error) {
+	if trx.coreChanges.shielded == nil {
+		return fail.InvalidInstanceContentError("trx.coreChanges.shielded", "cannot be nil")
+	}
+	name, err := trx.coreChanges.getName()
+	if err != nil {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
+	}
+	if name == "" {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
+	}
+	id, err := trx.coreChanges.getID()
+	if err != nil {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
+	}
+	if id == "" {
+		return fail.InconsistentError("uninitialized metadata should not be altered")
+	}
+
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	trx.coreChanges.lock.Lock()
+	defer trx.coreChanges.lock.Unlock()
+
+	chRes := make(chan result.Holder[struct{}])
+	go func() {
+		defer close(chRes)
+		gerr := func() (ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+			var xerr fail.Error
+
+			// Make sure myself.properties is populated
+			if trx.coreChanges.properties == nil {
+				trx.coreChanges.properties, xerr = serialize.NewJSONProperties("resources." + trx.coreChanges.kind)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return xerr
+				}
+			}
+
+			xerr = trx.coreChanges.shielded.Alter(func(p clonable.Clonable) fail.Error {
+				return callback(p, trx.coreChanges.properties)
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrAlteredNothing:
+					return nil
+				default:
+					return xerr
+				}
+			}
+
+			return nil
+		}()
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
+	}()
+	select {
+	case res := <-chRes:
+		return fail.Wrap(res.Error())
+	case <-ctx.Done():
+		return fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return fail.ConvertError(inctx.Err())
+	}
 }
 
 // AlterCarried ...

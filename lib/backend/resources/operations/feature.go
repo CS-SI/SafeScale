@@ -115,6 +115,14 @@ func NewEmbeddedFeature(ctx context.Context, name string) (_ resources.Feature, 
 	return featureInstance, nil
 }
 
+func (instance *Feature) Scope() scopeapi.Scope {
+	if valid.IsNull(instance) {
+		return nil
+	}
+
+	return instance.scope
+}
+
 // IsNull tells if the instance represents a null value
 func (instance *Feature) IsNull() bool {
 	return instance == nil || instance.file == nil
@@ -129,14 +137,6 @@ func (instance *Feature) Clone() (clonable.Clonable, error) {
 
 	res := &Feature{}
 	return res, res.Replace(instance)
-}
-
-func (instance *Feature) Scope() scopeapi.Scope {
-	if valid.IsNull(instance) {
-		return nil
-	}
-
-	return instance.scope
 }
 
 // Replace ...

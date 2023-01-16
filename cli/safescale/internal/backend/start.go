@@ -85,7 +85,7 @@ func startBackend(cmd *cobra.Command) error {
 		if !agentStarted {
 			out := <-agentDoneCh
 			if out.Failed() {
-				return fail.Wrap(out.Error(), "failed to start Consul agent")
+				return fail.Wrap(out.Error())
 			}
 		}
 		break

@@ -215,6 +215,33 @@ func (instance *Network) IsNull() bool {
 	return instance == nil || valid.IsNull(instance.Core)
 }
 
+func (instance *Network) Clone() (clonable.Clonable, error) {
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	newInstance := &Network{}
+	return newInstance, newInstance.Replace(instance)
+}
+
+func (instance *Network) Replace(in clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return fail.InvalidParameterCannotBeNilError("in")
+	}
+
+	src, ok := in.(*Network)
+	if !ok {
+		return fail.InvalidParameterError("in must be of type '*Network'")
+	}
+
+	var err error
+	instance.Core, err = clonable.CastedClone[*metadata.Core](src.Core)
+	return err
+}
+
 // VPL: Kind(à comes from *metadata.Core
 // // Kind returns the kind of resource
 // func (instance *Network) Kind() string {
@@ -511,7 +538,19 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 		var outprops *serialize.JSONProperties
 		var networkAbstract *abstract.Network
 
-		xerr := instance.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		trx, xerr := metadata.NewTransaction(ctx, instance)
+		if xerr != nil {
+			chRes <- result{xerr}
+			return
+		}
+		defer func() {
+			derr := trx.Close(ctx)
+			if derr != nil {
+				logrus.Errorf(derr.Error())
+			}
+		}()
+
+		xerr = trx.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			var innerErr error
 			networkAbstract, innerErr = clonable.Cast[*abstract.Network](p)
 			if innerErr != nil {
@@ -539,7 +578,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 		}
 
 		var abstractNetwork *abstract.Network
-		xerr = instance.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = trx.Alter(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			var innerErr error
 			abstractNetwork, innerErr = clonable.Cast[*abstract.Network](p)
 			if innerErr != nil {
@@ -712,10 +751,21 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 				debug.IgnoreErrorWithContext(ctx, xerr)
 				// continue
 			default:
+				derr := trx.Rollback(ctx)
+				if derr != nil {
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to rollback transaction"))
+				}
 				xerr.WithContext(ctx)
 				chRes <- result{xerr}
 				return
 			}
+		}
+
+		xerr = trx.Commit(ctx)
+		if xerr != nil {
+			xerr.WithContext(ctx)
+			chRes <- result{xerr}
+			return
 		}
 
 		// Remove metadata

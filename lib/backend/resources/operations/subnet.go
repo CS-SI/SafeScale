@@ -423,6 +423,37 @@ func (instance *Subnet) IsNull() bool {
 	return instance == nil || valid.IsNil(instance.Core)
 }
 
+func (instance *Subnet) Clone() (clonable.Clonable, error) {
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	newInstance := &Subnet{}
+	return newInstance, newInstance.Replace(instance)
+}
+
+func (instance *Subnet) Replace(in clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*Subnet](in)
+	if err != nil {
+		return err
+	}
+
+	instance.Core, err = clonable.CastedClone[*metadata.Core](src.Core)
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < 2; i++ {
+		instance.localCache.gateways[i] = src.localCache.gateways[i]
+	}
+
+	return nil
+}
+
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Subnet) Exists(ctx context.Context) (bool, fail.Error) {
 	theID, err := instance.GetID()

@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sanity-io/litter"
 )
@@ -53,7 +54,7 @@ func (instance *Shielded) IsNull() bool {
 }
 
 // Clone ...
-func (instance *Shielded) Clone() (*Shielded, error) {
+func (instance *Shielded) Clone() (clonable.Clonable, error) {
 	cloned, err := instance.witness.Clone()
 	if err != nil {
 		return nil, err
@@ -62,6 +63,27 @@ func (instance *Shielded) Clone() (*Shielded, error) {
 	return NewShielded(cloned)
 }
 
+// Replace ...
+func (instance *Shielded) Replace(in clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*Shielded](in)
+	if err != nil {
+		return err
+	}
+
+	cloned, err := clonable.CastedClone[*Shielded](src.witness)
+	if err != nil {
+		return err
+	}
+
+	instance.witness = cloned
+	return nil
+}
+
+// String returns a string representation of the Shielded
 func (instance *Shielded) String() (string, error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()

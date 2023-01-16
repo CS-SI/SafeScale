@@ -21,7 +21,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,10 +31,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v22/lib/global"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/net"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -86,34 +88,58 @@ func StartAgent(ctx context.Context) (startedCh chan bool, doneCh chan Result[co
 			global.Settings.Backend.Consul.SerfWanPort = strconv.Itoa(val + 2)
 		}
 	}
+	if global.Settings.Backend.Consul.BindAddr == "" {
+		detectedIPv4, err := net.ActiveNicsWithPrivateIPv4()
+		if err != nil {
+			return nil, nil, cancelNOP, fail.Wrap(err, "failed to detect IPv4 addresses")
+		}
 
-	// creates configuration if not present
+		addresses, err := net.PrivateIPv4OfNic(detectedIPv4[0])
+		if err != nil {
+			return nil, nil, cancelNOP, fail.Wrap(err, "failed to detect IPv4 addresses")
+		}
+
+		if len(addresses) > 1 {
+			return nil, nil, cancelNOP, fail.NewError("there are more than one public IPv4 address usable to listen: please set ListenAddr in Consul configuratioon")
+		}
+
+		if len(addresses) == 0 {
+			global.Settings.Backend.Consul.BindAddr = "127.0.0.1"
+		} else {
+			global.Settings.Backend.Consul.BindAddr = addresses[0]
+		}
+	}
+
 	consulRootDir := filepath.Join(global.Settings.Folders.ShareDir, "consul")
 	consulEtcDir := filepath.Join(consulRootDir, "etc")
 	// consulVarDir := filepath.Join(consulRootDir, "var")
 	consulConfigFile := filepath.Join(consulEtcDir, "consul.hcl")
-	st, err := os.Stat(consulConfigFile)
+	file, err := os.Create(consulConfigFile)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			file, err := os.Create(consulConfigFile)
-			if err != nil {
-				return nil, nil, cancelNOP, fail.Wrap(err, "failed to create consul configuration file")
-			}
+		return nil, nil, cancelNOP, fail.Wrap(err, "failed to create consul configuration file")
+	}
 
-			_, err = file.WriteString(consulConfigTemplate)
-			if err != nil {
-				return nil, nil, cancelNOP, fail.Wrap(err, "failed to write content of consul configuration file")
-			}
+	tmplCmd, err := template.Parse(consulConfigFile, string(consulConfigTemplate))
+	err = debug.InjectPlannedError(err)
+	if err != nil {
+		return nil, nil, cancelNOP, fail.Wrap(err, "failed to parse template")
+	}
 
-			err = file.Close()
-			if err != nil {
-				return nil, nil, cancelNOP, fail.Wrap(err, "failed to close consul configuration file")
-			}
-		} else {
-			return nil, nil, cancelNOP, fail.Wrap(err, "failed to check if consul configuration file exists")
-		}
-	} else if st.IsDir() {
-		return nil, nil, cancelNOP, fail.NotAvailableError("'%s' is a directory; should be a file", consulConfigFile)
+	dataBuffer := bytes.NewBufferString("")
+	err = tmplCmd.Option("missingkey=error").Execute(dataBuffer, map[string]any{"BindAddr": global.Settings.Backend.Consul.BindAddr})
+	err = debug.InjectPlannedError(err)
+	if err != nil {
+		return nil, nil, cancelNOP, fail.Wrap(err, "failed to execute template")
+	}
+
+	_, err = file.WriteString(dataBuffer.String())
+	if err != nil {
+		return nil, nil, cancelNOP, fail.Wrap(err, "failed to write content of consul configuration file")
+	}
+
+	err = file.Close()
+	if err != nil {
+		return nil, nil, cancelNOP, fail.Wrap(err, "failed to close consul configuration file")
 	}
 
 	// Make sure to stop already running consul on start
@@ -183,6 +209,8 @@ func StartAgent(ctx context.Context) (startedCh chan bool, doneCh chan Result[co
 
 			default:
 				stdout := out.Output().Stdout()
+				stderr := out.Output().stderr
+				_ = stderr
 				if strings.Contains(stdout, "Failed to start Consul server") {
 					if strings.Contains(stdout, "bind: address already in use") {
 						xerr := fail.NewError("failed to start consul agent on port localhost:%s: address already in use", global.Settings.Backend.Consul.ServerPort)
@@ -190,6 +218,16 @@ func StartAgent(ctx context.Context) (startedCh chan bool, doneCh chan Result[co
 						doneCh <- NewResult[commandOutput](xerr, out.Output())
 						return
 					}
+				}
+				if stderr != "" {
+					if strings.Contains(stderr, "Multiple private IPv4 addresses found") {
+						xerr = fail.NewError("failed to start consul: multiple private IPv4 addresses found; please set option backend.consul.bind_addr")
+					} else {
+						xerr = fail.NewError(fmt.Sprintf("failed to start consul: %s", stderr))
+					}
+					logrus.Error(xerr.Error())
+					doneCh <- NewResult[commandOutput](xerr, out.Output())
+					return
 				}
 
 				if i < maxRetries {

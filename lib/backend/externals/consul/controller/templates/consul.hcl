@@ -2,6 +2,7 @@ ui_config {
   enabled = true
 }
 log_level = "INFO"
+bind_addr = "{{ .BindAddr }}"
 addresses {
   http = "0.0.0.0"
 }

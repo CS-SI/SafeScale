@@ -30,7 +30,7 @@ import (
 type Holder[T any] interface {
 	Successful() (bool, fail.Error)
 	Completed() (bool, fail.Error)
-	Error() (error, fail.Error)
+	Error() error
 	ErrorMessage() (string, fail.Error)
 }
 
@@ -95,12 +95,12 @@ func (r *holder[T]) Completed() (bool, fail.Error) {
 	return r.completed, nil
 }
 
-func (r *holder[T]) Error() (error, fail.Error) {
+func (r *holder[T]) Error() error {
 	if valid.IsNull(r) {
-		return nil, fail.InvalidInstanceError()
+		return nil
 	}
 
-	return r.err, nil
+	return r.err
 }
 
 func (r *holder[T]) ErrorMessage() (string, fail.Error) {

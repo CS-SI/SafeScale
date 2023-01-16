@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 
 	"github.com/eko/gocache/v2/store"
 	"github.com/sanity-io/litter"
@@ -479,6 +480,45 @@ func (instance *Cluster) updateCachedInformation(inctx context.Context) fail.Err
 // IsNull tells if the instance should be considered as a null value
 func (instance *Cluster) IsNull() bool {
 	return instance == nil || valid.IsNil(instance.Core)
+}
+
+func (instance *Cluster) Clone() (clonable.Clonable, error) {
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	newInstance, xerr := NewCluster(context.Background())
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return newInstance, newInstance.Replace(instance)
+}
+
+func (instance *Cluster) Replace(in clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*Cluster](in)
+	if err != nil {
+		return err
+	}
+
+	instance.Core, err = clonable.CastedClone[*metadata.Core](src.Core)
+	if err != nil {
+		return err
+	}
+
+	instance.localCache.installMethods = src.localCache.installMethods
+	instance.localCache.makers = src.localCache.makers
+
+	instance.machines = make(map[string]resources.Host, len(src.machines))
+	for k, v := range src.machines {
+		instance.machines[k] = v
+	}
+
+	return nil
 }
 
 // carry ...

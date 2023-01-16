@@ -218,6 +218,29 @@ func (instance *SecurityGroup) IsNull() bool {
 	return instance == nil || valid.IsNil(instance.Core)
 }
 
+func (instance *SecurityGroup) Clone() (clonable.Clonable, error) {
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	newInstance := &SecurityGroup{}
+	return newInstance, newInstance.Replace(instance)
+}
+
+func (instance *SecurityGroup) Replace(in clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*Subnet](in)
+	if err != nil {
+		return err
+	}
+
+	instance.Core, err = clonable.CastedClone[*metadata.Core](src.Core)
+	return err
+}
+
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *SecurityGroup) Exists(ctx context.Context) (bool, fail.Error) {
 	// FIXME: Not so easy, securitygroups are in some cases a metadata-only construct -> we need to turn those into tags (provider ones) 1st

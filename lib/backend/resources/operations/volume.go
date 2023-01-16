@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
@@ -215,6 +216,29 @@ func onVolumeCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail
 // IsNull tells if the instance is a null value
 func (instance *volume) IsNull() bool {
 	return instance == nil || valid.IsNil(instance.Core)
+}
+
+func (instance *volume) Clone() (clonable.Clonable, error) {
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	newInstance := &volume{}
+	return newInstance, newInstance.Replace(instance)
+}
+
+func (instance *volume) Replace(in clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*volume](in)
+	if err != nil {
+		return err
+	}
+
+	instance.Core, err = clonable.CastedClone[*metadata.Core](src.Core)
+	return err
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)

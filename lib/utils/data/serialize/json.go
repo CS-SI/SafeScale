@@ -20,6 +20,7 @@ import (
 	stdjson "encoding/json"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 
@@ -66,10 +67,9 @@ func (jp *jsonProperty) Replace(p clonable.Clonable) error {
 
 // JSONProperties ...
 type JSONProperties struct {
-	Properties map[string]*jsonProperty
-	// This lock is used to make sure addition or removal of keys in JSonProperties won't collide in go routines
-	sync.RWMutex
-	module string
+	Properties    map[string]*jsonProperty
+	*sync.RWMutex // This lock is used to make sure addition or removal of keys in JSONProperties won't collide in go routines
+	module        string
 }
 
 // NewJSONProperties creates a new JSonProperties instance
@@ -83,8 +83,13 @@ func NewJSONProperties(module string) (_ *JSONProperties, ferr fail.Error) {
 	out := &JSONProperties{
 		Properties: map[string]*jsonProperty{},
 		module:     module,
+		RWMutex:    &sync.RWMutex{},
 	}
 	return out, nil
+}
+
+func (x *JSONProperties) IsNull() bool {
+	return x == nil || x.module == "" || x.Properties == nil || x.RWMutex == nil
 }
 
 // Lookup tells if a key is present in JSonProperties
@@ -100,28 +105,51 @@ func (x *JSONProperties) Lookup(key string) bool {
 	return ok && !valid.IsNil(p)
 }
 
-func (x *JSONProperties) Clone() (*JSONProperties, error) {
+func (x *JSONProperties) Clone() (clonable.Clonable, error) {
 	if x == nil {
 		return x, nil
 	}
 
 	x.RLock()
 	defer x.RUnlock()
-	newP := &JSONProperties{
-		module:     x.module,
-		Properties: map[string]*jsonProperty{},
+
+	newP, xerr := NewJSONProperties(x.module)
+	if xerr != nil {
+		return nil, xerr
 	}
-	if len(x.Properties) > 0 {
-		for k, v := range x.Properties {
-			b, err := clonable.CastedClone[*jsonProperty](v)
-			if err == nil {
-				newP.Properties[k] = b
-			}
-		}
-	}
-	return newP, nil
+
+	return newP, newP.Replace(x)
 }
 
+// Replace ...
+func (x *JSONProperties) Replace(in clonable.Clonable) error {
+	if x == nil {
+		return fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return fail.InvalidParameterCannotBeNilError("in")
+	}
+
+	x.Lock()
+	defer x.Unlock()
+
+	src, err := lang.Cast[*JSONProperties](in)
+	if err != nil {
+		return err
+	}
+
+	x.module = src.module
+	x.Properties = make(map[string]*jsonProperty, len(src.Properties))
+	for k, v := range x.Properties {
+		x.Properties[k], err = clonable.CastedClone[*jsonProperty](v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// hasKey ...
 func (x *JSONProperties) hasKey(key string) (*jsonProperty, bool) {
 	x.RLock()
 	defer x.RUnlock()

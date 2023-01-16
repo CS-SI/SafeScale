@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/eko/gocache/v2/store"
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
@@ -208,6 +209,29 @@ func onLabelCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail.
 // IsNull tells if the instance is a null value
 func (instance *label) IsNull() bool {
 	return instance == nil || valid.IsNil(instance.Core)
+}
+
+func (instance *label) Clone() (clonable.Clonable, error) {
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	newInstance := &label{}
+	return newInstance, newInstance.Replace(instance)
+}
+
+func (instance *label) Replace(in clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*Subnet](in)
+	if err != nil {
+		return err
+	}
+
+	instance.Core, err = clonable.CastedClone[*metadata.Core](src.Core)
+	return err
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)

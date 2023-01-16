@@ -506,6 +506,41 @@ func (instance *Host) IsNull() bool {
 	return instance == nil || valid.IsNil(instance.Core)
 }
 
+func (instance *Host) Clone() (clonable.Clonable, error) {
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	newInstance := &Host{}
+	return newInstance, newInstance.Replace(instance)
+}
+
+func (instance *Host) Replace(in clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*Host](in)
+	if err != nil {
+		return err
+	}
+
+	instance.Core, err = clonable.CastedClone[*metadata.Core](src.Core)
+	if err != nil {
+		return err
+	}
+
+	instance.localCache.installMethods = src.localCache.installMethods
+	instance.localCache.publicIP = src.localCache.publicIP
+	instance.localCache.privateIP = src.localCache.privateIP
+	instance.localCache.sshCfg = src.localCache.sshCfg
+	instance.localCache.sshProfile = src.localCache.sshProfile
+	instance.localCache.accessIP = src.localCache.accessIP
+	instance.localCache.once = src.localCache.once
+
+	return nil
+}
+
 // carry ...
 func (instance *Host) carry(ctx context.Context, p clonable.Clonable) (ferr fail.Error) {
 	if instance == nil {
@@ -760,7 +795,7 @@ func (instance *Host) GetView(ctx context.Context) (*abstract.HostCore, *seriali
 
 		var innerErr error
 		// FIXME: check if props is not already a clone...
-		propsClone, innerErr = props.Clone()
+		propsClone, innerErr = clonable.CastedClone[*serialize.JSONProperties](props)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}

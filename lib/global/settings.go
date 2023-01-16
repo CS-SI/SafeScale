@@ -71,6 +71,7 @@ type settings struct {
 			ServerPort  string   // contains the port used by the local agent for server
 			SerfLanPort string   // defaults to ServerPort +1
 			SerfWanPort string   // defaults to ServerPort +2
+			BindAddr    string   // contains the IP address to bind to (autoconfiguration is done; used only when autoconf cannot succeed)
 			External    bool     // tells if we use externally started consul server
 		}
 		Metadata struct {
@@ -407,7 +408,7 @@ func loadBackendSettings(cmd *cobra.Command, reader *viper.Viper) error {
 		Settings.Backend.Tls.CAs = reader.GetStringSlice("safescale.backend.tls.ca_files")
 	}
 
-	// FIXME: miss some consul parameters: external, peers, ...
+	// FIXME: miss some consul parameters: peers, ...
 	strValue, _, ok := env.FirstValue("SAFESCALE_DAEMON_CONSUL_HTTP_PORT", "SAFESCALE_BACKEND_CONSUL_HTTP_PORT")
 	if ok {
 		if _, err := strconv.Atoi(strValue); err != nil {
@@ -438,6 +439,30 @@ func loadBackendSettings(cmd *cobra.Command, reader *viper.Viper) error {
 		}
 
 		Settings.Backend.Consul.ServerPort = strValue
+	}
+
+	strValue, _, ok = env.FirstValue("SAFESCALE_DAEMON_CONSUL_BIND_ADDR", "SAFESCALE_BACKEND_CONSUL_BIND_ADDR")
+	if ok {
+		// FIXME: validate strValue as an IP address
+		Settings.Backend.Consul.BindAddr = strValue
+	} else if reader.IsSet("safescale.backend.consul.bind_addr") {
+		strValue = reader.GetString("safescale.backend.consul.bind_addr")
+		// FIXME: validate strValue as an IP address
+		Settings.Backend.Consul.ServerPort = strValue
+	}
+
+	strValue, _, ok = env.FirstValue("SAFESCALE_DAEMON_CONSUL_EXTERNAL", "SAFESCALE_BACKEND_CONSUL_EXTERNAL")
+	if ok {
+		var boolValue bool
+		switch strings.ToLower(strValue) {
+		case "yes", "true":
+			boolValue = true
+		default:
+			boolValue = false
+		}
+		Settings.Backend.Consul.External = boolValue
+	} else if reader.IsSet("safescale.backend.consul.external") {
+		Settings.Backend.Consul.External = reader.GetBool("safescale.backend.consul.external")
 	}
 
 	return nil

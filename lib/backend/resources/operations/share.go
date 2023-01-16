@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/eko/gocache/v2/store"
 	"github.com/gofrs/uuid"
 	"github.com/sirupsen/logrus"
@@ -215,6 +216,29 @@ func onShareCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail.
 // IsNull tells if the instance should be considered as a null value
 func (instance *Share) IsNull() bool {
 	return instance == nil || valid.IsNil(instance.Core)
+}
+
+func (instance *Share) Clone() (clonable.Clonable, error) {
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	newInstance := &Share{}
+	return newInstance, newInstance.Replace(instance)
+}
+
+func (instance *Share) Replace(in clonable.Clonable) error {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	src, err := lang.Cast[*Share](in)
+	if err != nil {
+		return err
+	}
+
+	instance.Core, err = clonable.CastedClone[*metadata.Core](src.Core)
+	return err
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
