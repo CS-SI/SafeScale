@@ -2501,7 +2501,7 @@ func (instance *Host) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = instance.RelaxedDeleteHost(ctx)
+	xerr = instance.RelaxedDeleteHost(cleanupContextFrom(ctx))
 	return xerr
 }
 
@@ -2797,7 +2797,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					continue
 				}
 
-				rerr = labelInstance.UnbindFromHost(ctx, instance)
+				rerr = labelInstance.UnbindFromHost(cleanupContextFrom(ctx), instance)
 				if rerr != nil {
 					switch rerr.(type) {
 					case *fail.ErrNotFound:

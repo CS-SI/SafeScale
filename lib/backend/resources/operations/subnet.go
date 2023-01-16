@@ -1238,7 +1238,7 @@ func (instance *Subnet) deleteGateways(ctx context.Context, subnet *abstract.Sub
 					return subnet.GatewayIDs, fail.InconsistentError("failed to cast hostInstance to '*Host'")
 				}
 
-				xerr := hostInstanceImpl.RelaxedDeleteHost(ctx)
+				xerr := hostInstanceImpl.RelaxedDeleteHost(cleanupContextFrom(ctx))
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
