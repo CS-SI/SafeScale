@@ -467,11 +467,9 @@ func (instance service) reduceTemplates(
 ) []*abstract.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if len(whitelistREs) > 0 {
-		// finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(instance.whitelistTemplateREs))
 		finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(whitelistREs))
 	}
 	if len(blacklistREs) > 0 {
-		//		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(instance.blacklistTemplateREs))
 		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(blacklistREs))
 		if finalFilter == nil {
 			finalFilter = blackFilter.Not()
@@ -480,7 +478,13 @@ func (instance service) reduceTemplates(
 		}
 	}
 	if finalFilter != nil {
-		return templatefilters.FilterTemplates(tpls, finalFilter)
+		// here we filter first, then we sort using white lists
+		res := templatefilters.FilterTemplates(tpls, finalFilter)
+		if len(whitelistREs) > 0 {
+			newRes := searchRegexAdaptor(whitelistREs[0].String(), res)
+			return newRes
+		}
+		return res
 	}
 	return tpls
 }
@@ -822,7 +826,6 @@ func (instance service) reduceImages(imgs []*abstract.Image) []*abstract.Image {
 		}
 	}
 	if finalFilter != nil {
-		// templateFilter := templatefilters.NewFilter(finalFilter)
 		return imagefilters.FilterImages(imgs, finalFilter)
 	}
 	return imgs

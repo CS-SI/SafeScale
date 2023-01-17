@@ -280,6 +280,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		newS.metadataBucket = metadataBucket
 		newS.metadataKey = metadataCryptKey
 
+		// FIXME: OPP, Wrong, this is input validation, and should be into Build.
 		if xerr := validateRegexps(newS, tenant); xerr != nil {
 			return nullService(), xerr
 		}
@@ -327,7 +328,7 @@ func validateRegexps(svc *service, tenant map[string]interface{}) fail.Error {
 		return fail.InvalidParameterError("tenant['compute']", "is not a map")
 	}
 
-	res, xerr := validateRegexpsOfKeyword("WhilelistTemplateRegexp", compute["WhitelistTemplateRegexp"])
+	res, xerr := validateRegexpsOfKeyword("WhitelistTemplateRegexp", compute["WhitelistTemplateRegexp"])
 	if xerr != nil {
 		return xerr
 	}
@@ -339,7 +340,7 @@ func validateRegexps(svc *service, tenant map[string]interface{}) fail.Error {
 	}
 	svc.blacklistTemplateREs = res
 
-	res, xerr = validateRegexpsOfKeyword("WhilelistImageRegexp", compute["WhitelistImageRegexp"])
+	res, xerr = validateRegexpsOfKeyword("WhitelistImageRegexp", compute["WhitelistImageRegexp"])
 	if xerr != nil {
 		return xerr
 	}
@@ -365,7 +366,7 @@ func validateRegexpsOfKeyword(keyword string, content interface{}) (out []*regex
 		return out, nil
 	}
 
-	if list, ok := content.([]interface{}); ok {
+	if list, ok := content.([]interface{}); ok { // FIXME: This branch never ever happened, the input is always a string
 		for _, v := range list {
 			re, err := regexp.Compile(v.(string))
 			if err != nil {

@@ -90,7 +90,7 @@ func (instance *Subnet) taskCreateGateway(inctx context.Context, params interfac
 				return ar, ar.rErr
 			}
 
-			cluID, _ := instance.GetID()
+			cluID, _ := instance.GetID() // FIXME: OPP, This is wrong, it should be used only in a cluster context
 			userData, createXErr := rgw.Create(ctx, hostReq, hostSizing, map[string]string{
 				"type":      "gateway",
 				"clusterID": cluID,
