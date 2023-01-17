@@ -327,8 +327,6 @@ service SubnetService {
 	rpc Delete(SubnetDeleteRequest) returns (google.protobuf.Empty){}
 	rpc BindSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
 	rpc UnbindSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
-	rpc EnableSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
-	rpc DisableSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
 	rpc ListSecurityGroups(SecurityGroupSubnetBindRequest) returns (SecurityGroupBondsResponse){}
 }
 

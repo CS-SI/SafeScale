@@ -503,15 +503,3 @@ func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Er
 
 	return cfg.DefaultSecurityGroupName, nil
 }
-
-// EnableSecurityGroup enables a Security Group
-// Does actually nothing for openstack
-func (s stack) EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
-	return fail.NotAvailableError("aws cannot enable a Security Group")
-}
-
-// DisableSecurityGroup disables a Security Group
-// Does actually nothing for openstack
-func (s stack) DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
-	return fail.NotAvailableError("aws cannot disable a Security Group")
-}

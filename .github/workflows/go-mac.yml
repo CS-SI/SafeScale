@@ -32,6 +32,9 @@ jobs:
       with:
         go-version: ${{ matrix.go }}
     - name: Install Protoc
+      env:
+        HOMEBREW_NO_AUTO_UPDATE: 1
+        HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
       run: |
         brew update
         brew install protoc-gen-go

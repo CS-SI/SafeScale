@@ -326,7 +326,7 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", sgLabel, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return nil, fail.NotImplementedError() // FIXME: Technical debt
+	return s.InspectSecurityGroup(ctx, asg)
 }
 
 // DisableSecurityGroup disables the rules of a Security Group

@@ -240,26 +240,6 @@ func (s StackProxy) GetDefaultSecurityGroupName(ctx context.Context) (_ string, 
 	return cfg, xerr
 }
 
-func (s StackProxy) EnableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.FullStack.EnableSecurityGroup(ctx, group)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}
-
-func (s StackProxy) DisableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.FullStack.DisableSecurityGroup(ctx, group)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}
-
 func (s StackProxy) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (_ *abstract.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
