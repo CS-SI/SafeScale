@@ -1,7 +1,7 @@
 ```
 [[tenants]]
     name = "TenantName"
-    client = "gpc"
+    client = "gcp"
 
     # This part defines how to authenticate with the provider
     [tenants.identity]
