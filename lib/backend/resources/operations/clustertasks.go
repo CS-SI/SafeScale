@@ -3146,15 +3146,15 @@ func (instance *Cluster) taskDeleteMaster(inctx context.Context, params interfac
 	}
 }
 
-type taskUpdateClusterInventoryMasterParameters struct {
+type taskRegenerateClusterInventoryParameters struct {
 	ctx           context.Context
 	master        resources.Host
 	inventoryData string
 	clusterName   string
 }
 
-// taskUpdateClusterInventoryMaster task to update a Host (master) ansible inventory
-func (instance *Cluster) taskUpdateClusterInventoryMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+// taskRegenerateClusterInventory task to update a Host (master) ansible inventory
+func (instance *Cluster) taskRegenerateClusterInventory(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -3172,9 +3172,9 @@ func (instance *Cluster) taskUpdateClusterInventoryMaster(inctx context.Context,
 		gres, _ := func() (_ result, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 			// Convert and validate params
-			casted, ok := params.(taskUpdateClusterInventoryMasterParameters)
+			casted, ok := params.(taskRegenerateClusterInventoryParameters)
 			if !ok {
-				ar := result{nil, fail.InvalidParameterError("params", "must be a 'taskUpdateClusterInventoryMasterParameters'")}
+				ar := result{nil, fail.InvalidParameterError("params", "must be a 'taskRegenerateClusterInventoryParameters'")}
 				return ar, ar.rErr
 			}
 
@@ -3196,7 +3196,7 @@ func (instance *Cluster) taskUpdateClusterInventoryMaster(inctx context.Context,
 }
 
 // updateClusterInventoryMaster updates a Host (master) ansible inventory
-func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, param taskUpdateClusterInventoryMasterParameters) (ferr fail.Error) {
+func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, param taskRegenerateClusterInventoryParameters) (ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
