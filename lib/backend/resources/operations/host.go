@@ -376,7 +376,6 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Do not test with Isnull here, as Browse may be used from null value
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}

@@ -1348,8 +1348,10 @@ var clusterNodeInspectCommand = cli.Command{
 
 // clusterNodeDeleteCmd handles 'deploy cluster <clustername> delete'
 var clusterNodeDeleteCommand = cli.Command{
-	Name:    "delete",
-	Aliases: []string{"destroy", "remove", "rm"},
+	Name:      "delete",
+	Usage:     "Deletes a cluster node",
+	ArgsUsage: "CLUSTERNAME HOSTNAME",
+	Aliases:   []string{"destroy", "remove", "rm"},
 
 	Flags: []cli.Flag{
 		cli.BoolFlag{
@@ -1387,11 +1389,8 @@ var clusterNodeDeleteCommand = cli.Command{
 		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node%s '%s' of the cluster '%s'", strprocess.Plural(uint(len(nodeList))), strings.Join(nodeList, ","), clusterName)) {
 			return clitools.SuccessResponse("Aborted")
 		}
-		if force {
-			logrus.Println("'-f,--force' does nothing yet")
-		}
 
-		err = ClientSession.Cluster.DeleteNode(clusterName, nodeList, 0)
+		err = ClientSession.Cluster.DeleteNode(clusterName, nodeList, force, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))

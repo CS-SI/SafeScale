@@ -89,7 +89,7 @@ func (n shareConsumer) Delete(names []string, timeout time.Duration) error {
 
 		defer wg.Done()
 
-		if _, xerr := service.Delete(newCtx, &protocol.Reference{Name: aname}); xerr != nil {
+		if _, xerr := service.Delete(newCtx, &protocol.ShareDeleteRequest{Name: aname}); xerr != nil {
 			mutex.Lock()
 			errs = append(errs, xerr.Error())
 			mutex.Unlock() // nolint

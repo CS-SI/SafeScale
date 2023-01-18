@@ -115,7 +115,7 @@ func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketReques
 }
 
 // Delete a bucket
-func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketRequest) (
+func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketDeleteRequest) (
 	empty *googleprotobuf.Empty, err error,
 ) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)

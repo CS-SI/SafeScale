@@ -224,7 +224,7 @@ func (h hostConsumer) Delete(names []string, timeout time.Duration) error {
 
 		defer wg.Done()
 
-		_, xerr := service.Delete(newCtx, &protocol.Reference{TenantId: h.session.tenant, Name: aname})
+		_, xerr := service.Delete(newCtx, &protocol.HostDeleteRequest{TenantId: h.session.tenant, Name: aname})
 		if xerr != nil {
 			mutex.Lock()
 			defer mutex.Unlock()

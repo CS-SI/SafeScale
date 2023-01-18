@@ -94,7 +94,7 @@ func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareDefiniti
 }
 
 // Delete call share service deletion
-func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *ShareListener) Delete(inctx context.Context, in *protocol.ShareDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete share")
 	defer fail.OnPanic(&err)

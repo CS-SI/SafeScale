@@ -109,7 +109,7 @@ func (v volumeConsumer) Delete(names []string, timeout time.Duration) error {
 		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
-		_, err := service.Delete(newCtx, &protocol.Reference{Name: aname})
+		_, err := service.Delete(newCtx, &protocol.VolumeDeleteRequest{Name: aname})
 
 		if err != nil {
 			mutex.Lock()

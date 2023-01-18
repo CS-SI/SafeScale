@@ -28,6 +28,34 @@ message Reference {
 	string name = 3;
 }
 
+message HostDeleteRequest {
+	string tenant_id = 1;
+	string id = 2;
+	string name = 3;
+	bool force = 4;
+}
+
+message VolumeDeleteRequest {
+	string tenant_id = 1;
+	string id = 2;
+	string name = 3;
+	bool force = 4;
+}
+
+message BucketDeleteRequest {
+	string tenant_id = 1;
+	string id = 2;
+	string name = 3;
+	bool force = 4;
+}
+
+message ShareDeleteRequest {
+	string tenant_id = 1;
+	string id = 2;
+	string name = 3;
+	bool force = 4;
+}
+
 // Client Requests
 
 message ClientID {
@@ -171,8 +199,6 @@ message ImageListRequest{
 
 service ImageService{
 	rpc List(ImageListRequest) returns (ImageList){}
-	//rpc Create(ImageCreateRequest) returns (Image){}
-	//rpc Delete(Image) returns (google.protobuf.Empty){}
 }
 
 
@@ -432,7 +458,7 @@ service HostService {
 	rpc Inspect(Reference) returns (Host){}
 	rpc Status(Reference) returns (HostStatus){}
 	rpc List(HostListRequest) returns (HostList){}
-	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc Delete(HostDeleteRequest) returns (google.protobuf.Empty){}
 	rpc Start(Reference) returns (google.protobuf.Empty){}
 	rpc Stop(Reference) returns (google.protobuf.Empty){}
 	rpc Reboot(Reference) returns (google.protobuf.Empty){}
@@ -617,7 +643,7 @@ service VolumeService {
 	rpc Create(VolumeCreateRequest) returns (VolumeInspectResponse) {}
 	rpc Attach(VolumeAttachmentRequest) returns (google.protobuf.Empty) {}
 	rpc Detach(VolumeDetachmentRequest) returns (google.protobuf.Empty){}
-	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc Delete(VolumeDeleteRequest) returns (google.protobuf.Empty){}
 	rpc List(VolumeListRequest) returns (VolumeListResponse) {}
 	rpc Inspect(Reference) returns (VolumeInspectResponse){}
 }
@@ -670,7 +696,7 @@ service BucketService {
 	rpc Create(BucketRequest) returns (google.protobuf.Empty){}
 	rpc Mount(BucketMountRequest) returns (google.protobuf.Empty){}
 	rpc Unmount(BucketMountRequest) returns (google.protobuf.Empty){}
-	rpc Delete(BucketRequest) returns (google.protobuf.Empty){}
+	rpc Delete(BucketDeleteRequest) returns (google.protobuf.Empty){}
 	rpc List(BucketListRequest) returns (BucketListResponse){}
 	rpc Inspect(BucketRequest) returns (BucketResponse){}
 	rpc Download(BucketRequest) returns (BucketDownloadResponse){}
@@ -753,7 +779,7 @@ message ShareMountList {
 
 service ShareService {
 	rpc Create(ShareDefinition) returns (ShareDefinition){}
-	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc Delete(ShareDeleteRequest) returns (google.protobuf.Empty){}
 	rpc List(Reference) returns (ShareList){}     // Here, Reference is used to carry tenant
 	rpc Mount(ShareMountDefinition) returns (ShareMountDefinition){}
 	rpc Unmount(ShareMountDefinition) returns (google.protobuf.Empty){}
@@ -925,6 +951,12 @@ message ClusterNodeRequest {
 	Reference host = 2;     // on deletion, if not set, requests to delete last added node
 }
 
+message ClusterDeleteNodeRequest {
+	string name = 1;
+	Reference host = 2;     // on deletion, if not set, requests to delete last added node
+	bool force = 3;
+}
+
 service ClusterService {
 	rpc List(Reference) returns (ClusterListResponse){}
 	rpc Inspect(Reference) returns (ClusterResponse){}
@@ -937,7 +969,7 @@ service ClusterService {
 	rpc Shrink(ClusterResizeRequest) returns (ClusterNodeListResponse){}
 	rpc ListNodes(Reference) returns (ClusterNodeListResponse){}
 	rpc InspectNode(ClusterNodeRequest) returns (Host){}
-	rpc DeleteNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
+	rpc DeleteNode(ClusterDeleteNodeRequest) returns (google.protobuf.Empty){}
 	rpc StopNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
 	rpc StartNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
 	rpc StateNode(ClusterNodeRequest) returns (HostStatus){}
@@ -1186,6 +1218,12 @@ message LabelInspectRequest {
 	bool is_tag = 2;
 }
 
+message LabelDeleteRequest {
+	Reference Label = 1;
+	bool is_tag = 2;
+	bool force = 3;
+}
+
 message LabelInspectResponse {
 	string id = 1;
 	string name = 2;
@@ -1222,7 +1260,7 @@ message LabelBoundsRequest {
 
 service LabelService {
 	rpc Create(LabelCreateRequest) returns (LabelInspectResponse) {}
-	rpc Delete(LabelInspectRequest) returns (google.protobuf.Empty){}
+	rpc Delete(LabelDeleteRequest) returns (google.protobuf.Empty){}
 	rpc List(LabelListRequest) returns (LabelListResponse) {}
 	rpc Inspect(LabelInspectRequest) returns (LabelInspectResponse){}
 }

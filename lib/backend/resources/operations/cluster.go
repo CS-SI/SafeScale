@@ -469,7 +469,7 @@ func (instance *Cluster) Create(inctx context.Context, req abstract.ClusterReque
 
 			logrus.WithContext(ctx).Tracef("Cluster creation finished with: %s", litter.Sdump(res))
 
-			xerr = instance.unsafeUpdateClusterInventory(ctx)
+			xerr = instance.regenerateClusterInventory(ctx)
 			if xerr != nil {
 				return xerr
 			}
@@ -1304,7 +1304,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		hosts = append(hosts, hostInstance)
 	}
 
-	xerr = instance.unsafeUpdateClusterInventory(ctx)
+	xerr = instance.regenerateClusterInventory(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1415,6 +1415,11 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	}
 
 	xerr = instance.deleteNode(cleanupContextFrom(ctx), node, selectedMaster.(*Host))
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.regenerateClusterInventory(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -2354,7 +2359,7 @@ func realizeTemplate(tmplName string, adata map[string]interface{}, fileName str
 var ansibleScripts embed.FS
 
 // Regenerate ansible inventory
-func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fail.Error {
+func (instance *Cluster) regenerateClusterInventory(inctx context.Context) fail.Error {
 	// Check incoming parameters
 	if inctx == nil {
 		return fail.InvalidParameterCannotBeNilError("inctx")
@@ -2593,7 +2598,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 			logrus.WithContext(ctx).Infof("%s Update master %s", prerr, masters[master].GetName())
 
 			tg.Go(func() error {
-				_, err := instance.taskUpdateClusterInventoryMaster(ctx, taskUpdateClusterInventoryMasterParameters{
+				_, err := instance.taskRegenerateClusterInventory(ctx, taskRegenerateClusterInventoryParameters{
 					ctx:           ctx,
 					master:        masters[master],
 					inventoryData: dataBuffer.String(),
@@ -3033,7 +3038,7 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 	if len(errors) > 0 {
 		return nil, fail.NewErrorList(errors)
 	}
-	xerr = instance.unsafeUpdateClusterInventory(ctx)
+	xerr = instance.regenerateClusterInventory(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

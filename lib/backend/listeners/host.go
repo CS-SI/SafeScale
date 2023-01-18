@@ -422,7 +422,7 @@ func (s *HostListener) Inspect(inctx context.Context, in *protocol.Reference) (h
 }
 
 // Delete a host
-func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *HostListener) Delete(inctx context.Context, in *protocol.HostDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete host")
 	defer fail.OnPanic(&err)
@@ -438,7 +438,11 @@ func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (em
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	ref, refLabel := srvutils.GetReference(in)
+	ref, refLabel := srvutils.GetReference(&protocol.Reference{
+		TenantId: in.GetTenantId(),
+		Id:       in.GetId(),
+		Name:     in.GetName(),
+	})
 	if ref == "" {
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
 	}
