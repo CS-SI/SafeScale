@@ -14,11 +14,11 @@ import (
 func Test_getTenantsFromCfg(t *testing.T) {
 	v := viper.New()
 	v.AddConfigPath(".")
-	v.SetConfigName("faketenant")
+	v.SetConfigName("faketenants")
 
 	r, _, xerr := getTenantsFromViperCfg(v)
-	if xerr != nil && strings.Contains(xerr.Error(), "Config File \"faketenant\" Not Found") {
-		t.Log("Config File \"faketenant\" Not Found")
+	if xerr != nil && strings.Contains(xerr.Error(), "Config File \"faketenants\" Not Found") {
+		t.Log("Config File \"faketenants\" Not Found")
 		t.SkipNow()
 		return
 	}

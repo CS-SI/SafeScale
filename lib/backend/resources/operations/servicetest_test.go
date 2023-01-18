@@ -3185,10 +3185,6 @@ func (e *ServiceTest) GetRawConfigurationOptions(ctx context.Context) (stacks.Co
 		DefaultSecurityGroupName:  "securitygroup-default",
 		DefaultNetworkName:        "network-default",
 		DefaultNetworkCIDR:        "192.168.0.1/24",
-		WhitelistTemplateRegexp:   nil,
-		BlacklistTemplateRegexp:   nil,
-		WhitelistImageRegexp:      nil,
-		BlacklistImageRegexp:      nil,
 		MaxLifeTime:               MaxLifeTimeInHours,
 		Timings:                   SHORTEN_TIMINGS,
 	}
