@@ -601,7 +601,7 @@ func (c clusterConsumer) InspectNode(clusterName string, nodeRef string, timeout
 }
 
 // DeleteNode ...
-func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, timeout time.Duration) error {
+func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, force bool, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -644,6 +644,7 @@ func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, timeout 
 				TenantId: c.session.tenant,
 				Name:     ref,
 			},
+			Force: force,
 		})
 		if err != nil {
 			mutex.Lock()
