@@ -639,7 +639,7 @@ func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, timeout 
 
 		defer wg.Done()
 
-		_, err := service.DeleteNode(newCtx, &protocol.ClusterNodeRequest{
+		_, err := service.DeleteNode(newCtx, &protocol.ClusterDeleteNodeRequest{
 			Name: clusterName, Host: &protocol.Reference{
 				TenantId: c.session.tenant,
 				Name:     ref,

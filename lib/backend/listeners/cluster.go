@@ -513,7 +513,7 @@ func (s *ClusterListener) InspectNode(inctx context.Context, in *protocol.Cluste
 }
 
 // DeleteNode removes node(s) from a cluster
-func (s *ClusterListener) DeleteNode(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *ClusterListener) DeleteNode(inctx context.Context, in *protocol.ClusterDeleteNodeRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete Cluster Node")
 

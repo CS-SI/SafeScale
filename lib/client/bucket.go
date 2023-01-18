@@ -183,7 +183,7 @@ func (c bucketConsumer) Delete(names []string, timeout time.Duration) error {
 		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
-		_, err := service.Delete(newCtx, &protocol.BucketRequest{Name: aname})
+		_, err := service.Delete(newCtx, &protocol.BucketDeleteRequest{Name: aname})
 		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()

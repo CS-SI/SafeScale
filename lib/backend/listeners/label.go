@@ -124,7 +124,7 @@ func (s *LabelListener) Create(inctx context.Context, in *protocol.LabelCreateRe
 }
 
 // Delete a Label
-func (s *LabelListener) Delete(inctx context.Context, in *protocol.LabelInspectRequest) (empty *googleprotobuf.Empty, err error) {
+func (s *LabelListener) Delete(inctx context.Context, in *protocol.LabelDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete Label")
 

@@ -233,7 +233,7 @@ func (s *VolumeListener) Detach(inctx context.Context, in *protocol.VolumeDetach
 }
 
 // Delete a volume
-func (s *VolumeListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *VolumeListener) Delete(inctx context.Context, in *protocol.VolumeDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete volume")
 
@@ -247,7 +247,11 @@ func (s *VolumeListener) Delete(inctx context.Context, in *protocol.Reference) (
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-	ref, refLabel := srvutils.GetReference(in)
+	ref, refLabel := srvutils.GetReference(&protocol.Reference{
+		TenantId: in.GetTenantId(),
+		Id:       in.GetId(),
+		Name:     in.GetName(),
+	})
 	if ref == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}

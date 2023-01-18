@@ -1348,8 +1348,10 @@ var clusterNodeInspectCommand = cli.Command{
 
 // clusterNodeDeleteCmd handles 'deploy cluster <clustername> delete'
 var clusterNodeDeleteCommand = cli.Command{
-	Name:    "delete",
-	Aliases: []string{"destroy", "remove", "rm"},
+	Name:      "delete",
+	Usage:     "Deletes a cluster node",
+	ArgsUsage: "CLUSTERNAME HOSTNAME",
+	Aliases:   []string{"destroy", "remove", "rm"},
 
 	Flags: []cli.Flag{
 		cli.BoolFlag{
