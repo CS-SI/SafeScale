@@ -901,9 +901,19 @@ func ExtractFeatureParameters(params []string) data.Map {
 	for _, v := range params {
 		splitted := strings.Split(v, "=")
 		if len(splitted) > 1 {
-			out[splitted[0]] = splitted[1]
+			if strings.Contains(splitted[0], ":") {
+				prefix := strings.Split(splitted[0], ":")
+				out[prefix[1]] = splitted[1]
+			} else {
+				out[splitted[0]] = splitted[1]
+			}
 		} else {
-			out[splitted[0]] = ""
+			if strings.Contains(splitted[0], ":") {
+				prefix := strings.Split(splitted[0], ":")
+				out[prefix[1]] = splitted[1]
+			} else {
+				out[splitted[0]] = ""
+			}
 		}
 	}
 	return out

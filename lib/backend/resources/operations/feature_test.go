@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/mitchellh/mapstructure"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
@@ -177,4 +178,18 @@ func TestNewEmbeddedFeatureFunction(t *testing.T) {
 	require.NotEmpty(t, res)
 	require.Contains(t, res, "sfExit")
 
+}
+
+func TestExtractFeatureParameters(t *testing.T) {
+	var hell []string
+	hell = append(hell, "login=wat")
+	hell = append(hell, "pass=wot")
+	hell = append(hell, "feat:lol=wat")
+	hell = append(hell, "feat:passz=wot")
+
+	dm := ExtractFeatureParameters(hell)
+	assert.Equalf(t, "wat", dm["login"], "first key failed")
+	assert.Equalf(t, "wot", dm["pass"], "second key failed")
+	assert.Equalf(t, "wat", dm["lol"], "3rd key failed")
+	assert.Equalf(t, "wot", dm["passz"], "4th key failed")
 }

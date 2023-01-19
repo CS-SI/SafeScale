@@ -181,6 +181,18 @@ EOF
   fi
   rm -f /tmp/docker-fail.txt || true
   docker run hello-world | grep "working correctly" || sfFail 215 "failure running hello-world docker image"
+  rm -f /tmp/docker-fail.txt || true
+  {{with .DockerHubUsername -}}
+  {{with .DockerHubPassword -}}
+  if [[ "{{.DockerHubUsername}}" != "" ]]; then
+      docker login --username="{{.DockerHubUsername}}" --password-stdin <<< "{{.DockerHubPassword}}" > /tmp/docker-fail.txt
+      if [[ "$(cat /tmp/docker-fail.txt)" != "Login Succeeded" ]]; then
+          sfFail 216 "$(cat /tmp/docker-fail.txt)"
+      fi
+  fi
+  rm -f /tmp/docker-fail.txt || true
+  {{end}}
+  {{end}}
 }
 export -f install_docker
 

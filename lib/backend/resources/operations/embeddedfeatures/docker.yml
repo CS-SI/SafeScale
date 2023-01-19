@@ -338,12 +338,8 @@ feature:
                             nodes: all
                         run: |
                             rm -f /tmp/docker-fail.txt || true
-                            if [[ "{{.DockerExperimentUsername}}" != "" ]]; then
-                                echo "Detected 1st env var"
-                            fi
-                            if [[ "{{.DockerExperimentPassword}}" != "" ]]; then
-                                echo "Detected 2nd env var"
-                            fi
+                            {{with .DockerHubUsername -}}
+                            {{with .DockerHubPassword -}}
                             if [[ "{{.DockerHubUsername}}" != "" ]]; then
                                 docker login --username="{{.DockerHubUsername}}" --password-stdin <<< "{{.DockerHubPassword}}" > /tmp/docker-fail.txt
                                 if [[ "$(cat /tmp/docker-fail.txt)" != "Login Succeeded" ]]; then
@@ -351,6 +347,8 @@ feature:
                                 fi
                             fi
                             rm -f /tmp/docker-fail.txt || true
+                            {{end}}
+                            {{end}}
                             sfExit
             remove:
                 pace: docker-logout,cleanup

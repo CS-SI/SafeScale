@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
+	"github.com/sanity-io/litter"
 	"os"
 	"reflect"
 	"strings"
@@ -45,7 +46,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
 )
@@ -652,7 +652,11 @@ func (instance *Cluster) installNodeRequirements(
 			return
 		}
 
+		logrus.WithContext(ctx).Warningf("When this was reached, we had the parameters: %s", litter.Sdump(pars))
+
 		params := data.NewMap()
+		params = params.Merge(ExtractFeatureParameters(pars.FeatureParameters))
+
 		if nodeType == clusternodetype.Master {
 			tp, xerr := instance.Service().GetTenantParameters()
 			if xerr != nil {
@@ -1103,100 +1107,6 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 		}
 		chRes <- result{nil}
 
-	}()
-	select {
-	case res := <-chRes:
-		return res.rErr
-	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
-	}
-}
-
-// installDocker installs docker and docker-compose
-func (instance *Cluster) installDocker(
-	inctx context.Context, host resources.Host, hostLabel string, params data.Map, pars abstract.ClusterRequest,
-) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
-		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/feature/install/docker/%s", oldKey, hostLabel)) // nolint
-		}
-
-		if _, ok := pars.DisabledDefaultFeatures["docker"]; ok {
-			chRes <- result{nil}
-			return
-		}
-
-		// uses NewFeature() to let a chance to the user to use its own docker feature
-		feat, xerr := NewFeature(ctx, instance.Service(), "docker")
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		params, _ := data.FromMap(params)
-		r, xerr := feat.Add(ctx, host, params, resources.FeatureSettings{})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		reason := false
-		if !r.Successful() {
-			for _, k := range r.Keys() {
-				rk := r.ResultsOfKey(k)
-				if !rk.Successful() {
-					if len(rk.ErrorMessages()) == 0 {
-						logrus.WithContext(ctx).Warnf("This is a false warning for %s !!: %s", k, rk.ErrorMessages())
-					} else {
-						reason = true
-						logrus.WithContext(ctx).Warnf("This failed: %s with %s", k, spew.Sdump(rk))
-					}
-				}
-			}
-
-			if reason {
-				chRes <- result{fail.NewError("[%s] failed to add feature 'docker' on host '%s': %s", hostLabel, host.GetName(), r.AllErrorMessages())}
-				return
-			}
-		}
-
-		xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				featuresV1.Installed[feat.GetName()] = &propertiesv1.ClusterInstalledFeature{
-					Name: feat.GetName(),
-				}
-				return nil
-			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-			chRes <- result{xerr}
-			return
-		}
-
-		logrus.WithContext(ctx).Debugf("[%s] feature 'docker' addition successful.", hostLabel)
-		chRes <- result{nil}
 	}()
 	select {
 	case res := <-chRes:
