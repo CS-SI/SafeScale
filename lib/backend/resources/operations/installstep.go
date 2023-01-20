@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/sanity-io/litter"
 	"reflect"
 	"strings"
 	"time"
@@ -633,11 +632,9 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 		return nil, fail.Wrap(cerr)
 	}
 
-	logrus.WithContext(context.Background()).Warningf("This BS: %s", litter.Sdump(cloneV))
-
+	// FIXME: This never actually worked as feature_test.go shows
 	for k, v := range cloneV {
 		if variable, ok := v.(string); ok {
-			// it's hard to believe this ever worked without this check.
 			if strings.Contains(variable, "{{") && strings.Contains(variable, "}}") {
 				varTemplate, xerr := template.Parse("realize_var", variable)
 				xerr = debug.InjectPlannedFail(xerr)

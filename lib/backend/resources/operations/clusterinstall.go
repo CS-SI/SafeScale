@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"expvar"
 	"fmt"
-	"github.com/sanity-io/litter"
 	"os"
 	"reflect"
 	"strings"
@@ -652,7 +651,7 @@ func (instance *Cluster) installNodeRequirements(
 			return
 		}
 
-		logrus.WithContext(ctx).Warningf("When this was reached, we had the parameters: %s", litter.Sdump(pars))
+		// logrus.WithContext(ctx).Warningf("When this was reached, we had the parameters: %s", litter.Sdump(pars))
 
 		params := data.NewMap()
 		efe, serr := ExtractFeatureParameters(pars.FeatureParameters)
@@ -732,6 +731,7 @@ func (instance *Cluster) installNodeRequirements(
 		params["SSHPublicKey"] = identity.Keypair.PublicKey
 		params["SSHPrivateKey"] = identity.Keypair.PrivateKey
 
+		// logrus.WithContext(ctx).Warningf("When this was reached, we had the parameters: %s", litter.Sdump(params))
 		retcode, stdout, stderr, xerr := instance.ExecuteScript(ctx, "node_install_requirements.sh", params, host)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
