@@ -1135,7 +1135,11 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 				hostImage = defaultsV3.Image
 
 				// merge FeatureParameters in parameters, the latter keeping precedence over the former
-				for k, v := range ExtractFeatureParameters(defaultsV3.FeatureParameters) {
+				efe, serr := ExtractFeatureParameters(defaultsV3.FeatureParameters)
+				if serr != nil {
+					return fail.ConvertError(serr)
+				}
+				for k, v := range efe {
 					if _, ok := parameters[k]; !ok {
 						parameters[k] = v
 					}
@@ -2235,12 +2239,17 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 	go func() {
 		defer close(chRes)
 
-		parameters := ExtractFeatureParameters(req.FeatureParameters)
+		efe, serr := ExtractFeatureParameters(req.FeatureParameters)
+		if serr != nil {
+			chRes <- result{fail.ConvertError(serr)}
+			return
+		}
+
+		parameters := efe
 
 		// FIXME: OPP This should use instance.AddFeature instead
 
 		// Install reverse-proxy feature on Cluster (gateways)
-
 		fla, xerr := instance.unsafeGetFlavor(inctx)
 		if xerr != nil {
 			chRes <- result{xerr}

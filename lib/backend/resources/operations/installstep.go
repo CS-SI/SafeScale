@@ -632,22 +632,25 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 		return nil, fail.Wrap(cerr)
 	}
 
+	// FIXME: This never actually worked as feature_test.go shows
 	for k, v := range cloneV {
-		if variable, ok := v.(string); ok && variable != "" {
-			varTemplate, xerr := template.Parse("realize_var", variable)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return cloneV, fail.SyntaxError("error parsing variable '%s': %s", k, xerr.Error())
-			}
+		if variable, ok := v.(string); ok {
+			if strings.Contains(variable, "{{") && strings.Contains(variable, "}}") {
+				varTemplate, xerr := template.Parse("realize_var", variable)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return cloneV, fail.SyntaxError("error parsing variable '%s': %s", k, xerr.Error())
+				}
 
-			buffer := bytes.NewBufferString("")
-			err := varTemplate.Option("missingkey=error").Execute(buffer, variables)
-			err = debug.InjectPlannedError(err)
-			if err != nil {
-				return cloneV, fail.ConvertError(err)
-			}
+				buffer := bytes.NewBufferString("")
+				err := varTemplate.Option("missingkey=error").Execute(buffer, variables)
+				err = debug.InjectPlannedError(err)
+				if err != nil {
+					return cloneV, fail.ConvertError(err)
+				}
 
-			cloneV[k] = buffer.String()
+				cloneV[k] = buffer.String()
+			}
 		}
 	}
 
