@@ -1978,7 +1978,11 @@ func clusterFeatureAddAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 	settings.SkipProxy = c.Bool("skip-proxy")
 
@@ -2012,15 +2016,26 @@ func clusterFeatureAddAction(c *cli.Context) (ferr error) {
 }
 
 // parametersToMap transforms parameters slice to map
-func parametersToMap(params []string) map[string]string {
-	values := map[string]string{}
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
+func parametersToMap(params []string) (map[string]string, error) {
+	re := regexp.MustCompile(`([A-Za-z0-9]+:)?([A-Za-z0-9]+)=([A-Za-z0-9]+)`)
+	parsed := make(map[string]string)
+	for _, v := range params {
+		october := re.FindAllStringSubmatch(v, -1)
+		if len(october) > 0 {
+			switch len(october[0]) {
+			case 3:
+				parsed[october[0][1]] = october[0][2]
+			case 4:
+				parsed[october[0][2]] = october[0][3]
+			default:
+				continue
+			}
+		} else {
+			return nil, fmt.Errorf("invalid expression: %s", v)
 		}
 	}
-	return values
+
+	return parsed, nil
 }
 
 // clusterFeatureCheckCommand handles 'deploy cluster check-feature CLUSTERNAME FEATURENAME'
@@ -2051,7 +2066,11 @@ func clusterFeatureCheckAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
@@ -2112,7 +2131,11 @@ func clusterFeatureRemoveAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 	// TODO: Reverse proxy rules are not yet purged when feature is removed, but current code
 	// will try to apply them... Quick fix: Setting SkipProxy to true prevent this

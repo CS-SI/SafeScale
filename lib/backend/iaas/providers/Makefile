@@ -7,6 +7,7 @@ generate: clean
 	@(mkdir -p ./mocks) || true
 
 vet:
+	@(mkdir -p ./mocks) || true
 	@$(GO) vet ./...
 
 clean:

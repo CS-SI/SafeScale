@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
@@ -896,27 +897,26 @@ func (instance Feature) controlledParameter(ctx context.Context, p string, targe
 }
 
 // ExtractFeatureParameters convert a slice of string in format a=b into a map index on 'a' with value 'b'
-func ExtractFeatureParameters(params []string) data.Map {
-	out := data.NewMap()
+func ExtractFeatureParameters(params []string) (map[string]interface{}, error) {
+	re := regexp.MustCompile(`([A-Za-z0-9]+:)?([A-Za-z0-9]+)=([A-Za-z0-9]+)`)
+	parsed := make(map[string]interface{})
 	for _, v := range params {
-		splitted := strings.Split(v, "=")
-		if len(splitted) > 1 {
-			if strings.Contains(splitted[0], ":") {
-				prefix := strings.Split(splitted[0], ":")
-				out[prefix[1]] = splitted[1]
-			} else {
-				out[splitted[0]] = splitted[1]
+		october := re.FindAllStringSubmatch(v, -1)
+		if len(october) > 0 {
+			switch len(october[0]) {
+			case 3:
+				parsed[october[0][1]] = october[0][2]
+			case 4:
+				parsed[october[0][2]] = october[0][3]
+			default:
+				continue
 			}
 		} else {
-			if strings.Contains(splitted[0], ":") {
-				prefix := strings.Split(splitted[0], ":")
-				out[prefix[1]] = splitted[1]
-			} else {
-				out[splitted[0]] = ""
-			}
+			return nil, fmt.Errorf("invalid expression: %s", v)
 		}
 	}
-	return out
+
+	return parsed, nil
 }
 
 // featureFilter represents the filter to apply on Features

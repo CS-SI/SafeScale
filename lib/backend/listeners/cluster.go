@@ -340,7 +340,11 @@ func (s *ClusterListener) Expand(inctx context.Context, in *protocol.ClusterResi
 	}
 
 	handler := handlers.NewClusterHandler(job)
-	resp, xerr := handler.Expand(ref, *sizing, uint(in.Count), operations.ExtractFeatureParameters(in.GetParameters()), in.GetKeepOnFailure())
+	efe, serr := operations.ExtractFeatureParameters(in.GetParameters())
+	if serr != nil {
+		return nil, serr
+	}
+	resp, xerr := handler.Expand(ref, *sizing, uint(in.Count), efe, in.GetKeepOnFailure())
 	if xerr != nil {
 		return nil, xerr
 	}

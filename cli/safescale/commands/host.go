@@ -48,7 +48,6 @@ var HostCommand = cli.Command{
 	Subcommands: cli.Commands{
 		hostList,
 		hostCreate,
-		//		hostResize,
 		hostDelete,
 		hostInspect,
 		hostStatus,
@@ -56,10 +55,6 @@ var HostCommand = cli.Command{
 		hostReboot,
 		hostStart,
 		hostStop,
-		hostCheckFeatureCommand,  // DEPRECATED: deprecated
-		hostAddFeatureCommand,    // DEPRECATED: deprecated
-		hostRemoveFeatureCommand, // DEPRECATED: deprecated
-		hostListFeaturesCommand,  // DEPRECATED: deprecated
 		hostSecurityCommands,
 		hostFeatureCommands,
 		hostTagCommands,
@@ -1165,7 +1160,11 @@ func hostFeatureAddAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 	settings.SkipProxy = c.Bool("skip-proxy")
 
@@ -1210,7 +1209,11 @@ func hostFeatureCheckAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 
 	if err = ClientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0); err != nil {
@@ -1256,7 +1259,11 @@ func hostFeatureRemoveAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 
 	err = ClientSession.Host.RemoveFeature(hostInstance.Id, featureName, values, &settings, 0)

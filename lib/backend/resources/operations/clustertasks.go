@@ -277,8 +277,13 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 				}
 			}()
 
+			efe, serr := ExtractFeatureParameters(req.FeatureParameters)
+			if serr != nil {
+				return nil, fail.ConvertError(serr)
+			}
+
 			// Creates and configures hosts
-			xerr = instance.createHostResources(ctx, subnetInstance, *mastersDef, *nodesDef, req, ExtractFeatureParameters(req.FeatureParameters), req.KeepOnFailure)
+			xerr = instance.createHostResources(ctx, subnetInstance, *mastersDef, *nodesDef, req, efe, req.KeepOnFailure)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr

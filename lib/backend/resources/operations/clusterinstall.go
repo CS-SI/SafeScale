@@ -655,7 +655,13 @@ func (instance *Cluster) installNodeRequirements(
 		logrus.WithContext(ctx).Warningf("When this was reached, we had the parameters: %s", litter.Sdump(pars))
 
 		params := data.NewMap()
-		params = params.Merge(ExtractFeatureParameters(pars.FeatureParameters))
+		efe, serr := ExtractFeatureParameters(pars.FeatureParameters)
+		if serr != nil {
+			chRes <- result{fail.ConvertError(serr)}
+			return
+		}
+
+		params = params.Merge(efe)
 
 		if nodeType == clusternodetype.Master {
 			tp, xerr := instance.Service().GetTenantParameters()
