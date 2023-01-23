@@ -3503,6 +3503,15 @@ func (instance *Host) GetPrivateIP(_ context.Context) (_ string, ferr fail.Error
 	if err != nil {
 		return "", fail.ConvertError(err)
 	}
+
+	if val, ok := this[hostproperty.NetworkV2]; !ok {
+		return "", fail.NewError("corrupted metadata")
+	} else {
+		if val == nil {
+			return "", fail.NewError("corrupted metadata")
+		}
+	}
+
 	aclo, err := this[hostproperty.NetworkV2].UnWrap()
 	if err != nil {
 		return "", fail.ConvertError(err)

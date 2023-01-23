@@ -304,6 +304,16 @@ func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (d
 			return
 		}
 
+		if val, ok := aclupro[clusterproperty.NodesV3]; !ok {
+			chRes <- result{nil, fail.NewError("corrupted metadata")}
+			return
+		} else {
+			if val == nil {
+				chRes <- result{nil, fail.NewError("corrupted metadata")}
+				return
+			}
+		}
+
 		foo, err := aclupro[clusterproperty.NodesV3].UnWrap()
 		if err != nil {
 			chRes <- result{nil, fail.ConvertError(err)}
@@ -610,7 +620,7 @@ func (instance *Cluster) GetComplexity(ctx context.Context) (_ clustercomplexity
 
 // GetAdminPassword returns the password of the Cluster admin account
 // satisfies interface Cluster.Controller
-func (instance *Cluster) GetAdminPassword(ctx context.Context) (adminPassword string, ferr fail.Error) {
+func (instance *Cluster) GetAdminPassword(_ context.Context) (adminPassword string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -621,7 +631,7 @@ func (instance *Cluster) GetAdminPassword(ctx context.Context) (adminPassword st
 }
 
 // GetKeyPair returns the key pair used in the Cluster
-func (instance *Cluster) GetKeyPair(ctx context.Context) (keyPair *abstract.KeyPair, ferr fail.Error) {
+func (instance *Cluster) GetKeyPair(_ context.Context) (keyPair *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -2286,12 +2296,42 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			}
 		*/
 
-		// Install ansible feature on Cluster (all masters)
-		xerr = instance.installAnsible(ctx, parameters)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
+		// Install ansible feature on Cluster (all masters) // aaaand it's gone...
+		/*
+			xerr = instance.installAnsible(ctx, parameters)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
+			}
+		*/
+
+		if itis, err := instance.isFeatureDisabled(ctx, "ansible-for-cluster"); !itis && err == nil {
+			xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					featuresV1.Installed["ansible"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible"}
+					featuresV1.Installed["ansible-for-cluster"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible-for-cluster"}
+					return nil
+				})
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				chRes <- result{xerr}
+				return
+			}
+
+			xerr = instance.regenerateClusterInventory(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
+			}
 		}
 
 		// configure what has to be done Cluster-wide
@@ -2642,6 +2682,52 @@ func (instance *Cluster) regenerateClusterInventory(inctx context.Context) fail.
 	case <-inctx.Done():
 		return fail.ConvertError(inctx.Err())
 	}
+}
+
+func (instance *Cluster) isFeatureDisabled(ctx context.Context, name string) (bool, fail.Error) {
+	var disabled map[string]struct{}
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			disabled = featuresV1.Disabled
+			return nil
+		})
+	})
+	if xerr != nil {
+		return false, xerr
+	}
+
+	_, ok := disabled[name]
+	if ok {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (instance *Cluster) isFeatureInstalled(ctx context.Context, name string) (bool, fail.Error) {
+	var installed map[string]*propertiesv1.ClusterInstalledFeature
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			installed = featuresV1.Installed
+			return nil
+		})
+	})
+	if xerr != nil {
+		return false, xerr
+	}
+
+	_, ok := installed[name]
+	if ok {
+		return true, nil
+	}
+	return false, nil
 }
 
 // configureNodesFromList configures nodes from a list
