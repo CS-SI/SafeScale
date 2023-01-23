@@ -747,6 +747,21 @@ func (instance *Cluster) installNodeRequirements(
 
 		// if docker is not disabled then is installed by default
 		if _, ok := pars.DisabledDefaultFeatures["docker"]; !ok {
+			// Another mitigation
+			if _, ok := params["DockerHubUsername"]; !ok {
+				params["DockerHubUsername"] = ""
+			}
+
+			// And another
+			if _, ok := params["DockerHubPassword"]; !ok {
+				params["DockerHubPassword"] = ""
+			}
+
+			// And another
+			if _, ok := params["DockerComposeVersion"]; !ok {
+				params["DockerComposeVersion"] = "latest"
+			}
+
 			retcode, stdout, stderr, xerr = instance.ExecuteScript(ctx, "node_install_docker.sh", params, host)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {

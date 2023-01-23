@@ -43,16 +43,6 @@ feature:
           description: |-
               Password to use to authenticate DockerHub (default: empty, useless if DockerHubUsername is empty)
               Note: not handle yet...
-        - name: DockerExperimentUsername
-          value: ''
-          description: |-
-              Username to use to authenticate DockerHub (default: empty, disabling authentication)
-              Note: not handled yet
-        - name: DockerExperimentPassword
-          value: ''
-          description: |-
-              Password to use to authenticate DockerHub (default: empty, useless if DockerHubUsername is empty)
-              Note: not handle yet...
     install:
         bash:
             check:
