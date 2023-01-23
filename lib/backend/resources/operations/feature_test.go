@@ -169,7 +169,7 @@ func TestNewEmbeddedFeatureFunction(t *testing.T) {
 		aob: ok,
 	}
 
-	efe, err := NewEmbeddedFeature(context.Background(), sm, "docker")
+	efe, err := NewEmbeddedFeature(context.Background(), sm, "ansible-for-cluster")
 	require.Nil(t, err)
 	require.NotNil(t, efe)
 
@@ -177,6 +177,8 @@ func TestNewEmbeddedFeatureFunction(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, res)
 	require.Contains(t, res, "sfExit")
+
+	t.Log(res)
 
 }
 

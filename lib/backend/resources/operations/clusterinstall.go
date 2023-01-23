@@ -794,6 +794,60 @@ func (instance *Cluster) installNodeRequirements(
 			}
 		}
 
+		if nodeType == clusternodetype.Master {
+			// if ansible is not disabled then is installed by default
+			if _, ok := pars.DisabledDefaultFeatures["ansible-for-cluster"]; !ok {
+				if _, ok := pars.DisabledDefaultFeatures["ansible"]; !ok {
+					xerr = instance.ComplementFeatureParameters(ctx, params)
+					if xerr != nil {
+						chRes <- result{fail.Wrap(xerr, "system ansible installation failed")}
+						return
+					}
+
+					xerr = host.ComplementFeatureParameters(ctx, params)
+					if xerr != nil {
+						chRes <- result{fail.Wrap(xerr, "system ansible installation failed")}
+						return
+					}
+
+					params["Username"] = "cladm"
+					params["Password"] = identity.AdminPassword
+
+					retcode, stdout, stderr, xerr = instance.ExecuteScript(ctx, "master_install_ansible.sh", params, host)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						chRes <- result{fail.Wrap(xerr, "system ansible installation failed")}
+						return
+					}
+					if retcode != 0 {
+						xerr = fail.ExecutionError(nil, "failed to install common ansible dependencies")
+						xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+						chRes <- result{xerr}
+						return
+					}
+
+					xerr = host.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+						return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+							featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+							if !ok {
+								return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							}
+
+							featuresV1.Installed["ansible"] = &propertiesv1.HostInstalledFeature{}
+							featuresV1.Installed["ansible-for-cluster"] = &propertiesv1.HostInstalledFeature{}
+							return nil
+						})
+					})
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+						chRes <- result{xerr}
+						return
+					}
+				}
+			}
+		}
+
 		logrus.WithContext(ctx).Debugf("system dependencies installation successful.")
 		chRes <- result{nil}
 
