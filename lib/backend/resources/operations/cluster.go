@@ -146,7 +146,13 @@ func (instance *Cluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 		rg.Go(func() error {
 			rh, xerr := LoadHost(ctx, svc, agw.Core.ID)
 			if xerr != nil {
-				return xerr
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					failures <- agw.Core.ID
+					return nil
+				default:
+					return xerr
+				}
 			}
 
 			exists, xerr := rh.Exists(ctx)
@@ -166,7 +172,13 @@ func (instance *Cluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 		rg.Go(func() error {
 			rh, xerr := LoadHost(ctx, svc, mid)
 			if xerr != nil {
-				return xerr
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					failures <- mid
+					return nil
+				default:
+					return xerr
+				}
 			}
 
 			exists, xerr := rh.Exists(ctx)
@@ -187,7 +199,13 @@ func (instance *Cluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 		rg.Go(func() error {
 			rh, xerr := LoadHost(ctx, svc, nid)
 			if xerr != nil {
-				return xerr
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					failures <- nid
+					return nil
+				default:
+					return xerr
+				}
 			}
 
 			exists, xerr := rh.Exists(ctx)
@@ -262,106 +280,98 @@ func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (d
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		clusterInstance, xerr := NewCluster(ctx, svc)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+		ga, gerr := func() (_ resources.Cluster, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		if xerr = clusterInstance.Read(ctx, name); xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		shi, err := clusterInstance.MetadataCore.shielded.UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		aclu, ok := shi.(*abstract.ClusterIdentity)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-		clusterInstance.cluID = aclu
-
-		aclupro, err := clusterInstance.MetadataCore.properties.UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		flavor, xerr := clusterInstance.GetFlavor(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		xerr = clusterInstance.bootstrap(flavor)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		if val, ok := aclupro[clusterproperty.NodesV3]; !ok {
-			chRes <- result{nil, fail.NewError("corrupted metadata")}
-			return
-		} else {
-			if val == nil {
-				chRes <- result{nil, fail.NewError("corrupted metadata")}
-				return
+			clusterInstance, xerr := NewCluster(ctx, svc)
+			if xerr != nil {
+				return nil, xerr
 			}
-		}
 
-		foo, err := aclupro[clusterproperty.NodesV3].UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		gotta, ok := foo.(*propertiesv3.ClusterNodes)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-		for k := range gotta.PrivateNodeByID {
-			clusterInstance.nodes = append(clusterInstance.nodes, k)
-		}
-		for k := range gotta.MasterByID {
-			clusterInstance.masters = append(clusterInstance.masters, k)
-		}
-
-		asta, err := aclupro[clusterproperty.StateV1].UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		gurb, ok := asta.(*propertiesv1.ClusterState)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-
-		clusterInstance.state = gurb.State
-
-		for k, v := range gotta.ByNumericalID {
-			if strings.Contains(v.Name, "node") {
-				clusterInstance.nodeIPs[k] = v.PrivateIP
+			if xerr = clusterInstance.Read(ctx, name); xerr != nil {
+				return nil, xerr
 			}
-			if strings.Contains(v.Name, "master") {
-				clusterInstance.masterIPs[k] = v.PrivateIP
+
+			shi, err := clusterInstance.MetadataCore.shielded.UnWrap()
+			if err != nil {
+				return nil, fail.ConvertError(err)
 			}
-		}
 
-		xerr = clusterInstance.updateCachedInformation(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+			aclu, ok := shi.(*abstract.ClusterIdentity)
+			if !ok {
+				return nil, fail.NewError("bad cast")
+			}
+			clusterInstance.cluID = aclu
 
-		chRes <- result{clusterInstance, nil}
+			aclupro, err := clusterInstance.MetadataCore.properties.UnWrap()
+			if err != nil {
+				return nil, fail.ConvertError(err)
+			}
+
+			flavor, xerr := clusterInstance.GetFlavor(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			xerr = clusterInstance.bootstrap(flavor)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if val, ok := aclupro[clusterproperty.NodesV3]; !ok {
+				return nil, fail.NewError("corrupted metadata")
+			} else {
+				if val == nil {
+					return nil, fail.NewError("corrupted metadata")
+				}
+			}
+
+			foo, err := aclupro[clusterproperty.NodesV3].UnWrap()
+			if err != nil {
+				return nil, fail.ConvertError(err)
+			}
+
+			gotta, ok := foo.(*propertiesv3.ClusterNodes)
+			if !ok {
+				return nil, fail.NewError("bad cast")
+			}
+
+			for k := range gotta.PrivateNodeByID {
+				clusterInstance.nodes = append(clusterInstance.nodes, k)
+			}
+			for k := range gotta.MasterByID {
+				clusterInstance.masters = append(clusterInstance.masters, k)
+			}
+
+			asta, err := aclupro[clusterproperty.StateV1].UnWrap()
+			if err != nil {
+				return nil, fail.ConvertError(err)
+			}
+
+			gurb, ok := asta.(*propertiesv1.ClusterState)
+			if !ok {
+				return nil, fail.NewError("bad cast")
+			}
+
+			clusterInstance.state = gurb.State
+
+			for k, v := range gotta.ByNumericalID {
+				if strings.Contains(v.Name, "node") {
+					clusterInstance.nodeIPs[k] = v.PrivateIP
+				}
+				if strings.Contains(v.Name, "master") {
+					clusterInstance.masterIPs[k] = v.PrivateIP
+				}
+			}
+
+			xerr = clusterInstance.updateCachedInformation(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			return clusterInstance, nil
+		}()
+		chRes <- result{ga, gerr}
 	}()
 	select {
 	case res := <-chRes:

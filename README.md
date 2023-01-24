@@ -87,7 +87,7 @@ A `Feature` can describe operations using different methods:
 - `package`: just define the package(s) concerned
 - `bash`: uses bash snippets
 - `helm`: uses helm chart, the "package" engine for Kubernetes
-- `ansible`: defines playbook to run, SafeScale provising inventory
+- `ansible`: defines playbook to run, SafeScale providing inventory
 
 Additionally, a `Feature` is able to apply:
 - reverse proxy rules
