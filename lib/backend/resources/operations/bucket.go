@@ -31,7 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"reflect"
@@ -164,9 +163,6 @@ func (instance *bucket) Browse(
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.bucket")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
@@ -265,10 +261,6 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, true, "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
-
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
@@ -334,10 +326,6 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -413,10 +401,6 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	if path == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("path")
 	}
-
-	tracer := debug.NewTracer(ctx, true, "('%s', '%s')", hostName, path).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -572,10 +556,6 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 	if hostName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("hostName")
 	}
-
-	tracer := debug.NewTracer(ctx, true, "('%s')", hostName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()

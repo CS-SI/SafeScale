@@ -41,7 +41,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -649,10 +648,6 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 			return
 		}
 
-		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
-		tracer.Trace("host='%s', command=%s", scmd.hostname, scmd.runCmdString)
-		defer tracer.Exiting()
-
 		subtask := new(errgroup.Group)
 
 		if timeout == 0 {
@@ -1218,7 +1213,6 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		return "", fail.InvalidInstanceContentError("sconf.IPAddress", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname, temporal.FormatDuration(timeout))
 
 	originalPhase := phase

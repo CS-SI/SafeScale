@@ -39,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -538,9 +537,6 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting addition of Feature '%s' on %s '%s'...", featureName, targetType, targetName), fmt.Sprintf("Ending addition of Feature '%s' on %s '%s' with err '%s'", featureName, targetType, targetName, ferr))()
 
 	installer, xerr := instance.determineInstallerForTarget(ctx, target, "check")
@@ -614,9 +610,6 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 	featureName := instance.GetName()
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	var (
 		results resources.Results

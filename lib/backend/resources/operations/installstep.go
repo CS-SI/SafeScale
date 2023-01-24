@@ -259,10 +259,6 @@ func (is *step) Run(inctx context.Context, hosts []resources.Host, v data.Map, s
 }
 
 func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
-	tracer := debug.NewTracer(ctx, true, "").Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
-
 	outcomes := &unitResults{}
 
 	for _, h := range hosts {
@@ -274,7 +270,6 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 		default:
 		}
 
-		tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
 		clonedV, xerr := is.initLoopTurnForHost(ctx, h, v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -291,16 +286,16 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 
 		if !outcomes.Successful() {
 			if is.Worker.action == installaction.Check { // Checks can fail and it's ok
-				tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present",
+				logrus.WithContext(ctx).Tracef("%s(%s):step(%s)@%s finished in %s: not present",
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
 					temporal.FormatDuration(time.Since(is.Worker.GetStartTime())))
 			} else { // other steps are expected to succeed
-				tracer.Trace("%s(%s):step(%s)@%s failed in %s: %s",
+				logrus.WithContext(ctx).Errorf("%s(%s):step(%s)@%s failed in %s: %s",
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
 					temporal.FormatDuration(time.Since(is.Worker.GetStartTime())), outcomes.ErrorMessages())
 			}
 		} else {
-			tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
+			logrus.WithContext(ctx).Infof("%s(%s):step(%s)@%s succeeded in %s.",
 				is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
 				temporal.FormatDuration(time.Since(is.Worker.GetStartTime())))
 		}
@@ -310,10 +305,6 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 }
 
 func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
-	tracer := debug.NewTracer(inctx, true, "").Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(inctx, &ferr, tracer.TraceMessage())
-
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
