@@ -25,8 +25,6 @@ import (
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -68,10 +66,6 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 	if targetRef == "" {
 		return nil, fail.InvalidParameterError("in.TargetRef", "neither Name nor ID fields are provided")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s)", targetType, targetRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	switch targetType {
 	case featuretargettype.Host:
@@ -135,10 +129,6 @@ func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, target
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
 	if xerr != nil {
 		return nil, xerr
@@ -187,10 +177,6 @@ func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetR
 	if featureName == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var (
 		feat resources.Feature
@@ -248,10 +234,6 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 	if featureName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
 	if xerr != nil {
@@ -337,10 +319,6 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
 	if xerr != nil {
 		return xerr
@@ -400,10 +378,6 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 	if featureName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
 	if xerr != nil {

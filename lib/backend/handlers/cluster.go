@@ -178,16 +178,12 @@ func (handler *clusterHandler) Inspect(name string) (_ resources.Cluster, ferr f
 
 	rc, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
-		return nil, xerr
+		return nil, fail.Wrap(xerr, "cluster load problem")
 	}
 
-	exists, xerr := rc.Exists(handler.job.Context())
+	_, xerr = rc.Exists(handler.job.Context())
 	if xerr != nil {
-		return nil, xerr
-	}
-
-	if !exists {
-		return nil, abstract.ResourceNotFoundError("cluster", name)
+		return nil, fail.Wrap(xerr, "existence problem")
 	}
 
 	return rc, nil

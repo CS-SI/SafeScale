@@ -51,6 +51,8 @@ lib/Pipfile.lock
 *.toml
 !Gopkg.toml
 
+what.md
+
 *.new
 *_results.log
 
