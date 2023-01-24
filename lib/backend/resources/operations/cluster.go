@@ -343,6 +343,14 @@ func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (d
 				clusterInstance.masters = append(clusterInstance.masters, k)
 			}
 
+			if val, ok := aclupro[clusterproperty.StateV1]; !ok {
+				return nil, fail.NewError("corrupted metadata")
+			} else {
+				if val == nil {
+					return nil, fail.NewError("corrupted metadata")
+				}
+			}
+
 			asta, err := aclupro[clusterproperty.StateV1].UnWrap()
 			if err != nil {
 				return nil, fail.ConvertError(err)
