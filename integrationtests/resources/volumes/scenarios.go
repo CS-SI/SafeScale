@@ -2,7 +2,7 @@
 // +build integration,volumetests allintegration
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -203,11 +203,6 @@ func DeleteVolumeMounted(t *testing.T) {
 	out, err = helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.45.0/24")
 	require.Nil(t, err)
 	_ = out
-
-	// Note: should be in networks if not already the case
-	// out, err = helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.45.0/24")
-	// require.NotNil(t, err)
-	// require.True(t, strings.Contains(out, "already exist"))
 
 	fmt.Println("Creating VM " + names.Hosts[0])
 

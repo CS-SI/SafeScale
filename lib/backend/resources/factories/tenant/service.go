@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -207,7 +207,7 @@ func (instance service) WaitHostState(ctx context.Context, hostID string, state 
 		var crash error
 		defer func() {
 			if crash != nil {
-				errCh <- fail.ConvertError(crash)
+				errCh <- fail.Wrap(crash)
 				return
 			}
 		}()
@@ -308,9 +308,9 @@ func (instance service) WaitVolumeState(inctx context.Context, volumeID string, 
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	case <-time.After(timeout):
 		return nil, fail.TimeoutError(nil, timeout, "Wait host state timeout")
 	}
@@ -352,9 +352,9 @@ func (instance service) ListTemplates(inctx context.Context, all bool) ([]*abstr
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -394,9 +394,9 @@ func (instance service) FindTemplateByName(inctx context.Context, name string) (
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -489,9 +489,9 @@ func (instance service) FindTemplateBySizing(inctx context.Context, sizing abstr
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -751,9 +751,9 @@ func (instance service) ListTemplatesBySizing(inctx context.Context, sizing abst
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -827,9 +827,9 @@ func (instance service) FilterImages(inctx context.Context, filter string) ([]*a
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -895,9 +895,9 @@ func (instance service) ListImages(inctx context.Context, all bool) ([]*abstract
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -973,9 +973,9 @@ func (instance service) SearchImage(inctx context.Context, osname string) (*abst
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -1028,7 +1028,7 @@ func (instance service) CreateHostWithKeyPair(inctx context.Context, request abs
 		var nilErrNotFound *fail.ErrNotFound = nil // nolint
 		if rerr != nil && rerr != nilErrNotFound {
 			if _, ok := rerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care in previous line
-				chRes <- result{nil, nil, nil, fail.ConvertError(rerr)}
+				chRes <- result{nil, nil, nil, fail.Wrap(rerr)}
 				return
 			}
 			found = false
@@ -1043,7 +1043,7 @@ func (instance service) CreateHostWithKeyPair(inctx context.Context, request abs
 		// Create temporary key pair
 		kpNameuuid, err := uuid.NewV4()
 		if err != nil {
-			chRes <- result{nil, nil, nil, fail.ConvertError(err)}
+			chRes <- result{nil, nil, nil, fail.Wrap(err)}
 			return
 		}
 
@@ -1080,9 +1080,9 @@ func (instance service) CreateHostWithKeyPair(inctx context.Context, request abs
 	case res := <-chRes:
 		return res.hf, res.uc, res.ak, res.rErr
 	case <-ctx.Done():
-		return nil, nil, nil, fail.ConvertError(ctx.Err())
+		return nil, nil, nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, nil, nil, fail.ConvertError(inctx.Err())
+		return nil, nil, nil, fail.Wrap(inctx.Err())
 	}
 
 }
@@ -1120,9 +1120,9 @@ func (instance service) ListHostsByName(inctx context.Context, details bool) (ma
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -1172,9 +1172,9 @@ func (instance service) LookupRuleInSecurityGroup(inctx context.Context, asg *ab
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return false, fail.ConvertError(ctx.Err())
+		return false, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return false, fail.ConvertError(inctx.Err())
+		return false, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -1208,9 +1208,9 @@ func (instance service) InspectHostByName(inctx context.Context, name string) (*
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -1257,9 +1257,9 @@ func (instance service) InspectSecurityGroupByName(inctx context.Context, networ
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -1287,8 +1287,8 @@ func (instance service) ObjectStorageConfiguration(inctx context.Context) (objec
 	case res := <-chRes:
 		return res.rTr, res.rErr
 	case <-ctx.Done():
-		return objectstorage.Config{}, fail.ConvertError(ctx.Err())
+		return objectstorage.Config{}, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return objectstorage.Config{}, fail.ConvertError(inctx.Err())
+		return objectstorage.Config{}, fail.Wrap(inctx.Err())
 	}
 }

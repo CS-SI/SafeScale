@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,8 +31,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -827,7 +827,7 @@ func (p *provider) BindSecurityGroupToHost(ctx context.Context, asg *abstract.Se
 		sgs = entry.(map[string]string)
 	}
 	sgs[asg.ID] = asg.Name
-	xerr = ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", sgs))
+	xerr = ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", sgs), abstract.WithExtraData("MarkedForCreation", false))
 	if xerr != nil {
 		return xerr
 	}
@@ -839,7 +839,7 @@ func (p *provider) BindSecurityGroupToHost(ctx context.Context, asg *abstract.Se
 
 	_, xerr = renderer.Apply(ctx, def)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to delete Network '%s'", ahf.Name)
+		return fail.Wrap(xerr, "failed to update Security Groups of Host '%s'", ahf.Name)
 	}
 
 	return nil
@@ -887,7 +887,7 @@ func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstrac
 			newSGs[k] = v
 		}
 	}
-	xerr = ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", newSGs))
+	xerr = ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", newSGs), abstract.WithExtraData("MarkedForCreation", false))
 	if xerr != nil {
 		return xerr
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
@@ -604,12 +604,12 @@ func reformatHostGroups(in []*protocol.SecurityGroupBond) ([]interface{}, fail.E
 	out := make([]interface{}, 0, len(in))
 	jsoned, err := json.Marshal(in)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	err = json.Unmarshal(jsoned, &out)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	return out, nil
@@ -966,12 +966,12 @@ func hostFeatureRemoveCommand() *cobra.Command {
 func formatSSHConfig(in sshapi.Config) (map[string]interface{}, fail.Error) {
 	jsoned, err := json.Marshal(&in)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 	out := map[string]interface{}{}
 	err = json.Unmarshal(jsoned, &out)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 	if anon, ok := out["primary_gateway_config"]; ok && anon == nil {
 		delete(out, "primary_gateway_config")

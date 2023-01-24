@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,9 +41,9 @@ const (
 
 // NetworkHandler exposes Network handling methods
 type NetworkHandler interface {
-	Create(networkReq abstract.NetworkRequest, subnetReq *abstract.SubnetRequest, gwName string, gwSizing *abstract.HostSizingRequirements) (resources.Network, fail.Error)
+	Create(networkReq abstract.NetworkRequest, subnetReq *abstract.SubnetRequest, gwName string, gwSizing *abstract.HostSizingRequirements) (*resources.Network, fail.Error)
 	Delete(networkRef string, force bool) fail.Error
-	Inspect(networkRef string) (resources.Network, fail.Error)
+	Inspect(networkRef string) (*resources.Network, fail.Error)
 	List(all bool) ([]*abstract.Network, fail.Error)
 }
 
@@ -68,7 +68,7 @@ func NewNetworkHandler(ctx context.Context) (NetworkHandler, fail.Error) {
 }
 
 // Create a new network
-func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnetReq *abstract.SubnetRequest, gwName string, gwSizing *abstract.HostSizingRequirements) (_ resources.Network, ferr fail.Error) {
+func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnetReq *abstract.SubnetRequest, gwName string, gwSizing *abstract.HostSizingRequirements) (_ *resources.Network, ferr fail.Error) {
 	ctx := handler.job.Context()
 	defer func() {
 		if ferr != nil {
@@ -143,7 +143,7 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 
 		subnetReq.NetworkID, err = networkInstance.GetID()
 		if err != nil {
-			return nil, fail.ConvertError(err)
+			return nil, fail.Wrap(err)
 		}
 
 		subnetReq.Name = networkReq.Name
@@ -183,7 +183,7 @@ func (handler *networkHandler) List(all bool) (_ []*abstract.Network, ferr fail.
 }
 
 // Inspect returns infos on a network
-func (handler *networkHandler) Inspect(networkRef string) (_ resources.Network, ferr fail.Error) {
+func (handler *networkHandler) Inspect(networkRef string) (_ *resources.Network, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())

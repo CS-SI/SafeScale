@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -230,7 +230,7 @@ func (instance stack) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			cause := fail.ConvertError(xerr.Cause())
+			cause := fail.Wrap(xerr.Cause())
 			if _, ok := cause.(*fail.ErrNotFound); ok {
 				return nil, fail.NotFoundError("failed to query Security Group %s", asgLabel)
 			}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -282,7 +282,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 	buf := bytes.NewBufferString("")
 	err = tmpl.Option("missingkey=error").Execute(buf, mapped)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	result = buf.Bytes()

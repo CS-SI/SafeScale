@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,14 +63,14 @@ func (p *provider) requestOVHAPI(_ context.Context, url string, httpCode string)
 		alternateAPIConsumerKey,
 	)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	var result interface{}
 	switch httpCode {
 	case "GET":
 		if err := client.Get(url, &result); err != nil {
-			return nil, fail.ConvertError(err)
+			return nil, fail.Wrap(err)
 		}
 	case "PUT":
 		return nil, fail.NotImplementedError(fmt.Sprintf("%s not implemented yet", httpCode)) // FIXME: Technical debt

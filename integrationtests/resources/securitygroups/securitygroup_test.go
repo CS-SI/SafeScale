@@ -2,7 +2,7 @@
 // +build integration,securitygrouptests allintegration
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,6 @@ import (
 )
 
 func Test_SecurityGroupCreate(t *testing.T) {
-	helpers.InSection("securitygroups").Clear().AddScenario(OpenPortClosedByDefaultInGateway).AddScenario(GwFirewallWorks)
+	helpers.InSection("securitygroups").Clear().AddScenario(EnableDisableListHostSecurityGroup).AddScenario(CreateAndDeleteNetworkSecurityGroup).AddScenario(AddAndClearRuleNetworkSecurityGroup).AddScenario(OpenPortClosedByDefaultInGateway).AddScenario(GwFirewallWorks).AddScenario(CreateAndDeleteSubnetSecurityGroup)
 	helpers.RunScenarios(t)
 }

@@ -2,7 +2,7 @@
 // +build integration,sharetests allintegration
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +21,11 @@ package shares
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 
 	"github.com/stretchr/testify/require"
 

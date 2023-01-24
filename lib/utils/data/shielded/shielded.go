@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,19 +28,19 @@ import (
 )
 
 // Shielded allows to store data with controlled access to it
-type Shielded struct {
-	witness clonable.Clonable
+type Shielded[T clonable.Clonable] struct {
+	witness T
 	lock    *sync.RWMutex
 }
 
 // NewShielded creates a new protected data from a cloned witness
-func NewShielded(witness clonable.Clonable) (*Shielded, error) {
-	cloned, err := witness.Clone()
+func NewShielded[T clonable.Clonable](witness T) (*Shielded[T], error) {
+	cloned, err := clonable.CastedClone[T](witness)
 	if err != nil {
 		return nil, err
 	}
 
-	out := &Shielded{
+	out := &Shielded[T]{
 		witness: cloned,
 		lock:    &sync.RWMutex{},
 	}
@@ -49,32 +49,32 @@ func NewShielded(witness clonable.Clonable) (*Shielded, error) {
 
 // IsNull ...
 // satisfies interface clonable.Clonable
-func (instance *Shielded) IsNull() bool {
+func (instance *Shielded[T]) IsNull() bool {
 	return instance == nil || valid.IsNil(instance.witness) || instance.lock == nil
 }
 
 // Clone ...
-func (instance *Shielded) Clone() (clonable.Clonable, error) {
-	cloned, err := instance.witness.Clone()
+func (instance *Shielded[T]) Clone() (clonable.Clonable, error) {
+	castedClone, err := clonable.CastedClone[T](instance.witness)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewShielded(cloned)
+	return NewShielded[T](castedClone)
 }
 
 // Replace ...
-func (instance *Shielded) Replace(in clonable.Clonable) error {
+func (instance *Shielded[T]) Replace(in clonable.Clonable) error {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*Shielded](in)
+	src, err := lang.Cast[*Shielded[T]](in)
 	if err != nil {
 		return err
 	}
 
-	cloned, err := clonable.CastedClone[*Shielded](src.witness)
+	cloned, err := clonable.CastedClone[T](src.witness)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (instance *Shielded) Replace(in clonable.Clonable) error {
 }
 
 // String returns a string representation of the Shielded
-func (instance *Shielded) String() (string, error) {
+func (instance *Shielded[T]) String() (string, error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
@@ -95,7 +95,7 @@ func (instance *Shielded) String() (string, error) {
 }
 
 // Inspect is used to lock a clonable for read
-func (instance *Shielded) Inspect(inspector func(p clonable.Clonable) fail.Error) (ferr fail.Error) {
+func (instance *Shielded[T]) Inspect(inspector func(p T) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
@@ -108,11 +108,11 @@ func (instance *Shielded) Inspect(inspector func(p clonable.Clonable) fail.Error
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	if instance.witness == nil {
+	if any(instance.witness) == any(nil) {
 		return fail.InvalidInstanceContentError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
 	}
 
-	cloned, err := instance.witness.Clone()
+	cloned, err := clonable.CastedClone[T](instance.witness)
 	if err != nil {
 		return fail.InconsistentErrorWithCause(err, nil, "d.witness", "cannot be cloned")
 	}
@@ -124,7 +124,7 @@ func (instance *Shielded) Inspect(inspector func(p clonable.Clonable) fail.Error
 // 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
 // generated with fail.AlteredNothingError().
 // The caller of the Alter() method will then be able to known, when an error occurs, if it's because there was no change.
-func (instance *Shielded) Alter(alterer func(clonable.Clonable) fail.Error) (ferr fail.Error) {
+func (instance *Shielded[T]) Alter(alterer func(T) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
@@ -137,12 +137,12 @@ func (instance *Shielded) Alter(alterer func(clonable.Clonable) fail.Error) (fer
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	if instance.witness == nil {
+	if any(instance.witness) == any(nil) {
 		return fail.InvalidInstanceContentError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
 	}
 
 	var xerr fail.Error
-	clone, err := instance.witness.Clone()
+	clone, err := clonable.CastedClone[T](instance.witness)
 	if err != nil {
 		return fail.Wrap(err)
 	}
@@ -161,7 +161,7 @@ func (instance *Shielded) Alter(alterer func(clonable.Clonable) fail.Error) (fer
 
 // Serialize transforms content of Shielded instance to data suitable for serialization
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (instance *Shielded) Serialize() (_ []byte, ferr fail.Error) {
+func (instance *Shielded[T]) Serialize() (_ []byte, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
@@ -169,7 +169,7 @@ func (instance *Shielded) Serialize() (_ []byte, ferr fail.Error) {
 	}
 
 	var jsoned []byte
-	xerr := instance.Inspect(func(p clonable.Clonable) fail.Error {
+	xerr := instance.Inspect(func(p T) fail.Error {
 		var innerErr error
 		jsoned, innerErr = json.Marshal(p)
 		if innerErr != nil {
@@ -187,7 +187,7 @@ func (instance *Shielded) Serialize() (_ []byte, ferr fail.Error) {
 
 // Deserialize transforms serialization data to valid content of Shielded instance
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (instance *Shielded) Deserialize(buf []byte) (ferr fail.Error) {
+func (instance *Shielded[T]) Deserialize(buf []byte) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil {
@@ -197,7 +197,7 @@ func (instance *Shielded) Deserialize(buf []byte) (ferr fail.Error) {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")
 	}
 
-	return instance.Alter(func(p clonable.Clonable) fail.Error {
+	return instance.Alter(func(p T) fail.Error {
 		if innerErr := json.Unmarshal(buf, p); innerErr != nil {
 			return fail.SyntaxError("failed to unmarshal: %s", innerErr.Error())
 		}

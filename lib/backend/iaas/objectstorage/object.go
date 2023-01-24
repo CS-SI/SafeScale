@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -85,7 +85,7 @@ func newObject(bucket *bucket, objectName string) (object, fail.Error) {
 		case NotFound: // this is an implementation detail of stow
 			return o, nil // nolint, we get an empty object
 		default:
-			return o, fail.ConvertError(err)
+			return o, fail.Wrap(err)
 		}
 	}
 
@@ -142,7 +142,7 @@ func (instance *object) Reload(ctx context.Context) fail.Error {
 		case NotFound: // this is an implementation detail of stow
 			return fail.NotFoundError("failed to reload '%s:%s' from Object Storage", instance.bucket.name, instance.name)
 		default:
-			return fail.ConvertError(err)
+			return fail.Wrap(err)
 		}
 	}
 
@@ -154,7 +154,7 @@ func (instance *object) reloadFromItem(item stow.Item) fail.Error {
 	instance.item = item
 	newMetadata, err := item.Metadata()
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 	instance.metadata = newMetadata
 	return nil
@@ -202,7 +202,7 @@ func (instance *object) Read(ctx context.Context, target io.Writer, from int64, 
 
 	source, serr := instance.item.Open()
 	if serr != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
@@ -216,7 +216,7 @@ func (instance *object) Read(ctx context.Context, target io.Writer, from int64, 
 	if seekTo == 0 && length >= size {
 		r, err := io.CopyN(target, source, size)
 		if err != nil {
-			return fail.ConvertError(err)
+			return fail.Wrap(err)
 		}
 		if r != size {
 			return fail.InconsistentError("read %d bytes instead of expected %d", r, size)
@@ -225,7 +225,7 @@ func (instance *object) Read(ctx context.Context, target io.Writer, from int64, 
 		buf := make([]byte, seekTo)
 		r, err := io.ReadAtLeast(source, buf, int(seekTo))
 		if err != nil {
-			return fail.ConvertError(fail.Wrap(err, "failed to seek Object Storage item"))
+			return fail.Wrap(fail.Wrap(err, "failed to seek Object Storage item"))
 		}
 		if r != int(seekTo) {
 			return fail.InconsistentError("seeked %d bytes instead of expected %d", r, seekTo)
@@ -234,7 +234,7 @@ func (instance *object) Read(ctx context.Context, target io.Writer, from int64, 
 		bufbis := make([]byte, length)
 		r, err = io.ReadAtLeast(source, bufbis, int(length))
 		if err != nil {
-			return fail.ConvertError(fail.Wrap(err, "failed to read from Object Storage item"))
+			return fail.Wrap(fail.Wrap(err, "failed to read from Object Storage item"))
 		}
 		if r != int(length) {
 			return fail.InconsistentError("read %d bytes instead of expected %d", r, length)
@@ -243,7 +243,7 @@ func (instance *object) Read(ctx context.Context, target io.Writer, from int64, 
 		readerbis := bytes.NewReader(bufbis)
 		_, err = io.CopyBuffer(target, readerbis, bufbis)
 		if err != nil {
-			return fail.ConvertError(err)
+			return fail.Wrap(err)
 		}
 	}
 	return nil
@@ -265,7 +265,7 @@ func (instance *object) Write(ctx context.Context, source io.Reader, sourceSize 
 
 	item, err := instance.bucket.stowContainer.Put(instance.name, source, sourceSize, instance.metadata)
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 	return instance.reloadFromItem(item)
 }
@@ -337,7 +337,7 @@ func (instance *object) Delete(ctx context.Context) fail.Error {
 
 	err := instance.bucket.stowContainer.RemoveItem(instance.name)
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 	instance.item = nil
 	return nil
@@ -423,7 +423,7 @@ func (instance object) GetSize(ctx context.Context) (int64, fail.Error) {
 	}
 	size, err := instance.item.Size()
 	if err != nil {
-		return -1, fail.ConvertError(err)
+		return -1, fail.Wrap(err)
 	}
 	return size, nil
 }
@@ -438,7 +438,7 @@ func (instance object) GetETag(ctx context.Context) (string, fail.Error) {
 	}
 	etag, err := instance.item.ETag()
 	if err != nil {
-		return "", fail.ConvertError(err)
+		return "", fail.Wrap(err)
 	}
 	return etag, nil
 }

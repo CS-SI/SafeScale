@@ -2,7 +2,7 @@
 // +build fixme
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ func Test_NewMetadataFolder(t *testing.T) {
 
 		mf, xerr = NewFolder(svc, "myfolder")
 		require.Nil(t, xerr)
-		require.EqualValues(t, reflect.TypeOf(mf).String(), "operations.folder")
+		require.EqualValues(t, reflect.TypeOf(mf).String(), "resources.folder")
 
 		svc._reset()
 		svc._updateOption("metadatakey", "")

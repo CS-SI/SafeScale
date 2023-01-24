@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
@@ -146,13 +147,14 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 		return nil, xerr
 	}
 
-	if isSingle || isGateway {
-		xerr = host.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			ahc, innerErr := clonable.Cast[*abstract.HostCore](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
+	hostTrx, xerr := metadata.NewTransaction[*abstract.HostCore, *resources.Host](ctx, host)
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
 
+	if isSingle || isGateway {
+		xerr = metadata.InspectCarried[*abstract.HostCore](ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
 			sshConfig.PrivateKey = ahc.PrivateKey
 			sshConfig.Port = int(ahc.SSHPort)
 			return nil
@@ -161,13 +163,8 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 			return nil, xerr
 		}
 	} else {
-		var subnetInstance resources.Subnet
-		xerr = host.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			ahc, innerErr := clonable.Cast[*abstract.HostCore](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
+		var subnetInstance *resources.Subnet
+		xerr = metadata.Inspect[*abstract.HostCore](ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
 			sshConfig.PrivateKey = ahc.PrivateKey
 			sshConfig.Port = int(ahc.SSHPort)
 			return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
@@ -212,8 +209,6 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 			}
 		}
 
-		var gwahc *abstract.HostCore
-
 		// gets primary gateway information
 		gw, xerr := subnetInstance.InspectGateway(handler.job.Context(), true)
 		if xerr != nil {
@@ -225,32 +220,24 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 				return nil, xerr
 			}
 		} else {
-			xerr = gw.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-				var innerErr error
-				gwahc, innerErr = clonable.Cast[*abstract.HostCore](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
+			ip, xerr = gw.GetAccessIP(task.Context())
+			if xerr != nil {
+				return nil, xerr
+			}
 
+			gwTrx, xerr := metadata.NewTransaction[*abstract.HostCore, *resources.Host](ctx, gw)
+			if xerr != nil {
+				return nil, xerr
+			}
+			defer gwTrx.TerminateBasedOnError(ctx, &ferr)
+
+			xerr = metadata.InspectCarried[*abstract.HostCore](ctx, gwTrx, func(ahc *abstract.HostCore) fail.Error {
+				sshConfig.GatewayConfig = ssh.NewConfig(ahc.Name, ip, int(ahc.SSHPort), user, ahc.PrivateKey, 0, "", nil, nil)
 				return nil
 			})
 			if xerr != nil {
 				return nil, xerr
 			}
-
-			if ip, xerr = gw.GetAccessIP(task.Context()); xerr != nil {
-				return nil, xerr
-			}
-
-			gwConfig, xerr := gw.GetSSHConfig(task.Context())
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			thePort, _ := gwConfig.GetPort()
-
-			GatewayConfig := ssh.NewConfig(gw.GetName(), ip, int(thePort), user, gwahc.PrivateKey, 0, "", nil, nil)
-			sshConfig.GatewayConfig = GatewayConfig
 		}
 
 		// gets secondary gateway information
@@ -267,28 +254,25 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 				return nil, xerr
 			}
 		} else {
-			xerr = gw.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-				var innerErr error
-				gwahc, innerErr = clonable.Cast[*abstract.HostCore](p)
-				return fail.Wrap(innerErr)
+			ip, xerr = gw.GetAccessIP(task.Context())
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			gwTrx, xerr := metadata.NewTransaction[*abstract.HostCore, *resources.Host](ctx, gw)
+			if xerr != nil {
+				return nil, xerr
+			}
+			defer gwTrx.TerminateBasedOnError(ctx, &ferr)
+
+			xerr = metadata.InspectCarried[*abstract.HostCore](ctx, gwTrx, func(ahc *abstract.HostCore) fail.Error {
+				sshConfig.SecondaryGatewayConfig = ssh.NewConfig(gw.GetName(), ip, int(ahc.SSHPort), user, ahc.PrivateKey, 0, "", nil, nil)
+				return nil
 			})
 			if xerr != nil {
 				return nil, xerr
 			}
 
-			if ip, xerr = gw.GetAccessIP(task.Context()); xerr != nil {
-				return nil, xerr
-			}
-
-			gwConfig, xerr := gw.GetSSHConfig(task.Context())
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			thePort, _ := gwConfig.GetPort()
-
-			GatewayConfig := ssh.NewConfig(gw.GetName(), ip, int(thePort), user, gwahc.PrivateKey, 0, "", nil, nil)
-			sshConfig.SecondaryGatewayConfig = GatewayConfig
 		}
 	}
 
@@ -581,7 +565,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 
 	hid, err := host.GetID()
 	if err != nil {
-		return invalid, "", "", fail.ConvertError(err)
+		return invalid, "", "", fail.Wrap(err)
 	}
 
 	// retrieve ssh config to perform some commands

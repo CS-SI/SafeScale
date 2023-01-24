@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,18 +19,18 @@ package bucketfs
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 // Client defines the structure of a Client object
 type Client struct {
-	host resources.Host
+	host hostTarget
 }
 
 // NewClient creates a new NFS client instance
-func NewClient(target resources.Host) (*Client, fail.Error) {
-	if target == nil {
+func NewClient(target hostTarget) (*Client, fail.Error) {
+	if valid.IsNil(target) {
 		return nil, fail.InvalidParameterCannotBeNilError("target")
 	}
 
@@ -42,7 +42,7 @@ func (c *Client) Mount(ctx context.Context, description Description) fail.Error 
 	if c == nil {
 		return fail.InvalidInstanceError()
 	}
-	if c.host == nil {
+	if valid.IsNil(c.host) {
 		return fail.InvalidInstanceContentError("c.host", "cannot be nil")
 	}
 	if description.BucketName == "" {

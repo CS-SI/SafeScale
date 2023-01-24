@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/frontend/cmdline"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"

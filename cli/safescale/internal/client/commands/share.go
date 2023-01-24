@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -165,7 +165,7 @@ func shareDeleteCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <Share_name>."))
 			}
 
-			// var errMessage atomic.Value
+			// var errMessage atomic.HolderOf
 			// errMessage.Store("")
 
 			if err := ClientSession.Share.Delete(args, 0); err != nil {

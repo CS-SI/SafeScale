@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,12 +35,12 @@ func GenerateRSAKeyPair(name string) (privKey string, pubKey string, ferr fail.E
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return "", "", fail.ConvertError(err)
+		return "", "", fail.Wrap(err)
 	}
 	publicKey := privateKey.PublicKey
 	pub, err := ssh.NewPublicKey(&publicKey)
 	if err != nil {
-		return "", "", fail.ConvertError(err)
+		return "", "", fail.Wrap(err)
 	}
 	pubBytes := ssh.MarshalAuthorizedKey(pub)
 

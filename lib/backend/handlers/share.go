@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,12 +21,12 @@ import (
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
 	sharefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/share"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -38,8 +38,8 @@ import (
 
 // ShareHandler defines API to manipulate Shares
 type ShareHandler interface {
-	Create(string, string, string, string /*[]string, bool, bool, bool, bool, bool, bool, bool*/) (resources.Share, fail.Error)
-	Inspect(string) (resources.Share, fail.Error)
+	Create(string, string, string, string /*[]string, bool, bool, bool, bool, bool, bool, bool*/) (*resources.Share, fail.Error)
+	Inspect(string) (*resources.Share, fail.Error)
 	Delete(string) fail.Error
 	List() (map[string]map[string]*propertiesv1.HostShare, fail.Error)
 	Mount(string, string, string, bool) (*propertiesv1.HostRemoteMount, fail.Error)
@@ -68,7 +68,7 @@ func sanitize(in string) (string, fail.Error) { // nolint
 func (handler *shareHandler) Create(
 	shareName, hostName, apath string, options string, /*securityModes []string,
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,*/
-) (share resources.Share, ferr fail.Error) {
+) (share *resources.Share, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -158,17 +158,17 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "").WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.share"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
-	objs, xerr := sharefactory.New(handler.job.Context())
+	objs, xerr := sharefactory.New(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
 	var servers []string
-	xerr = objs.Browse(task.Context(), func(hostName string, shareID string) fail.Error {
+	xerr = objs.Browse(ctx, func(hostName string, shareID string) fail.Error {
 		servers = append(servers, hostName)
 		return nil
 	})
@@ -183,21 +183,22 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	}
 
 	for _, serverID := range servers {
-		host, xerr := hostfactory.Load(handler.job.Context(), serverID)
+		host, xerr := hostfactory.Load(ctx, serverID)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		xerr = host.Inspect(task.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(hostproperty.SharesV1, func(p clonable.Clonable) fail.Error {
-				hostSharesV1, innerErr := clonable.Cast[*propertiesv1.HostShares](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
+		hostTrx, xerr := metadata.NewTransaction[*abstract.HostCore, *resources.Host](ctx, host)
+		if xerr != nil {
+			return nil, xerr
+		}
+		defer func(trx metadata.Transaction[*abstract.HostCore, *resources.Host]) {
+			trx.TerminateBasedOnError(ctx, &ferr)
+		}(hostTrx)
 
-				shares[serverID] = hostSharesV1.ByID
-				return nil
-			})
+		xerr = metadata.InspectProperty[*abstract.HostCore](ctx, hostTrx, hostproperty.SharesV1, func(hostSharesV1 *propertiesv1.HostShares) fail.Error {
+			shares[serverID] = hostSharesV1.ByID
+			return nil
 		})
 		if xerr != nil {
 			return nil, xerr
@@ -294,7 +295,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 
 // Inspect returns the host and share corresponding to 'shareName'
 // If share isn't found, return (nil, nil, nil, utils.ErrNotFound)
-func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, ferr fail.Error) {
+func (handler *shareHandler) Inspect(shareRef string) (_ *resources.Share, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	rscapi "github.com/CS-SI/SafeScale/v22/lib/backend/resources/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	clusterfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/cluster"
@@ -36,23 +37,23 @@ import (
 // ClusterHandler defines interface to manipulate buckets
 type ClusterHandler interface {
 	List() ([]abstract.Cluster, fail.Error)
-	Create(abstract.ClusterRequest) (resources.Cluster, fail.Error)
+	Create(abstract.ClusterRequest) (*resources.Cluster, fail.Error)
 	State(string) (clusterstate.Enum, fail.Error)
-	Inspect(string) (resources.Cluster, fail.Error)
+	Inspect(string) (*resources.Cluster, fail.Error)
 	Start(string) fail.Error
 	Stop(string) fail.Error
 	Delete(string, bool) fail.Error
-	Expand(string, abstract.HostSizingRequirements, uint, data.Map[string, any], bool) ([]resources.Host, fail.Error)
+	Expand(string, abstract.HostSizingRequirements, uint, data.Map[string, any], bool) ([]*resources.Host, fail.Error)
 	Shrink(string, uint) ([]*propertiesv3.ClusterNode, fail.Error)
-	ListNodes(string) (resources.IndexedListOfClusterNodes, fail.Error)
-	InspectNode(string, string) (resources.Host, fail.Error)
+	ListNodes(string) (rscapi.IndexedListOfClusterNodes, fail.Error)
+	InspectNode(string, string) (*resources.Host, fail.Error)
 	DeleteNode(string, string) fail.Error
 	StopNode(string, string) fail.Error
 	StartNode(string, string) fail.Error
 	StateNode(string, string) (hoststate.Enum, fail.Error)
-	ListMasters(string) (resources.IndexedListOfClusterNodes, fail.Error)
-	FindAvailableMaster(string) (resources.Host, fail.Error)
-	InspectMaster(string, string) (resources.Host, fail.Error)
+	ListMasters(string) (rscapi.IndexedListOfClusterNodes, fail.Error)
+	FindAvailableMaster(string) (*resources.Host, fail.Error)
+	InspectMaster(string, string) (*resources.Host, fail.Error)
 	StopMaster(string, string) fail.Error
 	StartMaster(string, string) fail.Error
 	StateMaster(string, string) (hoststate.Enum, fail.Error)
@@ -90,7 +91,7 @@ func (handler *clusterHandler) List() (_ []abstract.Cluster, ferr fail.Error) {
 
 // Create creates a new cluster
 // Note: returned resources.Cluster has to be .Released() by caller...
-func (handler *clusterHandler) Create(req abstract.ClusterRequest) (_ resources.Cluster, ferr fail.Error) {
+func (handler *clusterHandler) Create(req abstract.ClusterRequest) (_ *resources.Cluster, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -160,7 +161,7 @@ func (handler *clusterHandler) State(name string) (_ clusterstate.Enum, ferr fai
 
 // Inspect a cluster
 // Note: returned resources.Cluster has to be .Released() by caller...
-func (handler *clusterHandler) Inspect(name string) (_ resources.Cluster, ferr fail.Error) {
+func (handler *clusterHandler) Inspect(name string) (_ *resources.Cluster, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -280,7 +281,7 @@ func (handler *clusterHandler) Delete(name string, force bool) (ferr fail.Error)
 
 // Expand adds node(s) to a cluster
 // Note: returned []resources.host have to be .Released() by caller...
-func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingRequirements, count uint, parameters data.Map[string, any], keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
+func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingRequirements, count uint, parameters data.Map[string, any], keepOnFailure bool) (_ []*resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -343,7 +344,7 @@ func (handler *clusterHandler) Shrink(name string, count uint) (_ []*propertiesv
 }
 
 // ListNodes lists node(s) of a cluster
-func (handler *clusterHandler) ListNodes(name string) (_ resources.IndexedListOfClusterNodes, ferr fail.Error) {
+func (handler *clusterHandler) ListNodes(name string) (_ rscapi.IndexedListOfClusterNodes, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -372,7 +373,7 @@ func (handler *clusterHandler) ListNodes(name string) (_ resources.IndexedListOf
 
 // InspectNode inspects a node of the cluster
 // Note: returned resources.Host has to be .Released() by caller...
-func (handler *clusterHandler) InspectNode(clusterName, nodeRef string) (_ resources.Host, ferr fail.Error) {
+func (handler *clusterHandler) InspectNode(clusterName, nodeRef string) (_ *resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -592,7 +593,7 @@ func (handler *clusterHandler) StateNode(clusterName, nodeRef string) (_ hoststa
 }
 
 // ListMasters returns the list of masters of the cluster
-func (handler *clusterHandler) ListMasters(name string) (_ resources.IndexedListOfClusterNodes, ferr fail.Error) {
+func (handler *clusterHandler) ListMasters(name string) (_ rscapi.IndexedListOfClusterNodes, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -621,7 +622,7 @@ func (handler *clusterHandler) ListMasters(name string) (_ resources.IndexedList
 
 // FindAvailableMaster determines the first available master (ie the one that responds on ssh request)
 // Note: returned resources.Host has to be .Released()...
-func (handler *clusterHandler) FindAvailableMaster(name string) (_ resources.Host, ferr fail.Error) {
+func (handler *clusterHandler) FindAvailableMaster(name string) (_ *resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -650,7 +651,7 @@ func (handler *clusterHandler) FindAvailableMaster(name string) (_ resources.Hos
 
 // InspectMaster returns the information about a master of the cluster
 // Note: returned resources.Host has to be .Released() by caller...
-func (handler *clusterHandler) InspectMaster(clusterName, masterRef string) (_ resources.Host, ferr fail.Error) {
+func (handler *clusterHandler) InspectMaster(clusterName, masterRef string) (_ *resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -829,7 +830,7 @@ func (handler *clusterHandler) StateMaster(clusterName, masterRef string) (_ hos
 }
 
 // idOfClusterMember returns the id of the member of the Cluster corresponding to 'ref', or "" if not found
-func idOfClusterMember(list resources.IndexedListOfClusterNodes, ref string) string {
+func idOfClusterMember(list rscapi.IndexedListOfClusterNodes, ref string) string {
 	var id string
 	for _, v := range list {
 		if v.ID == ref || v.Name == ref {

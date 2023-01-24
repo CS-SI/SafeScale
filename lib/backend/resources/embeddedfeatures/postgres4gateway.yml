@@ -1,0 +1,138 @@
+#
+# Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+---
+feature:
+    suitableFor:
+        host: yes
+        cluster: all
+    requirements:
+        features:
+            - docker
+
+    parameters:
+        - PurgeOnRemoval=no
+
+    install:
+        bash:
+            check:
+                pace: docker
+                steps:
+                    docker:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || sfFail 192
+                            sfExit
+
+            add:
+                pace: config,start
+                steps:
+                    config:
+                        timeout: 10
+                        targets:
+                            hosts: yes
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            {{ if .HostIsGateway }}
+                            mkdir -p ${SF_ETCDIR}/postgres4gateway ${SF_VARDIR}/postgres4gateway/
+
+                            POSTGRES_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
+                            echo -n "$POSTGRES_PASSWORD" >${SF_ETCDIR}/postgres4gateway/password
+                            chmod go-rwx ${SF_ETCDIR}/postgres4gateway/password
+
+                            cat >${SF_ETCDIR}/postgres4gateway/docker-compose.yml <<-EOF
+                            version: '3.7'
+                            services:
+                                postgres:
+                                    image: postgres:11-alpine
+                                    environment:
+                                        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+                                    volumes:
+                                        - ${SF_VARDIR}/postgres4gateway:/var/lib/postgresql/data
+                                    ports:
+                                        - "{{ .HostIP }}:5432:5432"
+                                    restart: always
+                                    healthcheck:
+                                        test: ["CMD", "pg_isready", "-U", "postgres"]
+                                        interval: 10s
+                                        timeout: 5s
+                                        retries: 5
+                            EOF
+                            chmod go-rwx ${SF_ETCDIR}/postgres4gateway/docker-compose.yml
+                            sfExit
+                            {{ else }}
+                            sfFail 196 "postgresql4gateway is only allowed on gateways"
+                            {{ end }}
+
+                    start:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            {{ if .HostIsGateway }}
+                            echo "docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 194
+                            sfRetryEx 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || sfFail 195
+                            sfExit
+                            {{ else }}
+                            sfFail 196 "postgresql4gateway is only allowed on gateways"
+                            {{ end }}
+
+            remove:
+                pace: compose,cleanup
+                steps:
+                    compose:
+                        targets:
+                            hosts: yes
+                            gateways: any
+                            masters: no
+                            nodes: no
+                        run: |
+                            {{ if .HostIsGateway }}
+                            echo "docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 196
+                            docker image rm -f postgres:11-alpine
+                            sfExit
+                            {{ else }}
+                            sfFail 196 "postgresql4gateway is only allowed on gateways"
+                            {{ end }}
+
+                    cleanup:
+                        targets:
+                            hosts: no
+                            gateways: all
+                            masters: no
+                            nodes: no
+                        run: |
+                            {{ if .HostIsGateway }}
+                            PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"
+                            if [ "${PURGE_ON_REMOVAL,,}" = "yes" ]; then
+                                rm -rf ${SF_ETCDIR}/postgres4gateway ${SF_VARDIR}/postgres4gateway
+                            fi
+                            sfExit
+                            {{ else }}
+                            sfFail 196 "postgresql4gateway is only allowed on gateways"
+                            {{ end }}
+
+...

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,18 +33,41 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type transaction[T Metadata] struct {
+type Transaction[A clonable.Clonable, T Metadata[A]] interface {
+	Commit(ctx context.Context) fail.Error                       // commits the changes
+	GetName() string                                             // returns transactioned object name
+	GetID() (string, error)                                      // returns transactioned object id
+	Rollback(ctx context.Context) fail.Error                     // ignores the uncommitted changes
+	SilentTerminate(ctx context.Context)                         // closes the connection without returning error, only log if error occurs
+	Terminate(ctx context.Context) fail.Error                    // closes the transaction; will fail if dirty and neither Commit() nor Rollback() has been called
+	TerminateBasedOnError(ctx context.Context, ferr *fail.Error) // closes the transaction, committing if ferr contains no error, rolling back otherwise
+
+	alter(ctx context.Context, callback ResourceCallback[A], opts ...options.Option) fail.Error                            // allows to alter carried value and properties safely
+	alterCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) fail.Error                      // allows to alter carried value safely
+	alterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error   // allows to alter a property safely
+	alterProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error                // allows to alter all properties safely
+	inspect(ctx context.Context, callback ResourceCallback[A], opts ...options.Option) fail.Error                          // allows to inspect carried value and properties safely (after Reload)
+	inspectCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) fail.Error                    // allows to inspect a property safely (after Reload)
+	inspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error // allows to alter a property safely (after Reload)
+	inspectProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error              // allows to inspect all properties safely (after Reload)
+	review(ctx context.Context, callback ResourceCallback[A], opts ...options.Option) fail.Error                           // allows to inspect carried value and properties safely (without Reload)
+	reviewCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) fail.Error                     // allows to inspect a property safely (without Reload)
+	reviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error  // allows to inspect all properties safely (after Reload)
+	reviewProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error               // allows to inspect all properties safely (after Reload)
+}
+
+type transaction[A clonable.Clonable, T Metadata[A]] struct {
 	mu           *sync.Mutex // used for concurrency-safety
 	original     T           // contains the original instance on which the transaction applies
-	coreOriginal *Core       // is used to propagate some methods of 'original' to transaction
+	coreOriginal *Core[A]    // is used to propagate some methods of 'original' to transaction
 	changes      T           // contains the instance with changes
-	coreChanges  *Core
+	coreChanges  *Core[A]
 	dirty        bool // tells there have been changes
 	closed       bool // tells the transaction is closed
 }
 
 // NewTransaction creates a transaction
-func NewTransaction[T Metadata](ctx context.Context, original T) (*transaction[T], fail.Error) {
+func NewTransaction[A clonable.Clonable, T Metadata[A]](ctx context.Context, original T) (*transaction[A, T], fail.Error) {
 	if valid.IsNil(original) {
 		return nil, fail.InvalidParameterCannotBeNilError("original")
 	}
@@ -73,7 +96,7 @@ func NewTransaction[T Metadata](ctx context.Context, original T) (*transaction[T
 	}
 
 	// -- creates transaction instance
-	trx := &transaction[T]{
+	trx := &transaction[A, T]{
 		mu:           &sync.Mutex{},
 		original:     original,
 		coreOriginal: coreOriginal,
@@ -89,7 +112,7 @@ func NewTransaction[T Metadata](ctx context.Context, original T) (*transaction[T
 }
 
 // IsNull returns true if the Core instance represents the null value for Core
-func (trx *transaction[T]) IsNull() bool {
+func (trx *transaction[A, T]) IsNull() bool {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
@@ -97,7 +120,7 @@ func (trx *transaction[T]) IsNull() bool {
 }
 
 // Commit saves the changes
-func (trx *transaction[T]) Commit(ctx context.Context) fail.Error {
+func (trx *transaction[A, T]) Commit(ctx context.Context) fail.Error {
 	if valid.IsNil(trx) {
 		return fail.InvalidInstanceError()
 	}
@@ -108,6 +131,11 @@ func (trx *transaction[T]) Commit(ctx context.Context) fail.Error {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
+	return trx.commit(ctx)
+}
+
+// commit saves the changes
+func (trx *transaction[A, T]) commit(ctx context.Context) fail.Error {
 	if trx.closed {
 		return fail.NotAvailableError("transaction is closed")
 	}
@@ -139,7 +167,7 @@ func (trx *transaction[T]) Commit(ctx context.Context) fail.Error {
 }
 
 // Rollback gives up on changes
-func (trx *transaction[T]) Rollback(ctx context.Context) fail.Error {
+func (trx *transaction[A, T]) Rollback(ctx context.Context) fail.Error {
 	if valid.IsNil(trx) {
 		return fail.InvalidInstanceError()
 	}
@@ -150,16 +178,33 @@ func (trx *transaction[T]) Rollback(ctx context.Context) fail.Error {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
+	return trx.rollback(ctx)
+}
+
+// rollback gives up on changes
+func (trx *transaction[A, T]) rollback(_ context.Context) fail.Error {
 	if trx.closed {
 		return fail.NotAvailableError("transaction is closed")
 	}
 
+	trx.coreChanges.lock.Lock()
+	err := trx.changes.Replace(trx.original)
+	trx.coreChanges.lock.Unlock()
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
+	trx.coreOriginal.lock.RUnlock()
+	trx.coreOriginal.lock.Lock()
+	trx.coreOriginal.committed = false
+	trx.coreOriginal.lock.Unlock()
+	trx.coreOriginal.lock.RLock()
 	trx.dirty = false
 	return nil
 }
 
-// Close makes the transaction not usable anymore and free storage lock
-func (trx *transaction[T]) Close(ctx context.Context) fail.Error {
+// Terminate makes the transaction not usable anymore and free storage lock
+func (trx *transaction[A, T]) Terminate(ctx context.Context) fail.Error {
 	if valid.IsNil(trx) {
 		return fail.InvalidInstanceError()
 	}
@@ -185,16 +230,84 @@ func (trx *transaction[T]) Close(ctx context.Context) fail.Error {
 	return nil
 }
 
-// SilentClose is identical to Close() except it does not return any error, only log it
-func (trx *transaction[T]) SilentClose(ctx context.Context) {
-	xerr := trx.Close(ctx)
+// SilentTerminate is identical to Terminate() except it does not return any error, only log it
+func (trx *transaction[A, T]) SilentTerminate(ctx context.Context) {
+	xerr := trx.Terminate(ctx)
 	if xerr != nil {
 		logrus.WithContext(ctx).Error(xerr.Error())
 	}
 }
 
+// TerminateBasedOnError makes the transaction not usable anymore and free storage lock
+// if ferr is nil, commit if needed, else rollback
+func (trx *transaction[A, T]) TerminateBasedOnError(ctx context.Context, ferr *fail.Error) {
+	if valid.IsNil(trx) {
+		xerr := fail.InvalidInstanceError()
+		if ferr == nil {
+			logrus.WithContext(ctx).Error(xerr)
+		} else {
+			if *ferr != nil {
+				_ = (*ferr).AddConsequence(xerr)
+			} else {
+				*ferr = xerr
+			}
+		}
+		return
+	}
+	if ctx == nil {
+		xerr := fail.InvalidParameterCannotBeNilError("ctx")
+		if ferr == nil {
+			logrus.WithContext(ctx).Error(xerr)
+		} else {
+			if *ferr != nil {
+				_ = (*ferr).AddConsequence(xerr)
+			} else {
+				*ferr = xerr
+			}
+		}
+		return
+	}
+
+	trx.mu.Lock()
+	defer trx.mu.Unlock()
+
+	trx.coreOriginal.lock.RUnlock()
+	if trx.closed {
+		return
+	}
+
+	if trx.dirty {
+		if *ferr != nil {
+			derr := trx.rollback(ctx)
+			if derr != nil {
+				_ = (*ferr).AddConsequence(derr)
+			}
+		} else {
+			derr := trx.commit(ctx)
+			if derr != nil {
+				if ferr != nil {
+					if *ferr != nil {
+						_ = (*ferr).AddConsequence(derr)
+						derr = nil
+					} else {
+						*ferr = derr
+						derr = nil
+					}
+				} else {
+					logrus.WithContext(ctx).Error(derr)
+				}
+			}
+		}
+	}
+
+	// FIXME: unlocking storage
+
+	trx.closed = true
+	return
+}
+
 // Service returns the iaasapi.Service used to create/load the persistent object
-func (trx *transaction[T]) Service() iaasapi.Service {
+func (trx *transaction[A, T]) Service() iaasapi.Service {
 	if trx == nil {
 		return nil
 	}
@@ -205,7 +318,7 @@ func (trx *transaction[T]) Service() iaasapi.Service {
 	return trx.coreOriginal.Service()
 }
 
-func (trx *transaction[T]) Job() jobapi.Job {
+func (trx *transaction[A, T]) Job() jobapi.Job {
 	if trx == nil {
 		return nil
 	}
@@ -218,7 +331,7 @@ func (trx *transaction[T]) Job() jobapi.Job {
 
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
-func (trx *transaction[T]) GetID() (string, error) {
+func (trx *transaction[A, T]) GetID() (string, error) {
 	if valid.IsNull(trx) {
 		return "--invalid--", fail.InvalidInstanceError()
 	}
@@ -231,7 +344,7 @@ func (trx *transaction[T]) GetID() (string, error) {
 
 // GetName returns the name of the data protected
 // satisfies interface data.Identifiable
-func (trx *transaction[T]) GetName() string {
+func (trx *transaction[A, T]) GetName() string {
 	if valid.IsNull(trx) {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return "--invalid--"
@@ -243,7 +356,8 @@ func (trx *transaction[T]) GetName() string {
 	return trx.coreOriginal.GetName()
 }
 
-func (trx *transaction[T]) IsTaken() bool {
+// IsTaken ...
+func (trx *transaction[A, T]) IsTaken() bool {
 	if valid.IsNull(trx) {
 		return false
 	}
@@ -255,7 +369,7 @@ func (trx *transaction[T]) IsTaken() bool {
 }
 
 // Kind returns the kind of object served
-func (trx *transaction[T]) Kind() string {
+func (trx *transaction[A, T]) Kind() string {
 	if valid.IsNull(trx) {
 		logrus.Errorf(fail.InconsistentError("invalid call of Kind() from null value").Error())
 		return "-- invalid --"
@@ -268,7 +382,7 @@ func (trx *transaction[T]) Kind() string {
 }
 
 // Inspect protects the data for shared read
-func (trx *transaction[T]) Inspect(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
+func (trx *transaction[A, T]) inspect(inctx context.Context, callback ResourceCallback[A], opts ...options.Option) (_ fail.Error) {
 	if valid.IsNil(trx) {
 		return fail.InvalidInstanceError()
 	}
@@ -283,11 +397,6 @@ func (trx *transaction[T]) Inspect(inctx context.Context, callback AnyResourceCa
 		return fail.NotAvailableError("transaction is closed")
 	}
 
-	return trx.inspect(inctx, callback, opts...)
-}
-
-// inspect ...
-func (trx *transaction[T]) inspect(inctx context.Context, callback AnyResourceCallback, _ ...options.Option) (_ fail.Error) {
 	if trx.coreChanges.properties == nil {
 		return fail.InvalidInstanceContentError("trx.coreChanges.properties", "cannot be nil")
 	}
@@ -295,15 +404,11 @@ func (trx *transaction[T]) inspect(inctx context.Context, callback AnyResourceCa
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	// type result struct {
-	// 	rErr fail.Error
-	// }
 	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
-			var xerr fail.Error
 
 			timings, xerr := trx.coreChanges.Service().Timings()
 			if xerr != nil {
@@ -321,8 +426,8 @@ func (trx *transaction[T]) inspect(inctx context.Context, callback AnyResourceCa
 					default:
 					}
 
-					return trx.coreChanges.shielded.Inspect(func(p clonable.Clonable) fail.Error {
-						return callback(p, trx.coreChanges.properties)
+					return trx.coreChanges.carried.Inspect(func(carried A) fail.Error {
+						return callback(carried, trx.coreChanges.properties)
 					})
 				},
 				timings.SmallDelay(),
@@ -330,48 +435,49 @@ func (trx *transaction[T]) inspect(inctx context.Context, callback AnyResourceCa
 				6,
 			)
 			if xerr != nil {
-				return fail.ConvertError(xerr.Cause())
+				return fail.Wrap(xerr.Cause())
 			}
 			return nil
 		}()
 		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
 // InspectCarried ...
-func (trx *transaction[T]) InspectCarried(ctx context.Context, callback AnyCarriedCallback, opts ...options.Option) (_ fail.Error) {
-	return trx.Inspect(ctx, func(in clonable.Clonable, _ *serialize.JSONProperties) fail.Error { return callback(in) }, opts...)
+func (trx *transaction[A, T]) inspectCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) (_ fail.Error) {
+	return trx.inspect(ctx, func(in A, _ *serialize.JSONProperties) fail.Error { return callback(in) }, opts...)
 }
 
 // InspectProperty allows to inspect directly a single property
-func (trx *transaction[T]) InspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-	return trx.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+func (trx *transaction[A, T]) inspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
+	return trx.inspect(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(property, callback)
+	}, opts...)
+}
+
+// InspectProperties allows to inspect directly properties
+func (trx *transaction[A, T]) inspectProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error {
+	return trx.inspect(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
+		return callback(props)
 	}, opts...)
 }
 
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change through time).
-func (trx *transaction[T]) Review(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
+func (trx *transaction[A, T]) review(inctx context.Context, callback ResourceCallback[A], opts ...options.Option) (_ fail.Error) {
 	if valid.IsNil(trx) {
 		return fail.InvalidInstanceError()
-	}
-
-	trx.mu.Lock()
-	defer trx.mu.Unlock()
-
-	if trx.closed {
-		return fail.NotAvailableError("transaction is closed")
 	}
 
 	opts = append(opts, WithoutReload())
@@ -379,23 +485,32 @@ func (trx *transaction[T]) Review(inctx context.Context, callback AnyResourceCal
 }
 
 // ReviewCarried ...
-func (trx *transaction[T]) ReviewCarried(ctx context.Context, callback AnyCarriedCallback, opts ...options.Option) (_ fail.Error) {
-	return trx.Review(ctx, func(in clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+func (trx *transaction[A, T]) reviewCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) (_ fail.Error) {
+	return trx.review(ctx, func(in A, _ *serialize.JSONProperties) fail.Error {
 		return callback(in)
 	}, opts...)
 }
 
 // ReviewProperty allows to review directly a single property
-func (trx *transaction[T]) ReviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-	return trx.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+func (trx *transaction[A, T]) reviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
+	return trx.review(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(property, callback)
+	}, opts...)
+}
+
+// ReviewProperties allows to review directly properties
+func (trx *transaction[A, T]) reviewProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error {
+	return trx.review(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
+		return callback(props)
 	}, opts...)
 }
 
 // Alter protects the data for exclusive write
 // Valid options are :
 // - WithoutReload() = disable reloading from metadata storage
-func (trx *transaction[T]) Alter(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
+func (trx *transaction[A, T]) alter(inctx context.Context, callback ResourceCallback[A], opts ...options.Option) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(trx) {
 		return fail.InvalidInstanceError()
 	}
@@ -410,27 +525,8 @@ func (trx *transaction[T]) Alter(inctx context.Context, callback AnyResourceCall
 		return fail.NotAvailableError("transaction is closed")
 	}
 
-	xerr := trx.alter(inctx, callback, opts...)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrAlteredNothing:
-			debug.IgnoreError(xerr)
-			return nil
-		default:
-			return xerr
-		}
-	}
-
-	trx.dirty = true
-	return nil
-}
-
-// alter protects the data for exclusive write
-// Valid options are :
-// - WithoutReload() = disable reloading from metadata storage
-func (trx *transaction[T]) alter(inctx context.Context, callback AnyResourceCallback, _ ...options.Option) (_ fail.Error) {
-	if trx.coreChanges.shielded == nil {
-		return fail.InvalidInstanceContentError("trx.coreChanges.shielded", "cannot be nil")
+	if trx.coreChanges.carried == nil {
+		return fail.InvalidInstanceContentError("trx.coreChanges.carried", "cannot be nil")
 	}
 	name, err := trx.coreChanges.getName()
 	if err != nil {
@@ -447,66 +543,54 @@ func (trx *transaction[T]) alter(inctx context.Context, callback AnyResourceCall
 		return fail.InconsistentError("uninitialized metadata should not be altered")
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
 	trx.coreChanges.lock.Lock()
 	defer trx.coreChanges.lock.Unlock()
 
-	chRes := make(chan result.Holder[struct{}])
-	go func() {
-		defer close(chRes)
-		gerr := func() (ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-			var xerr fail.Error
+	var xerr fail.Error
 
-			// Make sure myself.properties is populated
-			if trx.coreChanges.properties == nil {
-				trx.coreChanges.properties, xerr = serialize.NewJSONProperties("resources." + trx.coreChanges.kind)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return xerr
-				}
-			}
-
-			xerr = trx.coreChanges.shielded.Alter(func(p clonable.Clonable) fail.Error {
-				return callback(p, trx.coreChanges.properties)
-			})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrAlteredNothing:
-					return nil
-				default:
-					return xerr
-				}
-			}
-
-			return nil
-		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
-		chRes <- res
-	}()
-	select {
-	case res := <-chRes:
-		return fail.Wrap(res.Error())
-	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+	// Make sure myself.properties is populated
+	if trx.coreChanges.properties == nil {
+		trx.coreChanges.properties, xerr = serialize.NewJSONProperties("resources." + trx.coreChanges.kind)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 	}
+
+	xerr = trx.coreChanges.carried.Alter(func(carried A) fail.Error {
+		return callback(carried, trx.coreChanges.properties)
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrAlteredNothing:
+			return nil
+		default:
+			return xerr
+		}
+	}
+
+	trx.dirty = true
+	return nil
 }
 
 // AlterCarried ...
-func (trx *transaction[T]) AlterCarried(ctx context.Context, callback AnyCarriedCallback, opts ...options.Option) (_ fail.Error) {
-	return trx.Alter(ctx, func(in clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		return callback(in)
+func (trx *transaction[A, T]) alterCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) (_ fail.Error) {
+	return trx.alter(ctx, func(carried A, _ *serialize.JSONProperties) fail.Error {
+		return callback(carried)
 	}, opts...)
 }
 
 // AlterProperty allows to alter directly a single property
-func (trx *transaction[T]) AlterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-	return trx.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(property, callback)
+func (trx *transaction[A, T]) alterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
+	return trx.alter(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(property, callback)
+	}, opts...)
+}
+
+// AlterProperties allows to alter directly properties
+func (trx *transaction[A, T]) alterProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error {
+	return trx.alter(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
+		return callback(props)
 	}, opts...)
 }

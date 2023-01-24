@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,13 +34,13 @@ import (
 
 // SecurityGroupHandler exposes interface of handler of Security Group requests
 type SecurityGroupHandler interface {
-	AddRule(sgRef string, rule *abstract.SecurityGroupRule) (resources.SecurityGroup, fail.Error)
+	AddRule(sgRef string, rule *abstract.SecurityGroupRule) (*resources.SecurityGroup, fail.Error)
 	Bonds(sgRef string, kind string) ([]*propertiesv1.SecurityGroupBond, []*propertiesv1.SecurityGroupBond, fail.Error)
 	Clear(sgRef string) fail.Error
-	Create(networkRef string, sgName string, description string, rules abstract.SecurityGroupRules) (resources.SecurityGroup, fail.Error)
+	Create(networkRef string, sgName string, description string, rules abstract.SecurityGroupRules) (*resources.SecurityGroup, fail.Error)
 	Delete(sgRef string, force bool) fail.Error
-	DeleteRule(sgRef string, rule *abstract.SecurityGroupRule) (resources.SecurityGroup, fail.Error)
-	Inspect(sgRef string) (resources.SecurityGroup, fail.Error)
+	DeleteRule(sgRef string, rule *abstract.SecurityGroupRule) (*resources.SecurityGroup, fail.Error)
+	Inspect(sgRef string) (*resources.SecurityGroup, fail.Error)
 	List(networkRef string, all bool) ([]*abstract.SecurityGroup, fail.Error)
 	Reset(sgRef string) fail.Error
 	// Sanitize(sgRef string) (ferr fail.Error)
@@ -76,7 +76,7 @@ func (handler *securityGroupHandler) List(networkRef string, all bool) (_ []*abs
 }
 
 // Create creates a new Security Group
-func (handler *securityGroupHandler) Create(networkRef, sgName, description string, rules abstract.SecurityGroupRules) (_ resources.SecurityGroup, ferr fail.Error) {
+func (handler *securityGroupHandler) Create(networkRef, sgName, description string, rules abstract.SecurityGroupRules) (_ *resources.SecurityGroup, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -107,7 +107,7 @@ func (handler *securityGroupHandler) Create(networkRef, sgName, description stri
 
 	nid, err := networkInstance.GetID()
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	xerr = sgInstance.Create(handler.job.Context(), nid, sgName, description, rules)
@@ -172,7 +172,7 @@ func (handler *securityGroupHandler) Reset(sgRef string) (ferr fail.Error) {
 }
 
 // Inspect a host
-func (handler *securityGroupHandler) Inspect(sgRef string) (_ resources.SecurityGroup, ferr fail.Error) {
+func (handler *securityGroupHandler) Inspect(sgRef string) (_ *resources.SecurityGroup, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -220,7 +220,7 @@ func (handler *securityGroupHandler) Delete(sgRef string, force bool) (ferr fail
 }
 
 // AddRule creates a new rule and add it to an eisting security group
-func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.SecurityGroupRule) (_ resources.SecurityGroup, ferr fail.Error) {
+func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.SecurityGroupRule) (_ *resources.SecurityGroup, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -256,7 +256,7 @@ func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.Securi
 }
 
 // DeleteRule deletes a rule identified by id from a security group
-func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.SecurityGroupRule) (_ resources.SecurityGroup, ferr fail.Error) {
+func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.SecurityGroupRule) (_ *resources.SecurityGroup, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())

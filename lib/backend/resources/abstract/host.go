@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -382,7 +382,7 @@ func (hc *HostCore) Deserialize(buf []byte) (ferr fail.Error) {
 	var panicErr error
 	defer func() {
 		if panicErr != nil {
-			ferr = fail.ConvertError(panicErr) // If panic occurred, transforms err to a fail.Error if needed
+			ferr = fail.Wrap(panicErr) // If panic occurred, transforms err to a fail.Error if needed
 		}
 	}()
 	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic

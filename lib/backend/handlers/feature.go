@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package handlers
 import (
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
+	rscapi "github.com/CS-SI/SafeScale/v22/lib/backend/resources/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	clusterfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/cluster"
 	featurefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/feature"
@@ -35,12 +36,12 @@ import (
 
 // FeatureHandler interface defines the methods available to handle Features
 type FeatureHandler interface {
-	Add(featuretargettype.Enum, string, string, data.Map[string, any], resources.FeatureSettings) fail.Error
-	Check(featuretargettype.Enum, string, string, data.Map[string, any], resources.FeatureSettings) fail.Error
+	Add(featuretargettype.Enum, string, string, data.Map[string, any], rscapi.FeatureSettings) fail.Error
+	Check(featuretargettype.Enum, string, string, data.Map[string, any], rscapi.FeatureSettings) fail.Error
 	Export(featuretargettype.Enum, string, string, bool) (*protocol.FeatureExportResponse, fail.Error)
-	Inspect(featuretargettype.Enum, string, string) (resources.Feature, fail.Error)
-	List(featuretargettype.Enum, string, bool) ([]resources.Feature, fail.Error)
-	Remove(featuretargettype.Enum, string, string, data.Map[string, any], resources.FeatureSettings) fail.Error
+	Inspect(featuretargettype.Enum, string, string) (*resources.Feature, fail.Error)
+	List(featuretargettype.Enum, string, bool) ([]*resources.Feature, fail.Error)
+	Remove(featuretargettype.Enum, string, string, data.Map[string, any], rscapi.FeatureSettings) fail.Error
 }
 
 // featureHandler is an implementation of FeatureHandler
@@ -54,7 +55,7 @@ func NewFeatureHandler(job jobapi.Job) FeatureHandler {
 
 // List ...
 // Note: returned []resources.Feature must be .Released by caller
-func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef string, installedOnly bool) (_ []resources.Feature, ferr fail.Error) {
+func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef string, installedOnly bool) (_ []*resources.Feature, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -80,7 +81,7 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 			return nil, xerr
 		}
 
-		var list []resources.Feature
+		var list []*resources.Feature
 		if installedOnly {
 			list, xerr = hostInstance.ListInstalledFeatures(handler.job.Context())
 		} else {
@@ -98,7 +99,7 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 			return nil, xerr
 		}
 
-		var list []resources.Feature
+		var list []*resources.Feature
 		if installedOnly {
 			list, xerr = clusterInstance.ListInstalledFeatures(handler.job.Context())
 		} else {
@@ -117,7 +118,7 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 
 // Inspect ...
 // Note: returned resources.Feature must be .Released() by the caller
-func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, targetRef, featureName string) (_ resources.Feature, ferr fail.Error) {
+func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, targetRef, featureName string) (_ *resources.Feature, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -193,7 +194,7 @@ func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetR
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var (
-		feat resources.Feature
+		feat *resources.Feature
 		xerr fail.Error
 	)
 	if embedded {
@@ -231,7 +232,7 @@ func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetR
 }
 
 // Check checks if a feature installed on target
-func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map[string, any], settings resources.FeatureSettings) (ferr fail.Error) {
+func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map[string, any], settings rscapi.FeatureSettings) (ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -265,7 +266,7 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 			return xerr
 		}
 
-		results, xerr := feat.Check(handler.job.Context(), hostInstance, variables, settings)
+		results, xerr := feat.Check(handler.job.Context(), hostInstance, variables, resources.WithFeatureSettings(settings))
 		if xerr != nil {
 			return xerr
 		}
@@ -285,7 +286,7 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 			return xerr
 		}
 
-		results, xerr := feat.Check(handler.job.Context(), clusterInstance, variables, settings)
+		results, xerr := feat.Check(handler.job.Context(), clusterInstance, variables, resources.WithFeatureSettings(settings))
 		if xerr != nil {
 			return xerr
 		}
@@ -319,7 +320,7 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 // }
 
 // Add ...
-func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map[string, any], settings resources.FeatureSettings) (ferr fail.Error) {
+func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map[string, any], settings rscapi.FeatureSettings) (ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -353,14 +354,14 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 			return xerr
 		}
 
-		results, xerr := feat.Add(handler.job.Context(), hostInstance, variables, settings)
+		results, xerr := feat.Add(handler.job.Context(), hostInstance, variables, resources.WithFeatureSettings(settings))
 		if xerr != nil {
 			return xerr
 		}
 		if results.Successful() {
 			return nil
 		}
-		return fail.ExecutionError(nil, results.AllErrorMessages())
+		return fail.ExecutionError(nil, results.ErrorMessage())
 
 	case featuretargettype.Cluster:
 		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), targetRef)
@@ -368,14 +369,14 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 			return xerr
 		}
 
-		results, xerr := feat.Add(handler.job.Context(), clusterInstance, variables, settings)
+		results, xerr := feat.Add(handler.job.Context(), clusterInstance, variables, resources.WithFeatureSettings(settings))
 		if xerr != nil {
 			return xerr
 		}
 		if results.Successful() {
 			return nil
 		}
-		return fail.ExecutionError(nil, results.AllErrorMessages())
+		return fail.ExecutionError(nil, results.ErrorMessage())
 
 	default:
 		return fail.InvalidParameterError("targetType", "invalid value %d", targetType)
@@ -383,7 +384,7 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 }
 
 // Remove uninstalls a Feature
-func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map[string, any], settings resources.FeatureSettings) (ferr fail.Error) {
+func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetRef, featureName string, variables data.Map[string, any], settings rscapi.FeatureSettings) (ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -417,14 +418,14 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 			return xerr
 		}
 
-		results, xerr := feat.Remove(handler.job.Context(), hostInstance, variables, settings)
+		results, xerr := feat.Remove(handler.job.Context(), hostInstance, variables, resources.WithFeatureSettings(settings))
 		if xerr != nil {
 			return xerr
 		}
 		if results.Successful() {
 			return nil
 		}
-		return fail.ExecutionError(nil, results.AllErrorMessages())
+		return fail.ExecutionError(nil, results.ErrorMessage())
 
 	case featuretargettype.Cluster:
 		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), targetRef)
@@ -432,14 +433,14 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 			return xerr
 		}
 
-		results, xerr := feat.Remove(handler.job.Context(), clusterInstance, variables, settings)
+		results, xerr := feat.Remove(handler.job.Context(), clusterInstance, variables, resources.WithFeatureSettings(settings))
 		if xerr != nil {
 			return xerr
 		}
 		if results.Successful() {
 			return nil
 		}
-		return fail.ExecutionError(nil, results.AllErrorMessages())
+		return fail.ExecutionError(nil, results.ErrorMessage())
 
 	default:
 		return fail.InvalidParameterError("targetType", "failed to handle type %d", targetType)

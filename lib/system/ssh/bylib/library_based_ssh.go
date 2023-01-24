@@ -509,7 +509,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 		case <-enough:
 			return 255, "", "", fail.NewError("received timeout of %s", timeout)
 		case <-ctx.Done():
-			return 255, "", "", fail.ConvertError(ctx.Err())
+			return 255, "", "", fail.Wrap(ctx.Err())
 		}
 	}
 
@@ -522,7 +522,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 
 		return res.errorcode, res.stdout, res.stderr, nil
 	case <-ctx.Done():
-		return 255, "", "", fail.ConvertError(ctx.Err())
+		return 255, "", "", fail.Wrap(ctx.Err())
 	}
 }
 
@@ -537,7 +537,7 @@ func (sc *LibCommand) cleanup() error {
 
 // Close this function exists only to provide compatibility with previous SSH api
 func (sc *LibCommand) Close() fail.Error {
-	return fail.ConvertError(sc.cleanup())
+	return fail.Wrap(sc.cleanup())
 }
 
 // CreateTunneling ...
@@ -986,7 +986,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 		fmt.Printf("Password: ")
 		up, err := terminal.ReadPassword(0)
 		if err != nil {
-			return fail.ConvertError(err)
+			return fail.Wrap(err)
 		}
 		userPass = string(up)
 	}
@@ -998,7 +998,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 
 	tu, sshConfig, err := sconf.CreateTunneling(context.Background())
 	if err != nil {
-		return fail.ConvertError(fmt.Errorf("unable to create tunnels : %s", err.Error()))
+		return fail.Wrap(fmt.Errorf("unable to create tunnels : %s", err.Error()))
 	}
 	defer func() {
 		if tu != nil {
@@ -1008,7 +1008,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 
 	pk, err := sshtunnel.AuthMethodFromPrivateKey([]byte(sshConfig.PrivateKey), nil)
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	config := &ssh.ClientConfig{
@@ -1023,7 +1023,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 	hostport := fmt.Sprintf("%s:%d", "localhost", tu.GetLocalEndpoint().Port())
 	conn, err := ssh.Dial("tcp", hostport, config)
 	if err != nil {
-		return fail.ConvertError(fmt.Errorf("cannot connect %v: %w", hostport, err))
+		return fail.Wrap(fmt.Errorf("cannot connect %v: %w", hostport, err))
 	}
 	defer func() {
 		_ = conn.Close()
@@ -1031,7 +1031,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 
 	session, err := conn.NewSession()
 	if err != nil {
-		return fail.ConvertError(fmt.Errorf("cannot open new session: %w", err))
+		return fail.Wrap(fmt.Errorf("cannot open new session: %w", err))
 	}
 	defer func() {
 		_ = session.Close()
@@ -1040,7 +1040,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 	fd := int(os.Stdin.Fd())
 	state, err := terminal.MakeRaw(fd)
 	if err != nil {
-		return fail.ConvertError(fmt.Errorf("terminal make raw: %s", err))
+		return fail.Wrap(fmt.Errorf("terminal make raw: %s", err))
 	}
 	defer func() {
 		_ = terminal.Restore(fd, state)
@@ -1048,7 +1048,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 
 	w, h, err := terminal.GetSize(fd)
 	if err != nil {
-		return fail.ConvertError(fmt.Errorf("terminal get size: %s", err))
+		return fail.Wrap(fmt.Errorf("terminal get size: %s", err))
 	}
 
 	modes := ssh.TerminalModes{
@@ -1062,7 +1062,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 		term = "xterm-256color"
 	}
 	if err := session.RequestPty(term, h, w, modes); err != nil {
-		return fail.ConvertError(fmt.Errorf("session xterm: %s", err))
+		return fail.Wrap(fmt.Errorf("session xterm: %s", err))
 	}
 
 	session.Stdout = os.Stdout
@@ -1082,7 +1082,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 	}
 
 	if err := session.Shell(); err != nil {
-		return fail.ConvertError(fmt.Errorf("session shell: %s", err))
+		return fail.Wrap(fmt.Errorf("session shell: %s", err))
 	}
 
 	if err := session.Wait(); err != nil {
@@ -1092,7 +1092,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 				return nil
 			}
 		}
-		return fail.ConvertError(fmt.Errorf("sc: %s", err))
+		return fail.Wrap(fmt.Errorf("sc: %s", err))
 	}
 
 	return nil

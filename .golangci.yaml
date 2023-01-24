@@ -27,7 +27,7 @@ run:
   # on Windows.
   skip-files:
     - ".*/rice-box.go$"
-    - "lib/backend/resources/operations/rice-box.go"
+    - "lib/backend/resources/rice-box.go"
     - ".*/retry_test.go"
 
   # Allow multiple parallel golangci-lint instances running.

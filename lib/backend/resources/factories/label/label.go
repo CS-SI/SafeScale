@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://ctagroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://ctagroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,15 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// New creates an instance of resources.Label
-func New(ctx context.Context) (_ resources.Label, ferr fail.Error) {
-	return operations.NewLabel(ctx)
+// New creates an instance of *Label
+func New(ctx context.Context) (_ *resources.Label, ferr fail.Error) {
+	return resources.NewLabel(ctx)
 }
 
-// Load loads the metadata of Security Group a,d returns an instance of resources.Label
-func Load(ctx context.Context, ref string) (_ resources.Label, ferr fail.Error) {
-	return operations.LoadLabel(ctx, ref)
+// Load loads the metadata of Security Group a,d returns an instance of *Label
+func Load(ctx context.Context, ref string) (_ *resources.Label, ferr fail.Error) {
+	return resources.LoadLabel(ctx, ref)
 }

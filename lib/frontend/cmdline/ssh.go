@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,8 +31,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh"
 	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
@@ -145,7 +145,7 @@ func (s sshConsumer) getHostSSHConfig(hostname string) (sshapi.Config, fail.Erro
 	hostConsumer := s.session.Host
 	cfg, err := hostConsumer.SSHConfig(hostname)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	return cfg, nil
@@ -465,7 +465,7 @@ func (s sshConsumer) getSSHConfigFromName(name string, _ time.Duration) (sshapi.
 	service := protocol.NewHostServiceClient(s.session.connection)
 	sshConfig, err := service.SSH(ctx, req)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	return converters.SSHConfigFromProtocolToSystem(sshConfig), nil

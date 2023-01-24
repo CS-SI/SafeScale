@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ func RetryableRemoteCall(inctx context.Context, callback func() error, convertEr
 			if convertError != nil {
 				normalizeError = func(err error) fail.Error { return convertError(err) }
 			} else {
-				normalizeError = fail.ConvertError
+				normalizeError = func(err error) fail.Error { return fail.Wrap(err) }
 			}
 
 			plannedAction := retry.NewAction(
@@ -83,7 +83,7 @@ func RetryableRemoteCall(inctx context.Context, callback func() error, convertEr
 			for _, opt := range options { // now we can override the actions without changing every function that invokes RetryableRemoteCall, only callers interested in such thing will add options parameters in their invocation
 				err := opt(plannedAction)
 				if err != nil {
-					return fail.ConvertError(err)
+					return fail.Wrap(err)
 				}
 			}
 
@@ -111,8 +111,8 @@ func RetryableRemoteCall(inctx context.Context, callback func() error, convertEr
 	case res := <-chRes:
 		return res.rErr
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }

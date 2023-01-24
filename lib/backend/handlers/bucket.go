@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ type BucketHandler interface {
 	List(bool) ([]string, fail.Error)
 	Create(string) fail.Error
 	Delete(string) fail.Error
-	Inspect(string) (resources.Bucket, fail.Error)
+	Inspect(string) (*resources.Bucket, fail.Error)
 	Download(string) ([]byte, fail.Error)
 	Clear(string) fail.Error
 	Upload(string, string) fail.Error
@@ -241,7 +241,7 @@ func (handler *bucketHandler) Clear(name string) (ferr fail.Error) {
 }
 
 // Inspect a bucket
-func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, ferr fail.Error) {
+func (handler *bucketHandler) Inspect(name string) (rb *resources.Bucket, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())

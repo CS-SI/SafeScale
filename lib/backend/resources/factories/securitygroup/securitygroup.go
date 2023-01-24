@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	networkfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/network"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -82,12 +81,12 @@ func List(ctx context.Context, networkRef string, all bool) ([]*abstract.Securit
 	return list, xerr
 }
 
-// New creates an instance of resources.SecurityGroup
-func New(ctx context.Context) (_ resources.SecurityGroup, ferr fail.Error) {
-	return operations.NewSecurityGroup(ctx)
+// New creates an instance of *SecurityGroup
+func New(ctx context.Context) (_ *resources.SecurityGroup, ferr fail.Error) {
+	return resources.NewSecurityGroup(ctx)
 }
 
-// Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
-func Load(ctx context.Context, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
-	return operations.LoadSecurityGroup(ctx, ref)
+// Load loads the metadata of Security Group a,d returns an instance of *SecurityGroup
+func Load(ctx context.Context, ref string) (_ *resources.SecurityGroup, ferr fail.Error) {
+	return resources.LoadSecurityGroup(ctx, ref)
 }

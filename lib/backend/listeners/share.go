@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/common"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
@@ -279,7 +279,7 @@ func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (
 		return nil, xerr
 	}
 
-	// VPL: operations.Host should filter these behavioral differences
+	// VPL: resources.Host should filter these behavioral differences
 	// // DEFENSIVE CODING: this _must not_ happen, but InspectShare has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	// if shareInstance == nil {
 	//	return nil, abstract.ResourceNotFoundError("share", shareRef)

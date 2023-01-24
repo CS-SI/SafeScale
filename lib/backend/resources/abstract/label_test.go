@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,10 +42,10 @@ func (t *BrokenLabel) Replace(p clonable.Clonable) error { return nil }
 func (t *BrokenLabel) Valid() bool                       { return false }
 func (t BrokenLabel) OK() bool                           { return true }
 func (t *BrokenLabel) Serialize() ([]byte, fail.Error) {
-	return nil, fail.ConvertError(fmt.Errorf("I'm broken!"))
+	return nil, fail.Wrap(fmt.Errorf("I'm broken!"))
 }
 func (t *BrokenLabel) Deserialize(buf []byte) (ferr fail.Error) {
-	return fail.ConvertError(fmt.Errorf("I'm broken!"))
+	return fail.Wrap(fmt.Errorf("I'm broken!"))
 }
 func (t *BrokenLabel) GetName() string        { return "broken!" }
 func (t *BrokenLabel) GetID() (string, error) { return "broken", nil }

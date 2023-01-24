@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package handlers
 
 import (
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
@@ -32,8 +33,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -44,21 +43,21 @@ import (
 // HostHandler ...
 type HostHandler interface {
 	BindSecurityGroup(string, string, resources.SecurityGroupActivation) fail.Error
-	Create(abstract.HostRequest, abstract.HostSizingRequirements) (resources.Host, fail.Error)
+	Create(abstract.HostRequest, abstract.HostSizingRequirements) (*resources.Host, fail.Error)
 	Delete(string) fail.Error
 	DisableSecurityGroup(string, string) fail.Error
 	EnableSecurityGroup(string, string) fail.Error
-	Inspect(string) (resources.Host, fail.Error)
+	Inspect(string) (*resources.Host, fail.Error)
 	List(bool) (abstract.HostList, fail.Error)
 	ListSecurityGroups(string) ([]*propertiesv1.SecurityGroupBond, fail.Error)
 	Reboot(string) fail.Error
-	Resize(string, abstract.HostSizingRequirements) (resources.Host, fail.Error)
+	Resize(string, abstract.HostSizingRequirements) (*resources.Host, fail.Error)
 	Start(string) fail.Error
 	Status(string) (hoststate.Enum, fail.Error)
 	Stop(string) fail.Error
 	UnbindSecurityGroup(string, string) fail.Error
 	BindLabel(hostRef, labelRef, value string) fail.Error
-	InspectLabel(hostRef, labelRef string) (resources.Label, string, fail.Error)
+	InspectLabel(hostRef, labelRef string) (*resources.Label, string, fail.Error)
 	ListLabels(hostRef string, kind string) ([]*protocol.LabelInspectResponse, fail.Error)
 	ResetLabel(hostRef, labelRef string) fail.Error
 	UnbindLabel(hostRef, labelRef string) fail.Error
@@ -195,7 +194,7 @@ func (handler *hostHandler) List(all bool) (_ abstract.HostList, ferr fail.Error
 
 // Create creates a new host
 // Note: returned resources.Host has to be .Released() by caller
-func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.HostSizingRequirements) (_ resources.Host, ferr fail.Error) {
+func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.HostSizingRequirements) (_ *resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -207,16 +206,17 @@ func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.Hos
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "('%s')", req.ResourceName).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.host"), "('%s')", req.ResourceName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.New(handler.job.Context())
+	hostInstance, xerr := hostfactory.New(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	_, xerr = hostInstance.Create(handler.job.Context(), req, sizing, nil)
+	_, xerr = hostInstance.Create(ctx, req, sizing, nil)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -225,42 +225,42 @@ func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.Hos
 }
 
 // Resize a Host
-func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequirements) (_ resources.Host, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
+func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequirements) (_ *resources.Host, ferr fail.Error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	ctx := handler.job.Context()
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(ctx)
+		}
+	}()
+	defer fail.OnPanic(&ferr)
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), ref)
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
+
+	hostInstance, xerr := hostfactory.Load(ctx, ref)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	reduce := false
-	xerr = hostInstance.Inspect(handler.job.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
-			hostSizingV2, innerErr := clonable.Cast[*propertiesv2.HostSizing](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
+	hostTrx, xerr := metadata.NewTransaction[*abstract.HostCore, *resources.Host](ctx, hostInstance)
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
 
-			reduce = reduce || (sizing.MinCores < hostSizingV2.RequestedSize.MinCores)
-			reduce = reduce || (sizing.MinRAMSize < hostSizingV2.RequestedSize.MinRAMSize)
-			reduce = reduce || (sizing.MinGPU < hostSizingV2.RequestedSize.MinGPU)
-			reduce = reduce || (sizing.MinCPUFreq < hostSizingV2.RequestedSize.MinCPUFreq)
-			reduce = reduce || (sizing.MinDiskSize < hostSizingV2.RequestedSize.MinDiskSize)
-			return nil
-		})
+	reduce := false
+	xerr = metadata.InspectProperty[*abstract.HostCore](ctx, hostTrx, hostproperty.SizingV2, func(hostSizingV2 *propertiesv2.HostSizing) fail.Error {
+		reduce = reduce || (sizing.MinCores < hostSizingV2.RequestedSize.MinCores)
+		reduce = reduce || (sizing.MinRAMSize < hostSizingV2.RequestedSize.MinRAMSize)
+		reduce = reduce || (sizing.MinGPU < hostSizingV2.RequestedSize.MinGPU)
+		reduce = reduce || (sizing.MinCPUFreq < hostSizingV2.RequestedSize.MinCPUFreq)
+		reduce = reduce || (sizing.MinDiskSize < hostSizingV2.RequestedSize.MinDiskSize)
+		return nil
 	})
 	if xerr != nil {
 		return nil, xerr
@@ -314,7 +314,7 @@ func (handler *hostHandler) Status(ref string) (_ hoststate.Enum, ferr fail.Erro
 }
 
 // Inspect a host
-func (handler *hostHandler) Inspect(ref string) (_ resources.Host, ferr fail.Error) {
+func (handler *hostHandler) Inspect(ref string) (_ *resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -593,38 +593,38 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, kind=%s)", hostRef, kind).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.host"), "(%s, kind=%s)", hostRef, kind).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
+	hostInstance, xerr := hostfactory.Load(ctx, hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
+	hostTrx, xerr := metadata.NewTransaction[*abstract.HostCore, *resources.Host](ctx, hostInstance)
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+
 	var list []*protocol.LabelInspectResponse
-	xerr = hostInstance.Review(handler.job.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.LabelsV1, func(p clonable.Clonable) fail.Error {
-			hlV1, innerErr := clonable.Cast[*propertiesv1.HostLabels](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
+	xerr = metadata.ReviewProperty[*abstract.HostCore](ctx, hostTrx, hostproperty.LabelsV1, func(hlV1 *propertiesv1.HostLabels) fail.Error {
+		for k := range hlV1.ByID {
+			labelInstance, innerXErr := labelfactory.Load(ctx, k)
+			if innerXErr != nil {
+				return innerXErr
 			}
 
-			for k := range hlV1.ByID {
-				labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), k)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				item, innerXErr := labelInstance.ToProtocol(handler.job.Context(), false)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				list = append(list, item)
+			item, innerXErr := labelInstance.ToProtocol(ctx, false)
+			if innerXErr != nil {
+				return innerXErr
 			}
-			return nil
-		})
+
+			list = append(list, item)
+		}
+		return nil
 	})
 	if xerr != nil {
 		return nil, xerr
@@ -634,7 +634,7 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 }
 
 // InspectLabel inspects a Label of a Host
-func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.Label, _ string, ferr fail.Error) {
+func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ *resources.Label, _ string, ferr fail.Error) {
 	if handler == nil {
 		return nil, "", fail.InvalidInstanceError()
 	}
@@ -645,41 +645,41 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 		return nil, "", fail.InvalidParameterCannotBeEmptyStringError("labelRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostRef)
+	hostInstance, xerr := hostfactory.Load(ctx, hostRef)
 	if xerr != nil {
 		return nil, "", xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), labelRef)
+	labelInstance, xerr := labelfactory.Load(ctx, labelRef)
 	if xerr != nil {
 		return nil, "", xerr
 	}
+
+	labelTrx, xerr := metadata.NewTransaction[*abstract.Label, *resources.Label](ctx, labelInstance)
+	if xerr != nil {
+		return nil, "", xerr
+	}
+	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
 
 	var outValue string
-	xerr = labelInstance.Review(handler.job.Context(), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			lhV1, innerErr := clonable.Cast[*propertiesv1.LabelHosts](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
+	xerr = metadata.ReviewProperty[*abstract.Label](ctx, labelTrx, labelproperty.HostsV1, func(lhV1 *propertiesv1.LabelHosts) fail.Error {
+		hin, err := hostInstance.GetID()
+		if err != nil {
+			return fail.Wrap(err)
+		}
 
-			hin, err := hostInstance.GetID()
-			if err != nil {
-				return fail.ConvertError(err)
-			}
+		var ok bool
+		outValue, ok = lhV1.ByID[hin]
+		if !ok {
+			return fail.NotFoundError()
+		}
 
-			var ok bool
-			outValue, ok = lhV1.ByID[hin]
-			if !ok {
-				return fail.NotFoundError()
-			}
-
-			return nil
-		})
+		return nil
 	})
 	if xerr != nil {
 		switch xerr.(type) {

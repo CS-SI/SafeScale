@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"context"
+
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 
 	"golang.org/x/oauth2/google"
@@ -88,17 +89,17 @@ func New(auth iaasoptions.Authentication, localCfg stacks.GCPConfiguration, cfg 
 
 	d1, err := json.MarshalIndent(localCfg, "", "  ")
 	if err != nil {
-		return &stack{}, fail.ConvertError(err)
+		return &stack{}, fail.Wrap(err)
 	}
 
 	cred, err := google.CredentialsFromJSON(context.Background(), d1, iam.CloudPlatformScope)
 	if err != nil {
-		return &stack{}, fail.ConvertError(err)
+		return &stack{}, fail.Wrap(err)
 	}
 
 	gcpStack.ComputeService, err = compute.NewService(context.Background(), option.WithTokenSource(cred.TokenSource))
 	if err != nil {
-		return &stack{}, fail.ConvertError(err)
+		return &stack{}, fail.Wrap(err)
 	}
 
 	gcpStack.selfLinkPrefix = `https://www.googleapis.com/compute/v1/projects/` + localCfg.ProjectID

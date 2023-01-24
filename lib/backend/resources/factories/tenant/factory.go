@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -157,7 +157,7 @@ func UseService(ctx context.Context, opts ...options.Option) (_ iaasapi.Service,
 			BufferItems: 1024,
 		})
 		if err != nil {
-			return nil, fail.ConvertError(err)
+			return nil, fail.Wrap(err)
 		}
 
 		newS := &service{
@@ -275,7 +275,7 @@ func UseService(ctx context.Context, opts ...options.Option) (_ iaasapi.Service,
 				if key, ok := metadataConfig["CryptKey"].(string); ok {
 					ek, err := crypt.NewEncryptionKey([]byte(key))
 					if err != nil {
-						return NullService(), fail.ConvertError(err)
+						return NullService(), fail.Wrap(err)
 					}
 					metadataCryptKey = ek
 				}
@@ -569,7 +569,7 @@ func initObjectStorageLocationConfig(authOpts iaasoptions.Authentication, tenant
 
 		d1, jserr := json.MarshalIndent(googleCfg, "", "  ")
 		if jserr != nil {
-			return config, fail.ConvertError(jserr)
+			return config, fail.Wrap(jserr)
 		}
 
 		config.Credentials = string(d1)
@@ -748,7 +748,7 @@ func initMetadataLocationConfig(authOpts iaasoptions.Authentication, tenant map[
 
 		d1, jserr := json.MarshalIndent(googleCfg, "", "  ")
 		if jserr != nil {
-			return config, fail.ConvertError(jserr)
+			return config, fail.Wrap(jserr)
 		}
 
 		config.Credentials = string(d1)
@@ -824,13 +824,13 @@ func getTenantsFromViperCfg(v *viper.Viper) ([]map[string]interface{}, *viper.Vi
 
 	jsoned, err := json.Marshal(tenantsCfg)
 	if err != nil {
-		return nil, v, fail.ConvertError(err)
+		return nil, v, fail.Wrap(err)
 	}
 
 	var out []map[string]interface{}
 	err = json.Unmarshal(jsoned, &out)
 	if err != nil {
-		return nil, v, fail.ConvertError(err)
+		return nil, v, fail.Wrap(err)
 	}
 	return out, v, nil
 }

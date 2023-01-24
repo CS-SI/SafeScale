@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/result"
 	"github.com/sirupsen/logrus"
 
@@ -38,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -51,12 +51,12 @@ const (
 )
 
 // Core contains the core functions of a persistent object
-type Core struct {
+type Core[T clonable.Clonable] struct {
 	lock              *sync.RWMutex
 	id                atomic.Value
 	name              atomic.Value
 	taken             atomic.Value
-	shielded          *shielded.Shielded
+	carried           *shielded.Shielded[T]
 	properties        *serialize.JSONProperties
 	kind              string
 	folder            storage.Folder
@@ -65,8 +65,11 @@ type Core struct {
 	kindSplittedStore bool // tells if data read/write is done directly from/to folder (when false) or from/to subfolders (when true)
 }
 
+// verify that Label satisfies resources.Label
+var _ Metadata[*abstract.HostCore] = (*Core[*abstract.HostCore])(nil)
+
 // NewCore creates an instance of Core
-func NewCore(ctx context.Context, method string, kind string, path string, abstractRsc clonable.Clonable) (_ *Core, ferr fail.Error) {
+func NewCore[T clonable.Clonable](ctx context.Context, method string, kind string, path string, abstractRsc T) (_ *Core[T], ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -91,17 +94,17 @@ func NewCore(ctx context.Context, method string, kind string, path string, abstr
 		return nil, err
 	}
 
-	protected, cerr := shielded.NewShielded(abstractRsc)
+	protected, cerr := shielded.NewShielded[T](abstractRsc)
 	if cerr != nil {
 		return nil, fail.Wrap(cerr)
 	}
 
-	c := Core{
+	c := Core[T]{
 		lock:       &sync.RWMutex{},
 		kind:       kind,
 		folder:     fld,
 		properties: props,
-		shielded:   protected,
+		carried:    protected,
 	}
 	switch kind {
 	case "organization", "project", "cluster":
@@ -115,27 +118,27 @@ func NewCore(ctx context.Context, method string, kind string, path string, abstr
 }
 
 // IsNull returns true if the Core instance represents the null value for Core
-func (instance *Core) IsNull() bool {
+func (instance *Core[T]) IsNull() bool {
 	return instance == nil || instance.kind == ""
 }
 
 // Clone ...
-func (instance *Core) Clone() (clonable.Clonable, error) {
+func (instance *Core[T]) Clone() (clonable.Clonable, error) {
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newCore := &Core{lock: &sync.RWMutex{}}
+	newCore := &Core[T]{lock: &sync.RWMutex{}}
 	return newCore, newCore.Replace(instance)
 }
 
 // Replace ...
-func (instance *Core) Replace(in clonable.Clonable) error {
+func (instance *Core[T]) Replace(in clonable.Clonable) error {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 
-	src, ok := in.(*Core)
+	src, ok := in.(*Core[T])
 	if !ok {
 		return fail.InvalidParameterError("invalid 'in' type")
 	}
@@ -145,7 +148,7 @@ func (instance *Core) Replace(in clonable.Clonable) error {
 		return err
 	}
 
-	shielded, err := clonable.CastedClone[*shielded.Shielded](src.shielded)
+	carried, err := clonable.CastedClone[*shielded.Shielded[T]](src.carried)
 	if err != nil {
 		return err
 	}
@@ -159,30 +162,31 @@ func (instance *Core) Replace(in clonable.Clonable) error {
 	instance.loaded = src.loaded
 	instance.taken = src.taken
 	instance.properties = properties
-	instance.shielded = shielded
+	instance.carried = carried
 
 	return nil
 }
 
 // Service returns the iaasapi.Service used to create/load the persistent object
-func (instance *Core) Service() iaasapi.Service {
+func (instance *Core[T]) Service() iaasapi.Service {
 	return instance.folder.Service()
 }
 
-func (instance *Core) Job() jobapi.Job {
+func (instance *Core[T]) Job() jobapi.Job {
 	return instance.folder.Job()
 }
 
-func (instance *Core) core() (*Core, fail.Error) {
+func (instance *Core[T]) core() (*Core[T], fail.Error) {
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+
 	return instance, nil
 }
 
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
-func (instance *Core) GetID() (string, error) {
+func (instance *Core[T]) GetID() (string, error) {
 	if valid.IsNull(instance) {
 		return "--invalid--", fail.InvalidInstanceError()
 	}
@@ -195,7 +199,7 @@ func (instance *Core) GetID() (string, error) {
 	return val, nil
 }
 
-func (instance *Core) getID() (string, fail.Error) {
+func (instance *Core[T]) getID() (string, fail.Error) {
 	if instance == nil {
 		return "", fail.InvalidInstanceError()
 	}
@@ -210,7 +214,7 @@ func (instance *Core) getID() (string, fail.Error) {
 
 // GetName returns the name of the data protected
 // satisfies interface data.Identifiable
-func (instance *Core) GetName() string {
+func (instance *Core[T]) GetName() string {
 	if valid.IsNull(instance) {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return "--invalid--"
@@ -225,7 +229,7 @@ func (instance *Core) GetName() string {
 	return name
 }
 
-func (instance *Core) getName() (string, fail.Error) {
+func (instance *Core[T]) getName() (string, fail.Error) {
 	if instance == nil {
 		return "", fail.InvalidInstanceError()
 	}
@@ -238,7 +242,7 @@ func (instance *Core) getName() (string, fail.Error) {
 	return name, nil
 }
 
-func (instance *Core) IsTaken() bool {
+func (instance *Core[T]) IsTaken() bool {
 	if valid.IsNull(instance) {
 		return false
 	}
@@ -252,7 +256,7 @@ func (instance *Core) IsTaken() bool {
 }
 
 // Kind returns the kind of object served
-func (instance *Core) Kind() string {
+func (instance *Core[T]) Kind() string {
 	if valid.IsNull(instance) {
 		logrus.Errorf(fail.InconsistentError("invalid call of Core.Kind() from null value").Error())
 		return "-- invalid --"
@@ -261,29 +265,8 @@ func (instance *Core) Kind() string {
 	return instance.kind
 }
 
-// Inspect protects the data for shared read
-func (instance *Core) Inspect(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) fail.Error {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-	if callback == nil {
-		return fail.InvalidParameterCannotBeNilError("callback")
-	}
-	if instance.properties == nil {
-		return fail.InvalidInstanceContentError("instance.properties", "cannot be nil")
-	}
-
-	trx, xerr := NewTransaction(inctx, instance)
-	if xerr != nil {
-		return xerr
-	}
-	defer trx.SilentClose(inctx)
-
-	return trx.Inspect(inctx, callback, opts...)
-}
-
 // // Inspect protects the data for shared read
-// func (instance *Core) inspect(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
+// func (instance *Core[T]) Inspect(inctx context.Context, callback ResourceCallback[T], opts ...options.Option) fail.Error {
 // 	if valid.IsNil(instance) {
 // 		return fail.InvalidInstanceError()
 // 	}
@@ -294,181 +277,79 @@ func (instance *Core) Inspect(inctx context.Context, callback AnyResourceCallbac
 // 		return fail.InvalidInstanceContentError("instance.properties", "cannot be nil")
 // 	}
 //
-// 	o, xerr := options.New(opts...)
+// 	trx, xerr := NewTransaction[T, *Core[T]](inctx, instance)
 // 	if xerr != nil {
 // 		return xerr
 // 	}
+// 	defer trx.SilentTerminate(inctx)
 //
-// 	noReload, xerr := options.Value[bool](o, OptionWithoutReloadKey)
-// 	if xerr != nil {
-// 		switch xerr.(type) {
-// 		case *fail.ErrNotFound:
-// 			// continue
-// 		default:
-// 			return xerr
-// 		}
-// 	}
-//
-// 	ctx, cancel := context.WithCancel(inctx)
-// 	defer cancel()
-//
-// 	type result struct {
-// 		rErr fail.Error
-// 	}
-// 	chRes := make(chan result)
-// 	go func() {
-// 		defer close(chRes)
-// 		gerr := func() (ferr fail.Error) {
-// 			defer fail.OnPanic(&ferr)
-// 			var xerr fail.Error
-//
-// 			timings, xerr := instance.Service().Timings()
-// 			if xerr != nil {
-// 				return xerr
-// 			}
-//
-// 			if !noReload {
-// 				// Reload reloads data from Object Storage to be sure to have the last revision
-// 				xerr = retry.WhileUnsuccessfulWithLimitedRetries(
-// 					func() error {
-// 						select {
-// 						case <-ctx.Done():
-// 							return retry.StopRetryError(ctx.Err())
-// 						default:
-// 						}
-//
-// 						instance.lock.Lock()
-// 						xerr = instance.reload(ctx)
-// 						instance.lock.Unlock() // nolint
-// 						xerr = debug.InjectPlannedFail(xerr)
-// 						if xerr != nil {
-// 							return fail.Wrap(xerr, "failed to reload metadata")
-// 						}
-//
-// 						return nil
-// 					},
-// 					timings.SmallDelay(),
-// 					timings.ContextTimeout(),
-// 					6,
-// 				)
-// 				if xerr != nil {
-// 					return fail.Wrap(xerr.Cause())
-// 				}
-// 			}
-//
-// 			instance.lock.RLock()
-// 			defer instance.lock.RUnlock()
-//
-// 			xerr = retry.WhileUnsuccessfulWithLimitedRetries(
-// 				func() error {
-// 					select {
-// 					case <-ctx.Done():
-// 						return retry.StopRetryError(ctx.Err())
-// 					default:
-// 					}
-//
-// 					return instance.shielded.Inspect(func(p clonable.Clonable) fail.Error {
-// 						return callback(p, instance.properties)
-// 					})
-// 				},
-// 				timings.SmallDelay(),
-// 				timings.ConnectionTimeout(),
-// 				6,
-// 			)
-// 			if xerr != nil {
-// 				return fail.ConvertError(xerr.Cause())
-// 			}
-// 			return nil
-// 		}()
-// 		chRes <- result{gerr}
-// 	}()
-// 	select {
-// 	case res := <-chRes:
-// 		return res.rErr
-// 	case <-ctx.Done():
-// 		return fail.ConvertError(ctx.Err())
-// 	case <-inctx.Done():
-// 		return fail.ConvertError(inctx.Err())
-// 	}
+// 	return trx.inspect(inctx, callback, opts...)
 // }
-
-// InspectProperty allows to inspect directly a single property
-func (instance *Core) InspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-	return instance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(property, callback)
-	}, opts...)
-}
-
-// Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
-// to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
-// change through time).
-func (instance *Core) Review(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (_ fail.Error) {
-	opts = append(opts, WithoutReload())
-	return instance.Inspect(inctx, callback, opts...)
-}
-
-// ReviewProperty allows to review directly a single property
-func (instance *Core) ReviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-	return instance.Review(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(property, callback)
-	}, opts...)
-}
-
-// Alter protects the data for exclusive write
-// Valid options are :
-// - WithoutReload() = disable reloading from metadata storage
-func (instance *Core) Alter(inctx context.Context, callback AnyResourceCallback, opts ...options.Option) (ferr fail.Error) {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-	if callback == nil {
-		return fail.InvalidParameterCannotBeNilError("callback")
-	}
-	if instance.shielded == nil {
-		return fail.InvalidInstanceContentError("instance.shielded", "cannot be nil")
-	}
-	if name, err := instance.getName(); err != nil {
-		return fail.InconsistentError("uninitialized metadata should not be altered")
-	} else if name == "" {
-		return fail.InconsistentError("uninitialized metadata should not be altered")
-	}
-	if id, err := instance.getID(); err != nil {
-		return fail.InconsistentError("uninitialized metadata should not be altered")
-	} else if id == "" {
-		return fail.InconsistentError("uninitialized metadata should not be altered")
-	}
-
-	trx, xerr := NewTransaction(inctx, instance)
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		derr := trx.Close(inctx)
-		if derr != nil {
-			if ferr != nil {
-				_ = ferr.AddConsequence(derr)
-			} else {
-				ferr = derr
-			}
-		}
-	}()
-
-	return trx.Alter(inctx, callback, opts...)
-}
-
-// // alter protects the data for exclusive write
-// // Valid options are :
-// // - WithoutReload() = disable reloading from metadata storage
-// func (instance *Core) alter(inctx context.Context, callback AnyResourceCallback, _ ...options.Option) (_ fail.Error) {
+//
+// // InspectCarried protects the data for shared read
+// func (instance *Core[T]) InspectCarried(inctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error {
 // 	if valid.IsNil(instance) {
 // 		return fail.InvalidInstanceError()
 // 	}
 // 	if callback == nil {
 // 		return fail.InvalidParameterCannotBeNilError("callback")
 // 	}
-// 	if instance.shielded == nil {
-// 		return fail.InvalidInstanceContentError("instance.shielded", "cannot be nil")
+//
+// 	trx, xerr := NewTransaction[T, *Core[T]](inctx, instance)
+// 	if xerr != nil {
+// 		return xerr
 // 	}
+// 	defer trx.SilentTerminate(inctx)
+//
+// 	return trx.inspectCarried(inctx, func(carried T) fail.Error {
+// 		return callback(carried)
+// 	}, opts...)
+// }
+//
+// // InspectProperty allows to inspect directly a single property
+// func (instance *Core[T]) InspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
+// 	return instance.Inspect(ctx, func(_ T, props *serialize.JSONProperties) fail.Error {
+// 		return props.Inspect(property, callback)
+// 	}, opts...)
+// }
+//
+// // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
+// // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
+// // change through time).
+// func (instance *Core[T]) Review(ctx context.Context, callback ResourceCallback[T], opts ...options.Option) fail.Error {
+// 	opts = append(opts, WithoutReload())
+// 	return instance.Inspect(ctx, callback, opts...)
+// }
+//
+// // ReviewCarried allows to access data contained in the instance, without reloading from the Object Storage; it's intended
+// // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
+// // change through time).
+// func (instance *Core[T]) ReviewCarried(ctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error {
+// 	opts = append(opts, WithoutReload())
+// 	return instance.InspectCarried(ctx, callback, opts...)
+// }
+//
+// // ReviewProperty allows to review directly a single property
+// func (instance *Core[T]) ReviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
+// 	return instance.Review(ctx, func(_ T, props *serialize.JSONProperties) fail.Error {
+// 		return props.Inspect(property, callback)
+// 	}, opts...)
+// }
+//
+// // Alter protects the data for exclusive write
+// // Valid options are :
+// // - WithoutReload() = disable reloading from metadata storage
+// func (instance *Core[T]) Alter(inctx context.Context, callback ResourceCallback[T], opts ...options.Option) (ferr fail.Error) {
+// 	if valid.IsNil(instance) {
+// 		return fail.InvalidInstanceError()
+// 	}
+// 	if callback == nil {
+// 		return fail.InvalidParameterCannotBeNilError("callback")
+// 	}
+// 	if instance.carried == nil {
+// 		return fail.InvalidInstanceContentError("instance.carried", "cannot be nil")
+// 	}
+//
 // 	name, err := instance.getName()
 // 	if err != nil {
 // 		return fail.InconsistentError("uninitialized metadata should not be altered")
@@ -476,6 +357,7 @@ func (instance *Core) Alter(inctx context.Context, callback AnyResourceCallback,
 // 	if name == "" {
 // 		return fail.InconsistentError("uninitialized metadata should not be altered")
 // 	}
+//
 // 	id, err := instance.getID()
 // 	if err != nil {
 // 		return fail.InconsistentError("uninitialized metadata should not be altered")
@@ -484,84 +366,67 @@ func (instance *Core) Alter(inctx context.Context, callback AnyResourceCallback,
 // 		return fail.InconsistentError("uninitialized metadata should not be altered")
 // 	}
 //
-// 	ctx, cancel := context.WithCancel(inctx)
-// 	defer cancel()
-//
-// 	instance.lock.Lock()
-// 	defer instance.lock.Unlock()
-//
-// 	type result struct {
-// 		rErr fail.Error
+// 	trx, xerr := NewTransaction[T, *Core[T]](inctx, instance)
+// 	if xerr != nil {
+// 		return xerr
 // 	}
-// 	chRes := make(chan result)
-// 	go func() {
-// 		defer close(chRes)
-// 		gerr := func() (ferr fail.Error) {
-// 			defer fail.OnPanic(&ferr)
-// 			var xerr fail.Error
+// 	defer trx.TerminateBasedOnError(inctx, &ferr)
 //
-// 			// Make sure myself.properties is populated
-// 			if instance.properties == nil {
-// 				instance.properties, xerr = serialize.NewJSONProperties("resources." + instance.kind)
-// 				xerr = debug.InjectPlannedFail(xerr)
-// 				if xerr != nil {
-// 					return xerr
-// 				}
-// 			}
-//
-// 			xerr = instance.shielded.Alter(func(p clonable.Clonable) fail.Error {
-// 				return callback(p, instance.properties)
-// 			})
-// 			xerr = debug.InjectPlannedFail(xerr)
-// 			if xerr != nil {
-// 				switch xerr.(type) {
-// 				case *fail.ErrAlteredNothing:
-// 					return nil
-// 				default:
-// 					return xerr
-// 				}
+// 	xerr = trx.alter(inctx, callback, opts...)
+// 	if xerr != nil {
+// 		switch xerr.(type) {
+// 		case *fail.ErrAlteredNothing:
+// 			derr := trx.Rollback(inctx)
+// 			if derr != nil {
+// 				return derr
 // 			}
 //
 // 			return nil
-// 		}()
-// 		chRes <- result{gerr}
-// 	}()
-// 	select {
-// 	case res := <-chRes:
-// 		return res.rErr
-// 	case <-ctx.Done():
-// 		return fail.ConvertError(ctx.Err())
-// 	case <-inctx.Done():
-// 		return fail.ConvertError(inctx.Err())
+// 		default:
+// 			derr := trx.Rollback(inctx)
+// 			if derr != nil {
+// 				_ = xerr.AddConsequence(derr)
+// 			}
+// 			return xerr
+// 		}
 // 	}
+//
+// 	return trx.Commit(inctx)
+// }
+//
+// // AlterCarried allows to alter directly the carried value
+// func (instance *Core[T]) AlterCarried(ctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error {
+// 	return instance.Alter(ctx, func(carried T, _ *serialize.JSONProperties) fail.Error {
+// 		return callback(carried)
+// 	}, opts...)
+// }
+//
+// // AlterProperty allows to alter directly a single property
+// func (instance *Core[T]) AlterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
+// 	return instance.Alter(ctx, func(_ T, props *serialize.JSONProperties) fail.Error {
+// 		return props.Alter(property, callback)
+// 	}, opts...)
 // }
 
-// AlterProperty allows to alter directly a single property
-func (instance *Core) AlterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-	return instance.Alter(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(property, callback)
-	}, opts...)
-}
-
 // Carry links metadata with real data
-// If c is already carrying a shielded data, returns fail.NotAvailableError
+// If c is already carrying a carried data, returns fail.NotAvailableError
 //
 // errors returned :
 // - fail.ErrInvalidInstance
 // - fail.ErrInvalidParameter
 // - fail.ErrNotAvailable if the Core instance already carries a data
-func (instance *Core) Carry(inctx context.Context, abstractResource clonable.Clonable) (_ fail.Error) {
+func (instance *Core[T]) Carry(inctx context.Context, abstractResource T) (_ fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 	if !valid.IsNil(instance) && instance.IsTaken() {
 		return fail.InvalidRequestError("cannot carry, already carries something")
 	}
-	if abstractResource == nil {
+	if any(abstractResource) == nil {
 		return fail.InvalidParameterCannotBeNilError("abstractResource")
 	}
-	if instance.shielded == nil {
-		return fail.InvalidInstanceContentError("instance.shielded", "cannot be nil")
+	if instance.carried == nil {
+		return fail.InvalidInstanceContentError("instance.carried", "cannot be nil")
 	}
 	if instance.loaded {
 		return fail.NotAvailableError("already carrying a value")
@@ -573,10 +438,7 @@ func (instance *Core) Carry(inctx context.Context, abstractResource clonable.Clo
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
@@ -584,7 +446,7 @@ func (instance *Core) Carry(inctx context.Context, abstractResource clonable.Clo
 			var xerr fail.Error
 
 			var cerr error
-			instance.shielded, cerr = shielded.NewShielded(abstractResource)
+			instance.carried, cerr = shielded.NewShielded(abstractResource)
 			if cerr != nil {
 				return fail.Wrap(cerr)
 			}
@@ -611,7 +473,7 @@ func (instance *Core) Carry(inctx context.Context, abstractResource clonable.Clo
 				return xerr
 			}
 
-			tfResource, ok := abstractResource.(terraformerapi.Resource)
+			tfResource, ok := any(abstractResource).(terraformerapi.Resource)
 			if !ok {
 				return fail.InconsistentError("failed to cast '%s' to 'terraformerapi.Resource'", reflect.TypeOf(abstractResource).String())
 			}
@@ -629,22 +491,23 @@ func (instance *Core) Carry(inctx context.Context, abstractResource clonable.Clo
 
 			return nil
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
 // updateIdentity updates instance cached identity
-func (instance *Core) updateIdentity() fail.Error {
+func (instance *Core[T]) updateIdentity() fail.Error {
 	if instance.loaded {
-		issue := instance.shielded.Alter(func(p clonable.Clonable) fail.Error {
+		issue := instance.carried.Alter(func(p T) fail.Error {
 			ident, err := lang.Cast[data.Identifiable](p)
 			if err != nil {
 				return fail.InconsistentError("'data.Identifiable' expected, '%s' provided", reflect.TypeOf(p).String())
@@ -652,7 +515,7 @@ func (instance *Core) updateIdentity() fail.Error {
 
 			idd, err := ident.GetID()
 			if err != nil {
-				return fail.ConvertError(err)
+				return fail.Wrap(err)
 			}
 
 			if loaded, ok := instance.id.Load().(string); ok {
@@ -682,7 +545,7 @@ func (instance *Core) updateIdentity() fail.Error {
 }
 
 // Read gets the data from Object Storage
-func (instance *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
+func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -699,10 +562,7 @@ func (instance *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
@@ -776,7 +636,13 @@ func (instance *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 				return xerr
 			}
 
-			return instance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
+			trx, xerr := NewTransaction[T, *Core[T]](ctx, instance)
+			if xerr != nil {
+				return xerr
+			}
+			defer trx.TerminateBasedOnError(ctx, &ferr)
+
+			return trx.reviewCarried(ctx, func(p T) fail.Error {
 				myjob, innerXErr := jobapi.FromContext(ctx)
 				if innerXErr != nil {
 					return innerXErr
@@ -800,31 +666,29 @@ func (instance *Core) Read(inctx context.Context, ref string) (_ fail.Error) {
 				return nil
 			})
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
-
 }
 
 // ReadByID reads a metadata identified by ID from Object Storage
-func (instance *Core) ReadByID(inctx context.Context, id string) (_ fail.Error) {
+func (instance *Core[T]) ReadByID(inctx context.Context, id string) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
@@ -911,27 +775,25 @@ func (instance *Core) ReadByID(inctx context.Context, id string) (_ fail.Error) 
 
 			return instance.updateIdentity()
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
 // readByID reads a metadata identified by ID from Object Storage
-func (instance *Core) readByID(inctx context.Context, id string) fail.Error {
+func (instance *Core[T]) readByID(inctx context.Context, id string) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
@@ -992,32 +854,30 @@ func (instance *Core) readByID(inctx context.Context, id string) fail.Error {
 			)
 
 			if rerr != nil {
-				return fail.ConvertError(rerr.Cause())
+				return fail.Wrap(rerr.Cause())
 			}
 
 			return nil
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
 // readByName reads a metadata identified by name
-func (instance *Core) readByName(inctx context.Context, name string) fail.Error {
+func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
@@ -1070,32 +930,30 @@ func (instance *Core) readByName(inctx context.Context, name string) fail.Error 
 				timings.ContextTimeout(),
 			)
 			if rerr != nil {
-				return fail.ConvertError(rerr.Cause())
+				return fail.Wrap(rerr.Cause())
 			}
 
 			return nil
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
 // write updates the metadata corresponding to the host in the Object Storage
-func (instance *Core) write(inctx context.Context) fail.Error {
+func (instance *Core[T]) write(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
@@ -1143,20 +1001,21 @@ func (instance *Core) write(inctx context.Context) fail.Error {
 			}
 			return nil
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
 // Reload reloads the content from the Object Storage
-func (instance *Core) Reload(inctx context.Context) (ferr fail.Error) {
+func (instance *Core[T]) Reload(inctx context.Context) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1167,10 +1026,7 @@ func (instance *Core) Reload(inctx context.Context) (ferr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
@@ -1178,28 +1034,26 @@ func (instance *Core) Reload(inctx context.Context) (ferr fail.Error) {
 
 			return instance.reload(ctx)
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
 // reload loads the content from the Object Storage
 // Note: must be called after locking the instance
-func (instance *Core) reload(inctx context.Context) fail.Error {
+func (instance *Core[T]) reload(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
@@ -1309,20 +1163,21 @@ func (instance *Core) reload(inctx context.Context) fail.Error {
 
 			return nil
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
 // BrowseFolder walks through folder and executes a callback for each entry
-func (instance *Core) BrowseFolder(inctx context.Context, callback func(buf []byte) fail.Error) (_ fail.Error) {
+func (instance *Core[T]) BrowseFolder(inctx context.Context, callback func(buf []byte) fail.Error) (_ fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1362,14 +1217,14 @@ func (instance *Core) BrowseFolder(inctx context.Context, callback func(buf []by
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
 // LookupByName tells if an entry exists by name in the folder
-func (instance *Core) LookupByName(inctx context.Context, name string) (_ fail.Error) {
+func (instance *Core[T]) LookupByName(inctx context.Context, name string) (_ fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1386,10 +1241,7 @@ func (instance *Core) LookupByName(inctx context.Context, name string) (_ fail.E
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 
@@ -1398,20 +1250,21 @@ func (instance *Core) LookupByName(inctx context.Context, name string) (_ fail.E
 
 			return instance.folder.Lookup(ctx, byNameFolderName, name)
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
 // Delete deletes the metadata
-func (instance *Core) Delete(inctx context.Context) (_ fail.Error) {
+func (instance *Core[T]) Delete(inctx context.Context) (_ fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1422,10 +1275,7 @@ func (instance *Core) Delete(inctx context.Context) (_ fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
@@ -1437,22 +1287,22 @@ func (instance *Core) Delete(inctx context.Context) (_ fail.Error) {
 			)
 
 			// First remove entry from scope registered abstracts
-			innerXErr := instance.shielded.Inspect(func(p clonable.Clonable) fail.Error {
-				abstractResource, ok := p.(terraformerapi.Resource)
+			xerr := instance.carried.Inspect(func(p T) fail.Error {
+				abstractResource, ok := any(p).(terraformerapi.Resource)
 				if !ok {
 					return fail.InconsistentError("failed to cast '%s' to 'terraformerapi.Resource'", reflect.TypeOf(p).String())
 				}
 
 				// Registers the abstract in scope
-				myjob, xerr := jobapi.FromContext(inctx)
-				if xerr != nil {
-					return xerr
+				myjob, innerXErr := jobapi.FromContext(inctx)
+				if innerXErr != nil {
+					return innerXErr
 				}
 
 				return myjob.Scope().UnregisterResource(abstractResource)
 			})
-			if innerXErr != nil {
-				return innerXErr
+			if xerr != nil {
+				return xerr
 			}
 
 			// Checks entries exist in Object Storage
@@ -1462,8 +1312,7 @@ func (instance *Core) Delete(inctx context.Context) (_ fail.Error) {
 					return fail.InconsistentError("field 'id' is not set with string")
 				}
 
-				var xerr fail.Error
-				xerr = instance.folder.Lookup(ctx, byIDFolderName, id)
+				xerr := instance.folder.Lookup(ctx, byIDFolderName, id)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -1552,74 +1401,49 @@ func (instance *Core) Delete(inctx context.Context) (_ fail.Error) {
 
 			return nil
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
-func (instance *Core) String(inctx context.Context) (string, fail.Error) {
+func (instance *Core[T]) String() (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	type result struct {
-		rTr  string
-		rErr fail.Error
+	dumped, err := instance.carried.String()
+	if err != nil {
+		return "", fail.Wrap(err)
 	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		dump, gerr := func() (_ string, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
 
-			dumped, err := instance.shielded.String()
-			if err != nil {
-				return "", fail.ConvertError(err)
-			}
-
-			props, err := instance.properties.String()
-			if err != nil {
-				return "", fail.ConvertError(err)
-			}
-
-			return dumped + props, nil
-		}()
-		chRes <- result{dump, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return "", fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return "", fail.ConvertError(inctx.Err())
+	props, err := instance.properties.String()
+	if err != nil {
+		return "", fail.Wrap(err)
 	}
+
+	return dumped + " " + props, nil
 }
 
 // unsafeSerialize serializes instance into bytes (output json code)
 // Note: must be called after locking the instance
-func (instance *Core) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) {
+func (instance *Core[T]) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
-		rTr  []byte
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[[]byte])
 	go func() {
 		defer close(chRes)
 		gtr, gerr := func() (_ []byte, ferr fail.Error) {
@@ -1632,7 +1456,7 @@ func (instance *Core) unsafeSerialize(inctx context.Context) ([]byte, fail.Error
 			)
 
 			var xerr fail.Error
-			shieldedJSONed, xerr = instance.shielded.Serialize()
+			shieldedJSONed, xerr = instance.carried.Serialize()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -1641,7 +1465,7 @@ func (instance *Core) unsafeSerialize(inctx context.Context) ([]byte, fail.Error
 			err := json.Unmarshal(shieldedJSONed, &shieldedMapped)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				return nil, fail.NewErrorWithCause(err, "*Core.Serialize(): Unmarshalling JSONed shielded into map failed!")
+				return nil, fail.NewErrorWithCause(err, "*Core.Serialize(): Unmarshalling JSONed carried into map failed!")
 			}
 
 			if instance.properties.Count() > 0 {
@@ -1653,7 +1477,7 @@ func (instance *Core) unsafeSerialize(inctx context.Context) ([]byte, fail.Error
 
 				if len(propsJSONed) > 0 && string(propsJSONed) != `"{}"` {
 					if jserr := json.Unmarshal(propsJSONed, &propsMapped); jserr != nil {
-						return nil, fail.ConvertError(jserr)
+						return nil, fail.Wrap(jserr)
 					}
 				}
 			}
@@ -1663,25 +1487,26 @@ func (instance *Core) unsafeSerialize(inctx context.Context) ([]byte, fail.Error
 			r, err := json.Marshal(shieldedMapped)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				return nil, fail.ConvertError(err)
+				return nil, fail.Wrap(err)
 			}
 
 			return r, nil
 		}()
-		chRes <- result{gtr, gerr}
+		res, _ := result.NewHolder[[]byte](result.WithPayload[[]byte](gtr), result.MarkAsFailed[[]byte](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rTr, res.rErr
+		return res.Payload(), fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
 // Deserialize reads json code and reinstantiates
-func (instance *Core) Deserialize(inctx context.Context, buf []byte) fail.Error {
+func (instance *Core[T]) Deserialize(inctx context.Context, buf []byte) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1692,10 +1517,7 @@ func (instance *Core) Deserialize(inctx context.Context, buf []byte) fail.Error 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
@@ -1703,28 +1525,26 @@ func (instance *Core) Deserialize(inctx context.Context, buf []byte) fail.Error 
 
 			return instance.unsafeDeserialize(ctx, buf)
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }
 
 // unsafeDeserialize reads json code and instantiates a Core
 // Note: must be called after locking the instance
-func (instance *Core) unsafeDeserialize(inctx context.Context, buf []byte) fail.Error {
+func (instance *Core[T]) unsafeDeserialize(inctx context.Context, buf []byte) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
@@ -1765,7 +1585,7 @@ func (instance *Core) unsafeDeserialize(inctx context.Context, buf []byte) fail.
 				return fail.SyntaxErrorWithCause(err, nil, "failed to marshal Core to JSON")
 			}
 
-			xerr := instance.shielded.Deserialize(jsoned)
+			xerr := instance.carried.Deserialize(jsoned)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "deserializing Core failed")
@@ -1786,14 +1606,15 @@ func (instance *Core) unsafeDeserialize(inctx context.Context, buf []byte) fail.
 			}
 			return nil
 		}()
-		chRes <- result{gerr}
+		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		chRes <- res
 	}()
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return fail.Wrap(res.Error())
 	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
+		return fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
+		return fail.Wrap(inctx.Err())
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -290,14 +289,14 @@ func (s *stack) Migrate(ctx context.Context, operation string, params map[string
 		if !ok {
 			return fail.InvalidParameterError("subnetInstance", "should be resources.Subnet")
 		}
-		instance, ok := params["instance"].(*operations.Host)
+		instance, ok := params["instance"].(*resources.Host)
 		if !ok {
-			return fail.InvalidParameterError("instance", "should be *operations.Host")
+			return fail.InvalidParameterError("instance", "should be *resources.Host")
 		}
 
 		hid, err := instance.GetID()
 		if err != nil {
-			return fail.ConvertError(err)
+			return fail.Wrap(err)
 		}
 
 		networkInstance, xerr := subnetInstance.InspectNetwork(context.Background())
@@ -307,7 +306,7 @@ func (s *stack) Migrate(ctx context.Context, operation string, params map[string
 
 		nid, err := networkInstance.GetID()
 		if err != nil {
-			return fail.ConvertError(err)
+			return fail.Wrap(err)
 		}
 
 		// remove old nat route tag

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ type ImmutableKeyValue struct {
 	keyValue
 }
 
-// NewImmutableKeyValue creates a new immutable key/Value
+// NewImmutableKeyValue creates a new immutable key/HolderOf
 // If no values is passed, sets the content of value to nil
 // If at least 1 value is passed, the first one only is considered (trick to allow to create an instance without value parameter)
 func NewImmutableKeyValue(key string, values ...interface{}) ImmutableKeyValue {
@@ -70,7 +70,7 @@ type KeyValue struct {
 	keyValue
 }
 
-// NewKeyValue creates a new mutable Key/Value
+// NewKeyValue creates a new mutable Key/HolderOf
 func NewKeyValue(name string, values ...interface{}) KeyValue {
 	var v interface{}
 	if len(values) > 0 {

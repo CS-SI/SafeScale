@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,14 +22,15 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/CS-SI/SafeScale/v22/lib/global"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/backend"
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/client"
 	"github.com/CS-SI/SafeScale/v22/cli/safescale/internal/webui"
+	"github.com/CS-SI/SafeScale/v22/lib/global"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/cli"
+
 	// Autoload embedded provider drivers
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend"
 )
@@ -56,7 +57,7 @@ func main() {
 	// 	&cli.StringFlag{
 	// 		Name:  "server, S",
 	// 		Usage: "Connect to daemon on server SERVER (default: localhost:50051)",
-	// 		Value: "",
+	// 		HolderOf: "",
 	// 	},
 	// 	&cli.StringFlag{
 	// 		Name:  "tenant, T",

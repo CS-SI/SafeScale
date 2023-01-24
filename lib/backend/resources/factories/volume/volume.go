@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,15 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// New creates an instance of resources.Volume
-func New(ctx context.Context) (resources.Volume, fail.Error) {
-	return operations.NewVolume(ctx)
+// New creates an instance of *Volume
+func New(ctx context.Context) (*resources.Volume, fail.Error) {
+	return resources.NewVolume(ctx)
 }
 
-// Load loads the metadata of a volume and returns an instance of resources.Volume
-func Load(ctx context.Context, ref string) (resources.Volume, fail.Error) {
-	return operations.LoadVolume(ctx, ref)
+// Load loads the metadata of a volume and returns an instance of *Volume
+func Load(ctx context.Context, ref string) (*resources.Volume, fail.Error) {
+	return resources.LoadVolume(ctx, ref)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -250,8 +250,8 @@ func executeScript(
 	case res := <-resChan: // if it works return the return
 		return res.resOutput, res.resErr
 	case <-ctx.Done(): // if not because parent context was canceled
-		return "", fail.ConvertError(ctx.Err())
+		return "", fail.Wrap(ctx.Err())
 	case <-currentCtx.Done(): // or timeout hits
-		return "", fail.ConvertError(currentCtx.Err())
+		return "", fail.Wrap(currentCtx.Err())
 	}
 }

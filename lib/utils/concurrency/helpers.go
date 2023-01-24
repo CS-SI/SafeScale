@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -91,7 +91,7 @@ func taskgenWithCustomFunc(
 				if crash != nil {
 					resch <- internalRes{
 						ir:  "InternalPanic",
-						err: fail.ConvertError(crash),
+						err: fail.Wrap(crash),
 					}
 				}
 			}()
@@ -165,13 +165,13 @@ func taskgenWithCustomFunc(
 
 			resch <- internalRes{
 				ir:  "Ahhhh",
-				err: fail.ConvertError(iErr),
+				err: fail.Wrap(iErr),
 			}
 		}()
 
 		select {
 		case res := <-resch:
-			return res.ir, fail.ConvertError(res.err)
+			return res.ir, fail.Wrap(res.err)
 		case <-time.After(time.Duration(rd-1) * time.Millisecond):
 			return "Ahhhh", nil
 		case <-ctx.Done():

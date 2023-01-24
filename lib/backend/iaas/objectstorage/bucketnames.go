@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
 	_, herr := hash.Write([]byte(sig))
 	if herr != nil {
-		return "", fail.ConvertError(herr)
+		return "", fail.Wrap(herr)
 	}
 	hashed := hex.EncodeToString(hash.Sum(nil))
 	name = BucketNamePrefix + "-" + hashed

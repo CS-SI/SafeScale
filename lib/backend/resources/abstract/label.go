@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -113,7 +113,7 @@ func (instance *Label) Serialize() ([]byte, fail.Error) {
 	}
 
 	r, err := json.Marshal(instance)
-	return r, fail.ConvertError(err)
+	return r, fail.Wrap(err)
 }
 
 // Deserialize reads json code and restores a Tag
@@ -123,7 +123,7 @@ func (instance *Label) Deserialize(buf []byte) (ferr fail.Error) {
 	}
 
 	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
-	return fail.ConvertError(json.Unmarshal(buf, instance))
+	return fail.Wrap(json.Unmarshal(buf, instance))
 }
 
 // // GetName returns the name of the tag

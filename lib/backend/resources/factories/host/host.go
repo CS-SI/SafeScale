@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,7 @@ import (
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -57,12 +56,12 @@ func List(ctx context.Context, all bool) (abstract.HostList, fail.Error) {
 	return hosts, xerr
 }
 
-// New creates an instance of resources.Host
-func New(ctx context.Context) (_ resources.Host, err fail.Error) {
-	return operations.NewHost(ctx)
+// New creates an instance of *Host
+func New(ctx context.Context) (_ *resources.Host, err fail.Error) {
+	return resources.NewHost(ctx)
 }
 
-// Load loads the metadata of host and returns an instance of resources.Host
-func Load(ctx context.Context, ref string) (_ resources.Host, err fail.Error) {
-	return operations.LoadHost(ctx, ref)
+// Load loads the metadata of host and returns an instance of *Host
+func Load(ctx context.Context, ref string) (_ *resources.Host, err fail.Error) {
+	return resources.LoadHost(ctx, ref)
 }

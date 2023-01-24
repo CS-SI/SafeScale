@@ -23,7 +23,7 @@ fi
 stamp=$(date +"%s")
 
 [ -z "$BRANCH_NAME" ] && BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
-[ -z "$GOVERSION" ] && GOVERSION=1.17.12
+[ -z "$GOVERSION" ] && GOVERSION=1.18.4
 [ -z "$PROTOVERSION" ] && PROTOVERSION=3.17.3
 
 BRANCH_NAME=$BRANCH_NAME PROTOVERSION=$PROTOVERSION GOVERSION=$GOVERSION COMMITSHA=$COMMITSHA envsubst <Dockerfile >Dockerfile.$stamp

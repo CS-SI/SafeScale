@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -134,11 +134,11 @@ func parseSizing(s string) (cpus, ram, perf int, ferr fail.Error) {
 	var err error
 	cpus, err = strconv.Atoi(tokens[0])
 	if err != nil {
-		return 0, 0, 0, fail.ConvertError(err)
+		return 0, 0, 0, fail.Wrap(err)
 	}
 	ram, err = strconv.Atoi(tokens[1])
 	if err != nil {
-		return 0, 0, 0, fail.ConvertError(err)
+		return 0, 0, 0, fail.Wrap(err)
 	}
 	perf = 2
 	if len(tokens) < 3 {
@@ -146,7 +146,7 @@ func parseSizing(s string) (cpus, ram, perf int, ferr fail.Error) {
 	}
 	perf, err = strconv.Atoi(tokens[2])
 	if err != nil {
-		return 0, 0, 0, fail.ConvertError(err)
+		return 0, 0, 0, fail.Wrap(err)
 	}
 
 	return
@@ -164,7 +164,7 @@ func parseGPU(s string) (gpus int, gpuType string, ferr fail.Error) {
 	var err error
 	gpus, err = strconv.Atoi(tokens[0])
 	if err != nil {
-		return 0, "", fail.ConvertError(err)
+		return 0, "", fail.Wrap(err)
 	}
 	gpuType = tokens[1]
 	return

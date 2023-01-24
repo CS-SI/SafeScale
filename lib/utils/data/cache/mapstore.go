@@ -2,7 +2,7 @@
 // +build ignore
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -117,11 +117,11 @@ func (instance *mapStore) Entry(ctx context.Context, key string) (*Entry, fail.E
 Reserve locks an entry identified by key for update
 
 Returns:
-	- nil: reservation succeeded
-	- *fail.ErrInvalidInstance: the instance is a null value, unable to use Reserve()
-	- *fail.ErrInvalidParameter: one of the parameter is invalid
-	- *fail.ErrNotAvailable; if entry is already cached or reserved
-	- *fail.ErrInconsistent: the internal content of instance regarding the reservation for key is inconsistent
+  - nil: reservation succeeded
+  - *fail.ErrInvalidInstance: the instance is a null value, unable to use Reserve()
+  - *fail.ErrInvalidParameter: one of the parameter is invalid
+  - *fail.ErrNotAvailable; if entry is already cached or reserved
+  - *fail.ErrInconsistent: the internal content of instance regarding the reservation for key is inconsistent
 */
 func (instance *mapStore) Reserve(ctx context.Context, key string, timeout time.Duration) (ferr fail.Error) {
 	if valid.IsNil(instance) {
@@ -216,6 +216,7 @@ Commit fills a previously reserved entry with content
 The key retained at the end in the cached may be different to the one passed in parameter (and used previously in ReserveEntry()), because content.ID() has to be the final key.
 
 Returns:
+
 	nil, *fail.ErrNotFound: the cached entry identified by 'key' is not reserved
 	nil, *fail.ErrNotAvailable: the content of the cached entry cannot be committed, because the content ID has changed and this new key has already been reserved
 	nil, *fail.ErrDuplicate: the content of the cached entry cannot be committed, because the content ID has changed and this new key is already present in the cached
@@ -282,7 +283,7 @@ func (instance *mapStore) Commit(ctx context.Context, key string, content Cachea
 		// TODO: this has to be tested with a specific unit test
 		err := content.AddObserver(instance)
 		if err != nil {
-			return nil, fail.ConvertError(err)
+			return nil, fail.Wrap(err)
 		}
 
 		// Update cached entry with real content
@@ -323,9 +324,9 @@ func (instance mapStore) checkReservationConsistency(ctx context.Context, key st
 
 // Free unlocks the cached entry and removes the reservation
 // returns:
-//  - nil: reservation removed
-//  - *fail.ErrNotAvailable: the cached entry identified by 'key' is not reserved
-//  - *fail.InconsistentError: the cached entry of the reservation should have been *cached.reservation, and is not
+//   - nil: reservation removed
+//   - *fail.ErrNotAvailable: the cached entry identified by 'key' is not reserved
+//   - *fail.InconsistentError: the cached entry of the reservation should have been *cached.reservation, and is not
 func (instance *mapStore) Free(ctx context.Context, key string) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()

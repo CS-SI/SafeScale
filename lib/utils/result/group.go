@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,32 +22,47 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/utils/data/holder.results -o mocks/mock_resultgroup.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/utils/data/result.Group -o mocks/mock_group.go
 
-// ResultGroup ...
-type ResultGroup[T any] interface {
-	AddOne(string, Holder[T]) fail.Error
-	Completed() (bool, fail.Error)
-	UncompletedKeys() ([]string, fail.Error)
-	ErrorMessages() (string, fail.Error)
-	Successful() (bool, fail.Error)
+// Group ...
+type Group[T any] interface {
+	Holder[T]
+
+	Add(string, T) fail.Error
 	Keys() ([]string, fail.Error)
-	ResultOfKey(key string) (Holder[T], fail.Error)
+	PayloadOf(key string) (T, fail.Error)
+	UncompletedKeys() ([]string, fail.Error)
 }
 
-// ResultGroup contains the errors of the step for each host target
-type resultGroup[T any] struct {
+// Group contains the errors of the step for each host target
+type group[T any] struct {
 	data.Map[string, Holder[T]]
 }
 
-// NewResultGroup returns a new instance of resultGroup
-func NewResultGroup[T any]() *resultGroup[T] {
-	return &resultGroup[T]{
+// NewGroup returns a new instance of group
+func NewGroup[T any]() *group[T] {
+	return &group[T]{
 		Map: data.NewMap[string, Holder[T]](),
 	}
 }
 
-func (rg *resultGroup[T]) AddOne(key string, r Holder[T]) fail.Error {
+// Add adds a new entry with key; will fail if key is already used
+func (rg *group[T]) Add(key string, r Holder[T]) fail.Error {
+	if valid.IsNull(rg) {
+		return fail.InvalidInstanceError()
+	}
+
+	_, ok := rg.Map[key]
+	if ok {
+		return fail.DuplicateError("rthere is already a value associated with key '%s'", key)
+	}
+
+	rg.Map[key] = r
+	return nil
+}
+
+// Replace works as Add, except it will replace the key value if it already exists
+func (rg *group[T]) Replace(key string, r Holder[T]) fail.Error {
 	if valid.IsNull(rg) {
 		return fail.InvalidInstanceError()
 	}
@@ -56,19 +71,15 @@ func (rg *resultGroup[T]) AddOne(key string, r Holder[T]) fail.Error {
 	return nil
 }
 
-// ErrorMessages returns a string containing all the errors registered
-func (rg *resultGroup[T]) ErrorMessages() (string, fail.Error) {
+// ErrorMessage returns a string containing all the errors registered
+func (rg *group[T]) ErrorMessage() string {
 	if valid.IsNull(rg) {
-		return "", fail.InvalidInstanceError()
+		return ""
 	}
 
 	output := ""
 	for k, v := range rg.Map {
-		val, xerr := v.ErrorMessage()
-		if xerr != nil {
-			return "", xerr
-		}
-
+		val := v.ErrorMessage()
 		if val != "" {
 			if output != "" {
 				output += ", "
@@ -76,76 +87,61 @@ func (rg *resultGroup[T]) ErrorMessages() (string, fail.Error) {
 			output += k + ": " + val
 		}
 	}
-	return output, nil
+	return output
 }
 
 // UncompletedKeys returns an array of all keys that are marked as uncompleted
-func (rg *resultGroup[T]) UncompletedKeys() ([]string, fail.Error) {
+func (rg *group[T]) UncompletedKeys() ([]string, fail.Error) {
 	if valid.IsNull(rg) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	var output []string
 	for k, v := range rg.Map {
-		ok, xerr := v.Completed()
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		if !ok {
+		if !v.Completed() {
 			output = append(output, k)
 		}
 	}
 	return output, nil
 }
 
-// Successful tells if all the resultGroup are successful
-func (rg *resultGroup[T]) Successful() (bool, fail.Error) {
+// Successful tells if all the group are successful
+func (rg *group[T]) Successful() bool {
 	if valid.IsNull(rg) {
-		return false, fail.InvalidInstanceError()
+		return false
 	}
 	if rg.Map.Length() == 0 {
-		return false, nil
+		return false
 	}
 
 	for _, v := range rg.Map {
-		ok, xerr := v.Successful()
-		if xerr != nil {
-			return false, xerr
-		}
-
-		if !ok {
-			return false, nil
+		if !v.Successful() {
+			return false
 		}
 	}
-	return true, nil
+	return true
 }
 
-// Completed tells if all the resultGroup are completed
-func (rg *resultGroup[T]) Completed() (bool, fail.Error) {
+// Completed tells if all the group are completed
+func (rg *group[T]) Completed() bool {
 	if valid.IsNull(rg) {
-		return false, fail.InvalidInstanceError()
+		return false
 	}
 
 	if rg.Map.Length() == 0 {
-		return false, nil
+		return false
 	}
 
 	for _, v := range rg.Map {
-		ok, xerr := v.Completed()
-		if xerr != nil {
-			return false, xerr
-		}
-
-		if !ok {
-			return false, nil
+		if !v.Completed() {
+			return false
 		}
 	}
-	return true, nil
+	return true
 }
 
-// ResultOfKey returns the holder corresponding to the key
-func (rg *resultGroup[T]) ResultOfKey(key string) (Holder[T], fail.Error) {
+// PayloadOf returns the Holder[T] corresponding to the key
+func (rg *group[T]) PayloadOf(key string) (Holder[T], fail.Error) {
 	if valid.IsNull(rg) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -161,19 +157,23 @@ func (rg *resultGroup[T]) ResultOfKey(key string) (Holder[T], fail.Error) {
 	return nil, fail.NotFoundError("failed to find a holder for key '%s'", key)
 }
 
+// Payload can not be used with Group, but need to be implemented to satisfy Holder[T] interface
+func (rg *group[T]) Payload(_ string) (Holder[T], fail.Error) {
+	return nil, fail.InvalidRequestError("cannot use Payload() with result.Group")
+}
+
 // ErrorMessageOfKey ...
-func (rg *resultGroup[T]) ErrorMessageOfKey(key string) (string, fail.Error) {
+func (rg *group[T]) ErrorMessageOfKey(key string) string {
 	if valid.IsNull(rg) {
-		return "", fail.InvalidInstanceError()
+		return ""
 	}
 	if key == "" {
-		return "", fail.InvalidParameterCannotBeEmptyStringError("key")
+		return ""
 	}
 
 	if item, ok := rg.Map[key]; ok {
-		msg, _ := item.ErrorMessage()
-		return msg, nil
+		return item.ErrorMessage()
 	}
 
-	return "", fail.NotFoundError()
+	return ""
 }

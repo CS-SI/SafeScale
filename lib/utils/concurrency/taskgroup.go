@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -477,7 +477,7 @@ func (instance *taskGroup) addErrorsAsConsequence(in map[string]error, out *fail
 		added := false
 		switch cerr := e.(type) {
 		case *fail.ErrAborted:
-			cause := fail.ConvertError(fail.Cause(cerr))
+			cause := fail.Wrap(fail.Cause(cerr))
 			if cause != nil {
 				_ = (*out).AddConsequence(fail.Wrap(cause, "%s", i))
 				added = true
@@ -497,7 +497,7 @@ func (instance *taskGroup) buildErrorList(in map[string]error) fail.Error {
 		added := false
 		switch cerr := e.(type) {
 		case *fail.ErrAborted:
-			cause := fail.ConvertError(fail.Cause(cerr))
+			cause := fail.Wrap(fail.Cause(cerr))
 			if cause != nil {
 				errors = append(errors, fail.Wrap(cause, "%s", child))
 				added = true

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,8 +34,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -448,7 +448,7 @@ func (instance *stack) WaitHostReady(ctx context.Context, hostParam iaasapi.Host
 
 	ahfi, err := ahf.GetID()
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %v)", hostRef, timeout).WithStopwatch().Entering().Exiting()
@@ -1071,7 +1071,7 @@ func (instance *stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostIde
 
 	ahfi, err := ahf.GetID()
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	ahfn := ahf.GetName()
@@ -1116,7 +1116,7 @@ func (instance *stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostIde
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAborted, *fail.ErrTimeout:
-			cause := fail.ConvertError(xerr.Cause())
+			cause := fail.Wrap(xerr.Cause())
 			switch cause.(type) {
 			case *fail.ErrNotFound, *fail.ErrInvalidRequest:
 				debug.IgnoreErrorWithContext(ctx, cause)
@@ -1136,7 +1136,7 @@ func (instance *stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostIde
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrAborted, *fail.ErrTimeout:
-				xerr = fail.ConvertError(xerr.Cause())
+				xerr = fail.Wrap(xerr.Cause())
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					debug.IgnoreErrorWithContext(ctx, xerr)
@@ -1472,7 +1472,7 @@ func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abs
 
 	hostID, err := ahf.GetID()
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	// query the instance to get its current Security Groups

@@ -2,7 +2,7 @@
 // +build ignore,!debug
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,6 @@ import (
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/listeners"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -143,7 +142,7 @@ func work(c *cobra.Command, args []string) {
 	// - /debug/fgprof
 	expose()
 
-	operations.StartFeatureFileWatcher()
+	resources.StartFeatureFileWatcher()
 
 	version := Version + ", build " + Revision + " (" + BuildDate + ")"
 	if              //goland:noinspection GoBoolExpressions

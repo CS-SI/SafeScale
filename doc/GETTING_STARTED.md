@@ -1,8 +1,8 @@
 # Getting Started Safescale
 ## To get binaries :
 1. Get on github : https://github.com/CS-SI/SafeScale/releases  
-2. Compil : https://github.com/CS-SI/SafeScale/blob/master/doc/build
-3. Compil with docker : After git checkout, run ./create-docker.sh -f (for that you need to install `docker-ce`)
+2. Compil : https://github.com/CS-SI/SafeScale/blob/master/doc/build/BUILDING.md
+3. Build with docker : https://github.com/CS-SI/SafeScale/blob/master/doc/build/DOCKER_BUILD.md
 
 # Steps to launch daemon safescaled :
 1. Copy binaries on your client
@@ -15,10 +15,7 @@ example :
 export SAFESCALE_METADATA_SUFFIX="your trigram"
 alias sc=safescale  
 alias schls="safescale host ls | jq"  
-alias sccls="safescale cluster ls | jq"  
-alias sctls="safescale tenant ls | jq"  
-alias sctget="safescale tenant get | jq"  
-````
+```
 6. Relaunch daemon: `safescaled` (`safescaled -d -v` for verbose and debug mode)
 
 # Example : safescale command

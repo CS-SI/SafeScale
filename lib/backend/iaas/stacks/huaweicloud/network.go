@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -950,7 +950,7 @@ func (instance stack) CreateVIP(ctx context.Context, networkID, subnetID, name s
 	}
 	port, err := ports.Create(instance.NetworkClient, options).Extract()
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 	vip, xerr := abstract.NewVirtualIP(abstract.WithName(name))
 	if xerr != nil {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ func Parse(title, content string) (*txttmpl.Template, fail.Error) {
 	}
 	r, err := txttmpl.New(title).Funcs(sprig.TxtFuncMap()).Funcs(internalFuncMap).Parse(content)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 	return r, nil
 }

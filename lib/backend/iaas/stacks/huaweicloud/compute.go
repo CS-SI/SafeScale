@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,9 +46,9 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -328,7 +328,7 @@ func (instance stack) ListAvailabilityZones(ctx context.Context) (list map[strin
 
 	content, err := az.ExtractAvailabilityZones(allPages)
 	if err != nil {
-		return emptyMap, fail.ConvertError(err)
+		return emptyMap, fail.Wrap(err)
 	}
 
 	azList := map[string]bool{}
@@ -1811,7 +1811,7 @@ func (instance *stack) WaitHostState(ctx context.Context, hostParam iaasapi.Host
 		case *fail.ErrAborted:
 			cause := retryErr.Cause()
 			if cause != nil {
-				retryErr = fail.ConvertError(cause)
+				retryErr = fail.Wrap(cause)
 			}
 			return server, retryErr // Not available error keeps the server info, good
 		default:

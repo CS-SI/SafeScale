@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,11 @@
 package outscale
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"io"
 	"net/http"
 	"reflect"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/outscale/osc-sdk-go/osc"
@@ -152,7 +153,7 @@ func normalizeError(err error) fail.Error {
 		case osc.GenericOpenAPIError:
 			return normalizeOpenAPIError(realErr)
 		default:
-			return fail.ConvertError(err)
+			return fail.Wrap(err)
 		}
 	}
 	return nil
@@ -214,7 +215,7 @@ func qualifyFromCode(code, details string) fail.Error {
 func qualifyFromBody(in []byte) (fail.Error, fail.Error) {
 	var jsoned map[string]interface{}
 	if err := json.Unmarshal(in, &jsoned); err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 	if errs, ok := jsoned["Errors"].([]interface{}); ok {
 		for _, v := range errs {

@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,9 @@
 #{{.Revision}}
 # Script customized for {{.ProviderName}} driver
 
+# shellcheck disable=SC1009
+# shellcheck disable=SC1073
+# shellcheck disable=SC1054
 {{.Header}}
 
 last_error=
@@ -74,6 +77,9 @@ date
 uptime > /opt/safescale/var/state/user_data.sysfix.done
 
 # Includes the BashLibrary
+# shellcheck disable=SC1009
+# shellcheck disable=SC1073
+# shellcheck disable=SC1054
 {{ .reserved_BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.sysfix.done
 

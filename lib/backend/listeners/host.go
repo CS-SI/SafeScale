@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
+	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/davecgh/go-spew/spew"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/grpc/codes"
@@ -30,11 +33,9 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/subnet"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -221,10 +222,10 @@ func (s *HostListener) List(inctx context.Context, in *protocol.HostListRequest)
 }
 
 // Create creates a new host
-func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequest) (_ *protocol.Host, err error) {
-	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot create host")
-	defer fail.OnPanic(&err)
+func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequest) (_ *protocol.Host, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
+	defer fail.OnExitWrapError(inctx, &ferr, "cannot create host")
+	defer fail.OnPanic(&ferr)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -246,10 +247,11 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequ
 	ctx := job.Context()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	var sizing *abstract.HostSizingRequirements
 	if in.SizingAsString != "" {
+		var err error
 		sizing, _, err = converters.HostSizingRequirementsFromStringToAbstract(in.SizingAsString)
 		if err != nil {
 			return nil, err
@@ -266,7 +268,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequ
 	// because previous release of SafeScale created network AND subnet with the same name
 	var (
 		networkRef     string
-		subnetInstance resources.Subnet
+		subnetInstance *resources.Subnet
 		subnets        []*abstract.Subnet
 	)
 	if !in.GetSingle() {
@@ -279,12 +281,13 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequ
 				return nil, xerr
 			}
 
-			xerr = subnetInstance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-				as, innerErr := clonable.Cast[*abstract.Subnet](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
+			subnetTrx, xerr := metadata.NewTransaction[*abstract.Subnet, *resources.Subnet](ctx, subnetInstance)
+			if xerr != nil {
+				return nil, xerr
+			}
+			defer func(trx metadata.Transaction[*abstract.Subnet, *resources.Subnet]) { trx.SilentTerminate(ctx) }(subnetTrx)
 
+			xerr = metadata.ReviewCarried[*abstract.Subnet](ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 				subnets = append(subnets, as)
 				return nil
 			})
@@ -299,12 +302,13 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostCreateRequ
 			return nil, xerr
 		}
 
-		xerr = subnetInstance.Review(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, innerErr := clonable.Cast[*abstract.Subnet](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
+		subnetTrx, xerr := metadata.NewTransaction[*abstract.Subnet, *resources.Subnet](ctx, subnetInstance)
+		if xerr != nil {
+			return nil, xerr
+		}
+		defer subnetTrx.SilentTerminate(ctx)
 
+		xerr = metadata.ReviewCarried[*abstract.Subnet](ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 			subnets = append(subnets, as)
 			return nil
 		})
@@ -463,6 +467,22 @@ func (s *HostListener) Inspect(inctx context.Context, in *protocol.Reference) (h
 
 	var out *protocol.Host
 	out, xerr = hostInstance.ToProtocol(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	hostTrx, xerr := metadata.NewTransaction[*abstract.HostCore, *resources.Host](ctx, hostInstance)
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer hostTrx.SilentTerminate(ctx)
+
+	xerr = metadata.InspectProperty[*abstract.HostCore, *propertiesv2.HostNetworking](ctx, hostTrx, hostproperty.NetworkV2, func(hnv2 *propertiesv2.HostNetworking) fail.Error {
+		for _, v := range hnv2.SubnetsByID {
+			out.Subnets = append(out.Subnets, v)
+		}
+		return nil
+	})
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1009,7 +1029,7 @@ func (s *HostListener) UpdateLabel(inctx context.Context, in *protocol.LabelBind
 		return empty, xerr
 	}
 
-	tracer.Trace("Value of Label %s successfully updated for Host %s", labelRefLabel, hostRefLabel)
+	tracer.Trace("HolderOf of Label %s successfully updated for Host %s", labelRefLabel, hostRefLabel)
 	return empty, nil
 }
 
@@ -1054,6 +1074,6 @@ func (s *HostListener) ResetLabel(inctx context.Context, in *protocol.LabelBindR
 		return empty, xerr
 	}
 
-	tracer.Trace("Value of Label %s for Host %s successfully reset to Label default value", hostRefLabel, labelRefLabel)
+	tracer.Trace("HolderOf of Label %s for Host %s successfully reset to Label default value", hostRefLabel, labelRefLabel)
 	return empty, nil
 }

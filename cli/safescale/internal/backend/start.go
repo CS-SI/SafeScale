@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/controller"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/listeners"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -77,7 +77,7 @@ func startBackend(cmd *cobra.Command) error {
 	startTrack()
 	defer endTrack()
 
-	operations.StartFeatureFileWatcher()
+	resources.StartFeatureFileWatcher()
 
 	// Wait for Consul agent start
 	select {

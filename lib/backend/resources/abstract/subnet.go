@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -180,7 +180,7 @@ func (s *Subnet) Serialize() ([]byte, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 	r, err := json.Marshal(s)
-	return r, fail.ConvertError(err)
+	return r, fail.Wrap(err)
 }
 
 // Deserialize reads json code and reinstantiates a Subnet
@@ -189,7 +189,7 @@ func (s *Subnet) Deserialize(buf []byte) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
-	return fail.ConvertError(json.Unmarshal(buf, s))
+	return fail.Wrap(json.Unmarshal(buf, s))
 }
 
 // // GetName ...

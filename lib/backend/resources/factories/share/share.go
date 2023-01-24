@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,16 +20,15 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// New creates an instance of resources.Share
-func New(ctx context.Context) (resources.Share, fail.Error) {
-	return operations.NewShare(ctx)
+// New creates an instance of *Share
+func New(ctx context.Context) (*resources.Share, fail.Error) {
+	return resources.NewShare(ctx)
 }
 
-// Load loads the metadata of a share and returns an instance of resources.Share
-func Load(ctx context.Context, ref string) (resources.Share, fail.Error) {
-	return operations.LoadShare(ctx, ref)
+// Load loads the metadata of a share and returns an instance of *Share
+func Load(ctx context.Context, ref string) (*resources.Share, fail.Error) {
+	return resources.LoadShare(ctx, ref)
 }

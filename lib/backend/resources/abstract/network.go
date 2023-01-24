@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -159,7 +159,7 @@ func (n *Network) Serialize() ([]byte, fail.Error) {
 	}
 
 	r, err := json.Marshal(n)
-	return r, fail.ConvertError(err)
+	return r, fail.Wrap(err)
 }
 
 // Deserialize reads json code and reinstantiates a Network
@@ -169,7 +169,7 @@ func (n *Network) Deserialize(buf []byte) (ferr fail.Error) {
 	}
 	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
 
-	return fail.ConvertError(json.Unmarshal(buf, n))
+	return fail.Wrap(json.Unmarshal(buf, n))
 }
 
 // // GetName ...

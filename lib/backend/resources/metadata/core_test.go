@@ -4,7 +4,7 @@
 //FIXME: need to move NewServiceTest() and skip() inside a package
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,11 +78,11 @@ func Test_NewCore(t *testing.T) {
 
 		mc, err := NewCore(svc, "network", "networks", &abstract.Network{})
 		require.Nil(t, err)
-		require.EqualValues(t, reflect.TypeOf(mc).String(), "*operations.Core")
+		require.EqualValues(t, reflect.TypeOf(mc).String(), "*resources.Core")
 
 		mc, err = NewCore(svc, clusterKind, "clusters", &abstract.Cluster{})
 		require.Nil(t, err)
-		require.EqualValues(t, reflect.TypeOf(mc).String(), "*operations.Core")
+		require.EqualValues(t, reflect.TypeOf(mc).String(), "*resources.Core")
 
 		svc._reset()
 		svc._updateOption("metadatakey", "")

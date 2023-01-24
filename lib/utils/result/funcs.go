@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,12 +42,7 @@ func PayloadIfSuccessful[T any](r Holder[T]) (T, bool, fail.Error) {
 		return empty, false, fail.InvalidParameterError("r", "cannot be null value of 'Holder'")
 	}
 
-	ok, xerr := r.Successful()
-	if xerr != nil {
-		return empty, false, xerr
-	}
-
-	if ok {
+	if r.Successful() {
 		payload, xerr := Payload[T](r)
 		if xerr != nil {
 			return empty, false, xerr

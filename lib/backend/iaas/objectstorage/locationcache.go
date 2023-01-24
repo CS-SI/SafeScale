@@ -178,7 +178,7 @@ func (l locationcache) ReadObject(inctx context.Context, s string, s2 string, wr
 		buf, _ := ct.([]byte) // nolint
 		_, err = rewriter.Write(buf)
 		if err != nil {
-			return bytes.Buffer{}, fail.ConvertError(err)
+			return bytes.Buffer{}, fail.Wrap(err)
 		}
 
 		incrementExpVar("metadata.cache.hits")

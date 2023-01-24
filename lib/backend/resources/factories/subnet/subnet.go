@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package subnet contains methods to load or create instance of resources.Subnet
+// Package subnet contains methods to load or create instance of *Subnet
 package subnet
 
 import (
@@ -22,21 +22,20 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // List returns a list of available subnets
 func List(ctx context.Context, networkID string, all bool) ([]*abstract.Subnet, fail.Error) {
-	return operations.ListSubnets(ctx, networkID, all)
+	return resources.ListSubnets(ctx, networkID, all)
 }
 
-// New creates an instance of resources.Subnet
-func New(ctx context.Context) (resources.Subnet, fail.Error) {
-	return operations.NewSubnet(ctx)
+// New creates an instance of *Subnet
+func New(ctx context.Context) (*resources.Subnet, fail.Error) {
+	return resources.NewSubnet(ctx)
 }
 
-// Load loads the metadata of a subnet and returns an instance of resources.Subnet
-func Load(ctx context.Context, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
-	return operations.LoadSubnet(ctx, networkRef, subnetRef)
+// Load loads the metadata of a subnet and returns an instance of *Subnet
+func Load(ctx context.Context, networkRef, subnetRef string) (*resources.Subnet, fail.Error) {
+	return resources.LoadSubnet(ctx, networkRef, subnetRef)
 }

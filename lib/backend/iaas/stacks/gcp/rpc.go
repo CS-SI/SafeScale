@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,29 +56,29 @@ func refreshResult(oco opContext) (res result, ferr fail.Error) {
 		if oco.Operation.Zone != "" { // nolint
 			zoneURL, ierr := url.Parse(oco.Operation.Zone)
 			if ierr != nil {
-				return res, fail.ConvertError(ierr)
+				return res, fail.Wrap(ierr)
 			}
 
 			zone := getResourceNameFromSelfLink(*zoneURL)
 			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
 			if err != nil {
-				return res, fail.ConvertError(err)
+				return res, fail.Wrap(err)
 			}
 		} else if oco.Operation.Region != "" {
 			regionURL, ierr := url.Parse(oco.Operation.Region)
 			if ierr != nil {
-				return res, fail.ConvertError(ierr)
+				return res, fail.Wrap(ierr)
 			}
 
 			region := getResourceNameFromSelfLink(*regionURL)
 			oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
 			if err != nil {
-				return res, fail.ConvertError(err)
+				return res, fail.Wrap(err)
 			}
 		} else {
 			oco.Operation, err = oco.Service.GlobalOperations.Get(oco.ProjectID, oco.Operation.Name).Do()
 			if err != nil {
-				return res, fail.ConvertError(err)
+				return res, fail.Wrap(err)
 			}
 		}
 
@@ -92,7 +92,7 @@ func refreshResult(oco opContext) (res result, ferr fail.Error) {
 		}
 		res.Done = res.State == oco.DesiredState
 
-		return res, fail.ConvertError(res.Error)
+		return res, fail.Wrap(res.Error)
 	}
 
 	return res, fail.NewError("no operation")
@@ -1430,7 +1430,7 @@ func (s stack) rpcCreateLabels(ctx context.Context, id string, kv map[string]str
 	}).Do()
 
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	xerr = s.checkStatusCode(resp)
@@ -1461,7 +1461,7 @@ func (s stack) rpcRemoveLabels(ctx context.Context, id string, kv []string) fail
 	}).Do()
 
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	xerr = s.checkStatusCode(resp)
@@ -1488,7 +1488,7 @@ func (s stack) rpcCreateTags(ctx context.Context, id string, kv map[string]strin
 
 	resp, err := s.ComputeService.Instances.SetMetadata(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id, metadatas).Do()
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	return s.checkStatusCode(resp)

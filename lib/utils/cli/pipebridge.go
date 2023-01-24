@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -241,7 +241,7 @@ func taskRead(ctx context.Context, p taskReadParameters) (_ interface{}, ferr fa
 			}
 		}
 	}
-	return nil, fail.ConvertError(err)
+	return nil, fail.Wrap(err)
 }
 
 // Structure to store taskRead parameters
@@ -276,13 +276,13 @@ func (pbc *PipeBridgeController) Wait() fail.Error {
 		return fail.InvalidInstanceContentError("pbc.readersGroup", "cannot be nil")
 	}
 
-	xerr := fail.ConvertError(pbc.readersGroup.Wait())
+	xerr := fail.Wrap(pbc.readersGroup.Wait())
 	close(pbc.displayCh)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = fail.ConvertError(pbc.displayTask.Wait())
+	xerr = fail.Wrap(pbc.displayTask.Wait())
 	return xerr
 }
 
@@ -299,7 +299,7 @@ func (pbc *PipeBridgeController) Stop() fail.Error {
 	}
 
 	// Try to wait the end of the task group
-	xerr := fail.ConvertError(pbc.readersGroup.Wait())
+	xerr := fail.Wrap(pbc.readersGroup.Wait())
 	if xerr != nil {
 		return xerr
 	}

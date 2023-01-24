@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package network contains functions to list, create, load instances of resources.Network
+// Package network contains functions to list, create, load instances of *Network
 package network
 
 import (
@@ -23,7 +23,6 @@ import (
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -72,12 +71,12 @@ func List(ctx context.Context) ([]*abstract.Network, fail.Error) {
 	return list, nil
 }
 
-// New creates an instance of resources.Network
-func New(ctx context.Context) (resources.Network, fail.Error) {
-	return operations.NewNetwork(ctx)
+// New creates an instance of *Network
+func New(ctx context.Context) (*resources.Network, fail.Error) {
+	return resources.NewNetwork(ctx)
 }
 
-// Load loads the metadata of a network and returns an instance of resources.Network
-func Load(ctx context.Context, ref string) (resources.Network, fail.Error) {
-	return operations.LoadNetwork(ctx, ref)
+// Load loads the metadata of a network and returns an instance of *Network
+func Load(ctx context.Context, ref string) (*resources.Network, fail.Error) {
+	return resources.LoadNetwork(ctx, ref)
 }

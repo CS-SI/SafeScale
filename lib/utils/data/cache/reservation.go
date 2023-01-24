@@ -2,7 +2,7 @@
 // +build ignore
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,11 +73,11 @@ func (rc reservation) GetName() string {
 
 // IsMine tells if the reservation is owned by the current task (taken from context)
 // requestor being the ID of the task that has reserved, returns:
-//    - false: if requestor is empty string and 'ctx' does contain Task instance
-//    - false: if requestor is not empty string and 'ctx' does not contain Task instance or is context.Background()
-//    - false: if requestor is not empty string and 'ctx' does contain Task instance and Task ID is not equal to requestor
-//    - true:  if requestor is empty string and 'ctx' does not contain Task instance or is equal to context.Background()
-//    - true:  if requestor is not empty string and 'ctx' does contain Task instance and Task ID is equal to requestor
+//   - false: if requestor is empty string and 'ctx' does contain Task instance
+//   - false: if requestor is not empty string and 'ctx' does not contain Task instance or is context.Background()
+//   - false: if requestor is not empty string and 'ctx' does contain Task instance and Task ID is not equal to requestor
+//   - true:  if requestor is empty string and 'ctx' does not contain Task instance or is equal to context.Background()
+//   - true:  if requestor is not empty string and 'ctx' does contain Task instance and Task ID is equal to requestor
 func (rc reservation) IsMine(ctx context.Context) bool {
 	if valid.IsNil(ctx) || ctx == context.Background() {
 		val := rc.requestor == ""
@@ -173,9 +173,9 @@ func (rc reservation) committed() <-chan struct{} {
 
 // waitReleased waits until the reservation is released
 // Returns:
-//  - nil: the reservation is released and can be used again
-//  - *fail.ErrTimeout: the reservation has timed out and can be used again
-//  - *fail.ErrDuplicate: the reservation is released but a cache entry exist, so can not be reused
+//   - nil: the reservation is released and can be used again
+//   - *fail.ErrTimeout: the reservation has timed out and can be used again
+//   - *fail.ErrDuplicate: the reservation is released but a cache entry exist, so can not be reused
 func (rc reservation) waitReleased() fail.Error {
 	// If key is reserved, we may have to wait reservation committed or freed to determine if
 	waitFor := rc.timeout - time.Since(rc.created)

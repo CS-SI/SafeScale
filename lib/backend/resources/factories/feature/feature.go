@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,13 +20,12 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func New(ctx context.Context, name string) (resources.Feature, fail.Error) {
+func New(ctx context.Context, name string) (*resources.Feature, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -34,7 +33,7 @@ func New(ctx context.Context, name string) (resources.Feature, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	feat, xerr := operations.NewFeature(ctx, name)
+	feat, xerr := resources.NewFeature(ctx, name)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -44,7 +43,7 @@ func New(ctx context.Context, name string) (resources.Feature, fail.Error) {
 		}
 
 		// Failed to find a spec file on filesystem, trying with embedded ones
-		if feat, xerr = operations.NewEmbeddedFeature(ctx, name); xerr != nil {
+		if feat, xerr = resources.NewEmbeddedFeature(ctx, name); xerr != nil {
 			return nil, xerr
 		}
 	}
@@ -53,6 +52,6 @@ func New(ctx context.Context, name string) (resources.Feature, fail.Error) {
 
 // NewEmbedded searches for an embedded feature called 'name' and initializes a new Feature object
 // with its content
-func NewEmbedded(ctx context.Context, name string) (resources.Feature, fail.Error) {
-	return operations.NewEmbeddedFeature(ctx, name)
+func NewEmbedded(ctx context.Context, name string) (*resources.Feature, fail.Error) {
+	return resources.NewEmbeddedFeature(ctx, name)
 }

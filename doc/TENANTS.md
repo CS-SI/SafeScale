@@ -263,7 +263,6 @@ It defines the "driver" to communicate with the provider. Valid values are:
 > | `"gcp"` |
 > | `"local"` |
 > | `"openstack"` |
-> | `"opentelekom"` |
 > | `"outscale"` |
 > | `"ovh"` |
 

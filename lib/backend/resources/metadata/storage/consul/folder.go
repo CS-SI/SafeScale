@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -299,7 +299,7 @@ func (instance folder) Write(ctx context.Context, path string, name string, cont
 	// 	data, err = crypt.Encrypt(content, instance.cryptKey)
 	// 	err = debug.InjectPlannedError(err)
 	// 	if err != nil {
-	// 		return fail.ConvertError(err)
+	// 		return fail.Wrap(err)
 	// 	}
 	// } else {
 	data = content
@@ -446,7 +446,7 @@ func (instance folder) Browse(ctx context.Context, path string, callback storage
 		// 	data, err = crypt.Decrypt(data, instance.cryptKey)
 		// 	err = debug.InjectPlannedError(err)
 		// 	if err != nil {
-		// 		return fail.Wrap(fail.ConvertError(err), "Error browsing metadata: decrypting data")
+		// 		return fail.Wrap(fail.Wrap(err), "Error browsing metadata: decrypting data")
 		// 	}
 		// }
 		// xerr = callback(data)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ func New(provider ProviderUsingTerraform, opts options.Options) (api.Terraformer
 		return nil, xerr
 	}
 
-	// out.workdir, xerr = options.Value[string](opts, ConfigOptionWorkDir)
+	// out.workdir, xerr = options.HolderOf[string](opts, ConfigOptionWorkDir)
 	// if xerr != nil {
 	// 	return nil, xerr
 	// }

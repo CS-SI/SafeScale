@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -92,7 +92,7 @@ func Unsuccessful() Arbiter {
 			case *fail.ErrRuntimePanic:
 				return verdict.Abort, cerr
 			default:
-				return verdict.Retry, fail.ConvertError(t.Err)
+				return verdict.Retry, fail.Wrap(t.Err)
 			}
 		}
 		return verdict.Done, nil
@@ -125,7 +125,7 @@ func OrArbiter(arbiters ...Arbiter) Arbiter {
 func Successful() Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err != nil {
-			return verdict.Done, fail.ConvertError(t.Err)
+			return verdict.Done, fail.Wrap(t.Err)
 		}
 		return verdict.Retry, nil
 	}
@@ -150,7 +150,7 @@ func Timeout(limit time.Duration) Arbiter {
 					return verdict.Abort, TimeoutError(t.Err, limit, time.Since(t.Start))
 				}
 
-				return verdict.Undecided, fail.ConvertError(t.Err)
+				return verdict.Undecided, fail.Wrap(t.Err)
 			}
 		}
 
@@ -179,7 +179,7 @@ func Max(limit uint) Arbiter {
 					return verdict.Abort, LimitError(t.Err, limit)
 				}
 
-				return verdict.Retry, fail.ConvertError(t.Err)
+				return verdict.Retry, fail.Wrap(t.Err)
 			}
 		}
 		return verdict.Undecided, nil
@@ -200,10 +200,10 @@ func Min(limit uint) Arbiter {
 				return verdict.Abort, cerr
 			default:
 				if t.Count < limit { // last try is also good
-					return verdict.Retry, fail.ConvertError(t.Err)
+					return verdict.Retry, fail.Wrap(t.Err)
 				}
 
-				return verdict.Undecided, fail.ConvertError(t.Err)
+				return verdict.Undecided, fail.Wrap(t.Err)
 			}
 		}
 		return verdict.Undecided, nil

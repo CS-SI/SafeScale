@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,7 +171,7 @@ func (c *core) TerraformTypes() []string {
 // 		if xerr != nil {
 // 			return xerr
 // 		}
-// 		defer func() { _ = renderer.Close() }()
+// 		defer func() { _ = renderer.Terminate() }()
 //
 // 		// lvars.Merge(map[string]any{"Resource": r.ToMap()})
 // 		variables.Merge(map[string]any{"Resource": c})

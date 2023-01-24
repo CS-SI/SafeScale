@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -154,7 +154,7 @@ func NewLocation(conf Config) (_ Location, ferr fail.Error) { // nolint
 	if conf.Direct {
 		nlt, serr := newlocationtransparent(l)
 		if serr != nil {
-			return nil, fail.ConvertError(serr)
+			return nil, fail.Wrap(serr)
 		}
 
 		return nlt, nil
@@ -162,7 +162,7 @@ func NewLocation(conf Config) (_ Location, ferr fail.Error) { // nolint
 
 	nl, serr := newLocationcache(l)
 	if serr != nil {
-		return nil, fail.ConvertError(serr)
+		return nil, fail.Wrap(serr)
 	}
 
 	return nl, nil
@@ -207,11 +207,11 @@ func (instance *location) connect() fail.Error {
 	// Check config stowLocation
 	err := stow.Validate(kind, config)
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 	instance.stowLocation, err = stow.Dial(kind, config)
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	return nil
@@ -280,7 +280,7 @@ func (instance location) ListBuckets(ctx context.Context, prefix string) (_ []st
 
 	estimatedPageSize, err := instance.estimateSize(prefix)
 	if err != nil {
-		return list, fail.ConvertError(err)
+		return list, fail.Wrap(err)
 	}
 
 	err = stow.WalkContainers(instance.stowLocation, stow.NoPrefix, estimatedPageSize,
@@ -295,7 +295,7 @@ func (instance location) ListBuckets(ctx context.Context, prefix string) (_ []st
 		},
 	)
 	if err != nil {
-		return []string{}, fail.ConvertError(err)
+		return []string{}, fail.Wrap(err)
 	}
 	return list, nil
 }
@@ -317,7 +317,7 @@ func (instance location) FindBucket(ctx context.Context, bucketName string) (_ b
 
 	estimatedPageSize, err := instance.estimateSize(stow.NoPrefix)
 	if err != nil {
-		return false, fail.ConvertError(err)
+		return false, fail.Wrap(err)
 	}
 
 	err = stow.WalkContainers(instance.stowLocation, stow.NoPrefix, estimatedPageSize,
@@ -335,7 +335,7 @@ func (instance location) FindBucket(ctx context.Context, bucketName string) (_ b
 	if found {
 		return true, nil
 	}
-	return false, fail.ConvertError(err)
+	return false, fail.Wrap(err)
 }
 
 // InspectBucket ...
@@ -390,7 +390,7 @@ func (instance *location) GetBucket(bucketName string) (_ bucket, ferr fail.Erro
 	b.stowContainer, err = instance.stowLocation.Container(bucketName)
 	if err != nil {
 		// Note: No errors.Wrap here; error needs to be transmitted as-is
-		return bucket{}, fail.ConvertError(err)
+		return bucket{}, fail.Wrap(err)
 	}
 
 	instance.currentBucket = b
@@ -440,7 +440,7 @@ func (instance location) DeleteBucket(ctx context.Context, bucketName string) (f
 
 	err := instance.stowLocation.RemoveContainer(bucketName)
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 	return nil
 }
@@ -602,7 +602,7 @@ func (instance location) UploadBucket(ctx context.Context, bucketName, localDire
 	})
 
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	if len(issues) > 0 {
@@ -630,7 +630,7 @@ func (instance location) DownloadBucket(ctx context.Context, bucketName, decrypt
 
 	zippedBucket, err := os.CreateTemp("", "bucketcontent.*.zip")
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	defer func(closer *os.File) {
@@ -660,11 +660,11 @@ func (instance location) DownloadBucket(ctx context.Context, bucketName, decrypt
 		if decryptionKey != "" {
 			ck, err := crypt.NewEncryptionKey([]byte(decryptionKey))
 			if err != nil {
-				return fail.ConvertError(err)
+				return fail.Wrap(err)
 			}
 			clean, err := crypt.Decrypt(buffer.Bytes(), ck)
 			if err != nil {
-				return fail.ConvertError(err)
+				return fail.Wrap(err)
 			}
 			content = clean
 		} else {
@@ -673,11 +673,11 @@ func (instance location) DownloadBucket(ctx context.Context, bucketName, decrypt
 
 		tw, err := zipwriter.Create(name)
 		if err != nil {
-			return fail.ConvertError(err)
+			return fail.Wrap(err)
 		}
 		_, err = tw.Write(content)
 		if err != nil {
-			return fail.ConvertError(err)
+			return fail.Wrap(err)
 		}
 
 		return nil
@@ -691,7 +691,7 @@ func (instance location) DownloadBucket(ctx context.Context, bucketName, decrypt
 
 	ct, err := os.ReadFile(zippedBucket.Name())
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	return ct, nil
@@ -778,7 +778,7 @@ func (instance location) HasObject(ctx context.Context, bucketName string, objec
 		case NotFound: // this is an implementation detail of stow
 			return false, nil // nolint, we get an empty object
 		default:
-			return false, fail.ConvertError(err)
+			return false, fail.Wrap(err)
 		}
 	}
 

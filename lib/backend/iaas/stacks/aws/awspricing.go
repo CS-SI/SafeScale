@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,11 @@ package aws
 
 import (
 	"bytes"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 
 	"github.com/aws/aws-sdk-go/aws"
 
@@ -126,11 +127,11 @@ func NewPriceFromJSONValue(in aws.JSONValue) (Price, fail.Error) {
 	nullPrice := Price{}
 	jsonPrice, err := json.Marshal(in)
 	if err != nil {
-		return nullPrice, fail.ConvertError(err)
+		return nullPrice, fail.Wrap(err)
 	}
 	price := Price{}
 	if err = json.Unmarshal(jsonPrice, &price); err != nil {
-		return nullPrice, fail.ConvertError(err)
+		return nullPrice, fail.Wrap(err)
 	}
 	return price, nil
 }

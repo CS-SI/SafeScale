@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -184,7 +184,7 @@ func (instance bucket) ListObjects(ctx context.Context, path string, prefix stri
 
 	estimatedPageSize, err := instance.estimateSize(path, prefix)
 	if err != nil {
-		return list, fail.ConvertError(err)
+		return list, fail.Wrap(err)
 	}
 
 	// log.Println("location.Container => : ", c.GetName()
@@ -200,7 +200,7 @@ func (instance bucket) ListObjects(ctx context.Context, path string, prefix stri
 		},
 	)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 	return list, nil
 }
@@ -221,7 +221,7 @@ func (instance bucket) Browse(
 
 	estimatedPageSize, err := instance.estimateSize(path, prefix)
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	err = stow.Walk(instance.stowContainer, path, estimatedPageSize,
@@ -236,7 +236,7 @@ func (instance bucket) Browse(
 			return nil
 		},
 	)
-	return fail.ConvertError(err)
+	return fail.Wrap(err)
 }
 
 // Clear empties a bucket
@@ -252,7 +252,7 @@ func (instance bucket) Clear(ctx context.Context, path, prefix string) (ferr fai
 
 	estimatedPageSize, err := instance.estimateSize(path, prefix)
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	err = stow.Walk(instance.stowContainer, path, estimatedPageSize,
@@ -269,7 +269,7 @@ func (instance bucket) Clear(ctx context.Context, path, prefix string) (ferr fai
 			return nil
 		},
 	)
-	return fail.ConvertError(err)
+	return fail.Wrap(err)
 }
 
 // DeleteObject deletes an object from a bucket
@@ -394,7 +394,7 @@ func (instance bucket) GetCount(ctx context.Context, path string, prefix string)
 
 	estimatedPageSize, err := instance.estimateSize(path, prefix)
 	if err != nil {
-		return -1, fail.ConvertError(err)
+		return -1, fail.Wrap(err)
 	}
 
 	err = stow.Walk(instance.stowContainer, path, estimatedPageSize,
@@ -409,7 +409,7 @@ func (instance bucket) GetCount(ctx context.Context, path string, prefix string)
 		},
 	)
 	if err != nil {
-		return -1, fail.ConvertError(err)
+		return -1, fail.Wrap(err)
 	}
 	return count, nil
 }
@@ -427,7 +427,7 @@ func (instance bucket) GetSize(ctx context.Context, path string, prefix string) 
 
 	estimatedPageSize, err := instance.estimateSize(path, prefix)
 	if err != nil {
-		return -1, "", fail.ConvertError(err)
+		return -1, "", fail.Wrap(err)
 	}
 
 	var totalSize int64
@@ -449,7 +449,7 @@ func (instance bucket) GetSize(ctx context.Context, path string, prefix string) 
 		},
 	)
 	if err != nil {
-		return -1, "", fail.ConvertError(err)
+		return -1, "", fail.Wrap(err)
 	}
 	return totalSize, humanReadableSize(totalSize), nil
 }

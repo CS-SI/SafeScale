@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ func TestEnum_String(t *testing.T) {
 	for k, v := range stringMap {
 		if r, ok := enumMap[v]; ok {
 			if strings.Compare(strings.ToLower(k), strings.ToLower(r)) != 0 {
-				t.Errorf("Value mismatch: %s, %s", k, r)
+				t.Errorf("HolderOf mismatch: %s, %s", k, r)
 			}
 		} else {
 			t.Errorf("Key %s not found: ", k)

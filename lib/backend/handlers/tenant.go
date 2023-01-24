@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/oscarpicas/scribble"
 	"github.com/sirupsen/logrus"
 
@@ -40,9 +41,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -363,9 +362,9 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
 
-	isScannable, err := handler.checkScannable()
-	if err != nil {
-		return nil, err
+	isScannable, xerr := handler.checkScannable()
+	if xerr != nil {
+		return nil, xerr
 	}
 	if !isScannable {
 		return nil, fail.ForbiddenError("tenant is not defined as scannable")
@@ -406,7 +405,6 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	logrus.Infof("Starting scan of tenant %q with templates: %v", tenantName, templateNamesToScan)
 	logrus.Infof("Using %q image", defaultScanImage)
 
-	var xerr fail.Error
 	handler.scannedHostImage, xerr = svc.SearchImage(ctx, defaultScanImage)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "could not find needed image in given service")
@@ -418,9 +416,9 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		return nil, fail.Wrap(xerr, "could not get/create the scan network")
 	}
 
-	nid, aerr := network.GetID()
-	if aerr != nil {
-		return nil, fail.ConvertError(aerr)
+	nid, err := network.GetID()
+	if err != nil {
+		return nil, fail.Wrap(err)
 	}
 
 	defer func() {
@@ -437,9 +435,9 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		return nil, fail.Wrap(xerr, "could not get/create the scan subnet")
 	}
 
-	snid, aerr := subnet.GetID()
-	if aerr != nil {
-		return nil, fail.ConvertError(aerr)
+	snid, err := subnet.GetID()
+	if err != nil {
+		return nil, fail.Wrap(err)
 	}
 
 	defer func() {
@@ -450,12 +448,13 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		}
 	}()
 
-	xerr = subnet.Inspect(context.Background(), func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, innerErr := clonable.Cast[*abstract.Subnet](p)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
-		}
+	subnetTrx, xerr := metadata.NewTransaction[*abstract.Subnet, *resources.Subnet](ctx, subnet)
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
 
+	xerr = metadata.InspectCarried[*abstract.Subnet](context.Background(), subnetTrx, func(as *abstract.Subnet) fail.Error {
 		handler.abstractSubnet = as
 		return nil
 	})
@@ -555,7 +554,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 
 	hid, err := host.GetID()
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	defer func() {
@@ -592,13 +591,13 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 	daOut, err := json.MarshalIndent(daCPU, "", "\t")
 	if err != nil {
 		logrus.Warnf("tenant '%s', template '%s' : Problem marshaling json data: %v", tenantName, template.Name, err)
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	nerr := os.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json"), daOut, 0600)
 	if nerr != nil {
 		logrus.Warnf("tenant '%s', template '%s' : Error writing file: %v", tenantName, template.Name, nerr)
-		return fail.ConvertError(nerr)
+		return fail.Wrap(nerr)
 	}
 	logrus.Infof("tenant '%s', template '%s': Stored in file: %s", tenantName, template.Name, "$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json")
 
@@ -656,7 +655,7 @@ func (handler *tenantHandler) checkScannable() (isScannable bool, ferr fail.Erro
 func (handler *tenantHandler) dumpTemplates(ctx context.Context) (ferr fail.Error) {
 	err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777)
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	type TemplateList struct {
@@ -673,7 +672,7 @@ func (handler *tenantHandler) dumpTemplates(ctx context.Context) (ferr fail.Erro
 		Templates: templates,
 	})
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	svcName, xerr := svc.GetName()
@@ -684,7 +683,7 @@ func (handler *tenantHandler) dumpTemplates(ctx context.Context) (ferr fail.Erro
 	f = utils.AbsPathify(f)
 
 	if err = os.WriteFile(f, content, 0600); err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	return nil
@@ -692,7 +691,7 @@ func (handler *tenantHandler) dumpTemplates(ctx context.Context) (ferr fail.Erro
 
 func (handler *tenantHandler) dumpImages(ctx context.Context) (ferr fail.Error) {
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	type ImageList struct {
@@ -709,7 +708,7 @@ func (handler *tenantHandler) dumpImages(ctx context.Context) (ferr fail.Error) 
 		Images: images,
 	})
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	svcName, xerr := svc.GetName()
@@ -721,13 +720,13 @@ func (handler *tenantHandler) dumpImages(ctx context.Context) (ferr fail.Error) 
 	f = utils.AbsPathify(f)
 
 	if err := os.WriteFile(f, content, 0600); err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	return nil
 }
 
-func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr fail.Error) {
+func (handler *tenantHandler) getScanNetwork() (network *resources.Network, ferr fail.Error) {
 	var xerr fail.Error
 	network, xerr = networkfactory.Load(handler.job.Context(), scanNetworkName)
 	if xerr != nil {
@@ -751,7 +750,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr 
 	return network, xerr
 }
 
-func (handler *tenantHandler) getScanSubnet(networkID string) (_ resources.Subnet, ferr fail.Error) {
+func (handler *tenantHandler) getScanSubnet(networkID string) (_ *resources.Subnet, ferr fail.Error) {
 	subnet, xerr := subnetfactory.Load(handler.job.Context(), scanNetworkName, scanSubnetName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
@@ -877,17 +876,17 @@ func (handler *tenantHandler) collect(ctx context.Context) (ferr fail.Error) {
 	folder := fmt.Sprintf("images/%s/%s", svcName, region)
 
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	files, err := ioutil.ReadDir(utils.AbsPathify("$HOME/.safescale/scanner"))
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	for _, file := range files {
@@ -904,17 +903,17 @@ func (handler *tenantHandler) collect(ctx context.Context) (ferr fail.Error) {
 
 			byteValue, err := os.ReadFile(theFile)
 			if err != nil {
-				return fail.ConvertError(err)
+				return fail.Wrap(err)
 			}
 
 			if err = json.Unmarshal(byteValue, &acpu); err != nil {
-				return fail.ConvertError(err)
+				return fail.Wrap(err)
 			}
 
 			acpu.ID = acpu.ImageID
 
 			if err = db.Write(folder, acpu.TemplateName, acpu); err != nil {
-				return fail.ConvertError(err)
+				return fail.Wrap(err)
 			}
 		}
 		if !file.IsDir() {

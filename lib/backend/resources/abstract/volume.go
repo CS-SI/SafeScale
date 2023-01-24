@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -129,7 +129,7 @@ func (v *Volume) Serialize() ([]byte, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 	r, err := json.Marshal(v)
-	return r, fail.ConvertError(err)
+	return r, fail.Wrap(err)
 }
 
 // Deserialize reads json code and restores a Volume
@@ -139,7 +139,7 @@ func (v *Volume) Deserialize(buf []byte) (ferr fail.Error) {
 	}
 
 	defer fail.OnPanic(&ferr) // json.Unmarshal may panic
-	return fail.ConvertError(json.Unmarshal(buf, v))
+	return fail.Wrap(json.Unmarshal(buf, v))
 }
 
 // // GetName returns the name of the volume

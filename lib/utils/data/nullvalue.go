@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,5 +20,5 @@ package data
 
 // NullValue ...
 type NullValue interface {
-	IsNull() bool // Tells if the underlying instance is a Null Value
+	IsNull() bool // Tells if the underlying instance is a Null HolderOf
 }

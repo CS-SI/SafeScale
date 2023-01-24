@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -149,7 +149,7 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	for _, v := range templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice, fail.ConvertError(err)
+			return emptySlice, fail.Wrap(err)
 		}
 		out = append(out, re)
 	}

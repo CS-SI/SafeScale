@@ -2,7 +2,7 @@
 // +build ignore
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,11 +55,11 @@ func NewSingleCache(name string, store Store) (*SingleCache, fail.Error) {
 // Without option OptionOnMissKeyword, Get will not try to fill the cahce, and behaves just like a way to search in cache
 // if key exists
 // returns:
-//    - *Entry, nil: found the entry corresponding to key
-//    - nil, *fail.ErrInvalidInstance: Get called from nil of null value of SingleCache
-//    - nil, *fail.ErrInvalidParameter: one of the parameter is wrong
-//    - nil, *fail.ErrInconsistentError: something is inconsistent in options
-//    - nil, *fail.ErrNotFoundError: no entry associated with 'key' in cache
+//   - *Entry, nil: found the entry corresponding to key
+//   - nil, *fail.ErrInvalidInstance: Get called from nil of null value of SingleCache
+//   - nil, *fail.ErrInvalidParameter: one of the parameter is wrong
+//   - nil, *fail.ErrInconsistentError: something is inconsistent in options
+//   - nil, *fail.ErrNotFoundError: no entry associated with 'key' in cache
 func (instance *SingleCache) Get(ctx context.Context, key string, options ...data.ImmutableKeyValue) (ce *Entry, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()

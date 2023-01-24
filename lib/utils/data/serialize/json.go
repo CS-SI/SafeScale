@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,11 +33,11 @@ import (
 
 // jsonProperty contains data and a RWMutex to handle sync
 type jsonProperty struct {
-	shielded.Shielded
+	shielded.Shielded[clonable.Clonable]
 	module, key string
 }
 
-// IsNull tells if the jsonProperty is a Null Value
+// IsNull tells if the jsonProperty is a Null HolderOf
 func (jp *jsonProperty) IsNull() bool {
 	return jp == nil || valid.IsNil(jp.Shielded)
 }
@@ -294,7 +294,7 @@ func (x *JSONProperties) Alter(key string, alterer func(clonable.Clonable) fail.
 
 	clone, err := clonable.CastedClone[*jsonProperty](item)
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	xerr := clone.Alter(alterer)

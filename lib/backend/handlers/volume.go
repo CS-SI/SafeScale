@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,18 +19,15 @@ package handlers
 import (
 	"strings"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumeproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
 	volumefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/volume"
-	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -43,11 +40,11 @@ import (
 // VolumeHandler defines API to manipulate hosts
 type VolumeHandler interface {
 	Attach(volume string, host string, path string, format string, doNotFormat bool, doNotMount bool) fail.Error
-	Create(name string, size int, speed volumespeed.Enum) (resources.Volume, fail.Error)
+	Create(name string, size int, speed volumespeed.Enum) (*resources.Volume, fail.Error)
 	Detach(volume string, host string) fail.Error
 	Delete(ref string) fail.Error
-	Inspect(ref string) (resources.Volume, fail.Error)
-	List(all bool) ([]resources.Volume, fail.Error)
+	Inspect(ref string) (*resources.Volume, fail.Error)
+	List(all bool) ([]*resources.Volume, fail.Error)
 }
 
 // NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
@@ -65,7 +62,7 @@ func NewVolumeHandler(job jobapi.Job) VolumeHandler {
 }
 
 // List returns the list of Volumes
-func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr fail.Error) {
+func (handler *volumeHandler) List(all bool) (volumes []*resources.Volume, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -141,24 +138,26 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 		}
 	}
 
-	xerr = volumeInstance.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
-			volumeAttachmentsV1, innerErr := clonable.Cast[*propertiesv1.VolumeAttachments](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
+	volumeTrx, xerr := metadata.NewTransaction[*abstract.Volume, *resources.Volume](ctx, volumeInstance)
+	if xerr != nil {
+		return xerr
+	}
+	defer volumeTrx.TerminateBasedOnError(ctx, &ferr)
 
-			nbAttach := uint(len(volumeAttachmentsV1.Hosts))
-			if nbAttach > 0 {
-				var list []string
-				for _, v := range volumeAttachmentsV1.Hosts {
-					list = append(list, v)
-				}
-				return fail.InvalidRequestError("still attached to %d host%s: %s", nbAttach, strprocess.Plural(nbAttach), strings.Join(list, ", "))
-			}
-			return nil
-		})
-	})
+	// FIXME: introduce a volumeInstance.GetAttachments() to replace the code below
+	attachments, xerr := volumeInstance.GetAttachments(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	nbAttach := uint(len(attachments.Hosts))
+	if nbAttach > 0 {
+		var list []string
+		for _, v := range attachments.Hosts {
+			list = append(list, v)
+		}
+		return fail.InvalidRequestError("still attached to %d host%s: %s", nbAttach, strprocess.Plural(nbAttach), strings.Join(list, ", "))
+	}
 	if xerr != nil {
 		return xerr
 	}
@@ -167,7 +166,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 }
 
 // Inspect returns the volume identified by ref and its attachment (if any)
-func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr fail.Error) {
+func (handler *volumeHandler) Inspect(ref string) (volume *resources.Volume, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -211,7 +210,7 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr
 }
 
 // Create a volume
-func (handler *volumeHandler) Create(name string, size int, speed volumespeed.Enum) (objv resources.Volume, ferr fail.Error) {
+func (handler *volumeHandler) Create(name string, size int, speed volumespeed.Enum) (_ *resources.Volume, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -233,20 +232,21 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	var xerr fail.Error
-	objv, xerr = volumefactory.New(handler.job.Context())
+	volumeInstance, xerr := volumefactory.New(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	request := abstract.VolumeRequest{
 		Name:  name,
 		Size:  size,
 		Speed: speed,
 	}
-	if xerr = objv.Create(handler.job.Context(), request); xerr != nil {
+	if xerr = volumeInstance.Create(handler.job.Context(), request); xerr != nil {
 		return nil, xerr
 	}
-	return objv, nil
+
+	return volumeInstance, nil
 }
 
 // Attach a volume to a host

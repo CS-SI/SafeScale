@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ func AddConsequence(err error, cons error) error {
 	if err != nil {
 		if conseq, ok := err.(consequencer); ok {
 			if cons != nil {
-				convErr := ConvertError(cons)
+				convErr := Wrap(cons)
 				nerr := conseq.AddConsequence(convErr)
 				return nerr
 			}
@@ -278,13 +278,13 @@ func Cause(err error) (resp error) {
 	return err
 }
 
-// ConvertError converts an error to a fail.Error
-func ConvertError(err error) Error {
-	if err != nil {
-		if casted, ok := err.(Error); ok {
-			return casted
-		}
-		return NewErrorWithCause(Cause(err), err.Error())
-	}
-	return nil
-}
+// // ConvertError converts an error to a fail.Error
+// func ConvertError(err error) Error {
+// 	if err != nil {
+// 		if casted, ok := err.(Error); ok {
+// 			return casted
+// 		}
+// 		return NewErrorWithCause(Cause(err), err.Error())
+// 	}
+// 	return nil
+// }

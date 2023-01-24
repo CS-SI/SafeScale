@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,11 +38,11 @@ import (
 
 type SubnetHandler interface {
 	BindSecurityGroup(networkRef string, subnetRef string, sgRef string, enable resources.SecurityGroupActivation) fail.Error
-	Create(networkRef string, req abstract.SubnetRequest, gwName string, sizing abstract.HostSizingRequirements) (resources.Subnet, fail.Error)
+	Create(networkRef string, req abstract.SubnetRequest, gwName string, sizing abstract.HostSizingRequirements) (*resources.Subnet, fail.Error)
 	Delete(networkRef string, subnetRef string, force bool) fail.Error
 	DisableSecurityGroup(networkRef string, subnetRef string, sgRef string) fail.Error
 	EnableSecurityGroup(networkRef string, subnetRef string, sgRef string) fail.Error
-	Inspect(networkRef string, subnetRef string) (resources.Subnet, fail.Error)
+	Inspect(networkRef string, subnetRef string) (*resources.Subnet, fail.Error)
 	List(networkRef string, all bool) ([]*abstract.Subnet, fail.Error)
 	ListSecurityGroups(networkRef string, subnetRef string, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)
 	UnbindSecurityGroup(networkRef, subnetRef, sgRef string) fail.Error
@@ -58,7 +58,7 @@ func NewSubnetHandler(job jobapi.Job) SubnetHandler {
 }
 
 // Create a new subnet
-func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetRequest, gwName string, sizing abstract.HostSizingRequirements) (_ resources.Subnet, ferr fail.Error) {
+func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetRequest, gwName string, sizing abstract.HostSizingRequirements) (_ *resources.Subnet, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -96,7 +96,7 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 
 	req.NetworkID, err = networkInstance.GetID()
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	subnetInstance, xerr := subnetfactory.New(handler.job.Context())
@@ -159,7 +159,7 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 		var err error
 		networkID, err = networkInstance.GetID()
 		if err != nil {
-			return nil, fail.ConvertError(err)
+			return nil, fail.Wrap(err)
 		}
 	}
 
@@ -167,7 +167,7 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 }
 
 // Inspect returns infos on a subnet
-func (handler *subnetHandler) Inspect(networkRef, subnetRef string) (_ resources.Subnet, ferr fail.Error) {
+func (handler *subnetHandler) Inspect(networkRef, subnetRef string) (_ *resources.Subnet, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -218,8 +218,8 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 	newCtx := context.WithValue(handler.job.Context(), "force", force) // nolint
 
 	var (
-		networkInstance resources.Network
-		subnetInstance  resources.Subnet
+		networkInstance *resources.Network
+		subnetInstance  *resources.Subnet
 	)
 	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), networkRef, subnetRef)
 	if xerr != nil {
@@ -236,7 +236,7 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 	clean := true
 	subnetID, err := subnetInstance.GetID()
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 
 	networkInstance, xerr = subnetInstance.InspectNetwork(handler.job.Context())

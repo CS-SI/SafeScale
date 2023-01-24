@@ -92,8 +92,9 @@ resource "openstack_compute_instance_v2" "{{ $rsc.Name }}" {
 		delete_on_termination = true
 	}
 {{-   end }}
-
+{{- if $extra.MarkedForCreation }}
 	user_data = "${file("{{ $rsc.Name }}_userdata")}"
+{{- end }}
 
 	metadata = {
 {{-   range $t, $v := $rsc.Tags }}

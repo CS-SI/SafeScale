@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -444,7 +444,7 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 	cmd.SysProcAttr = getSyscallAttrs()
 	cerr := cmd.Start()
 	if cerr != nil {
-		return nil, fail.ConvertError(cerr)
+		return nil, fail.Wrap(cerr)
 	}
 
 	// gives 10s to build a tunnel, 1s is not enough as the number of tunnels keeps growing
@@ -483,7 +483,7 @@ type CliCommand struct {
 // The returned error is nil if the command runs, has no problems copying stdin, stdout, and stderr, and exits with a zero exit status.
 // If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
-// Wait does not release resources associated with the cmd; Command.Close() must be called for that.
+// Wait does not release resources associated with the cmd; Command.Terminate() must be called for that.
 // !!!WARNING!!!: the error returned is NOT USING fail.Error because we may NEED TO CAST the error to recover return code
 func (scmd *CliCommand) Wait() error {
 	if scmd == nil {
@@ -529,7 +529,7 @@ func (scmd *CliCommand) getStdoutPipe() (io.ReadCloser, fail.Error) {
 
 	pipe, err := scmd.cmd.StdoutPipe()
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 	return pipe, nil
 }
@@ -548,7 +548,7 @@ func (scmd *CliCommand) getStderrPipe() (io.ReadCloser, fail.Error) {
 
 	pipe, err := scmd.cmd.StderrPipe()
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 	return pipe, nil
 }
@@ -567,7 +567,7 @@ func (scmd *CliCommand) getStdinPipe() (io.WriteCloser, fail.Error) {
 
 	pipe, err := scmd.cmd.StdinPipe()
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 	return pipe, nil
 }
@@ -618,7 +618,7 @@ func (scmd *CliCommand) Start() fail.Error {
 	}
 
 	if err := scmd.cmd.Start(); err != nil {
-		return fail.ConvertError(err)
+		return fail.Wrap(err)
 	}
 	return nil
 }
@@ -681,7 +681,7 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 			return xerr
 		})
 
-		xerr := fail.ConvertError(subtask.Wait())
+		xerr := fail.Wrap(subtask.Wait())
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
@@ -720,9 +720,9 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 	case res := <-chRes:
 		return res.ra, res.rb, res.rc, res.rErr
 	case <-ctx.Done():
-		return invalid, "", "", fail.ConvertError(ctx.Err())
+		return invalid, "", "", fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return invalid, "", "", fail.ConvertError(inctx.Err())
+		return invalid, "", "", fail.Wrap(inctx.Err())
 	}
 }
 
@@ -808,11 +808,11 @@ func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (data.
 
 			if params.collectOutputs {
 				if msgOut, err = io.ReadAll(stdoutPipe); err != nil {
-					return remap, fail.ConvertError(err)
+					return remap, fail.Wrap(err)
 				}
 
 				if msgErr, err = io.ReadAll(stderrPipe); err != nil {
-					return remap, fail.ConvertError(err)
+					return remap, fail.Wrap(err)
 				}
 			}
 
@@ -887,9 +887,9 @@ func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (data.
 	case res := <-chRes:
 		return res.rRes, res.rErr
 	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
+		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
+		return nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -1018,7 +1018,7 @@ func createConsecutiveTunnels(sc sshapi.Config, tunnels *Tunnels) (*Tunnel, fail
 				case *retry.ErrStopRetry:
 					return nil, fail.Wrap(fail.Cause(xerr))
 				case *retry.ErrTimeout:
-					return nil, fail.ConvertError(fail.Cause(xerr))
+					return nil, fail.Wrap(fail.Cause(xerr))
 				}
 				return nil, xerr
 			}

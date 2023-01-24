@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,7 +73,7 @@ func (instance *KV) Put(ctx context.Context, key string, value any) fail.Error {
 	// base64.StdEncoding.Encode(encoded, jsoned)
 	// p := &consulapi.KVPair{
 	// 	Key:   fullKey,
-	// 	Value: encoded,
+	// 	HolderOf: encoded,
 	// }
 	p := &consulapi.KVPair{
 		Key:     fullKey,

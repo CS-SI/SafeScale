@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,12 +24,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -38,6 +39,13 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
+// hostTarget is a subnet of *resources.Host to use in the package, to prevent import cycle
+type hostTarget interface {
+	Run(context.Context, string, outputs.Enum, time.Duration, time.Duration) (int, string, string, fail.Error)
+	Service() iaasapi.Service
+	Push(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, ferr fail.Error)
+}
+
 //go:embed scripts/*
 var bucketfsScripts embed.FS
 
@@ -45,7 +53,7 @@ var bucketfsScripts embed.FS
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
 // func executeScript(ctx context.Context, sshconfig ssh.Profile, name string, data map[string]interface{}) (int, string, string, fail.Error) {
-func executeScript(ctx context.Context, host resources.Host, name string, data map[string]interface{}) fail.Error {
+func executeScript(ctx context.Context, host hostTarget, name string, data map[string]interface{}) fail.Error {
 	timings, xerr := host.Service().Timings()
 	if xerr != nil {
 		return xerr
@@ -163,7 +171,7 @@ func realizeTemplate(name string, data interface{}) (string, fail.Error) {
 	return content, nil
 }
 
-func uploadContentToFile(ctx context.Context, content, name, owner, rights string, host resources.Host) (string, fail.Error) {
+func uploadContentToFile(ctx context.Context, content, name, owner, rights string, host hostTarget) (string, fail.Error) {
 	// Copy script to remote host with retries if needed
 	f, xerr := utils.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -37,11 +36,11 @@ func List(ctx context.Context, scope scopeapi.Scope) ([]string, fail.Error) {
 }
 
 // New creates a bucket instance
-func New(ctx context.Context) (resources.Bucket, fail.Error) { // nolint
-	return operations.NewBucket(ctx)
+func New(ctx context.Context) (*resources.Bucket, fail.Error) { // nolint
+	return resources.NewBucket(ctx)
 }
 
 // Load initializes the bucket with metadata from provider
-func Load(ctx context.Context, name string) (resources.Bucket, fail.Error) { // nolint
-	return operations.LoadBucket(ctx, name)
+func Load(ctx context.Context, name string) (*resources.Bucket, fail.Error) { // nolint
+	return resources.LoadBucket(ctx, name)
 }

@@ -2,7 +2,7 @@
 // +build ignore
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -605,4 +605,24 @@ func jsonUnMarshalIgnored(m dsl.Matcher) {
 		`$x, _ := json.UnMarshal($*_)`,
 	).
 		Report("json unmarshalling errors cannot be ignored")
+}
+
+func removeDebugCode(m dsl.Matcher) {
+	m.Match(
+		"logrus.Warningf($*_, $*_)",
+		"logrus.Warning($*_, $x)",
+		"logrus.Warningf($*_)",
+		"logrus.Warning($*_)",
+	).
+		Report("REMOVE debug code before a release")
+}
+
+func removeMoreDebugCode(m dsl.Matcher) {
+	m.Match(
+		"logrus.WithContext($*_).Warningf($*_, $*_)",
+		"logrus.WithContext($*_).Warning($*_, $x)",
+		"logrus.WithContext($*_).Warningf($*_)",
+		"logrus.WithContext($*_).Warning($*_)",
+	).
+		Report("REMOVE ctx debug code before a release")
 }

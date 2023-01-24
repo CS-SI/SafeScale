@@ -1,0 +1,67 @@
+package resources
+
+import (
+	"context"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+)
+
+type (
+	bucketTransaction = metadata.Transaction[*abstract.Bucket, *Bucket]
+)
+
+func newBucketTransaction(ctx context.Context, instance *Bucket) (bucketTransaction, fail.Error) {
+	return metadata.NewTransaction[*abstract.Bucket, *Bucket](ctx, instance)
+}
+
+func inspectBucketMetadata(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket, *serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.Inspect[*abstract.Bucket](ctx, trx, callback)
+}
+
+func inspectBucketMetadataCarried(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket) fail.Error) fail.Error {
+	return metadata.InspectCarried[*abstract.Bucket](ctx, trx, callback)
+}
+
+func inspectBucketMetadataProperty[P clonable.Clonable](ctx context.Context, trx bucketTransaction, property string, callback func(P) fail.Error) fail.Error {
+	return metadata.InspectProperty[*abstract.Bucket, P](ctx, trx, property, callback)
+}
+
+func inspectBucketMetadataProperties(ctx context.Context, trx bucketTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.InspectProperties[*abstract.Bucket](ctx, trx, callback)
+}
+
+func reviewBucketMetadata(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket, *serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.Review[*abstract.Bucket](ctx, trx, callback)
+}
+
+func reviewBucketMetadataCarried(ctx context.Context, trx bucketTransaction, callback func(ahc *abstract.Bucket) fail.Error) fail.Error {
+	return metadata.ReviewCarried[*abstract.Bucket](ctx, trx, callback)
+}
+
+func reviewBucketMetadataProperty[P clonable.Clonable](ctx context.Context, trx bucketTransaction, property string, callback func(P) fail.Error) fail.Error {
+	return metadata.ReviewProperty[*abstract.Bucket, P](ctx, trx, property, callback)
+}
+
+func reviewBucketMetadataProperties(ctx context.Context, trx bucketTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.ReviewProperties[*abstract.Bucket](ctx, trx, callback)
+}
+
+func alterBucketMetadata(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket, *serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.Alter[*abstract.Bucket](ctx, trx, callback)
+}
+
+func alterBucketMetadataCarried(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket) fail.Error) fail.Error {
+	return metadata.AlterCarried[*abstract.Bucket](ctx, trx, callback)
+}
+
+func alterBucketMetadataProperty[P clonable.Clonable](ctx context.Context, trx bucketTransaction, property string, callback func(P) fail.Error) fail.Error {
+	return metadata.AlterProperty[*abstract.Bucket, P](ctx, trx, property, callback)
+}
+
+func alterBucketMetadataProperties(ctx context.Context, trx bucketTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.InspectProperties[*abstract.Bucket](ctx, trx, callback)
+}

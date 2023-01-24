@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -46,12 +45,12 @@ func List(ctx context.Context) (list []abstract.Cluster, ferr fail.Error) {
 	return list, xerr
 }
 
-// New creates a new instance of resources.Cluster
-func New(ctx context.Context) (_ resources.Cluster, ferr fail.Error) {
-	return operations.NewCluster(ctx)
+// New creates a new instance of *Cluster
+func New(ctx context.Context) (_ *resources.Cluster, ferr fail.Error) {
+	return resources.NewCluster(ctx)
 }
 
-// Load loads metadata of a cluster and returns an instance of resources.Cluster
-func Load(ctx context.Context, name string) (_ resources.Cluster, ferr fail.Error) {
-	return operations.LoadCluster(ctx, name)
+// Load loads metadata of a cluster and returns an instance of *Cluster
+func Load(ctx context.Context, name string) (_ *resources.Cluster, ferr fail.Error) {
+	return resources.LoadCluster(ctx, name)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -44,7 +43,7 @@ type Description struct {
 }
 
 // Upload uploads configuration file to remote host
-func (desc *Description) upload(ctx context.Context, host resources.Host) fail.Error {
+func (desc *Description) upload(ctx context.Context, host hostTarget) fail.Error {
 	f, xerr := desc.createConfigurationFile()
 	if xerr != nil {
 		return xerr

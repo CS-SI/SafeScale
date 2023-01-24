@@ -1,0 +1,67 @@
+package resources
+
+import (
+	"context"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+)
+
+type (
+	shareTransaction = metadata.Transaction[*abstract.Share, *Share]
+)
+
+func newShareTransaction(ctx context.Context, instance *Share) (shareTransaction, fail.Error) {
+	return metadata.NewTransaction[*abstract.Share, *Share](ctx, instance)
+}
+
+func inspectShareMetadata(ctx context.Context, trx shareTransaction, callback func(*abstract.Share, *serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.Inspect[*abstract.Share](ctx, trx, callback)
+}
+
+func inspectShareMetadataCarried(ctx context.Context, trx shareTransaction, callback func(*abstract.Share) fail.Error) fail.Error {
+	return metadata.InspectCarried[*abstract.Share](ctx, trx, callback)
+}
+
+func inspectShareMetadataProperty[P clonable.Clonable](ctx context.Context, trx shareTransaction, property string, callback func(P) fail.Error) fail.Error {
+	return metadata.InspectProperty[*abstract.Share, P](ctx, trx, property, callback)
+}
+
+func inspectShareMetadataProperties(ctx context.Context, trx shareTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.InspectProperties[*abstract.Share](ctx, trx, callback)
+}
+
+func reviewShareMetadata(ctx context.Context, trx shareTransaction, callback func(*abstract.Share, *serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.Review[*abstract.Share](ctx, trx, callback)
+}
+
+func reviewShareMetadataCarried(ctx context.Context, trx shareTransaction, callback func(ahc *abstract.Share) fail.Error) fail.Error {
+	return metadata.ReviewCarried[*abstract.Share](ctx, trx, callback)
+}
+
+func reviewShareMetadataProperty[P clonable.Clonable](ctx context.Context, trx shareTransaction, property string, callback func(P) fail.Error) fail.Error {
+	return metadata.ReviewProperty[*abstract.Share, P](ctx, trx, property, callback)
+}
+
+func reviewShareMetadataProperties(ctx context.Context, trx shareTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.ReviewProperties[*abstract.Share](ctx, trx, callback)
+}
+
+func alterShareMetadata(ctx context.Context, trx shareTransaction, callback func(*abstract.Share, *serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.Alter[*abstract.Share](ctx, trx, callback)
+}
+
+func alterShareMetadataCarried(ctx context.Context, trx shareTransaction, callback func(*abstract.Share) fail.Error) fail.Error {
+	return metadata.AlterCarried[*abstract.Share](ctx, trx, callback)
+}
+
+func alterShareMetadataProperty[P clonable.Clonable](ctx context.Context, trx shareTransaction, property string, callback func(P) fail.Error) fail.Error {
+	return metadata.AlterProperty[*abstract.Share, P](ctx, trx, property, callback)
+}
+
+func alterShareMetadataProperties(ctx context.Context, trx shareTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.InspectProperties[*abstract.Share](ctx, trx, callback)
+}

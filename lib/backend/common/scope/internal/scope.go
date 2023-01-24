@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
@@ -32,6 +33,7 @@ import (
 	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/securitygroup"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/subnet"
 	volumefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/volume"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
@@ -462,7 +464,7 @@ func (s *scope) loadHosts(ctx context.Context, provider providerUsingTerraform) 
 
 	svc := browser.Service()
 
-	return browser.Browse(ctx, func(ahc *abstract.HostCore) fail.Error {
+	return browser.Browse(ctx, func(ahc *abstract.HostCore) (ferr fail.Error) {
 		innerXErr := provider.ConsolidateHostSnippet(ahc)
 		if innerXErr != nil {
 			return innerXErr
@@ -479,7 +481,13 @@ func (s *scope) loadHosts(ctx context.Context, provider providerUsingTerraform) 
 			return innerXErr
 		}
 
-		innerXErr = host.Inspect(ctx, func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
+		hostTrx, innerXErr := metadata.NewTransaction[*abstract.HostCore, *resources.Host](ctx, host)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+
+		innerXErr = metadata.InspectProperties[*abstract.HostCore](ctx, hostTrx, func(props *serialize.JSONProperties) fail.Error {
 			inspectXErr := props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
 				networkV2, inspectErr := clonable.Cast[*propertiesv2.HostNetworking](p)
 				if inspectErr != nil {

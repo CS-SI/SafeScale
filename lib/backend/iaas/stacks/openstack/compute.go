@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,9 +42,9 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -79,7 +79,7 @@ func (instance *stack) ListRegions(ctx context.Context) (list []string, ferr fai
 
 	allRegions, err := regions.ExtractRegions(allPages)
 	if err != nil {
-		return nil, fail.ConvertError(err)
+		return nil, fail.Wrap(err)
 	}
 
 	var results []string
@@ -116,7 +116,7 @@ func (instance *stack) ListAvailabilityZones(ctx context.Context) (list map[stri
 
 	content, err := az.ExtractAvailabilityZones(allPages)
 	if err != nil {
-		return emptyMap, fail.ConvertError(err)
+		return emptyMap, fail.Wrap(err)
 	}
 
 	azList := map[string]bool{}
@@ -1387,7 +1387,7 @@ func (instance *stack) WaitHostState(ctx context.Context, hostParam iaasapi.Host
 		case *fail.ErrAborted:
 			cause := retryErr.Cause()
 			if cause != nil {
-				retryErr = fail.ConvertError(cause)
+				retryErr = fail.Wrap(cause)
 			}
 			return server, retryErr // Not available error keeps the server info, good
 		default:
@@ -1649,14 +1649,14 @@ func (instance *stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostIde
 			if _, ok := cause.(*fail.ErrNotFound); ok {
 				debug.IgnoreErrorWithContext(ctx, xerr)
 			} else {
-				return fail.ConvertError(cause)
+				return fail.Wrap(cause)
 			}
 		case *retry.ErrStopRetry:
 			cause := fail.Cause(xerr)
 			if _, ok := cause.(*fail.ErrNotFound); ok {
 				debug.IgnoreErrorWithContext(ctx, xerr)
 			} else {
-				return fail.ConvertError(cause)
+				return fail.Wrap(cause)
 			}
 		case *fail.ErrNotFound:
 			// if host disappeared (rpcListPorts succeeded and host was still there at this moment), consider the error as a successful deletion;

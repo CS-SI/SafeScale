@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,14 +24,15 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/utils/result/result.Result -o mocks/mock_result.go
+//go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/utils/result.Holder -o mocks/mock_holder.go
 
 // Holder ...
 type Holder[T any] interface {
-	Successful() (bool, fail.Error)
-	Completed() (bool, fail.Error)
+	Successful() bool
+	Completed() bool
 	Error() error
-	ErrorMessage() (string, fail.Error)
+	ErrorMessage() string
+	Payload() T
 }
 
 // holder[T any] implements Holder interface
@@ -77,22 +78,22 @@ func (r *holder[T]) IsLocked() bool {
 	return r.frozen
 }
 
-// Successful returns true if the script has finished AND its resultGroup is a success
-func (r *holder[T]) Successful() (bool, fail.Error) {
+// Successful returns true if the script has finished AND its group is a success
+func (r *holder[T]) Successful() bool {
 	if valid.IsNull(r) {
-		return false, fail.InvalidInstanceError()
+		return false
 	}
 
-	return r.success, nil
+	return r.success
 }
 
 // Completed returns true if the script has finished, false otherwise
-func (r *holder[T]) Completed() (bool, fail.Error) {
+func (r *holder[T]) Completed() bool {
 	if valid.IsNull(r) {
-		return false, fail.InvalidInstanceError()
+		return false
 	}
 
-	return r.completed, nil
+	return r.completed
 }
 
 func (r *holder[T]) Error() error {
@@ -103,9 +104,9 @@ func (r *holder[T]) Error() error {
 	return r.err
 }
 
-func (r *holder[T]) ErrorMessage() (string, fail.Error) {
+func (r *holder[T]) ErrorMessage() string {
 	if valid.IsNull(r) {
-		return "", fail.InvalidInstanceError()
+		return ""
 	}
 
 	var msg string
@@ -167,5 +168,15 @@ func (r *holder[T]) ErrorMessage() (string, fail.Error) {
 			msg = r.err.Error()
 		}
 	}
-	return msg, nil
+	return msg
+}
+
+// Payload returns the data carried by the Holder, if result is completed
+func (r *holder[T]) Payload() T {
+	empty := new(T)
+	if r.Completed() {
+		return r.payload
+	}
+
+	return *empty
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,9 +31,9 @@ import (
 // LabelHandler defines API to manipulate tags
 type LabelHandler interface {
 	Delete(ref string) fail.Error
-	List(listTag bool) ([]resources.Label, fail.Error)
-	Inspect(ref string) (resources.Label, fail.Error)
-	Create(name string, hasDefault bool, defaultValue string) (resources.Label, fail.Error)
+	List(listTag bool) ([]*resources.Label, fail.Error)
+	Inspect(ref string) (*resources.Label, fail.Error)
+	Create(name string, hasDefault bool, defaultValue string) (*resources.Label, fail.Error)
 }
 
 // labelHandler Label service
@@ -47,7 +47,7 @@ func NewTagHandler(job jobapi.Job) LabelHandler {
 }
 
 // List returns the network list
-func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fail.Error) {
+func (handler *labelHandler) List(listTag bool) (list []*resources.Label, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -134,7 +134,7 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 }
 
 // Inspect returns the tag identified by ref and its attachment (if any)
-func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.Error) {
+func (handler *labelHandler) Inspect(ref string) (_ *resources.Label, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -171,7 +171,7 @@ func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.E
 }
 
 // Create a tag
-func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue string) (instance resources.Label, ferr fail.Error) {
+func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue string) (_ *resources.Label, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
@@ -193,14 +193,15 @@ func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue s
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
-	var xerr fail.Error
-	instance, xerr = labelfactory.New(handler.job.Context())
+	instance, xerr := labelfactory.New(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	if xerr = instance.Create(handler.job.Context(), name, hasDefault, defaultValue); xerr != nil {
+	xerr = instance.Create(handler.job.Context(), name, hasDefault, defaultValue)
+	if xerr != nil {
 		return nil, xerr
 	}
+
 	return instance, nil
 }
