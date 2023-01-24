@@ -35,6 +35,7 @@ type Scope interface {
 	Organization() string
 	Project() string
 	RegisterResource(terraformerapi.Resource) fail.Error
+	RegisterResourceIfNeeded(terraformerapi.Resource) (bool, fail.Error)
 	ReplaceResource(terraformerapi.Resource) fail.Error
 	Resource(kind, name string) (terraformerapi.Resource, fail.Error)
 	Service() iaasapi.Service

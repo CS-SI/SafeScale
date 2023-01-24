@@ -648,19 +648,14 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 					return innerXErr
 				}
 
-				tfResource, err := lang.Cast[terraformerapi.Resource](p)
-				if err != nil {
-					return fail.Wrap(err)
+				tfResource, innerErr := lang.Cast[terraformerapi.Resource](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
 				}
 
-				innerXErr = myjob.Scope().RegisterResource(tfResource)
+				_, innerXErr = myjob.Scope().RegisterResourceIfNeeded(tfResource)
 				if innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrDuplicate:
-						debug.IgnoreError(innerXErr)
-					default:
-						return innerXErr
-					}
+					return innerXErr
 				}
 
 				return nil

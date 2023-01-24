@@ -66,8 +66,8 @@ type (
 
 	// scope contains information about context of the Job
 	scope struct {
-		lock         *sync.RWMutex
 		resources    *xsync.MapOf[string, terraformerapi.Resource]
+		mu           *sync.Mutex
 		consulClient *consumer.Client
 		consulKV     *consumer.KV
 		service      iaasapi.Service
@@ -99,9 +99,9 @@ func Load(organization, project, tenant string) (*scope, fail.Error) {
 		return nil, fail.NotFoundError("failed to find a Scope identified by '%s'", kvPath)
 	}
 
-	out, ok := entry.(*scope)
-	if !ok {
-		return nil, fail.InconsistentError("loaded scope is not of type '*scope'")
+	out, err := lang.Cast[*scope](entry)
+	if err != nil {
+		return nil, fail.Wrap(err)
 	}
 
 	return out, nil
@@ -132,7 +132,7 @@ func New(organization, project, tenant, description string) (*scope, fail.Error)
 		fsPath:       filepath.Join(organization, project, tenant),
 		kvPath:       strings.Join([]string{organization, project, tenant}, "/"),
 		resources:    xsync.NewMapOf[terraformerapi.Resource](),
-		lock:         &sync.RWMutex{},
+		mu:           &sync.Mutex{},
 	}
 
 	_, loaded := scopeList.LoadOrStore(out.kvPath, out)
@@ -165,8 +165,8 @@ func (s *scope) IsLoaded() bool {
 		return false
 	}
 
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	return s.loaded
 }
@@ -175,6 +175,9 @@ func (s *scope) String() string {
 	if valid.IsNull(s) {
 		return "unknown"
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	return s.kvPath
 }
@@ -185,8 +188,8 @@ func (s *scope) ID() string {
 		return ""
 	}
 
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	return s.kvPath
 }
@@ -197,8 +200,8 @@ func (s *scope) Organization() string {
 		return ""
 	}
 
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	return s.organization
 }
@@ -209,8 +212,8 @@ func (s *scope) Project() string {
 		return ""
 	}
 
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	return s.project
 }
@@ -221,8 +224,8 @@ func (s *scope) Tenant() string {
 		return ""
 	}
 
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	return s.tenant
 }
@@ -233,8 +236,8 @@ func (s *scope) Description() string {
 		return ""
 	}
 
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	return s.description
 }
@@ -245,8 +248,8 @@ func (s *scope) KVPath() string {
 		return ""
 	}
 
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	return s.kvPath
 }
@@ -265,8 +268,8 @@ func (s *scope) Service() iaasapi.Service {
 		return nil
 	}
 
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	return s.service
 }
@@ -276,8 +279,8 @@ func (s *scope) ConsulKV() *consumer.KV {
 		return nil
 	}
 
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	return s.consulKV
 }
@@ -292,10 +295,10 @@ func (s *scope) LoadAbstracts(ctx context.Context) fail.Error {
 		return xerr
 	}
 
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if s.loaded {
+	s.mu.Lock()
+	loaded := s.loaded
+	s.mu.Unlock()
+	if loaded {
 		return nil
 	}
 
@@ -535,7 +538,7 @@ func (s *scope) loadHosts(ctx context.Context, provider providerUsingTerraform) 
 		})
 
 		// -- register resource in scope
-		innerXErr = s.registerResource(ahf)
+		_, innerXErr = s.RegisterResourceIfNeeded(ahf)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -638,8 +641,8 @@ func (s *scope) AllResources() (map[string]terraformerapi.Resource, fail.Error) 
 		return nil, fail.InvalidInstanceError()
 	}
 
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	list := make(map[string]terraformerapi.Resource, s.resources.Size())
 	s.resources.Range(func(key string, value terraformerapi.Resource) bool {
@@ -661,9 +664,6 @@ func (s *scope) Resource(kind, name string) (terraformerapi.Resource, fail.Error
 	if name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
-
-	s.lock.RLock()
-	defer s.lock.RUnlock()
 
 	queryName := kind + ":" + name
 	entry, found := s.resources.Load(queryName)
@@ -693,10 +693,30 @@ func (s *scope) RegisterResource(rsc terraformerapi.Resource) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("rsc")
 	}
 
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	return s.registerResource(rsc)
+}
+
+// RegisterResourceIfNeeded ...
+func (s *scope) RegisterResourceIfNeeded(rsc terraformerapi.Resource) (bool, fail.Error) {
+	if valid.IsNull(s) {
+		return false, fail.InvalidInstanceError()
+	}
+	if valid.IsNull(rsc) {
+		return false, fail.InvalidParameterCannotBeNilError("rsc")
+	}
+
+	xerr := s.registerResource(rsc)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrDuplicate:
+			// If duplicate, do nothing and do not generate an error
+			return false, nil
+		default:
+			return false, xerr
+		}
+	}
+
+	return true, nil
 }
 
 // registerResource ...
@@ -724,9 +744,6 @@ func (s *scope) ReplaceResource(rsc terraformerapi.Resource) fail.Error {
 		return xerr
 	}
 
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	s.resources.Store(queryName, rsc)
 	return nil
 }
@@ -744,9 +761,6 @@ func (s *scope) UnregisterResource(rsc terraformerapi.Resource) fail.Error {
 	if xerr != nil {
 		return xerr
 	}
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
 
 	s.resources.Delete(queryName)
 	return nil

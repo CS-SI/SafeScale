@@ -170,11 +170,11 @@ func LoadHost(inctx context.Context, ref string) (*Host, fail.Error) {
 				return nil, fail.Wrap(err)
 			}
 
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = hostInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
+			// // if cache failed we are here, so we better retrieve updated information...
+			// xerr = hostInstance.Reload(ctx)
+			// if xerr != nil {
+			// 	return nil, xerr
+			// }
 
 			if cache != nil {
 				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hostInstance.GetName()), hostInstance, &store.Options{Expiration: 1 * time.Minute})
@@ -245,7 +245,7 @@ func onHostCacheMiss(inctx context.Context, ref string) (data.Identifiable, fail
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	// FIXME: replace with localresult.Holder
+	// FIXME: replace with result.Holder
 	type localresult struct {
 		a    data.Identifiable
 		rErr fail.Error
@@ -421,16 +421,16 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 						return xerr
 					}
 				} else {
+					ip, inXErr := gwInstance.GetAccessIP(ctx)
+					if inXErr != nil {
+						return inXErr
+					}
+
 					trx, xerr := newHostTransaction(ctx, gwInstance)
 					if xerr != nil {
 						return xerr
 					}
 					defer trx.TerminateBasedOnError(ctx, &ferr)
-
-					ip, inXErr := gwInstance.GetAccessIP(ctx)
-					if inXErr != nil {
-						return inXErr
-					}
 
 					gwErr = inspectHostMetadataCarried(ctx, trx, func(ahf *abstract.HostCore) fail.Error {
 						secondaryGatewayConfig = ssh.NewConfig(gwInstance.GetName(), ip, int(ahf.SSHPort), opUser, ahf.PrivateKey, 0, "", nil, nil)
@@ -786,11 +786,11 @@ func (instance *Host) trxReload(ctx context.Context, hostTrx hostTransaction) (f
 		}
 	}
 
-	xerr = instance.Job().Scope().RegisterResource(ahf)
-	if xerr != nil {
-		return xerr
-	}
-
+	// xerr = instance.Job().Scope().RegisterResource(ahf)
+	// if xerr != nil {
+	// 	return xerr
+	// }
+	//
 	return instance.trxUpdateCachedInformation(ctx, hostTrx)
 }
 
