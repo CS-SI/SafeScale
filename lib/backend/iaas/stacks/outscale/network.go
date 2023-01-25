@@ -36,7 +36,7 @@ import (
 const tagNameLabel = "name"
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s stack) HasDefaultNetwork(ctx context.Context) (bool, fail.Error) {
+func (s stack) HasDefaultNetwork(_ context.Context) (bool, fail.Error) {
 	if valid.IsNil(s) {
 		return false, fail.InvalidInstanceError()
 	}
@@ -44,7 +44,7 @@ func (s stack) HasDefaultNetwork(ctx context.Context) (bool, fail.Error) {
 }
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (s stack) GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
+func (s stack) GetDefaultNetwork(_ context.Context) (*abstract.Network, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -595,6 +595,16 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 
 		// Remove should fail only if something goes wrong when deleting VMs
 		logrus.WithContext(ctx).Warnf("found orphan Nics to delete (%s), check if nothing goes wrong deleting Hosts...", spew.Sdump(resp))
+
+		for _, nic := range resp {
+			if nic.LinkNic.VmId != "" {
+				xerr = s.rpcDeleteVms(ctx, []string{nic.LinkNic.VmId})
+				if xerr != nil {
+					debug.IgnoreError2(ctx, xerr)
+				}
+			}
+		}
+
 		if xerr = s.deleteNICs(ctx, resp); xerr != nil {
 			return xerr
 		}
