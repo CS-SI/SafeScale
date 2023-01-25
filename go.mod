@@ -50,7 +50,7 @@ require (
 	golang.org/x/text v0.6.0
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.107.0
-	google.golang.org/grpc v1.51.0
+	google.golang.org/grpc v1.52.1
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/fsnotify.v1 v1.4.7
 )
