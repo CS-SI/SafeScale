@@ -291,29 +291,6 @@ func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.Sec
 	return sgInstance, nil
 }
 
-// Sanitize checks if provider-side rules are coherent with registered ones in metadata
-func (handler *securityGroupHandler) Sanitize(sgRef string) (ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
-	if handler == nil {
-		return fail.InvalidInstanceError()
-	}
-	if sgRef == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
-	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
-	return fail.NotImplementedError("not yet implemented")
-}
-
 // Bonds lists the resources bound to the Security Group
 func (handler *securityGroupHandler) Bonds(sgRef string, kind string) (_ []*propertiesv1.SecurityGroupBond, _ []*propertiesv1.SecurityGroupBond, ferr fail.Error) {
 	defer func() {
