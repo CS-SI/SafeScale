@@ -184,7 +184,7 @@ func (instance *SecurityGroup) Browse(
 func (instance *SecurityGroup) Create(
 	inctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules,
 ) (_ fail.Error) {
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}

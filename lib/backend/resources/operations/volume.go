@@ -332,7 +332,7 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}

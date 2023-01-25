@@ -243,7 +243,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}

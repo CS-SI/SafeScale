@@ -612,7 +612,7 @@ func (instance *Host) GetState(ctx context.Context) (hoststate.Enum, fail.Error)
 func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements, extra interface{}) (_ *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
