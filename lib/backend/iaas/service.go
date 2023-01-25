@@ -40,7 +40,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -508,9 +507,6 @@ func (instance service) ListTemplatesBySizing(
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(inctx, true, "").Entering()
-	defer tracer.Exiting()
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()

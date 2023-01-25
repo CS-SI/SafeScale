@@ -27,7 +27,7 @@ import (
 var settings map[string]map[string]bool
 
 // RegisterTraceSettings keeps track of what has to be traced
-func RegisterTraceSettings(jsonSettings string) error {
+func RegisterTraceSettings(jsonSettings string) error { // FIXME: Delete this
 	if settings != nil {
 		return fmt.Errorf("trace settings are already defined")
 	}
