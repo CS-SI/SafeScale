@@ -27,8 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
@@ -117,9 +115,6 @@ func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 	if options == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("options")
 	}
-
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	config := osc.NewConfiguration()
 	config.BasePath = options.Compute.URL
@@ -232,9 +227,6 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 		return []string{}, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	resp, _, err := s.client.RegionApi.ReadRegions(s.auth, nil)
 	if err != nil {
 		return []string{}, normalizeError(err)
@@ -253,9 +245,6 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (az map[string]bool, f
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)
 	if err != nil {
