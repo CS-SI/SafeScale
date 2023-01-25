@@ -287,7 +287,6 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	s.IdentityClient = identity
 	s.cfgOpts.UseFloatingIP = true
 
-	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 	if cfg.Timings != nil {
 		s.MutableTimings = cfg.Timings
 		_ = s.MutableTimings.Update(temporal.NewTimings())
@@ -450,7 +449,7 @@ func (s stack) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fail.Erro
 	if xerr != nil {
 		return nil, xerr
 	}
-	// Note: empty list is not an error, so do not raise one
+
 	return kpList, nil
 }
 

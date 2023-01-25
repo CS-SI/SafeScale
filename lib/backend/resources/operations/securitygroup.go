@@ -141,7 +141,6 @@ func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -157,8 +156,7 @@ func (instance *SecurityGroup) Browse(
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Do not test with IsNull here, as Browse may be used from null value
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

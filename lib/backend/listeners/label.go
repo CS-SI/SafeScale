@@ -19,13 +19,12 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	labelfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/label"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -61,9 +60,6 @@ func (s *LabelListener) List(inctx context.Context, in *protocol.LabelListReques
 
 	ctx := job.Context()
 	selectTags := in.GetTags()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "(%v)", selectTags).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := LabelHandler(job)
 	list, xerr := handler.List(selectTags)
@@ -109,17 +105,13 @@ func (s *LabelListener) Create(inctx context.Context, in *protocol.LabelCreateRe
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
 	handler := handlers.NewTagHandler(job)
 	labelInstance, xerr := handler.Create(name, in.GetHasDefault(), in.GetDefaultValue())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	tracer.Trace("%s '%s' created", kindToString(in.GetHasDefault()), name)
+	logrus.WithContext(ctx).Tracef("%s '%s' created", kindToString(in.GetHasDefault()), name)
 	return labelInstance.ToProtocol(ctx, true)
 }
 
@@ -150,16 +142,13 @@ func (s *LabelListener) Delete(inctx context.Context, in *protocol.LabelDeleteRe
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := LabelHandler(job)
 	if xerr = handler.Delete(ref); xerr != nil {
 		return empty, xerr
 	}
 
-	tracer.Trace("Label/Tag %s successfully deleted.", refLabel)
+	logrus.WithContext(ctx).Tracef("Label/Tag %s successfully deleted.", refLabel)
 	return empty, nil
 }
 
@@ -177,7 +166,7 @@ func (s *LabelListener) Inspect(inctx context.Context, in *protocol.LabelInspect
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-	ref, refLabel := srvutils.GetReference(in.GetLabel())
+	ref, _ := srvutils.GetReference(in.GetLabel())
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -189,9 +178,6 @@ func (s *LabelListener) Inspect(inctx context.Context, in *protocol.LabelInspect
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.label"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	instance, xerr := labelfactory.Load(ctx, job.Service(), ref)
 	if xerr != nil {

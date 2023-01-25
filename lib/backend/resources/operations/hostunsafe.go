@@ -207,7 +207,6 @@ func getMD5Hash(text string) string {
 }
 
 // unsafePush is the non goroutine-safe version of Push, with less parameter validation, that do the real work
-// Note: must be used with wisdom
 func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
@@ -398,7 +397,6 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 }
 
 // unsafeGetVolumes is the not goroutine-safe version of GetVolumes, without parameter validation, that does the real work
-// Note: must be used with wisdom
 func (instance *Host) unsafeGetVolumes(ctx context.Context) (*propertiesv1.HostVolumes, fail.Error) {
 	var hvV1 *propertiesv1.HostVolumes
 	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {

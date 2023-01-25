@@ -59,7 +59,6 @@ func (instance *Cluster) unsafeGetState(inctx context.Context) (_ clusterstate.E
 }
 
 // unsafeListMasters is the not goroutine-safe equivalent of ListMasters, that does the real work
-// Note: must be used with wisdom
 func (instance *Cluster) unsafeListMasters(inctx context.Context) (_ resources.IndexedListOfClusterNodes, _ fail.Error) {
 	defer elapsed(inctx, "unsafeListMasters")()
 	ctx, cancel := context.WithCancel(inctx)
@@ -108,7 +107,6 @@ func (instance *Cluster) unsafeListMasters(inctx context.Context) (_ resources.I
 }
 
 // unsafeListMasterIDs is the not goroutine-safe version of ListNodeIDs and no parameter validation, that does the real work
-// Note: must be used wisely
 func (instance *Cluster) unsafeListMasterIDs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -504,7 +502,6 @@ func (instance *Cluster) trueListGateways(inctx context.Context) (_ []*abstract.
 }
 
 // unsafeListNodes is the not goroutine-safe version of ListNodes and no parameter validation, that does the real work
-// Note: must be used wisely
 func (instance *Cluster) unsafeListNodes(inctx context.Context) (_ resources.IndexedListOfClusterNodes, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -551,7 +548,6 @@ func (instance *Cluster) unsafeListNodes(inctx context.Context) (_ resources.Ind
 }
 
 // unsafeListNodeIDs is the not goroutine-safe version of ListNodeIDs and no parameter validation, that does the real work
-// Note: must be used wisely
 func (instance *Cluster) unsafeListNodeIDs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -593,7 +589,6 @@ func (instance *Cluster) unsafeListNodeIDs(inctx context.Context) (_ data.Indexe
 }
 
 // unsafeFindAvailableNode is the package restricted, not goroutine-safe, no parameter validation version of FindAvailableNode, that does the real work
-// Note: must be used wisely
 func (instance *Cluster) unsafeFindAvailableNode(inctx context.Context) (node resources.Host, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()

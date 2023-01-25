@@ -453,7 +453,6 @@ func (instance *Cluster) carry(inctx context.Context, clonable data.Clonable) (f
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

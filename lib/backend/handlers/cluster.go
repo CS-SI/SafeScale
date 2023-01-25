@@ -83,7 +83,6 @@ func (handler *clusterHandler) List() (_ []abstract.ClusterIdentity, ferr fail.E
 }
 
 // Create creates a new cluster
-// Note: returned resources.Cluster has to be .Released() by caller...
 func (handler *clusterHandler) Create(req abstract.ClusterRequest) (_ resources.Cluster, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -143,7 +142,6 @@ func (handler *clusterHandler) State(name string) (_ clusterstate.Enum, ferr fai
 }
 
 // Inspect a cluster
-// Note: returned resources.Cluster has to be .Released() by caller...
 func (handler *clusterHandler) Inspect(name string) (_ resources.Cluster, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -237,13 +235,11 @@ func (handler *clusterHandler) Delete(name string, force bool) (ferr fail.Error)
 	if xerr != nil {
 		return xerr
 	}
-	// Note: no .Released, the instance will be deleted
 
 	return instance.Delete(handler.job.Context(), force)
 }
 
 // Expand adds node(s) to a cluster
-// Note: returned []resources.host have to be .Released() by caller...
 func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingRequirements, count uint, parameters data.Map, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -323,7 +319,6 @@ func (handler *clusterHandler) ListNodes(name string) (_ resources.IndexedListOf
 }
 
 // InspectNode inspects a node of the cluster
-// Note: returned resources.Host has to be .Released() by caller...
 func (handler *clusterHandler) InspectNode(clusterName, nodeRef string) (_ resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -549,7 +544,6 @@ func (handler *clusterHandler) ListMasters(name string) (_ resources.IndexedList
 }
 
 // FindAvailableMaster determines the first available master (ie the one that responds on ssh request)
-// Note: returned resources.Host has to be .Released()...
 func (handler *clusterHandler) FindAvailableMaster(name string) (_ resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -574,7 +568,6 @@ func (handler *clusterHandler) FindAvailableMaster(name string) (_ resources.Hos
 }
 
 // InspectMaster returns the information about a master of the cluster
-// Note: returned resources.Host has to be .Released() by caller...
 func (handler *clusterHandler) InspectMaster(clusterName, masterRef string) (_ resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {

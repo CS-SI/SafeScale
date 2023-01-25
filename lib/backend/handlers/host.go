@@ -192,7 +192,6 @@ func (handler *hostHandler) List(all bool) (_ abstract.HostList, ferr fail.Error
 }
 
 // Create creates a new host
-// Note: returned resources.Host has to be .Released() by caller
 func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.HostSizingRequirements) (_ resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {

@@ -266,7 +266,6 @@ func (instance *object) Write(ctx context.Context, source io.Reader, sourceSize 
 }
 
 // WriteMultiPart writes big data to Object, by parts (also called chunks)
-// Note: nothing to do with multi-chunk abilities of various object storage technologies
 func (instance *object) WriteMultiPart(
 	ctx context.Context, source io.Reader, sourceSize int64, chunkSize int,
 ) fail.Error {

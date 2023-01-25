@@ -167,7 +167,6 @@ func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 	}
 	s.buildTemplateList()
 
-	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 	if options.Timings != nil {
 		s.MutableTimings = options.Timings
 		_ = s.MutableTimings.Update(temporal.NewTimings())

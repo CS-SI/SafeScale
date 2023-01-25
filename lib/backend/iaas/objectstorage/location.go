@@ -893,7 +893,6 @@ func (instance location) WriteObject(
 }
 
 // WriteMultiPartObject writes data from 'source' to an object in Object Storage, splitting data in parts of 'chunkSize' bytes
-// Note: nothing to do with multi-chunk abilities of various object storage technologies
 func (instance location) WriteMultiPartObject(
 	ctx context.Context, bucketName string, objectName string, source io.Reader, sourceSize int64, chunkSize int,
 	metadata abstract.ObjectStorageItemMetadata,

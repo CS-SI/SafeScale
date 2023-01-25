@@ -58,7 +58,6 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*ab
 }
 
 // CreateSecurityGroup creates a security group
-// Note: parameter 'networkRef' is used in AWS, Security Groups scope is Network/VPC-wide.
 func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()

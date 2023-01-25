@@ -96,7 +96,6 @@ func (instance *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
 
 // Deserialize reads json code and instantiates an ObjectStorageItem
 func (instance *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
-	// Note: Do not validate with .IsNull(), instance may be a null value of ObjectStorageBucket when deserializing
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}

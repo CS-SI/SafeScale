@@ -34,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -113,7 +112,6 @@ func (instance *label) carry(ctx context.Context, clonable data.Clonable) (ferr 
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -127,8 +125,7 @@ func (instance *label) carry(ctx context.Context, clonable data.Clonable) (ferr 
 func (instance *label) Browse(ctx context.Context, callback func(*abstract.Label) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -137,9 +134,6 @@ func (instance *label) Browse(ctx context.Context, callback func(*abstract.Label
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label")).Entering()
-	defer tracer.Exiting()
 
 	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		at := abstract.NewLabel()
@@ -170,9 +164,6 @@ func (instance *label) Delete(inctx context.Context) fail.Error {
 			}
 		}
 	}()
-
-	tracer := debug.NewTracer(inctx, tracing.ShouldTrace("resources.label")).Entering()
-	defer tracer.Exiting()
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -261,9 +252,6 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 	if ctx == nil {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "('%s')", name).Entering()
-	defer tracer.Exiting()
 
 	var kind string
 	switch hasDefault {
@@ -411,9 +399,6 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 		return fail.InvalidParameterError("hostInstance", "cannot be null value of 'resources.Host'")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "('%s', '%s')", instance.GetName(), hostInstance.GetName()).Entering()
-	defer tracer.Exiting()
-
 	if does, _ := hostInstance.Exists(ctx); does {
 		xerr := hostInstance.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			ahc, ok := clonable.(*abstract.HostCore)
@@ -472,7 +457,6 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 }
 
 // UnbindFromHost removes Host from Label metadata, unbinding Host from Label
-// Note: still need to call Host.UnbindLabel to remove reference of Label in Host...
 func (instance *label) UnbindFromHost(ctx context.Context, hostInstance resources.Host) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -483,9 +467,6 @@ func (instance *label) UnbindFromHost(ctx context.Context, hostInstance resource
 	if valid.IsNull(hostInstance) {
 		return fail.InvalidParameterError("hostInstance", "cannot be null value of 'resources.Host'")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "(label='%s', host='%s')", instance.GetName(), hostInstance.GetName()).Entering()
-	defer tracer.Exiting()
 
 	if v, k := ctx.Value("cleanup").(bool); !v && k {
 		if does, _ := hostInstance.Exists(ctx); does {

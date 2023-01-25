@@ -362,7 +362,6 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

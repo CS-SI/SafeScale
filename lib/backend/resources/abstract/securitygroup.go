@@ -235,7 +235,6 @@ func concernsGroups(in []string) (bool, fail.Error) {
 
 // Validate returns an error if the content of the rule is incomplete
 func (instance *SecurityGroupRule) Validate() fail.Error {
-	// Note: DO NOT USE SecurityGroupRule.IsNull() here
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}

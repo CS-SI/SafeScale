@@ -525,8 +525,7 @@ func (instance *Subnet) unbindHostFromVIP(ctx context.Context, vip *abstract.Vir
 func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subnet) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Do not test with Isnull here, as Browse may be used from null value
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1830,7 +1829,6 @@ func (instance *Subnet) InspectPublicIPSecurityGroup(ctx context.Context) (_ res
 func (instance *Subnet) CreateSubnetWithoutGateway(ctx context.Context, req abstract.SubnetRequest) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: do not use .isNull() here
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}

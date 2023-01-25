@@ -747,7 +747,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	// host.Networking.DefaultGatewayID = defaultGatewayID
 	// host.Networking.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
 	host.Networking.IsGateway = isGateway
-	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 	host.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	if request.PublicIP {

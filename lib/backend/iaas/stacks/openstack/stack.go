@@ -243,7 +243,6 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 
 	}
 
-	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 	if cfg.Timings != nil {
 		s.MutableTimings = cfg.Timings
 		_ = s.MutableTimings.Update(temporal.NewTimings())

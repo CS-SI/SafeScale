@@ -623,8 +623,7 @@ func (scmd *CliCommand) Start() fail.Error {
 //     . *fail.ErrTimeout if 'timeout' is reached
 //
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
-//
-//	you risk to call twice os/exec.Wait, which may panic
+// you risk to call twice os/exec.Wait, which may panic
 func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()

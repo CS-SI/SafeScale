@@ -216,8 +216,7 @@ func (instance *volume) GetAttachments(ctx context.Context) (_ *propertiesv1.Vol
 func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {

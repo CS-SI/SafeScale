@@ -51,7 +51,6 @@ func NewFeatureHandler(job backend.Job) FeatureHandler {
 }
 
 // List ...
-// Note: returned []resources.Feature must be .Released by caller
 func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef string, installedOnly bool) (_ []resources.Feature, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -110,7 +109,6 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 }
 
 // Inspect ...
-// Note: returned resources.Feature must be .Released() by the caller
 func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, targetRef, featureName string) (_ resources.Feature, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {

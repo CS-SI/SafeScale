@@ -101,7 +101,6 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 	gcpStack.selfLinkPrefix = `https://www.googleapis.com/compute/v1/projects/` + localCfg.ProjectID
 	// gcpStack.searchPrefix = `.*/projects/` + localCfg.ProjectID + `/global`
 
-	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 	if cfg.Timings != nil {
 		gcpStack.MutableTimings = cfg.Timings
 		_ = gcpStack.MutableTimings.Update(temporal.NewTimings())

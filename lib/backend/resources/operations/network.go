@@ -269,7 +269,6 @@ func (instance *Network) carry(ctx context.Context, clonable data.Clonable) (fer
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -338,8 +337,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Do not test with Isnull here, as Browse may be used from null value
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
