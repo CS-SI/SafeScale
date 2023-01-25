@@ -28,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -60,7 +59,7 @@ func (s *FeatureListener) List(inctx context.Context, in *protocol.FeatureListRe
 		return nil, xerr
 	}
 
-	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
+	targetRef, _ := srvutils.GetReference(in.GetTargetRef())
 	if targetRef == "" {
 		return empty, fail.InvalidParameterError("in.TargetRef", "neither Name nor ID fields are provided")
 	}
@@ -72,9 +71,6 @@ func (s *FeatureListener) List(inctx context.Context, in *protocol.FeatureListRe
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%s, %s)", in.GetTargetType(), targetRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewFeatureHandler(job)
 	list, xerr := handler.List(targetType, targetRef, in.GetInstalledOnly())
@@ -116,7 +112,7 @@ func (s *FeatureListener) Inspect(inctx context.Context, in *protocol.FeatureDet
 		return nil, xerr
 	}
 
-	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
+	targetRef, _ := srvutils.GetReference(in.GetTargetRef())
 	if targetRef == "" {
 		return nil, fail.InvalidRequestError("target reference is missing")
 	}
@@ -131,11 +127,6 @@ func (s *FeatureListener) Inspect(inctx context.Context, in *protocol.FeatureDet
 		return nil, err
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, ferr, tracer.TraceMessage())
 
 	handler := handlers.NewFeatureHandler(job)
 	feat, xerr := handler.Inspect(targetType, targetRef, featureName)
@@ -166,7 +157,7 @@ func (s *FeatureListener) Export(inctx context.Context, in *protocol.FeatureDeta
 		return nil, xerr
 	}
 
-	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
+	targetRef, _ := srvutils.GetReference(in.GetTargetRef())
 	if targetRef == "" {
 		return nil, fail.InvalidRequestError("target reference is missing")
 	}
@@ -177,11 +168,6 @@ func (s *FeatureListener) Export(inctx context.Context, in *protocol.FeatureDeta
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, ferr, tracer.TraceMessage())
 
 	handler := handlers.NewFeatureHandler(job)
 	return handler.Export(targetType, targetRef, featureName, in.GetEmbedded())
@@ -239,15 +225,14 @@ func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActio
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
+
 	defer func() {
 		ferr = debug.InjectPlannedError(ferr)
 		if ferr != nil {
 			switch ferr.(type) {
 			case *fail.ErrNotFound:
 			default:
-				fail.OnExitLogError(ctx, ferr, tracer.TraceMessage())
+				fail.OnExitLogError(ctx, ferr)
 			}
 		}
 	}()
@@ -317,11 +302,6 @@ func (s *FeatureListener) Add(inctx context.Context, in *protocol.FeatureActionR
 	}
 	defer job.Close()
 
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
-
 	handler := handlers.NewFeatureHandler(job)
 	xerr = handler.Add(targetType, targetRef, featureName, featureVariables, featureSettings)
 	if xerr != nil {
@@ -366,11 +346,6 @@ func (s *FeatureListener) Remove(inctx context.Context, in *protocol.FeatureActi
 		return empty, err
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewFeatureHandler(job)
 	xerr = handler.Remove(targetType, targetRef, featureName, featureVariables, featureSettings)
