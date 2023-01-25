@@ -27,8 +27,8 @@ import (
 func TestObjectStorageBucket_NewObjectStorageBucket(t *testing.T) {
 
 	n := NewObjectStorageBucket()
-	if !n.IsNull() {
-		t.Error("ObjectStorageBucket is null !")
+	if n.IsNull() {
+		t.Error("ObjectStorageBucket is not null, it's just empty !")
 		t.Fail()
 	}
 	if n.IsConsistent() {
