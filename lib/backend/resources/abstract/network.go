@@ -27,8 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-const NetworkKind = "network"
-
 // NetworkRequest represents network requirements to create a network/VPC where CIDR contains a non-routable network
 // like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
 type NetworkRequest struct {

@@ -31,8 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-const HostKind = "host"
-
 // KeyPair represents a SSH key pair
 type KeyPair struct {
 	ID         string `json:"id,omitempty"`

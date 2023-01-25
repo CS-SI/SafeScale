@@ -42,7 +42,7 @@ func PayloadIfSuccessful[T any](r Holder[T]) (T, bool, fail.Error) {
 		return empty, false, fail.InvalidParameterError("r", "cannot be null value of 'Holder'")
 	}
 
-	if r.Successful() {
+	if r.IsSuccessful() {
 		payload, xerr := Payload[T](r)
 		if xerr != nil {
 			return empty, false, xerr

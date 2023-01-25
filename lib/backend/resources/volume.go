@@ -508,7 +508,7 @@ func (instance *Volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			if derr := svc.DeleteVolume(cleanupContextFrom(ctx), av.ID); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete Volume '%s'", ActionFromError(ferr), req.Name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Volume '%s'", ActionFromError(ferr), req.Name))
 			}
 		}
 	}()
@@ -998,7 +998,7 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
 
 	// -- retrieves Volume data --
-	xerr = reviewVolumeMetadataCarried(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
+	xerr = reviewVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
 		volumeID = av.ID
 		volumeName = av.Name
 		return nil

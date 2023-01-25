@@ -438,7 +438,7 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 				if ferr != nil {
 					derr := svc.DeleteSecurityGroup(cleanupContextFrom(ctx), asg)
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete Security Group '%s'", ActionFromError(ferr), name))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), name))
 					}
 				}
 			}()
@@ -456,7 +456,7 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 				if ferr != nil {
 					derr := instance.Core.Delete(cleanupContextFrom(ctx))
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete Security Group '%s' metadata", ActionFromError(ferr)))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(ferr)))
 					}
 				}
 			}()
@@ -630,7 +630,7 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (ferr fail.Error) {
 	defer trx.TerminateBasedOnError(ctx, &ferr)
 
 	var rules abstract.SecurityGroupRules
-	xerr = inspectSecurityGroupMetadataCarried(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
+	xerr = inspectSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
 		rules = asg.Rules
 		return nil
 	})
@@ -676,7 +676,7 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules ...*abstract.
 	}
 	defer trx.TerminateBasedOnError(ctx, &ferr)
 
-	return alterSecurityGroupMetadataCarried(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
+	return alterSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
 		for k, v := range rules {
 			if valid.IsNull(v) {
 				return fail.InvalidParameterError("rules", "entry #%d cannot be null value of '*abstract.SecurityGroupRule'", k)
@@ -719,7 +719,7 @@ func (instance *SecurityGroup) DeleteRules(ctx context.Context, rules ...*abstra
 	}
 	defer trx.TerminateBasedOnError(ctx, &ferr)
 
-	return alterSecurityGroupMetadataCarried(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
+	return alterSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
 		innerXErr := instance.Service().DeleteRulesFromSecurityGroup(ctx, asg, rules...)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
@@ -809,7 +809,7 @@ func (instance *SecurityGroup) ToProtocol(ctx context.Context) (_ *protocol.Secu
 	trx.TerminateBasedOnError(ctx, &ferr)
 
 	out := &protocol.SecurityGroupResponse{}
-	return out, inspectSecurityGroupMetadataCarried(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
+	return out, inspectSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
 		out.Id = asg.ID
 		out.Name = asg.Name
 		out.Description = asg.Description
@@ -935,7 +935,7 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 				}
 			}
 			if hostID != "" {
-				innerXErr := alterHostMetadataCarried(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
+				innerXErr := alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
 					entry, innerXErr := instance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
 					if innerXErr != nil {
 						return innerXErr

@@ -454,7 +454,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}
 	defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
 
-	xerr = metadata.InspectCarried[*abstract.Subnet](context.Background(), subnetTrx, func(as *abstract.Subnet) fail.Error {
+	xerr = metadata.InspectAbstract[*abstract.Subnet](context.Background(), subnetTrx, func(as *abstract.Subnet) fail.Error {
 		handler.abstractSubnet = as
 		return nil
 	})

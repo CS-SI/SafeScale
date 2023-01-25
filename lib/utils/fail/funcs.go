@@ -142,6 +142,7 @@ func Wrap(cause error, msg ...interface{}) Error {
 		if len(msg) == 0 {
 			return nil
 		}
+
 		return newError(nil, nil, msg...)
 	}
 

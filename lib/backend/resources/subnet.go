@@ -370,7 +370,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context, trx subnetT
 	defer instance.localCache.Unlock()
 
 	var primaryGatewayID, secondaryGatewayID string
-	xerr := inspectSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr := inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		if len(as.GatewayIDs) > 0 {
 			primaryGatewayID = as.GatewayIDs[0]
 		}
@@ -524,13 +524,13 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		return fail.Wrap(err)
 	}
 
-	// Starting from here, trxDelete Subnet if exiting with error
+	// Starting from here, delete Subnet if exiting with error
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && req.CleanOnFailure() {
 			derr := instance.deleteSubnetThenWaitCompletion(cleanupContextFrom(ctx), snid)
 			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete Subnet", ActionFromError(ferr)))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 			} else {
 				logrus.WithContext(ctx).Infof("the subnet '%s' should be gone by now", snid)
 			}
@@ -574,7 +574,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 
 // trxBindInternalSecurityGroupToGateway does what its name says
 func (instance *Subnet) trxBindInternalSecurityGroupToGateway(ctx context.Context, subnetTrx subnetTransaction, hostTrx hostTransaction) fail.Error {
-	return reviewSubnetMetadataCarried(ctx, subnetTrx, func(as *abstract.Subnet) (innerFErr fail.Error) {
+	return reviewSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) (innerFErr fail.Error) {
 		sg, innerXErr := LoadSecurityGroup(ctx, as.InternalSecurityGroupID)
 		if innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", as.Name, as.InternalSecurityGroupID)
@@ -602,7 +602,7 @@ func (instance *Subnet) trxUndoBindInternalSecurityGroupToGateway(ctx context.Co
 	}
 
 	if xerr != nil && *xerr != nil && keepOnFailure {
-		rerr := reviewSubnetMetadataCarried(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
+		rerr := reviewSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 			sg, derr := LoadSecurityGroup(ctx, as.InternalSecurityGroupID)
 			if derr != nil {
 				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind External Security Group of Subnet '%s' from Host '%s'", as.Name, hostTrx.GetName()))
@@ -641,7 +641,7 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(ctx context.Context, id s
 		return xerr
 	}
 
-	// FIXME: OPP List the ports, trxDelete the ports, and then...
+	// FIXME: OPP List the ports, delete the ports, and then...
 
 	xerr = svc.DeleteSubnet(ctx, id)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -847,7 +847,7 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 		return nil, nil, xerr
 	}
 
-	xerr = inspectNetworkMetadataCarried(ctx, networkTrx, func(an *abstract.Network) fail.Error {
+	xerr = inspectNetworkMetadataAbstract(ctx, networkTrx, func(an *abstract.Network) fail.Error {
 		// check the network exists on provider side
 		_, innerXErr := instance.Service().InspectNetwork(ctx, an.ID)
 		if innerXErr != nil {
@@ -1124,7 +1124,7 @@ func (instance *Subnet) GetGatewayPublicIP(ctx context.Context, primary bool) (_
 	defer trx.TerminateBasedOnError(ctx, &ferr)
 
 	var ip string
-	xerr = inspectSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		var (
 			id  string
 			rgw *Host
@@ -1176,7 +1176,7 @@ func (instance *Subnet) GetGatewayPublicIPs(ctx context.Context) (_ []string, fe
 	defer trx.TerminateBasedOnError(ctx, &ferr)
 
 	var gatewayIPs []string
-	xerr = reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		gatewayIPs = make([]string, 0, len(as.GatewayIDs))
 		for _, v := range as.GatewayIDs {
 			rgw, inErr := LoadHost(ctx, v)
@@ -1289,7 +1289,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 						} else {
 							verb = "are"
 						}
-						errorMsg = fmt.Sprintf("cannot trxDelete Subnet '%s': %d host%s %s still attached to it: %s", as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
+						errorMsg = fmt.Sprintf("cannot delete Subnet '%s': %d host%s %s still attached to it: %s", as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
 						return fail.NotAvailableError(errorMsg)
 					}
 					return nil
@@ -1318,15 +1318,15 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 					}
 				}
 
-				// 2nd trxDelete VIP if needed
+				// 2nd delete VIP if needed
 				if as.VIP != nil {
 					innerXErr := svc.DeleteVIP(ctx, as.VIP)
 					if innerXErr != nil {
-						return fail.Wrap(innerXErr, "failed to trxDelete VIP for gateways")
+						return fail.Wrap(innerXErr, "failed to delete VIP for gateways")
 					}
 				}
 
-				// 3rd trxDelete security groups associated to Subnet by users (do not include SG created with Subnet, they will be deleted later)
+				// 3rd delete security groups associated to Subnet by users (do not include SG created with Subnet, they will be deleted later)
 				innerXErr = props.Alter(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
 					ssgV1, innerErr := clonable.Cast[*propertiesv1.SubnetSecurityGroups](p)
 					if innerErr != nil {
@@ -1359,7 +1359,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 					}
 				}
 
-				// finally trxDelete Subnet
+				// finally delete Subnet
 				logrus.WithContext(ctx).Debugf("Deleting Subnet '%s'...", as.Name)
 				innerXErr = instance.deleteSubnetThenWaitCompletion(ctx, as.ID)
 				if innerXErr != nil {
@@ -1457,7 +1457,7 @@ func (instance *Subnet) InspectNetwork(ctx context.Context) (_ *Network, ferr fa
 	defer trx.TerminateBasedOnError(ctx, &ferr)
 
 	var network string
-	xerr = reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		network = as.Network
 		return nil
 	})
@@ -1472,7 +1472,7 @@ func (instance *Subnet) InspectNetwork(ctx context.Context) (_ *Network, ferr fa
 // A gateway host that is not found must be considered as a success
 func trxDeleteGateways(ctx context.Context, trx subnetTransaction) (ids []string, ferr fail.Error) {
 	var empty []string
-	return ids, reviewSubnetMetadataCarried(ctx, trx, func(subnet *abstract.Subnet) fail.Error {
+	return ids, reviewSubnetMetadataAbstract(ctx, trx, func(subnet *abstract.Subnet) fail.Error {
 		if subnet.GatewayIDs == nil { // unlikely, either is an input error or we are dealing with metadata corruption
 			subnet.GatewayIDs = empty
 		}
@@ -1590,8 +1590,8 @@ func (instance *Subnet) trxUnbindSecurityGroups(ctx context.Context, subnetTrx s
 			}
 
 			// VPL: no need to update SubnetSecurityGroups property, the Subnet is being removed
-			// trxDelete(sgs.ByID, v)
-			// trxDelete(sgs.ByName, k)
+			// delete(sgs.ByID, v)
+			// delete(sgs.ByName, k)
 		}
 	}
 	return nil
@@ -1629,7 +1629,7 @@ func (instance *Subnet) GetEndpointIP(ctx context.Context) (ip string, ferr fail
 	}
 	defer trx.TerminateBasedOnError(ctx, &ferr)
 
-	xerr = reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		if as.VIP != nil && as.VIP.PublicIP != "" {
 			ip = as.VIP.PublicIP
 		} else {
@@ -2036,7 +2036,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance *Sec
 			}
 
 			var abstractSG *abstract.SecurityGroup
-			innerXErr := inspectSecurityGroupMetadataCarried(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
+			innerXErr := inspectSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
 				abstractSG = asg
 				return nil
 			})
@@ -2132,7 +2132,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance *Se
 			}
 
 			var abstractSG *abstract.SecurityGroup
-			innerXErr := inspectSecurityGroupMetadataCarried(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
+			innerXErr := inspectSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
 				abstractSG = asg
 				return nil
 			})
@@ -2186,7 +2186,7 @@ func (instance *Subnet) InspectGatewaySecurityGroup(ctx context.Context) (_ *Sec
 	defer trx.TerminateBasedOnError(ctx, &ferr)
 
 	var abstractSubnet *abstract.Subnet
-	xerr = reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		abstractSubnet = as
 		return nil
 	})
@@ -2212,7 +2212,7 @@ func (instance *Subnet) InspectInternalSecurityGroup(ctx context.Context) (_ *Se
 	defer trx.TerminateBasedOnError(ctx, &ferr)
 
 	var sgID string
-	xerr = reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		sgID = as.InternalSecurityGroupID
 		return nil
 	})
@@ -2238,7 +2238,7 @@ func (instance *Subnet) InspectPublicIPSecurityGroup(ctx context.Context) (_ *Se
 	defer trx.TerminateBasedOnError(ctx, &ferr)
 
 	var sgID string
-	xerr = reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		sgID = as.PublicIPSecurityGroupID
 		return nil
 	})
@@ -2341,13 +2341,13 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 				// }
 			}
 
-			// Starting from here, trxDelete Subnet if exiting with error
+			// Starting from here, delete Subnet if exiting with error
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && abstractSubnet != nil && req.CleanOnFailure() {
 					derr := instance.deleteSubnetThenWaitCompletion(cleanupContextFrom(ctx), abstractSubnet.ID)
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete Subnet", ActionFromError(ferr)))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 					}
 				}
 			}()
@@ -2360,13 +2360,13 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 				return ar, ar.rErr
 			}
 
-			// Starting from here, trxDelete Subnet metadata if exiting with error
+			// Starting from here, delete Subnet metadata if exiting with error
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && req.CleanOnFailure() {
 					derr := instance.Core.Delete(cleanupContextFrom(ctx))
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete Subnet metadata", ActionFromError(ferr)))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet metadata", ActionFromError(ferr)))
 					}
 				}
 			}()
@@ -2410,7 +2410,7 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 
 					derr := instance.deleteSecurityGroups(cleanupContextFrom(ctx), [3]string{a, b, c})
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to trxDelete Security Groups"))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Groups"))
 					}
 				}
 			}()
@@ -2443,13 +2443,13 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 					return ar, ar.rErr
 				}
 
-				// Starting from here, trxDelete VIP if exists with error
+				// Starting from here, delete VIP if exists with error
 				defer func() {
 					ferr = debug.InjectPlannedFail(ferr)
 					if ferr != nil && abstractSubnet != nil && abstractSubnet.VIP != nil && req.CleanOnFailure() {
 						derr := svc.DeleteVIP(cleanupContextFrom(ctx), abstractSubnet.VIP)
 						if derr != nil {
-							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete VIP", ActionFromError(ferr)))
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete VIP", ActionFromError(ferr)))
 						}
 					}
 				}()

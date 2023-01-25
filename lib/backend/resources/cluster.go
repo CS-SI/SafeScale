@@ -1366,7 +1366,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		nodes = append(nodes, v.Content.(*propertiesv3.ClusterNode))
 	}
 
-	// Starting from here, if exiting with error, trxDelete created nodes if allowed (cf. keepOnFailure)
+	// Starting from here, if exiting with error, delete created nodes if allowed (cf. keepOnFailure)
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !keepOnFailure && len(nodes) > 0 {
@@ -2048,7 +2048,7 @@ func (instance *Cluster) trxDeleteNode(inctx context.Context, clusterTrx cluster
 				nodeRef = node.Name
 			}
 
-			// Identify the node to trxDelete and remove it preventively from metadata
+			// Identify the node to delete and remove it preventively from metadata
 			xerr := alterClusterMetadataProperty(ctx, clusterTrx, clusterproperty.NodesV3, func(nodesV3 *propertiesv3.ClusterNodes) fail.Error {
 				delete(nodesV3.ByNumericalID, node.NumericalID)
 
@@ -2126,7 +2126,7 @@ func (instance *Cluster) trxDeleteNode(inctx context.Context, clusterTrx cluster
 
 			hid, _ := hostInstance.GetID()
 
-			// Finally trxDelete host
+			// Finally delete host
 			xerr = hostInstance.Delete(cleanupContextFrom(ctx))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -2184,7 +2184,7 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Erro
 	return instance.trxDelete(ctx, trx)
 }
 
-// trxDelete does the work to trxDelete Cluster
+// trxDelete does the work to delete Cluster
 func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTransaction) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -2341,7 +2341,7 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 					cleaningErrors = append(cleaningErrors, xerr)
 				}
 				if len(cleaningErrors) > 0 {
-					xerr = fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to trxDelete Hosts")
+					xerr = fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to delete Hosts")
 					return result{xerr}, xerr
 				}
 			}
@@ -2402,11 +2402,11 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 							// Subnet not found, considered as a successful deletion and continue
 							debug.IgnoreErrorWithContext(ctx, nerr)
 						default:
-							xerr = fail.Wrap(nerr, "failed to trxDelete Subnet '%s'", subnetName)
+							xerr = fail.Wrap(nerr, "failed to delete Subnet '%s'", subnetName)
 							return result{xerr}, xerr
 						}
 					default:
-						xerr = fail.Wrap(xerr, "failed to trxDelete Subnet '%s'", subnetName)
+						xerr = fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
 						return result{xerr}, xerr
 					}
 				}
@@ -2450,7 +2450,7 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 						xerr = fail.Wrap(xerr.Cause(), "timeout")
 						return result{xerr}, xerr
 					default:
-						xerr = fail.Wrap(xerr, "failed to trxDelete Network '%s'", networkName)
+						xerr = fail.Wrap(xerr, "failed to delete Network '%s'", networkName)
 						logrus.WithContext(ctx).Errorf(xerr.Error())
 						return result{xerr}, xerr
 					}
@@ -2762,7 +2762,7 @@ func (instance *Cluster) trxUpdateClusterInventory(inctx context.Context, cluste
 				}
 				defer hostTrx.TerminateBasedOnError(ctx, &ferr)
 
-				innerXErr = inspectHostMetadataCarried(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
+				innerXErr = inspectHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
 					params["PrimaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
 					if ahc.Name != "" {
 						params["PrimaryGatewayName"] = ahc.Name
@@ -2785,7 +2785,7 @@ func (instance *Cluster) trxUpdateClusterInventory(inctx context.Context, cluste
 					}
 					defer hostTrx.TerminateBasedOnError(ctx, &ferr)
 
-					innerXErr = inspectHostMetadataCarried(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
+					innerXErr = inspectHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
 						params["SecondaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
 						if ahc.Name != "" {
 							params["SecondaryGatewayName"] = ahc.Name

@@ -28,8 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-const ClusterKind = "cluster"
-
 // ClusterRequest defines what kind of Cluster is wanted
 type ClusterRequest struct {
 	Name                    string                 // contains the name of the cluster wanted

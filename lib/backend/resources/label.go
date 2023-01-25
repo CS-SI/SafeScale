@@ -485,7 +485,7 @@ func (instance *Label) IsTag(ctx context.Context) (_ bool, ferr fail.Error) {
 	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
 
 	var out bool
-	xerr = reviewLabelMetadataCarried(ctx, labelTrx, func(alabel *abstract.Label) fail.Error {
+	xerr = reviewLabelMetadataAbstract(ctx, labelTrx, func(alabel *abstract.Label) fail.Error {
 		out = !alabel.HasDefault
 		return nil
 	})
@@ -509,7 +509,7 @@ func (instance *Label) DefaultValue(ctx context.Context) (_ string, ferr fail.Er
 	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
 
 	var out string
-	xerr = inspectLabelMetadataCarried(ctx, labelTrx, func(alabel *abstract.Label) fail.Error {
+	xerr = inspectLabelMetadataAbstract(ctx, labelTrx, func(alabel *abstract.Label) fail.Error {
 		out = alabel.DefaultValue
 		return nil
 	})

@@ -37,8 +37,8 @@ func inspectSubnetMetadata(ctx context.Context, trx subnetTransaction, callback 
 	return metadata.Inspect[*abstract.Subnet](ctx, trx, callback)
 }
 
-func inspectSubnetMetadataCarried(ctx context.Context, trx subnetTransaction, callback func(*abstract.Subnet) fail.Error) fail.Error {
-	return metadata.InspectCarried[*abstract.Subnet](ctx, trx, callback)
+func inspectSubnetMetadataAbstract(ctx context.Context, trx subnetTransaction, callback func(*abstract.Subnet) fail.Error) fail.Error {
+	return metadata.InspectAbstract[*abstract.Subnet](ctx, trx, callback)
 }
 
 func inspectSubnetMetadataProperty[P clonable.Clonable](ctx context.Context, trx subnetTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -53,8 +53,8 @@ func reviewSubnetMetadata(ctx context.Context, trx subnetTransaction, callback f
 	return metadata.Review[*abstract.Subnet](ctx, trx, callback)
 }
 
-func reviewSubnetMetadataCarried(ctx context.Context, trx subnetTransaction, callback func(ahc *abstract.Subnet) fail.Error) fail.Error {
-	return metadata.ReviewCarried[*abstract.Subnet](ctx, trx, callback)
+func reviewSubnetMetadataAbstract(ctx context.Context, trx subnetTransaction, callback func(ahc *abstract.Subnet) fail.Error) fail.Error {
+	return metadata.ReviewAbstract[*abstract.Subnet](ctx, trx, callback)
 }
 
 func reviewSubnetMetadataProperty[P clonable.Clonable](ctx context.Context, trx subnetTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -69,8 +69,8 @@ func alterSubnetMetadata(ctx context.Context, trx subnetTransaction, callback fu
 	return metadata.Alter[*abstract.Subnet](ctx, trx, callback)
 }
 
-func alterSubnetMetadataCarried(ctx context.Context, trx subnetTransaction, callback func(*abstract.Subnet) fail.Error) fail.Error {
-	return metadata.AlterCarried[*abstract.Subnet](ctx, trx, callback)
+func alterSubnetMetadataAbstract(ctx context.Context, trx subnetTransaction, callback func(*abstract.Subnet) fail.Error) fail.Error {
+	return metadata.AlterAbstract[*abstract.Subnet](ctx, trx, callback)
 }
 
 func alterSubnetMetadataProperty[P clonable.Clonable](ctx context.Context, trx subnetTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -116,7 +116,7 @@ func (instance *Subnet) trxInspectGateway(ctx context.Context, trx subnetTransac
 // unsafeGetDefaultRouteIP ...
 func (instance *Subnet) trxGetDefaultRouteIP(ctx context.Context, trx subnetTransaction) (_ string, ferr fail.Error) {
 	var ip string
-	xerr := reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr := reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		if as.VIP != nil && as.VIP.PrivateIP != "" {
 			ip = as.VIP.PrivateIP
 			return nil
@@ -142,7 +142,7 @@ func (instance *Subnet) trxGetDefaultRouteIP(ctx context.Context, trx subnetTran
 
 // trxGetVirtualIP returns an abstract.VirtualIP used by gateway HA
 func (instance *Subnet) trxGetVirtualIP(ctx context.Context, trx subnetTransaction) (vip *abstract.VirtualIP, ferr fail.Error) {
-	xerr := reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr := reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		vip = as.VIP
 		return nil
 	})
@@ -161,7 +161,7 @@ func (instance *Subnet) trxGetVirtualIP(ctx context.Context, trx subnetTransacti
 // Intended to be used when instance is notoriously not nil (because previously checked)
 func (instance *Subnet) trxGetCIDR(ctx context.Context, trx subnetTransaction) (cidr string, ferr fail.Error) {
 	cidr = ""
-	return cidr, reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	return cidr, reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		cidr = as.CIDR
 		return nil
 	})
@@ -170,7 +170,7 @@ func (instance *Subnet) trxGetCIDR(ctx context.Context, trx subnetTransaction) (
 // trxGetState returns the state of the network
 // Intended to be used when rs is notoriously not null (because previously checked)
 func (instance *Subnet) trxGetState(ctx context.Context, trx subnetTransaction) (state subnetstate.Enum, ferr fail.Error) {
-	xerr := reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr := reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		state = as.State
 		return nil
 	})
@@ -192,7 +192,7 @@ func (instance *Subnet) trxAbandonHost(ctx context.Context, trx subnetTransactio
 // trxHasVirtualIP tells if the Subnet uses a VIP a default route
 func (instance *Subnet) trxHasVirtualIP(ctx context.Context, trx subnetTransaction) (bool, fail.Error) {
 	var found bool
-	xerr := reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr := reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		found = as.VIP != nil
 		return nil
 	})
@@ -329,7 +329,7 @@ func (instance *Subnet) trxCreateGWSecurityGroup(ctx context.Context, subnetTrx 
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !keepOnFailure {
 			if derr := sg.Delete(cleanupContextFrom(ctx), true); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete Security Group '%s'", ActionFromError(ferr), sgName))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), sgName))
 			}
 		}
 	}()
@@ -442,7 +442,7 @@ func (instance *Subnet) trxCreatePublicIPSecurityGroup(ctx context.Context, subn
 		if ferr != nil && !keepOnFailure {
 			derr := sgInstance.Delete(cleanupContextFrom(ctx), true)
 			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete Security Group '%s'", ActionFromError(ferr), sgName))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), sgName))
 			}
 		}
 	}()
@@ -472,7 +472,7 @@ func (instance *Subnet) trxCreatePublicIPSecurityGroup(ctx context.Context, subn
 	return sgInstance, nil
 }
 
-// Starting from here, trxDelete the Security Group if exiting with error
+// Starting from here, delete the Security Group if exiting with error
 func (instance *Subnet) trxUndoCreateSecurityGroup(ctx context.Context, subnetTrx subnetTransaction, errorPtr *fail.Error, keepOnFailure bool, sg *SecurityGroup) fail.Error {
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
@@ -581,7 +581,7 @@ func (instance *Subnet) trxUpdateSubnetStatus(inctx context.Context, trx subnetT
 	go func() {
 		defer close(chRes)
 
-		xerr := alterSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+		xerr := alterSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 			as.State = target
 			return nil
 		})
@@ -623,7 +623,7 @@ func (instance *Subnet) trxFinalizeSubnetCreation(inctx context.Context, trx sub
 	go func() {
 		defer close(chRes)
 
-		xerr := alterSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+		xerr := alterSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 			as.State = subnetstate.Ready
 			return nil
 		})
@@ -759,7 +759,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 			}
 
 			var as *abstract.Subnet
-			xerr = reviewSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+			xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 				// IDs of Security Groups to attach to Host used as gateway
 				if len(sgs) == 0 {
 					sgs = map[string]string{}
@@ -1092,7 +1092,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 			}
 
 			// Update userdata of gateway(s)
-			xerr = inspectSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) (innerXErr fail.Error) {
+			xerr = inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) (innerXErr fail.Error) {
 				// Updates userdatas to use later
 				var inErr fail.Error
 				primaryUserdata.PrimaryGatewayPrivateIP, inErr = primaryGateway.GetPrivateIP(ctx)
@@ -1147,7 +1147,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 			}
 
 			// As hosts are marked as gateways, the configuration stopped on phase 2 'netsec', the remaining 3 phases have to be run explicitly
-			xerr = alterSubnetMetadataCarried(ctx, trx, func(as *abstract.Subnet) fail.Error {
+			xerr = alterSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 				as.State = subnetstate.GatewayConfiguration
 				return nil
 			})

@@ -342,7 +342,7 @@ func (w *worker) extractHostsFailingCheck(ctx context.Context, hosts []*Host) ([
 			return nil, d
 		}
 
-		if !r.Successful() {
+		if !r.IsSuccessful() {
 			concernedHosts = append(concernedHosts, h)
 		}
 	}
@@ -971,9 +971,9 @@ func (w *worker) taskLaunchStep(inctx context.Context, p taskLaunchStepParameter
 			return
 		}
 
-		if !r.Successful() {
+		if !r.IsSuccessful() {
 			// If there are some not completed steps, reports them and break
-			if !r.Completed() {
+			if !r.IsCompleted() {
 				var errpack []error
 				keys, xerr := r.Keys()
 				if xerr != nil {
@@ -989,7 +989,7 @@ func (w *worker) taskLaunchStep(inctx context.Context, p taskLaunchStepParameter
 					}
 
 					if cuk != nil {
-						if !cuk.Successful() && !cuk.Completed() {
+						if !cuk.IsSuccessful() && !cuk.IsCompleted() {
 							var msg error
 							if global.Settings.Verbose && global.Settings.Debug { // log more details if in trace mode
 								msg = fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v with localresult: [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
@@ -1029,7 +1029,7 @@ func (w *worker) taskLaunchStep(inctx context.Context, p taskLaunchStepParameter
 				}
 
 				if cuk != nil {
-					if !cuk.Successful() && cuk.Completed() {
+					if !cuk.IsSuccessful() && cuk.IsCompleted() {
 						var msg error
 						if global.Settings.Verbose && global.Settings.Debug { // log more details if in trace mode
 							msg = fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with localresult: [%v]", w.action.String(), p.stepName, key /*cuk.Error()*/, spew.Sdump(cuk))

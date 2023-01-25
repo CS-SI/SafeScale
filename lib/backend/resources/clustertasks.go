@@ -98,7 +98,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, clusterTrx clu
 			}
 
 			cleanFailure := false
-			// Starting from here, trxDelete metadata if exiting with error
+			// Starting from here, delete metadata if exiting with error
 			// but if the next cleaning steps fail, we must keep the metadata to try again, so we have the cleanFailure flag to detect that issue
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
@@ -106,7 +106,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, clusterTrx clu
 					logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
 					if derr := instance.Core.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
 						logrus.WithContext(context.Background()).Errorf(
-							"cleaning up on %s, failed to trxDelete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
+							"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
 						)
 						_ = ferr.AddConsequence(derr)
 					} else {
@@ -164,8 +164,8 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, clusterTrx clu
 							debug.IgnoreErrorWithContext(ctx, derr)
 						default:
 							cleanFailure = true
-							logrus.WithContext(context.Background()).Errorf("Cleaning up on %s, failed to trxDelete Subnet '%s'", ActionFromError(ferr), subnetInstance.GetName())
-							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete Subnet", ActionFromError(ferr)))
+							logrus.WithContext(context.Background()).Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr), subnetInstance.GetName())
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 						}
 					} else {
 						logrus.WithContext(ctx).Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr), subnetInstance.GetName())
@@ -178,8 +178,8 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, clusterTrx clu
 									debug.IgnoreErrorWithContext(ctx, derr)
 								default:
 									cleanFailure = true
-									logrus.WithContext(context.Background()).Errorf("cleaning up on %s, failed to trxDelete Network '%s'", ActionFromError(ferr), networkInstance.GetName())
-									_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete Network", ActionFromError(ferr)))
+									logrus.WithContext(context.Background()).Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr), networkInstance.GetName())
+									_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr)))
 								}
 							} else {
 								logrus.WithContext(ctx).Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr), networkInstance.GetName())
@@ -999,7 +999,7 @@ func (instance *Cluster) createHostResources(
 				return result{xerr}, xerr
 			}
 
-			// Starting from here, trxDelete masters if exiting with error and req.keepOnFailure is not true
+			// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !keepOnFailure {
@@ -1118,7 +1118,7 @@ func (instance *Cluster) createHostResources(
 				return result{xerr}, xerr
 			}
 
-			// Starting from here, if exiting with error, trxDelete nodes
+			// Starting from here, if exiting with error, delete nodes
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !keepOnFailure {
@@ -1761,7 +1761,7 @@ func (instance *Cluster) trxCreateMaster(inctx context.Context, clusterTrx clust
 			defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
 
 			// -- Create the Host --
-			xerr = inspectSubnetMetadataCarried(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
+			xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 				hostReq.Subnets = []*abstract.Subnet{as}
 				return nil
 			})
@@ -2448,7 +2448,7 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, clusterTrx cluste
 			defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
 
 			// -- Create the Host instance corresponding to the new node --
-			xerr = inspectSubnetMetadataCarried(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
+			xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 				hostReq.Subnets = []*abstract.Subnet{as}
 				return nil
 			})
@@ -2490,7 +2490,7 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, clusterTrx cluste
 							// missing Host is considered as a successful deletion, continue
 							debug.IgnoreErrorWithContext(ctx, derr)
 						default:
-							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to trxDelete Host '%s'", ActionFromError(ferr), hostInstance.GetName()))
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), hostInstance.GetName()))
 						}
 					}
 				}
@@ -2859,7 +2859,7 @@ func (instance *Cluster) taskDeleteNodeOnFailure(inctx context.Context, params t
 	case <-time.After(params.Timeout):
 		cancel()
 		<-chRes
-		return nil, fail.TimeoutError(fmt.Errorf("timeout trying to trxDelete node on failure"), params.Timeout)
+		return nil, fail.TimeoutError(fmt.Errorf("timeout trying to delete node on failure"), params.Timeout)
 	case <-inctx.Done():
 		cancel()
 		<-chRes
@@ -2957,7 +2957,7 @@ func (instance *Cluster) trxDeleteMaster(inctx context.Context, clusterTrx clust
 	defer cancel()
 
 	if oldKey := ctx.Value("ID"); oldKey != nil {
-		ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/trxDelete/master/%s", oldKey, nodeRef)) // nolint
+		ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/delete/master/%s", oldKey, nodeRef)) // nolint
 	}
 
 	type result struct {

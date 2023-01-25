@@ -30,8 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-const SecurityGroupKind = "sg"
-
 // SecurityGroupRule represents a rule of a SecurityGroup
 type SecurityGroupRule struct {
 	IDs         []string                        `json:"ids"`                   // ids of the rule (an abstracted rule may be split to several provider rules)

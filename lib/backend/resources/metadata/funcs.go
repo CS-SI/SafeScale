@@ -16,9 +16,9 @@ func Review[A clonable.Clonable](ctx context.Context, trx Transaction[A, Metadat
 	}, opts...)
 }
 
-// ReviewCarried ...
-func ReviewCarried[A clonable.Clonable](ctx context.Context, trx Transaction[A, Metadata[A]], callback CarriedCallback[A], opts ...options.Option) fail.Error {
-	return trx.reviewCarried(ctx, func(carried A) fail.Error {
+// ReviewAbstract ...
+func ReviewAbstract[A clonable.Clonable](ctx context.Context, trx Transaction[A, Metadata[A]], callback CarriedCallback[A], opts ...options.Option) fail.Error {
+	return trx.reviewAbstract(ctx, func(carried A) fail.Error {
 		return callback(carried)
 	}, opts...)
 }
@@ -49,9 +49,9 @@ func Inspect[A clonable.Clonable](ctx context.Context, trx Transaction[A, Metada
 	}, opts...)
 }
 
-// InspectCarried ...
-func InspectCarried[A clonable.Clonable](ctx context.Context, trx Transaction[A, Metadata[A]], callback CarriedCallback[A], opts ...options.Option) fail.Error {
-	return trx.inspectCarried(ctx, func(carried A) fail.Error {
+// InspectAbstract ...
+func InspectAbstract[A clonable.Clonable](ctx context.Context, trx Transaction[A, Metadata[A]], callback CarriedCallback[A], opts ...options.Option) fail.Error {
+	return trx.inspectAbstract(ctx, func(carried A) fail.Error {
 		return callback(carried)
 	}, opts...)
 }
@@ -82,9 +82,9 @@ func Alter[A clonable.Clonable](ctx context.Context, trx Transaction[A, Metadata
 	}, opts...)
 }
 
-// AlterCarried ...
-func AlterCarried[A clonable.Clonable](ctx context.Context, trx Transaction[A, Metadata[A]], callback CarriedCallback[A], opts ...options.Option) fail.Error {
-	return trx.alterCarried(ctx, func(carried A) fail.Error {
+// AlterAbstract ...
+func AlterAbstract[A clonable.Clonable](ctx context.Context, trx Transaction[A, Metadata[A]], callback CarriedCallback[A], opts ...options.Option) fail.Error {
+	return trx.alterAbstract(ctx, func(carried A) fail.Error {
 		return callback(carried)
 	}, opts...)
 }

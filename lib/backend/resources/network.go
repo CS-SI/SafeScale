@@ -363,7 +363,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 					derr := svc.DeleteNetwork(cleanupContextFrom(ctx), abstractNetwork.ID)
 					derr = debug.InjectPlannedFail(derr)
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to trxDelete Network"))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
 					}
 				}
 			}()
@@ -541,8 +541,6 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 		}
 		defer trx.TerminateBasedOnError(ctx, &ferr)
 
-		// ctx := context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract) // nolint
-		// ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, outprops)       // nolint
 		ctx := context.WithValue(ctx, CurrentNetworkTransactionContextKey, trx) // nolint
 
 		tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
@@ -576,14 +574,14 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 			subnetsLen := len(subnets)
 			switch subnetsLen {
 			case 0:
-				// no subnet, continue to trxDelete the Network
+				// no subnet, continue to delete the Network
 			case 1:
 				var found bool
 				for k, v := range subnets {
 					if k == instance.GetName() {
 						found = true
 						deleted := false
-						// the single subnet present is a subnet named like the Network, trxDelete it first
+						// the single subnet present is a subnet named like the Network, delete it first
 						subnetInstance, xerr := LoadSubnet(ctx, "", v)
 						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
@@ -602,19 +600,19 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 							xerr = subnetInstance.Delete(ctx)
 							xerr = debug.InjectPlannedFail(xerr)
 							if xerr != nil {
-								return fail.Wrap(xerr, "failed to trxDelete Subnet '%s'", subnetName)
+								return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
 							}
 						}
 					}
 				}
 				if !found {
-					return fail.InvalidRequestError("failed to trxDelete Network '%s', 1 Subnet still inside", instance.GetName())
+					return fail.InvalidRequestError("failed to delete Network '%s', 1 Subnet still inside", instance.GetName())
 				}
 			default:
-				return fail.InvalidRequestError("failed to trxDelete Network '%s', %d Subnets still inside", instance.GetName(), subnetsLen)
+				return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", instance.GetName(), subnetsLen)
 			}
 
-			// trxDelete Network if not imported, with tolerance
+			// delete Network if not imported, with tolerance
 			if !abstractNetwork.Imported {
 				innerXErr = props.Alter(networkproperty.SecurityGroupsV1, func(p clonable.Clonable) (innerFErr fail.Error) {
 					nsgV1, innerErr := clonable.Cast[*propertiesv1.NetworkSecurityGroups](p)
@@ -650,7 +648,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 							return propsXErr
 						}
 
-						// -- trxDelete reference to Security Group in Network
+						// -- delete reference to Security Group in Network
 						delete(nsgV1.ByID, sgid)
 						delete(nsgV1.ByName, sgInstance.GetName())
 					}
@@ -669,7 +667,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 						logrus.WithContext(ctx).Debugf("failed to find Network on provider side, cleaning up metadata.")
 						maybeDeleted = true
 					case *fail.ErrTimeout:
-						logrus.WithContext(ctx).Error("cannot trxDelete Network due to a timeout")
+						logrus.WithContext(ctx).Error("cannot delete Network due to a timeout")
 						errWaitMore := retry.WhileUnsuccessful(
 							func() error {
 								select {
@@ -785,7 +783,7 @@ func (instance *Network) GetCIDR(ctx context.Context) (cidr string, ferr fail.Er
 	}
 	defer trx.TerminateBasedOnError(ctx, &ferr)
 
-	xerr = reviewNetworkMetadataCarried(ctx, trx, func(an *abstract.Network) fail.Error {
+	xerr = reviewNetworkMetadataAbstract(ctx, trx, func(an *abstract.Network) fail.Error {
 		cidr = an.CIDR
 		return nil
 	})

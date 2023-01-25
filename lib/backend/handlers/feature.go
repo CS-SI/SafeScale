@@ -270,7 +270,7 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 		if xerr != nil {
 			return xerr
 		}
-		if results.Successful() {
+		if results.IsSuccessful() {
 			return nil
 		}
 
@@ -290,7 +290,7 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 		if xerr != nil {
 			return xerr
 		}
-		if results.Successful() {
+		if results.IsSuccessful() {
 			return nil
 		}
 
@@ -358,7 +358,7 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 		if xerr != nil {
 			return xerr
 		}
-		if results.Successful() {
+		if results.IsSuccessful() {
 			return nil
 		}
 		return fail.ExecutionError(nil, results.ErrorMessage())
@@ -373,7 +373,7 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 		if xerr != nil {
 			return xerr
 		}
-		if results.Successful() {
+		if results.IsSuccessful() {
 			return nil
 		}
 		return fail.ExecutionError(nil, results.ErrorMessage())
@@ -422,7 +422,7 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 		if xerr != nil {
 			return xerr
 		}
-		if results.Successful() {
+		if results.IsSuccessful() {
 			return nil
 		}
 		return fail.ExecutionError(nil, results.ErrorMessage())
@@ -437,7 +437,7 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 		if xerr != nil {
 			return xerr
 		}
-		if results.Successful() {
+		if results.IsSuccessful() {
 			return nil
 		}
 		return fail.ExecutionError(nil, results.ErrorMessage())

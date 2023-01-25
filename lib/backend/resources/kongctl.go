@@ -113,7 +113,7 @@ func NewKongController(ctx context.Context, subnet *Subnet, addressPrimaryGatewa
 		}
 		defer addressedGatewayTrx.TerminateBasedOnError(ctx, &ferr)
 
-		if results.Successful() {
+		if results.IsSuccessful() {
 			xerr = alterHostMetadataProperty(ctx, addressedGatewayTrx, hostproperty.FeaturesV1, func(featuresV1 *propertiesv1.HostFeatures) fail.Error {
 				item := propertiesv1.NewHostInstalledFeature()
 				item.HostContext = true
@@ -196,7 +196,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 	}
 	defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
 
-	xerr = inspectSubnetMetadataCarried(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
+	xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 		if as.VIP != nil {
 			// VPL: for now, no public IP on VIP, so uses the IP of the first getGateway
 			// (*values)["EndpointIP"] = as.VIP.unsafeGetPublicIP

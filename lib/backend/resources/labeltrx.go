@@ -22,8 +22,8 @@ func inspectLabelMetadata(ctx context.Context, trx labelTransaction, callback fu
 	return metadata.Inspect[*abstract.Label](ctx, trx, callback)
 }
 
-func inspectLabelMetadataCarried(ctx context.Context, trx labelTransaction, callback func(*abstract.Label) fail.Error) fail.Error {
-	return metadata.InspectCarried[*abstract.Label](ctx, trx, callback)
+func inspectLabelMetadataAbstract(ctx context.Context, trx labelTransaction, callback func(*abstract.Label) fail.Error) fail.Error {
+	return metadata.InspectAbstract[*abstract.Label](ctx, trx, callback)
 }
 
 func inspectLabelMetadataProperty[P clonable.Clonable](ctx context.Context, trx labelTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -38,8 +38,8 @@ func reviewLabelMetadata(ctx context.Context, trx labelTransaction, callback fun
 	return metadata.Review[*abstract.Label](ctx, trx, callback)
 }
 
-func reviewLabelMetadataCarried(ctx context.Context, trx labelTransaction, callback func(ahc *abstract.Label) fail.Error) fail.Error {
-	return metadata.ReviewCarried[*abstract.Label](ctx, trx, callback)
+func reviewLabelMetadataAbstract(ctx context.Context, trx labelTransaction, callback func(ahc *abstract.Label) fail.Error) fail.Error {
+	return metadata.ReviewAbstract[*abstract.Label](ctx, trx, callback)
 }
 
 func reviewLabelMetadataProperty[P clonable.Clonable](ctx context.Context, trx labelTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -54,8 +54,8 @@ func alterLabelMetadata(ctx context.Context, trx labelTransaction, callback func
 	return metadata.Alter[*abstract.Label](ctx, trx, callback)
 }
 
-func alterLabelMetadataCarried(ctx context.Context, trx labelTransaction, callback func(*abstract.Label) fail.Error) fail.Error {
-	return metadata.AlterCarried[*abstract.Label](ctx, trx, callback)
+func alterLabelMetadataAbstract(ctx context.Context, trx labelTransaction, callback func(*abstract.Label) fail.Error) fail.Error {
+	return metadata.AlterAbstract[*abstract.Label](ctx, trx, callback)
 }
 
 func alterLabelMetadataProperty[P clonable.Clonable](ctx context.Context, trx labelTransaction, property string, callback func(P) fail.Error) fail.Error {

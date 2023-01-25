@@ -1542,13 +1542,13 @@ func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam s
 	//		if len(sghV1.ByID) > 0 {
 	//			_, ok = sghV1.ByID[hostName]
 	//			if ok {
-	//				trxDelete(sghV1.ByID, hostName)
+	//				delete(sghV1.ByID, hostName)
 	//			}
 	//		}
 	//		if len(sghV1.ByName) > 0 {
 	//			_, ok = sghV1.ByName[hostName]
 	//			if ok {
-	//				trxDelete(sghV1.ByName, hostName)
+	//				delete(sghV1.ByName, hostName)
 	//			}
 	//		}
 	//		return nil

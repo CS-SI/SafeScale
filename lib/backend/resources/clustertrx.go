@@ -22,8 +22,8 @@ func inspectClusterMetadata(ctx context.Context, trx clusterTransaction, callbac
 	return metadata.Inspect[*abstract.Cluster](ctx, trx, callback)
 }
 
-func inspectClusterMetadataCarried(ctx context.Context, trx clusterTransaction, callback func(*abstract.Cluster) fail.Error) fail.Error {
-	return metadata.InspectCarried[*abstract.Cluster](ctx, trx, callback)
+func inspectClusterMetadataAbstract(ctx context.Context, trx clusterTransaction, callback func(*abstract.Cluster) fail.Error) fail.Error {
+	return metadata.InspectAbstract[*abstract.Cluster](ctx, trx, callback)
 }
 
 func inspectClusterMetadataProperty[P clonable.Clonable](ctx context.Context, trx clusterTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -38,8 +38,8 @@ func reviewClusterMetadata(ctx context.Context, trx clusterTransaction, callback
 	return metadata.Review[*abstract.Cluster](ctx, trx, callback)
 }
 
-func reviewClusterMetadataCarried(ctx context.Context, trx clusterTransaction, callback func(ahc *abstract.Cluster) fail.Error) fail.Error {
-	return metadata.ReviewCarried[*abstract.Cluster](ctx, trx, callback)
+func reviewClusterMetadataAbstract(ctx context.Context, trx clusterTransaction, callback func(ahc *abstract.Cluster) fail.Error) fail.Error {
+	return metadata.ReviewAbstract[*abstract.Cluster](ctx, trx, callback)
 }
 
 func reviewClusterMetadataProperty[P clonable.Clonable](ctx context.Context, trx clusterTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -54,8 +54,8 @@ func alterClusterMetadata(ctx context.Context, trx clusterTransaction, callback 
 	return alterClusterMetadata(ctx, trx, callback)
 }
 
-func alterClusterMetadataCarried(ctx context.Context, trx clusterTransaction, callback func(*abstract.Cluster) fail.Error) fail.Error {
-	return metadata.AlterCarried[*abstract.Cluster](ctx, trx, callback)
+func alterClusterMetadataAbstract(ctx context.Context, trx clusterTransaction, callback func(*abstract.Cluster) fail.Error) fail.Error {
+	return metadata.AlterAbstract[*abstract.Cluster](ctx, trx, callback)
 }
 
 func alterClusterMetadataProperty[P clonable.Clonable](ctx context.Context, trx clusterTransaction, property string, callback func(P) fail.Error) fail.Error {

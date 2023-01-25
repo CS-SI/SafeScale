@@ -46,18 +46,18 @@ type Metadata[T clonable.Clonable] interface {
 	core() (*Core[T], fail.Error)
 	IsNull() bool
 	// Alter(ctx context.Context, callback ResourceCallback[T], opts ...options.Option) fail.Error                            // protects the data for exclusive write
-	// AlterCarried(ctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error                      // protects the data for exclusive write
+	// AlterAbstract(ctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error                      // protects the data for exclusive write
 	// AlterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error   // protects the data for exclusive write
 	BrowseFolder(ctx context.Context, callback func(buf []byte) fail.Error) fail.Error // walks through host folder and executes a callback for each entry
 	Deserialize(ctx context.Context, buf []byte) fail.Error                            // Transforms a slice of bytes in struct
 	// Inspect(ctx context.Context, callback ResourceCallback[T], opts ...options.Option) fail.Error                          // protects the data for shared read with first reloading data from Object Storage
-	// InspectCarried(ctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error                    // protects the data for shared read with first reloading data from Object Storage
+	// InspectAbstract(ctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error                    // protects the data for shared read with first reloading data from Object Storage
 	// InspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error // protects the data for shared read with first reloading data from Object Storage
 	Read(ctx context.Context, ref string) fail.Error    // reads the data from Object Storage using ref as id or name
 	ReadByID(ctx context.Context, id string) fail.Error // reads the data from Object Storage by id
 	Reload(ctx context.Context) fail.Error              // Reloads the metadata from the Object Storage, overriding what is in the object
 	// Review(ctx context.Context, callback ResourceCallback[T], opts ...options.Option) fail.Error                           // protects the data for shared read without reloading first (uses in-memory data); use with caution
-	// ReviewCarried(ctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error                     // protects the data for shared read without reloading first (uses in-memory data); use with caution
+	// ReviewAbstract(ctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error                     // protects the data for shared read without reloading first (uses in-memory data); use with caution
 	// ReviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error  // protects the data for shared read with first reloading data from Object Storage
 	String() (string, fail.Error)
 }

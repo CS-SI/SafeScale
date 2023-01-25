@@ -22,8 +22,8 @@ func inspectBucketMetadata(ctx context.Context, trx bucketTransaction, callback 
 	return metadata.Inspect[*abstract.Bucket](ctx, trx, callback)
 }
 
-func inspectBucketMetadataCarried(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket) fail.Error) fail.Error {
-	return metadata.InspectCarried[*abstract.Bucket](ctx, trx, callback)
+func inspectBucketMetadataAbstract(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket) fail.Error) fail.Error {
+	return metadata.InspectAbstract[*abstract.Bucket](ctx, trx, callback)
 }
 
 func inspectBucketMetadataProperty[P clonable.Clonable](ctx context.Context, trx bucketTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -38,8 +38,8 @@ func reviewBucketMetadata(ctx context.Context, trx bucketTransaction, callback f
 	return metadata.Review[*abstract.Bucket](ctx, trx, callback)
 }
 
-func reviewBucketMetadataCarried(ctx context.Context, trx bucketTransaction, callback func(ahc *abstract.Bucket) fail.Error) fail.Error {
-	return metadata.ReviewCarried[*abstract.Bucket](ctx, trx, callback)
+func reviewBucketMetadataAbstract(ctx context.Context, trx bucketTransaction, callback func(ahc *abstract.Bucket) fail.Error) fail.Error {
+	return metadata.ReviewAbstract[*abstract.Bucket](ctx, trx, callback)
 }
 
 func reviewBucketMetadataProperty[P clonable.Clonable](ctx context.Context, trx bucketTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -54,8 +54,8 @@ func alterBucketMetadata(ctx context.Context, trx bucketTransaction, callback fu
 	return metadata.Alter[*abstract.Bucket](ctx, trx, callback)
 }
 
-func alterBucketMetadataCarried(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket) fail.Error) fail.Error {
-	return metadata.AlterCarried[*abstract.Bucket](ctx, trx, callback)
+func alterBucketMetadataAbstract(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket) fail.Error) fail.Error {
+	return metadata.AlterAbstract[*abstract.Bucket](ctx, trx, callback)
 }
 
 func alterBucketMetadataProperty[P clonable.Clonable](ctx context.Context, trx bucketTransaction, property string, callback func(P) fail.Error) fail.Error {

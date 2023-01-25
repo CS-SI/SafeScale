@@ -22,8 +22,8 @@ func inspectNetworkMetadata(ctx context.Context, trx networkTransaction, callbac
 	return metadata.Inspect[*abstract.Network](ctx, trx, callback)
 }
 
-func inspectNetworkMetadataCarried(ctx context.Context, trx networkTransaction, callback func(*abstract.Network) fail.Error) fail.Error {
-	return metadata.InspectCarried[*abstract.Network](ctx, trx, callback)
+func inspectNetworkMetadataAbstract(ctx context.Context, trx networkTransaction, callback func(*abstract.Network) fail.Error) fail.Error {
+	return metadata.InspectAbstract[*abstract.Network](ctx, trx, callback)
 }
 
 func inspectNetworkMetadataProperty[P clonable.Clonable](ctx context.Context, trx networkTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -38,8 +38,8 @@ func reviewNetworkMetadata(ctx context.Context, trx networkTransaction, callback
 	return metadata.Review[*abstract.Network](ctx, trx, callback)
 }
 
-func reviewNetworkMetadataCarried(ctx context.Context, trx networkTransaction, callback func(ahc *abstract.Network) fail.Error) fail.Error {
-	return metadata.ReviewCarried[*abstract.Network](ctx, trx, callback)
+func reviewNetworkMetadataAbstract(ctx context.Context, trx networkTransaction, callback func(ahc *abstract.Network) fail.Error) fail.Error {
+	return metadata.ReviewAbstract[*abstract.Network](ctx, trx, callback)
 }
 
 func reviewNetworkMetadataProperty[P clonable.Clonable](ctx context.Context, trx networkTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -54,8 +54,8 @@ func alterNetworkMetadata(ctx context.Context, trx networkTransaction, callback 
 	return metadata.Alter[*abstract.Network](ctx, trx, callback)
 }
 
-func alterNetworkMetadataCarried(ctx context.Context, trx networkTransaction, callback func(*abstract.Network) fail.Error) fail.Error {
-	return metadata.AlterCarried[*abstract.Network](ctx, trx, callback)
+func alterNetworkMetadataAbstract(ctx context.Context, trx networkTransaction, callback func(*abstract.Network) fail.Error) fail.Error {
+	return metadata.AlterAbstract[*abstract.Network](ctx, trx, callback)
 }
 
 func alterNetworkMetadataProperty[P clonable.Clonable](ctx context.Context, trx networkTransaction, property string, callback func(P) fail.Error) fail.Error {

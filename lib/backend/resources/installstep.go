@@ -55,13 +55,13 @@ const (
 // 	err       error // if an error occurred, 'err' contains it
 // }
 //
-// // Successful returns true if the script has finished AND its results is a success
-// func (sr StepResult) Successful() bool {
+// // IsSuccessful returns true if the script has finished AND its results is a success
+// func (sr StepResult) IsSuccessful() bool {
 // 	return sr.success
 // }
 //
-// // Completed returns true if the script has finished, false otherwise
-// func (sr StepResult) Completed() bool {
+// // IsCompleted returns true if the script has finished, false otherwise
+// func (sr StepResult) IsCompleted() bool {
 // 	return sr.completed
 // }
 //
@@ -289,7 +289,7 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []*Host, v data.M
 			return nil, xerr
 		}
 
-		if !outcomes.Successful() {
+		if !outcomes.IsSuccessful() {
 			if is.Worker.action == installaction.Check { // Checks can fail and it's ok
 				tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present",
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
@@ -396,7 +396,7 @@ func (is *step) collectOutcomes(subtasks map[string]concurrency.Task, results co
 				return wrongs, nil, xerr
 			}
 
-			if !oko.Successful() || !strings.Contains(oko.Payload().Output, "exit 0") {
+			if !oko.IsSuccessful() || !strings.Contains(oko.Payload().Output, "exit 0") {
 				wrongs++
 			}
 		}

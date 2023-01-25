@@ -32,8 +32,8 @@ func inspectSecurityGroupMetadata(ctx context.Context, trx securityGroupTransact
 	return metadata.Inspect[*abstract.SecurityGroup](ctx, trx, callback, opts...)
 }
 
-func inspectSecurityGroupMetadataCarried(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.InspectCarried[*abstract.SecurityGroup](ctx, trx, callback, opts...)
+func inspectSecurityGroupMetadataAbstract(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup) fail.Error, opts ...options.Option) fail.Error {
+	return metadata.InspectAbstract[*abstract.SecurityGroup](ctx, trx, callback, opts...)
 }
 
 func inspectSecurityGroupMetadataProperty[P clonable.Clonable](ctx context.Context, trx securityGroupTransaction, property string, callback func(P) fail.Error, opts ...options.Option) fail.Error {
@@ -48,8 +48,8 @@ func reviewSecurityGroupMetadata(ctx context.Context, trx securityGroupTransacti
 	return metadata.Review[*abstract.SecurityGroup](ctx, trx, callback, opts...)
 }
 
-func reviewSecurityGroupMetadataCarried(ctx context.Context, trx securityGroupTransaction, callback func(ahc *abstract.SecurityGroup) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.ReviewCarried[*abstract.SecurityGroup](ctx, trx, callback, opts...)
+func reviewSecurityGroupMetadataAbstract(ctx context.Context, trx securityGroupTransaction, callback func(ahc *abstract.SecurityGroup) fail.Error, opts ...options.Option) fail.Error {
+	return metadata.ReviewAbstract[*abstract.SecurityGroup](ctx, trx, callback, opts...)
 }
 
 func reviewSecurityGroupMetadataProperty[P clonable.Clonable](ctx context.Context, trx securityGroupTransaction, property string, callback func(P) fail.Error, opts ...options.Option) fail.Error {
@@ -64,8 +64,8 @@ func alterSecurityGroupMetadata(ctx context.Context, trx securityGroupTransactio
 	return metadata.Alter[*abstract.SecurityGroup](ctx, trx, callback, opts...)
 }
 
-func alterSecurityGroupMetadataCarried(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.AlterCarried[*abstract.SecurityGroup](ctx, trx, callback, opts...)
+func alterSecurityGroupMetadataAbstract(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup) fail.Error, opts ...options.Option) fail.Error {
+	return metadata.AlterAbstract[*abstract.SecurityGroup](ctx, trx, callback, opts...)
 }
 
 func alterSecurityGroupMetadataProperty[P clonable.Clonable](ctx context.Context, trx securityGroupTransaction, property string, callback func(P) fail.Error, opts ...options.Option) fail.Error {
@@ -350,7 +350,7 @@ func (instance *SecurityGroup) trxDelete(inctx context.Context, sgTrx securityGr
 
 					// Do not remove a Security Group marked as default for a host
 					if hostsV1.DefaultFor != "" {
-						return fail.InvalidRequestError("failed to trxDelete Security Group '%s': is default for host identified by %s", hostsV1.DefaultFor)
+						return fail.InvalidRequestError("failed to delete Security Group '%s': is default for host identified by %s", hostsV1.DefaultFor)
 					}
 					return nil
 				})
@@ -377,7 +377,7 @@ func (instance *SecurityGroup) trxDelete(inctx context.Context, sgTrx securityGr
 
 					// Do not remove a Security Group marked as default for a subnet
 					if subnetsV1.DefaultFor != "" {
-						return fail.InvalidRequestError("failed to trxDelete SecurityGroup '%s': is default for Subnet identified by '%s'", abstractSG.Name, subnetsV1.DefaultFor)
+						return fail.InvalidRequestError("failed to delete SecurityGroup '%s': is default for Subnet identified by '%s'", abstractSG.Name, subnetsV1.DefaultFor)
 					}
 					return nil
 				})
@@ -414,7 +414,7 @@ func (instance *SecurityGroup) trxDelete(inctx context.Context, sgTrx securityGr
 				return innerXErr
 			}
 
-			// trxDelete SecurityGroup resource
+			// delete SecurityGroup resource
 			return deleteProviderSecurityGroup(ctx, instance.Service(), abstractSG)
 		})
 		if xerr != nil {
@@ -422,7 +422,7 @@ func (instance *SecurityGroup) trxDelete(inctx context.Context, sgTrx securityGr
 			return
 		}
 
-		// trxDelete Security Group metadata
+		// delete Security Group metadata
 		xerr = instance.Core.Delete(ctx)
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -483,7 +483,7 @@ func (instance *SecurityGroup) trxClear(inctx context.Context, trx securityGroup
 	go func() {
 		defer close(chRes)
 
-		xerr := alterSecurityGroupMetadataCarried(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
+		xerr := alterSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
 			return instance.Service().ClearSecurityGroup(ctx, asg)
 		})
 		chRes <- result{xerr}
@@ -526,7 +526,7 @@ func (instance *SecurityGroup) trxAddRules(inctx context.Context, trx securityGr
 			}
 		}
 
-		xerr := alterSecurityGroupMetadataCarried(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
+		xerr := alterSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
 			return instance.Service().AddRulesToSecurityGroup(ctx, asg, rules...)
 		})
 		chRes <- result{xerr}
@@ -720,7 +720,7 @@ func (instance *SecurityGroup) trxBindToHost(inctx context.Context, sgTrx securi
 					return fail.Wrap(lvl2err)
 				}
 
-				return alterHostMetadataCarried(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
+				return alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
 					entry, lvl3xerr := instance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
 					if lvl3xerr != nil {
 						return lvl3xerr

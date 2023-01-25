@@ -27,8 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-const VolumeKind = "volume"
-
 // VolumeRequest represents a volume request
 type VolumeRequest struct {
 	Name          string           `json:"name,omitempty"`

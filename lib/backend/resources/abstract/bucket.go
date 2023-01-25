@@ -25,8 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-const BucketKind = "bucket"
-
 // Bucket abstracts an Objet Storage container (also known as bucket in some implementations)
 type Bucket struct {
 	*core

@@ -43,15 +43,15 @@ type Transaction[A clonable.Clonable, T Metadata[A]] interface {
 	TerminateBasedOnError(ctx context.Context, ferr *fail.Error) // closes the transaction, committing if ferr contains no error, rolling back otherwise
 
 	alter(ctx context.Context, callback ResourceCallback[A], opts ...options.Option) fail.Error                            // allows to alter carried value and properties safely
-	alterCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) fail.Error                      // allows to alter carried value safely
+	alterAbstract(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) fail.Error                     // allows to alter carried value safely
 	alterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error   // allows to alter a property safely
 	alterProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error                // allows to alter all properties safely
 	inspect(ctx context.Context, callback ResourceCallback[A], opts ...options.Option) fail.Error                          // allows to inspect carried value and properties safely (after Reload)
-	inspectCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) fail.Error                    // allows to inspect a property safely (after Reload)
+	inspectAbstract(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) fail.Error                   // allows to inspect a property safely (after Reload)
 	inspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error // allows to alter a property safely (after Reload)
 	inspectProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error              // allows to inspect all properties safely (after Reload)
 	review(ctx context.Context, callback ResourceCallback[A], opts ...options.Option) fail.Error                           // allows to inspect carried value and properties safely (without Reload)
-	reviewCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) fail.Error                     // allows to inspect a property safely (without Reload)
+	reviewAbstract(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) fail.Error                    // allows to inspect a property safely (without Reload)
 	reviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error  // allows to inspect all properties safely (after Reload)
 	reviewProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error               // allows to inspect all properties safely (after Reload)
 }
@@ -439,7 +439,7 @@ func (trx *transaction[A, T]) inspect(inctx context.Context, callback ResourceCa
 			}
 			return nil
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr), result.TagSuccessFromCondition[struct{}](gerr == nil))
 		chRes <- res
 	}()
 
@@ -453,8 +453,8 @@ func (trx *transaction[A, T]) inspect(inctx context.Context, callback ResourceCa
 	}
 }
 
-// InspectCarried ...
-func (trx *transaction[A, T]) inspectCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) (_ fail.Error) {
+// InspectAbstract ...
+func (trx *transaction[A, T]) inspectAbstract(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) (_ fail.Error) {
 	return trx.inspect(ctx, func(in A, _ *serialize.JSONProperties) fail.Error { return callback(in) }, opts...)
 }
 
@@ -484,8 +484,8 @@ func (trx *transaction[A, T]) review(inctx context.Context, callback ResourceCal
 	return trx.inspect(inctx, callback, opts...)
 }
 
-// ReviewCarried ...
-func (trx *transaction[A, T]) reviewCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) (_ fail.Error) {
+// ReviewAbstract ...
+func (trx *transaction[A, T]) reviewAbstract(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) (_ fail.Error) {
 	return trx.review(ctx, func(in A, _ *serialize.JSONProperties) fail.Error {
 		return callback(in)
 	}, opts...)
@@ -574,8 +574,8 @@ func (trx *transaction[A, T]) alter(inctx context.Context, callback ResourceCall
 	return nil
 }
 
-// AlterCarried ...
-func (trx *transaction[A, T]) alterCarried(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) (_ fail.Error) {
+// AlterAbstract ...
+func (trx *transaction[A, T]) alterAbstract(ctx context.Context, callback CarriedCallback[A], opts ...options.Option) (_ fail.Error) {
 	return trx.alter(ctx, func(carried A, _ *serialize.JSONProperties) fail.Error {
 		return callback(carried)
 	}, opts...)

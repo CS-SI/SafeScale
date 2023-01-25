@@ -51,7 +51,7 @@ func trxGetIdentity(inctx context.Context, clusterTrx clusterTransaction) (_ abs
 		defer fail.OnPanic(&ferr)
 
 		var clusterIdentity abstract.Cluster
-		xerr := metadata.ReviewCarried[*abstract.Cluster](ctx, clusterTrx, func(aci *abstract.Cluster) fail.Error {
+		xerr := metadata.ReviewAbstract[*abstract.Cluster](ctx, clusterTrx, func(aci *abstract.Cluster) fail.Error {
 			clusterIdentity = *aci
 			return nil
 		})

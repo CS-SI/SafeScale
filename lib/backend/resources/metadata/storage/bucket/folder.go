@@ -460,7 +460,7 @@ func (instance folder) Browse(ctx context.Context, path string, callback storage
 	}
 
 	// If there is a single entry equals to absolute path, then there is nothing, it's an empty folder
-	if len(list) == 1 && strings.Trim(list[0], "/") == absPath {
+	if len(list) == 0 || (len(list) == 1 && strings.Trim(list[0], "/") == absPath) {
 		return nil
 	}
 
@@ -476,6 +476,10 @@ func (instance folder) Browse(ctx context.Context, path string, callback storage
 		if xerr != nil {
 			_ = instance.job.Service().InvalidateObject(ctx, metadataBucket.Name, i)
 			return fail.Wrap(xerr, "Error browsing metadata: reading from buffer")
+		}
+
+		if buffer.Len() == 0 {
+			return fail.InconsistentError("metadata read of '%s' has a size of 0 bytes", i)
 		}
 
 		data := buffer.Bytes()

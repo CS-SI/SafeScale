@@ -298,7 +298,7 @@ func (instance *Feature) Applicable(ctx context.Context, tg Targetable) (bool, f
 }
 
 // Check if Feature is installed on target
-// Check is ok if error is nil and Results.Successful() is true
+// Check is ok if error is nil and Results.IsSuccessful() is true
 func (instance *Feature) Check(ctx context.Context, target Targetable, v data.Map[string, any], opts ...options.Option) (_ rscapi.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -495,7 +495,7 @@ func (instance *Feature) determineInstallerForTarget(ctx context.Context, target
 }
 
 // Add installs the Feature on the target
-// Installs succeeds if error == nil and Results.Successful() is true
+// Installs succeeds if error == nil and Results.IsSuccessful() is true
 func (instance *Feature) Add(ctx context.Context, target Targetable, v data.Map[string, any], opts ...options.Option) (_ rscapi.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -547,7 +547,7 @@ func (instance *Feature) Add(ctx context.Context, target Targetable, v data.Map[
 			return nil, fail.Wrap(xerr, "failed to check Feature '%s'", featureName)
 		}
 
-		if results.Successful() {
+		if results.IsSuccessful() {
 			logrus.WithContext(ctx).Infof("Feature '%s' is already installed.", featureName)
 			return results, nil
 		}
@@ -704,14 +704,14 @@ func (instance *Feature) installRequirements(ctx context.Context, t Targetable, 
 				return fail.Wrap(xerr, "failed to check required Feature '%s' for Feature '%s'", requirement, instance.GetName())
 			}
 
-			if !results.Successful() {
+			if !results.IsSuccessful() {
 				results, xerr := needed.Add(ctx, t, v, WithFeatureSettings(s))
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return fail.Wrap(xerr, "failed to install required Feature '%s'", requirement)
 				}
 
-				if !results.Successful() {
+				if !results.IsSuccessful() {
 					return fail.NewError("failed to install required Feature '%s':\n%s", requirement, results.ErrorMessage())
 				}
 
@@ -778,7 +778,7 @@ func mapSuccessfulHostsInResults(results rscapi.Results) (map[string]struct{}, f
 				return nil, xerr
 			}
 
-			if s.Successful() {
+			if s.IsSuccessful() {
 				successfulHosts[l] = struct{}{}
 			}
 		}

@@ -22,8 +22,8 @@ func inspectShareMetadata(ctx context.Context, trx shareTransaction, callback fu
 	return metadata.Inspect[*abstract.Share](ctx, trx, callback)
 }
 
-func inspectShareMetadataCarried(ctx context.Context, trx shareTransaction, callback func(*abstract.Share) fail.Error) fail.Error {
-	return metadata.InspectCarried[*abstract.Share](ctx, trx, callback)
+func inspectShareMetadataAbstract(ctx context.Context, trx shareTransaction, callback func(*abstract.Share) fail.Error) fail.Error {
+	return metadata.InspectAbstract[*abstract.Share](ctx, trx, callback)
 }
 
 func inspectShareMetadataProperty[P clonable.Clonable](ctx context.Context, trx shareTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -38,8 +38,8 @@ func reviewShareMetadata(ctx context.Context, trx shareTransaction, callback fun
 	return metadata.Review[*abstract.Share](ctx, trx, callback)
 }
 
-func reviewShareMetadataCarried(ctx context.Context, trx shareTransaction, callback func(ahc *abstract.Share) fail.Error) fail.Error {
-	return metadata.ReviewCarried[*abstract.Share](ctx, trx, callback)
+func reviewShareMetadataAbstract(ctx context.Context, trx shareTransaction, callback func(ahc *abstract.Share) fail.Error) fail.Error {
+	return metadata.ReviewAbstract[*abstract.Share](ctx, trx, callback)
 }
 
 func reviewShareMetadataProperty[P clonable.Clonable](ctx context.Context, trx shareTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -54,8 +54,8 @@ func alterShareMetadata(ctx context.Context, trx shareTransaction, callback func
 	return metadata.Alter[*abstract.Share](ctx, trx, callback)
 }
 
-func alterShareMetadataCarried(ctx context.Context, trx shareTransaction, callback func(*abstract.Share) fail.Error) fail.Error {
-	return metadata.AlterCarried[*abstract.Share](ctx, trx, callback)
+func alterShareMetadataAbstract(ctx context.Context, trx shareTransaction, callback func(*abstract.Share) fail.Error) fail.Error {
+	return metadata.AlterAbstract[*abstract.Share](ctx, trx, callback)
 }
 
 func alterShareMetadataProperty[P clonable.Clonable](ctx context.Context, trx shareTransaction, property string, callback func(P) fail.Error) fail.Error {

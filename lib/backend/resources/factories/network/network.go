@@ -63,7 +63,6 @@ func List(ctx context.Context) ([]*abstract.Network, fail.Error) {
 		list = append(list, an)
 		return nil
 	})
-
 	if xerr != nil {
 		return nil, xerr
 	}

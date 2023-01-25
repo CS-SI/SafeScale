@@ -27,34 +27,33 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
+	"github.com/sirupsen/logrus"
+
+	"github.com/hashicorp/terraform-exec/tfexec"
+	tfjson "github.com/hashicorp/terraform-json"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
-	"github.com/hashicorp/terraform-exec/tfexec"
-	tfjson "github.com/hashicorp/terraform-json"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-type (
-	// ProviderUsingTerraform ...
-	ProviderUsingTerraform interface {
-		iaasapi.Provider
+// ProviderUsingTerraform ...
+type ProviderUsingTerraform interface {
+	iaasapi.Provider
 
-		TerraformDefinitionSnippet() string
-		TerraformerOptions() options.Options
-		Name() string
-		EmbeddedFS() embed.FS // returns the embed.FS containing snippets
-	}
-)
+	TerraformDefinitionSnippet() string
+	TerraformerOptions() options.Options
+	Name() string
+	EmbeddedFS() embed.FS // returns the embed.FS containing snippets
+}
 
 // renderer is an implementation of Terraformer interface
 type renderer struct {
@@ -191,6 +190,7 @@ func (instance *renderer) Assemble(ctx context.Context, resources ...api.Resourc
 		// lvars.Merge(map[string]any{"Resource": r.ToMap()})
 		lvars.Merge(map[string]any{"Resource": r})
 		lvars["Extra"] = r.Extra()
+
 		content, xerr := instance.RealizeSnippet(embeddedFS, r.TerraformSnippet(), lvars)
 		if xerr != nil {
 			return "", xerr

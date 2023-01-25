@@ -872,7 +872,7 @@ func (instance *Cluster) trxInstallReverseProxy(inctx context.Context, clusterTr
 				return
 			}
 
-			if !results.Successful() {
+			if !results.IsSuccessful() {
 				chRes <- result{fail.NewError("[Cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), results.ErrorMessage())}
 				return
 			}
@@ -982,7 +982,7 @@ func (instance *Cluster) trxInstallRemoteDesktop(inctx context.Context, clusterT
 				return
 			}
 
-			if !r.Successful() {
+			if !r.IsSuccessful() {
 				xerr = fail.NewError("[Cluster %s] failed to add 'remotedesktop' failed: %s", identity.Name, r.ErrorMessage())
 				_ = xerr.Annotate("ran_but_failed", true)
 				chRes <- result{xerr}
@@ -1073,7 +1073,7 @@ func (instance *Cluster) trxInstallAnsible(inctx context.Context, clusterTrx clu
 				return
 			}
 
-			if !r.Successful() {
+			if !r.IsSuccessful() {
 				chRes <- result{fail.NewError("[Cluster %s] failed to add 'ansible': %s", identity.Name, r.ErrorMessage())}
 				return
 			}
@@ -1094,7 +1094,7 @@ func (instance *Cluster) trxInstallAnsible(inctx context.Context, clusterTrx clu
 				return
 			}
 
-			if !r.Successful() {
+			if !r.IsSuccessful() {
 				chRes <- result{fail.NewError("[Cluster %s] failed to add 'ansible-for-cluster': %s", identity.Name, r.ErrorMessage())}
 				return
 			}
@@ -1174,7 +1174,7 @@ func (instance *Cluster) trxInstallDocker(inctx context.Context, clusterTrx clus
 		}
 
 		reason := false
-		if !r.Successful() {
+		if !r.IsSuccessful() {
 			keys, xerr := r.Keys()
 			if xerr != nil {
 				chRes <- result{xerr}
@@ -1187,7 +1187,7 @@ func (instance *Cluster) trxInstallDocker(inctx context.Context, clusterTrx clus
 					return
 				}
 
-				if !rk.Successful() {
+				if !rk.IsSuccessful() {
 					msg := rk.ErrorMessage()
 					if len(msg) == 0 {
 						logrus.WithContext(ctx).Warnf("This is a false warning for %s !!: %s", k, msg)

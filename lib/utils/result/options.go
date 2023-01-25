@@ -14,32 +14,25 @@ func WithPayload[T any](payload T) Option[T] {
 	}
 }
 
-// MarkAsSuccessful ...
-func MarkAsSuccessful[T any]() Option[T] {
+// TagSuccessFromCondition tags the holder as successful if b is true, to failed otherwise
+func TagSuccessFromCondition[T any](b bool) Option[T] {
 	return func(r *holder[T]) fail.Error {
-		r.success = true
+		r.success = b
 		return nil
 	}
 }
 
-// MarkAsFailed sets the error of the result Holder
-func MarkAsFailed[T any](err error) Option[T] {
+// TagCompletedFromError ...
+func TagCompletedFromError[T any](err error) Option[T] {
 	return func(r *holder[T]) fail.Error {
 		r.err = err
+		r.completed = err == nil
 		return nil
 	}
 }
 
-// MarkAsCompleted ...
-func MarkAsCompleted[T any]() Option[T] {
-	return func(r *holder[T]) fail.Error {
-		r.completed = true
-		return nil
-	}
-}
-
-// Lock ...
-func Lock[T any]() Option[T] {
+// TagFrozen freezes the cointent of the holder, making update impossible
+func TagFrozen[T any]() Option[T] {
 	return func(r *holder[T]) fail.Error {
 		r.frozen = true
 		return nil

@@ -334,7 +334,7 @@ func (instance *Bucket) GetHost(ctx context.Context) (_ string, ferr fail.Error)
 	defer bucketTrx.TerminateBasedOnError(ctx, &ferr)
 
 	var res string
-	xerr = inspectBucketMetadataCarried(ctx, bucketTrx, func(ab *abstract.Bucket) fail.Error {
+	xerr = inspectBucketMetadataAbstract(ctx, bucketTrx, func(ab *abstract.Bucket) fail.Error {
 		res = ab.Host
 		return nil
 	})
@@ -365,7 +365,7 @@ func (instance *Bucket) GetMountPoint(ctx context.Context) (_ string, ferr fail.
 	defer bucketTrx.TerminateBasedOnError(ctx, &ferr)
 
 	var res string
-	xerr = inspectBucketMetadataCarried(ctx, bucketTrx, func(ab *abstract.Bucket) fail.Error {
+	xerr = inspectBucketMetadataAbstract(ctx, bucketTrx, func(ab *abstract.Bucket) fail.Error {
 		res = ab.MountPoint
 		return nil
 	})
@@ -490,7 +490,7 @@ func (instance *Bucket) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	// -- trxDelete Bucket
+	// -- delete Bucket
 	xerr = instance.Service().DeleteBucket(ctx, bun)
 	if xerr != nil {
 		if strings.Contains(xerr.Error(), objectstorage.NotFound) {

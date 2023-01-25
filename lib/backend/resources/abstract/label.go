@@ -25,8 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-const LabelKind = "label"
-
 type Label struct {
 	*core
 	ID           string `json:"id"`

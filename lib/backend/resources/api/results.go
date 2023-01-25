@@ -14,16 +14,11 @@ type StepResult = result.Holder[StepOutput]
 
 // NewStepResult ...
 func NewStepResult(output StepOutput, err error) (StepResult, fail.Error) {
-	opts := []result.Option[StepOutput]{result.WithPayload[StepOutput](output)}
-	if err != nil {
-		opts = append(opts, result.MarkAsFailed[StepOutput](err))
-	} else {
-		opts = append(opts, result.MarkAsCompleted[StepOutput]())
-	}
-	if output.Retcode == 0 {
-		opts = append(opts, result.MarkAsSuccessful[StepOutput]())
-	}
-	return result.NewHolder[StepOutput](opts...)
+	return result.NewHolder[StepOutput](
+		result.WithPayload[StepOutput](output),
+		result.TagCompletedFromError[StepOutput](err),
+		result.TagSuccessFromCondition[StepOutput](output.Retcode == 0),
+	)
 }
 
 // UnitResults ...

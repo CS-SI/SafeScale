@@ -98,7 +98,7 @@ func (rg *group[T]) UncompletedKeys() ([]string, fail.Error) {
 
 	var output []string
 	for k, v := range rg.Map {
-		if !v.Completed() {
+		if !v.IsCompleted() {
 			output = append(output, k)
 		}
 	}
@@ -115,7 +115,7 @@ func (rg *group[T]) Successful() bool {
 	}
 
 	for _, v := range rg.Map {
-		if !v.Successful() {
+		if !v.IsSuccessful() {
 			return false
 		}
 	}
@@ -133,7 +133,7 @@ func (rg *group[T]) Completed() bool {
 	}
 
 	for _, v := range rg.Map {
-		if !v.Completed() {
+		if !v.IsCompleted() {
 			return false
 		}
 	}

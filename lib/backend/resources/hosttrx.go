@@ -20,8 +20,8 @@ func inspectHostMetadata(ctx context.Context, ht hostTransaction, callback func(
 	return metadata.Inspect[*abstract.HostCore](ctx, ht, callback)
 }
 
-func inspectHostMetadataCarried(ctx context.Context, ht hostTransaction, callback func(ahc *abstract.HostCore) fail.Error) fail.Error {
-	return metadata.InspectCarried[*abstract.HostCore](ctx, ht, callback)
+func inspectHostMetadataAbstract(ctx context.Context, ht hostTransaction, callback func(ahc *abstract.HostCore) fail.Error) fail.Error {
+	return metadata.InspectAbstract[*abstract.HostCore](ctx, ht, callback)
 }
 
 func inspectHostMetadataProperty[P clonable.Clonable](ctx context.Context, ht hostTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -36,8 +36,8 @@ func reviewHostMetadata(ctx context.Context, ht hostTransaction, callback func(*
 	return metadata.Review[*abstract.HostCore](ctx, ht, callback)
 }
 
-func reviewHostMetadataCarried(ctx context.Context, ht hostTransaction, callback func(ahc *abstract.HostCore) fail.Error) fail.Error {
-	return metadata.ReviewCarried[*abstract.HostCore](ctx, ht, callback)
+func reviewHostMetadataAbstract(ctx context.Context, ht hostTransaction, callback func(ahc *abstract.HostCore) fail.Error) fail.Error {
+	return metadata.ReviewAbstract[*abstract.HostCore](ctx, ht, callback)
 }
 
 func reviewHostMetadataProperty[P clonable.Clonable](ctx context.Context, ht hostTransaction, property string, callback func(P) fail.Error) fail.Error {
@@ -52,8 +52,8 @@ func alterHostMetadata(ctx context.Context, ht hostTransaction, callback func(*a
 	return metadata.Alter[*abstract.HostCore](ctx, ht, callback)
 }
 
-func alterHostMetadataCarried(ctx context.Context, ht hostTransaction, callback func(ahc *abstract.HostCore) fail.Error) fail.Error {
-	return metadata.AlterCarried[*abstract.HostCore](ctx, ht, callback)
+func alterHostMetadataAbstract(ctx context.Context, ht hostTransaction, callback func(ahc *abstract.HostCore) fail.Error) fail.Error {
+	return metadata.AlterAbstract[*abstract.HostCore](ctx, ht, callback)
 }
 
 func alterHostMetadataProperty[P clonable.Clonable](ctx context.Context, ht hostTransaction, property string, callback func(P) fail.Error) fail.Error {

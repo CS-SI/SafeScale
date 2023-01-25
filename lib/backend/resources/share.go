@@ -486,7 +486,7 @@ func (instance *Share) Create(
 		return xerr
 	}
 
-	// Starting from here, trxDelete Share reference in server if exiting with error
+	// Starting from here, delete Share reference in server if exiting with error
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
@@ -543,7 +543,7 @@ func (instance *Share) trxGetServer(ctx context.Context, shareTrx shareTransacti
 	}
 
 	var hostID, hostName string
-	xerr := reviewShareMetadataCarried(ctx, shareTrx, func(as *abstract.Share) fail.Error {
+	xerr := reviewShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
 		hostID = as.HostID
 		hostName = as.HostName
 		return nil
@@ -577,7 +577,7 @@ func (instance *Share) trxGetServerWithTransaction(ctx context.Context, shareTrx
 	}
 
 	var hostID, hostName string
-	xerr := reviewShareMetadataCarried(ctx, shareTrx, func(as *abstract.Share) fail.Error {
+	xerr := reviewShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
 		hostID = as.HostID
 		hostName = as.HostName
 		return nil
@@ -668,7 +668,7 @@ func (instance *Share) Mount(ctx context.Context, target *Host, spath string, wi
 	defer shareTrx.TerminateBasedOnError(ctx, &ferr)
 
 	// Retrieve info about the Share
-	xerr = reviewShareMetadataCarried(ctx, shareTrx, func(as *abstract.Share) fail.Error {
+	xerr = reviewShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
 		shareName = as.Name
 		shareID = as.ID
 		return nil
@@ -800,19 +800,19 @@ func (instance *Share) Mount(ctx context.Context, target *Host, spath string, wi
 				return nil
 			})
 			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to alter metadata trying to trxDelete Share"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to alter metadata trying to delete Share"))
 				return
 			}
 
 			var nfsClient *nfs.Client
 			if nfsClient, derr = nfs.NewNFSClient(sshProfile); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to get nfs client trying to trxDelete Share"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to get nfs client trying to delete Share"))
 				return
 			}
 
 			derr = nfsClient.Unmount(cleanupContextFrom(ctx), instance.Service(), export)
 			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount trying to trxDelete Share"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount trying to delete Share"))
 				return
 			}
 		}
@@ -898,7 +898,7 @@ func (instance *Share) Unmount(ctx context.Context, target *Host) (ferr fail.Err
 	defer shareTrx.TerminateBasedOnError(ctx, &ferr)
 
 	// Retrieve info about the Share
-	xerr = reviewShareMetadataCarried(ctx, shareTrx, func(as *abstract.Share) fail.Error {
+	xerr = reviewShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
 		shareName = as.Name
 		shareID = as.ID
 		return nil
@@ -1025,7 +1025,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 
 	// -- Retrieve info about the Share --
 	// Note: we do not use GetName() and ID() to avoid 2 consecutive instance.Inspect()
-	xerr = inspectShareMetadataCarried(ctx, shareTrx, func(as *abstract.Share) fail.Error {
+	xerr = inspectShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
 		shareID = as.ID
 		shareName = as.Name
 		return nil
@@ -1051,7 +1051,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	if state != hoststate.Started {
-		return fail.InvalidRequestError(fmt.Sprintf("cannot trxDelete share on '%s', '%s' is NOT started", targetName, targetName))
+		return fail.InvalidRequestError(fmt.Sprintf("cannot delete share on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
 	xerr = alterHostMetadataProperty(ctx, serverTrx, hostproperty.SharesV1, func(hostSharesV1 *propertiesv1.HostShares) fail.Error {

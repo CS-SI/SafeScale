@@ -19,6 +19,7 @@ package result
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -28,15 +29,19 @@ import (
 
 // Holder ...
 type Holder[T any] interface {
-	Successful() bool
-	Completed() bool
 	Error() error
 	ErrorMessage() string
+	IsCompleted() bool
+	IsFrozen() bool
+	IsSuccessful() bool
+	TagCompletedFromError(error) error
+	TagSuccessFromCondition(bool) error
 	Payload() T
 }
 
 // holder[T any] implements Holder interface
 type holder[T any] struct {
+	mu        *sync.Mutex
 	err       error // if an error occurred, 'err' contains it
 	payload   T     // contains the real holder
 	completed bool  // if true, the script has been run to completion
@@ -46,18 +51,21 @@ type holder[T any] struct {
 
 // NewHolder creates a new instance of Holder with payload of type T
 func NewHolder[T any](opts ...Option[T]) (*holder[T], fail.Error) {
-	out := &holder[T]{}
-	return out, out.Update(opts...)
+	out := &holder[T]{mu: &sync.Mutex{}}
+	return out, fail.Wrap(out.Update(opts...))
 }
 
 // Update allows to update content of the holder
-func (r *holder[T]) Update(opts ...Option[T]) fail.Error {
+func (r *holder[T]) Update(opts ...Option[T]) error {
 	if valid.IsNull(r) {
 		return fail.InvalidInstanceError()
 	}
 
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if r.frozen {
-		return fail.InvalidRequestError("cannot update a holder already locked")
+		return fail.InvalidRequestError("failed to change state of Holder because it is frozen")
 	}
 
 	for _, v := range opts {
@@ -69,29 +77,53 @@ func (r *holder[T]) Update(opts ...Option[T]) fail.Error {
 	return nil
 }
 
-// IsLocked tells if the Holder is locked (ie nothing can be updated anymore)
-func (r *holder[T]) IsLocked() bool {
+// TagSuccessFromCondition ...
+func (r *holder[T]) TagSuccessFromCondition(b bool) error {
+	return r.Update(TagSuccessFromCondition[T](b))
+}
+
+// TagCompletedFromError marks the holder as completed if err == nil
+func (r *holder[T]) TagCompletedFromError(err error) error {
+	return r.Update(TagCompletedFromError[T](err))
+}
+
+// TagFrozen ...
+func (r *holder[T]) TagFrozen() error {
+	return r.Update(TagFrozen[T]())
+}
+
+// IsFrozen tells if the Holder is locked (ie nothing can be updated anymore)
+func (r *holder[T]) IsFrozen() bool {
 	if valid.IsNull(r) {
 		return false
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	return r.frozen
 }
 
-// Successful returns true if the script has finished AND its group is a success
-func (r *holder[T]) Successful() bool {
+// IsSuccessful returns true if the script has finished AND its group is a success
+func (r *holder[T]) IsSuccessful() bool {
 	if valid.IsNull(r) {
 		return false
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	return r.success
 }
 
-// Completed returns true if the script has finished, false otherwise
-func (r *holder[T]) Completed() bool {
+// IsCompleted returns true if the script has finished, false otherwise
+func (r *holder[T]) IsCompleted() bool {
 	if valid.IsNull(r) {
 		return false
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	return r.completed
 }
@@ -101,6 +133,9 @@ func (r *holder[T]) Error() error {
 		return nil
 	}
 
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	return r.err
 }
 
@@ -108,6 +143,9 @@ func (r *holder[T]) ErrorMessage() string {
 	if valid.IsNull(r) {
 		return ""
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	var msg string
 	if r.err != nil {
@@ -174,7 +212,10 @@ func (r *holder[T]) ErrorMessage() string {
 // Payload returns the data carried by the Holder, if result is completed
 func (r *holder[T]) Payload() T {
 	empty := new(T)
-	if r.Completed() {
+
+	if r.IsCompleted() {
+		r.mu.Lock()
+		defer r.mu.Unlock()
 		return r.payload
 	}
 

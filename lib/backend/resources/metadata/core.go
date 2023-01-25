@@ -50,20 +50,32 @@ const (
 	byNameFolderName = "byName"
 )
 
-// Core contains the core functions of a persistent object
-type Core[T clonable.Clonable] struct {
-	lock              *sync.RWMutex
-	id                atomic.Value
-	name              atomic.Value
-	taken             atomic.Value
-	carried           *shielded.Shielded[T]
-	properties        *serialize.JSONProperties
-	kind              string
-	folder            storage.Folder
-	loaded            bool
-	committed         bool
-	kindSplittedStore bool // tells if data read/write is done directly from/to folder (when false) or from/to subfolders (when true)
-}
+type (
+	// providerUsingTerraform interface for use by metadata
+	providerUsingTerraform interface {
+		ConsolidateNetworkSnippet(*abstract.Network) fail.Error             // configures if needed Terraform Snippet to use for abstract.Network in parameter
+		ConsolidateSubnetSnippet(*abstract.Subnet) fail.Error               // configures if needed Terraform Snippet to use for abstract.Subnet in parameter
+		ConsolidateSecurityGroupSnippet(*abstract.SecurityGroup) fail.Error // configures if needed Terraform Snippet to use for abstract.SecurityGroup in parameter
+		ConsolidateHostSnippet(*abstract.HostCore) fail.Error               // configures if needed Terraform Snippet to use for abstract.Host in parameter
+		// ConsolidateLabelSnippet(*abstract.Label) fail.Error                // configures if needed Terraform Snippet to use for abstract.Label in parameter
+		ConsolidateVolumeSnippet(*abstract.Volume) fail.Error // configures if needed Terraform Snippet to use for abstract.Volume
+	}
+
+	// Core contains the core functions of a persistent object
+	Core[T clonable.Clonable] struct {
+		lock              *sync.RWMutex
+		id                atomic.Value
+		name              atomic.Value
+		taken             atomic.Value
+		carried           *shielded.Shielded[T]
+		properties        *serialize.JSONProperties
+		kind              string
+		folder            storage.Folder
+		loaded            bool
+		committed         bool
+		kindSplittedStore bool // tells if data read/write is done directly from/to folder (when false) or from/to subfolders (when true)
+	}
+)
 
 // verify that Label satisfies resources.Label
 var _ Metadata[*abstract.HostCore] = (*Core[*abstract.HostCore])(nil)
@@ -265,149 +277,6 @@ func (instance *Core[T]) Kind() string {
 	return instance.kind
 }
 
-// // Inspect protects the data for shared read
-// func (instance *Core[T]) Inspect(inctx context.Context, callback ResourceCallback[T], opts ...options.Option) fail.Error {
-// 	if valid.IsNil(instance) {
-// 		return fail.InvalidInstanceError()
-// 	}
-// 	if callback == nil {
-// 		return fail.InvalidParameterCannotBeNilError("callback")
-// 	}
-// 	if instance.properties == nil {
-// 		return fail.InvalidInstanceContentError("instance.properties", "cannot be nil")
-// 	}
-//
-// 	trx, xerr := NewTransaction[T, *Core[T]](inctx, instance)
-// 	if xerr != nil {
-// 		return xerr
-// 	}
-// 	defer trx.SilentTerminate(inctx)
-//
-// 	return trx.inspect(inctx, callback, opts...)
-// }
-//
-// // InspectCarried protects the data for shared read
-// func (instance *Core[T]) InspectCarried(inctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error {
-// 	if valid.IsNil(instance) {
-// 		return fail.InvalidInstanceError()
-// 	}
-// 	if callback == nil {
-// 		return fail.InvalidParameterCannotBeNilError("callback")
-// 	}
-//
-// 	trx, xerr := NewTransaction[T, *Core[T]](inctx, instance)
-// 	if xerr != nil {
-// 		return xerr
-// 	}
-// 	defer trx.SilentTerminate(inctx)
-//
-// 	return trx.inspectCarried(inctx, func(carried T) fail.Error {
-// 		return callback(carried)
-// 	}, opts...)
-// }
-//
-// // InspectProperty allows to inspect directly a single property
-// func (instance *Core[T]) InspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-// 	return instance.Inspect(ctx, func(_ T, props *serialize.JSONProperties) fail.Error {
-// 		return props.Inspect(property, callback)
-// 	}, opts...)
-// }
-//
-// // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
-// // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
-// // change through time).
-// func (instance *Core[T]) Review(ctx context.Context, callback ResourceCallback[T], opts ...options.Option) fail.Error {
-// 	opts = append(opts, WithoutReload())
-// 	return instance.Inspect(ctx, callback, opts...)
-// }
-//
-// // ReviewCarried allows to access data contained in the instance, without reloading from the Object Storage; it's intended
-// // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
-// // change through time).
-// func (instance *Core[T]) ReviewCarried(ctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error {
-// 	opts = append(opts, WithoutReload())
-// 	return instance.InspectCarried(ctx, callback, opts...)
-// }
-//
-// // ReviewProperty allows to review directly a single property
-// func (instance *Core[T]) ReviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-// 	return instance.Review(ctx, func(_ T, props *serialize.JSONProperties) fail.Error {
-// 		return props.Inspect(property, callback)
-// 	}, opts...)
-// }
-//
-// // Alter protects the data for exclusive write
-// // Valid options are :
-// // - WithoutReload() = disable reloading from metadata storage
-// func (instance *Core[T]) Alter(inctx context.Context, callback ResourceCallback[T], opts ...options.Option) (ferr fail.Error) {
-// 	if valid.IsNil(instance) {
-// 		return fail.InvalidInstanceError()
-// 	}
-// 	if callback == nil {
-// 		return fail.InvalidParameterCannotBeNilError("callback")
-// 	}
-// 	if instance.carried == nil {
-// 		return fail.InvalidInstanceContentError("instance.carried", "cannot be nil")
-// 	}
-//
-// 	name, err := instance.getName()
-// 	if err != nil {
-// 		return fail.InconsistentError("uninitialized metadata should not be altered")
-// 	}
-// 	if name == "" {
-// 		return fail.InconsistentError("uninitialized metadata should not be altered")
-// 	}
-//
-// 	id, err := instance.getID()
-// 	if err != nil {
-// 		return fail.InconsistentError("uninitialized metadata should not be altered")
-// 	}
-// 	if id == "" {
-// 		return fail.InconsistentError("uninitialized metadata should not be altered")
-// 	}
-//
-// 	trx, xerr := NewTransaction[T, *Core[T]](inctx, instance)
-// 	if xerr != nil {
-// 		return xerr
-// 	}
-// 	defer trx.TerminateBasedOnError(inctx, &ferr)
-//
-// 	xerr = trx.alter(inctx, callback, opts...)
-// 	if xerr != nil {
-// 		switch xerr.(type) {
-// 		case *fail.ErrAlteredNothing:
-// 			derr := trx.Rollback(inctx)
-// 			if derr != nil {
-// 				return derr
-// 			}
-//
-// 			return nil
-// 		default:
-// 			derr := trx.Rollback(inctx)
-// 			if derr != nil {
-// 				_ = xerr.AddConsequence(derr)
-// 			}
-// 			return xerr
-// 		}
-// 	}
-//
-// 	return trx.Commit(inctx)
-// }
-//
-// // AlterCarried allows to alter directly the carried value
-// func (instance *Core[T]) AlterCarried(ctx context.Context, callback CarriedCallback[T], opts ...options.Option) fail.Error {
-// 	return instance.Alter(ctx, func(carried T, _ *serialize.JSONProperties) fail.Error {
-// 		return callback(carried)
-// 	}, opts...)
-// }
-//
-// // AlterProperty allows to alter directly a single property
-// func (instance *Core[T]) AlterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-// 	return instance.Alter(ctx, func(_ T, props *serialize.JSONProperties) fail.Error {
-// 		return props.Alter(property, callback)
-// 	}, opts...)
-// }
-
 // Carry links metadata with real data
 // If c is already carrying a carried data, returns fail.NotAvailableError
 //
@@ -491,9 +360,10 @@ func (instance *Core[T]) Carry(inctx context.Context, abstractResource T) (_ fai
 
 			return nil
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
@@ -518,10 +388,8 @@ func (instance *Core[T]) updateIdentity() fail.Error {
 				return fail.Wrap(err)
 			}
 
-			if loaded, ok := instance.id.Load().(string); ok {
-				if idd == loaded {
-					return nil
-				}
+			if loaded, ok := instance.id.Load().(string); ok && idd == loaded {
+				return nil
 			}
 
 			if instance.kindSplittedStore {
@@ -544,7 +412,7 @@ func (instance *Core[T]) updateIdentity() fail.Error {
 	return fail.InconsistentError("uninitialized data should NOT be updated")
 }
 
-// Read gets the data from Object Storage
+// Read gets the data from metadata Storage
 func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
@@ -642,7 +510,7 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 			}
 			defer trx.TerminateBasedOnError(ctx, &ferr)
 
-			return trx.reviewCarried(ctx, func(p T) fail.Error {
+			return trx.reviewAbstract(ctx, func(p T) fail.Error {
 				myjob, innerXErr := jobapi.FromContext(ctx)
 				if innerXErr != nil {
 					return innerXErr
@@ -653,7 +521,12 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 					return fail.Wrap(innerErr)
 				}
 
-				_, innerXErr = myjob.Scope().RegisterResourceIfNeeded(tfResource)
+				innerErr = instance.consolidateSnippet(tfResource)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				innerXErr = myjob.Scope().ReplaceResource(tfResource)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -661,7 +534,7 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 				return nil
 			})
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
 
@@ -673,6 +546,58 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 	case <-inctx.Done():
 		return fail.Wrap(inctx.Err())
 	}
+}
+
+// consolidateSnippet does what its name suggest: update terraformer snippet information of the resource
+func (instance *Core[T]) consolidateSnippet(p terraformerapi.Resource) fail.Error {
+	if !instance.Service().Capabilities().UseTerraformer {
+		return nil
+	}
+
+	prov, xerr := instance.Service().ProviderDriver()
+	if xerr != nil {
+		return xerr
+	}
+
+	castedProv, ok := prov.(providerUsingTerraform)
+	if !ok {
+		return fail.InconsistentError("failed to wrap provider to private interface 'providerUsingTerraform'")
+	}
+
+	switch p.Kind() {
+	case abstract.HostKind:
+		ahc, err := lang.Cast[*abstract.HostCore](p)
+		if err != nil {
+			return fail.Wrap(err)
+		}
+		return castedProv.ConsolidateHostSnippet(ahc)
+	case abstract.NetworkKind:
+		an, err := lang.Cast[*abstract.Network](p)
+		if err != nil {
+			return fail.Wrap(err)
+		}
+		return castedProv.ConsolidateNetworkSnippet(an)
+	case abstract.SecurityGroupKind:
+		asg, err := lang.Cast[*abstract.SecurityGroup](p)
+		if err != nil {
+			return fail.Wrap(err)
+		}
+		return castedProv.ConsolidateSecurityGroupSnippet(asg)
+	case abstract.SubnetKind:
+		as, err := lang.Cast[*abstract.Subnet](p)
+		if err != nil {
+			return fail.Wrap(err)
+		}
+		return castedProv.ConsolidateSubnetSnippet(as)
+	case abstract.VolumeKind:
+		av, err := lang.Cast[*abstract.Volume](p)
+		if err != nil {
+			return fail.Wrap(err)
+		}
+		return castedProv.ConsolidateVolumeSnippet(av)
+	}
+
+	return nil
 }
 
 // ReadByID reads a metadata identified by ID from Object Storage
@@ -770,9 +695,10 @@ func (instance *Core[T]) ReadByID(inctx context.Context, id string) (_ fail.Erro
 
 			return instance.updateIdentity()
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
@@ -820,16 +746,16 @@ func (instance *Core[T]) readByID(inctx context.Context, id string) fail.Error {
 						default:
 						}
 
-						if innerXErr := instance.unsafeDeserialize(ctx, buf); innerXErr != nil {
+						if innerXErr := instance.deserialize(ctx, buf); innerXErr != nil {
 							switch innerXErr.(type) {
 							case *fail.ErrNotAvailable:
-								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", instance.kind)
+								return fail.Wrap(innerXErr, "failed to deserialize %s resource", instance.kind)
 							case *fail.ErrSyntax:
-								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", instance.kind)
+								return fail.Wrap(innerXErr, "failed to deserialize %s resource", instance.kind)
 							case *fail.ErrInconsistent, *fail.ErrInvalidParameter, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
 								return retry.StopRetryError(innerXErr)
 							default:
-								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s resource", instance.kind)
+								return fail.Wrap(innerXErr, "failed to deserialize %s resource", instance.kind)
 							}
 						}
 						return nil
@@ -854,9 +780,10 @@ func (instance *Core[T]) readByID(inctx context.Context, id string) fail.Error {
 
 			return nil
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
@@ -904,8 +831,8 @@ func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Err
 							default:
 							}
 
-							if innerXErr := instance.unsafeDeserialize(ctx, buf); innerXErr != nil {
-								return fail.Wrap(innerXErr, "failed to unsafeDeserialize %s '%s'", instance.kind, name)
+							if innerXErr := instance.deserialize(ctx, buf); innerXErr != nil {
+								return fail.Wrap(innerXErr, "failed to deserialize %s '%s'", instance.kind, name)
 							}
 
 							return nil
@@ -930,9 +857,10 @@ func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Err
 
 			return nil
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
@@ -955,7 +883,7 @@ func (instance *Core[T]) write(inctx context.Context) fail.Error {
 			defer fail.OnPanic(&ferr)
 
 			if !instance.committed {
-				jsoned, xerr := instance.unsafeSerialize(ctx)
+				jsoned, xerr := instance.serialize(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -996,9 +924,10 @@ func (instance *Core[T]) write(inctx context.Context) fail.Error {
 			}
 			return nil
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
@@ -1029,9 +958,10 @@ func (instance *Core[T]) Reload(inctx context.Context) (ferr fail.Error) {
 
 			return instance.reload(ctx)
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
@@ -1158,9 +1088,10 @@ func (instance *Core[T]) reload(inctx context.Context) fail.Error {
 
 			return nil
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
@@ -1205,9 +1136,11 @@ func (instance *Core[T]) BrowseFolder(inctx context.Context, callback func(buf [
 				return callback(buf)
 			})
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
@@ -1245,9 +1178,10 @@ func (instance *Core[T]) LookupByName(inctx context.Context, name string) (_ fai
 
 			return instance.folder.Lookup(ctx, byNameFolderName, name)
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
@@ -1396,7 +1330,7 @@ func (instance *Core[T]) Delete(inctx context.Context) (_ fail.Error) {
 
 			return nil
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
 	select {
@@ -1409,6 +1343,7 @@ func (instance *Core[T]) Delete(inctx context.Context) (_ fail.Error) {
 	}
 }
 
+// String returns a string representation of data stored
 func (instance *Core[T]) String() (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -1432,9 +1367,9 @@ func (instance *Core[T]) String() (_ string, ferr fail.Error) {
 	return dumped + " " + props, nil
 }
 
-// unsafeSerialize serializes instance into bytes (output json code)
+// serialize serializes instance into bytes (output json code)
 // Note: must be called after locking the instance
-func (instance *Core[T]) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) {
+func (instance *Core[T]) serialize(inctx context.Context) ([]byte, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1487,9 +1422,10 @@ func (instance *Core[T]) unsafeSerialize(inctx context.Context) ([]byte, fail.Er
 
 			return r, nil
 		}()
-		res, _ := result.NewHolder[[]byte](result.WithPayload[[]byte](gtr), result.MarkAsFailed[[]byte](gerr))
+		res, _ := result.NewHolder[[]byte](result.WithPayload[[]byte](gtr), result.TagSuccessFromCondition[[]byte](gerr == nil), result.TagCompletedFromError[[]byte](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.Payload(), fail.Wrap(res.Error())
@@ -1518,11 +1454,12 @@ func (instance *Core[T]) Deserialize(inctx context.Context, buf []byte) fail.Err
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			return instance.unsafeDeserialize(ctx, buf)
+			return instance.deserialize(ctx, buf)
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())
@@ -1533,9 +1470,9 @@ func (instance *Core[T]) Deserialize(inctx context.Context, buf []byte) fail.Err
 	}
 }
 
-// unsafeDeserialize reads json code and instantiates a Core
+// deserialize reads json code and instantiates a Core
 // Note: must be called after locking the instance
-func (instance *Core[T]) unsafeDeserialize(inctx context.Context, buf []byte) fail.Error {
+func (instance *Core[T]) deserialize(inctx context.Context, buf []byte) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1596,14 +1533,15 @@ func (instance *Core[T]) unsafeDeserialize(inctx context.Context, buf []byte) fa
 				xerr = instance.properties.Deserialize(jsoned)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					return fail.Wrap(xerr, "failed to unsafeDeserialize properties")
+					return fail.Wrap(xerr, "failed to deserialize properties")
 				}
 			}
 			return nil
 		}()
-		res, _ := result.NewHolder[struct{}](result.MarkAsFailed[struct{}](gerr))
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
 	}()
+
 	select {
 	case res := <-chRes:
 		return fail.Wrap(res.Error())

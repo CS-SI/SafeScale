@@ -37,3 +37,14 @@ const (
 const (
 	SingleHostNetworkCIDR = "10.42.0.0/16"
 )
+
+const (
+	BucketKind        = "bucket"
+	ClusterKind       = "cluster"
+	HostKind          = "host"
+	LabelKind         = "label"
+	NetworkKind       = "network"
+	SecurityGroupKind = "sg"
+	SubnetKind        = "subnet"
+	VolumeKind        = "volume"
+)

@@ -684,7 +684,7 @@ func TestMetadataCore_UnsafeSerialize(t *testing.T) {
 	ctx = context.WithValue(ctx, "task", task)
 
 	var amc *Core = nil
-	_, xerr = amc.unsafeSerialize(ctx)
+	_, xerr = amc.serialize(ctx)
 	// require.Contains(t, xerr.Error(), "calling method from a nil pointer"), true)
 	require.Contains(t, xerr.Error(), "runtime error: invalid memory address or nil pointer dereference") // FIXME: aw, runtime error -__-
 
@@ -705,7 +705,7 @@ func TestMetadataCore_UnsafeSerialize(t *testing.T) {
 		err = mc.Carry(ctx, network)
 		require.Nil(t, err)
 
-		data, xerr := mc.unsafeSerialize(ctx)
+		data, xerr := mc.serialize(ctx)
 		require.Nil(t, xerr)
 		str := string(data)
 
@@ -741,7 +741,7 @@ func TestMetadataCore_Deserialize(t *testing.T) {
 		err = mc.Carry(ctx, network)
 		require.Nil(t, err)
 
-		data, xerr := mc.unsafeSerialize(ctx)
+		data, xerr := mc.serialize(ctx)
 		require.Nil(t, xerr)
 		str := string(data)
 		require.Contains(t, str, "\"id\":\"Network_ID\"")
@@ -755,7 +755,7 @@ func TestMetadataCore_Deserialize(t *testing.T) {
 		require.Nil(t, err)
 		xerr = amc.Deserialize(ctx, []byte(str))
 		require.Nil(t, xerr)
-		data, xerr = mc.unsafeSerialize(ctx)
+		data, xerr = mc.serialize(ctx)
 		require.Nil(t, xerr)
 		require.EqualValues(t, str, string(data))
 

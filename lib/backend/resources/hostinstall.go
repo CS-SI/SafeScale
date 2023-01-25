@@ -133,7 +133,7 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 	return feat.Check(ctx, instance, vars, opts...)
 }
 
-// DeleteFeature handles 'safescale host trxDelete-feature <host name> <feature name>'
+// DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
 func (instance *Host) DeleteFeature(inctx context.Context, name string, vars data.Map[string, any], opts ...options.Option) (_ rscapi.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -161,7 +161,7 @@ func (instance *Host) DeleteFeature(inctx context.Context, name string, vars dat
 	}
 
 	if state != hoststate.Started {
-		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot trxDelete feature on '%s', '%s' is NOT started", targetName, targetName))
+		return nil, fail.InvalidRequestError(fmt.Sprintf("cannot delete feature on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
 	hostTrx, xerr := newHostTransaction(ctx, instance)
@@ -182,8 +182,8 @@ func (instance *Host) DeleteFeature(inctx context.Context, name string, vars dat
 			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, instance.GetName())
 		}
 
-		if !outcomes.Successful() {
-			msg := fmt.Sprintf("failed to trxDelete feature '%s' from host '%s'", name, instance.GetName())
+		if !outcomes.IsSuccessful() {
+			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", name, instance.GetName())
 			tracer.Trace(strprocess.Capitalize(msg) + ":\n" + outcomes.ErrorMessage())
 			return fail.NewError(msg)
 		}

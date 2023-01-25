@@ -84,8 +84,8 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 
 			// Set link to Subnet before testing if Host has been successfully created;
 			// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
-			// be able to trxDelete subnet on later safescale command
-			xerr = alterSubnetMetadataCarried(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
+			// be able to delete subnet on later safescale command
+			xerr = alterSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 				// If Host resources has been created and error occurred after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
 				if rgw.IsTaken() {
 					id, _ := rgw.GetID()
@@ -117,7 +117,7 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 						logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", request.ResourceName)
 						derr := rgw.Delete(cleanupContextFrom(ctx))
 						if derr != nil {
-							msgRoot := "Cleaning up on failure, failed to trxDelete gateway '%s'"
+							msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 							switch derr.(type) {
 							case *fail.ErrNotFound:
 								// missing Host is considered as a successful deletion, continue
@@ -137,7 +137,7 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 						if derr == nil {
 							defer rgwTrx.TerminateBasedOnError(ctx, &ferr)
 
-							derr = alterHostMetadataCarried(cleanupContextFrom(ctx), rgwTrx, func(as *abstract.HostCore) fail.Error {
+							derr = alterHostMetadataAbstract(cleanupContextFrom(ctx), rgwTrx, func(as *abstract.HostCore) fail.Error {
 								as.LastState = hoststate.Failed
 								return nil
 							})
@@ -159,7 +159,7 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 			}()
 
 			// Binds gateway to VIP if needed
-			xerr = reviewSubnetMetadataCarried(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
+			xerr = reviewSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 				hid, err := rgw.GetID()
 				if err != nil {
 					return fail.Wrap(err)
