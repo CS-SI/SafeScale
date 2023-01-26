@@ -69,8 +69,6 @@ var ClusterCommand = cli.Command{
 		clusterDeleteCommand,
 		clusterInspectCommand,
 		clusterStateCommand,
-		clusterRunCommand,
-		// clusterSshCommand,
 		clusterStartCommand,
 		clusterStopCommand,
 		clusterExpandCommand,
@@ -1088,24 +1086,6 @@ var clusterHelmCommand = cli.Command{
 	},
 }
 
-var clusterRunCommand = cli.Command{
-	Name:      "run",
-	Aliases:   []string{"execute", "exec"},
-	Usage:     "run CLUSTERNAME COMMAND",
-	ArgsUsage: "CLUSTERNAME",
-
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
-		err := extractClusterName(c)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "clusterRunCmd not yet implemented"))
-	},
-}
-
 func executeCommand(clientSession *client.Session, command string, files *client.RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
 
@@ -1748,7 +1728,6 @@ var clusterFeatureCommands = cli.Command{
 	ArgsUsage: "COMMAND",
 	Subcommands: cli.Commands{
 		clusterFeatureListCommand,
-		clusterFeatureInspectCommand,
 		clusterFeatureExportCommand,
 		clusterFeatureCheckCommand,
 		clusterFeatureAddCommand,
@@ -1810,68 +1789,6 @@ func clusterFeatureListAction(c *cli.Context) (ferr error) {
 	}
 
 	return clitools.SuccessResponse(features)
-}
-
-// clusterFeatureInspectCommand handles 'safescale cluster feature inspect <cluster name or id> <feature name>'
-// Displays information about the feature (parameters, if eligible on cluster, if installed, ...)
-var clusterFeatureInspectCommand = cli.Command{
-	Name:      "inspect",
-	Aliases:   []string{"show"},
-	Usage:     "Inspects the feature",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name: "embedded",
-			// Value: false,
-			Usage: "if used, tells to show details of embedded feature (if it exists)",
-		},
-	},
-
-	Action: clusterFeatureInspectAction,
-}
-
-func clusterFeatureInspectAction(c *cli.Context) (ferr error) {
-	defer fail.OnPanic(&ferr)
-	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
-
-	if err := extractClusterName(c); err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	featureName, err := extractFeatureArgument(c)
-	if err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Inspecting features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
-
-	details, err := ClientSession.Cluster.InspectFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
-	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-	}
-
-	return clitools.SuccessResponse(details)
 }
 
 // clusterFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'

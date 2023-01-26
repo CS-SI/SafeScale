@@ -846,7 +846,6 @@ var hostFeatureCommands = cli.Command{
 	Usage: hostFeatureCmdLabel + " COMMAND",
 	Subcommands: cli.Commands{
 		hostFeatureCheckCommand,
-		hostFeatureInspectCommand,
 		hostFeatureExportCommand,
 		hostFeatureAddCommand,
 		hostFeatureRemoveCommand,
@@ -908,68 +907,6 @@ func hostFeatureListAction(c *cli.Context) (ferr error) {
 	}
 
 	return clitools.SuccessResponse(list)
-}
-
-// hostFeatureInspectCommand handles 'safescale host feature inspect <cluster name or id> <feature name>'
-// Displays information about the feature (parameters, if eligible on host, if installed, ...)
-var hostFeatureInspectCommand = cli.Command{
-	Name:      "inspect",
-	Aliases:   []string{"show"},
-	Usage:     "Inspects the feature",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "embedded",
-			Usage: "if used, tells to show details of embedded feature (if it exists)",
-		},
-	},
-
-	Action: hostFeatureInspectAction,
-}
-
-func hostFeatureInspectAction(c *cli.Context) (ferr error) {
-	defer fail.OnPanic(&ferr)
-	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
-
-	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
-	if err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	featureName, err := extractFeatureArgument(c)
-	if err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Inspecting host features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
-
-	details, err := ClientSession.Host.InspectFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
-	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-	}
-
-	return clitools.SuccessResponse(details)
 }
 
 // hostFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
