@@ -36,7 +36,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
@@ -51,9 +50,6 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyP
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
 
 	keypair, xerr := abstract.NewKeyPair(name)
 	if xerr != nil {
@@ -75,9 +71,6 @@ func (s stack) ImportKeyPair(ctx context.Context, keypair *abstract.KeyPair) (fe
 		return fail.InvalidParameterCannotBeNilError("keypair")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", keypair).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
-
 	return s.rpcImportKeyPair(ctx, aws.String(keypair.Name), []byte(keypair.PublicKey))
 }
 
@@ -90,12 +83,6 @@ func (s stack) InspectKeyPair(ctx context.Context, id string) (_ *abstract.KeyPa
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).
-		WithStopwatch().
-		Entering().
-		Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeKeyPairByID(ctx, aws.String(id))
 	if xerr != nil {
@@ -120,12 +107,6 @@ func (s stack) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fa
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).
-		WithStopwatch().
-		Entering().
-		Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
-
 	resp, xerr := s.rpcDescribeKeyPairs(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
@@ -143,9 +124,6 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
-
 	return s.rpcDeleteKeyPair(ctx, aws.String(id))
 }
 
@@ -154,9 +132,6 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, fe
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeAvailabilityZones(ctx, nil)
 	if xerr != nil {
@@ -182,9 +157,6 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
-
 	resp, xerr := s.rpcDescribeRegions(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
@@ -209,9 +181,6 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
-
 	resp, xerr := s.rpcDescribeImageByID(ctx, aws.String(id))
 	if xerr != nil {
 		return nil, xerr
@@ -228,9 +197,6 @@ func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstra
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeInstanceTypeByID(ctx, aws.String(id))
 	if xerr != nil {
@@ -321,9 +287,6 @@ func (s stack) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
-
 	resp, xerr := s.rpcDescribeImages(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
@@ -360,9 +323,6 @@ func (s stack) ListTemplates(ctx context.Context, all bool) (templates []*abstra
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
 
 	var resp []*ec2.InstanceTypeInfo
 	unfilteredResp, xerr := s.rpcDescribeInstanceTypes(ctx, nil)
@@ -440,7 +400,7 @@ func (s stack) WaitHostReady(
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -449,9 +409,6 @@ func (s stack) WaitHostReady(
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %v)", hostRef, timeout).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -512,9 +469,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	if valid.IsNil(s) {
 		return nil, nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resourceName := request.ResourceName
 	subnets := request.Subnets
@@ -841,8 +795,6 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 		return nil, xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
-
 	var resp *ec2.Instance
 	if ahf.Core.ID != "" {
 		resp, xerr = s.rpcDescribeInstanceByID(ctx, aws.String(ahf.Core.ID))
@@ -990,9 +942,6 @@ func (s stack) InspectHostByName(ctx context.Context, name string) (_ *abstract.
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
-
 	resp, xerr := s.rpcDescribeInstanceByName(ctx, aws.String(name))
 	if xerr != nil {
 		return nil, xerr
@@ -1020,9 +969,6 @@ func (s stack) ListHosts(ctx context.Context, details bool) (hosts abstract.Host
 	if valid.IsNil(s) {
 		return nullList, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(details=%v)", details).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
 
 	resp, xerr := s.rpcDescribeInstances(ctx, nil)
 	if xerr != nil {
@@ -1065,7 +1011,7 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -1076,9 +1022,6 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 	}
 
 	ahfn := ahf.GetName()
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
 
 	vm, xerr := s.rpcDescribeInstanceByID(ctx, aws.String(ahfi))
 	if xerr != nil {
@@ -1200,9 +1143,6 @@ func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, graceful
 		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
-
 	timings, xerr := s.Timings()
 	if xerr != nil {
 		return xerr
@@ -1261,9 +1201,6 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (f
 	if xerr != nil {
 		return xerr
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -1327,9 +1264,6 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (
 	if xerr != nil {
 		return xerr
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(ctx, &ferr)
 
 	if xerr = s.rpcRebootInstances(ctx, []*string{aws.String(ahf.Core.ID)}); xerr != nil {
 		return xerr
