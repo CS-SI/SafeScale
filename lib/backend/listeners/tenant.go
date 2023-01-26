@@ -24,8 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -146,9 +144,6 @@ func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantClean
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	currentTenant := operations.CurrentTenant(ctx)
 	if currentTenant != nil && currentTenant.Name == in.GetName() {
@@ -184,11 +179,6 @@ func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequ
 	}
 	defer job.Close()
 
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
 	handler := handlers.NewTenantHandler(job)
 	var resultList *protocol.ScanResultList
 	resultList, err = handler.Scan(name, in.GetDryRun(), in.GetTemplates())
@@ -217,11 +207,6 @@ func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName)
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewTenantHandler(job)
 	tenantInfo, err := handler.Inspect(name)

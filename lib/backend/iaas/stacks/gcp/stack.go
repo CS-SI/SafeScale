@@ -19,6 +19,7 @@ package gcp
 import (
 	"context"
 	"encoding/json"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -46,7 +47,7 @@ type stack struct {
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
-func NullStack() *stack { // nolint
+func NullStack() api.Stack { // nolint
 	return nil
 }
 

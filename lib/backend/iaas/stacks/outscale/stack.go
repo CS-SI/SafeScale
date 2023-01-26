@@ -19,6 +19,7 @@ package outscale // Package outscale contains stack implementation for Outscale
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -101,7 +102,7 @@ type stack struct {
 }
 
 // NullStack returns a null value of the stack
-func NullStack() *stack { // nolint
+func NullStack() api.Stack { // nolint
 	return nil
 }
 

@@ -18,6 +18,7 @@ package huaweicloud
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"strings"
 	"time"
 
@@ -76,7 +77,7 @@ type stack struct {
 }
 
 // NullStack is not exposed through API, is needed essentially by tests // FIXME: No
-func NullStack() *stack { // nolint
+func NullStack() api.Stack { // nolint
 	return nil
 }
 

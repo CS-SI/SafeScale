@@ -18,6 +18,7 @@ package openstack // Package openstack contains the implemenation of a stack for
 
 import (
 	context2 "context"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"strings"
 
 	"github.com/gophercloud/gophercloud"
@@ -60,7 +61,7 @@ type stack struct {
 }
 
 // NullStack returns a null value of the stack
-func NullStack() *stack { // nolint
+func NullStack() api.Stack { // nolint
 	return nil
 }
 
