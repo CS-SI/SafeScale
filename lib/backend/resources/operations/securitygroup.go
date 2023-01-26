@@ -39,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -221,9 +220,6 @@ func (instance *SecurityGroup) Create(
 				ar := result{xerr}
 				return ar, ar.rErr
 			}
-
-			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.security-group"), "('%s')", name).WithStopwatch().Entering()
-			defer tracer.Exiting()
 
 			// Check if SecurityGroup exists and is managed by SafeScale
 			svc := instance.Service()
