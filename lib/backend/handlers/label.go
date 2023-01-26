@@ -23,8 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	labelfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/label"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -61,10 +59,6 @@ func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fa
 	if handler.job == nil {
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tag"), "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	browseInstance, xerr := labelfactory.New(handler.job.Service())
 	if xerr != nil {
@@ -113,10 +107,6 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tag"), "(%s)", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -150,10 +140,6 @@ func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.E
 		return nil, fail.InvalidParameterError("ref", "cannot be empty!")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tag"), "('"+ref+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -185,10 +171,6 @@ func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue s
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty!")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tag"), "('%s', %d, %s)", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var xerr fail.Error
 	instance, xerr = labelfactory.New(handler.job.Service())

@@ -32,9 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -51,9 +49,6 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
-	defer tracer.Exiting()
 
 	targetName := instance.GetName()
 
@@ -124,9 +119,6 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
-	defer tracer.Exiting()
-
 	feat, xerr := NewFeature(ctx, instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -153,9 +145,6 @@ func (instance *Host) DeleteFeature(inctx context.Context, name string, vars dat
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	tracer := debug.NewTracerFromCtx(ctx, false /*tracing.ShouldTrace("resources.host") || tracing.ShouldTrace("resources.feature"), */, "(%s)", name).Entering()
-	defer tracer.Exiting()
-
 	targetName := instance.GetName()
 
 	state, xerr := instance.ForceGetState(ctx)
@@ -179,8 +168,7 @@ func (instance *Host) DeleteFeature(inctx context.Context, name string, vars dat
 			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, instance.GetName())
 		}
 		if !outcomes.Successful() {
-			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", name, instance.GetName())
-			tracer.Trace(strprocess.Capitalize(msg) + ":\n" + outcomes.AllErrorMessages())
+			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s': %s", name, instance.GetName(), outcomes.AllErrorMessages())
 			return fail.NewError(msg)
 		}
 		return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -210,7 +198,7 @@ func (instance *Host) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
-func (instance *Host) InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error) {
+func (instance *Host) InstallMethods(_ context.Context) (map[uint8]installmethod.Enum, fail.Error) {
 	if valid.IsNil(instance) {
 		return map[uint8]installmethod.Enum{}, fail.InvalidInstanceError()
 	}

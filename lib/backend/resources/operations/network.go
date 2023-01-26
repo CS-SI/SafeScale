@@ -139,9 +139,6 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	tracer := debug.NewTracer(inctx, true, "('%s', '%s')", req.Name, req.CIDR).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	svc := instance.Service()
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -269,7 +266,6 @@ func (instance *Network) carry(ctx context.Context, clonable data.Clonable) (fer
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -292,9 +288,6 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	tracer := debug.NewTracer(ctx, true, "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
@@ -338,8 +331,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Do not test with Isnull here, as Browse may be used from null value
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -417,9 +409,6 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 
 		ctx := context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract) // nolint
 		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, outprops)       // nolint
-
-		tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
-		defer tracer.Exiting()
 
 		timings, xerr := instance.Service().Timings()
 		if xerr != nil {

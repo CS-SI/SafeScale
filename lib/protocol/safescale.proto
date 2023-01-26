@@ -1013,13 +1013,6 @@ message FeatureDetailRequest {
 	bool embedded = 4;
 }
 
-message FeatureDetailResponse {
-	bool eligible = 1;
-	bool installed = 2;
-	repeated string dependencies = 3;
-	repeated string parameters = 4;
-}
-
 message FeatureExportResponse {
 	repeated string export = 1;
 }
@@ -1043,7 +1036,6 @@ message FeatureActionRequest {
 
 service FeatureService {
 	rpc List(FeatureListRequest) returns (FeatureListResponse){}
-	rpc Inspect(FeatureDetailRequest) returns (FeatureDetailResponse){}
 	rpc Export(FeatureDetailRequest) returns (FeatureExportResponse){}
 	rpc Check(FeatureActionRequest) returns (google.protobuf.Empty){}
 	rpc Add(FeatureActionRequest) returns (google.protobuf.Empty){}

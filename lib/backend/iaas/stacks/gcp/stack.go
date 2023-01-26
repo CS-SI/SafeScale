@@ -19,6 +19,7 @@ package gcp
 import (
 	"context"
 	"encoding/json"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -46,7 +47,7 @@ type stack struct {
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
-func NullStack() *stack { // nolint
+func NullStack() api.Stack { // nolint
 	return nil
 }
 
@@ -101,7 +102,6 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 	gcpStack.selfLinkPrefix = `https://www.googleapis.com/compute/v1/projects/` + localCfg.ProjectID
 	// gcpStack.searchPrefix = `.*/projects/` + localCfg.ProjectID + `/global`
 
-	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 	if cfg.Timings != nil {
 		gcpStack.MutableTimings = cfg.Timings
 		_ = gcpStack.MutableTimings.Update(temporal.NewTimings())

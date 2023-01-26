@@ -70,7 +70,6 @@ func isEmpty(v reflect.Value) bool {
 }
 
 // IsEmpty checks whether v is an empty struct
-// Note:because IsEmpty uses reflect package, it may be slow. Use with parsimony
 func IsEmpty(v interface{}) bool {
 	return isEmpty(reflect.ValueOf(v))
 }

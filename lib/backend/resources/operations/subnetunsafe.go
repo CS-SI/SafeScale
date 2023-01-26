@@ -131,7 +131,6 @@ func (instance *Subnet) unsafeGetState(ctx context.Context) (_ subnetstate.Enum,
 }
 
 // unsafeAbandonHost is the non goroutine-safe version of UnbindHost, without parameter validation, that does the real work
-// Note: must be used wisely
 func (instance *Subnet) unsafeAbandonHost(props *serialize.JSONProperties, hostID string) fail.Error {
 	return props.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 		shV1, ok := clonable.(*propertiesv1.SubnetHosts)

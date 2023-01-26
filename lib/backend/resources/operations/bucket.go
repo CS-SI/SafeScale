@@ -136,7 +136,6 @@ func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -152,8 +151,7 @@ func (instance *bucket) Browse(
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Do not test with Isnull here, as Browse may be used from null value
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -245,7 +243,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}

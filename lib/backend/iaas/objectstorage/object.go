@@ -34,7 +34,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -129,8 +128,6 @@ func (instance *object) Reload(ctx context.Context) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
-
 	item, err := instance.bucket.stowContainer.Item(instance.name)
 	if err != nil {
 		switch err.Error() {
@@ -168,8 +165,6 @@ func (instance *object) Read(ctx context.Context, target io.Writer, from int64, 
 	if from > to {
 		return fail.InvalidParameterError("from", "cannot be greater than 'to'")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%d, %d)", from, to).Entering().Exiting()
 
 	var seekTo int64
 	var length int64
@@ -256,8 +251,6 @@ func (instance *object) Write(ctx context.Context, source io.Reader, sourceSize 
 		return fail.InvalidInstanceContentError("instance.bucket", "cannot be nil")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().Exiting()
-
 	item, err := instance.bucket.stowContainer.Put(instance.name, source, sourceSize, instance.metadata)
 	if err != nil {
 		return fail.ConvertError(err)
@@ -266,7 +259,6 @@ func (instance *object) Write(ctx context.Context, source io.Reader, sourceSize 
 }
 
 // WriteMultiPart writes big data to Object, by parts (also called chunks)
-// Note: nothing to do with multi-chunk abilities of various object storage technologies
 func (instance *object) WriteMultiPart(
 	ctx context.Context, source io.Reader, sourceSize int64, chunkSize int,
 ) fail.Error {
@@ -276,8 +268,6 @@ func (instance *object) WriteMultiPart(
 	if source == nil { // If source is nil, do nothing and don't trigger an error
 		return nil
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().Exiting()
 
 	metadataCopy := instance.metadata.Clone()
 
@@ -328,8 +318,6 @@ func (instance *object) Delete(ctx context.Context) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
-
 	err := instance.bucket.stowContainer.RemoveItem(instance.name)
 	if err != nil {
 		return fail.ConvertError(err)
@@ -346,8 +334,6 @@ func (instance *object) ForceAddMetadata(
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
-
 	for k, v := range newMetadata {
 		instance.metadata[k] = v
 	}
@@ -359,8 +345,6 @@ func (instance *object) AddMetadata(ctx context.Context, newMetadata abstract.Ob
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	for k, v := range newMetadata {
 		_, found := instance.metadata[k]
@@ -378,8 +362,6 @@ func (instance *object) ReplaceMetadata(
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	instance.metadata = newMetadata
 	return nil

@@ -42,7 +42,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
@@ -216,8 +215,7 @@ func (instance *volume) GetAttachments(ctx context.Context) (_ *propertiesv1.Vol
 func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -226,9 +224,6 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume")).Entering()
-	defer tracer.Exiting()
 
 	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		av := abstract.NewVolume()
@@ -261,9 +256,6 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 			}
 		}
 	}()
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume")).Entering()
-	defer tracer.Exiting()
 
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
@@ -340,7 +332,7 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -358,9 +350,6 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	if req.Size <= 0 {
 		return fail.InvalidParameterError("req.Size", "must be an integer > 0")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s', %f, %s)", req.Name, req.Size, req.Speed.String()).Entering()
-	defer tracer.Exiting()
 
 	// Check if Volume exists and is managed by SafeScale
 	svc := instance.Service()
@@ -446,9 +435,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	if xerr != nil {
 		return xerr
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s', %s, %s, %v)", host.GetName(), path, format, doNotFormat).Entering()
-	defer tracer.Exiting()
 
 	var (
 		volumeID, volumeName, deviceName, volumeUUID, mountPoint, vaID string
@@ -871,8 +857,6 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 	if err != nil {
 		return fail.ConvertError(err)
 	}
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s')", targetID).Entering()
-	defer tracer.Exiting()
 
 	var (
 		volumeID, volumeName string

@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
@@ -391,9 +390,6 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (su
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, true, "(%s)", req.Name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	var xerr fail.Error
 	if _, xerr = s.InspectSubnetByName(ctx, req.NetworkID, req.Name); xerr != nil {
 		switch xerr.(type) {
@@ -571,8 +567,6 @@ func (s stack) inspectOpenstackSubnet(ctx context.Context, id string) (*abstract
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	as := abstract.NewSubnet()
 	var sn *subnets.Subnet

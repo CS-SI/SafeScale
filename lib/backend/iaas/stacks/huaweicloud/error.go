@@ -33,7 +33,6 @@ func NormalizeError(err error) fail.Error {
 	if err != nil {
 		switch e := err.(type) {
 		case fail.Error:
-			// Note: must check if the cause is a gophercloud error...
 			cause := e.Cause()
 			if cause != nil {
 				return NormalizeError(cause)

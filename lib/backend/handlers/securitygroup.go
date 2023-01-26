@@ -25,8 +25,6 @@ import (
 	networkfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/network"
 	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/securitygroup"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -68,10 +66,6 @@ func (handler *securityGroupHandler) List(all bool) (_ []*abstract.SecurityGroup
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	return securitygroupfactory.List(handler.job.Context(), handler.job.Service(), all)
 }
 
@@ -90,10 +84,6 @@ func (handler *securityGroupHandler) Create(networkRef, sgName, description stri
 	if networkRef == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s', '%s')", networkRef, sgName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
 	if xerr != nil {
@@ -134,10 +124,6 @@ func (handler *securityGroupHandler) Clear(sgRef string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
 		return xerr
@@ -158,10 +144,6 @@ func (handler *securityGroupHandler) Reset(sgRef string) (ferr fail.Error) {
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
@@ -184,10 +166,6 @@ func (handler *securityGroupHandler) Inspect(sgRef string) (_ resources.Security
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "(%s)", sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	return securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 }
 
@@ -206,10 +184,6 @@ func (handler *securityGroupHandler) Delete(sgRef string, force bool) (ferr fail
 	if sgRef == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
@@ -237,10 +211,6 @@ func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.Securi
 	if rule == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
@@ -274,10 +244,6 @@ func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.Sec
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s', %v)", sgRef, rule).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
 		return nil, xerr
@@ -289,29 +255,6 @@ func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.Sec
 	}
 
 	return sgInstance, nil
-}
-
-// Sanitize checks if provider-side rules are coherent with registered ones in metadata
-func (handler *securityGroupHandler) Sanitize(sgRef string) (ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
-	if handler == nil {
-		return fail.InvalidInstanceError()
-	}
-	if sgRef == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
-	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s')", sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
-	return fail.NotImplementedError("not yet implemented")
 }
 
 // Bonds lists the resources bound to the Security Group
@@ -339,10 +282,6 @@ func (handler *securityGroupHandler) Bonds(sgRef string, kind string) (_ []*prop
 	default:
 		return nil, nil, fail.InvalidRequestError("invalid value '%s' in field 'Kind'", kind)
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.security-group"), "('%s', %s)", sgRef, kind).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {

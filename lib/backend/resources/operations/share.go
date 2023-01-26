@@ -181,7 +181,6 @@ func (instance *Share) carry(ctx context.Context, clonable data.Clonable) (ferr 
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -195,8 +194,7 @@ func (instance *Share) carry(ctx context.Context, clonable data.Clonable) (ferr 
 func (instance *Share) Browse(ctx context.Context, callback func(string, string) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Do not test with Isnull here, as Browse may be used from null value
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -228,7 +226,7 @@ func (instance *Share) Create(
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -467,7 +465,6 @@ func (instance *Share) Create(
 }
 
 // unsafeGetServer returns the Host acting as Share server, with error handling
-// Note: do not forget to call .Released() on returned host when you do not use it anymore
 func (instance *Share) unsafeGetServer(ctx context.Context) (_ resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -506,7 +503,6 @@ func (instance *Share) unsafeGetServer(ctx context.Context) (_ resources.Host, f
 }
 
 // GetServer returns the Host acting as Share server, with error handling
-// Note: do not forget to call .Released() on returned host when you do not use it anymore
 func (instance *Share) GetServer(ctx context.Context) (_ resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

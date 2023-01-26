@@ -301,7 +301,6 @@ func TestSerialize(t *testing.T) {
 		t.Error(err)
 		t.FailNow()
 	}
-	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
 
 	content, err := armored.Serialize()
 	assert.Nil(t, err)
@@ -331,7 +330,6 @@ func TestSerializeDeserialize(t *testing.T) {
 		t.FailNow()
 	}
 	assert.NotNil(t, armored)
-	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
 
 	content, err := armored.Serialize()
 	assert.Nil(t, err)

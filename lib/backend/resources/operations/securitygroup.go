@@ -39,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -141,7 +140,6 @@ func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -157,8 +155,7 @@ func (instance *SecurityGroup) Browse(
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Do not test with IsNull here, as Browse may be used from null value
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -186,7 +183,7 @@ func (instance *SecurityGroup) Browse(
 func (instance *SecurityGroup) Create(
 	inctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules,
 ) (_ fail.Error) {
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -223,9 +220,6 @@ func (instance *SecurityGroup) Create(
 				ar := result{xerr}
 				return ar, ar.rErr
 			}
-
-			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.security-group"), "('%s')", name).WithStopwatch().Entering()
-			defer tracer.Exiting()
 
 			// Check if SecurityGroup exists and is managed by SafeScale
 			svc := instance.Service()
@@ -847,11 +841,6 @@ func (instance *SecurityGroup) GetBoundSubnets(ctx context.Context) (
 		})
 	})
 	return list, xerr
-}
-
-// CheckConsistency checks the rules in the security group on provider side are identical to the ones registered in metadata
-func (instance *SecurityGroup) CheckConsistency(_ context.Context) fail.Error {
-	return fail.NotImplementedError() // FIXME: Technical debt
 }
 
 // ToProtocol converts a Security Group to protobuf message

@@ -57,7 +57,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -362,7 +361,6 @@ func (instance *Host) carry(ctx context.Context, clonable data.Clonable) (ferr f
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -385,9 +383,6 @@ func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCo
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// instance.RLock()
 	// defer instance.RUnlock()
@@ -613,7 +608,7 @@ func (instance *Host) GetState(ctx context.Context) (hoststate.Enum, fail.Error)
 func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements, extra interface{}) (_ *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -663,9 +658,6 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 func (instance *Host) implCreate(
 	ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements, extra interface{},
 ) (_ *userdata.Content, _ fail.Error) {
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	type result struct {
 		ct  *userdata.Content
 		err fail.Error
@@ -2265,9 +2257,6 @@ func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 		return "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).Entering()
-	defer tracer.Exiting()
-
 	return instance.waitInstallPhase(ctx, userdata.PHASE5_FINAL, timeout)
 }
 
@@ -2477,9 +2466,6 @@ func (instance *Host) Delete(ctx context.Context) (ferr fail.Error) {
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).Entering()
-	defer tracer.Exiting()
 
 	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Do not remove a Host that is a gateway
@@ -2987,9 +2973,6 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(cmd='%s', outs=%s)", outs.String()).Entering()
-	defer tracer.Exiting()
-
 	return instance.unsafeRun(ctx, cmd, outs, connectionTimeout, executionTimeout)
 }
 
@@ -3015,9 +2998,6 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(target=%s,source=%s)", target, source).Entering()
-	defer tracer.Exiting()
 
 	// instance.RLock()
 	// defer instance.RUnlock()
@@ -3101,9 +3081,6 @@ func (instance *Host) Push(
 	if ctx == nil {
 		return invalid, "", "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner, mode).Entering()
-	defer tracer.Exiting()
 
 	// instance.RLock()
 	// defer instance.RUnlock()
@@ -3197,9 +3174,6 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	hostName := instance.GetName()
 	hostID, err := instance.GetID()
 	if err != nil {
@@ -3275,9 +3249,6 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	hostName := instance.GetName()
 	hostID, err := instance.GetID()
@@ -3443,9 +3414,6 @@ func (instance *Host) hardReboot(ctx context.Context) (ferr fail.Error) {
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	xerr := instance.Stop(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -3752,9 +3720,6 @@ func (instance *Host) PushStringToFileWithOwnership(
 		return fail.InvalidParameterError("filename", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(content, filename='%s', ownner=%s, mode=%s", filename, owner, mode).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	// instance.RLock()
 	// defer instance.RUnlock()
 
@@ -3918,9 +3883,6 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resource
 		return fail.InvalidParameterCannotBeNilError("sgInstance")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(sgInstance='%s', enable=%v", sgInstance.GetName(), enable).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	// instance.Lock()
 	// defer instance.Unlock()
 
@@ -3993,8 +3955,6 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 	}
 
 	sgName := sgInstance.GetName()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(sgInstance='%s')", sgName).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// instance.Lock()
 	// defer instance.Unlock()
@@ -4113,8 +4073,6 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 	}
 
 	sgName := sg.GetName()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// instance.Lock()
 	// defer instance.Unlock()
@@ -4203,9 +4161,6 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 	if err != nil {
 		return fail.ConvertError(err)
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(sgInstance='%s')", sgName).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	svc := instance.Service()
 	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -4369,9 +4324,6 @@ func (instance *Host) ListLabels(ctx context.Context) (_ map[string]string, ferr
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	var labelsV1 *propertiesv1.HostLabels
 	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
@@ -4407,9 +4359,6 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance resources.Lab
 	}
 
 	labelName := labelInstance.GetName()
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	labelID, err := labelInstance.GetID()
 	if err != nil {
@@ -4501,11 +4450,6 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance resources.L
 		return fail.InvalidParameterCannotBeNilError("labelInstance")
 	}
 
-	labelName := labelInstance.GetName()
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	instanceID, err := instance.GetID()
 	if err != nil {
 		return fail.ConvertError(err)
@@ -4586,10 +4530,6 @@ func (instance *Host) UpdateLabel(ctx context.Context, labelInstance resources.L
 	if labelInstance == nil {
 		return fail.InvalidParameterCannotBeNilError("labelInstance")
 	}
-
-	labelName := labelInstance.GetName()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", labelName).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	var alabel *abstract.Label
 	hostID, err := instance.GetID()

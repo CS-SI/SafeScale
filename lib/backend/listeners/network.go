@@ -25,8 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -69,9 +67,6 @@ func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCrea
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, true, "('%s')", networkName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	cidr := in.GetCidr()
 	if cidr == "" {
@@ -124,7 +119,7 @@ func (s *NetworkListener) Create(inctx context.Context, in *protocol.NetworkCrea
 		return nil, xerr
 	}
 
-	tracer.Trace("Network '%s' successfully created.", networkName)
+	logrus.WithContext(ctx).Infof("Network '%s' successfully created.", networkName)
 	return networkInstance.ToProtocol(ctx)
 }
 
@@ -148,11 +143,6 @@ func (s *NetworkListener) List(inctx context.Context, in *protocol.NetworkListRe
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.network")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewNetworkHandler(job)
 	list, xerr := handler.List(in.GetAll())
@@ -184,7 +174,7 @@ func (s *NetworkListener) Inspect(inctx context.Context, in *protocol.Reference)
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	networkRef, networkRefLabel := srvutils.GetReference(in)
+	networkRef, _ := srvutils.GetReference(in)
 	if networkRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -196,9 +186,6 @@ func (s *NetworkListener) Inspect(inctx context.Context, in *protocol.Reference)
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", networkRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewNetworkHandler(job)
 	networkInstance, xerr := handler.Inspect(networkRef)
@@ -225,7 +212,7 @@ func (s *NetworkListener) Delete(inctx context.Context, in *protocol.NetworkDele
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	networkRef, networkRefLabel := srvutils.GetReference(in.Network)
+	networkRef, _ := srvutils.GetReference(in.Network)
 	if networkRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -240,11 +227,6 @@ func (s *NetworkListener) Delete(inctx context.Context, in *protocol.NetworkDele
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", networkRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewNetworkHandler(job)
 	return empty, handler.Delete(networkRef, in.GetForce())

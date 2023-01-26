@@ -26,8 +26,6 @@ import (
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -81,15 +79,10 @@ func (handler *clusterHandler) List() (_ []abstract.ClusterIdentity, ferr fail.E
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	return clusterfactory.List(handler.job.Context(), handler.job.Service())
 }
 
 // Create creates a new cluster
-// Note: returned resources.Cluster has to be .Released() by caller...
 func (handler *clusterHandler) Create(req abstract.ClusterRequest) (_ resources.Cluster, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -101,10 +94,6 @@ func (handler *clusterHandler) Create(req abstract.ClusterRequest) (_ resources.
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", req.Name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.New(handler.job.Context(), handler.job.Service())
 	if xerr != nil {
@@ -138,9 +127,6 @@ func (handler *clusterHandler) State(name string) (_ clusterstate.Enum, ferr fai
 	if name == "" {
 		return clusterstate.Unknown, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -156,7 +142,6 @@ func (handler *clusterHandler) State(name string) (_ clusterstate.Enum, ferr fai
 }
 
 // Inspect a cluster
-// Note: returned resources.Cluster has to be .Released() by caller...
 func (handler *clusterHandler) Inspect(name string) (_ resources.Cluster, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -171,10 +156,6 @@ func (handler *clusterHandler) Inspect(name string) (_ resources.Cluster, ferr f
 	if name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	rc, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -202,10 +183,6 @@ func (handler *clusterHandler) Start(name string) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return xerr
@@ -229,10 +206,6 @@ func (handler *clusterHandler) Stop(name string) (ferr fail.Error) {
 	if name == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -258,21 +231,15 @@ func (handler *clusterHandler) Delete(name string, force bool) (ferr fail.Error)
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return xerr
 	}
-	// Note: no .Released, the instance will be deleted
 
 	return instance.Delete(handler.job.Context(), force)
 }
 
 // Expand adds node(s) to a cluster
-// Note: returned []resources.host have to be .Released() by caller...
 func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingRequirements, count uint, parameters data.Map, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -290,10 +257,6 @@ func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingReq
 	if count < 1 {
 		return nil, fail.InvalidParameterError("count", "must be at least 1")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
@@ -323,10 +286,6 @@ func (handler *clusterHandler) Shrink(name string, count uint) (_ []*propertiesv
 		return nil, fail.InvalidParameterError("count", "must be at least 1")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return nil, xerr
@@ -351,10 +310,6 @@ func (handler *clusterHandler) ListNodes(name string) (_ resources.IndexedListOf
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return nil, xerr
@@ -364,7 +319,6 @@ func (handler *clusterHandler) ListNodes(name string) (_ resources.IndexedListOf
 }
 
 // InspectNode inspects a node of the cluster
-// Note: returned resources.Host has to be .Released() by caller...
 func (handler *clusterHandler) InspectNode(clusterName, nodeRef string) (_ resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -382,10 +336,6 @@ func (handler *clusterHandler) InspectNode(clusterName, nodeRef string) (_ resou
 	if nodeRef == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, nodeRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), svc, clusterName)
@@ -425,10 +375,6 @@ func (handler *clusterHandler) DeleteNode(clusterName, nodeRef string) (ferr fai
 		return fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, nodeRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
 		return xerr
@@ -465,10 +411,6 @@ func (handler *clusterHandler) StopNode(clusterName, nodeRef string) (ferr fail.
 	if nodeRef == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, nodeRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
@@ -512,10 +454,6 @@ func (handler *clusterHandler) StartNode(clusterName, nodeRef string) (ferr fail
 		return fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, nodeRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
 		return xerr
@@ -558,10 +496,6 @@ func (handler *clusterHandler) StateNode(clusterName, nodeRef string) (_ hoststa
 		return hoststate.Unknown, fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, nodeRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
 		return hoststate.Unknown, xerr
@@ -601,10 +535,6 @@ func (handler *clusterHandler) ListMasters(name string) (_ resources.IndexedList
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return nil, xerr
@@ -614,7 +544,6 @@ func (handler *clusterHandler) ListMasters(name string) (_ resources.IndexedList
 }
 
 // FindAvailableMaster determines the first available master (ie the one that responds on ssh request)
-// Note: returned resources.Host has to be .Released()...
 func (handler *clusterHandler) FindAvailableMaster(name string) (_ resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -630,10 +559,6 @@ func (handler *clusterHandler) FindAvailableMaster(name string) (_ resources.Hos
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return nil, xerr
@@ -643,7 +568,6 @@ func (handler *clusterHandler) FindAvailableMaster(name string) (_ resources.Hos
 }
 
 // InspectMaster returns the information about a master of the cluster
-// Note: returned resources.Host has to be .Released() by caller...
 func (handler *clusterHandler) InspectMaster(clusterName, masterRef string) (_ resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -661,10 +585,6 @@ func (handler *clusterHandler) InspectMaster(clusterName, masterRef string) (_ r
 	if masterRef == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("masterRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, masterRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
@@ -702,10 +622,6 @@ func (handler *clusterHandler) StopMaster(clusterName, masterRef string) (ferr f
 	if masterRef == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("masterRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, masterRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
@@ -749,10 +665,6 @@ func (handler *clusterHandler) StartMaster(clusterName, masterRef string) (ferr 
 		return fail.InvalidParameterCannotBeEmptyStringError("masterRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, masterRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {
 		return xerr
@@ -794,10 +706,6 @@ func (handler *clusterHandler) StateMaster(clusterName, masterRef string) (_ hos
 	if masterRef == "" {
 		return hoststate.Unknown, fail.InvalidParameterCannotBeEmptyStringError("masterRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.cluster"), "('%s', %s)", clusterName, masterRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
 	if xerr != nil {

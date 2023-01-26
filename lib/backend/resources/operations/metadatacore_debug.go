@@ -1064,7 +1064,6 @@ func (myself *MetadataCore) Reload(inctx context.Context) (ferr fail.Error) {
 }
 
 // unsafeReload loads the content from the Object Storage
-// Note: must be called after locking the instance
 func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -1427,7 +1426,6 @@ func (myself *MetadataCore) Sdump(inctx context.Context) (string, fail.Error) {
 }
 
 // unsafeSerialize serializes instance into bytes (output json code)
-// Note: must be called after locking the instance
 func (myself *MetadataCore) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -1535,7 +1533,6 @@ func (myself *MetadataCore) Deserialize(inctx context.Context, buf []byte) fail.
 }
 
 // unsafeDeserialize reads json code and instantiates a MetadataCore
-// Note: must be called after locking the instance
 func (myself *MetadataCore) unsafeDeserialize(inctx context.Context, buf []byte) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()

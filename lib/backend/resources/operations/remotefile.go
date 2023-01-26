@@ -81,9 +81,6 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (ferr fail.Erro
 	uploadTime := time.Duration(uploadSize)*time.Second/(64*1024) + 30*time.Second
 	timeout := 4 * 8 * uploadTime
 
-	tracer := debug.NewTracerFromCtx(ctx, true, "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	iterations := 0
 	retryErr := retry.WhileUnsuccessful(
 		func() error {

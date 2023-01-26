@@ -150,7 +150,6 @@ func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (ferr fa
 }
 
 // Serialize transforms content of Shielded instance to data suitable for serialization
-// Note: doesn't follow interface data.Serializable (task parameter not used in it)
 func (instance *Shielded) Serialize() (_ []byte, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -176,7 +175,6 @@ func (instance *Shielded) Serialize() (_ []byte, ferr fail.Error) {
 }
 
 // Deserialize transforms serialization data to valid content of Shielded instance
-// Note: doesn't follow interface data.Serializable (task parameter not used in it)
 func (instance *Shielded) Deserialize(buf []byte) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

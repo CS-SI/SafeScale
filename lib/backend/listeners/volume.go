@@ -19,14 +19,13 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -67,11 +66,7 @@ func (s *VolumeListener) List(inctx context.Context, in *protocol.VolumeListRequ
 	}
 	defer job.Close()
 
-	all := in.GetAll()
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
 	volumes, xerr := handler.List(in.GetAll())
@@ -118,9 +113,6 @@ func (s *VolumeListener) Create(inctx context.Context, in *protocol.VolumeCreate
 	speed := in.GetSpeed()
 	size := in.GetSize()
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewVolumeHandler(job)
 	volumeInstance, xerr := handler.Create(name, int(size), volumespeed.Enum(speed))
@@ -147,11 +139,11 @@ func (s *VolumeListener) Attach(inctx context.Context, in *protocol.VolumeAttach
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
+	volumeRef, _ := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for volume")
 	}
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	hostRef, _ := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for host")
 	}
@@ -161,23 +153,11 @@ func (s *VolumeListener) Attach(inctx context.Context, in *protocol.VolumeAttach
 	doNotFormat := in.DoNotFormat
 	doNotMount := in.DoNotMount
 
-	var doNotFormatStr string
-	if doNotFormat {
-		doNotFormatStr = "NOFORMAT"
-	} else {
-		doNotFormatStr = "FORMAT"
-	}
-
 	job, xerr := PrepareJob(inctx, in.GetVolume().GetTenantId(), fmt.Sprintf("/volume/%s/host/%s/attach", volumeRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%s, %s, '%s', %s, %s)", volumeRefLabel, hostRefLabel, mountPath, filesystem, doNotFormatStr).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
 	if xerr = handler.Attach(volumeRef, hostRef, mountPath, filesystem, doNotFormat, doNotMount); xerr != nil {
@@ -218,17 +198,12 @@ func (s *VolumeListener) Detach(inctx context.Context, in *protocol.VolumeDetach
 	}
 	defer job.Close()
 
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%s, %s)", volumeRefLabel, hostRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
 	handler := VolumeHandler(job)
 	if xerr = handler.Detach(volumeRef, hostRef); xerr != nil {
 		return empty, xerr
 	}
 
-	tracer.Trace("Volume %s successfully detached from %s.", volumeRefLabel, hostRefLabel)
+	logrus.WithContext(job.Context()).Infof("Volume %s successfully detached from %s.", volumeRefLabel, hostRefLabel)
 	return empty, nil
 }
 
@@ -262,17 +237,12 @@ func (s *VolumeListener) Delete(inctx context.Context, in *protocol.VolumeDelete
 	}
 	defer job.Close()
 
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, true, "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
 	handler := VolumeHandler(job)
 	if xerr = handler.Delete(ref); xerr != nil {
 		return empty, xerr
 	}
 
-	tracer.Trace("Volume %s successfully deleted.", refLabel)
+	logrus.WithContext(job.Context()).Infof("Volume %s successfully deleted.", refLabel)
 	return empty, nil
 }
 
@@ -290,7 +260,7 @@ func (s *VolumeListener) Inspect(inctx context.Context, in *protocol.Reference) 
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -302,9 +272,6 @@ func (s *VolumeListener) Inspect(inctx context.Context, in *protocol.Reference) 
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.volume"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewVolumeHandler(job)
 	volumeInstance, xerr := handler.Inspect(ref)
