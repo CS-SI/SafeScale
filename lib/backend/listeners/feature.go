@@ -94,51 +94,6 @@ func convertTargetType(in protocol.FeatureTargetType) (featuretargettype.Enum, f
 	return targetType, nil
 }
 
-// Inspect ...
-func (s *FeatureListener) Inspect(inctx context.Context, in *protocol.FeatureDetailRequest) (_ *protocol.FeatureDetailResponse, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
-	defer fail.OnExitWrapError(inctx, &ferr, "cannot inspect Feature")
-	defer fail.OnPanic(&ferr)
-
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
-	}
-
-	targetType, xerr := convertTargetType(in.GetTargetType())
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	targetRef, _ := srvutils.GetReference(in.GetTargetRef())
-	if targetRef == "" {
-		return nil, fail.InvalidRequestError("target reference is missing")
-	}
-
-	featureName := in.GetName()
-	if featureName == "" {
-		return nil, fail.InvalidRequestError("feature name is missing")
-	}
-
-	job, err := PrepareJob(inctx, in.GetTargetRef().GetTenantId(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
-	if err != nil {
-		return nil, err
-	}
-	defer job.Close()
-
-	handler := handlers.NewFeatureHandler(job)
-	feat, xerr := handler.Inspect(targetType, targetRef, featureName)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// FIXME: not implemented for now, no way to fill protocol.FeatureDetailsResponse from feat...
-	_ = feat
-	return nil, fail.NotImplementedError()
-}
-
 // Export exports the content of the feature file
 func (s *FeatureListener) Export(inctx context.Context, in *protocol.FeatureDetailRequest) (_ *protocol.FeatureExportResponse, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
