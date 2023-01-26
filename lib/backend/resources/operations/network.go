@@ -139,9 +139,6 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	tracer := debug.NewTracer(inctx, true, "('%s', '%s')", req.Name, req.CIDR).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	svc := instance.Service()
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -292,9 +289,6 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	tracer := debug.NewTracer(ctx, true, "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
@@ -415,9 +409,6 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 
 		ctx := context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract) // nolint
 		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, outprops)       // nolint
-
-		tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
-		defer tracer.Exiting()
 
 		timings, xerr := instance.Service().Timings()
 		if xerr != nil {

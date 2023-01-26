@@ -19,6 +19,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"net"
 	"strconv"
 	"strings"
@@ -30,7 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 )
@@ -59,9 +59,6 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", req.Name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	if _, xerr := s.rpcGetNetworkByName(ctx, req.Name); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -74,9 +71,9 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 
 	// Checks if CIDR is valid...
 	if req.CIDR == "" {
-		tracer.Trace("CIDR is empty, choosing one...")
+		logrus.WithContext(ctx).Tracef("CIDR is empty, choosing one...")
 		req.CIDR = stacks.DefaultNetworkCIDR
-		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
+		logrus.WithContext(ctx).Tracef("CIDR chosen for network is '%s'", req.CIDR)
 	}
 
 	resp, xerr := s.rpcCreateNetwork(ctx, req.Name)
@@ -103,9 +100,6 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (*abstract.Network
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	resp, xerr := s.rpcGetNetworkByID(ctx, id)
 	if xerr != nil {
 		return nil, xerr
@@ -122,9 +116,6 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (*abstract
 	if name = strings.TrimSpace(name); name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, xerr := s.rpcGetNetworkByName(ctx, name)
 	if xerr != nil {
@@ -149,9 +140,6 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	resp, xerr := s.rpcListNetworks(ctx)
 	if xerr != nil {
 		return nil, xerr
@@ -172,9 +160,6 @@ func (s stack) DeleteNetwork(ctx context.Context, ref string) (ferr fail.Error) 
 	if ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	metadata := true
 	theNetwork, xerr := s.InspectNetwork(ctx, ref)
@@ -218,9 +203,6 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 		return nil, fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", networkID).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	return nil, fail.NotImplementedError("CreateVIP() not implemented yet") // FIXME: Technical debt
 }
 
@@ -232,9 +214,6 @@ func (s stack) AddPublicIPToVIP(ctx context.Context, vip *abstract.VirtualIP) fa
 	if vip == nil {
 		return fail.InvalidParameterCannotBeNilError("vip")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%v)", vip).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	return fail.NotImplementedError("AddPublicIPToVIP() not implemented yet") // FIXME: Technical debt
 }
@@ -251,9 +230,6 @@ func (s stack) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP, hostI
 		return fail.InvalidParameterError("networkID", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%v, %s)", vip, hostID).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	return fail.NotImplementedError("BindHostToVIP() not implemented yet") // FIXME: Technical debt
 }
 
@@ -269,9 +245,6 @@ func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, h
 		return fail.InvalidParameterError("networkID", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%v, %s)", vip, hostID).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
@@ -283,9 +256,6 @@ func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) fail.Erro
 	if vip == nil {
 		return fail.InvalidParameterCannotBeNilError("vip")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%v)", vip).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
@@ -299,9 +269,6 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (_ 
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", req.Name).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	an, xerr := s.InspectNetwork(ctx, req.NetworkID)
 	if xerr != nil {
@@ -365,9 +332,6 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (*abstract.Subnet, 
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	resp, xerr := s.rpcGetSubnetByID(ctx, id)
 	if xerr != nil {
 		return nil, xerr
@@ -381,9 +345,6 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkID string, name s
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, xerr := s.rpcGetSubnetByName(ctx, name)
 	if xerr != nil {
@@ -407,9 +368,6 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstrac
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	var (
 		subnets []*abstract.Subnet
@@ -465,9 +423,6 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// Delete NAT route
 	natRouteName := fmt.Sprintf(NATRouteNameFormat, id)
