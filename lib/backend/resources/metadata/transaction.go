@@ -271,8 +271,8 @@ func (trx *transaction[A, T]) TerminateBasedOnError(ctx context.Context, ferr *f
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
-	trx.coreOriginal.lock.RUnlock()
 	if trx.closed {
+		trx.coreOriginal.lock.RUnlock()
 		return
 	}
 
@@ -301,6 +301,7 @@ func (trx *transaction[A, T]) TerminateBasedOnError(ctx context.Context, ferr *f
 	}
 
 	// FIXME: unlocking storage
+	trx.coreOriginal.lock.RUnlock()
 
 	trx.closed = true
 	return

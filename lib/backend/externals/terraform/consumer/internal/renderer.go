@@ -27,7 +27,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
 	"github.com/sirupsen/logrus"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
@@ -41,7 +40,11 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -279,8 +282,8 @@ func (instance *renderer) createMainFile(content string) fail.Error {
 
 // Plan calls the terraform Plan command to simulate changes
 // returns:
-//   - false, *fail.ErrNotFound if the query returns no result
-//   - false, fail.Error if the query returns no result
+//   - false, *fail.ErrNotFound if the query returns no localresult
+//   - false, fail.Error if the query returns no localresult
 //   - false, nil if no error occurred and no change would be made
 //   - true, nil if no error occurred and changes would be made
 func (instance *renderer) Plan(ctx context.Context, def string) (_ map[string]tfexec.OutputMeta, _ bool, ferr fail.Error) {
@@ -326,9 +329,18 @@ func (instance *renderer) Plan(ctx context.Context, def string) (_ map[string]tf
 		}
 	}()
 
-	err = instance.executor.Init(ctx, tfexec.Upgrade(false))
-	if err != nil {
-		return nil, false, fail.Wrap(err, "failed to execute terraform init")
+	xerr = retryableTerraformExecutorCall(ctx, func() error { return instance.executor.Init(ctx, tfexec.Upgrade(false)) })
+	if xerr != nil {
+		logrus.Trace("terraform init failed.")
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			cause := xerr.Cause()
+			if cause != nil {
+				return nil, false, fail.Wrap(cause)
+			}
+		default:
+		}
+		return nil, false, xerr
 	}
 	logrus.Trace("terraform init ran successfully.")
 
@@ -339,22 +351,22 @@ func (instance *renderer) Plan(ctx context.Context, def string) (_ map[string]tf
 	// _ = output
 	// logrus.Trace("terraform validate ran successfully.")
 
-	success, err := instance.executor.Plan(ctx)
-	if err != nil {
-		uerr := errors.Unwrap(err)
-		rerr := errors.Unwrap(uerr)
-		if rerr != nil {
-			switch rerr.(type) {
-			case *exec.ExitError:
-				if strings.Contains(err.Error(), "Your query returned no results") {
-					return nil, false, fail.NotFoundError()
-				}
-
-			default:
+	var success bool
+	xerr = retryableTerraformExecutorCall(ctx, func() (innerErr error) {
+		success, innerErr = instance.executor.Plan(ctx)
+		return innerErr
+	})
+	if xerr != nil {
+		logrus.Trace("terraform plan failed.")
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			cause := xerr.Cause()
+			if cause != nil {
+				return nil, false, fail.Wrap(cause)
 			}
+		default:
 		}
-
-		return nil, false, fail.Wrap(err, "failed to run terraform plan")
+		return nil, false, xerr
 	}
 	logrus.Trace("terraform plan ran successfully.")
 
@@ -477,37 +489,33 @@ func (instance *renderer) apply(ctx context.Context, def string) (_ map[string]t
 		}
 	}()
 
-	err = instance.executor.Init(ctx, tfexec.Upgrade(false))
-	if err != nil {
-		return nil, fail.AbortedError(err, "failed to init terraform executor")
+	xerr = retryableTerraformExecutorCall(ctx, func() error { return instance.executor.Init(ctx, tfexec.Upgrade(false)) })
+	if xerr != nil {
+		logrus.Trace("terraform init failed.")
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			cause := xerr.Cause()
+			if cause != nil {
+				return nil, fail.Wrap(cause)
+			}
+		default:
+		}
+		return nil, xerr
 	}
 	logrus.Trace("terraform init ran successfully.")
 
-	err = instance.executor.Apply(ctx)
-	if err != nil {
-		uerr := errors.Unwrap(err)
-		rerr := errors.Unwrap(uerr)
-		if rerr != nil {
-			switch rerr.(type) {
-			case *exec.ExitError:
-				lowered := strings.ToLower(err.Error())
-				if strings.Contains(lowered, "your query returned no results") {
-					return nil, fail.NotFoundError(err.Error())
-				}
-				if strings.Contains(lowered, "your query returned more than one result") {
-					return nil, fail.DuplicateError(err.Error())
-				}
-				if strings.Contains(lowered, "incorrect attribute value type") {
-					return nil, fail.SyntaxError(err.Error())
-				}
-				if strings.Contains(lowered, "configuration is invalid") {
-					return nil, fail.SyntaxError(err.Error())
-				}
-			default:
+	xerr = retryableTerraformExecutorCall(ctx, func() error { return instance.executor.Apply(ctx) })
+	if xerr != nil {
+		logrus.Trace("terraform apply failed.")
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			cause := xerr.Cause()
+			if cause != nil {
+				return nil, fail.Wrap(cause)
 			}
-
-			return nil, fail.Wrap(err, "terraform apply failed")
+		default:
 		}
+		return nil, xerr
 	}
 	logrus.Trace("terraform apply ran successfully.")
 
@@ -599,22 +607,41 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 			}
 		}()
 
-		err = instance.executor.Init(ctx, tfexec.Upgrade(false))
-		if err != nil {
-			return fail.Wrap(err, "failed to init terraform executor")
+		xerr = retryableTerraformExecutorCall(ctx, func() error { return instance.executor.Init(ctx, tfexec.Upgrade(false)) })
+		if xerr != nil {
+			logrus.Trace("terraform init failed.")
+			switch xerr.(type) {
+			case *retry.ErrStopRetry:
+				cause := xerr.Cause()
+				if cause != nil {
+					return fail.Wrap(cause)
+				}
+			default:
+			}
+			return xerr
 		}
-
 		logrus.Trace("terraform init ran successfully.")
 
 		tfOpts := []tfexec.DestroyOption{}
 		for _, v := range targets {
 			tfOpts = append(tfOpts, tfexec.Target(v))
 		}
-		err = instance.executor.Destroy(ctx, tfOpts...)
-		if err != nil {
-			return fail.Wrap(err, "failed to apply terraform")
+
+		xerr = retryableTerraformExecutorCall(ctx, func() error { return instance.executor.Destroy(ctx, tfOpts...) })
+		if xerr != nil {
+			logrus.Trace("terraform destroy failed.")
+			switch xerr.(type) {
+			case *retry.ErrStopRetry:
+				cause := xerr.Cause()
+				if cause != nil {
+					return fail.Wrap(cause)
+				}
+			default:
+			}
+			return xerr
 		}
 		logrus.Trace("terraform destroy ran successfully.")
+
 	}
 
 	return nil
@@ -773,4 +800,122 @@ func (instance *renderer) WorkDir() (string, fail.Error) {
 	defer instance.mu.Unlock()
 
 	return instance.buildPath, nil
+}
+
+// retryableTerraformExecutorCall calls a callback with tolerance to communication failures
+// Terraform executor call is done inside callback and returns error if necessary as a fail.Error
+func retryableTerraformExecutorCall(inctx context.Context, callback func() error, options ...retry.Option) fail.Error {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type localresult struct {
+		rErr fail.Error
+	}
+	chRes := make(chan localresult)
+	go func() {
+		defer close(chRes)
+		gerr := func() (ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+
+			if callback == nil {
+				return fail.InvalidParameterCannotBeNilError("callback")
+			}
+
+			plannedAction := retry.NewAction(
+				retry.Fibonacci(temporal.MinDelay()), // waiting time between retries follows Fibonacci numbers x MinDelay()
+				nil,
+				func() (nested error) {
+					defer fail.OnPanic(&nested)
+
+					select {
+					case <-ctx.Done():
+						return retry.StopRetryError(ctx.Err())
+					default:
+					}
+
+					innerErr := callback()
+					if innerErr != nil {
+						captured := normalizeError(innerErr)
+						switch captured.(type) { // nolint
+						case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+							return retry.StopRetryError(captured)
+						case *fail.ErrOverload:
+							return retry.StopRetryError(captured)
+						default:
+							return captured
+						}
+					}
+					return nil
+				},
+				nil,
+				temporal.CommunicationTimeout(),
+			)
+
+			for _, opt := range options { // now we can override the actions without changing every function that invokes retryableTerraformExecutorCall, only callers interested in such thing will add options parameters in their invocation
+				err := opt(plannedAction)
+				if err != nil {
+					return fail.Wrap(err)
+				}
+			}
+
+			// Execute the remote call with tolerance for transient communication failure
+			xerr := netutils.WhileUnsuccessfulButRetryable(
+				plannedAction.Run,
+				plannedAction.Officer,
+				plannedAction.Timeout,
+			)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+					return fail.Wrap(fail.Cause(xerr), "stopping retries")
+				case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+					return fail.Wrap(fail.Cause(xerr), "timeout")
+				default:
+					return xerr
+				}
+			}
+			return nil
+		}()
+		chRes <- localresult{gerr}
+	}()
+
+	select {
+	case res := <-chRes:
+		return res.rErr
+	case <-ctx.Done():
+		return fail.Wrap(ctx.Err())
+	case <-inctx.Done():
+		return fail.Wrap(inctx.Err())
+	}
+}
+
+func normalizeError(err error) error {
+	if err != nil {
+		uerr := errors.Unwrap(err)
+		rerr := errors.Unwrap(uerr)
+		if rerr != nil {
+			switch rerr.(type) {
+			case *exec.ExitError:
+				lowered := strings.ToLower(err.Error())
+				if strings.Contains(lowered, "your query returned no results") {
+					return fail.NotFoundError(err.Error())
+				}
+				if strings.Contains(lowered, "your query returned more than one localresult") {
+					return fail.DuplicateError(err.Error())
+				}
+				if strings.Contains(lowered, "incorrect attribute value type") {
+					return fail.SyntaxError(err.Error())
+				}
+				if strings.Contains(lowered, "configuration is invalid") {
+					return fail.SyntaxError(err.Error())
+				}
+				if strings.Contains(lowered, "connection reset by peer") {
+					return fail.NewError("connection reset by peer")
+				}
+			default:
+			}
+		}
+	}
+
+	return err
 }

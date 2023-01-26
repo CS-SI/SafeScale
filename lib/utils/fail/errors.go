@@ -62,6 +62,8 @@ type Error interface {
 	WithContext(context.Context)
 	UnformattedError() string
 	ToGRPCStatus() error
+
+	prefixMessage(msg ...any)
 }
 
 const EmbeddedErrorStructName = "errorCore"
@@ -100,6 +102,13 @@ func (e errorCore) Valid() bool {
 		return false
 	}
 	return true
+}
+
+// prefixMessage prefixes instance message with parameters (if there are any)
+func (e *errorCore) prefixMessage(msg ...any) {
+	if len(msg) > 0 {
+		e.message = strings.TrimSpace(strprocess.FormatStrings(msg...)) + ": " + e.message
+	}
 }
 
 // ErrUnqualified is a generic Error type that has no particular signification

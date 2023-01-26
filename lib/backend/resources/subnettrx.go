@@ -307,20 +307,20 @@ func (instance *Subnet) trxCreateGWSecurityGroup(ctx context.Context, subnetTrx 
 	// Creates security group for hosts in Subnet to allow internal access
 	sgName := fmt.Sprintf(subnetGWSecurityGroupNamePattern, subnetTrx.GetName(), networkName)
 
-	sg, xerr := NewSecurityGroup(ctx)
+	sgInstance, xerr := NewSecurityGroup(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	description := fmt.Sprintf(subnetGWSecurityGroupDescriptionPattern, subnetTrx.GetName(), networkName)
-	xerr = sg.Create(ctx, networkID, sgName, description, nil)
+	xerr = sgInstance.Create(ctx, networkID, sgName, description, nil)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	sgid, err := sg.GetID()
+	sgid, err := sgInstance.GetID()
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
@@ -328,7 +328,8 @@ func (instance *Subnet) trxCreateGWSecurityGroup(ctx context.Context, subnetTrx 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !keepOnFailure {
-			if derr := sg.Delete(cleanupContextFrom(ctx), true); derr != nil {
+			derr := sgInstance.Delete(cleanupContextFrom(ctx), true)
+			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), sgName))
 			}
 		}
@@ -370,14 +371,8 @@ func (instance *Subnet) trxCreateGWSecurityGroup(ctx context.Context, subnetTrx 
 			Targets:     []string{sgid},
 		},
 	}
-	xerr = sg.AddRules(ctx, rules...)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	if defaultSSHPort != 22 {
-		rules := abstract.SecurityGroupRules{
+		tempSSHRules := abstract.SecurityGroupRules{
 			{
 				Description: "[ingress][ipv4][tcp] Temporary Allow SSH",
 				Direction:   securitygroupruledirection.Ingress,
@@ -397,14 +392,15 @@ func (instance *Subnet) trxCreateGWSecurityGroup(ctx context.Context, subnetTrx 
 				Targets:     []string{sgid},
 			},
 		}
-		xerr = sg.AddRules(ctx, rules...)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
+		rules = append(rules, tempSSHRules...)
+	}
+	xerr = sgInstance.AddRules(ctx, rules...)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	return sg, nil
+	return sgInstance, nil
 }
 
 // trxCreatePublicIPSecurityGroup creates a Security Group to be applied to host of the Subnet with public IP that is not a gateway
@@ -758,8 +754,10 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 				return ar, ar.rErr
 			}
 
-			var as *abstract.Subnet
+			var abstractSubnet *abstract.Subnet
 			xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+				abstractSubnet = as
+
 				// IDs of Security Groups to attach to Host used as gateway
 				if len(sgs) == 0 {
 					sgs = map[string]string{}
@@ -777,7 +775,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 			gwRequest := abstract.HostRequest{
 				ImageID:           gwSizing.Image,
 				ImageRef:          imageQuery,
-				Subnets:           []*abstract.Subnet{as},
+				Subnets:           []*abstract.Subnet{abstractSubnet},
 				SSHPort:           req.DefaultSSHPort,
 				TemplateID:        template.ID,
 				KeepOnFailure:     req.KeepOnFailure,
@@ -905,7 +903,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 								debug.IgnoreErrorWithContext(cleanupContextFrom(ctx), derr)
 							}
 							if req.HA {
-								derr = instance.unbindHostFromVIP(cleanupContextFrom(ctx), as.VIP, primaryGateway)
+								derr = instance.unbindHostFromVIP(cleanupContextFrom(ctx), abstractSubnet.VIP, primaryGateway)
 								if derr != nil {
 									debug.IgnoreErrorWithContext(cleanupContextFrom(ctx), derr)
 								}
@@ -1027,7 +1025,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 								if derr != nil {
 									debug.IgnoreErrorWithContext(cleanupContextFrom(ctx), derr)
 								}
-								derr = instance.unbindHostFromVIP(cleanupContextFrom(ctx), as.VIP, secondaryGateway)
+								derr = instance.unbindHostFromVIP(cleanupContextFrom(ctx), abstractSubnet.VIP, secondaryGateway)
 								derr = debug.InjectPlannedFail(derr)
 								if derr != nil {
 									debug.IgnoreErrorWithContext(cleanupContextFrom(ctx), derr)

@@ -1013,6 +1013,11 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			} else {
 				// By convention, default subnet is the first of the list
 				as := hostReq.Subnets[0]
+				if as == nil {
+					ar := localresult{nil, fail.InvalidParameterError("hostReq.Subnet[0] cannot be nil")}
+					return ar, ar.err
+				}
+
 				defaultSubnet, xerr = LoadSubnet(ctx, "", as.ID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -1139,20 +1144,6 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				return ar, ar.err
 			}
 
-			xerr = instance.Job().Scope().ReplaceResource(ahf)
-			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
-			}
-
-			// Starting from here, using metadata.Transaction
-			hostTrx, xerr := newHostTransaction(ctx, instance)
-			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
-			}
-			defer hostTrx.TerminateBasedOnError(ctx, &ferr)
-
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && hostReq.CleanOnFailure() {
@@ -1163,6 +1154,31 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 					}
 				}
 			}()
+
+			xerr = instance.Job().Scope().ReplaceResource(ahf)
+			if xerr != nil {
+				ar := localresult{nil, xerr}
+				return ar, ar.err
+			}
+
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && hostReq.CleanOnFailure() {
+					derr := instance.Job().Scope().UnregisterResource(ahf)
+					if derr != nil {
+						logrus.WithContext(ctx).Errorf("cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Name, derr)
+						_ = ferr.AddConsequence(derr)
+					}
+				}
+			}()
+
+			// Starting from here, using metadata.Transaction
+			hostTrx, xerr := newHostTransaction(ctx, instance)
+			if xerr != nil {
+				ar := localresult{nil, xerr}
+				return ar, ar.err
+			}
+			defer hostTrx.TerminateBasedOnError(ctx, &ferr)
 
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)

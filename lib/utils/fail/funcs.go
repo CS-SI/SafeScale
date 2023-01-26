@@ -147,57 +147,63 @@ func Wrap(cause error, msg ...interface{}) Error {
 	}
 
 	switch rerr := cause.(type) {
-	case *ErrorList:
-		return NewErrorListComplete(rerr.ToErrorSlice(), rerr.Cause(), rerr.Consequences(), msg...)
-	case *ErrUnqualified:
-		return newError(cause, rerr.Consequences(), msg...)
-	case *ErrWarning:
-		return WarningErrorWithCauseAndConsequences(cause, rerr.Consequences(), msg...)
-	case *ErrTimeout:
-		return TimeoutErrorWithCauseAndConsequences(cause, rerr.dur, rerr.Consequences(), msg...)
-	case *ErrNotFound:
-		return NotFoundErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrAborted:
-		return AbortedErrorWithCauseAndConsequences(cause, rerr.Consequences(), msg...)
-	case *ErrRuntimePanic:
-		var wrapArgs []interface{}
-		wrapArgs = append(wrapArgs, rerr.UnformattedError())
-		wrapArgs = append(wrapArgs, msg...)
-		return RuntimePanicErrorWithCauseAndConsequences(cause, rerr.Consequences(), false, wrapArgs)
-	case *ErrNotAvailable:
-		return NotAvailableErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrDuplicate:
-		return DuplicateErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrInvalidRequest:
-		return InvalidRequestErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrSyntax:
-		return SyntaxErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrNotAuthenticated:
-		return NotAuthenticatedErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrForbidden:
-		return ForbiddenErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrOverflow:
-		return OverflowErrorWithCause(cause, rerr.limit, rerr.Consequences(), msg...)
-	case *ErrOverload:
-		return OverloadErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrNotImplemented:
-		return NotImplementedErrorWithCauseAndConsequences(cause, rerr.Consequences(), msg...)
-	case *ErrInvalidInstance:
-		return InvalidInstanceErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrInvalidParameter:
-		return InvalidParameterErrorWithCauseAndConsequences(cause, rerr.Consequences(), rerr.what, rerr.skip, msg...)
-	case *ErrInvalidInstanceContent:
-		return InvalidInstanceContentErrorWithCause(cause, rerr.Consequences(), rerr.what, rerr.why, msg...)
-	case *ErrInconsistent:
-		return InconsistentErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrExecution:
-		return ExecutionErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrAlteredNothing:
-		return AlteredNothingErrorWithCause(cause, rerr.Consequences(), msg...)
-	case *ErrUnknown:
-		return UnknownErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrorList:
+	// 	return NewErrorListComplete(rerr.ToErrorSlice(), rerr.Cause(), rerr.Consequences(), msg...)
+	// case *ErrUnqualified:
+	// 	return newError(cause, rerr.Consequences(), msg...)
+	// case *ErrWarning:
+	// 	return WarningErrorWithCauseAndConsequences(cause, rerr.Consequences(), msg...)
+	// case *ErrTimeout:
+	// 	return TimeoutErrorWithCauseAndConsequences(cause, rerr.dur, rerr.Consequences(), msg...)
+	// case *ErrNotFound:
+	// 	return NotFoundErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrAborted:
+	// 	return AbortedErrorWithCauseAndConsequences(cause, rerr.Consequences(), msg...)
+	// case *ErrRuntimePanic:
+	// 	var wrapArgs []interface{}
+	// 	wrapArgs = append(wrapArgs, rerr.UnformattedError())
+	// 	wrapArgs = append(wrapArgs, msg...)
+	// 	return RuntimePanicErrorWithCauseAndConsequences(cause, rerr.Consequences(), false, wrapArgs)
+	// case *ErrNotAvailable:
+	// 	return NotAvailableErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrDuplicate:
+	// 	return DuplicateErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrInvalidRequest:
+	// 	return InvalidRequestErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrSyntax:
+	// 	return SyntaxErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrNotAuthenticated:
+	// 	return NotAuthenticatedErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrForbidden:
+	// 	return ForbiddenErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrOverflow:
+	// 	return OverflowErrorWithCause(cause, rerr.limit, rerr.Consequences(), msg...)
+	// case *ErrOverload:
+	// 	return OverloadErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrNotImplemented:
+	// 	return NotImplementedErrorWithCauseAndConsequences(cause, rerr.Consequences(), msg...)
+	// case *ErrInvalidInstance:
+	// 	return InvalidInstanceErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrInvalidParameter:
+	// 	return InvalidParameterErrorWithCauseAndConsequences(cause, rerr.Consequences(), rerr.what, rerr.skip, msg...)
+	// case *ErrInvalidInstanceContent:
+	// 	return InvalidInstanceContentErrorWithCause(cause, rerr.Consequences(), rerr.what, rerr.why, msg...)
+	// case *ErrInconsistent:
+	// 	return InconsistentErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrExecution:
+	// 	return ExecutionErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrAlteredNothing:
+	// 	return AlteredNothingErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case *ErrUnknown:
+	// 	return UnknownErrorWithCause(cause, rerr.Consequences(), msg...)
+	// case Error:
+	// 	return newError(cause, rerr.Consequences(), msg...)
 	case Error:
-		return newError(cause, rerr.Consequences(), msg...)
+		if len(msg) > 0 {
+			rerr.prefixMessage(msg...)
+		}
+		return rerr
+
 	default:
 		return newError(cause, nil, msg...)
 	}

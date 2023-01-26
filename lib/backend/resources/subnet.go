@@ -809,8 +809,8 @@ func (instance *Subnet) checkUnicity(ctx context.Context, req abstract.SubnetReq
 // Note: caller has the responsibility to terminate returned networkTransaction
 func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.SubnetRequest) (_ *abstract.Network, _ networkTransaction, ferr fail.Error) {
 	var (
-		an         *abstract.Network
-		networkTrx networkTransaction
+		abstractNetwork *abstract.Network
+		networkTrx      networkTransaction
 	)
 	networkInstance, xerr := LoadNetwork(ctx, req.NetworkID)
 	if xerr != nil {
@@ -825,13 +825,13 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 				return nil, nil, xerr
 			}
 
-			an, xerr = instance.Service().DefaultNetwork(ctx)
+			abstractNetwork, xerr = instance.Service().DefaultNetwork(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, nil, xerr
 			}
 
-			networkInstance, xerr = LoadNetwork(ctx, an.ID)
+			networkInstance, xerr = LoadNetwork(ctx, abstractNetwork.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, nil, xerr
@@ -848,6 +848,8 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 	}
 
 	xerr = inspectNetworkMetadataAbstract(ctx, networkTrx, func(an *abstract.Network) fail.Error {
+		abstractNetwork = an
+
 		// check the network exists on provider side
 		_, innerXErr := instance.Service().InspectNetwork(ctx, an.ID)
 		if innerXErr != nil {
@@ -866,12 +868,12 @@ func (instance *Subnet) validateNetwork(ctx context.Context, req *abstract.Subne
 		return nil, nil, xerr
 	}
 
-	req.NetworkID = an.ID
+	req.NetworkID = abstractNetwork.ID
 	if len(req.DNSServers) == 0 {
-		req.DNSServers = an.DNSServers
+		req.DNSServers = abstractNetwork.DNSServers
 	}
 
-	return an, networkTrx, nil
+	return abstractNetwork, networkTrx, nil
 }
 
 // unbindHostFromVIP unbinds a Host from VIP

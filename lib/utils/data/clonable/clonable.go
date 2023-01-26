@@ -35,9 +35,9 @@ type Clonable interface {
 // returns:
 //   - on success: the clone in type T, nil
 //   - on failure: empty T, error
-func CastedClone[T any](clonable Clonable) (T, error) {
+func CastedClone[T any](p Clonable) (T, error) {
 	var empty T
-	clone, err := clonable.Clone()
+	clone, err := p.Clone()
 	if err != nil {
 		return empty, err
 	}

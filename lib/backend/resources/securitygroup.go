@@ -248,7 +248,7 @@ func (instance *SecurityGroup) Replace(in clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := lang.Cast[*Subnet](in)
+	src, err := lang.Cast[*SecurityGroup](in)
 	if err != nil {
 		return err
 	}
