@@ -37,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -198,10 +197,6 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"),
-		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	xerr := instance.unsafeCreateSubnet(ctx, req)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -561,9 +556,6 @@ func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (fe
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	tracer := debug.NewTracer(ctx, true, "("+host.GetName()+")").Entering()
-	defer tracer.Exiting()
-
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
 
@@ -675,9 +667,6 @@ func (instance *Subnet) DetachHost(ctx context.Context, hostID string) (ferr fai
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"), "('"+hostID+"')").Entering()
-	defer tracer.Exiting()
-
 	return instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return instance.unsafeAbandonHost(props, hostID)
 	})
@@ -693,8 +682,6 @@ func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, ferr
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet")).Entering().Exiting()
 
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
@@ -933,9 +920,6 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 
 			ctx := context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract) // nolint
 			ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, outprops)      // nolint
-
-			tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("operations.Subnet")*/).WithStopwatch().Entering()
-			defer tracer.Exiting()
 
 			// Lock Subnet instance
 			// instance.lock.Lock()
@@ -1462,13 +1446,10 @@ func (instance *Subnet) BindSecurityGroup(ctx context.Context, sgInstance resour
 		return fail.InvalidParameterCannotBeNilError("sgInstance")
 	}
 
-	snid, err := instance.GetID()
+	_, err := instance.GetID()
 	if err != nil {
 		return fail.ConvertError(err)
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"), "(%s)", snid).Entering()
-	defer tracer.Exiting()
 
 	return instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractSubnet, ok := clonable.(*abstract.Subnet)
@@ -1557,9 +1538,6 @@ func (instance *Subnet) ListSecurityGroups(ctx context.Context, state securitygr
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"), "(%s)", state.String()).Entering()
-	defer tracer.Exiting()
 
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
@@ -1835,10 +1813,6 @@ func (instance *Subnet) CreateSubnetWithoutGateway(ctx context.Context, req abst
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet"),
-		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	xerr := instance.unsafeCreateSubnet(ctx, req)
 	xerr = debug.InjectPlannedFail(xerr)

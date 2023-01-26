@@ -30,8 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -61,7 +59,7 @@ func (s *SubnetListener) Create(inctx context.Context, in *protocol.SubnetCreate
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	networkRef, networkLabel := srvutils.GetReference(in.GetNetwork())
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
 	if networkRef == "" {
 		return nil, fail.InvalidParameterError("in.Network", "must contain an ID or a Name")
 	}
@@ -73,9 +71,6 @@ func (s *SubnetListener) Create(inctx context.Context, in *protocol.SubnetCreate
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, '%s')", networkLabel, in.GetName()).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	var sizing *abstract.HostSizingRequirements
 	if in.GetGateway() != nil {
@@ -108,7 +103,7 @@ func (s *SubnetListener) Create(inctx context.Context, in *protocol.SubnetCreate
 		return nil, xerr
 	}
 
-	tracer.Trace("Subnet '%s' successfully created.", req.Name)
+	logrus.WithContext(ctx).Infof("Subnet '%s' successfully created.", req.Name)
 	return subnetInstance.ToProtocol(ctx)
 }
 
@@ -127,7 +122,7 @@ func (s *SubnetListener) List(inctx context.Context, in *protocol.SubnetListRequ
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
 	if networkRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Network")
 	}
@@ -137,11 +132,6 @@ func (s *SubnetListener) List(inctx context.Context, in *protocol.SubnetListRequ
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %v)", networkRefLabel, in.All).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	list, xerr := handler.List(networkRef, in.GetAll())
@@ -175,8 +165,8 @@ func (s *SubnetListener) Inspect(inctx context.Context, in *protocol.SubnetInspe
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
-	subnetRef, subnetRefLabel := srvutils.GetReference(in.GetSubnet())
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
+	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
@@ -188,9 +178,6 @@ func (s *SubnetListener) Inspect(inctx context.Context, in *protocol.SubnetInspe
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnetInstance"), "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	subnetInstance, xerr := handler.Inspect(networkRef, subnetRef)
@@ -218,7 +205,7 @@ func (s *SubnetListener) Delete(inctx context.Context, in *protocol.SubnetDelete
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
 	subnetRef, subnetRefLabel := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
@@ -229,11 +216,6 @@ func (s *SubnetListener) Delete(inctx context.Context, in *protocol.SubnetDelete
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, true, "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	xerr = handler.Delete(networkRef, subnetRef, in.GetForce())
@@ -262,13 +244,13 @@ func (s *SubnetListener) BindSecurityGroup(inctx context.Context, in *protocol.S
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	sgRef, _ := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
@@ -278,11 +260,6 @@ func (s *SubnetListener) BindSecurityGroup(inctx context.Context, in *protocol.S
 		return empty, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRef, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
@@ -313,13 +290,13 @@ func (s *SubnetListener) UnbindSecurityGroup(inctx context.Context, in *protocol
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Subnet")
 	}
 
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	sgRef, _ := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
@@ -329,11 +306,6 @@ func (s *SubnetListener) UnbindSecurityGroup(inctx context.Context, in *protocol
 		return empty, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	return empty, handler.UnbindSecurityGroup(networkRef, subnetRef, sgRef)
@@ -356,13 +328,13 @@ func (s *SubnetListener) EnableSecurityGroup(inctx context.Context, in *protocol
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
-	subnetRef, subnetRefLabel := srvutils.GetReference(in.GetSubnet())
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
+	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	sgRef, _ := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
@@ -372,11 +344,6 @@ func (s *SubnetListener) EnableSecurityGroup(inctx context.Context, in *protocol
 		return empty, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRefLabel, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	return empty, handler.EnableSecurityGroup(networkRef, subnetRef, sgRef)
@@ -399,13 +366,13 @@ func (s *SubnetListener) DisableSecurityGroup(inctx context.Context, in *protoco
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	sgRef, _ := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
@@ -415,11 +382,6 @@ func (s *SubnetListener) DisableSecurityGroup(inctx context.Context, in *protoco
 		return empty, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSubnetHandler(job)
 	return empty, handler.DisableSecurityGroup(networkRef, subnetRef, sgRef)
@@ -441,7 +403,7 @@ func (s *SubnetListener) ListSecurityGroups(inctx context.Context, in *protocol.
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
 	subnetRef, _ := srvutils.GetReference(in.GetSubnet())
 	if subnetRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
@@ -452,11 +414,6 @@ func (s *SubnetListener) ListSecurityGroups(inctx context.Context, in *protocol.
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.subnet"), "(%s)", networkRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	state := securitygroupstate.Enum(in.GetState())
 

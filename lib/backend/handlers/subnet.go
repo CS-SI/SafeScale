@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -28,7 +29,6 @@ import (
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/subnet"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -76,10 +76,6 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s')", networkRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	thisCidr := netretry.CIDRString(req.CIDR)
 	conflict, err := thisCidr.IntersectsWith("172.17.0.0/16")
 	if err != nil {
@@ -114,7 +110,7 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 		return nil, xerr
 	}
 
-	tracer.Trace("Subnet '%s' successfully created.", req.Name)
+	logrus.WithContext(handler.job.Context()).Infof("Subnet '%s' successfully created.", req.Name)
 	return subnetInstance, nil
 }
 
@@ -130,10 +126,6 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "(%v, %v)", networkRef, all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var networkID string
 	if networkRef == "" {
@@ -184,10 +176,6 @@ func (handler *subnetHandler) Inspect(networkRef, subnetRef string) (_ resources
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "'%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	return subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
 }
 
@@ -209,10 +197,6 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 	if subnetRef == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), true, "('%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	newCtx := context.WithValue(handler.job.Context(), "force", force) // nolint
 
@@ -297,10 +281,6 @@ func (handler *subnetHandler) BindSecurityGroup(networkRef, subnetRef, sgRef str
 		return fail.InvalidParameterError("enable", "must be either 'resources.SecurityGroupEnable' or 'resources.SecurityGroupDisable'")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return xerr
@@ -332,10 +312,6 @@ func (handler *subnetHandler) UnbindSecurityGroup(networkRef, subnetRef, sgRef s
 	if sgRef == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
 	if xerr != nil {
@@ -378,10 +354,6 @@ func (handler *subnetHandler) EnableSecurityGroup(networkRef, subnetRef, sgRef s
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return xerr
@@ -419,10 +391,6 @@ func (handler *subnetHandler) DisableSecurityGroup(networkRef, subnetRef, sgRef 
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s', '%s')", networkRef, subnetRef, sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return xerr
@@ -459,10 +427,6 @@ func (handler *subnetHandler) ListSecurityGroups(networkRef, subnetRef string, s
 	if subnetRef == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "('%s', '%s')", networkRef, subnetRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
 	if xerr != nil {
