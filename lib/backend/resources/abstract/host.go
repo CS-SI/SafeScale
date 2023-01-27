@@ -19,6 +19,7 @@ package abstract
 import (
 	stdjson "encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"math"
 	"time"
 
@@ -248,6 +249,7 @@ func NewHostCore() *HostCore {
 	hc.ProvisioningState = hoststate.Unknown
 	hc.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	hc.Tags["ManagedBy"] = "safescale"
+	hc.Tags["Revision"] = lib.Revision
 	return hc
 }
 

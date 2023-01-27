@@ -18,6 +18,7 @@ package outscale
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/v22/lib"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
@@ -220,6 +221,7 @@ func (s stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail
 		volume.Tags["CreationDate"] = getResourceTag(ov.Tags, "CreationDate", "")
 		volume.Tags["ManagedBy"] = getResourceTag(ov.Tags, "ManagedBy", "")
 		volume.Tags["DeclaredInBucket"] = getResourceTag(ov.Tags, "DeclaredInBucket", "")
+		volume.Tags["Revision"] = lib.Revision
 		volumes = append(volumes, volume)
 	}
 	return volumes, nil

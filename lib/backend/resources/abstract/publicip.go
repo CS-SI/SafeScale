@@ -19,6 +19,7 @@ package abstract
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -50,6 +51,7 @@ func NewPublicIP() *PublicIP {
 	}
 	instance.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	instance.Tags["ManagedBy"] = "safescale"
+	instance.Tags["Revision"] = lib.Revision
 	return instance
 }
 

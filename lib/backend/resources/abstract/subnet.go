@@ -19,6 +19,7 @@ package abstract
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -73,6 +74,7 @@ func NewSubnet() *Subnet {
 	}
 	sn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	sn.Tags["ManagedBy"] = "safescale"
+	sn.Tags["Revision"] = lib.Revision
 	return sn
 }
 

@@ -19,6 +19,7 @@ package openstack
 import (
 	"context"
 	"encoding/json"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"strings"
 	"time"
 
@@ -270,6 +271,7 @@ func (s stack) rpcCreateServer(ctx context.Context, name string, networks []serv
 	metadata["Image"] = imageID
 	metadata["Template"] = templateID
 	metadata["CreationDate"] = time.Now().Format(time.RFC3339)
+	metadata["Revision"] = lib.Revision
 
 	srvOpts := servers.CreateOpts{
 		Name:             name,
