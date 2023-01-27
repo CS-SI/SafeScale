@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"net"
 	"net/http"
 	"regexp"
@@ -534,6 +535,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	metadata["Image"] = request.ImageRef
 	metadata["Template"] = request.TemplateID
 	metadata["CreationDate"] = time.Now().Format(time.RFC3339)
+	metadata["Revision"] = lib.Revision
 
 	// defines creation options
 	srvOpts := serverCreateOpts{

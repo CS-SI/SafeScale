@@ -19,6 +19,7 @@ package abstract
 import (
 	stdjson "encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
@@ -67,6 +68,7 @@ func NewClusterIdentity() *ClusterIdentity {
 	}
 	ci.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	ci.Tags["ManagedBy"] = "safescale"
+	ci.Tags["Revision"] = lib.Revision
 	return ci
 }
 

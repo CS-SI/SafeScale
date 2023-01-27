@@ -33,8 +33,6 @@ case $LINUX_KIND in
     ubuntu)
         export DEBIAN_FRONTEND=noninteractive
         sfApt update
-        apt-cache showpkg software-properties-common && apt-get install --no-install-recommends -y software-properties-common
-        apt-cache showpkg python-software-properties && apt-get install --no-install-recommends -y python-software-properties
         apt-add-repository --yes --update ppa:ansible/ansible
         fApt update
         sfApt install -y ansible

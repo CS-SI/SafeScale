@@ -71,8 +71,6 @@ feature:
                                 ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
                                     sfRetry "sfApt update"
-                                    apt-cache showpkg software-properties-common && apt-get install --no-install-recommends -y software-properties-common
-                                    apt-cache showpkg python-software-properties && apt-get install --no-install-recommends -y python-software-properties
                                     apt-add-repository --yes --update ppa:ansible/ansible
                                     sfRetry "sfApt update"
                                     sfRetry "sfApt install -y ansible"
