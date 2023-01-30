@@ -558,11 +558,7 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 			if !ok {
 				return fail.InconsistentError("expected Identifiable and Named")
 			}
-			if myself.kindSplittedStore {
-				myself.id.Store(idd)
-			} else {
-				myself.id.Store(named.GetName())
-			}
+			myself.id.Store(idd)
 			myself.name.Store(named.GetName())
 			myself.taken.Store(true)
 
