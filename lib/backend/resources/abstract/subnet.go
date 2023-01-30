@@ -43,6 +43,7 @@ type SubnetRequest struct {
 	ImageRef       string         // contains the reference (ID or name) of the image requested for gateway(s)
 	DefaultSSHPort uint32         // contains the port to use for SSH on all hosts of the subnet by default
 	KeepOnFailure  bool           // tells if resources have to be kept in case of failure (default behavior is to delete them)
+	ClusterID      string
 }
 
 // Subnet represents a subnet

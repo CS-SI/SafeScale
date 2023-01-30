@@ -19,6 +19,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"github.com/sony/gobreaker"
 	"math"
 	"net"
 	"reflect"
@@ -139,7 +140,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			}()
 
 			// Obtain number of nodes to create
-			_, privateNodeCount, _, xerr := instance.determineRequiredNodes(ctx)
+			privateMasterCount, privateNodeCount, _, xerr := instance.determineRequiredNodes(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -151,6 +152,14 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
 				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
 				req.InitialNodeCount = privateNodeCount
+			}
+
+			if req.InitialMasterCount == 0 {
+				req.InitialMasterCount = privateMasterCount
+			}
+			if req.InitialMasterCount > 0 && req.InitialMasterCount < privateMasterCount {
+				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialMasterCount, privateMasterCount, req.Flavor.String())
+				req.InitialMasterCount = privateMasterCount
 			}
 
 			// Define the sizing dependencies for Cluster hosts
@@ -825,6 +834,8 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				return ar, xerr
 			}
 
+			cid, _ := instance.GetID()
+
 			// Creates Subnet
 			logrus.WithContext(ctx).Debugf("[Cluster %s] creating Subnet '%s'", req.Name, req.Name)
 			subnetReq := abstract.SubnetRequest{
@@ -834,6 +845,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				HA:             !gwFailoverDisabled,
 				ImageRef:       gatewaysDef.Image,
 				DefaultSSHPort: uint32(req.DefaultSshPort),
+				ClusterID:      cid,
 				KeepOnFailure:  false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
 			}
 
@@ -1082,6 +1094,15 @@ func (instance *Cluster) createHostResources(
 				return result{xerr}, xerr
 			}
 
+			// FIXME: that's a bad practice -> overwriting initial request (what could be go wrong?)
+			if cluReq.InitialMasterCount == 0 {
+				cluReq.InitialMasterCount = masterCount
+			}
+			if cluReq.InitialMasterCount > 0 && cluReq.InitialMasterCount < masterCount {
+				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", cluReq.Name, cluReq.InitialMasterCount, masterCount, cluReq.Flavor.String())
+				cluReq.InitialMasterCount = masterCount
+			}
+
 			// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
@@ -1139,7 +1160,7 @@ func (instance *Cluster) createHostResources(
 			egMas := new(errgroup.Group)
 			egMas.Go(func() error {
 				masters, xerr := instance.taskCreateMasters(ctx, taskCreateMastersParameters{
-					count:         masterCount,
+					count:         cluReq.InitialMasterCount,
 					mastersDef:    mastersDef,
 					keepOnFailure: keepOnFailure,
 					clusterName:   cluReq.Name,
@@ -1609,9 +1630,12 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 			}
 
 			var theMasters []*Host
-			masterChan := make(chan StdResult, p.count)
+			masterChan := make(chan StdResult, 4*p.count)
 
-			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), timeout, masterChan, instance.taskCreateMaster, taskCreateMasterParameters{
+			ctx, tc := context.WithTimeout(ctx, timeout)
+			defer tc()
+
+			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), masterChan, instance.taskCreateMaster, taskCreateMasterParameters{
 				masterDef:     p.mastersDef,
 				timeout:       timings.HostCreationTimeout(),
 				keepOnFailure: p.keepOnFailure,
@@ -2147,9 +2171,13 @@ func drainChannel(dch chan struct{}) {
 	close(dch)
 }
 
-func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.Duration, uat chan StdResult, runner func(context.Context, interface{}) (interface{}, fail.Error), data interface{}) error {
+func runWindow(inctx context.Context, count uint, windowSize uint, uat chan StdResult, runner func(context.Context, interface{}) (interface{}, fail.Error), data interface{}) error {
 	if windowSize > count {
 		return errors.Errorf("window size cannot be greater than task size: %d, %d", count, windowSize)
+	}
+
+	if uint32(cap(uat)) < uint32(2*count+windowSize) { // Account for a 50% success ratio creating machines
+		return errors.Errorf("channel must hold count + windowSize")
 	}
 
 	if windowSize == count {
@@ -2157,6 +2185,16 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 			windowSize -= 2
 		}
 	}
+
+	var st gobreaker.Settings
+	st.Name = "window"
+	st.MaxRequests = uint32(count + windowSize)
+	st.ReadyToTrip = func(counts gobreaker.Counts) bool {
+		failureRatio := float64(counts.TotalFailures) / float64(counts.Requests)
+		return counts.Requests >= 6 && failureRatio >= 0.8
+	}
+
+	cb := gobreaker.NewCircuitBreaker(st)
 
 	window := make(chan struct{}, windowSize) // Sliding window of windowSize
 	target := make(chan struct{}, count)
@@ -2181,16 +2219,32 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 
 		go func() {
 			defer func() {
+				if r := recover(); r != nil {
+					logrus.WithContext(treeCtx).Errorf("Unexpected panic: %v", r)
+				}
+			}()
+
+			if sta := cb.State(); sta == gobreaker.StateOpen {
+				logrus.WithContext(treeCtx).Error("Too many consecutive failures")
+				cancel()
+				return
+			}
+
+			defer func() {
 				<-window
 			}()
 
-			res, err := runner(treeCtx, data)
-			if err != nil {
-				// log the error
-				// FIXME: OPP, If it IS a cancelled context, it is NOT an error
-				logrus.WithContext(treeCtx).Errorf("window runner failed with: %s", err)
-				return
-			}
+			res, err := cb.Execute(func() (interface{}, error) {
+				ares, aerr := runner(treeCtx, data)
+				if aerr != nil {
+					if strings.Contains(aerr.Error(), "context canceled") {
+						return ares, aerr
+					}
+					logrus.WithContext(treeCtx).Errorf("window runner failed with: %s", aerr)
+					return ares, aerr
+				}
+				return ares, nil
+			})
 
 			select {
 			case <-done:
@@ -2212,6 +2266,9 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 					Content:     res,
 					Err:         err,
 					ToBeDeleted: false,
+				}
+				if err != nil { // only when err != nil our target should decrease
+					return
 				}
 			}
 
@@ -2238,10 +2295,16 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 
 	select {
 	case <-done:
+		if sta := cb.State(); sta == gobreaker.StateOpen {
+			return errors.Errorf("Too many errors")
+		}
 		return nil
 	case <-inctx.Done():
 		return errors.Errorf("Task was cancelled by parent: %s", inctx.Err())
 	case <-treeCtx.Done():
+		if sta := cb.State(); sta == gobreaker.StateOpen {
+			return errors.Errorf("Too many errors")
+		}
 		if len(uat) == int(count) {
 			return nil
 		}
@@ -2315,9 +2378,11 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 				}
 			}
 
-			nodesChan := make(chan StdResult, p.count)
+			nodesChan := make(chan StdResult, 4*p.count)
+			ctx, tc := context.WithTimeout(ctx, timeout)
+			defer tc()
 
-			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), timeout, nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
+			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
 				nodeDef:       p.nodesDef,
 				timeout:       timings.HostOperationTimeout(),
 				keepOnFailure: p.keepOnFailure,

@@ -37,6 +37,7 @@ require (
 	github.com/schollz/progressbar/v3 v3.9.0
 	github.com/sethvargo/go-password v0.2.0
 	github.com/sirupsen/logrus v1.9.0
+	github.com/sony/gobreaker v0.5.0
 	github.com/spf13/viper v1.11.0
 	github.com/stretchr/testify v1.8.1
 	github.com/urfave/cli v1.22.10
@@ -50,7 +51,7 @@ require (
 	golang.org/x/text v0.6.0
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.107.0
-	google.golang.org/grpc v1.51.0
+	google.golang.org/grpc v1.52.3
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/fsnotify.v1 v1.4.7
 )

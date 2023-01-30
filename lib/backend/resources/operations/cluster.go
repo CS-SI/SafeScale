@@ -59,6 +59,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
+
+	_ "github.com/sony/gobreaker"
 )
 
 const (
@@ -1239,9 +1241,12 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		}
 	}
 
+	ctx, ca := context.WithTimeout(ctx, timeout)
+	defer ca()
+
 	// for OVH, we have to ignore the errors and keep trying until we have 'count'
-	nodesChan := make(chan StdResult, count)
-	err = runWindow(ctx, count, uint(math.Min(float64(count), float64(winSize))), timeout, nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
+	nodesChan := make(chan StdResult, 4*count)
+	err = runWindow(ctx, count, uint(math.Min(float64(count), float64(winSize))), nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
 		nodeDef:       nodeDef,
 		timeout:       timings.HostCreationTimeout(),
 		keepOnFailure: keepOnFailure,
@@ -1577,67 +1582,6 @@ func (instance *Cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 	}
 
 	return list, nil
-}
-
-// FindAvailableNode returns node instance of the first node available to execute order
-func (instance *Cluster) FindAvailableNode(ctx context.Context) (node resources.Host, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	return instance.unsafeFindAvailableNode(ctx)
-}
-
-// LookupNode tells if the ID of the master passed as parameter is a node
-func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if valid.IsNil(instance) {
-		return false, fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return false, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-	if ref == "" {
-		return false, fail.InvalidParameterError("ref", "cannot be empty string")
-	}
-
-	xerr := instance.beingRemoved(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return false, xerr
-	}
-
-	var hostInstance resources.Host
-	hostInstance, xerr = LoadHost(ctx, instance.Service(), ref)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return false, xerr
-	}
-
-	found = false
-	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			hid, err := hostInstance.GetID()
-			if err != nil {
-				return fail.ConvertError(err)
-			}
-
-			_, found = nodesV3.PrivateNodeByID[hid]
-			return nil
-		})
-	})
-	return found, xerr
 }
 
 // deleteMaster deletes the master specified by its ID
