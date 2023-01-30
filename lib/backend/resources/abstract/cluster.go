@@ -20,6 +20,7 @@ import (
 	stdjson "encoding/json"
 	"fmt"
 	"github.com/CS-SI/SafeScale/v22/lib"
+	uuidpkg "github.com/gofrs/uuid"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
@@ -59,11 +60,18 @@ type ClusterIdentity struct {
 	Keypair       *KeyPair               `json:"keypair"`        // Keypair contains the key-pair used inside the Cluster
 	AdminPassword string                 `json:"admin_password"` // contains the password of the cladm account
 	Tags          map[string]string      `json:"tags,omitempty"`
+	ID            string                 `json:"ID"`
 }
 
 // NewClusterIdentity ...
 func NewClusterIdentity() *ClusterIdentity {
+	aid := ""
+	if uuid, err := uuidpkg.NewV4(); err == nil {
+		aid = uuid.String()
+	}
+
 	ci := &ClusterIdentity{
+		ID:   aid,
 		Tags: make(map[string]string),
 	}
 	ci.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
@@ -109,10 +117,10 @@ func (instance ClusterIdentity) GetName() string {
 	return instance.Name
 }
 
-// GetID returns the ID of the cluster (== GetName)
+// GetID returns the ID of the cluster
 // Satisfies interface data.Identifiable
 func (instance ClusterIdentity) GetID() (string, error) {
-	return instance.GetName(), nil
+	return instance.ID, nil
 }
 
 // OK ...

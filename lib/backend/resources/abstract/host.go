@@ -50,7 +50,7 @@ func (kp *KeyPair) IsNull() bool {
 func NewKeyPair(name string) (*KeyPair, fail.Error) {
 	id, err := uuid.NewV4()
 	if err != nil {
-		return nil, fail.Wrap(err, "failed to create host UUID")
+		return nil, fail.Wrap(err, "failed to create keypair UUID")
 	}
 
 	if name == "" {
