@@ -140,7 +140,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			}()
 
 			// Obtain number of nodes to create
-			_, privateNodeCount, _, xerr := instance.determineRequiredNodes(ctx)
+			privateMasterCount, privateNodeCount, _, xerr := instance.determineRequiredNodes(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -152,6 +152,14 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
 				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
 				req.InitialNodeCount = privateNodeCount
+			}
+
+			if req.InitialMasterCount == 0 {
+				req.InitialMasterCount = privateMasterCount
+			}
+			if req.InitialMasterCount > 0 && req.InitialMasterCount < privateMasterCount {
+				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialMasterCount, privateMasterCount, req.Flavor.String())
+				req.InitialMasterCount = privateMasterCount
 			}
 
 			// Define the sizing dependencies for Cluster hosts
@@ -1086,6 +1094,15 @@ func (instance *Cluster) createHostResources(
 				return result{xerr}, xerr
 			}
 
+			// FIXME: that's a bad practice -> overwriting initial request (what could be go wrong?)
+			if cluReq.InitialMasterCount == 0 {
+				cluReq.InitialMasterCount = masterCount
+			}
+			if cluReq.InitialMasterCount > 0 && cluReq.InitialMasterCount < masterCount {
+				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", cluReq.Name, cluReq.InitialMasterCount, masterCount, cluReq.Flavor.String())
+				cluReq.InitialMasterCount = masterCount
+			}
+
 			// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
@@ -1143,7 +1160,7 @@ func (instance *Cluster) createHostResources(
 			egMas := new(errgroup.Group)
 			egMas.Go(func() error {
 				masters, xerr := instance.taskCreateMasters(ctx, taskCreateMastersParameters{
-					count:         masterCount,
+					count:         cluReq.InitialMasterCount,
 					mastersDef:    mastersDef,
 					keepOnFailure: keepOnFailure,
 					clusterName:   cluReq.Name,

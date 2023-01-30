@@ -514,10 +514,6 @@ var clusterCreateCommand = cli.Command{
 			}
 		}
 		if c.IsSet("master-sizing") {
-			if strings.Contains(c.String("master-sizing"), "count") {
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("the number of masters cannot be changed yet: count cannot be included in 'master-sizing' flag"))
-			}
-
 			mastersDef, err = constructHostDefinitionStringFromCLI(c, "master-sizing")
 			if err != nil {
 				return err
