@@ -36,9 +36,9 @@ import (
 )
 
 type taskCreateGatewayParameters struct {
-	request     abstract.HostRequest
-	sizing      abstract.HostSizingRequirements
-	clusterName string
+	request   abstract.HostRequest
+	sizing    abstract.HostSizingRequirements
+	clusterID string
 }
 
 func (instance *Subnet) taskCreateGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
@@ -90,10 +90,9 @@ func (instance *Subnet) taskCreateGateway(inctx context.Context, params interfac
 				return ar, ar.rErr
 			}
 
-			cluID, _ := instance.GetID() // FIXME: OPP, This is wrong, it should be used only in a cluster context
 			userData, createXErr := rgw.Create(ctx, hostReq, hostSizing, map[string]string{
 				"type":      "gateway",
-				"clusterID": cluID,
+				"clusterID": castedParams.clusterID,
 			}) // createXErr is tested later
 
 			// Set link to Subnet before testing if Host has been successfully created;

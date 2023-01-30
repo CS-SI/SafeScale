@@ -826,6 +826,8 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				return ar, xerr
 			}
 
+			cid, _ := instance.GetID()
+
 			// Creates Subnet
 			logrus.WithContext(ctx).Debugf("[Cluster %s] creating Subnet '%s'", req.Name, req.Name)
 			subnetReq := abstract.SubnetRequest{
@@ -835,6 +837,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				HA:             !gwFailoverDisabled,
 				ImageRef:       gatewaysDef.Image,
 				DefaultSSHPort: uint32(req.DefaultSshPort),
+				ClusterID:      cid,
 				KeepOnFailure:  false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
 			}
 

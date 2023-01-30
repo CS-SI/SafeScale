@@ -1031,9 +1031,9 @@ func (instance *Subnet) unsafeCreateGateways(
 					close(waitForFirstGw)
 				}()
 				tr, err := instance.taskCreateGateway(ctx, taskCreateGatewayParameters{
-					request:     primaryRequest,
-					sizing:      *gwSizing,
-					clusterName: "",
+					request:   primaryRequest,
+					sizing:    *gwSizing,
+					clusterID: req.ClusterID,
 				})
 				if err != nil {
 					gws <- gwRes{
@@ -1071,9 +1071,9 @@ func (instance *Subnet) unsafeCreateGateways(
 						secondaryRequest.HostName = secondaryGatewayName + domain
 					}
 					tr, err := instance.taskCreateGateway(ctx, taskCreateGatewayParameters{
-						request:     secondaryRequest,
-						sizing:      *gwSizing,
-						clusterName: "",
+						request:   secondaryRequest,
+						sizing:    *gwSizing,
+						clusterID: req.ClusterID,
 					})
 					if err != nil {
 						gws <- gwRes{
