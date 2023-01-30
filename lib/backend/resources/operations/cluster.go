@@ -59,6 +59,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
+
+	_ "github.com/sony/gobreaker"
 )
 
 const (
@@ -1239,9 +1241,12 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		}
 	}
 
+	ctx, ca := context.WithTimeout(ctx, timeout)
+	defer ca()
+
 	// for OVH, we have to ignore the errors and keep trying until we have 'count'
-	nodesChan := make(chan StdResult, count)
-	err = runWindow(ctx, count, uint(math.Min(float64(count), float64(winSize))), timeout, nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
+	nodesChan := make(chan StdResult, 4*count)
+	err = runWindow(ctx, count, uint(math.Min(float64(count), float64(winSize))), nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
 		nodeDef:       nodeDef,
 		timeout:       timings.HostCreationTimeout(),
 		keepOnFailure: keepOnFailure,
