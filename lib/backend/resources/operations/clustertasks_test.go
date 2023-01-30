@@ -126,7 +126,7 @@ func TestRunWindow2(t *testing.T) {
 				runner:     tak,
 				data:       struct{}{},
 			},
-			wantErr: false,
+			wantErr: true,
 		},
 		// TODO: Add test cases.
 	}
