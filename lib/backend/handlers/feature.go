@@ -20,6 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	clusterfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/cluster"
 	featurefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/feature"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
@@ -98,10 +99,9 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 		}
 
 		return list, nil
+	default:
+		return nil, fail.InvalidParameterError("targetType", "invalid value %d", targetType)
 	}
-
-	// Should not reach this
-	return nil, fail.InconsistentError("reached theoretically unreachable point")
 }
 
 // Check checks if a feature installed on target
@@ -133,6 +133,14 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
 		if xerr != nil {
 			return xerr
+		}
+
+		st, xerr := hostInstance.ForceGetState(handler.job.Context())
+		if xerr != nil {
+			return xerr
+		}
+		if st != hoststate.Started {
+			return fail.NewError("Host MUST be in started state in order to check a feature")
 		}
 
 		results, xerr := feat.Check(handler.job.Context(), hostInstance, variables, settings)
@@ -219,6 +227,14 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 			return xerr
 		}
 
+		st, xerr := hostInstance.ForceGetState(handler.job.Context())
+		if xerr != nil {
+			return xerr
+		}
+		if st != hoststate.Started {
+			return fail.NewError("Host MUST be in started state in order to add a feature")
+		}
+
 		results, xerr := feat.Add(handler.job.Context(), hostInstance, variables, settings)
 		if xerr != nil {
 			return xerr
@@ -277,6 +293,14 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
 		if xerr != nil {
 			return xerr
+		}
+
+		st, xerr := hostInstance.ForceGetState(handler.job.Context())
+		if xerr != nil {
+			return xerr
+		}
+		if st != hoststate.Started {
+			return fail.NewError("Host MUST be in started state in order to remove a feature")
 		}
 
 		results, xerr := feat.Remove(handler.job.Context(), hostInstance, variables, settings)
