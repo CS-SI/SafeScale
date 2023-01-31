@@ -204,7 +204,7 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) (map[stri
 				return nil, fail.InconsistentError("'nodes' should be a map[string][]*protocol.Host")
 			}
 		} else {
-			config["remote_desktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
+			config["remote_desktop"] = fmt.Sprintf("no remote desktop available")
 		}
 	}
 	return config, nil
@@ -1596,7 +1596,7 @@ var clusterMasterInspectCommand = cli.Command{
 			}()
 		}
 
-		host, err := ClientSession.Cluster.InspectNode(clusterName, hostName, 0)
+		host, err := ClientSession.Cluster.InspectMaster(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
