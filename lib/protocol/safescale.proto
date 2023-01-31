@@ -87,11 +87,6 @@ message TenantName {
 	string provider = 3;
 }
 
-message TenantCleanupRequest {
-	string name = 1;
-	bool force = 2;
-}
-
 message TenantScanRequest {
 	string name = 1;
 	bool dry_run = 2;
@@ -173,7 +168,6 @@ message TenantInspectResponse {
 }
 
 service TenantService{
-	rpc Cleanup (TenantCleanupRequest) returns (google.protobuf.Empty){}
 	rpc Get (google.protobuf.Empty) returns (TenantName){}
 	rpc Inspect (TenantName) returns (TenantInspectResponse){}
 	rpc List (google.protobuf.Empty) returns (TenantList){}
@@ -1006,17 +1000,6 @@ message FeatureListResponse {
 	repeated FeatureResponse features = 1;
 }
 
-message FeatureDetailRequest {
-	FeatureTargetType target_type = 1;
-	Reference target_ref = 2;
-	string name = 3;
-	bool embedded = 4;
-}
-
-message FeatureExportResponse {
-	repeated string export = 1;
-}
-
 message FeatureSettings {
 	bool skip_proxy = 1;
 	bool serialize = 2;
@@ -1036,7 +1019,6 @@ message FeatureActionRequest {
 
 service FeatureService {
 	rpc List(FeatureListRequest) returns (FeatureListResponse){}
-	rpc Export(FeatureDetailRequest) returns (FeatureExportResponse){}
 	rpc Check(FeatureActionRequest) returns (google.protobuf.Empty){}
 	rpc Add(FeatureActionRequest) returns (google.protobuf.Empty){}
 	rpc Remove(FeatureActionRequest) returns (google.protobuf.Empty){}
@@ -1149,7 +1131,6 @@ service SecurityGroupService {
 	rpc Inspect(Reference) returns (SecurityGroupResponse){}
 	rpc List(SecurityGroupListRequest) returns (SecurityGroupListResponse){}
 	rpc Reset(Reference) returns (google.protobuf.Empty){}
-	rpc Sanitize(Reference) returns (google.protobuf.Empty){}
 }
 
 // Public IP

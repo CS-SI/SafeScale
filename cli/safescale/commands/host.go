@@ -846,7 +846,6 @@ var hostFeatureCommands = cli.Command{
 	Usage: hostFeatureCmdLabel + " COMMAND",
 	Subcommands: cli.Commands{
 		hostFeatureCheckCommand,
-		hostFeatureExportCommand,
 		hostFeatureAddCommand,
 		hostFeatureRemoveCommand,
 		hostFeatureListCommand,
@@ -907,75 +906,6 @@ func hostFeatureListAction(c *cli.Context) (ferr error) {
 	}
 
 	return clitools.SuccessResponse(list)
-}
-
-// hostFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
-var hostFeatureExportCommand = cli.Command{
-	Name:      "export",
-	Aliases:   []string{"dump"},
-	Usage:     "Export feature file content",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "embedded",
-			Usage: "if used, tells to export embedded feature (if it exists)",
-		},
-		cli.BoolFlag{
-			Name:  "raw",
-			Usage: "outputs only the feature content, without json",
-		},
-	},
-
-	Action: hostFeatureExportAction,
-}
-
-func hostFeatureExportAction(c *cli.Context) (ferr error) {
-	defer fail.OnPanic(&ferr)
-	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
-
-	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
-	if err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	featureName, err := extractFeatureArgument(c)
-	if err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Exporting host features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
-
-	export, err := ClientSession.Host.ExportFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
-	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-	}
-
-	if c.Bool("raw") {
-		return clitools.SuccessResponse(export.Export)
-	}
-
-	return clitools.SuccessResponse(export)
 }
 
 // hostAddFeatureCommand handles 'deploy host <host name or id> package <pkgname> add'

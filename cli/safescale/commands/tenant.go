@@ -42,7 +42,6 @@ var TenantCommand = cli.Command{
 		tenantSetCommand,
 		tenantInspectCommand,
 		tenantScanCommand,
-		tenantMetadataCommands,
 	},
 }
 
@@ -219,46 +218,5 @@ var tenantScanCommand = cli.Command{
 		}
 
 		return clitools.SuccessResponse(results.GetResults())
-	},
-}
-
-const tenantMetadataCmdLabel = "metadata"
-
-// tenantMetadataCommands handles 'safescale tenant metadata' commands
-var tenantMetadataCommands = cli.Command{
-	Name:      tenantMetadataCmdLabel,
-	Usage:     "manage tenant metadata",
-	ArgsUsage: "COMMAND",
-
-	Subcommands: cli.Commands{
-		// tenantMetadataUpgradeCommand,
-		// tenantMetadataBackupCommand,
-		// tenantMetadataRestoreCommand,
-		tenantMetadataDeleteCommand,
-	},
-}
-
-const tenantMetadataDeleteCmdLabel = "delete"
-
-var tenantMetadataDeleteCommand = cli.Command{
-	Name:    tenantMetadataDeleteCmdLabel,
-	Aliases: []string{"remove", "rm", "destroy", "cleanup"},
-	Usage:   "Remove SafeScale metadata (making SafeScale unable to manage resources anymore); use with caution",
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-		}
-
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
-
-		err := ClientSession.Tenant.Cleanup(c.Args().First(), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
-		}
-
-		return clitools.SuccessResponse(nil)
 	},
 }

@@ -23,10 +23,8 @@ import (
 	clusterfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/cluster"
 	featurefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/feature"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
-	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 //go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/backend/handlers.FeatureHandler -o mocks/mock_feature.go
@@ -35,7 +33,6 @@ import (
 type FeatureHandler interface {
 	Add(featuretargettype.Enum, string, string, data.Map, resources.FeatureSettings) fail.Error
 	Check(featuretargettype.Enum, string, string, data.Map, resources.FeatureSettings) fail.Error
-	Export(featuretargettype.Enum, string, string, bool) (*protocol.FeatureExportResponse, fail.Error)
 	List(featuretargettype.Enum, string, bool) ([]resources.Feature, fail.Error)
 	Remove(featuretargettype.Enum, string, string, data.Map, resources.FeatureSettings) fail.Error
 }
@@ -105,63 +102,6 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 
 	// Should not reach this
 	return nil, fail.InconsistentError("reached theoretically unreachable point")
-}
-
-// Export exports the content of the feature file
-func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetRef, featureName string, embedded bool) (_ *protocol.FeatureExportResponse, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
-	if handler == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if targetRef == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("targetRef")
-	}
-	if featureName == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("featureName")
-	}
-
-	var (
-		feat resources.Feature
-		xerr fail.Error
-	)
-	if embedded {
-		feat, xerr = featurefactory.NewEmbedded(handler.job.Context(), handler.job.Service(), featureName)
-	} else {
-		feat, xerr = featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
-	}
-	if xerr != nil {
-		return nil, xerr
-	}
-	if valid.IsNil(feat) {
-		return nil, fail.InconsistentError("invalid feature: %s", featureName)
-	}
-
-	switch targetType {
-	case featuretargettype.Host:
-		_ /*hostInstance*/, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		return nil, fail.NotImplementedError()
-
-	case featuretargettype.Cluster:
-		_ /*clusterInstance*/, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		return nil, fail.NotImplementedError()
-
-	default:
-		return nil, fail.InvalidParameterError("targetType", "invalid value %d", targetType)
-	}
 }
 
 // Check checks if a feature installed on target

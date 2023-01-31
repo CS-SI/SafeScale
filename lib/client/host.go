@@ -265,28 +265,6 @@ func (h hostConsumer) SSHConfig(name string) (sshapi.Config, error) {
 	return sshCfg, err
 }
 
-// Resize ...
-func (h hostConsumer) Resize(def *protocol.HostDefinition, timeout time.Duration) (*protocol.Host, error) {
-	h.session.Connect()
-	defer h.session.Disconnect()
-
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// finally, using context
-	newCtx := ctx
-	if timeout != 0 {
-		aCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		newCtx = aCtx
-	}
-
-	service := protocol.NewHostServiceClient(h.session.connection)
-	return service.Resize(newCtx, def)
-}
-
 // ListFeatures ...
 func (h hostConsumer) ListFeatures(hostRef string, all bool, timeout time.Duration) (*protocol.FeatureListResponse, error) {
 	h.session.Connect()
@@ -316,34 +294,6 @@ func (h hostConsumer) ListFeatures(hostRef string, all bool, timeout time.Durati
 		return nil, err
 	}
 	return result, nil
-}
-
-// ExportFeature ...
-func (h hostConsumer) ExportFeature(hostRef, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureExportResponse, error) {
-	h.session.Connect()
-	defer h.session.Disconnect()
-
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// finally, using context
-	newCtx := ctx
-	if timeout != 0 {
-		aCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		newCtx = aCtx
-	}
-
-	req := &protocol.FeatureDetailRequest{
-		TargetType: protocol.FeatureTargetType_FT_HOST,
-		TargetRef:  &protocol.Reference{TenantId: h.session.tenant, Name: hostRef},
-		Name:       featureName,
-		Embedded:   embedded,
-	}
-	service := protocol.NewFeatureServiceClient(h.session.connection)
-	return service.Export(newCtx, req)
 }
 
 // CheckFeature ...

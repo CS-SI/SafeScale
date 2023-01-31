@@ -120,46 +120,6 @@ func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantName) (em
 	return empty, nil
 }
 
-// Cleanup removes everything corresponding to SafeScale from tenant (metadata in particular)
-func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantCleanupRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot cleanup tenant")
-
-	empty = &googleprotobuf.Empty{}
-	if s == nil {
-		return empty, fail.InvalidInstanceError()
-	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
-	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	name := in.GetName()
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("tenant/%s/metadata/delete", name))
-	if xerr != nil {
-		return nil, xerr
-	}
-	defer job.Close()
-
-	ctx := job.Context()
-
-	currentTenant := operations.CurrentTenant(ctx)
-	if currentTenant != nil && currentTenant.Name == in.GetName() {
-		return empty, nil
-	}
-
-	// no need to set metadataVersion in UseService, we will remove content...
-	service, xerr := iaas.UseService(ctx, in.GetName(), "")
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	xerr = service.TenantCleanup(ctx, in.Force)
-	return empty, xerr
-}
-
 // Scan proceeds a scan of host corresponding to each template to gather real data(metadata in particular)
 func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequest) (_ *protocol.ScanResultList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
