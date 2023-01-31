@@ -1215,7 +1215,8 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		return nil, xerr
 	}
 
-	timeout := time.Duration(count) * timings.HostCreationTimeout() // More than enough
+	tcount := uint(math.Max(float64(count), 4))
+	timeout := time.Duration(tcount) * timings.HostCreationTimeout() // More than enough
 
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1480,7 +1481,8 @@ func (instance *Cluster) ListMasters(ctx context.Context) (list resources.Indexe
 		return nil, xerr
 	}
 
-	return instance.unsafeListMasters(ctx)
+	lim, xerr := instance.unsafeListMasters(ctx)
+	return lim, xerr
 }
 
 // FindAvailableMaster returns ID of the first master available to execute order

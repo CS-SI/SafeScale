@@ -1607,7 +1607,8 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 
 			logrus.WithContext(ctx).Debugf("Creating %d master%s...", p.count, strprocess.Plural(p.count))
 
-			timeout := time.Duration(p.count) * timings.HostCreationTimeout() // FIXME: OPP This became the timeout for the whole cluster creation....
+			tcount := uint(math.Max(4, float64(p.count)))
+			timeout := time.Duration(tcount) * timings.HostCreationTimeout() // FIXME: OPP This became the timeout for the whole cluster creation....
 
 			winSize := 8
 			st, xerr := instance.Service().GetProviderName()
@@ -2354,7 +2355,8 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 
 			logrus.WithContext(ctx).Debugf("Creating %d node%s...", p.count, strprocess.Plural(p.count))
 
-			timeout := time.Duration(p.count) * timings.HostCreationTimeout()
+			tcount := uint(math.Max(4, float64(p.count)))
+			timeout := time.Duration(tcount) * timings.HostCreationTimeout()
 
 			// another tweak for Stein
 			winSize := 8
