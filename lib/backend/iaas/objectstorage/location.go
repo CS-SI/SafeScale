@@ -103,10 +103,6 @@ type Location interface {
 	HasObject(context.Context, string, string) (bool, fail.Error)
 	// ReadObject ...
 	ReadObject(context.Context, string, string, io.Writer, int64, int64) (bytes.Buffer, fail.Error)
-	// WriteMultiPartObject ...
-	WriteMultiPartObject(
-		context.Context, string, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata,
-	) (abstract.ObjectStorageItem, fail.Error)
 	// WriteObject ...
 	WriteObject(
 		context.Context, string, string, io.Reader, int64, abstract.ObjectStorageItemMetadata,
@@ -856,39 +852,6 @@ func (instance location) WriteObject(
 		return aosi, err
 	}
 
-	aosi.BucketName = bucketName
-	return aosi, nil
-}
-
-// WriteMultiPartObject writes data from 'source' to an object in Object Storage, splitting data in parts of 'chunkSize' bytes
-func (instance location) WriteMultiPartObject(
-	ctx context.Context, bucketName string, objectName string, source io.Reader, sourceSize int64, chunkSize int,
-	metadata abstract.ObjectStorageItemMetadata,
-) (aosi abstract.ObjectStorageItem, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-	aosi = abstract.ObjectStorageItem{}
-	if valid.IsNil(instance) {
-		return aosi, fail.InvalidInstanceError()
-	}
-	if bucketName == "" {
-		return aosi, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
-	}
-	if objectName == "" {
-		return aosi, fail.InvalidParameterCannotBeEmptyStringError("objectName")
-	}
-
-	b, err := instance.GetBucket(bucketName)
-	if err != nil {
-		return aosi, err
-	}
-	o, err := b.WriteMultiPartObject(ctx, objectName, source, sourceSize, chunkSize, metadata)
-	if err != nil {
-		return aosi, err
-	}
-	aosi, err = convertObjectToAbstract(ctx, o)
-	if err != nil {
-		return aosi, err
-	}
 	aosi.BucketName = bucketName
 	return aosi, nil
 }

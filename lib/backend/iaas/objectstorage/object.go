@@ -41,17 +41,11 @@ import (
 
 // Object interface
 type Object interface {
-	Stored(context.Context) (bool, fail.Error)
-
 	Read(context.Context, io.Writer, int64, int64) fail.Error
 	Write(context.Context, io.Reader, int64) fail.Error
-	WriteMultiPart(context.Context, io.Reader, int64, int) fail.Error
 	Reload(context.Context) fail.Error
 	Delete(context.Context) fail.Error
 	AddMetadata(context.Context, abstract.ObjectStorageItemMetadata) fail.Error
-	ForceAddMetadata(context.Context, abstract.ObjectStorageItemMetadata) fail.Error
-	ReplaceMetadata(context.Context, abstract.ObjectStorageItemMetadata) fail.Error
-
 	GetID(context.Context) (string, fail.Error)
 	GetName(context.Context) (string, fail.Error)
 	GetLastUpdate(context.Context) (time.Time, fail.Error)
@@ -112,14 +106,6 @@ func newObjectFromStow(b *bucket, item stow.Item) *object {
 		item:   item,
 		name:   item.Name(),
 	}
-}
-
-// Stored return true if the object exists in Object Storage
-func (instance object) Stored(ctx context.Context) (bool, fail.Error) {
-	if valid.IsNil(instance) {
-		return false, fail.InvalidInstanceError()
-	}
-	return instance.item != nil, nil
 }
 
 // Reload reloads the data of the Object from the Object Storage
@@ -258,39 +244,6 @@ func (instance *object) Write(ctx context.Context, source io.Reader, sourceSize 
 	return instance.reloadFromItem(item)
 }
 
-// WriteMultiPart writes big data to Object, by parts (also called chunks)
-func (instance *object) WriteMultiPart(
-	ctx context.Context, source io.Reader, sourceSize int64, chunkSize int,
-) fail.Error {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-	if source == nil { // If source is nil, do nothing and don't trigger an error
-		return nil
-	}
-
-	metadataCopy := instance.metadata.Clone()
-
-	var chunkIndex int
-	remaining := sourceSize
-	for {
-		if remaining < int64(chunkSize) {
-			chunkSize = int(remaining)
-		}
-		err := writeChunk(instance.bucket.stowContainer, instance.name, source, chunkSize, metadataCopy, chunkIndex)
-		if err != nil {
-			return err
-		}
-		remaining -= int64(chunkSize)
-		// client.NbItem = client.NbItem + 1
-		if remaining <= 0 {
-			break
-		}
-		chunkIndex++
-	}
-	return nil
-}
-
 // writeChunk writes a chunk of data for object
 func writeChunk(container stow.Container, objectName string, source io.Reader, nBytesToRead int, metadata abstract.ObjectStorageItemMetadata, chunkIndex int) fail.Error {
 	buf := make([]byte, nBytesToRead)
@@ -326,20 +279,6 @@ func (instance *object) Delete(ctx context.Context) fail.Error {
 	return nil
 }
 
-// ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
-func (instance *object) ForceAddMetadata(
-	ctx context.Context, newMetadata abstract.ObjectStorageItemMetadata,
-) fail.Error {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-
-	for k, v := range newMetadata {
-		instance.metadata[k] = v
-	}
-	return nil
-}
-
 // AddMetadata adds missing entries in object metadata
 func (instance *object) AddMetadata(ctx context.Context, newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
 	if valid.IsNil(instance) {
@@ -352,18 +291,6 @@ func (instance *object) AddMetadata(ctx context.Context, newMetadata abstract.Ob
 			instance.metadata[k] = v
 		}
 	}
-	return nil
-}
-
-// ReplaceMetadata replaces object metadata with the ones provided in parameter
-func (instance *object) ReplaceMetadata(
-	ctx context.Context, newMetadata abstract.ObjectStorageItemMetadata,
-) fail.Error {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-
-	instance.metadata = newMetadata
 	return nil
 }
 
