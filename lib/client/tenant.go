@@ -123,29 +123,6 @@ func (t tenantConsumer) Inspect(name string, timeout time.Duration) (*protocol.T
 	return service.Inspect(newCtx, &protocol.TenantName{Name: name})
 }
 
-// Cleanup ...
-func (t tenantConsumer) Cleanup(name string, timeout time.Duration) error {
-	t.session.Connect()
-	defer t.session.Disconnect()
-
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return xerr
-	}
-
-	// finally, using context
-	newCtx := ctx
-	if timeout != 0 {
-		aCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		newCtx = aCtx
-	}
-
-	service := protocol.NewTenantServiceClient(t.session.connection)
-	_, err := service.Cleanup(newCtx, &protocol.TenantCleanupRequest{Name: name, Force: false})
-	return err
-}
-
 // Scan ...ScanRequest
 func (t tenantConsumer) Scan(name string, dryRun bool, templates []string, timeout time.Duration) (*protocol.ScanResultList, error) {
 	t.session.Connect()

@@ -58,10 +58,6 @@ type Bucket interface {
 	ReadObject(context.Context, string, io.Writer, int64, int64) (Object, fail.Error)
 	// WriteObject writes into an object
 	WriteObject(context.Context, string, io.Reader, int64, abstract.ObjectStorageItemMetadata) (Object, fail.Error)
-	// WriteMultiPartObject writes a lot of data into an object, cut in pieces
-	WriteMultiPartObject(context.Context, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (
-		Object, fail.Error,
-	)
 	// // CopyObject copies an object
 	// CopyObject(string, string) fail.Error
 
@@ -322,31 +318,6 @@ func (instance bucket) WriteObject(
 		return nil, err
 	}
 
-	return &o, nil
-}
-
-// WriteMultiPartObject ...
-func (instance bucket) WriteMultiPartObject(
-	ctx context.Context, objectName string, source io.Reader, sourceSize int64, chunkSize int,
-	metadata abstract.ObjectStorageItemMetadata,
-) (_ Object, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	o, err := newObject(&instance, objectName)
-	if err != nil {
-		return nil, err
-	}
-	err = o.AddMetadata(ctx, metadata)
-	if err != nil {
-		return nil, err
-	}
-	err = o.WriteMultiPart(ctx, source, sourceSize, chunkSize)
-	if err != nil {
-		return nil, err
-	}
 	return &o, nil
 }
 

@@ -556,11 +556,6 @@ func (m minService) HasObject(ctx context.Context, s string, s2 string) (bool, f
 func (m minService) ReadObject(ctx context.Context, s string, s2 string, writer io.Writer, i int64, i2 int64) (bytes.Buffer, fail.Error) {
 	return m.loc.ReadObject(ctx, s, s2, writer, i, i2)
 }
-
-func (m minService) WriteMultiPartObject(ctx context.Context, s string, s2 string, reader io.Reader, i int64, i2 int, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
-	return m.loc.WriteMultiPartObject(ctx, s, s2, reader, i, i2, metadata)
-}
-
 func (m minService) WriteObject(ctx context.Context, s string, s2 string, reader io.Reader, i int64, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
 	return m.loc.WriteObject(ctx, s, s2, reader, i, metadata)
 }

@@ -204,7 +204,7 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) (map[stri
 				return nil, fail.InconsistentError("'nodes' should be a map[string][]*protocol.Host")
 			}
 		} else {
-			config["remote_desktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
+			config["remote_desktop"] = fmt.Sprintf("no remote desktop available")
 		}
 	}
 	return config, nil
@@ -1487,7 +1487,7 @@ var clusterNodeStateCommand = cli.Command{
 
 const clusterMasterCmdLabel = "master"
 
-// clusterMasterCommands handles 'safescale cluster master ...
+// clusterMasterCommands handles 'safescale cluster master ...'
 var clusterMasterCommands = cli.Command{
 	Name:      clusterMasterCmdLabel,
 	Usage:     "manage cluster masters",
@@ -1596,7 +1596,7 @@ var clusterMasterInspectCommand = cli.Command{
 			}()
 		}
 
-		host, err := ClientSession.Cluster.InspectNode(clusterName, hostName, 0)
+		host, err := ClientSession.Cluster.InspectMaster(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1724,7 +1724,6 @@ var clusterFeatureCommands = cli.Command{
 	ArgsUsage: "COMMAND",
 	Subcommands: cli.Commands{
 		clusterFeatureListCommand,
-		clusterFeatureExportCommand,
 		clusterFeatureCheckCommand,
 		clusterFeatureAddCommand,
 		clusterFeatureRemoveCommand,
@@ -1785,77 +1784,6 @@ func clusterFeatureListAction(c *cli.Context) (ferr error) {
 	}
 
 	return clitools.SuccessResponse(features)
-}
-
-// clusterFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
-var clusterFeatureExportCommand = cli.Command{
-	Name:      "list",
-	Aliases:   []string{"ls"},
-	Usage:     "List features installed on the cluster",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name: "embedded",
-			// Value: false,
-			Usage: "if used, tells to export embedded feature (if it exists)",
-		},
-		cli.BoolFlag{
-			Name: "raw",
-			// Value: false,
-			Usage: "outputs only the feature content, without json",
-		},
-	},
-
-	Action: clusterFeatureExportAction,
-}
-
-func clusterFeatureExportAction(c *cli.Context) (ferr error) {
-	defer fail.OnPanic(&ferr)
-	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
-
-	if err := extractClusterName(c); err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	featureName := c.Args().Get(1)
-	if featureName == "" {
-		_ = cli.ShowSubcommandHelp(c)
-		return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME.")
-	}
-
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Exporting feature"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
-
-	export, err := ClientSession.Cluster.ExportFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
-	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-	}
-
-	if c.Bool("raw") {
-		return clitools.SuccessResponse(export.Export)
-	}
-
-	return clitools.SuccessResponse(export)
 }
 
 // clusterFeatureAddCommand handles 'safescale cluster feature add CLUSTERNAME FEATURENAME'

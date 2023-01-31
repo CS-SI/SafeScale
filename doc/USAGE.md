@@ -1170,7 +1170,7 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group rule add [command_options] &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Add a Security Group rule<br><br>
+  <td>Add a Security Group rule<br><br>
       <code>command_options</code>:
       <ul>
         <li><code>--direction ingress|egress</code>code> Defines the direction of the rule (optional, default: ingress)</li>
@@ -1205,7 +1205,7 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group rule delete [command_options] &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Delete a rule from a Security Group<br><br>
+  <td>Delete a rule from a Security Group<br><br>
       <code>command_options</code>:
       <ul>
         <li><code>--direction ingress|egress</code>code> Defines the direction of the rule (optional, default: ingress)</li>
@@ -1250,7 +1250,7 @@ Note: if <code>&lt;subnet_name_or_id&gt;</code> or <code>&lt;security_group_name
 This command family deals with host management: creation, list, connection, deletion...
 The following actions are proposed:
 
-REVIEW_ME:
+
 <table>
 <thead><td><div style="width:350px">Action</div></td><td><div style="min-width: 650px">description</div></td></thead>
 <tbody>
@@ -1302,14 +1302,14 @@ REVIEW_ME:
         </li>
         <li>
           Create a Host inside a specific Subnet of a Network:
-          <pre>$ safescale host create --network example_network --subnet example_subnet --sizing "cpu=4,ram=[7-14],disk>=100" myhost</pre>
+          <pre>$ safescale host create --network example_network --subnet example_subnet --sizing "cpu=2,ram=[2-14],disk>=100" myhost</pre>
           response on success:
           <pre>
-{"result":{
+{"result":{"cpu":1,"creation_date":"2023-01-30T16:12:53Z","disk":10,"id":"ddac95cf-340f-4e89-8b60-ce3b62a43e79","kvs":[{"key":"Revision","value":"c4b987e257ff31e2610d57d94cb1eff9cb88c78d"},{"key":"Template","value":"2eedae16-a86c-4caa-a3d2-14be03293ba8"},{"key":"Image","value":"75483863-4aee-4e37-a93e-5cb49ea13d1b"},{"key":"DeclaredInBucket","value":"0.safescale-f63b10c1f1d99a0014bfd076b894219f.afraid"},{"key":"CreationDate","value":"2023-01-30T16:12:53Z"},{"key":"ManagedBy","value":"safescale"}],"name":"myhost","password":".....","private_ip":"192.168.38.22","private_key":"-----BEGIN RSA PRIVATE KEY-----......\n-----END RSA PRIVATE KEY-----","ram":2,"state":2,"state_label":"Started","template":"s1-2"},"status":"success"}
           </pre>
           response on failure:
           <pre>
-{"error": {
+{"error":{"exitcode":6,"message":"Cannot create host: 'myhost' already exists [ctx:198e1825-861d-4d83-b355-2ff77ced26f5]"},"result":null,"status":"failure"}
           </pre>
         </li>
       </ul>
@@ -1456,7 +1456,7 @@ REVIEW_ME:
   "status": "success"
 }
       </pre>
-      response on failure: REVIEW_ME
+      response on failure:
       <pre>
 {
   "error": {
@@ -1471,61 +1471,61 @@ REVIEW_ME:
 </tr>
 <tr>
   <td><code>safescale [global_options] host start &lt;host_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Starts a Host.<br><br>
+  <td>Starts a Host.<br><br>
       example:
       <pre>$ safescale host start example_host</pre>
       response on success:
       <pre>
-{
+{"result":null,"status":"success"}
       </pre>
       response on failure:
       <pre>
-{
+{"error":{"exitcode":6,"message":"Cannot start host: timeout waiting Host 'myhost' to be started: retries timed out after 00h02m30.378s (timeout defined at 00h02m30.000s) (timeout: 2m30s): myhost not started yet: Stopped [ctx: 57df83c7-c2b4-4873-87cc-26eeafda5d17]"},"result":null,"status":"failure"}
       </pre>
   </td>
 </tr>
 <tr>
   <td><code>safescale [global_options] host stop &lt;host_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Stop a Host.<br><br>
+  <td>Stop a Host.<br><br>
       example:
       <pre>$ safescale host stop example_host</pre>
       response on success:
       <pre>
-{
+{"result":null,"status":"success"}
       </pre>
       response on failure:
       <pre>
-{
+{"error":{"exitcode":6,"message":"Cannot stop host: timeout waiting Host 'myhost' to be stopped: retries timed out after 00h02m30.326s (timeout defined at 00h02m30.000s) (timeout: 2m30s): myhost not stopped yet: Started [ctx: df57ffb8-71f5-404c-a554-a258c6a43c5e]"},"result":null,"status":"failure"}
       </pre>
   </td>
 </tr>
 <tr>
   <td><code>safescale [global_options] host reboot &lt;host_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Reboots an Host.<br><br>
+  <td>Reboots an Host.<br><br>
       example:
       <pre>$ safescale host reboot example_host</pre>
       response on success:
       <pre>
-{
+{"result":null,"status":"success"}
       </pre>
       response on failure:
       <pre>
-{
+{"error":{"exitcode":6,"message":"Cannot reboot host: stopping retries: Cannot 'stop' instance ddac95cf-340f-4e89-8b60-ce3b62a43e79 while it is in vm_state stopped [ctx: 2b8c0ad9-dfd8-498f-9736-27c2f80233ec]"},"result":null,"status":"failure"}
       </pre>
   </td>
 </tr>
 <tr>
   <td><code>safescale [global_options] host status &lt;host_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Displays the current status of an Host.<br><br>
+  <td>Displays the current status of an Host.<br><br>
       example:
       <pre>$ safescale host status example_host</pre>
       response on success:
       <pre>
-{
+{"result":{"name":"myhost","status_code":0,"status_label":"Stopped"},"status":"success"}
       </pre>
       response on failure:
       <pre>
-{
+{"error":{"exitcode":6,"message":"Cannot get host status: host 'boom' not found [ctx: 92290112-acf3-43c8-9257-59bf96d2e95f]"},"result":null,"status":"failure"}
       </pre>
   </td>
 </tr>
@@ -1539,7 +1539,7 @@ REVIEW_ME:
       </ul>
       example:
       <pre>$ safescale host check-feature myhost docker</pre>
-      response if feature is present: REVIEW_ME
+      response if feature is present
       <pre>
 {
   "result": null,
@@ -1595,51 +1595,56 @@ REVIEW_ME:
   "status": "success"
 }
       </pre>
-      response on failure may vary.
   </td>
 </tr>
 <tr>
   <td><code>safescale [global_options] host security group list &lt;host_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Lists the Security Groups bound to an Host.<br><br>
+  <td>Lists the Security Groups bound to an Host.<br><br>
       example:
-      <pre>$ safescale host security group list example_host</pre>
+      <pre>$ safescale host security group list carved</pre>
       response on success:
       <pre>
-{
+{"result":[{"id":"79ea1d7a-a813-46f0-931e-e77b34056be3","name":"safescale-sg_subnet_internals.carved.carved"}],"status":"success"}
       </pre>
       response on failure:
       <pre>
-{
+{"error":{"exitcode":6,"message":"Cannot list security group on host: host 'riot' not found [ctx: af2a9c7c-ca56-48f6-9c88-de47bc7cdd8c]"},"result":null,"status":"failure"}
       </pre>
   </td>
 </tr>
 <tr>
   <td><code>safescale [global_options] host security group bind &lt;host_name_or_id&gt; &lt;securitygroup_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Links a Security Group to an Host.<br><br>
+  <td>Links a Security Group to an Host.<br><br>
       example:
       <pre>$ safescale host security group bind example_host sg-for-some-hosts</pre>
       response on success:
       <pre>
 {
+  "result": null,
+  "status": "success"
+}
       </pre>
       response on failure:
       <pre>
-{
+{"error":{"exitcode":6,"message":"Cannot bind Security Group to Host: neither security-groups/byName/default nor security-groups/byID/default were found in the bucket [ctx: f086fba0-4268-422d-84f0-aab92f62310e]"},"result":null,"status":"failure"}
       </pre>
   </td>
 </tr>
 <tr>
   <td><code>safescale [global_options] host security group unbind &lt;host_name_or_id&gt; &lt;securitygroup_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Unlinks a Security Group from an Host.<br><br>
+  <td>Unlinks a Security Group from an Host.<br><br>
       example:
       <pre>$ safescale host security group bind example_host sg-for-some-hosts</pre>
       response on success:
       <pre>
 {
+  "result": null,
+  "status": "success"
+}
       </pre>
       response on failure:
       <pre>
-{
+{"error":{"exitcode":6,"message":"Cannot unbind Security Group from Host: neither security-groups/byName/default nor security-groups/byID/default were found in the bucket [ctx: f086fba0-4268-422d-84f0-aab92f62310e]"},"result":null,"status":"failure"}
       </pre>
   </td>
 </tr>
@@ -1667,7 +1672,7 @@ The following actions are proposed:
     </ul>
     example:
     <pre>$ safescale volume create myvolume</pre>
-    response on success:REVIEW_ME
+    response on success
     <pre>
 {
   "result": {
@@ -1720,7 +1725,7 @@ The following actions are proposed:
     Get info about a volume.<br><br>
     example:
     <pre>$ safescale volume inspect myvolume</pre>
-    response on success: REVIEW_ME
+    response on success
     <pre>
 {
   "result": {
@@ -1922,7 +1927,7 @@ The following actions are proposed:
     Get detailed information about the share.<br><br>
     example:
     <pre>$ safescale share inspect myshare</pre>
-    response on success: REVIEW_ME
+    response on success
     <pre>
 {
   "result": {
@@ -1951,7 +1956,7 @@ The following actions are proposed:
   "status": "success"
 }
     </pre>
-    response on failure:REVIEW_ME
+    response on failure
     <pre>
 {
   "error": {
@@ -1988,11 +1993,11 @@ The following actions are proposed:
     <pre>
 {"result":null,"status":"success"}
     </pre>
-    response on failure (Share not found): REVIEW_ME
+    response on failure (Share not found)
     <pre>
 {"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find share 'myshare'}]"},"result":null,"status":"failure"}
     </pre>
-    response on failure (hHost not found): REVIEW_ME
+    response on failure (Host not found)
     <pre>
 {"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find host 'myclient'}]"},"result":null,"status":"failure"}
     </pre>
@@ -2008,11 +2013,11 @@ The following actions are proposed:
     <pre>
 {"result":null,"status":"success"}
     </pre>
-    response on failure (Host not found): REVIEW_ME
+    response on failure (Host not found)
     <pre>
 {"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find host 'myclient'}]"},"result":null,"status":"failure"}
     </pre>
-    response on failure (Share not found): REVIEW_ME
+    response on failure (Share not found)
     <pre>
 {"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find share 'myshare'}]"},"result":null,"status":"failure"}
     </pre>
@@ -2058,11 +2063,11 @@ The following actions are proposed:
     Create a bucket<br><br>
     example:
     <pre>$ safescale bucket create mybucket</pre>
-    response on success: REVIEW_ME
+    response on success
     <pre>
 {"result":null,"status":"success"}
     </pre>
-    response on failure: REVIEW_ME
+    response on failure
     <pre>
 {"error":{"exitcode":6,"message":"Cannot create bucket [caused by {bucket 'mybucket' already exists}]"},"result":null,"status":"failure"}
     </pre>
@@ -2074,7 +2079,7 @@ The following actions are proposed:
     List buckets<br><br>
     example:
     <pre>$ safescale bucket list</pre>
-    response: REVIEW_ME
+    response
     <pre>
 {"result":{"buckets":[{"name":"0.safescale-96d245d7cf98171f14f4bc0abd8f8019"},{"name":"mybucket"}]},"status":"success"}
     </pre>
@@ -2090,7 +2095,7 @@ The following actions are proposed:
     <pre>
 {"result":{"bucket":"mybucket","host":{}},"status":"success"}
     </pre>
-    response on failure: REVIEW_ME
+    response on failure
     <pre>
 {"error":{"exitcode":6,"message":"Cannot inspect bucket [caused by {failed to find bucket 'mybucket'}]"},"result":null,"status":"failure"}
     </pre>
@@ -2110,11 +2115,11 @@ The following actions are proposed:
     <pre>
 {"result":null,"status":"success"}
     </pre>
-    response on failure (Host not found): REVIEW_ME
+    response on failure (Host not found)
     <pre>
 {"error":{"exitcode":6,"message":"No host found with name or id 'myhost2'"},"result":null,"status":"failure"}
     </pre>
-    response on failure (Bucket not found): REVIEW_ME
+    response on failure (Bucket not found)
     <pre>
 {"error":{"exitcode":6,"message":"Not found"},"result":null,"status":"failure"}
     </pre>
@@ -2130,11 +2135,11 @@ The following actions are proposed:
     <pre>
 {"result":null,"status":"success"}
     </pre>
-    response on failure (Bucket not found): REVIEW_ME
+    response on failure (Bucket not found)
     <pre>
 {"error":{"exitcode":6,"message":"Failed to find bucket 'mybucket'"},"result":null,"status":"failure"}
     </pre>
-    response on failure (Host not found): REVIEW_ME
+    response on failure (Host not found)
     <pre>
 {"error":{"exitcode":6,"message":"Failed to find host 'myhost'"},"result":null,"status":"failure"}
     </pre>
@@ -2150,11 +2155,11 @@ The following actions are proposed:
     <pre>
 {"result":null,"status":"success"}
     </pre>
-    response on failure (Bucket not found): REVIEW_ME
+    response on failure (Bucket not found)
     <pre>
 {"error":{"exitcode":6,"message":"cannot delete bucket [caused by {Container Not Found}]"},"result":null,"status":"failure"}
     </pre>
-    response on failure (Bucket mounted on Host(s)): REVIEW_ME
+    response on failure (Bucket mounted on Host(s))
     <pre>
 {"error":{"exitcode":6,"message":"cannot delete bucket [caused by {Container Not Empty}]"},"result":null,"status":"failure"}
     </pre>
@@ -2177,7 +2182,7 @@ The following actions are proposed:
   <td valign="top"><code>safescale [global_options] ssh run -c "&lt;command&gt;" &lt;host_name_or_id&gt;</code></td>
   <td>
     Run a command on the host<br><br>
-    <code>command</code> is the command to execute remotely.<br><br> REVIEW_ME
+    <code>command</code> is the command to execute remotely.<br><br>
     example:
     <pre>$ safescale ssh run -c "ls -la ~" example_host</pre>
     response on success:
@@ -2199,14 +2204,14 @@ drwx------ 2 safescale safescale 4096 Jun  5 13:00 .ssh
   <td valign="top"><code>safescale [global_options] ssh copy &lt;src&gt; &lt;dest&gt;</code></td>
   <td>
     Copy a local file/directory to an Host or copy from an Host to local<br><br>
-    example: REVIEW_ME
+    example
     <pre>$ safescale ssh copy /my/local/file example_host:/remote/path</pre>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] ssh connect &lt;host_name_or_id&gt;</code></td>
   <td>
-    REVIEW_ME: Connect to an Host with interactive shell<br><br>
+    Connect to an Host with interactive shell<br><br>
     example:
     <pre>$ safescale ssh connect example_host</pre>
     response on success:
@@ -2322,12 +2327,12 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster state &lt;cluster_name&gt;</code></td>
-  <td>REVIEW_ME: Get current state of a Cluster<br><br>
+  <td>Get current state of a Cluster<br><br>
       example:
       <pre>$ safescale cluster state mycluster</pre>
       response on success:
       <pre>
-{"result":{
+{"result":{"Name":"mycluster","State":1,"StateLabel":"Nominal"},"status":"success"}
       </pre>
       response on failure:
       <pre>
@@ -2408,7 +2413,7 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster expand [command_options] &lt;cluster_name&gt;</code></td>
-  <td>REVIEW_ME:Creates new Cluster nodes and add them to Cluster for duty<br><br>
+  <td>Creates new Cluster nodes and add them to Cluster for duty<br><br>
       <code>command_options</code>:
       <ul>
       </ul>
@@ -2416,7 +2421,7 @@ The following actions are proposed:
       <pre>$ safescale cluster expand mycluster</pre>
       response on success:
       <pre>
-{"result":{
+{"result":{"nodes":[{"creation_date":"2023-01-30T17:52:41Z","id":"551e2db3-eb78-4e22-a067-29d7899749c8","kvs":[{"key":"Revision","value":"dce4ee77859e1e249a39ec84d18b41f4ee4de319"},{"key":"Template","value":"906e8259-0340-4856-95b5-4ea2d26fe377"},{"key":"clusterID","value":"ed7fde77-4c6b-495e-afc5-0edcd8b67b67"},{"key":"type","value":"node"},{"key":"CreationDate","value":"2023-01-30T17:52:41Z"},{"key":"DeclaredInBucket","value":"0.safescale-f63b10c1f1d99a0014bfd076b894219f.afraid"},{"key":"Image","value":"75483863-4aee-4e37-a93e-5cb49ea13d1b"},{"key":"ManagedBy","value":"safescale"}],"name":"corvo-node-7","password":"...","private_ip":"192.168.37.9","private_key":"-----BEGIN RSA PRIVATE KEY-----\n.....\n-----END RSA PRIVATE KEY-----","state":2,"state_label":"Started","template":"b2-7"}]},"status":"success"}
       </pre>
       response on failure:
       <pre>
@@ -2426,12 +2431,12 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster shrink [command_options] &lt;cluster_name&gt;</code></td>
-  <td>REVIEW_ME: Reduce the numbers of Cluster nodes and deletes the chosen ones<br><br>
+  <td>Reduce the numbers of Cluster nodes and deletes the chosen ones<br><br>
       example:
       <pre>$ safescale cluster shrink mycluster</pre>
       response on success:
       <pre>
-{"result":{
+{"result":null,"status":"success"}
       </pre>
       response on failure:
       <pre>
@@ -2489,16 +2494,17 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster helm [command_options] &lt;cluster_name&gt; -- &lt;helm_parameters&gt;</code></td>
-  <td>REVIEW_ME: Executes helm command on Cluster<br><br>
+  <td>Executes helm command on Cluster<br><br>
       example:
       <pre>$ safescale cluster helm mycluster -- install nginx</pre>
       response on success:
       <pre>
-{"result":{
+{"result":null,"status":"success"}
       </pre>
       response on failure:
       <pre>
-{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+-bash: helm: command not found
+{"error":{"exitcode":1,"message":""},"result":null,"status":"failure"}
       </pre>
   </td>
 </tr>
@@ -2519,12 +2525,12 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
 </tr>
 <!-- <tr>
   <td valign="top"><code>safescale [global_options] cluster master inspect [command_options] &lt;cluster_name&gt; &lt;master_name&gt;</code></td>
-  <td>REVIEW_ME: List the masters of a cluster<br><br>
+  <td>List the masters of a cluster<br><br>
       example:
       <pre>$ safescale cluster master inspect mycluster mycluster-master-1</pre>
       response on success:
       <pre>
-{"result":
+{"result":{"creation_date":"2023-01-30T14:33:33Z","id":"94f3281b-d737-46aa-9cfa-304856b819a8","kvs":[{"key":"Revision","value":"c4b987e257ff31e2610d57d94cb1eff9cb88c78d"},{"key":"Template","value":"a33fdf1d-0cec-42bb-89c6-b023331da2f4"},{"key":"clusterID","value":"ed7fde77-4c6b-495e-afc5-0edcd8b67b67"},{"key":"type","value":"master"},{"key":"CreationDate","value":"2023-01-30T14:33:33Z"},{"key":"DeclaredInBucket","value":"0.safescale-f63b10c1f1d99a0014bfd076b894219f.afraid"},{"key":"Image","value":"75483863-4aee-4e37-a93e-5cb49ea13d1b"},{"key":"ManagedBy","value":"safescale"}],"name":"corvo-master-2","password":".....","private_ip":"192.168.37.127","private_key":"-----BEGIN RSA PRIVATE KEY-----\n.....\n-----END RSA PRIVATE KEY-----","state":2,"state_label":"Started","template":"b2-15"},"status":"success"}
       </pre>
       response on failure (cluster not found):
       <pre>
@@ -2549,7 +2555,7 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
 </tr>
 <!-- <tr>
   <td valign="top"><code>safescale [global_options] cluster node inspect [command_options] &lt;cluster_name&gt; &lt;node_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Get info about a specific Cluster Node<br><br>
+  <td>Get info about a specific Cluster Node<br><br>
       example:
       <pre>$ safescale cluster node inspect mycluster mycluster-node-4</pre>
       response on success:
@@ -2568,12 +2574,12 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster node state [command_options] &lt;cluster_name&gt; &lt;node_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Get the state of a specific Cluster node<br><br>
+  <td>Get the state of a specific Cluster node<br><br>
       example:
       <pre>$ safescale cluster node state mycluster mycluster-node-4</pre>
       response on success:
       <pre>
-{"result":{
+{"result":{"name":"corvo-node-2","status_code":2,"status_label":"Started"},"status":"success"}
       </pre>
       response on failure (cluster not found):
       <pre>
@@ -2587,7 +2593,7 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster node stop [command_options] &lt;cluster_name&gt; &lt;node_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Disable a specific Cluster node of duty and stop it<br><br>
+  <td>Disable a specific Cluster node of duty and stop it<br><br>
       <code>command_options</code>:
       <ul>
       </ul>
@@ -2595,7 +2601,7 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
       <pre>$ safescale cluster node stop mycluster mycluster-node-4</pre>
       response on success:
       <pre>
-{"result":
+{"result":null,"status":"success"}
       </pre>
       response on failure:
       <pre>
@@ -2605,12 +2611,12 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster node start [command_options] &lt;cluster_name&gt; &lt;node_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Start a specific Cluster node and enable it for duty<br><br>
+  <td>Start a specific Cluster node and enable it for duty<br><br>
       example:
       <pre>$ safescale cluster node start mycluster mycluster-node-4</pre>
       response on success:
       <pre>
-{"result":
+{"result":null,"status":"success"}
       </pre>
       response on failure:
       <pre>

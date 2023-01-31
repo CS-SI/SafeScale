@@ -18,6 +18,7 @@ package resources
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -40,6 +41,7 @@ type Metadata interface {
 	ReadByID(ctx context.Context, id string) fail.Error                                // reads the data from Object Storage by id
 	Reload(ctx context.Context) fail.Error                                             // Reloads the metadata from the Object Storage, overriding what is in the object
 	Sdump(ctx context.Context) (string, fail.Error)
+	Service() iaas.Service // Undocumented implicit dependency
 }
 
 type Consistent interface {

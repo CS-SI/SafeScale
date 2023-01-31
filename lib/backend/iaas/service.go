@@ -63,7 +63,6 @@ type Service interface {
 	ListTemplatesBySizing(context.Context, abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
 	ObjectStorageConfiguration(ctx context.Context) (objectstorage.Config, fail.Error)
 	SearchImage(context.Context, string) (*abstract.Image, fail.Error)
-	TenantCleanup(context.Context, bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
 
 	GetLock(abstract.Enum) (*sync.Mutex, fail.Error)
 

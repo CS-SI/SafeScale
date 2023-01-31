@@ -94,40 +94,6 @@ func convertTargetType(in protocol.FeatureTargetType) (featuretargettype.Enum, f
 	return targetType, nil
 }
 
-// Export exports the content of the feature file
-func (s *FeatureListener) Export(inctx context.Context, in *protocol.FeatureDetailRequest) (_ *protocol.FeatureExportResponse, ferr error) {
-	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)
-	defer fail.OnExitWrapError(inctx, &ferr, "cannot export Feature")
-	defer fail.OnPanic(&ferr)
-
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if inctx == nil {
-		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
-	}
-
-	targetType, xerr := convertTargetType(in.GetTargetType())
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	targetRef, _ := srvutils.GetReference(in.GetTargetRef())
-	if targetRef == "" {
-		return nil, fail.InvalidRequestError("target reference is missing")
-	}
-	featureName := in.GetName()
-
-	job, xerr := PrepareJob(inctx, in.GetTargetRef().GetTenantId(), fmt.Sprintf("/feature/%s/check/%s/%s", featureName, targetType, targetRef))
-	if xerr != nil {
-		return nil, xerr
-	}
-	defer job.Close()
-
-	handler := handlers.NewFeatureHandler(job)
-	return handler.Export(targetType, targetRef, featureName, in.GetEmbedded())
-}
-
 // Check checks if a feature installed on target
 func (s *FeatureListener) Check(inctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &ferr)

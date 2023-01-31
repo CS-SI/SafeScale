@@ -3200,7 +3200,7 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 			default:
 			}
 
-			hs, err := instance.GetState(ctx)
+			hs, err := instance.ForceGetState(ctx)
 			if err != nil {
 				return err
 			}
@@ -3282,7 +3282,7 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 			default:
 			}
 
-			hs, err := instance.GetState(ctx)
+			hs, err := instance.ForceGetState(ctx)
 			if err != nil {
 				return err
 			}

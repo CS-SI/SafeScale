@@ -429,44 +429,6 @@ func (c clusterConsumer) ListFeatures(clusterName string, all bool, timeout time
 	return list, nil
 }
 
-// ExportFeature recovers content of the feature file and returns it
-func (c clusterConsumer) ExportFeature(clusterName, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureExportResponse, error) {
-	if clusterName == "" {
-		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
-	}
-
-	c.session.Connect()
-	defer c.session.Disconnect()
-
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	service := protocol.NewFeatureServiceClient(c.session.connection)
-	request := &protocol.FeatureDetailRequest{
-		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
-		Name:       featureName,
-		Embedded:   embedded,
-	}
-
-	// finally, using context
-	newCtx := ctx
-	if timeout != 0 {
-		aCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		newCtx = aCtx
-	}
-
-	list, err := service.Export(newCtx, request)
-	if err != nil {
-		return nil, err
-	}
-
-	return list, nil
-}
-
 // FindAvailableMaster ...
 func (c clusterConsumer) FindAvailableMaster(clusterName string, timeout time.Duration) (*protocol.Host, error) {
 	if clusterName == "" {

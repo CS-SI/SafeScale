@@ -591,6 +591,22 @@ func (s stack) rpcDeleteFloatingIP(ctx context.Context, id string) fail.Error {
 	)
 }
 
-func (s stack) rpcGetFloatingIP(ctx context.Context, id string) (interface{}, fail.Error) {
-	panic("not implemented")
+func (s stack) rpcGetFloatingIP(ctx context.Context, id string) (*floatingips.FloatingIP, fail.Error) {
+	if id == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
+	}
+
+	var res *floatingips.FloatingIP
+
+	return res, stacks.RetryableRemoteCall(ctx,
+		func() error {
+			a, b := floatingips.Get(s.ComputeClient, id).Extract()
+			if b != nil {
+				return b
+			}
+			res = a
+			return b
+		},
+		NormalizeError,
+	)
 }

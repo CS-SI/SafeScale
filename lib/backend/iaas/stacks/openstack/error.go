@@ -104,6 +104,9 @@ func NormalizeError(err error) fail.Error {
 			if strings.Contains(err.Error(), "NeutronError") {
 				return fail.InvalidRequestError(e.Error())
 			}
+			if strings.Contains(err.Error(), "Unexpected API Error") {
+				return fail.InvalidRequestError(e.Error())
+			}
 			return fail.ConvertError(defaultErrorInterpreter(err))
 		}
 	}

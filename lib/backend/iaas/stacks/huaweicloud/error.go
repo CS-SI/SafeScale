@@ -103,6 +103,9 @@ func NormalizeError(err error) fail.Error {
 			case "EOF":
 				return fail.NotFoundError("EOF")
 			default:
+				if strings.Contains(err.Error(), "Unexpected API Error") {
+					return fail.InvalidRequestError(e.Error())
+				}
 				return fail.NewError("unhandled error received from provider: %s", err.Error())
 			}
 		}
