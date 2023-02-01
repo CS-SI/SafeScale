@@ -70,7 +70,7 @@ For example the following command creates a Kubernetes cluster named `k8s-cluste
 $ safescale cluster create --flavor k8s --complexity Normal k8s-cluster
 ```
 
-Supplemental software and/or configurations can be installed in 2 ways on SafeScale Hosts or Clusters:
+Supplemental software and/or configurations can be installed in 3 ways on SafeScale Hosts or Clusters:
 - using ssh command (the old and manual way):
   ```
   $ safescale ssh run -c "apt install nginx" my-host
@@ -79,6 +79,30 @@ Supplemental software and/or configurations can be installed in 2 ways on SafeSc
 
   ```
   $ safescale cluster feature add mycluster keycloak
+  ```
+- and using ansible, which is the preferred method to install your software in a SafeScale cluster:
+  installing a simple script:
+  ```
+  $ safescale cluster ansible playbook my-cluster my-ansible-script.yml
+  ```
+
+  where my-ansible-script.yml is something like:
+```yml
+---
+- hosts: nodes
+  tasks:
+    - name: Install golang
+      become: yes
+      apt:
+        pkg:
+          - golang
+          - bison
+
+```
+
+  or a more complex one (put all your files in a .zip)
+  ```
+  $ safescale cluster ansible playbook my-cluster my-zipped-scripts.zip
   ```
 
 A "SafeScale `Feature`" is a file in YAML format that describes the operations to check/add/remove software and/or configuration on a target (Host or Cluster).
@@ -92,16 +116,6 @@ A `Feature` can describe operations using different methods:
 Additionally, a `Feature` is able to apply:
 - reverse proxy rules
 - Security Group rules
-
-### SafeScale Security
-
-SafeScale Security is a Web API and a Web Portal to create on-demand security gateways to protect Web services along 5 axes: Encryption, Authentication, Authorization, Auditability and Intrusion detection.
-SafeScale Security relies on Kong, an open source generic proxy to be put in between user and service. Kong intercepts user requests and service responses and executes plugins to empower any API. To build a SafeScale Security gateway 3 plugins are used:
-- Dynamic SSL plugin to encrypt traffic between the user and the service protected
-- Open ID plugin to connect the Identity and Access Management server, KeyCloak
-- UDP Log plugin to connect the Log management system, Logstash
-The design of a SafeScale Security gateway can be depicted as below:
-![SafeScale Security](doc/img/SafeScale_Security.png "SafeScale Security")
 
 ## Available features
 SafeScale is currently under active development and does not yet offer all the abilities planned. However, we are already publishing it with the following ones:
