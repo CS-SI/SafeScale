@@ -20,17 +20,15 @@ SafeScale is an Infrastructure and Platform as Code tool.
   - [Description](#description)
     - [SafeScale Infra](#safescale-infra)
     - [SafeScale Platform](#safescale-platform)
-    - [SafeScale Security](#safescale-security)
   - [Available features](#available-features)
   - [Contributing](#contributing)
   - [License](#license)
 
 ## Description
-SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters that span multiple Clouds. These APIs and CLIs are divided in 3 service layers:
+SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters that span multiple Clouds. These APIs and CLIs are divided in 2 service layers:
 
 - SafeScale Infra to manage Cloud infrastructure (IaaS - Infrastructure as a Service)
 - SafeScale Platform to manage Cloud computing platforms (PaaS - Platform as a Service)
-- SafeScale Security to secure user environments
 
 ![SafeScale](doc/img/SafeScale.png "SafeScale")
 
@@ -80,7 +78,7 @@ Supplemental software and/or configurations can be installed in 3 ways on SafeSc
   ```
   $ safescale cluster feature add mycluster keycloak
   ```
-- and using ansible, which is the preferred method to install your software in a SafeScale cluster:
+- and using ansible, which is the PREFERRED method to install your software in a SafeScale cluster:
   installing a simple script:
   ```
   $ safescale cluster ansible playbook my-cluster my-ansible-script.yml
