@@ -183,17 +183,34 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			if req.Flavor == clusterflavor.K8S {
 				lowerOS := strings.ToLower(req.GatewaysDef.Image)
 				if strings.Contains(lowerOS, "centos 7") {
-					return nil, fail.NewError("K8s with CentOS 7 not supported")
+					return nil, fail.NewError("Sorry, K8s with CentOS 7 not supported")
 				}
 
 				lowerOS = strings.ToLower(req.MastersDef.Image)
 				if strings.Contains(lowerOS, "centos 7") {
-					return nil, fail.NewError("K8s with CentOS 7 not supported")
+					return nil, fail.NewError("Sorry, K8s with CentOS 7 not supported")
 				}
 
 				lowerOS = strings.ToLower(req.NodesDef.Image)
 				if strings.Contains(lowerOS, "centos 7") {
-					return nil, fail.NewError("K8s with CentOS 7 not supported")
+					return nil, fail.NewError("Sorry, K8s with CentOS 7 not supported")
+				}
+			}
+
+			if req.Flavor != 0 {
+				lowerOS := strings.ToLower(req.GatewaysDef.Image)
+				if strings.Contains(lowerOS, "ubuntu 22.04") {
+					return nil, fail.NewError("Sorry, Ubuntu 22.04 not supported")
+				}
+
+				lowerOS = strings.ToLower(req.MastersDef.Image)
+				if strings.Contains(lowerOS, "ubuntu 22.04") {
+					return nil, fail.NewError("Sorry, Ubuntu 22.04 not supported")
+				}
+
+				lowerOS = strings.ToLower(req.NodesDef.Image)
+				if strings.Contains(lowerOS, "ubuntu 22.04") {
+					return nil, fail.NewError("Sorry, Ubuntu 22.04 not supported")
 				}
 			}
 
