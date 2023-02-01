@@ -19,6 +19,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
 	"github.com/sony/gobreaker"
 	"math"
 	"net"
@@ -177,6 +178,23 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
+			}
+
+			if req.Flavor == clusterflavor.K8S {
+				lowerOS := strings.ToLower(req.GatewaysDef.Image)
+				if strings.Contains(lowerOS, "centos 7") {
+					return nil, fail.NewError("K8s with CentOS 7 not supported")
+				}
+
+				lowerOS = strings.ToLower(req.MastersDef.Image)
+				if strings.Contains(lowerOS, "centos 7") {
+					return nil, fail.NewError("K8s with CentOS 7 not supported")
+				}
+
+				lowerOS = strings.ToLower(req.NodesDef.Image)
+				if strings.Contains(lowerOS, "centos 7") {
+					return nil, fail.NewError("K8s with CentOS 7 not supported")
+				}
 			}
 
 			var networkInstance resources.Network
