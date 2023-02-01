@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,31 +19,22 @@ package operations
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-	"sync"
-	"time"
-
-	"github.com/eko/gocache/v2/store"
-	"github.com/farmergreg/rfsnotify"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-	"gopkg.in/fsnotify.v1"
-
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 var (
-	featureFileController = make(map[string]interface{})
-	featureFileFolders    = []string{
+	featureFileFolders = []string{
 		"$HOME/.safescale/features",
 		"$HOME/.config/safescale/features",
 		"/etc/safescale/features",
@@ -57,18 +48,16 @@ var (
 
 // FeatureFile contains the information about an installable Feature
 type FeatureFile struct {
-	displayName               string                       // is the name of the feature
-	fileName                  string                       // is the name of the specification file
-	displayFileName           string                       // is the 'pretty' name of the specification file
-	embedded                  bool                         // tells if the Feature is embedded in SafeScale
-	specs                     *viper.Viper                 // is the Viper instance containing Feature file content
-	observersLock             *sync.RWMutex                // lock to access field 'observers'
-	observers                 map[string]observer.Observer // contains the Observers of the FeatureFile
-	suitableFor               map[string]struct{}          // tells for what the Feature is suitable
-	parameters                map[string]FeatureParameter  // contains all the parameters defined in Feature file
-	versionControl            map[string]string            // contains the templated bash code to determine version of a component used in the FeatureFile
-	dependencies              map[string]struct{}          // contains the list of features required to install the Feature described by the file
-	clusterSizingRequirements map[string]interface{}       // contains the cluster sizing requirements to allow install
+	displayName               string                      // is the name of the feature
+	fileName                  string                      // is the name of the specification file
+	displayFileName           string                      // is the 'pretty' name of the specification file
+	embedded                  bool                        // tells if the Feature is embedded in SafeScale
+	specs                     *viper.Viper                // is the Viper instance containing Feature file content
+	suitableFor               map[string]struct{}         // tells for what the Feature is suitable
+	parameters                map[string]FeatureParameter // contains all the parameters defined in Feature file
+	versionControl            map[string]string           // contains the templated bash code to determine version of a component used in the FeatureFile
+	dependencies              map[string]struct{}         // contains the list of features required to install the Feature described by the file
+	clusterSizingRequirements map[string]interface{}      // contains the cluster sizing requirements to allow install
 	installers                map[string]interface{}
 }
 
@@ -76,8 +65,6 @@ func newFeatureFile(fileName, displayName string, embedded bool, specs *viper.Vi
 	instance := &FeatureFile{
 		parameters:      map[string]FeatureParameter{},
 		versionControl:  map[string]string{},
-		observersLock:   &sync.RWMutex{},
-		observers:       map[string]observer.Observer{},
 		fileName:        fileName,
 		displayName:     displayName,
 		displayFileName: fileName,
@@ -120,9 +107,6 @@ func (ff *FeatureFile) Replace(p data.Clonable) (data.Clonable, error) {
 	ff.displayFileName = src.displayFileName
 	ff.specs = src.specs // Note: using same pointer here is wanted; do not raise an alert in UT on this
 	ff.embedded = src.embedded
-	for k, v := range src.observers {
-		ff.observers[k] = v
-	}
 	return ff, nil
 }
 
@@ -164,108 +148,6 @@ func (ff *FeatureFile) Specs() *viper.Viper {
 
 	roSpecs := *(ff.specs)
 	return &roSpecs
-}
-
-// LoadFeatureFile searches for a spec file named 'name' and initializes a new FeatureFile object
-// with its content
-// 'xerr' may contain:
-//   - nil: everything worked as expected
-//   - fail.ErrNotFound: no FeatureFile is found with the name
-//   - fail.ErrSyntax: FeatureFile contains syntax error
-func LoadFeatureFile(inctx context.Context, svc iaas.Service, name string, embeddedOnly bool) (*FeatureFile, fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  *FeatureFile
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		ga, gerr := func() (_ *FeatureFile, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			if svc == nil {
-				return nil, fail.InvalidParameterCannotBeNilError("svc")
-			}
-			if name == "" {
-				return nil, fail.InvalidParameterError("name", "cannot be empty string")
-			}
-
-			// trick to avoid collisions
-			var kt *FeatureFile
-			cachename := fmt.Sprintf("%T/%s", kt, name)
-
-			cache, xerr := svc.GetCache(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-					casted, ok := val.(*FeatureFile)
-					if ok {
-						incrementExpVar("newhost.cache.hit")
-						return casted, nil
-					}
-				}
-			}
-
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onFeatureFileCacheMiss(svc, name, embeddedOnly) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			featureFileInstance, ok := anon.(*FeatureFile)
-			if !ok {
-				return nil, fail.InconsistentError("cache content for key '%s' is not a resources.Feature", name)
-			}
-			if featureFileInstance == nil {
-				return nil, fail.InconsistentError("nil value found in Feature cache for key '%s'", name)
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, featureFileInstance.GetName()), featureFileInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-				hid, err := featureFileInstance.GetID()
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), featureFileInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-					casted, ok := val.(*FeatureFile)
-					if ok {
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.FeatureFile")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("feature cache response (%s): %v", cachename, xerr)
-				}
-			}
-
-			return featureFileInstance, nil
-		}()
-		chRes <- result{ga, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
 }
 
 // onFeatureFileCacheMiss is called when host 'ref' is not found in cache
@@ -722,143 +604,4 @@ func setViperConfigPathes(v *viper.Viper) {
 			v.AddConfigPath(i)
 		}
 	}
-}
-
-// watchFeatureFileFolders watches folders that may contain Feature Files and react to changes (invalidating cache entry
-// already loaded)
-func watchFeatureFileFolders(ctx context.Context) error {
-	watcher, err := rfsnotify.NewWatcher()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = watcher.Close() }()
-
-	done := make(chan bool)
-	go func() {
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				onFeatureFileEvent(ctx, watcher, event)
-
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-				logrus.WithContext(ctx).Error("Feature File watcher returned an error: ", err)
-			}
-		}
-	}()
-
-	for _, v := range getFeatureFileFolders(false) {
-		err = addPathToWatch(ctx, watcher, v)
-		if err != nil {
-			return err
-		}
-	}
-
-	<-done
-	return nil
-}
-
-func addPathToWatch(ctx context.Context, w *rfsnotify.RWatcher, path string) error {
-	err := w.AddRecursive(path)
-	if err != nil {
-		switch casted := err.(type) {
-		case *fs.PathError:
-			switch casted.Err {
-			case NOTFOUND:
-				// folder not found, ignore it
-				debug.IgnoreError2(ctx, err)
-				return nil
-			default:
-				logrus.WithContext(ctx).Error(err)
-				return err
-			}
-		default:
-			logrus.WithContext(ctx).Error(err)
-			return err
-		}
-	}
-
-	logrus.WithContext(ctx).Debugf("adding monitoring of folder '%s' for Feature file changes", path)
-	return nil
-}
-
-// onFeatureFileEvent reacts to filesystem change event
-func onFeatureFileEvent(ctx context.Context, w *rfsnotify.RWatcher, e fsnotify.Event) {
-	switch {
-	case e.Op&fsnotify.Chmod == fsnotify.Chmod:
-		fallthrough
-	case e.Op&fsnotify.Remove == fsnotify.Remove:
-		fallthrough
-	case e.Op&fsnotify.Rename == fsnotify.Rename:
-		fallthrough
-	case e.Op&fsnotify.Write == fsnotify.Write:
-		relativeName := reduceFilename(e.Name)
-		stat, err := os.Stat(e.Name)
-		if err == nil {
-			if stat.IsDir() {
-				// If the fs object is a folder, do nothing more
-				return
-			}
-
-			// If the fs object is a file and is still readable, do nothing more
-			if e.Op&fsnotify.Chmod == fsnotify.Chmod {
-				fd, err := os.Open(e.Name)
-				if err == nil {
-					_ = fd.Close()
-					return
-				}
-			}
-		}
-
-		// invalidate only .yml/.yaml files from cache
-		extension := path.Ext(relativeName)
-		if extension != ".yml" && extension != ".yaml" {
-			return
-		}
-
-		// From here, we need to invalidate cache entry, either because content has changed or file have been removed/renamed or updated
-		featureName := strings.TrimPrefix(strings.TrimSuffix(relativeName, extension), "/")
-		if len(featureName) != len(relativeName) {
-			delete(featureFileController, featureName)
-		}
-
-	case e.Op&fsnotify.Create == fsnotify.Create:
-		// If the object created is a path, add it to RWatcher (if it's a file, nothing more to do, cache miss will
-		// do the necessary in time
-		fi, err := os.Stat(e.Name)
-		if err == nil && fi.IsDir() {
-			_ = w.AddRecursive(e.Name)
-		}
-	}
-}
-
-// reduceFilename removes the absolute part of 'name' corresponding to folder
-func reduceFilename(name string) string {
-	folders := getFeatureFileFolders(false)
-	last := name
-	for _, v := range folders {
-		if strings.HasPrefix(name, v) {
-			reduced := strings.TrimPrefix(name, v)
-			if len(reduced) < len(last) {
-				last = reduced
-			}
-		}
-	}
-	return strings.TrimLeft(last, "/")
-}
-
-// StartFeatureFileWatcher inits the watcher of Feature File changes
-func StartFeatureFileWatcher() {
-	// Starts go routine watching changes in Feature File folders
-	go func() {
-		err := watchFeatureFileFolders(context.Background())
-		if err != nil {
-			logrus.WithContext(context.Background()).Error(err)
-		}
-	}()
 }

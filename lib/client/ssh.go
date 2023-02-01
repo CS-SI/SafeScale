@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -228,7 +228,7 @@ func (s sshConsumer) Copy(from, to string, connectionTimeout, executionTimeout t
 		return invalid, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet") // FIXME: Technical debt
 	}
 	if hostFrom == "" && hostTo == "" {
-		return invalid, "", "", fail.NotImplementedError("no host name specified neither in from nor to") // FIXME: Technical debt
+		return invalid, "", "", fail.InvalidParameterError("no host name specified neither in from nor to")
 	}
 
 	fromPath, rerr := extractPath(from)

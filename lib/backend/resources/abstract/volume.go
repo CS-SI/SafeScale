@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package abstract
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
@@ -51,6 +52,7 @@ func NewVolume() *Volume {
 	}
 	nv.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	nv.Tags["ManagedBy"] = "safescale"
+	nv.Tags["Revision"] = lib.Revision
 	return nv
 }
 

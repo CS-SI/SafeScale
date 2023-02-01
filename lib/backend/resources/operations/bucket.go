@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,6 @@ package operations
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"strings"
-	"sync"
-	"time"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -36,11 +31,11 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/eko/gocache/v2/store"
-	"github.com/sirupsen/logrus"
+	"reflect"
+	"strings"
+	"sync"
 )
 
 const (
@@ -72,109 +67,6 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 		MetadataCore: coreInstance,
 	}
 	return instance, nil
-}
-
-// LoadBucket instantiates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
-func LoadBucket(inctx context.Context, svc iaas.Service, name string) (resources.Bucket, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if name == "" {
-		return nil, fail.InvalidParameterError("name", "cannot be empty string")
-	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  resources.Bucket
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		gb, gerr := func() (_ resources.Bucket, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			// trick to avoid collisions
-			var kt *bucket
-			cachename := fmt.Sprintf("%T/%s", kt, name)
-
-			cache, xerr := svc.GetCache(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-					casted, ok := val.(resources.Bucket)
-					if ok {
-						return casted, nil
-					}
-				}
-			}
-
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(ctx, svc, name) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			b, ok := anon.(resources.Bucket)
-			if !ok {
-				return nil, fail.InconsistentError("cache content should be a resources.Bucket", name)
-			}
-
-			if b == nil {
-				return nil, fail.InconsistentError("nil value found in Bucket cache for key '%s'", name)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = b.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, b.GetName()), b, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-				hid, err := b.GetID()
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), b, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-					casted, ok := val.(resources.Bucket)
-					if ok {
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.Bucket")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("bucket cache response (%s): %v", cachename, xerr)
-				}
-			}
-
-			return b, nil
-		}()
-		chRes <- result{gb, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
 }
 
 func onBucketCacheMiss(ctx context.Context, svc iaas.Service, ref string) (data.Identifiable, fail.Error) {
@@ -244,7 +136,6 @@ func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -255,11 +146,12 @@ func (instance *bucket) carry(ctx context.Context, clonable data.Clonable) (ferr
 }
 
 // Browse walks through Bucket metadata folder and executes a callback for each entry
-func (instance *bucket) Browse(ctx context.Context, callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error) (ferr fail.Error) {
+func (instance *bucket) Browse(
+	ctx context.Context, callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error,
+) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Do not test with Isnull here, as Browse may be used from null value
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -268,9 +160,6 @@ func (instance *bucket) Browse(ctx context.Context, callback func(storageBucket 
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.bucket")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
@@ -354,7 +243,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -369,10 +258,6 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(ctx, true, "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -440,17 +325,13 @@ func (instance *bucket) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
-
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
 	bun := instance.GetName()
 
 	// -- check Bucket is not still mounted
-	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {
@@ -519,10 +400,6 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 		return fail.InvalidParameterCannotBeEmptyStringError("path")
 	}
 
-	tracer := debug.NewTracer(ctx, true, "('%s', '%s')", hostName, path).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
-
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
@@ -541,7 +418,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	}
 
 	// -- check if Bucket is already mounted on any Host (only one Mount by Bucket allowed by design, to mitigate sync issues induced by Object Storage)
-	xerr = instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {
@@ -678,10 +555,6 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 		return fail.InvalidParameterCannotBeEmptyStringError("hostName")
 	}
 
-	tracer := debug.NewTracer(ctx, true, "('%s')", hostName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
-
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
@@ -779,7 +652,7 @@ func (instance *bucket) ToProtocol(ctx context.Context) (*protocol.BucketRespons
 		Name: bun,
 	}
 
-	xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,8 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -52,9 +50,6 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 	if request.Size <= 0 {
 		return nil, fail.InvalidParameterError("request.Size", "cannot be negative integer or 0")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// TODO: validate content of request
 
@@ -102,9 +97,6 @@ func (s stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volum
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	resp, xerr := s.rpcGetDisk(ctx, ref)
 	if xerr != nil {
 		return nil, xerr
@@ -139,9 +131,6 @@ func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error)
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	var out []*abstract.Volume
 	resp, xerr := s.rpcListDisks(ctx)
@@ -193,9 +182,6 @@ func (s stack) DeleteVolume(ctx context.Context, ref string) fail.Error {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	return s.rpcDeleteDisk(ctx, ref)
 }
 
@@ -210,9 +196,6 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 	if request.HostID == "" {
 		return "", fail.InvalidParameterCannotBeEmptyStringError("request.HostID")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, xerr := s.rpcCreateDiskAttachment(ctx, request.VolumeID, request.HostID)
 	if xerr != nil {
@@ -232,9 +215,6 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, hostRef, vaID string
 	if vaID == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", hostRef, vaID).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	serverID, diskID := extractFromAttachmentID(vaID)
 	instance, xerr := s.rpcGetInstance(ctx, serverID)
@@ -336,9 +316,6 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverRef, vaID strin
 		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverRef, vaID).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	return s.rpcDeleteDiskAttachment(ctx, vaID)
 }
 
@@ -350,9 +327,6 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverRef string) ([]*
 	if serverRef == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverRef")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", serverRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	var vats []*abstract.VolumeAttachment
 

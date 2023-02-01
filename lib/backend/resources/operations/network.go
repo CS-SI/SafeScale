@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ import (
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 )
 
@@ -67,108 +66,6 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 		MetadataCore: coreInstance,
 	}
 	return instance, nil
-}
-
-// LoadNetwork loads the metadata of a subnet
-func LoadNetwork(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Network, fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  resources.Network
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		ga, gerr := func() (_ resources.Network, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-			if svc == nil {
-				return nil, fail.InvalidParameterError("svc", "cannot be null value")
-			}
-			if ref = strings.TrimSpace(ref); ref == "" {
-				return nil, fail.InvalidParameterError("ref", "cannot be empty string")
-			}
-
-			// trick to avoid collisions
-			var kt *Network
-			cacheref := fmt.Sprintf("%T/%s", kt, ref)
-
-			cache, xerr := svc.GetCache(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(resources.Network)
-					if ok {
-						return casted, nil
-					}
-				}
-			}
-
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(ctx, svc, ref) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			networkInstance, ok := anon.(resources.Network)
-			if !ok {
-				return nil, fail.InconsistentError("cache content should be a resources.Network", ref)
-			}
-			if networkInstance == nil {
-				return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = networkInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, networkInstance.GetName()), networkInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-				hid, err := networkInstance.GetID()
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), networkInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(resources.Network)
-					if ok {
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.Network")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("network cache response (%s): %v", cacheref, xerr)
-				}
-			}
-
-			return networkInstance, nil
-
-		}()
-		chRes <- result{ga, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
 }
 
 // onNetworkCacheMiss is called when there is no instance in cache of Network 'ref'
@@ -241,9 +138,6 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 	if inctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	tracer := debug.NewTracer(inctx, true, "('%s', '%s')", req.Name, req.CIDR).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	svc := instance.Service()
 
@@ -372,7 +266,6 @@ func (instance *Network) carry(ctx context.Context, clonable data.Clonable) (fer
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -395,9 +288,6 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	tracer := debug.NewTracer(ctx, true, "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
@@ -441,8 +331,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Do not test with Isnull here, as Browse may be used from null value
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -483,6 +372,15 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	defer func() {
+		// drop the cache when we are done creating the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
+
 	type result struct {
 		rErr fail.Error
 	}
@@ -493,7 +391,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 		var outprops *serialize.JSONProperties
 		var networkAbstract *abstract.Network
 
-		xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			var ok bool
 			networkAbstract, ok = clonable.(*abstract.Network)
 			if !ok {
@@ -512,18 +410,13 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 		ctx := context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract) // nolint
 		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, outprops)       // nolint
 
-		tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
-		defer tracer.Exiting()
-
 		timings, xerr := instance.Service().Timings()
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
 		}
 
-		// instance.lock.Lock()
-		// defer instance.lock.Unlock()
-
+		// FIXME: Any metadata problem blocks resource destruction... great !!
 		xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			abstractNetwork, ok := clonable.(*abstract.Network)
 			if !ok {
@@ -745,7 +638,7 @@ func (instance *Network) GetCIDR(ctx context.Context) (cidr string, ferr fail.Er
 	// defer instance.lock.RUnlock()
 
 	cidr = ""
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -768,7 +661,7 @@ func (instance *Network) ToProtocol(ctx context.Context) (out *protocol.Network,
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
 
-	xerr := instance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())

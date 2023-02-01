@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,34 @@ message Reference {
 	string tenant_id = 1;
 	string id = 2;
 	string name = 3;
+}
+
+message HostDeleteRequest {
+	string tenant_id = 1;
+	string id = 2;
+	string name = 3;
+	bool force = 4;
+}
+
+message VolumeDeleteRequest {
+	string tenant_id = 1;
+	string id = 2;
+	string name = 3;
+	bool force = 4;
+}
+
+message BucketDeleteRequest {
+	string tenant_id = 1;
+	string id = 2;
+	string name = 3;
+	bool force = 4;
+}
+
+message ShareDeleteRequest {
+	string tenant_id = 1;
+	string id = 2;
+	string name = 3;
+	bool force = 4;
 }
 
 // Client Requests
@@ -57,17 +85,6 @@ message TenantName {
 	string name = 1;
 	string bucket_name = 2;
 	string provider = 3;
-}
-
-message TenantCleanupRequest {
-	string name = 1;
-	bool force = 2;
-}
-
-message TenantUpgradeRequest {
-	string name = 1;
-	bool force = 2;
-	bool dry_run = 3;
 }
 
 message TenantScanRequest {
@@ -150,18 +167,12 @@ message TenantInspectResponse {
 	TenantMetadata metadata = 6;
 }
 
-message TenantUpgradeResponse {
-	repeated string actions = 1;
-}
-
 service TenantService{
-	rpc Cleanup (TenantCleanupRequest) returns (google.protobuf.Empty){}
 	rpc Get (google.protobuf.Empty) returns (TenantName){}
 	rpc Inspect (TenantName) returns (TenantInspectResponse){}
 	rpc List (google.protobuf.Empty) returns (TenantList){}
 	rpc Scan (TenantScanRequest) returns (ScanResultList){}
 	rpc Set (TenantName) returns (google.protobuf.Empty){}
-	rpc Upgrade (TenantUpgradeRequest) returns (TenantUpgradeResponse){}
 }
 
 // Image
@@ -182,8 +193,6 @@ message ImageListRequest{
 
 service ImageService{
 	rpc List(ImageListRequest) returns (ImageList){}
-	//rpc Create(ImageCreateRequest) returns (Image){}
-	//rpc Delete(Image) returns (google.protobuf.Empty){}
 }
 
 
@@ -223,6 +232,7 @@ message Network {
 	NetworkState state = 8;             // Deprecated: moved to Subnet
 	repeated string subnets = 9;
 	repeated string dns_servers = 10;
+	repeated KeyValue kvs = 11;
 }
 
 message NetworkList {
@@ -312,6 +322,7 @@ message Subnet {
 	bool failover = 6;
 	SubnetState state = 7;
 	string network_id = 8;
+	repeated KeyValue kvs = 9;
 }
 
 message SubnetList {
@@ -336,8 +347,6 @@ service SubnetService {
 	rpc Delete(SubnetDeleteRequest) returns (google.protobuf.Empty){}
 	rpc BindSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
 	rpc UnbindSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
-	rpc EnableSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
-	rpc DisableSecurityGroup(SecurityGroupSubnetBindRequest) returns (google.protobuf.Empty){}
 	rpc ListSecurityGroups(SecurityGroupSubnetBindRequest) returns (SecurityGroupBondsResponse){}
 }
 
@@ -411,6 +420,7 @@ message Host {
 	bool managed = 17;
 	string template = 18;
 	repeated HostLabelResponse labels = 19;
+	repeated KeyValue kvs = 20;
 }
 
 message HostStatus {
@@ -442,7 +452,7 @@ service HostService {
 	rpc Inspect(Reference) returns (Host){}
 	rpc Status(Reference) returns (HostStatus){}
 	rpc List(HostListRequest) returns (HostList){}
-	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc Delete(HostDeleteRequest) returns (google.protobuf.Empty){}
 	rpc Start(Reference) returns (google.protobuf.Empty){}
 	rpc Stop(Reference) returns (google.protobuf.Empty){}
 	rpc Reboot(Reference) returns (google.protobuf.Empty){}
@@ -591,6 +601,7 @@ message VolumeInspectResponse {
 	string format = 7; // Deprecated: replaced by attachments field
 	string device = 8; // Deprecated: replaced by attachments field
 	repeated VolumeAttachmentResponse attachments = 10;
+	repeated KeyValue kvs = 11;
 }
 
 message VolumeAttachmentRequest {
@@ -626,7 +637,7 @@ service VolumeService {
 	rpc Create(VolumeCreateRequest) returns (VolumeInspectResponse) {}
 	rpc Attach(VolumeAttachmentRequest) returns (google.protobuf.Empty) {}
 	rpc Detach(VolumeDetachmentRequest) returns (google.protobuf.Empty){}
-	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc Delete(VolumeDeleteRequest) returns (google.protobuf.Empty){}
 	rpc List(VolumeListRequest) returns (VolumeListResponse) {}
 	rpc Inspect(Reference) returns (VolumeInspectResponse){}
 }
@@ -679,7 +690,7 @@ service BucketService {
 	rpc Create(BucketRequest) returns (google.protobuf.Empty){}
 	rpc Mount(BucketMountRequest) returns (google.protobuf.Empty){}
 	rpc Unmount(BucketMountRequest) returns (google.protobuf.Empty){}
-	rpc Delete(BucketRequest) returns (google.protobuf.Empty){}
+	rpc Delete(BucketDeleteRequest) returns (google.protobuf.Empty){}
 	rpc List(BucketListRequest) returns (BucketListResponse){}
 	rpc Inspect(BucketRequest) returns (BucketResponse){}
 	rpc Download(BucketRequest) returns (BucketDownloadResponse){}
@@ -762,7 +773,7 @@ message ShareMountList {
 
 service ShareService {
 	rpc Create(ShareDefinition) returns (ShareDefinition){}
-	rpc Delete(Reference) returns (google.protobuf.Empty){}
+	rpc Delete(ShareDeleteRequest) returns (google.protobuf.Empty){}
 	rpc List(Reference) returns (ShareList){}     // Here, Reference is used to carry tenant
 	rpc Mount(ShareMountDefinition) returns (ShareMountDefinition){}
 	rpc Unmount(ShareMountDefinition) returns (google.protobuf.Empty){}
@@ -814,8 +825,8 @@ enum ClusterComplexity {
 
 enum ClusterFlavor {
 	CF_UNKNOWN = 0;
-	CF_BOH = 1;
 	CF_K8S = 2;
+	CF_BOH = 4;
 }
 
 message ClusterListResponse {
@@ -934,6 +945,12 @@ message ClusterNodeRequest {
 	Reference host = 2;     // on deletion, if not set, requests to delete last added node
 }
 
+message ClusterDeleteNodeRequest {
+	string name = 1;
+	Reference host = 2;     // on deletion, if not set, requests to delete last added node
+	bool force = 3;
+}
+
 service ClusterService {
 	rpc List(Reference) returns (ClusterListResponse){}
 	rpc Inspect(Reference) returns (ClusterResponse){}
@@ -946,7 +963,7 @@ service ClusterService {
 	rpc Shrink(ClusterResizeRequest) returns (ClusterNodeListResponse){}
 	rpc ListNodes(Reference) returns (ClusterNodeListResponse){}
 	rpc InspectNode(ClusterNodeRequest) returns (Host){}
-	rpc DeleteNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
+	rpc DeleteNode(ClusterDeleteNodeRequest) returns (google.protobuf.Empty){}
 	rpc StopNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
 	rpc StartNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
 	rpc StateNode(ClusterNodeRequest) returns (HostStatus){}
@@ -983,24 +1000,6 @@ message FeatureListResponse {
 	repeated FeatureResponse features = 1;
 }
 
-message FeatureDetailRequest {
-	FeatureTargetType target_type = 1;
-	Reference target_ref = 2;
-	string name = 3;
-	bool embedded = 4;
-}
-
-message FeatureDetailResponse {
-	bool eligible = 1;
-	bool installed = 2;
-	repeated string dependencies = 3;
-	repeated string parameters = 4;
-}
-
-message FeatureExportResponse {
-	repeated string export = 1;
-}
-
 message FeatureSettings {
 	bool skip_proxy = 1;
 	bool serialize = 2;
@@ -1020,8 +1019,6 @@ message FeatureActionRequest {
 
 service FeatureService {
 	rpc List(FeatureListRequest) returns (FeatureListResponse){}
-	rpc Inspect(FeatureDetailRequest) returns (FeatureDetailResponse){}
-	rpc Export(FeatureDetailRequest) returns (FeatureExportResponse){}
 	rpc Check(FeatureActionRequest) returns (google.protobuf.Empty){}
 	rpc Add(FeatureActionRequest) returns (google.protobuf.Empty){}
 	rpc Remove(FeatureActionRequest) returns (google.protobuf.Empty){}
@@ -1134,7 +1131,6 @@ service SecurityGroupService {
 	rpc Inspect(Reference) returns (SecurityGroupResponse){}
 	rpc List(SecurityGroupListRequest) returns (SecurityGroupListResponse){}
 	rpc Reset(Reference) returns (google.protobuf.Empty){}
-	rpc Sanitize(Reference) returns (google.protobuf.Empty){}
 }
 
 // Public IP
@@ -1195,12 +1191,19 @@ message LabelInspectRequest {
 	bool is_tag = 2;
 }
 
+message LabelDeleteRequest {
+	Reference Label = 1;
+	bool is_tag = 2;
+	bool force = 3;
+}
+
 message LabelInspectResponse {
 	string id = 1;
 	string name = 2;
 	repeated LabelHostResponse hosts = 3;
 	bool has_default = 4;
 	string default_value = 5;
+	string value = 6;
 }
 
 message LabelListRequest {
@@ -1230,7 +1233,7 @@ message LabelBoundsRequest {
 
 service LabelService {
 	rpc Create(LabelCreateRequest) returns (LabelInspectResponse) {}
-	rpc Delete(LabelInspectRequest) returns (google.protobuf.Empty){}
+	rpc Delete(LabelDeleteRequest) returns (google.protobuf.Empty){}
 	rpc List(LabelListRequest) returns (LabelListResponse) {}
 	rpc Inspect(LabelInspectRequest) returns (LabelInspectResponse){}
 }

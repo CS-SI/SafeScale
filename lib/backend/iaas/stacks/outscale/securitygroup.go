@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,16 +19,14 @@ package outscale
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/outscale/osc-sdk-go/osc"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/outscale/osc-sdk-go/osc"
 )
 
 // ListSecurityGroups lists existing security groups
@@ -37,9 +35,6 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) (list 
 	if valid.IsNil(s) {
 		return list, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.outscale")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	groups, xerr := s.rpcReadSecurityGroups(ctx, networkRef, nil)
 	if xerr != nil {
@@ -90,9 +85,6 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 	if name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, xerr := s.rpcCreateSecurityGroup(ctx, networkRef, name, description)
 	if xerr != nil {
@@ -147,9 +139,6 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGr
 		}
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", asg.ID).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	return s.rpcDeleteSecurityGroup(ctx, asg.ID)
 }
 
@@ -158,13 +147,10 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam stacks.Security
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", sgLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	var group osc.SecurityGroup
 	if asg.ID != "" {
@@ -188,7 +174,7 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -198,9 +184,6 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 			return asg, xerr
 		}
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", sgLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	group, xerr := s.rpcReadSecurityGroupByID(ctx, asg.ID)
 	if xerr != nil {
@@ -227,7 +210,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -237,9 +220,6 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 			return asg, xerr
 		}
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s)", sgLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	if rule.EtherType == ipversion.IPv6 {
 		// No IPv6 at Outscale (?)
@@ -254,6 +234,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 	if xerr := s.rpcCreateSecurityGroupRules(ctx, asg.ID, flow, []osc.SecurityGroupRule{oscRule}); xerr != nil {
 		return asg, xerr
 	}
+	asg.Rules = append(asg.Rules, rule)
 	return s.InspectSecurityGroup(ctx, asg.ID)
 }
 
@@ -278,15 +259,15 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ 
 	switch in.Direction {
 	case securitygroupruledirection.Ingress:
 		flow = "Inbound"
-		involved = in.Targets
-		usesGroups, xerr = in.TargetsConcernGroups()
+		involved = in.Sources
+		usesGroups, xerr = in.SourcesConcernGroups()
 		if xerr != nil {
 			return "", rule, xerr
 		}
 	case securitygroupruledirection.Egress:
 		flow = "Outbound"
-		involved = in.Sources
-		usesGroups, xerr = in.SourcesConcernGroups()
+		involved = in.Targets
+		usesGroups, xerr = in.TargetsConcernGroups()
 		if xerr != nil {
 			return "", rule, xerr
 		}
@@ -334,7 +315,7 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
+	asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -345,12 +326,14 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		}
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "(%s, %s)", sgLabel, rule.Description).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	// IPv6 not supported at Outscale (?)
 	if rule.EtherType == ipversion.IPv6 {
 		return asg, nil
+	}
+
+	index, xerr := asg.Rules.IndexOfEquivalentRule(rule)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	flow, oscRule, xerr := fromAbstractSecurityGroupRule(rule)
@@ -369,22 +352,16 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		}
 	}
 
+	innerXErr := asg.RemoveRuleByIndex(index)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
 	return s.InspectSecurityGroup(ctx, asg.ID)
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
 func (s stack) GetDefaultSecurityGroupName(context.Context) (string, fail.Error) {
+	// TODO, check this
 	return "", nil
-}
-
-// EnableSecurityGroup enables a Security Group
-// Does actually nothing for openstack
-func (s stack) EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
-	return fail.NotAvailableError("openstack cannot enable a Security Group")
-}
-
-// DisableSecurityGroup disables a Security Group
-// Does actually nothing for openstack
-func (s stack) DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
-	return fail.NotAvailableError("openstack cannot disable a Security Group")
 }

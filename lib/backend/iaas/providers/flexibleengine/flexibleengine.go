@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -211,17 +211,13 @@ next:
 			"SATA": volumespeed.Cold,
 			"Ssd":  volumespeed.Ssd,
 		},
-		MetadataBucket:           metadataBucketName,
-		OperatorUsername:         operatorUsername,
-		ProviderName:             providerName,
-		DefaultSecurityGroupName: "default",
-		DefaultNetworkName:       vpcName,
-		DefaultNetworkCIDR:       vpcCIDR,
-		DefaultImage:             defaultImage,
-		// WhitelistTemplateRegexp: whitelistTemplatePattern,
-		// BlacklistTemplateRegexp: blacklistTemplatePattern,
-		// WhitelistImageRegexp:    whitelistImagePattern,
-		// BlacklistImageRegexp:    blacklistImagePattern,
+		MetadataBucket:                 metadataBucketName,
+		OperatorUsername:               operatorUsername,
+		ProviderName:                   providerName,
+		DefaultSecurityGroupName:       "default",
+		DefaultNetworkName:             vpcName,
+		DefaultNetworkCIDR:             vpcCIDR,
+		DefaultImage:                   defaultImage,
 		MaxLifeTime:                    maxLifeTime,
 		Timings:                        timings,
 		Safe:                           isSafe,
@@ -232,8 +228,6 @@ next:
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	// Note: if timings have to be tuned, update stack.MutableTimings
 
 	wrapped := api.StackProxy{
 		FullStack: stack,
@@ -374,7 +368,6 @@ func (p *provider) GetName() (string, fail.Error) {
 }
 
 // GetStack returns the stack object used by the provider
-// Note: use with caution, last resort option
 func (p provider) GetStack() (api.Stack, fail.Error) {
 	return p.Stack, nil
 }
@@ -393,9 +386,8 @@ func (p *provider) GetCapabilities(context.Context) (providers.Capabilities, fai
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
 func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
-	var emptySlice []*regexp.Regexp
 	if valid.IsNil(p) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var (
@@ -407,7 +399,7 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	for _, v := range templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice, fail.ConvertError(err)
+			return nil, fail.ConvertError(err)
 		}
 		out = append(out, re)
 	}

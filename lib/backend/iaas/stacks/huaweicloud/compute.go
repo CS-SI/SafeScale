@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"net"
 	"net/http"
 	"regexp"
@@ -47,7 +48,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -302,14 +302,9 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptyMap map[string]bool
 	if valid.IsNil(s) {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	var allPages pagination.Page
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -320,12 +315,12 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool,
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptyMap, xerr
+		return nil, xerr
 	}
 
 	content, err := az.ExtractAvailabilityZones(allPages)
 	if err != nil {
-		return emptyMap, fail.ConvertError(err)
+		return nil, fail.ConvertError(err)
 	}
 
 	azList := map[string]bool{}
@@ -335,7 +330,6 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool,
 		}
 	}
 
-	// VPL: what's the point if there ios
 	if len(azList) == 0 {
 		logrus.WithContext(ctx).Warnf("no Availability Zones detected !")
 	}
@@ -420,9 +414,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	if valid.IsNil(s) {
 		return nil, nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
-	defer fail.OnPanic(&ferr)
 
 	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
@@ -544,6 +535,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	metadata["Image"] = request.ImageRef
 	metadata["Template"] = request.TemplateID
 	metadata["CreationDate"] = time.Now().Format(time.RFC3339)
+	metadata["Revision"] = lib.Revision
 
 	// defines creation options
 	srvOpts := serverCreateOpts{
@@ -644,7 +636,11 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 						if server != nil && server.ID != "" {
 							derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
-								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
+								_ = xerr.AddConsequence(
+									fail.Wrap(
+										derr, "cleaning up on failure, failed to delete host",
+									),
+								)
 							}
 						}
 						switch xerr.(type) {
@@ -709,7 +705,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 				case *fail.ErrNotAvailable:
 					_ = s.DeleteHost(cleanupContextFrom(ctx), finalServer.ID)
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
-
 				default:
 					_ = s.DeleteHost(cleanupContextFrom(ctx), finalServer.ID)
 					return innerXErr
@@ -726,25 +721,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 		timings.NormalDelay(),
 		timings.HostLongOperationTimeout(),
 	)
-
-	// Starting from here, delete host if exiting with error
-	defer func() {
-		if ferr != nil && ahc.ID != "" {
-			derr := s.DeleteHost(ctx, ahc.ID)
-			if derr != nil {
-				switch derr.(type) {
-				case *fail.ErrNotFound:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', resource not found: '%v'", ahc.Name, derr)
-				case *fail.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s', timeout: '%v'", ahc.Name, derr)
-				default:
-					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
-				}
-				_ = ferr.AddConsequence(derr)
-			}
-		}
-	}()
-
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry: // here it should never happen
@@ -765,7 +741,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	// host.Networking.DefaultGatewayID = defaultGatewayID
 	// host.Networking.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
 	host.Networking.IsGateway = isGateway
-	// Note: from there, no idea what was the RequestedSize; caller will have to complement this information
 	host.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
 	if request.PublicIP {
@@ -884,9 +859,6 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	var img *images.Image
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
@@ -986,10 +958,6 @@ func (s stack) ListImages(ctx context.Context, _ bool) (imgList []*abstract.Imag
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
-
 	opts := images.ListOpts{
 		Status: images.ImageStatusActive,
 		Sort:   "name=asc,updated_at:desc",
@@ -1025,9 +993,6 @@ func (s stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTempl
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	opts := flavors.ListOpts{}
 
@@ -1240,9 +1205,8 @@ func (s stack) collectAddresses(ctx context.Context, host *abstract.HostCore) ([
 
 // ListHosts lists available hosts
 func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
-	var emptyList abstract.HostList
 	if valid.IsNil(s) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var hostList abstract.HostList
@@ -1278,7 +1242,7 @@ func (s stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, 
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	return hostList, nil
@@ -1475,7 +1439,7 @@ func (s stack) getFloatingIPOfHost(ctx context.Context, hostID string) (*floatin
 	if commRetryErr != nil {
 		return nil, commRetryErr
 	}
-	// VPL: fip not found is not an abnormal situation, do not log or raise error
+	// fip not found is not an abnormal situation, do not log or raise error
 	if len(fips) > 1 {
 		return nil, fail.InconsistentError("configuration error, more than one Floating IP associated to host '%s'", hostID)
 	}

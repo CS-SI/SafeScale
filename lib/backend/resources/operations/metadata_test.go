@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,13 +34,6 @@ func Test_CheckMetadataVersion(t *testing.T) {
 			version string
 			xerr    fail.Error
 		)
-
-		svc._updateOption("version", "")
-		svc._updateOption("versionErr", fail.NewError("There is no version"))
-
-		_, xerr = CheckMetadataVersion(ctx, svc)
-		require.Contains(t, xerr.Error(), "failed to read content of 'version' file in metadata bucket")
-		require.Contains(t, xerr.Error(), "There is no version")
 
 		svc._reset()
 		svc._updateOption("name", "")

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,6 @@ type Cluster interface {
 	DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) fail.Error                                                                // deletes a node identified by its ID
 	Delete(ctx context.Context, force bool) fail.Error                                                                                                        // deletes the cluster (Delete is not used to not collision with metadata)
 	FindAvailableMaster(ctx context.Context) (Host, fail.Error)                                                                                               // returns ID of the first master available to execute order
-	FindAvailableNode(ctx context.Context) (Host, fail.Error)                                                                                                 // returns node instance of the first node available to execute order
 	GetIdentity(ctx context.Context) (abstract.ClusterIdentity, fail.Error)                                                                                   // returns Cluster Identity
 	GetFlavor(ctx context.Context) (clusterflavor.Enum, fail.Error)                                                                                           // returns the flavor of the cluster
 	GetComplexity(ctx context.Context) (clustercomplexity.Enum, fail.Error)                                                                                   // returns the complexity of the cluster
@@ -62,7 +61,6 @@ type Cluster interface {
 	ListInstalledFeatures(ctx context.Context) ([]Feature, fail.Error)                                                                                        // returns the list of installed features on the Cluster
 	ListMasters(ctx context.Context) (IndexedListOfClusterNodes, fail.Error)                                                                                  // lists the node instances corresponding to masters (if there is such masters in the flavor...)
 	ListNodes(ctx context.Context) (IndexedListOfClusterNodes, fail.Error)                                                                                    // lists node instances corresponding to the nodes in the cluster
-	LookupNode(ctx context.Context, ref string) (bool, fail.Error)                                                                                            // tells if the ID of the host passed as parameter is a node
 	RemoveFeature(ctx context.Context, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)                                            // removes feature from cluster
 	Shrink(ctx context.Context, name string, count uint) ([]*propertiesv3.ClusterNode, fail.Error)                                                            // reduce the size of the cluster of 'count' nodes (the last created)
 	Start(ctx context.Context) fail.Error                                                                                                                     // starts the cluster

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,10 +71,6 @@ type Stack interface {
 	DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// GetDefaultSecurityGroupName returns the name of the default security group automatically bound to new host
 	GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error)
-	// EnableSecurityGroup enables a Security Group
-	EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error
-	// DisableSecurityGroup disables a Security Group
-	DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error
 
 	// CreateNetwork creates a network named name
 	CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (*abstract.Network, fail.Error)
@@ -122,10 +118,9 @@ type Stack interface {
 
 	// InspectHost returns the information of the Host identified by id
 	InspectHost(context.Context, stacks.HostParameter) (*abstract.HostFull, fail.Error)
+
 	// GetHostState returns the current state of the host identified by id
 	GetHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error)
-	// GetTrueHostState returns the current state of the host identified by id
-	GetTrueHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error)
 	// ListHosts lists all hosts
 	ListHosts(context.Context, bool) (abstract.HostList, fail.Error)
 	// DeleteHost deletes the host identified by id
@@ -166,6 +161,9 @@ type Stack interface {
 
 	// UpdateTags updates provider's tags
 	UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error
+
+	// ListTags list provider's tags
+	ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error)
 
 	// DeleteTags removes provider's tags
 	DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error

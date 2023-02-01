@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package abstract
 import (
 	stdjson "encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"math"
 	"time"
 
@@ -49,7 +50,7 @@ func (kp *KeyPair) IsNull() bool {
 func NewKeyPair(name string) (*KeyPair, fail.Error) {
 	id, err := uuid.NewV4()
 	if err != nil {
-		return nil, fail.Wrap(err, "failed to create host UUID")
+		return nil, fail.Wrap(err, "failed to create keypair UUID")
 	}
 
 	if name == "" {
@@ -78,7 +79,6 @@ type HostSizingRequirements struct {
 	MaxDiskSize int
 	MinGPU      int
 	MinCPUFreq  float32
-	Replaceable bool // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT
 	Image       string
 	Template    string // if != "", describes the template to use and disables the use of other fields
 }
@@ -182,7 +182,6 @@ type HostRequest struct {
 	PublicIP         bool                // PublicIP a flag telling if the host must have a public IP
 	IsGateway        bool                // IsGateway tells if the host will act as a gateway
 	KeepOnFailure    bool                // KeepOnFailure tells if resource must be kept on failure
-	Preemptible      bool                // Use spot-like instance
 	SecurityGroupIDs map[string]struct{} // List of Security Groups to attach to Host (using map as dict)
 }
 
@@ -195,8 +194,6 @@ type HostEffectiveSizing struct {
 	GPUType   string  `json:"gpu_type,omitempty"`
 	CPUFreq   float32 `json:"cpu_freq,omitempty"`
 	ImageID   string  `json:"image_id,omitempty"`
-	// TODO: implement the handling of this field (will need to introduce provider capabilities to know if a specific provider allows this kind of host)
-	Replaceable bool `json:"replaceable,omitempty"` // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT
 }
 
 // NewHostEffectiveSizing ...
@@ -252,6 +249,7 @@ func NewHostCore() *HostCore {
 	hc.ProvisioningState = hoststate.Unknown
 	hc.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	hc.Tags["ManagedBy"] = "safescale"
+	hc.Tags["Revision"] = lib.Revision
 	return hc
 }
 

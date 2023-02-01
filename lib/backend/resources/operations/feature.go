@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
@@ -38,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -88,9 +88,58 @@ func NewFeature(ctx context.Context, svc iaas.Service, name string) (_ resources
 	return featureInstance, nil
 }
 
+func RenderFeature(inctx context.Context, feat Feature) (string, fail.Error) {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	type result struct {
+		rRes string
+		rErr fail.Error
+	}
+	chRes := make(chan result)
+	go func() {
+		defer close(chRes)
+		gres, _ := func() (_ result, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+
+			_, err := feat.PrepareParameters(ctx, map[string]interface{}{}, nil)
+			if err != nil {
+				return result{"", err}, err
+			}
+
+			boo := feat.Specs().GetString("feature.install.bash.add.pace")
+
+			foo := feat.Specs().GetStringMap("feature.install.bash.add.steps")
+
+			var merged []string
+			merged = append(merged, "\n")
+
+			for _, v := range strings.Split(boo, ",") {
+				sk, _ := foo[v].(map[string]interface{}) // nolint
+				choices := strings.ReplaceAll(sk["run"].(string), "sfExit\n", "\n")
+				merged = append(merged, choices)
+			}
+
+			merged = append(merged, "sfExit\n")
+
+			joined := strings.Join(merged, "\n")
+			return result{joined, nil}, nil
+		}()
+		chRes <- gres
+	}()
+	select {
+	case res := <-chRes:
+		return res.rRes, res.rErr
+	case <-ctx.Done():
+		return "", fail.ConvertError(ctx.Err())
+	case <-inctx.Done():
+		return "", fail.ConvertError(inctx.Err())
+	}
+}
+
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
-func NewEmbeddedFeature(ctx context.Context, svc iaas.Service, name string) (_ resources.Feature, ferr fail.Error) {
+func NewEmbeddedFeature(ctx context.Context, svc iaas.Service, name string) (_ *Feature, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -165,7 +214,7 @@ func (instance *Feature) GetID() (string, error) {
 }
 
 // GetFilename returns the filename of the Feature definition, with error handling
-func (instance *Feature) GetFilename(ctx context.Context) (string, fail.Error) {
+func (instance *Feature) GetFilename(_ context.Context) (string, fail.Error) {
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
@@ -174,7 +223,7 @@ func (instance *Feature) GetFilename(ctx context.Context) (string, fail.Error) {
 }
 
 // GetDisplayFilename returns the filename of the Feature definition, beautifulled, with error handling
-func (instance *Feature) GetDisplayFilename(ctx context.Context) string {
+func (instance *Feature) GetDisplayFilename(_ context.Context) string {
 	if valid.IsNil(instance) {
 		return ""
 	}
@@ -259,7 +308,7 @@ func (instance *Feature) Applicable(ctx context.Context, tg resources.Targetable
 // Check is ok if error is nil and Results.Successful() is true
 func (instance *Feature) Check(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("Feature.Check")()
+	defer elapsed(ctx, "Feature.Check")()
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -274,9 +323,6 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	featureName := instance.GetName()
 	targetName := target.GetName()
 	targetType := strings.ToLower(target.TargetType().String())
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	// -- passive check if feature is installed on target
 	switch target.(type) { // nolint
@@ -287,7 +333,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
 		}
 
-		xerr := castedTarget.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr := castedTarget.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
 				if !ok {
@@ -318,7 +364,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
 		}
 
-		xerr := castedTarget.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr := castedTarget.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 				clufea, ok := clonable.(*propertiesv1.ClusterFeatures)
 				if !ok {
@@ -367,7 +413,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 	logrus.WithContext(ctx).Debugf("Checking if Feature '%s' is installed on %s '%s'...\n", featureName, targetType, targetName)
 
 	// Inits and checks target parameters
-	myV, xerr := instance.prepareParameters(ctx, v, target)
+	myV, xerr := instance.PrepareParameters(ctx, v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -384,30 +430,32 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 // Returned error may be:
 //   - nil: everything went well
 //   - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
-func (instance Feature) prepareParameters(ctx context.Context, externals data.Map, target resources.Targetable) (data.Map, fail.Error) {
-	defer elapsed("prepareParameters")()
-	xerr := instance.conditionParameters(ctx, externals, target)
+func (instance Feature) PrepareParameters(ctx context.Context, externals data.Map, target resources.Targetable) (data.Map, fail.Error) {
+	defer elapsed(ctx, "PrepareParameters")()
+	xerr := instance.ConditionParameters(ctx, externals, target)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Inits target specific parameters
 	myV := instance.conditionedParameters.ToMap()
-	xerr = target.ComplementFeatureParameters(ctx, myV)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
+	if target != nil {
+		xerr = target.ComplementFeatureParameters(ctx, myV)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
 
 	return myV, nil
 }
 
-// conditionParameters inits if needed the Feature parameters conditioned for final use
+// ConditionParameters inits if needed the Feature parameters conditioned for final use
 // Returned error may be:
 //   - nil: everything went well
 //   - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
-func (instance *Feature) conditionParameters(ctx context.Context, externals data.Map, target resources.Targetable) fail.Error {
-	defer elapsed("conditionParameters")()
+func (instance *Feature) ConditionParameters(ctx context.Context, externals data.Map, target resources.Targetable) fail.Error {
+	defer elapsed(ctx, "ConditionParameters")()
 	if instance.conditionedParameters == nil {
 		var xerr fail.Error
 		instance.conditionedParameters = make(ConditionedFeatureParameters)
@@ -489,9 +537,6 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting addition of Feature '%s' on %s '%s'...", featureName, targetType, targetName), fmt.Sprintf("Ending addition of Feature '%s' on %s '%s' with err '%s'", featureName, targetType, targetName, ferr))()
 
 	installer, xerr := instance.determineInstallerForTarget(ctx, target, "check")
@@ -501,7 +546,7 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 	}
 
 	// Inits and checks target parameters
-	myV, xerr := instance.prepareParameters(ctx, v, target)
+	myV, xerr := instance.PrepareParameters(ctx, v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -565,9 +610,6 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 	featureName := instance.GetName()
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	var (
 		results resources.Results
@@ -583,7 +625,7 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 	defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting removal of Feature '%s' from %s '%s'", featureName, targetType, targetName), fmt.Sprintf("Ending removal of Feature '%s' from %s '%s'", featureName, targetType, targetName))()
 
 	// Inits and checks target parameters
-	myV, xerr := instance.prepareParameters(ctx, v, target)
+	myV, xerr := instance.PrepareParameters(ctx, v, target)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -610,10 +652,9 @@ func (instance *Feature) Remove(ctx context.Context, target resources.Targetable
 }
 
 // Dependencies returns a list of features needed as dependencies
-func (instance *Feature) Dependencies(ctx context.Context) (map[string]struct{}, fail.Error) {
-	emptyMap := map[string]struct{}{}
+func (instance *Feature) Dependencies(_ context.Context) (map[string]struct{}, fail.Error) {
 	if valid.IsNil(instance) {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	return instance.file.getDependencies(), nil
@@ -622,9 +663,8 @@ func (instance *Feature) Dependencies(ctx context.Context) (map[string]struct{},
 // ClusterSizingRequirements returns the cluster sizing requirements for all flavors
 // FIXME: define a type to return instead of a map[string]interface{}
 func (instance *Feature) ClusterSizingRequirements() (map[string]interface{}, fail.Error) {
-	emptyMap := map[string]interface{}{}
 	if instance.IsNull() {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if instance.file == nil {
 		return nil, fail.InvalidInstanceContentError("instance.file", "cannot be nil")
@@ -641,9 +681,8 @@ func (instance *Feature) ClusterSizingRequirements() (map[string]interface{}, fa
 //
 // FIXME: define a type to return instead of a map[string]interface{}
 func (instance *Feature) ClusterSizingRequirementsForFlavor(flavor string) (map[string]interface{}, fail.Error) {
-	emptyMap := map[string]interface{}{}
 	if instance.IsNull() {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if instance.file == nil {
 		return nil, fail.InvalidInstanceContentError("instance.file", "cannot be nil")
@@ -781,7 +820,7 @@ func (instance Feature) ToProtocol(ctx context.Context) *protocol.FeatureRespons
 }
 
 // ListParametersWithControl returns a slice of parameter names that have control script
-func (instance Feature) ListParametersWithControl(ctx context.Context) []string {
+func (instance Feature) ListParametersWithControl(_ context.Context) []string {
 	out := make([]string, 0, len(instance.file.versionControl))
 	for k := range instance.file.versionControl {
 		out = append(out, k)
@@ -851,17 +890,26 @@ func (instance Feature) controlledParameter(ctx context.Context, p string, targe
 }
 
 // ExtractFeatureParameters convert a slice of string in format a=b into a map index on 'a' with value 'b'
-func ExtractFeatureParameters(params []string) data.Map {
-	out := data.NewMap()
+func ExtractFeatureParameters(params []string) (map[string]interface{}, error) {
+	re := regexp.MustCompile(`([A-Za-z0-9]+:)?([A-Za-z0-9]+)=([A-Za-z0-9]+)`)
+	parsed := make(map[string]interface{})
 	for _, v := range params {
-		splitted := strings.Split(v, "=")
-		if len(splitted) > 1 {
-			out[splitted[0]] = splitted[1]
+		october := re.FindAllStringSubmatch(v, -1)
+		if len(october) > 0 {
+			switch len(october[0]) {
+			case 3:
+				parsed[october[0][1]] = october[0][2]
+			case 4:
+				parsed[october[0][2]] = october[0][3]
+			default:
+				continue
+			}
 		} else {
-			out[splitted[0]] = ""
+			return nil, fmt.Errorf("invalid expression: %s", v)
 		}
 	}
-	return out
+
+	return parsed, nil
 }
 
 // featureFilter represents the filter to apply on Features

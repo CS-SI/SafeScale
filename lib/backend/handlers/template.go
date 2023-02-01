@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,6 @@ package handlers
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -35,11 +33,11 @@ type TemplateHandler interface {
 
 // templateHandler image service
 type templateHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewTemplateHandler creates a host service
-func NewTemplateHandler(job server.Job) TemplateHandler {
+func NewTemplateHandler(job backend.Job) TemplateHandler {
 	return &templateHandler{job: job}
 }
 
@@ -55,10 +53,6 @@ func (handler *templateHandler) List(all bool) (_ []*abstract.HostTemplate, ferr
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), true, "(all=%v)", all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return handler.job.Service().ListTemplates(handler.job.Context(), all)
 }
@@ -76,10 +70,6 @@ func (handler *templateHandler) Match(sizing abstract.HostSizingRequirements) (_
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), true, "%s", sizing).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	return handler.job.Service().ListTemplatesBySizing(handler.job.Context(), sizing, false)
 }
 
@@ -95,10 +85,6 @@ func (handler *templateHandler) Inspect(ref string) (_ *abstract.HostTemplate, f
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.template"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	return handler.job.Service().FindTemplateByName(handler.job.Context(), ref)
 }

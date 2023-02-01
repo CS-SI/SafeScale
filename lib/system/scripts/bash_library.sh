@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -347,7 +347,7 @@ function sfRetry4 {
 
 # sfSalvageDBusIfNeeded restarts dbus-daemon if needed (ie there are no or more than 1 dbus-daemon)
 # returns 0 if nothing has been done, 1 if dbus has been salvaged
-# Note: often dbus cannot be restarted automatically. It's necessary to restart a service that has dusb as dependency to
+# Note: often dbus cannot be restarted automatically. It's necessary to restart a service that has dbus as dependency to
 #       effectively restart dbus
 function sfSalvageDBusIfNeeded() {
   count=$(ps ax | grep dbus-daemon | grep -v grep | wc -l)
@@ -801,7 +801,7 @@ function sfDoesDockerRunContainer() {
         FOUND=yes
       fi
     fi
-    [ "$FOUND" != "yes"] && return 1
+    [ "$FOUND" != "yes" ] && return 1
   fi
   echo $LIST | cut -d'|' -f3 | grep -i "^up" &> /dev/null || return 1
   return 0

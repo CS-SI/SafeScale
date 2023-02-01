@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	bucketfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/bucket"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -45,11 +44,11 @@ type BucketHandler interface {
 
 // bucketHandler bucket service
 type bucketHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewBucketHandler creates a BucketHandler
-func NewBucketHandler(job server.Job) BucketHandler {
+func NewBucketHandler(job backend.Job) BucketHandler {
 	return &bucketHandler{job: job}
 }
 
@@ -64,10 +63,6 @@ func (handler *bucketHandler) List(all bool) (_ []string, ferr fail.Error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), true, "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	if all {
 		return handler.job.Service().ListBuckets(handler.job.Context(), objectstorage.RootPath)
@@ -105,10 +100,6 @@ func (handler *bucketHandler) Create(name string) (ferr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
-
 	svc := handler.job.Service()
 	rb, xerr := bucketfactory.Load(handler.job.Context(), svc, name)
 	if xerr != nil {
@@ -142,10 +133,6 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
-
 	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return xerr
@@ -153,7 +140,7 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 	return rb.Delete(handler.job.Context())
 }
 
-// Uploads a bucket
+// Upload a bucket
 func (handler *bucketHandler) Upload(bucketName, directoryName string) (ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -170,10 +157,6 @@ func (handler *bucketHandler) Upload(bucketName, directoryName string) (ferr fai
 	if directoryName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("directoryName")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+directoryName+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	// -- upload bucket
 	xerr := handler.job.Service().UploadBucket(handler.job.Context(), bucketName, directoryName)
@@ -198,10 +181,6 @@ func (handler *bucketHandler) Download(name string) (bytes []byte, ferr fail.Err
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
-
 	// -- download bucket
 	ct, xerr := handler.job.Service().DownloadBucket(handler.job.Context(), name, "")
 	if xerr != nil {
@@ -225,10 +204,6 @@ func (handler *bucketHandler) Clear(name string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
-
 	// clear bucket
 	xerr := handler.job.Service().ClearBucket(handler.job.Context(), name, "", "")
 	if xerr != nil {
@@ -251,10 +226,6 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, ferr fa
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	var xerr fail.Error
 	rb, xerr = bucketfactory.Load(handler.job.Context(), handler.job.Service(), name)
@@ -292,10 +263,6 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fai
 		return fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
-
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
@@ -329,10 +296,6 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (ferr fail.Er
 	if hostName == "" {
 		return fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)

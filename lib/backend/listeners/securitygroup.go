@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"strings"
 
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -30,8 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -59,10 +58,6 @@ func (s *SecurityGroupListener) List(inctx context.Context, in *protocol.Securit
 	defer job.Close()
 
 	all := in.GetAll()
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	list, xerr := handler.List(all)
@@ -94,7 +89,7 @@ func (s *SecurityGroupListener) Create(inctx context.Context, in *protocol.Secur
 	}
 
 	name := in.GetName()
-	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
 	job, xerr := PrepareJob(inctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/securitygroup/%s/create", networkRef, name))
 	if xerr != nil {
 		return nil, xerr
@@ -102,9 +97,6 @@ func (s *SecurityGroupListener) Create(inctx context.Context, in *protocol.Secur
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "('%s', '%s')", networkRefLabel, name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	rules, xerr := converters.SecurityGroupRulesFromProtocolToAbstract(in.GetRules())
 	if xerr != nil {
@@ -117,7 +109,7 @@ func (s *SecurityGroupListener) Create(inctx context.Context, in *protocol.Secur
 		return nil, xerr
 	}
 
-	tracer.Trace("Security Group '%s' successfully created", name)
+	logrus.WithContext(ctx).Infof("Security Group '%s' successfully created", name)
 	return sgInstance.ToProtocol(ctx)
 }
 
@@ -138,7 +130,7 @@ func (s *SecurityGroupListener) Clear(inctx context.Context, in *protocol.Refere
 	}
 
 	// FIXME: networkRef is missing to locate security group if name is provided
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -150,9 +142,6 @@ func (s *SecurityGroupListener) Clear(inctx context.Context, in *protocol.Refere
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	xerr = handler.Clear(ref)
@@ -160,7 +149,7 @@ func (s *SecurityGroupListener) Clear(inctx context.Context, in *protocol.Refere
 		return empty, xerr
 	}
 
-	tracer.Trace("Security Group '%s' successfully cleared", ref)
+	logrus.WithContext(ctx).Infof("Security Group '%s' successfully cleared", ref)
 	return empty, nil
 }
 
@@ -192,9 +181,6 @@ func (s *SecurityGroupListener) Reset(inctx context.Context, in *protocol.Refere
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	xerr = handler.Reset(ref)
@@ -202,7 +188,7 @@ func (s *SecurityGroupListener) Reset(inctx context.Context, in *protocol.Refere
 		return empty, xerr
 	}
 
-	tracer.Trace("Security Group %s successfully cleared", refLabel)
+	logrus.WithContext(ctx).Infof("Security Group %s successfully cleared", refLabel)
 	return empty, nil
 }
 
@@ -222,7 +208,7 @@ func (s *SecurityGroupListener) Inspect(inctx context.Context, in *protocol.Refe
 	}
 
 	// FIXME: networkRef missing if security group is provided by name
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -234,9 +220,6 @@ func (s *SecurityGroupListener) Inspect(inctx context.Context, in *protocol.Refe
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	sgInstance, xerr := handler.Inspect(ref)
@@ -276,9 +259,6 @@ func (s *SecurityGroupListener) Delete(inctx context.Context, in *protocol.Secur
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	xerr = handler.Delete(sgRef, in.GetForce())
@@ -286,7 +266,7 @@ func (s *SecurityGroupListener) Delete(inctx context.Context, in *protocol.Secur
 		return empty, xerr
 	}
 
-	tracer.Trace("Security Group %s successfully deleted.", sgRefLabel)
+	logrus.WithContext(ctx).Infof("Security Group %s successfully deleted.", sgRefLabel)
 	return empty, nil
 }
 
@@ -322,9 +302,6 @@ func (s *SecurityGroupListener) AddRule(inctx context.Context, in *protocol.Secu
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	sgInstance, xerr := handler.AddRule(sgRef, rule)
@@ -332,7 +309,7 @@ func (s *SecurityGroupListener) AddRule(inctx context.Context, in *protocol.Secu
 		return nil, xerr
 	}
 
-	tracer.Trace("Rule successfully added to security group %s", sgRefLabel)
+	logrus.WithContext(ctx).Infof("Rule successfully added to security group %s", sgRefLabel)
 	return sgInstance.ToProtocol(ctx)
 }
 
@@ -368,9 +345,6 @@ func (s *SecurityGroupListener) DeleteRule(inctx context.Context, in *protocol.S
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s, %v)", refLabel, rule).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSecurityGroupHandler(job)
 	sgInstance, xerr := handler.DeleteRule(ref, rule)
@@ -378,12 +352,12 @@ func (s *SecurityGroupListener) DeleteRule(inctx context.Context, in *protocol.S
 		return nil, xerr
 	}
 
-	tracer.Trace("Rule successfully added to security group %s", refLabel)
+	logrus.WithContext(ctx).Infof("Rule successfully added to security group %s", refLabel)
 	return sgInstance.ToProtocol(ctx)
 }
 
 // Sanitize checks if provider-side rules are coherent with registered ones in metadata
-func (s *SecurityGroupListener) Sanitize(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *SecurityGroupListener) Sanitize(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) { // FIXME: Remove this
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot sanitize security group")
 
@@ -398,7 +372,7 @@ func (s *SecurityGroupListener) Sanitize(inctx context.Context, in *protocol.Ref
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -408,11 +382,6 @@ func (s *SecurityGroupListener) Sanitize(inctx context.Context, in *protocol.Ref
 		return nil, err
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	return empty, fail.NotImplementedError("not yet implemented") // FIXME: Technical debt
 }
@@ -432,7 +401,7 @@ func (s *SecurityGroupListener) Bonds(inctx context.Context, in *protocol.Securi
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	ref, refLabel := srvutils.GetReference(in.GetTarget())
+	ref, _ := srvutils.GetReference(in.GetTarget())
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
@@ -454,9 +423,6 @@ func (s *SecurityGroupListener) Bonds(inctx context.Context, in *protocol.Securi
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	sgInstance, xerr := securitygroupfactory.Load(ctx, job.Service(), ref)
 	if xerr != nil {

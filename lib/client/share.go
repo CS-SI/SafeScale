@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ func (n shareConsumer) Delete(names []string, timeout time.Duration) error {
 
 		defer wg.Done()
 
-		if _, xerr := service.Delete(newCtx, &protocol.Reference{Name: aname}); xerr != nil {
+		if _, xerr := service.Delete(newCtx, &protocol.ShareDeleteRequest{Name: aname}); xerr != nil {
 			mutex.Lock()
 			errs = append(errs, xerr.Error())
 			mutex.Unlock() // nolint

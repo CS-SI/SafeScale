@@ -2,7 +2,7 @@
 // +build debug
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -125,7 +125,7 @@ func (t iterationTrigger) Why() string {
 	return fmt.Sprintf("iteration %d", t.max)
 }
 
-// setup is called by InitializeErrorInjector() to configure crash sites in your code. It parses
+// SetupError is called by InitializeErrorInjector() to configure crash sites in your code. It parses
 // and saves a list of originalCrash sites and their probabilities of crashing, and then
 // makes the crash() function crash with appropriate trigger when called from one of
 // the specified crash sites. An example spec:
@@ -134,7 +134,7 @@ func (t iterationTrigger) Why() string {
 //
 // That will cause a originalCrash .003 of the time at client.go line 53, and .02 of the time
 // at server.go line 18.
-func setup(spec string) error {
+func SetupError(spec string) error {
 	if spec == "" { // Crashing is disabled
 		crash = nil
 		return nil
@@ -231,12 +231,12 @@ func newSite(s string) (string, int64, crashTrigger, error) {
 	return "", 0, nil, fmt.Errorf("invalid crash site spec '%s'", s)
 }
 
-// InitializeErrorInjector loads error plans from environment and setup the error injector
+// InitializeErrorInjector loads error plans from environment and SetupError the error injector
 func init() {
 	if errorPlans := os.Getenv("SAFESCALE_PLANNED_ERRORS"); errorPlans != "" {
 		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 			logrus.Warnf("Reloading planned errors: %s", errorPlans)
 		}
-		_ = setup(errorPlans)
+		_ = SetupError(errorPlans)
 	}
 }

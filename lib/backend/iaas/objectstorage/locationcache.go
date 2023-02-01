@@ -14,7 +14,6 @@ import (
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
-	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
 )
 
@@ -139,14 +138,6 @@ func incrementExpVar(name string) {
 	}
 }
 
-func elapsed(what string) func() { // nolint
-	start := time.Now()
-	logrus.Tracef("starting %s", what)
-	return func() {
-		logrus.Tracef("%s took %v\n", what, time.Since(start))
-	}
-}
-
 func (l locationcache) getLock(s string, s2 string) *sync.RWMutex {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
@@ -199,28 +190,6 @@ func (l locationcache) ReadObject(inctx context.Context, s string, s2 string, wr
 	time.Sleep(10 * time.Millisecond)
 
 	return wr, nil
-}
-
-func (l locationcache) WriteMultiPartObject(ctx context.Context, s string, s2 string, reader io.Reader, i int64, i2 int, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
-	mu := l.getLock(s, s2)
-	mu.Lock()
-	defer mu.Unlock()
-
-	incrementExpVar("writeobject")
-	incrementExpVar("metadata.writes")
-
-	var buf bytes.Buffer
-	nr := io.TeeReader(reader, &buf)
-	chunk, err := l.inner.WriteMultiPartObject(ctx, s, s2, nr, i, i2, metadata)
-	if err != nil {
-		return abstract.ObjectStorageItem{}, err
-	}
-
-	// now we have stuff for our cache in buffer2
-	_ = l.cacheManager.Set(ctx, fmt.Sprintf("%s:%s", s, s2), buf.Bytes(), nil)
-	time.Sleep(10 * time.Millisecond)
-
-	return chunk, nil
 }
 
 func (l locationcache) WriteObject(ctx context.Context, s string, s2 string, reader io.Reader, i int64, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {

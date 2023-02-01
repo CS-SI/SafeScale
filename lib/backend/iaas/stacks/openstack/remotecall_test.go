@@ -2,7 +2,7 @@
 // +build alltests
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 package openstack
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -86,7 +87,7 @@ func genNetURLError() error {
 }
 
 func TestDropRetriesIfNotFound(t *testing.T) {
-	theErr := stacks.RetryableRemoteCall(gen404Err, NormalizeError)
+	theErr := stacks.RetryableRemoteCall(context.Background(), gen404Err, NormalizeError)
 	if numNotThere > 1 {
 		t.Errorf("We should have stop trying")
 		t.FailNow()
@@ -98,7 +99,7 @@ func TestDropRetriesIfNotFound(t *testing.T) {
 }
 
 func TestRetryableURLError(t *testing.T) {
-	theErr := stacks.RetryableRemoteCall(genNetURLError, NormalizeError)
+	theErr := stacks.RetryableRemoteCall(context.Background(), genNetURLError, NormalizeError)
 	if numBadURLs <= 1 {
 		t.Errorf("No retries at all")
 		t.FailNow()
@@ -110,7 +111,7 @@ func TestRetryableURLError(t *testing.T) {
 }
 
 func TestRetryableNetError(t *testing.T) {
-	theErr := stacks.RetryableRemoteCall(genDNSError, NormalizeError)
+	theErr := stacks.RetryableRemoteCall(context.Background(), genDNSError, NormalizeError)
 	if numDNSCalls <= 1 {
 		t.Errorf("No retries at all")
 		t.FailNow()
@@ -122,7 +123,7 @@ func TestRetryableNetError(t *testing.T) {
 }
 
 func TestRetryableRemoteCall(t *testing.T) {
-	theErr := stacks.RetryableRemoteCall(gen503Err, NormalizeError)
+	theErr := stacks.RetryableRemoteCall(context.Background(), gen503Err, NormalizeError)
 	if numCalls <= 1 {
 		t.Errorf("No retries at all")
 		t.FailNow()

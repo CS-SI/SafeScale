@@ -89,18 +89,6 @@ func (l locationtransparent) ReadObject(ctx context.Context, s string, s2 string
 	return wr, nil
 }
 
-func (l locationtransparent) WriteMultiPartObject(ctx context.Context, s string, s2 string, reader io.Reader, i int64, i2 int, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
-	incrementExpVar("writeobject")
-	incrementExpVar("metadata.writes")
-
-	chunk, err := l.inner.WriteMultiPartObject(ctx, s, s2, reader, i, i2, metadata)
-	if err != nil {
-		return abstract.ObjectStorageItem{}, err
-	}
-
-	return chunk, nil
-}
-
 func (l locationtransparent) WriteObject(ctx context.Context, s string, s2 string, reader io.Reader, i int64, metadata abstract.ObjectStorageItemMetadata) (abstract.ObjectStorageItem, fail.Error) {
 	incrementExpVar("writeobject")
 	incrementExpVar("metadata.writes")

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,30 +28,25 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // ListSecurityGroups lists existing security groups
 func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
-	var emptySlice []*abstract.SecurityGroup
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, xerr := s.rpcDescribeSecurityGroups(ctx, aws.String(networkRef), nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	out := make([]*abstract.SecurityGroup, 0, len(resp))
 	for k, v := range resp {
 		item, xerr := toAbstractSecurityGroup(v)
 		if xerr != nil {
-			return emptySlice, fail.Wrap(xerr, "failed to convert rule #%d", k)
+			return nil, fail.Wrap(xerr, "failed to convert rule #%d", k)
 		}
 		out = append(out, item)
 	}
@@ -59,7 +54,6 @@ func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*ab
 }
 
 // CreateSecurityGroup creates a security group
-// Note: parameter 'networkRef' is used in AWS, Security Groups scope is Network/VPC-wide.
 func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
@@ -67,9 +61,6 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	network, xerr := s.InspectNetwork(ctx, networkRef)
 	if xerr != nil {
@@ -227,9 +218,6 @@ func (s stack) DeleteSecurityGroup(ctx context.Context, asg *abstract.SecurityGr
 		}
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	return s.rpcDeleteSecurityGroup(ctx, aws.String(asg.ID))
 }
 
@@ -242,9 +230,6 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam stacks.Security
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	if asg.ID != "" {
 		resp, xerr := s.rpcDescribeSecurityGroupByID(ctx, aws.String(asg.ID))
@@ -350,9 +335,6 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 		}
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.aws"), "(%s)", asg.ID).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	resp, xerr := s.rpcDescribeSecurityGroupByID(ctx, aws.String(asg.ID))
 	if xerr != nil {
 		return asg, xerr
@@ -368,6 +350,9 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 			return asg, xerr
 		}
 	}
+
+	asg.Rules = abstract.SecurityGroupRules{}
+
 	return s.InspectSecurityGroup(ctx, asg)
 }
 
@@ -390,9 +375,6 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	ingressPermissions, egressPermissions, xerr := s.fromAbstractSecurityGroupRules(*asg, abstract.SecurityGroupRules{rule})
 	if xerr != nil {
 		return asg, xerr
@@ -403,6 +385,7 @@ func (s stack) AddRuleToSecurityGroup(ctx context.Context, sgParam stacks.Securi
 		return asg, xerr
 	}
 
+	asg.Rules = append(asg.Rules, rule)
 	return s.InspectSecurityGroup(ctx, asg)
 }
 
@@ -441,16 +424,23 @@ func (s stack) DeleteRuleFromSecurityGroup(ctx context.Context, sgParam stacks.S
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, '%s')", asg.ID, rule.Description).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	ingressPermissions, egressPermissions, xerr := s.fromAbstractSecurityGroupRules(*asg, abstract.SecurityGroupRules{rule})
 	if xerr != nil {
 		return asg, xerr
 	}
 
+	index, xerr := asg.Rules.IndexOfEquivalentRule(rule)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if xerr = s.deleteRules(ctx, asg, ingressPermissions, egressPermissions); xerr != nil {
 		return asg, xerr
+	}
+
+	innerXErr := asg.RemoveRuleByIndex(index)
+	if innerXErr != nil {
+		return nil, innerXErr
 	}
 
 	return s.InspectSecurityGroup(ctx, asg)
@@ -489,16 +479,4 @@ func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Er
 	}
 
 	return cfg.DefaultSecurityGroupName, nil
-}
-
-// EnableSecurityGroup enables a Security Group
-// Does actually nothing for openstack
-func (s stack) EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
-	return fail.NotAvailableError("aws cannot enable a Security Group")
-}
-
-// DisableSecurityGroup disables a Security Group
-// Does actually nothing for openstack
-func (s stack) DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
-	return fail.NotAvailableError("aws cannot disable a Security Group")
 }

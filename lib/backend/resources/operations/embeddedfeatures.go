@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -228,30 +228,6 @@ func remoteDesktopFeature() *FeatureFile {
 	return newFeatureFile(filename, name, true, specs)
 }
 
-// proxycacheServerFeature ...
-func proxycacheServerFeature() *FeatureFile {
-	name := "proxycache-server"
-	filename, specs, err := loadSpecFile(name)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	return newFeatureFile(filename, name, true, specs)
-}
-
-// proxycacheClientFeature ...
-func proxycacheClientFeature() *FeatureFile {
-	name := "proxycache-client"
-	filename, specs, err := loadSpecFile(name)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	return newFeatureFile(filename, name, true, specs)
-}
-
 // postgres4gatewayFeature ...
 func postgres4gatewayFeature() *FeatureFile {
 	name := "postgres4gateway"
@@ -296,8 +272,6 @@ func init() {
 		edgeproxy4subnetFeature(),
 		// keycloak4platformFeature(),
 		kubernetesFeature(),
-		proxycacheServerFeature(),
-		proxycacheClientFeature(),
 		// apacheIgniteFeature(),
 		// elasticsearchFeature(),
 		// logstashFeature(),

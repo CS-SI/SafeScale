@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +18,12 @@ package huaweicloud
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -76,9 +76,9 @@ type stack struct {
 	*temporal.MutableTimings
 }
 
-// NullStack is not exposed through API, is needed essentially by tests
-func NullStack() *stack { // nolint
-	return &stack{}
+// NullStack is not exposed through API, is needed essentially by tests // FIXME: No
+func NullStack() api.Stack { // nolint
+	return nil
 }
 
 // New authenticates and return interface stack
@@ -287,7 +287,6 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	s.IdentityClient = identity
 	s.cfgOpts.UseFloatingIP = true
 
-	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 	if cfg.Timings != nil {
 		s.MutableTimings = cfg.Timings
 		_ = s.MutableTimings.Update(temporal.NewTimings())
@@ -309,8 +308,6 @@ func (s stack) ListRegions(ctx context.Context) (list []string, ferr fail.Error)
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var allPages pagination.Page
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -348,9 +345,6 @@ func (s stack) InspectTemplate(ctx context.Context, id string) (template *abstra
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	// Try to get template
 	var flv *flavors.Flavor
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -382,9 +376,6 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (*abstract.KeyPai
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	return abstract.NewKeyPair(name)
 }
 
@@ -396,9 +387,6 @@ func (s stack) InspectKeyPair(ctx context.Context, id string) (*abstract.KeyPair
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	kp, err := keypairs.Get(s.ComputeClient, id, nil).Extract()
 	if err != nil {
@@ -418,8 +406,6 @@ func (s stack) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fail.Erro
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var kpList []*abstract.KeyPair
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -450,7 +436,7 @@ func (s stack) ListKeyPairs(ctx context.Context) ([]*abstract.KeyPair, fail.Erro
 	if xerr != nil {
 		return nil, xerr
 	}
-	// Note: empty list is not an error, so do not raise one
+
 	return kpList, nil
 }
 
@@ -462,8 +448,6 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() error {
@@ -621,23 +605,7 @@ func (s stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool,
 	return nil
 }
 
-// GetHostState returns the current state of host identified by id
-// hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
 func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	if valid.IsNil(s) {
-		return hoststate.Unknown, fail.InvalidInstanceError()
-	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
-
-	host, xerr := s.InspectHost(ctx, hostParam)
-	if xerr != nil {
-		return hoststate.Error, xerr
-	}
-	return host.CurrentState, nil
-}
-
-func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
@@ -669,12 +637,10 @@ func (s stack) StopHost(ctx context.Context, hostParam stacks.HostParameter, gra
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
@@ -689,12 +655,10 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) fa
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
@@ -709,12 +673,10 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) f
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
 	// Only hard reboot fixes problems
 	return stacks.RetryableRemoteCall(ctx,
@@ -739,9 +701,6 @@ func (s stack) WaitHostState(ctx context.Context, hostParam stacks.HostParameter
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
-		state.String(), timeout).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -933,8 +892,6 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
-
 	timings, xerr := s.Timings()
 	if xerr != nil {
 		return xerr
@@ -991,8 +948,6 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 		return "", fail.InvalidParameterCannotBeEmptyStringError("request.Name")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
-
 	// Creates the attachment
 	var va *volumeattach.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -1022,8 +977,6 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string)
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
-
 	var va *volumeattach.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
@@ -1051,8 +1004,6 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*a
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
 
 	var vs []*abstract.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -1094,8 +1045,6 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string
 	if vaID = strings.TrimSpace(vaID); vaID == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
@@ -1166,6 +1115,10 @@ func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, l
 
 	xerr := s.rpcSetMetadataOfInstance(ctx, id, lmap)
 	return xerr
+}
+
+func (s *stack) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
+	panic("implement me")
 }
 
 func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,8 +44,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
@@ -82,8 +80,6 @@ type CPUInfo struct {
 	MainDiskSpeed  float64     `json:"main_disk_speed_MBps"`
 	SampleNetSpeed float64     `json:"sample_net_speed_KBps"`
 	EphDiskSize    int64       `json:"eph_disk_size_Gb"`
-	PricePerSecond float64     `json:"price_in_dollars_second"` // DEPRECATED: use field Prices
-	PricePerHour   float64     `json:"price_in_dollars_hour"`   // DEPRECATED: use field Prices
 	Prices         []PriceInfo `json:"prices,omitempty"`
 }
 
@@ -152,13 +148,13 @@ type TenantHandler interface {
 
 // tenantHandler service
 type tenantHandler struct {
-	job              server.Job
+	job              backend.Job
 	abstractSubnet   *abstract.Subnet
 	scannedHostImage *abstract.Image
 }
 
 // NewTenantHandler creates a scanner service
-func NewTenantHandler(job server.Job) TenantHandler {
+func NewTenantHandler(job backend.Job) TenantHandler {
 	return &tenantHandler{job: job}
 }
 
@@ -179,10 +175,6 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 	if tenantName == "" {
 		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
 	currentName, err := svc.GetName()
@@ -327,10 +319,6 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	if tenantName == "" {
 		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
@@ -829,8 +817,6 @@ func createCPUInfo(output string) (_ *CPUInfo, ferr fail.Error) {
 	} else {
 		info.SampleNetSpeed = nsp / 1000 / 8
 	}
-
-	info.PricePerHour = 0
 
 	return &info, nil
 }

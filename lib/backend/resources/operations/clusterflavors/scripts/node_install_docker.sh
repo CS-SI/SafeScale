@@ -1,6 +1,6 @@
 #!/bin/bash -x
 
-# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ install_docker() {
       debian)
           export DEBIAN_FRONTEND=noninteractive
           sfRetryEx 14m 4 "sfApt update" || sfFail 192 "error updating"
-          sfRetryEx 14m 4 "sfApt install -qqy apt-transport-https ca-certificates curl software-properties-common" || sfFail 193 "error installing apt tools (exit code $?)"
+          sfRetryEx 14m 4 "sfApt install -qqy apt-transport-https ca-certificates curl" || sfFail 193 "error installing apt tools (exit code $?)"
           sfRetryEx 14m 4 "(apt-cache show gnupg2 && apt install -qqy gnupg2) || (apt-cache show gnupg && apt install -qqy gnupg)"
           sfRetryEx 14m 4 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
           echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
@@ -65,7 +65,7 @@ install_docker() {
       ubuntu)
           export DEBIAN_FRONTEND=noninteractive
           sfRetryEx 14m 4 "sfApt update" || sfFail 192 "error updating"
-          sfRetryEx 14m 4 "sfApt install -qqy apt-transport-https ca-certificates curl software-properties-common" || sfFail 193 "error installing apt tools (exit code $?)"
+          sfRetryEx 14m 4 "sfApt install -qqy apt-transport-https ca-certificates curl" || sfFail 193 "error installing apt tools (exit code $?)"
           sfRetryEx 14m 4 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
           echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
           sfRetryEx 14m 4 "sfApt update" || sfFail 192 "error updating"
@@ -181,6 +181,14 @@ EOF
   fi
   rm -f /tmp/docker-fail.txt || true
   docker run hello-world | grep "working correctly" || sfFail 215 "failure running hello-world docker image"
+  rm -f /tmp/docker-fail.txt || true
+  if [[ "{{.DockerHubUsername}}" != "" ]]; then
+      docker login --username="{{.DockerHubUsername}}" --password-stdin <<< "{{.DockerHubPassword}}" > /tmp/docker-fail.txt
+      if [[ "$(cat /tmp/docker-fail.txt)" != "Login Succeeded" ]]; then
+          sfFail 216 "$(cat /tmp/docker-fail.txt)"
+      fi
+  fi
+  rm -f /tmp/docker-fail.txt || true
 }
 export -f install_docker
 

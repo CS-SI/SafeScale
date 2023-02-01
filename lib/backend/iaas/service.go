@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,25 +24,22 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/eko/gocache/v2/cache"
-	"github.com/gofrs/uuid"
 	"github.com/oscarpicas/scribble"
 	"github.com/oscarpicas/smetrics"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	imagefilters "github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract/filters/images"
 	templatefilters "github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract/filters/templates"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -66,9 +63,8 @@ type Service interface {
 	ListTemplatesBySizing(context.Context, abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
 	ObjectStorageConfiguration(ctx context.Context) (objectstorage.Config, fail.Error)
 	SearchImage(context.Context, string) (*abstract.Image, fail.Error)
-	TenantCleanup(context.Context, bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
-	WaitHostState(context.Context, string, hoststate.Enum, time.Duration) fail.Error
-	WaitVolumeState(context.Context, string, volumestate.Enum, time.Duration) (*abstract.Volume, fail.Error)
+
+	GetLock(abstract.Enum) (*sync.Mutex, fail.Error)
 
 	// Provider --- from interface iaas.Providers ---
 	providers.Provider
@@ -77,6 +73,18 @@ type Service interface {
 
 	// Location --- from interface objectstorage.Location ---
 	objectstorage.Location
+}
+
+type Loader interface {
+	LoadHost(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadCluster(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadLabel(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadNetwork(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadShare(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadVolume(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadBucket(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+	LoadSubnet(inctx context.Context, svc Service, netref string, ref string) (interface{}, fail.Error)
+	LoadSecurityGroup(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
 }
 
 // service is the implementation struct of interface Service
@@ -88,7 +96,6 @@ type service struct {
 
 	cacheManager *wrappedCache
 
-	//	metadataBucket objectstorage.GetBucket
 	metadataBucket abstract.ObjectStorageBucket
 	metadataKey    *crypt.Key
 
@@ -96,6 +103,19 @@ type service struct {
 	blacklistTemplateREs []*regexp.Regexp
 	whitelistImageREs    []*regexp.Regexp
 	blacklistImageREs    []*regexp.Regexp
+
+	// this is a hack to avoid race conditions calling the Load* functions
+	// the Load* global functions were a bad idea
+	mLoadHost          *sync.Mutex
+	mLoadCluster       *sync.Mutex
+	mLoadLabel         *sync.Mutex
+	mLoadNetwork       *sync.Mutex
+	mLoadShare         *sync.Mutex
+	mLoadVolume        *sync.Mutex
+	mLoadBucket        *sync.Mutex
+	mLoadSubnet        *sync.Mutex
+	mLoadSecurityGroup *sync.Mutex
+	mLoadFeature       *sync.Mutex
 }
 
 const (
@@ -107,40 +127,9 @@ const (
 	DiskDRFWeight float32 = 1.0 / 16.0
 )
 
-// RankDRF computes the Dominant Resource Fairness Rank of a host template
-func RankDRF(t *abstract.HostTemplate) float32 {
-	fc := float32(t.Cores)
-	fr := t.RAMSize
-	fd := float32(t.DiskSize)
-	return fc*CoreDRFWeight + fr*RAMDRFWeight + fd*DiskDRFWeight
-}
-
-// ByRankDRF implements sort.Interface for []HostTemplate based on
-// the Dominant Resource Fairness
-type ByRankDRF []*abstract.HostTemplate
-
-func (a ByRankDRF) Len() int      { return len(a) }
-func (a ByRankDRF) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-// Less returns what entry is less between indexes i and j, based on rank. If rank is identical, compares entry names
-func (a ByRankDRF) Less(i, j int) bool {
-	ra := RankDRF(a[i])
-	rb := RankDRF(a[j])
-
-	if ra < rb {
-		return true
-	}
-
-	if ra > rb {
-		return false
-	}
-
-	return a[i].Name < a[j].Name
-}
-
-// NullService creates a service instance corresponding to null value
-func NullService() *service { // nolint
-	return &service{}
+// nullService creates a service instance corresponding to null value
+func nullService() *service { // nolint
+	return nil
 }
 
 // IsNull tells if the instance is null value
@@ -168,6 +157,37 @@ func (instance service) GetName() (string, fail.Error) {
 	}
 
 	return instance.tenantName, nil
+}
+
+func (instance service) GetLock(en abstract.Enum) (*sync.Mutex, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InconsistentError()
+	}
+
+	switch en {
+	case abstract.ClusterResource:
+		return instance.mLoadCluster, nil
+	case abstract.HostResource:
+		return instance.mLoadHost, nil
+	case abstract.LabelResource:
+		return instance.mLoadLabel, nil
+	case abstract.NetworkResource:
+		return instance.mLoadNetwork, nil
+	case abstract.SecurityGroupResource:
+		return instance.mLoadSecurityGroup, nil
+	case abstract.SubnetResource:
+		return instance.mLoadSubnet, nil
+	case abstract.VolumeResource:
+		return instance.mLoadVolume, nil
+	case abstract.ShareResource:
+		return instance.mLoadShare, nil
+	case abstract.ObjectStorageBucketResource:
+		return instance.mLoadBucket, nil
+	case abstract.FeatureResource:
+		return instance.mLoadFeature, nil
+	default:
+		return nil, fail.InvalidParameterError("en", "wrong enumeration")
+	}
 }
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket
@@ -199,79 +219,6 @@ func (instance *service) ChangeProvider(provider providers.Provider) fail.Error 
 	}
 	instance.Provider = provider
 	return nil
-}
-
-// WaitHostState waits until a host achieves state 'state'
-// If host is in error state, returns utils.ErrNotAvailable
-// If timeout is reached, returns utils.ErrTimeout
-func (instance service) WaitHostState(ctx context.Context, hostID string, state hoststate.Enum, timeout time.Duration) (rerr fail.Error) {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-	if hostID == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("hostID")
-	}
-
-	timer := time.After(timeout)
-	host := abstract.NewHostFull()
-	host.Core.ID = hostID
-
-	errCh := make(chan fail.Error)
-	done := make(chan struct{})
-	defer close(errCh)
-
-	go func() {
-		var crash error
-		defer func() {
-			if crash != nil {
-				errCh <- fail.ConvertError(crash)
-				return
-			}
-		}()
-		defer fail.SilentOnPanic(&crash)
-
-		for {
-			select {
-			case <-done: // only when it's closed
-				return
-			default:
-			}
-
-			host, rerr = instance.InspectHost(ctx, host)
-			if rerr != nil {
-				errCh <- rerr
-				return
-			}
-			if host.CurrentState == state {
-				errCh <- nil
-				return
-			}
-			if host.CurrentState == hoststate.Error {
-				errCh <- fail.NotAvailableError("host in error state")
-				return
-			}
-
-			select {
-			case <-done: // only when it's closed
-				return
-			default:
-				timings, _ := instance.Timings()
-				time.Sleep(timings.SmallDelay())
-			}
-		}
-	}()
-
-	select {
-	case <-timer:
-		close(done)
-		return fail.TimeoutError(nil, timeout, "Wait state timeout")
-	case rErr := <-errCh:
-		close(done)
-		if rErr != nil {
-			return rErr
-		}
-		return nil
-	}
 }
 
 // WaitVolumeState waits until a volume achieves state
@@ -518,11 +465,9 @@ func (instance service) reduceTemplates(
 ) []*abstract.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if len(whitelistREs) > 0 {
-		// finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(instance.whitelistTemplateREs))
 		finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(whitelistREs))
 	}
 	if len(blacklistREs) > 0 {
-		//		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(instance.blacklistTemplateREs))
 		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(blacklistREs))
 		if finalFilter == nil {
 			finalFilter = blackFilter.Not()
@@ -531,7 +476,13 @@ func (instance service) reduceTemplates(
 		}
 	}
 	if finalFilter != nil {
-		return templatefilters.FilterTemplates(tpls, finalFilter)
+		// here we filter first, then we sort using white lists
+		res := templatefilters.FilterTemplates(tpls, finalFilter)
+		if len(whitelistREs) > 0 {
+			newRes := searchRegexAdaptor(whitelistREs[0].String(), res)
+			return newRes
+		}
+		return res
 	}
 	return tpls
 }
@@ -555,9 +506,6 @@ func (instance service) ListTemplatesBySizing(
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(inctx, true, "").Entering()
-	defer tracer.Exiting()
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -873,7 +821,6 @@ func (instance service) reduceImages(imgs []*abstract.Image) []*abstract.Image {
 		}
 	}
 	if finalFilter != nil {
-		// templateFilter := templatefilters.NewFilter(finalFilter)
 		return imagefilters.FilterImages(imgs, finalFilter)
 	}
 	return imgs
@@ -1022,91 +969,6 @@ func addPadding(in string, maxLength int) string {
 		in += strings.Repeat(" ", paddingRight)
 	}
 	return in
-}
-
-// CreateHostWithKeyPair creates a host
-func (instance service) CreateHostWithKeyPair(inctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
-	if valid.IsNil(instance) {
-		return nil, nil, nil, fail.InvalidInstanceError()
-	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		hf   *abstract.HostFull
-		uc   *userdata.Content
-		ak   *abstract.KeyPair
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
-		found := true
-		ah := abstract.NewHostCore()
-		ah.Name = request.ResourceName
-		_, rerr := instance.InspectHost(ctx, ah)
-		var nilErrNotFound *fail.ErrNotFound = nil // nolint
-		if rerr != nil && rerr != nilErrNotFound {
-			if _, ok := rerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care in previous line
-				chRes <- result{nil, nil, nil, fail.ConvertError(rerr)}
-				return
-			}
-			found = false
-			debug.IgnoreError(rerr)
-		}
-
-		if found {
-			chRes <- result{nil, nil, nil, abstract.ResourceDuplicateError("host", request.ResourceName)}
-			return
-		}
-
-		// Create temporary key pair
-		kpNameuuid, err := uuid.NewV4()
-		if err != nil {
-			chRes <- result{nil, nil, nil, fail.ConvertError(err)}
-			return
-		}
-
-		kpName := kpNameuuid.String()
-		kp, rerr := instance.CreateKeyPair(ctx, kpName)
-		if rerr != nil {
-			chRes <- result{nil, nil, nil, rerr}
-			return
-		}
-
-		// Create host
-		hostReq := abstract.HostRequest{
-			ResourceName:   request.ResourceName,
-			HostName:       request.HostName,
-			ImageID:        request.ImageID,
-			ImageRef:       request.ImageID,
-			KeyPair:        kp,
-			PublicIP:       request.PublicIP,
-			Subnets:        request.Subnets,
-			DefaultRouteIP: request.DefaultRouteIP,
-			DiskSize:       request.DiskSize,
-			// DefaultGateway: request.DefaultGateway,
-			TemplateID: request.TemplateID,
-		}
-		host, userData, rerr := instance.CreateHost(ctx, hostReq, nil)
-		if rerr != nil {
-			chRes <- result{nil, nil, nil, rerr}
-			return
-		}
-		chRes <- result{host, userData, kp, nil}
-
-	}()
-	select {
-	case res := <-chRes:
-		return res.hf, res.uc, res.ak, res.rErr
-	case <-ctx.Done():
-		return nil, nil, nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, nil, nil, fail.ConvertError(inctx.Err())
-	}
-
 }
 
 // ListHostsWithTags list hosts with tags

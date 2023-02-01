@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -429,82 +429,6 @@ func (c clusterConsumer) ListFeatures(clusterName string, all bool, timeout time
 	return list, nil
 }
 
-// InspectFeature ...
-func (c clusterConsumer) InspectFeature(clusterName, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureDetailResponse, error) {
-	if clusterName == "" {
-		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
-	}
-
-	c.session.Connect()
-	defer c.session.Disconnect()
-
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	service := protocol.NewFeatureServiceClient(c.session.connection)
-	request := &protocol.FeatureDetailRequest{
-		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
-		Name:       featureName,
-		Embedded:   embedded,
-	}
-
-	// finally, using context
-	newCtx := ctx
-	if timeout != 0 {
-		aCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		newCtx = aCtx
-	}
-
-	list, err := service.Inspect(newCtx, request)
-	if err != nil {
-		return nil, err
-	}
-
-	return list, nil
-}
-
-// ExportFeature recovers content of the feature file and returns it
-func (c clusterConsumer) ExportFeature(clusterName, featureName string, embedded bool, timeout time.Duration) (*protocol.FeatureExportResponse, error) {
-	if clusterName == "" {
-		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
-	}
-
-	c.session.Connect()
-	defer c.session.Disconnect()
-
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	service := protocol.NewFeatureServiceClient(c.session.connection)
-	request := &protocol.FeatureDetailRequest{
-		TargetType: protocol.FeatureTargetType_FT_CLUSTER,
-		TargetRef:  &protocol.Reference{TenantId: c.session.tenant, Name: clusterName},
-		Name:       featureName,
-		Embedded:   embedded,
-	}
-
-	// finally, using context
-	newCtx := ctx
-	if timeout != 0 {
-		aCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		newCtx = aCtx
-	}
-
-	list, err := service.Export(newCtx, request)
-	if err != nil {
-		return nil, err
-	}
-
-	return list, nil
-}
-
 // FindAvailableMaster ...
 func (c clusterConsumer) FindAvailableMaster(clusterName string, timeout time.Duration) (*protocol.Host, error) {
 	if clusterName == "" {
@@ -601,7 +525,7 @@ func (c clusterConsumer) InspectNode(clusterName string, nodeRef string, timeout
 }
 
 // DeleteNode ...
-func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, timeout time.Duration) error {
+func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, force bool, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -639,11 +563,12 @@ func (c clusterConsumer) DeleteNode(clusterName string, nodes []string, timeout 
 
 		defer wg.Done()
 
-		_, err := service.DeleteNode(newCtx, &protocol.ClusterNodeRequest{
+		_, err := service.DeleteNode(newCtx, &protocol.ClusterDeleteNodeRequest{
 			Name: clusterName, Host: &protocol.Reference{
 				TenantId: c.session.tenant,
 				Name:     ref,
 			},
+			Force: force,
 		})
 		if err != nil {
 			mutex.Lock()

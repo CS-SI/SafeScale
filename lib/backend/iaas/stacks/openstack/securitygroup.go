@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,9 +38,8 @@ const defaultSecurityGroupName = "default"
 // ListSecurityGroups lists existing security groups
 // Parameter 'networkRef' is not used in Openstack (they are tenant-wide)
 func (s stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
-	var emptySlice []*abstract.SecurityGroup
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var list []*abstract.SecurityGroup
@@ -128,6 +127,11 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 			}
 		}
 	}()
+
+	asg, xerr = s.InspectSecurityGroup(ctx, asg)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	// In OpenStack, freshly created security group may contain default rules; we do not want them
 	asg, xerr = s.ClearSecurityGroup(ctx, asg)
@@ -256,10 +260,6 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 	if xerr != nil {
 		return nil, xerr
 	}
-	asg, xerr = s.InspectSecurityGroup(ctx, asg.ID)
-	if xerr != nil {
-		return asg, xerr
-	}
 
 	// delete security group rules
 	for _, v := range asg.Rules {
@@ -285,7 +285,8 @@ func (s stack) ClearSecurityGroup(ctx context.Context, sgParam stacks.SecurityGr
 		}
 	}
 	asg.Rules = abstract.SecurityGroupRules{}
-	return asg, nil
+	//return asg, nil
+	return s.InspectSecurityGroup(ctx, asg)
 }
 
 // toAbstractSecurityGroupRules
@@ -574,16 +575,4 @@ func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Er
 	}
 
 	return cfg.DefaultSecurityGroupName, nil
-}
-
-// EnableSecurityGroup enables a Security Group
-// Does actually nothing for openstack
-func (s stack) EnableSecurityGroup(ctx context.Context, _ *abstract.SecurityGroup) fail.Error {
-	return fail.NotAvailableError("openstack cannot enable a Security Group")
-}
-
-// DisableSecurityGroup disables a Security Group
-// Does actually nothing for openstack
-func (s stack) DisableSecurityGroup(ctx context.Context, _ *abstract.SecurityGroup) fail.Error {
-	return fail.NotAvailableError("openstack cannot disable a Security Group")
 }

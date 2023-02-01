@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,8 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 )
@@ -96,8 +94,6 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 	if request.Name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("request.Name")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
 
 	az, xerr := s.SelectedAvailabilityZone(ctx)
 	if xerr != nil { // nolint
@@ -183,8 +179,6 @@ func (s stack) InspectVolume(ctx context.Context, id string) (*abstract.Volume, 
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering().Exiting()
-
 	var vol *volumesv2.Volume
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
@@ -217,8 +211,6 @@ func (s stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error)
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "").WithStopwatch().Entering().Exiting()
 
 	var vs []*abstract.Volume
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -263,8 +255,6 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 	if id = strings.TrimSpace(id); id == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -322,8 +312,6 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 		return "", fail.InvalidParameterCannotBeEmptyStringError("request.Name")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
-
 	// Creates the attachment
 	var va *volumeattach.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -354,8 +342,6 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string)
 		return nilA, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
-
 	var va *volumeattach.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
@@ -383,8 +369,6 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*a
 	if serverID = strings.TrimSpace(serverID); serverID == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
 
 	var vs []*abstract.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -415,10 +399,6 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*a
 	return vs, nil
 }
 
-func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
-	return nil
-}
-
 // DeleteVolumeAttachment deletes the volume attachment identified by id
 func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string) fail.Error {
 	if valid.IsNil(s) {
@@ -430,8 +410,6 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string
 	if vaID = strings.TrimSpace(vaID); vaID == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {

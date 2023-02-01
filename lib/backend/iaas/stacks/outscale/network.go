@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import (
 const tagNameLabel = "name"
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s stack) HasDefaultNetwork(ctx context.Context) (bool, fail.Error) {
+func (s stack) HasDefaultNetwork(_ context.Context) (bool, fail.Error) {
 	if valid.IsNil(s) {
 		return false, fail.InvalidInstanceError()
 	}
@@ -44,7 +44,7 @@ func (s stack) HasDefaultNetwork(ctx context.Context) (bool, fail.Error) {
 }
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (s stack) GetDefaultNetwork(ctx context.Context) (*abstract.Network, fail.Error) {
+func (s stack) GetDefaultNetwork(_ context.Context) (*abstract.Network, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -62,8 +62,6 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 	if req.CIDR == "" {
 		req.CIDR = stacks.DefaultNetworkCIDR
 	}
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", req).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, xerr := s.rpcCreateNetwork(ctx, req.Name, req.CIDR)
 	if xerr != nil {
@@ -257,9 +255,6 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (_ *abstract.Netwo
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	resp, xerr := s.rpcReadNetByID(ctx, id)
 	if xerr != nil {
 		return nil, xerr
@@ -274,9 +269,6 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstra
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	resp, xerr := s.rpcReadNetByName(ctx, name)
 	if xerr != nil {
 		return nil, xerr
@@ -287,17 +279,13 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstra
 
 // ListNetworks lists all networks
 func (s stack) ListNetworks(ctx context.Context) (_ []*abstract.Network, ferr fail.Error) {
-	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadNets(ctx, nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	var nets []*abstract.Network
@@ -313,9 +301,6 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// Reads NICs that belong to the subnet
 	resp, xerr := s.rpcReadNics(ctx, id, "")
@@ -353,9 +338,6 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (as
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", req).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// Check if CIDR intersects with VPC cidr; if not, error
 	vpc, xerr := s.InspectNetwork(ctx, req.NetworkID)
@@ -407,9 +389,6 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	resp, xerr := s.rpcReadSubnetByID(ctx, id)
 	if xerr != nil {
 		return nil, xerr
@@ -429,9 +408,6 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, subnetName s
 	if subnetName == "" {
 		return nil, fail.InvalidParameterError("subnetName", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s)", networkRef, subnetName).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	var networkID string
 	// If networkRef is not empty string, networkRef can be an ID or a Name; let's find out the ID of this network for sure
@@ -496,13 +472,9 @@ func toAbstractSubnet(subnet osc.Subnet) *abstract.Subnet {
 
 // ListSubnets lists all subnets
 func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstract.Subnet, ferr fail.Error) {
-	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	if networkRef == "" {
 		networkRef = s.Options.Network.DefaultNetworkName
@@ -516,16 +488,16 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstrac
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			if an, xerr = s.InspectNetworkByName(ctx, networkRef); xerr != nil {
-				return emptySlice, xerr
+				return nil, xerr
 			}
 		default:
-			return emptySlice, xerr
+			return nil, xerr
 		}
 	}
 
 	resp, xerr := s.rpcReadSubnets(ctx, an.ID, nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 	var subnets []*abstract.Subnet
 	for _, v := range resp {
@@ -536,20 +508,15 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) (_ []*abstrac
 }
 
 func (s stack) listSubnetsByHost(ctx context.Context, hostID string) ([]*abstract.Subnet, []osc.Nic, fail.Error) {
-	var (
-		emptySubnetSlice []*abstract.Subnet
-		emptyNicSlice    []osc.Nic
-	)
-
 	resp, xerr := s.rpcReadNics(ctx, "", hostID)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
 			// No nics found, considered as a success and returns empty slices
 			debug.IgnoreError2(ctx, xerr)
-			return emptySubnetSlice, emptyNicSlice, nil
+			return nil, nil, nil
 		}
-		return emptySubnetSlice, emptyNicSlice, xerr
+		return nil, nil, xerr
 	}
 
 	var list []*abstract.Subnet
@@ -560,7 +527,7 @@ func (s stack) listSubnetsByHost(ctx context.Context, hostID string) ([]*abstrac
 			case *fail.ErrNotFound:
 				continue
 			default:
-				return emptySubnetSlice, emptyNicSlice, xerr
+				return nil, nil, xerr
 			}
 		}
 
@@ -574,9 +541,6 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// Reads NIS that belong to the subnet
 	resp, xerr := s.rpcReadNics(ctx, id, "")
@@ -602,6 +566,16 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 
 		// Remove should fail only if something goes wrong when deleting VMs
 		logrus.WithContext(ctx).Warnf("found orphan Nics to delete (%s), check if nothing goes wrong deleting Hosts...", spew.Sdump(resp))
+
+		for _, nic := range resp {
+			if nic.LinkNic.VmId != "" {
+				xerr = s.rpcDeleteVms(ctx, []string{nic.LinkNic.VmId})
+				if xerr != nil {
+					debug.IgnoreError2(ctx, xerr)
+				}
+			}
+		}
+
 		if xerr = s.deleteNICs(ctx, resp); xerr != nil {
 			return xerr
 		}
@@ -611,8 +585,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 }
 
 func (s stack) updateDefaultSecurityRules(ctx context.Context, sg osc.SecurityGroup) fail.Error {
-	rules := append(s.createTCPPermissions(), s.createUDPPermissions()...)
-	rules = append(rules, s.createICMPPermissions()...)
+	rules := generatePermissions()
 	xerr := s.rpcCreateSecurityGroupRules(ctx, sg.SecurityGroupId, "Inbound", rules)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to add Network ingress rules to Security Group %s", sg.SecurityGroupId)
@@ -625,30 +598,26 @@ func (s stack) updateDefaultSecurityRules(ctx context.Context, sg osc.SecurityGr
 	return nil
 }
 
-// open all ports, ingress is controlled by the vm firewall
-func (s stack) createTCPPermissions() []osc.SecurityGroupRule {
+// generate default rules for network
+func generatePermissions() []osc.SecurityGroupRule {
+	rules := createSSHPermissions()
+	rules = append(rules, createICMPPermissions()...)
+	return rules
+}
+
+// open ssh port
+func createSSHPermissions() []osc.SecurityGroupRule {
 	rule := osc.SecurityGroupRule{
-		FromPortRange: 1,
-		ToPortRange:   65535,
+		FromPortRange: 22,
+		ToPortRange:   22,
 		IpRanges:      []string{"0.0.0.0/0"},
 		IpProtocol:    "tcp",
 	}
 	return []osc.SecurityGroupRule{rule}
 }
 
-// open all ports, ingress is controlled by the vm firewall
-func (s stack) createUDPPermissions() []osc.SecurityGroupRule {
-	rule := osc.SecurityGroupRule{
-		FromPortRange: 1,
-		ToPortRange:   65535,
-		IpRanges:      []string{"0.0.0.0/0"},
-		IpProtocol:    "udp",
-	}
-	return []osc.SecurityGroupRule{rule}
-}
-
 // ingress is controlled by the vm firewall
-func (s stack) createICMPPermissions() []osc.SecurityGroupRule {
+func createICMPPermissions() []osc.SecurityGroupRule {
 	var rules []osc.SecurityGroupRule
 	// Echo reply
 	rules = append(rules, osc.SecurityGroupRule{

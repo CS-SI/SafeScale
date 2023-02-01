@@ -19,6 +19,9 @@ ifneq ($(OS),Windows_NT)
 PATH = $(HOME)/.local/bin:$(shell printenv PATH)
 endif
 
+VERSIONFILE := version.go
+REV := `git rev-parse HEAD 2>/dev/null || echo ""`
+
 all:	lib/protocol lib/system lib/utils lib/backend lib/client sdk
 
 vet:
@@ -31,12 +34,22 @@ test:
 bashtest:
 	@(cd system && $(MAKE) $(@))
 
-gensrc:
+genver:
+	@$(RM) $(VERSIONFILE) || true
+	@echo "package lib" > $(VERSIONFILE)
+	@echo "// Build constants" >> $(VERSIONFILE)
+	@echo "const (" >> $(VERSIONFILE)
+	@echo "    Revision  = \"$(REV)\"" >> $(VERSIONFILE)
+	@echo ")" >> $(VERSIONFILE)
+	@gofmt $(VERSIONFILE) > /dev/null 2>&1
+
+gensrc: genver
 	@(mkdir -p mocks) || true
 	@(cd backend/iaas/userdata && $(MAKE) $(@))
 	@(cd system && $(MAKE) $(@))
 
 generate: gensrc sdk
+	@gofmt $(VERSIONFILE) > /dev/null 2>&1
 	@(cd protocol && $(MAKE) $@)
 	@(cd utils && $(MAKE) $@)
 	@(cd backend && $(MAKE) $@)

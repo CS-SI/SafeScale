@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -41,9 +40,6 @@ func (s stack) CreateVolume(ctx context.Context, request abstract.VolumeRequest)
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(ctx, &ferr)
 
 	volumeType, minSize := fromAbstractVolumeSpeed(request.Speed)
 	if request.Size < minSize {
@@ -83,10 +79,6 @@ func (s stack) InspectVolume(ctx context.Context, ref string) (_ *abstract.Volum
 	if ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", ref).WithStopwatch().Entering().Exiting()
-	// VPL: caller must log; sometimes InspectVolume() returned error is to be considered as an information, not a real error
-	// defer fail.OnExitLogError(&xerr)
 
 	var name string
 	resp, xerr := s.rpcDescribeVolumeByName(ctx, aws.String(ref))
@@ -192,9 +184,6 @@ func (s stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr fail
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(ctx, &ferr)
-
 	var resp *ec2.DescribeVolumesOutput
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
@@ -242,9 +231,6 @@ func (s stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(ctx, &ferr)
-
 	query := ec2.DeleteVolumeInput{
 		VolumeId: aws.String(id),
 	}
@@ -262,9 +248,6 @@ func (s stack) CreateVolumeAttachment(ctx context.Context, request abstract.Volu
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", request).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(ctx, &ferr)
 
 	availableDevices := initAvailableDevices()
 	var resp *ec2.VolumeAttachment
@@ -367,10 +350,6 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, serverID, id string)
 		return nilA, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	// VPL: caller MUST log; sometimes, InspectVolumeAttachment returned error may be considered as an information of non-existence, not a real error
-	// defer fail.OnExitLogError(&xerr)
-
 	query := ec2.DescribeVolumesInput{
 		VolumeIds: []*string{aws.String(id)},
 	}
@@ -407,8 +386,6 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []
 	if serverID == "" {
 		return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", serverID).WithStopwatch().Entering().Exiting()
 
 	query := ec2.DescribeVolumesInput{
 		Filters: []*ec2.Filter{
@@ -459,8 +436,6 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, id string) 
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s, %s)", serverID, id).WithStopwatch().Entering().Exiting()
 
 	query := ec2.DetachVolumeInput{
 		InstanceId: aws.String(serverID),

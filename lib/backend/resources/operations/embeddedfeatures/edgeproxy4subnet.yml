@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        host: yes
+        host: all
         cluster: all
     requirements:
         features:
@@ -30,10 +30,10 @@ feature:
                 steps:
                     curl:
                         targets:
-                            hosts: no
+                            hosts: none
                             gateways: all
-                            masters: no
-                            nodes: no
+                            masters: none
+                            nodes: none
                         run: |
                             curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep HTTP | grep 200 | grep OK &>/dev/null || sfFail 192
 
@@ -221,7 +221,7 @@ feature:
         networking:
             - name: https
               targets:
-                  host: yes
+                  host: all
                   gateways: all
               protocol: tcp
               ports: 443

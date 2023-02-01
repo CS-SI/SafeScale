@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -318,7 +318,7 @@ func TestBucket_Create(t *testing.T) {
 		xerr = bucket.Create(ctx, "any")
 		require.Nil(t, err)
 		xerr = bucket.Create(ctx, "any")
-		require.Contains(t, xerr.Error(), "already carrying information")
+		require.Contains(t, xerr.Error(), "already exists")
 
 	})
 	require.Nil(t, xerr)
@@ -346,7 +346,7 @@ func TestBucket_Delete(t *testing.T) {
 		require.Nil(t, xerr)
 
 		xerr = bucket.Delete(ctx)
-		require.Contains(t, xerr.Error(), "failed to find Bucket 'mybucket'")
+		require.Contains(t, xerr.Error(), "the instance is not valid")
 
 	})
 	require.Nil(t, xerr)

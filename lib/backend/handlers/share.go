@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -49,11 +47,11 @@ type ShareHandler interface {
 
 // shareHandler nas service
 type shareHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewShareHandler creates a ShareHandler
-func NewShareHandler(job server.Job) ShareHandler {
+func NewShareHandler(job backend.Job) ShareHandler {
 	return &shareHandler{job: job}
 }
 
@@ -93,10 +91,6 @@ func (handler *shareHandler) Create(
 		return nil, fail.InvalidParameterError("path", "cannot be empty")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", shareName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
-
 	shareInstance, xerr := sharefactory.New(handler.job.Service())
 	if xerr != nil {
 		return nil, xerr
@@ -129,10 +123,6 @@ func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
-
 	shareInstance, xerr := sharefactory.Load(handler.job.Context(), handler.job.Service(), name)
 	if xerr != nil {
 		return xerr
@@ -156,10 +146,6 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	if handler.job == nil {
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	svc := handler.job.Service()
 	objs, xerr := sharefactory.New(svc)
@@ -229,10 +215,6 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 		return nil, fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareName, hostRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
-
 	// Retrieve info about the share
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
@@ -271,10 +253,6 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 		return fail.InvalidParameterError("hostRef", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareRef, hostRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
-
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
 	objs, xerr := sharefactory.Load(ctx, svc, shareRef)
@@ -309,10 +287,6 @@ func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, fe
 	if shareRef == "" {
 		return nil, fail.InvalidParameterError("shareName", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", shareRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	return sharefactory.Load(handler.job.Context(), handler.job.Service(), shareRef)
 }

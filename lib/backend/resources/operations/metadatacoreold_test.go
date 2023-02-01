@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/require"
@@ -277,7 +276,7 @@ func TestMetadataCore_Review(t *testing.T) {
 	ctx := context.Background()
 
 	var amc *MetadataCore = nil
-	xerr := amc.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := amc.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return nil
 	})
 	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
@@ -298,10 +297,10 @@ func TestMetadataCore_Review(t *testing.T) {
 		xerr = mc.Carry(ctx, network)
 		require.Nil(t, xerr)
 
-		xerr = mc.Review(ctx, callback)
+		xerr = mc.Inspect(ctx, callback)
 		require.Contains(t, xerr.Error(), "cannot be nil")
 
-		xerr = mc.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = mc.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
 
 			an, ok := clonable.(*abstract.Network)
@@ -708,45 +707,4 @@ func TestMetadataCore_Deserialize(t *testing.T) {
 	})
 	require.Nil(t, err)
 
-}
-
-type SomeObserver struct {
-	observer.Observer
-	ID     string
-	Name   string
-	States map[string]string
-}
-
-func (e *SomeObserver) GetID() (string, error) {
-	if e == nil {
-		return "", nil
-	}
-	return e.ID, nil
-}
-func (e *SomeObserver) GetName() string {
-	if e == nil {
-		return ""
-	}
-	return e.Name
-}
-func (e *SomeObserver) GetStates() map[string]string {
-	if e == nil {
-		return map[string]string{}
-	}
-	return e.States
-}
-
-// is called by Observable to signal an Observer a change occurred
-func (e *SomeObserver) SignalChange(id string) {
-	e.States[id] = "changed"
-}
-
-// is called by Observable to signal an Observer the content will not be used anymore (decreasing the counter of uses)
-func (e *SomeObserver) MarkAsFreed(id string) {
-	e.States[id] = "markasreed"
-}
-
-// used to mark the Observable as deleted (allowing to remove the entry from the Observer internals)
-func (e *SomeObserver) MarkAsDeleted(id string) {
-	e.States[id] = "markasdeleted"
 }

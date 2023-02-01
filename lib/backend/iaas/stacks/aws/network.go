@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	// "github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
@@ -63,8 +62,6 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -196,8 +193,6 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (_ *abstract.Netwo
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-
 	resp, xerr := s.rpcDescribeVpcByID(ctx, aws.String(id))
 	if xerr != nil {
 		return nil, xerr
@@ -239,8 +234,6 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstra
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s')", name).WithStopwatch().Entering().Exiting()
-
 	resp, xerr := s.rpcDescribeVpcByName(ctx, aws.String(name))
 	if xerr != nil {
 		return nil, xerr
@@ -256,16 +249,13 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstra
 
 // ListNetworks ...
 func (s stack) ListNetworks(ctx context.Context) (_ []*abstract.Network, ferr fail.Error) {
-	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
 
 	resp, xerr := s.rpcDescribeVpcs(ctx, nil)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	nets := make([]*abstract.Network, 0, len(resp))
@@ -292,8 +282,6 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) (ferr fail.Error) {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	var xerr fail.Error
 	if _, xerr = s.InspectNetwork(ctx, id); xerr != nil {
@@ -398,8 +386,6 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (re
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
-
 	timings, xerr := s.Timings()
 	if xerr != nil {
 		return nil, xerr
@@ -491,8 +477,6 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-
 	resp, xerr := s.rpcDescribeSubnetByID(ctx, aws.String(id))
 	if xerr != nil {
 		return nil, xerr
@@ -527,8 +511,6 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, subnetName s
 	if subnetName == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "('%s', '%s')", networkRef, subnetName).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -580,12 +562,9 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, subnetName s
 
 // ListSubnets ...
 func (s stack) ListSubnets(ctx context.Context, networkRef string) (list []*abstract.Subnet, ferr fail.Error) {
-	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -657,8 +636,6 @@ func (s stack) initEC2DescribeSubnetsInput(ctx context.Context, networkRef strin
 
 // listSubnetIDs ...
 func (s stack) listSubnetIDs(ctx context.Context, networkRef string) (list []string, ferr fail.Error) { // nolint
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
-
 	timings, xerr := s.Timings()
 	if xerr != nil {
 		return nil, xerr
@@ -703,8 +680,6 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) (ferr fail.Error) {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	// Disassociate route tables from subnet
 	tables, xerr := s.rpcDescribeRouteTables(ctx, aws.String("association.subnet-id"), []*string{aws.String(id)})

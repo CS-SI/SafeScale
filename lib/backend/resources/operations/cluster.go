@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/eko/gocache/v2/store"
 	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -60,6 +59,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
+
+	_ "github.com/sony/gobreaker"
 )
 
 const (
@@ -147,7 +148,13 @@ func (instance *Cluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 		rg.Go(func() error {
 			rh, xerr := LoadHost(ctx, svc, agw.Core.ID)
 			if xerr != nil {
-				return xerr
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					failures <- agw.Core.ID
+					return nil
+				default:
+					return xerr
+				}
 			}
 
 			exists, xerr := rh.Exists(ctx)
@@ -167,7 +174,13 @@ func (instance *Cluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 		rg.Go(func() error {
 			rh, xerr := LoadHost(ctx, svc, mid)
 			if xerr != nil {
-				return xerr
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					failures <- mid
+					return nil
+				default:
+					return xerr
+				}
 			}
 
 			exists, xerr := rh.Exists(ctx)
@@ -188,7 +201,13 @@ func (instance *Cluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 		rg.Go(func() error {
 			rh, xerr := LoadHost(ctx, svc, nid)
 			if xerr != nil {
-				return xerr
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					failures <- nid
+					return nil
+				default:
+					return xerr
+				}
 			}
 
 			exists, xerr := rh.Exists(ctx)
@@ -251,208 +270,6 @@ func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max
 	return nil
 }
 
-// LoadCluster loads cluster information from metadata
-func LoadCluster(inctx context.Context, svc iaas.Service, name string, options ...data.ImmutableKeyValue) (_ resources.Cluster, ferr fail.Error) {
-	defer elapsed("LoadCluster")()
-	defer fail.OnPanic(&ferr)
-
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if name = strings.TrimSpace(name); name == "" {
-		return nil, fail.InvalidParameterError("name", "cannot be empty string")
-	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  resources.Cluster
-		rErr fail.Error
-	}
-
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
-		// trick to avoid collisions
-		var kt *Cluster
-		cachename := fmt.Sprintf("%T/%s", kt, name)
-
-		cache, xerr := svc.GetCache(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		if cache != nil {
-			if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-				casted, ok := val.(resources.Cluster)
-				if ok {
-					chRes <- result{casted, nil}
-					return
-				}
-			}
-		}
-
-		cacheMissLoader := func() (data.Identifiable, fail.Error) { return onClusterCacheMiss(ctx, svc, name) }
-		anon, xerr := cacheMissLoader()
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		var (
-			clusterInstance *Cluster
-			ok              bool
-		)
-		if clusterInstance, ok = anon.(*Cluster); !ok {
-			chRes <- result{nil, fail.InconsistentError("value found in Cluster cache for key '%s' is not a Cluster", name)}
-			return
-		}
-		if clusterInstance == nil {
-			chRes <- result{nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)}
-			return
-		}
-
-		if clusterInstance.randomDelayCh == nil {
-			xerr = clusterInstance.startRandomDelayGenerator(ctx, 0, 2000)
-			if xerr != nil {
-				chRes <- result{nil, xerr}
-				return
-			}
-		}
-
-		// if cache failed we are here, so we better retrieve updated information...
-		xerr = clusterInstance.Reload(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		if cache != nil {
-			err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, clusterInstance.GetName()), clusterInstance, &store.Options{Expiration: 120 * time.Minute})
-			if err != nil {
-				chRes <- result{nil, fail.ConvertError(err)}
-				return
-			}
-			hid, err := clusterInstance.GetID()
-			if err != nil {
-				chRes <- result{nil, fail.ConvertError(err)}
-				return
-			}
-			err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), clusterInstance, &store.Options{Expiration: 120 * time.Minute})
-			if err != nil {
-				chRes <- result{nil, fail.ConvertError(err)}
-				return
-			}
-			time.Sleep(100 * time.Millisecond) // consolidate cache.Set
-
-			if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-				casted, ok := val.(resources.Cluster)
-				if ok {
-					chRes <- result{casted, nil}
-					return
-				} else {
-					logrus.WithContext(ctx).Warnf("wrong type of resources.Host")
-				}
-			} else {
-				logrus.WithContext(ctx).Warnf("cluster cache response (%s): %v", cachename, xerr)
-			}
-		}
-
-		// FIXME: OPP We need to load extra info here
-		xerr = clusterInstance.updateCachedInformation(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		// And now prevent useless metadata trickery here...
-		shi, err := clusterInstance.MetadataCore.shielded.UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		aclu, ok := shi.(*abstract.ClusterIdentity)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-		clusterInstance.cluID = aclu
-
-		aclupro, err := clusterInstance.MetadataCore.properties.UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		flavor, xerr := clusterInstance.GetFlavor(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		xerr = clusterInstance.bootstrap(flavor)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		foo, err := aclupro[clusterproperty.NodesV3].UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		gotta, ok := foo.(*propertiesv3.ClusterNodes)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-		for k := range gotta.PrivateNodeByID {
-			clusterInstance.nodes = append(clusterInstance.nodes, k)
-		}
-		for k := range gotta.MasterByID {
-			clusterInstance.masters = append(clusterInstance.masters, k)
-		}
-
-		asta, err := aclupro[clusterproperty.StateV1].UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		gurb, ok := asta.(*propertiesv1.ClusterState)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-
-		clusterInstance.state = gurb.State
-
-		for k, v := range gotta.ByNumericalID {
-			if strings.Contains(v.Name, "node") {
-				clusterInstance.nodeIPs[k] = v.PrivateIP
-			}
-			if strings.Contains(v.Name, "master") {
-				clusterInstance.masterIPs[k] = v.PrivateIP
-			}
-		}
-
-		chRes <- result{clusterInstance, nil}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
-}
-
 // onClusterCacheMiss is called when cluster cache does not contain an instance of cluster 'name'
 func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (data.Identifiable, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
@@ -465,96 +282,106 @@ func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (d
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		clusterInstance, xerr := NewCluster(ctx, svc)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+		ga, gerr := func() (_ resources.Cluster, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		if xerr = clusterInstance.Read(ctx, name); xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		shi, err := clusterInstance.MetadataCore.shielded.UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		aclu, ok := shi.(*abstract.ClusterIdentity)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-		clusterInstance.cluID = aclu
-
-		aclupro, err := clusterInstance.MetadataCore.properties.UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		flavor, xerr := clusterInstance.GetFlavor(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		xerr = clusterInstance.bootstrap(flavor)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		foo, err := aclupro[clusterproperty.NodesV3].UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		gotta, ok := foo.(*propertiesv3.ClusterNodes)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-		for k := range gotta.PrivateNodeByID {
-			clusterInstance.nodes = append(clusterInstance.nodes, k)
-		}
-		for k := range gotta.MasterByID {
-			clusterInstance.masters = append(clusterInstance.masters, k)
-		}
-
-		asta, err := aclupro[clusterproperty.StateV1].UnWrap()
-		if err != nil {
-			chRes <- result{nil, fail.ConvertError(err)}
-			return
-		}
-
-		gurb, ok := asta.(*propertiesv1.ClusterState)
-		if !ok {
-			chRes <- result{nil, fail.NewError("bad cast")}
-			return
-		}
-
-		clusterInstance.state = gurb.State
-
-		for k, v := range gotta.ByNumericalID {
-			if strings.Contains(v.Name, "node") {
-				clusterInstance.nodeIPs[k] = v.PrivateIP
+			clusterInstance, xerr := NewCluster(ctx, svc)
+			if xerr != nil {
+				return nil, xerr
 			}
-			if strings.Contains(v.Name, "master") {
-				clusterInstance.masterIPs[k] = v.PrivateIP
+
+			if xerr = clusterInstance.Read(ctx, name); xerr != nil {
+				return nil, xerr
 			}
-		}
 
-		xerr = clusterInstance.updateCachedInformation(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+			shi, err := clusterInstance.MetadataCore.shielded.UnWrap()
+			if err != nil {
+				return nil, fail.ConvertError(err)
+			}
 
-		chRes <- result{clusterInstance, nil}
+			aclu, ok := shi.(*abstract.ClusterIdentity)
+			if !ok {
+				return nil, fail.NewError("bad cast")
+			}
+			clusterInstance.cluID = aclu
+
+			aclupro, err := clusterInstance.MetadataCore.properties.UnWrap()
+			if err != nil {
+				return nil, fail.ConvertError(err)
+			}
+
+			flavor, xerr := clusterInstance.GetFlavor(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			xerr = clusterInstance.bootstrap(flavor)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			if val, ok := aclupro[clusterproperty.NodesV3]; !ok {
+				return nil, fail.NewError("corrupted metadata")
+			} else {
+				if val == nil {
+					return nil, fail.NewError("corrupted metadata")
+				}
+			}
+
+			foo, err := aclupro[clusterproperty.NodesV3].UnWrap()
+			if err != nil {
+				return nil, fail.ConvertError(err)
+			}
+
+			gotta, ok := foo.(*propertiesv3.ClusterNodes)
+			if !ok {
+				return nil, fail.NewError("bad cast")
+			}
+
+			for k := range gotta.PrivateNodeByID {
+				clusterInstance.nodes = append(clusterInstance.nodes, k)
+			}
+			for k := range gotta.MasterByID {
+				clusterInstance.masters = append(clusterInstance.masters, k)
+			}
+
+			if val, ok := aclupro[clusterproperty.StateV1]; !ok {
+				return nil, fail.NewError("corrupted metadata")
+			} else {
+				if val == nil {
+					return nil, fail.NewError("corrupted metadata")
+				}
+			}
+
+			asta, err := aclupro[clusterproperty.StateV1].UnWrap()
+			if err != nil {
+				return nil, fail.ConvertError(err)
+			}
+
+			gurb, ok := asta.(*propertiesv1.ClusterState)
+			if !ok {
+				return nil, fail.NewError("bad cast")
+			}
+
+			clusterInstance.state = gurb.State
+
+			for k, v := range gotta.ByNumericalID {
+				if strings.Contains(v.Name, "node") {
+					clusterInstance.nodeIPs[k] = v.PrivateIP
+				}
+				if strings.Contains(v.Name, "master") {
+					clusterInstance.masterIPs[k] = v.PrivateIP
+				}
+			}
+
+			xerr = clusterInstance.updateCachedInformation(ctx)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			return clusterInstance, nil
+		}()
+		chRes <- result{ga, gerr}
 	}()
 	select {
 	case res := <-chRes:
@@ -597,7 +424,6 @@ func (instance *Cluster) updateCachedInformation(inctx context.Context) fail.Err
 			}
 		}
 
-		// FIXME: OPP Populate all other local structs...
 		chRes <- result{nil}
 	}()
 	select {
@@ -629,7 +455,6 @@ func (instance *Cluster) carry(inctx context.Context, clonable data.Clonable) (f
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -673,7 +498,7 @@ func (instance *Cluster) Create(inctx context.Context, req abstract.ClusterReque
 
 			logrus.WithContext(ctx).Tracef("Cluster creation finished with: %s", litter.Sdump(res))
 
-			xerr = instance.unsafeUpdateClusterInventory(ctx)
+			xerr = instance.regenerateClusterInventory(ctx)
 			if xerr != nil {
 				return xerr
 			}
@@ -814,7 +639,7 @@ func (instance *Cluster) GetComplexity(ctx context.Context) (_ clustercomplexity
 
 // GetAdminPassword returns the password of the Cluster admin account
 // satisfies interface Cluster.Controller
-func (instance *Cluster) GetAdminPassword(ctx context.Context) (adminPassword string, ferr fail.Error) {
+func (instance *Cluster) GetAdminPassword(_ context.Context) (adminPassword string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -825,7 +650,7 @@ func (instance *Cluster) GetAdminPassword(ctx context.Context) (adminPassword st
 }
 
 // GetKeyPair returns the key pair used in the Cluster
-func (instance *Cluster) GetKeyPair(ctx context.Context) (keyPair *abstract.KeyPair, ferr fail.Error) {
+func (instance *Cluster) GetKeyPair(_ context.Context) (keyPair *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -852,7 +677,6 @@ func (instance *Cluster) GetNetworkConfig(ctx context.Context) (config *properti
 						"'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
 					)
 				}
-				// config = networkV3.Clone().(*propertiesv3.ClusterNetwork)
 				config = networkV3
 				return nil
 			},
@@ -1026,8 +850,6 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	var problems []error
-
 	runGroup := new(errgroup.Group)
 
 	runGroup.Go(func() error {
@@ -1063,48 +885,11 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 	xerr = fail.ConvertError(runGroup.Wait())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		if len(problems) > 0 {
-			_ = xerr.AddConsequence(fail.NewErrorList(problems))
-		}
+		_ = instance.changeStatusTo(ctx, clusterstate.Degraded)
 		return xerr
 	}
 
-	if len(problems) > 0 {
-		// Mark Cluster as state Degraded
-		outerr := fail.NewErrorList(problems)
-		xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-				stateV1, ok := clonable.(*propertiesv1.ClusterState)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				stateV1.State = clusterstate.Degraded
-				instance.state = clusterstate.Degraded
-				return nil
-			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-			_ = outerr.AddConsequence(xerr)
-		}
-		return outerr
-	}
-
-	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-			stateV1, ok := clonable.(*propertiesv1.ClusterState)
-			if !ok {
-				return fail.InconsistentError(
-					"'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-				)
-			}
-			stateV1.State = clusterstate.Nominal
-			instance.state = clusterstate.Nominal
-			return nil
-		})
-	})
+	xerr = instance.changeStatusTo(ctx, clusterstate.Nominal)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
@@ -1328,6 +1113,15 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		return nil, fail.InvalidParameterError("count", "must be an int > 0")
 	}
 
+	defer func() {
+		// drop the cache when we are done expanding the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
+
 	parameters, err := data.FromMap(parameters)
 	if err != nil {
 		return nil, fail.ConvertError(err)
@@ -1370,7 +1164,11 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 				hostImage = defaultsV3.Image
 
 				// merge FeatureParameters in parameters, the latter keeping precedence over the former
-				for k, v := range ExtractFeatureParameters(defaultsV3.FeatureParameters) {
+				efe, serr := ExtractFeatureParameters(defaultsV3.FeatureParameters)
+				if serr != nil {
+					return fail.ConvertError(serr)
+				}
+				for k, v := range efe {
 					if _, ok := parameters[k]; !ok {
 						parameters[k] = v
 					}
@@ -1417,7 +1215,8 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		return nil, xerr
 	}
 
-	timeout := time.Duration(count) * timings.HostCreationTimeout() // More than enough
+	tcount := uint(math.Max(float64(count), 4))
+	timeout := time.Duration(tcount) * timings.HostCreationTimeout() // More than enough
 
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1443,9 +1242,12 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		}
 	}
 
+	ctx, ca := context.WithTimeout(ctx, timeout)
+	defer ca()
+
 	// for OVH, we have to ignore the errors and keep trying until we have 'count'
-	nodesChan := make(chan StdResult, count)
-	err = runWindow(ctx, count, uint(math.Min(float64(count), float64(winSize))), timeout, nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
+	nodesChan := make(chan StdResult, 4*count)
+	err = runWindow(ctx, count, uint(math.Min(float64(count), float64(winSize))), nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
 		nodeDef:       nodeDef,
 		timeout:       timings.HostCreationTimeout(),
 		keepOnFailure: keepOnFailure,
@@ -1508,7 +1310,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		return nil, xerr
 	}
 	if makers.ConfigureCluster != nil {
-		xerr = makers.ConfigureCluster(ctx, instance, parameters)
+		xerr = makers.ConfigureCluster(ctx, instance, parameters, true)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1539,7 +1341,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		hosts = append(hosts, hostInstance)
 	}
 
-	xerr = instance.unsafeUpdateClusterInventory(ctx)
+	xerr = instance.regenerateClusterInventory(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1654,6 +1456,11 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 		return xerr
 	}
 
+	xerr = instance.regenerateClusterInventory(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
 	return nil
 }
 
@@ -1661,28 +1468,28 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 func (instance *Cluster) ListMasters(ctx context.Context) (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	emptyList := resources.IndexedListOfClusterNodes{}
 	if valid.IsNil(instance) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	xerr := instance.beingRemoved(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
-	return instance.unsafeListMasters(ctx)
+	lim, xerr := instance.unsafeListMasters(ctx)
+	return lim, xerr
 }
 
 // FindAvailableMaster returns ID of the first master available to execute order
 // satisfies interface Cluster.Cluster.Controller
 func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("FindAvailableMaster")()
+	defer elapsed(ctx, "FindAvailableMaster")()
 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -1705,12 +1512,11 @@ func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resour
 func (instance *Cluster) ListNodes(ctx context.Context) (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	emptyList := resources.IndexedListOfClusterNodes{}
 	if valid.IsNil(instance) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	xerr := instance.beingRemoved(ctx)
@@ -1742,12 +1548,11 @@ func (instance *Cluster) beingRemoved(ctx context.Context) fail.Error {
 func (instance *Cluster) ListNodeNames(ctx context.Context) (list data.IndexedListOfStrings, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	emptyList := data.IndexedListOfStrings{}
 	if valid.IsNil(instance) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	xerr := instance.beingRemoved(ctx)
@@ -1775,71 +1580,10 @@ func (instance *Cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	return list, nil
-}
-
-// FindAvailableNode returns node instance of the first node available to execute order
-func (instance *Cluster) FindAvailableNode(ctx context.Context) (node resources.Host, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	return instance.unsafeFindAvailableNode(ctx)
-}
-
-// LookupNode tells if the ID of the master passed as parameter is a node
-func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if valid.IsNil(instance) {
-		return false, fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return false, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-	if ref == "" {
-		return false, fail.InvalidParameterError("ref", "cannot be empty string")
-	}
-
-	xerr := instance.beingRemoved(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return false, xerr
-	}
-
-	var hostInstance resources.Host
-	hostInstance, xerr = LoadHost(ctx, instance.Service(), ref)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return false, xerr
-	}
-
-	found = false
-	xerr = instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			hid, err := hostInstance.GetID()
-			if err != nil {
-				return fail.ConvertError(err)
-			}
-
-			_, found = nodesV3.PrivateNodeByID[hid]
-			return nil
-		})
-	})
-	return found, xerr
 }
 
 // deleteMaster deletes the master specified by its ID
@@ -1976,7 +1720,11 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 					return result{xerr}, xerr
 				}
 
-				makers, _ := instance.getMaker(ctx)
+				makers, xerr := instance.getMaker(ctx)
+				if xerr != nil {
+					return result{xerr}, xerr
+				}
+
 				incrementExpVar("cluster.cache.hit")
 				if makers.UnconfigureNode != nil {
 					xerr = makers.UnconfigureNode(ctx, instance, hostInstance, master)
@@ -2025,6 +1773,15 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Erro
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
+
+	defer func() {
+		// drop the cache when we are done creating the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
 
 	if !force {
 		xerr := instance.beingRemoved(ctx)
@@ -2455,41 +2212,102 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 	go func() {
 		defer close(chRes)
 
+		efe, serr := ExtractFeatureParameters(req.FeatureParameters)
+		if serr != nil {
+			chRes <- result{fail.ConvertError(serr)}
+			return
+		}
+
+		parameters := efe
+
 		// FIXME: OPP This should use instance.AddFeature instead
 
 		// Install reverse-proxy feature on Cluster (gateways)
-		parameters := ExtractFeatureParameters(req.FeatureParameters)
-		xerr := instance.installReverseProxy(ctx, parameters, req)
-		xerr = debug.InjectPlannedFail(xerr)
+		fla, xerr := instance.unsafeGetFlavor(inctx)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
 		}
 
+		switch fla {
+		case clusterflavor.K8S:
+			// Reverse proxy disabled by default: EOL, unsafe, undocumented
+			// FIXME: k8s has an UNDOCUMENTED dependency on reverse proxy...
+			// reverseproxy CANNOT be disabled on K8S and expect K8S to work...
+			xerr := instance.installReverseProxy(ctx, parameters, req)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
+			}
+		default:
+		}
+
 		// Install remote-desktop feature on Cluster (all masters)
-		xerr = instance.installRemoteDesktop(ctx, parameters, req)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
-			if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
+
+		// FIXME: Enable this ONLY after remotedesktop feature is UPDATED AND TESTED
+		// Also, EOL, unsafe, undocumented, 4 releases have passed since 1.0.0 was published
+		/*
+			xerr := instance.installRemoteDesktop(ctx, parameters, req)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
+				if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
+					chRes <- result{xerr}
+					return
+				}
+			}
+		*/
+
+		// Install ansible feature on Cluster (all masters) // aaaand it's gone...
+		/*
+			xerr = instance.installAnsible(ctx, parameters)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				chRes <- result{xerr}
+				return
+			}
+		*/
+
+		if itis, err := instance.isFeatureDisabled(ctx, "ansible-for-cluster"); !itis && err == nil {
+			xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					featuresV1.Installed["ansible"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible"}
+					featuresV1.Installed["ansible-for-cluster"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible-for-cluster"}
+					return nil
+				})
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				chRes <- result{xerr}
+				return
+			}
+
+			xerr = instance.regenerateClusterInventory(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
 				chRes <- result{xerr}
 				return
 			}
 		}
 
-		// Install ansible feature on Cluster (all masters)
-		xerr = instance.installAnsible(ctx, parameters)
+		// configure what has to be done Cluster-wide
+		makers, xerr := instance.getMaker(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
 		}
 
-		// configure what has to be done Cluster-wide
-		makers, _ := instance.getMaker(ctx)
 		incrementExpVar("cluster.cache.hit")
 		if makers.ConfigureCluster != nil {
-			chRes <- result{makers.ConfigureCluster(ctx, instance, parameters)}
+			chRes <- result{makers.ConfigureCluster(ctx, instance, parameters, false)}
 			return
 		}
 
@@ -2506,7 +2324,10 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 }
 
 func (instance *Cluster) determineRequiredNodes(ctx context.Context) (uint, uint, uint, fail.Error) {
-	makers, _ := instance.getMaker(ctx)
+	makers, xerr := instance.getMaker(ctx)
+	if xerr != nil {
+		return 0, 0, 0, xerr
+	}
 	if makers.MinimumRequiredServers != nil {
 		g, m, n, xerr := makers.MinimumRequiredServers(ctx, *instance.cluID)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2550,7 +2371,7 @@ func realizeTemplate(tmplName string, adata map[string]interface{}, fileName str
 var ansibleScripts embed.FS
 
 // Regenerate ansible inventory
-func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fail.Error {
+func (instance *Cluster) regenerateClusterInventory(inctx context.Context) fail.Error {
 	// Check incoming parameters
 	if inctx == nil {
 		return fail.InvalidParameterCannotBeNilError("inctx")
@@ -2789,7 +2610,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 			logrus.WithContext(ctx).Infof("%s Update master %s", prerr, masters[master].GetName())
 
 			tg.Go(func() error {
-				_, err := instance.taskUpdateClusterInventoryMaster(ctx, taskUpdateClusterInventoryMasterParameters{
+				_, err := instance.taskRegenerateClusterInventory(ctx, taskRegenerateClusterInventoryParameters{
 					ctx:           ctx,
 					master:        masters[master],
 					inventoryData: dataBuffer.String(),
@@ -2824,6 +2645,52 @@ func (instance *Cluster) unsafeUpdateClusterInventory(inctx context.Context) fai
 	case <-inctx.Done():
 		return fail.ConvertError(inctx.Err())
 	}
+}
+
+func (instance *Cluster) isFeatureDisabled(ctx context.Context, name string) (bool, fail.Error) {
+	var disabled map[string]struct{}
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			disabled = featuresV1.Disabled
+			return nil
+		})
+	})
+	if xerr != nil {
+		return false, xerr
+	}
+
+	_, ok := disabled[name]
+	if ok {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (instance *Cluster) isFeatureInstalled(ctx context.Context, name string) (bool, fail.Error) {
+	var installed map[string]*propertiesv1.ClusterInstalledFeature
+	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			installed = featuresV1.Installed
+			return nil
+		})
+	})
+	if xerr != nil {
+		return false, xerr
+	}
+
+	_, ok := installed[name]
+	if ok {
+		return true, nil
+	}
+	return false, nil
 }
 
 // configureNodesFromList configures nodes from a list
@@ -2876,7 +2743,10 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 
 	// Joins to Cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending on the Cluster Flavor)
-	makers, _ := instance.getMaker(ctx)
+	makers, xerr := instance.getMaker(ctx)
+	if xerr != nil {
+		return xerr
+	}
 	if makers.JoinNodeToCluster != nil {
 		for _, v := range nodes {
 			hostInstance, xerr := LoadHost(ctx, instance.Service(), v.ID)
@@ -2902,7 +2772,10 @@ func (instance *Cluster) leaveNodesFromList(ctx context.Context, hosts []resourc
 
 	// Un-joins from Cluster are done sequentially, experience shows too many (un)join at the same time
 	// may fail (depending on the Cluster Flavor)
-	makers, _ := instance.getMaker(ctx)
+	makers, xerr := instance.getMaker(ctx)
+	if xerr != nil {
+		return xerr
+	}
 	if makers.LeaveNodeFromCluster != nil {
 		var xerr fail.Error
 		for _, node := range hosts {
@@ -3095,21 +2968,29 @@ func (instance *Cluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterRes
 func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint) (_ []*propertiesv3.ClusterNode, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	emptySlice := make([]*propertiesv3.ClusterNode, 0)
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return emptySlice, fail.InvalidParameterCannotBeNilError("ctx")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if count == 0 {
-		return emptySlice, fail.InvalidParameterError("count", "cannot be 0")
+		return nil, fail.InvalidParameterError("count", "cannot be 0")
 	}
+
+	defer func() {
+		// drop the cache when we are done shrinking the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
 
 	xerr := instance.beingRemoved(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	var (
@@ -3154,7 +3035,7 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	defer func() {
@@ -3196,7 +3077,7 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 
 		selectedMaster, xerr := instance.unsafeFindAvailableMaster(ctx)
 		if xerr != nil {
-			return emptySlice, xerr
+			return nil, xerr
 		}
 
 		for _, v := range removedNodes {
@@ -3213,11 +3094,11 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 		}
 	}
 	if len(errors) > 0 {
-		return emptySlice, fail.NewErrorList(errors)
+		return nil, fail.NewErrorList(errors)
 	}
-	xerr = instance.unsafeUpdateClusterInventory(ctx)
+	xerr = instance.regenerateClusterInventory(ctx)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	return removedNodes, nil
@@ -3288,4 +3169,26 @@ func (instance *Cluster) IsFeatureInstalled(inctx context.Context, name string) 
 		<-chRes
 		return false, fail.ConvertError(inctx.Err())
 	}
+}
+
+func (instance *Cluster) changeStatusTo(ctx context.Context, stat clusterstate.Enum) fail.Error {
+	// Mark Cluster as state Degraded
+	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+			stateV1, ok := clonable.(*propertiesv1.ClusterState)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			stateV1.State = stat
+			instance.state = stat
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+		return xerr
+	}
+	return nil
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,18 +18,18 @@ package listeners
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // PrepareJob creates a new job
-func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ server.Job, ferr fail.Error) {
+func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ backend.Job, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -56,25 +56,7 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 		}
 	}
 	newctx, cancel := context.WithCancel(ctx)
-	job, xerr := server.NewJob(newctx, cancel, tenant.Service, jobDescription)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return job, nil
-}
-
-// PrepareJobWithoutService creates a new job without service instanciation (for example to be used with metadata upgrade)
-func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ server.Job, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	newctx, cancel := context.WithCancel(ctx)
-
-	job, xerr := server.NewJob(newctx, cancel, nil, jobDescription)
+	job, xerr := backend.NewJob(newctx, cancel, tenant.Service, jobDescription)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -86,9 +68,6 @@ func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ ser
 type JobManagerListener struct {
 	protocol.UnimplementedJobServiceServer
 }
-
-// // VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
-// func (s *JobManagerListener) mustEmbedUnimplementedJobServiceServer() {}
 
 // Stop specified process
 func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, ferr error) {
@@ -112,18 +91,14 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 		return empty, fail.InvalidRequestError("cannot stop job: job id not set")
 	}
 
-	tracer := debug.NewTracer(ctx, true, "('%s')", uuid).Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
+	logrus.WithContext(ctx).Infof("Receiving stop order for job identified by '%s'...", uuid)
 
-	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
-
-	xerr := server.AbortJobByID(uuid)
+	xerr := backend.AbortJobByID(uuid)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If uuid is not found, it's done
-			tracer.Trace("Job '%s' already terminated.", uuid)
+			logrus.WithContext(ctx).Infof("Job '%s' already terminated.", uuid)
 		default:
 			return empty, xerr
 		}
@@ -144,12 +119,7 @@ func (s *JobManagerListener) List(inctx context.Context, _ *googleprotobuf.Empty
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	tracer := debug.NewTracer(inctx, true, "").Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(inctx, &err, tracer.TraceMessage())
-
-	// handler := JobManagerHandler(tenant.Service)
-	jobMap := server.ListJobs()
+	jobMap := backend.ListJobs()
 	var pbProcessList []*protocol.JobDefinition
 	for uuid, info := range jobMap {
 		select {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -68,12 +67,6 @@ func (s *SSHListener) Run(inctx context.Context, in *protocol.SshCommand) (sr *p
 	}
 	defer job.Close()
 
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
-	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
-
 	handler := handlers.NewSSHHandler(job)
 	retcode, stdout, stderr, xerr := handler.Run(hostRef, command)
 	if xerr != nil {
@@ -105,19 +98,11 @@ func (s *SSHListener) Copy(inctx context.Context, in *protocol.SshCopyCommand) (
 
 	var hostRef string
 
-	source := in.Source
-	dest := in.Destination
-
 	job, xerr := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/ssh/%s", hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewSSHHandler(job)
 	retcode, stdout, stderr, xerr := handler.Copy(in.GetSource(), in.GetDestination())

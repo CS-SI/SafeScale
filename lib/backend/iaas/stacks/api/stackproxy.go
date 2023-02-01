@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -240,26 +240,6 @@ func (s StackProxy) GetDefaultSecurityGroupName(ctx context.Context) (_ string, 
 	return cfg, xerr
 }
 
-func (s StackProxy) EnableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.FullStack.EnableSecurityGroup(ctx, group)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}
-
-func (s StackProxy) DisableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.FullStack.DisableSecurityGroup(ctx, group)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}
-
 func (s StackProxy) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (_ *abstract.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -472,16 +452,6 @@ func (s StackProxy) GetHostState(ctx context.Context, parameter stacks.HostParam
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.FullStack.GetHostState(ctx, parameter)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return host, xerr
-}
-
-func (s StackProxy) GetTrueHostState(ctx context.Context, parameter stacks.HostParameter) (_ hoststate.Enum, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	host, xerr := s.FullStack.GetTrueHostState(ctx, parameter)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}

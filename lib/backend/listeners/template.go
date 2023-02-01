@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,8 +29,6 @@ import (
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -62,10 +60,6 @@ func (s *TemplateListener) List(inctx context.Context, in *protocol.TemplateList
 	scannedOnly := in.GetScannedOnly()
 	all := in.GetAll()
 	ctx := job.Context()
-
-	tracer := debug.NewTracer(ctx, true, "(scannedOnly=%v, all=%v)", scannedOnly, all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewTemplateHandler(job)
 	originalList, xerr := handler.List(all)
@@ -100,10 +94,6 @@ func (s *TemplateListener) Match(inctx context.Context, in *protocol.TemplateMat
 	defer job.Close()
 
 	sizing := in.GetSizing()
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, true, "%s", sizing).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	ahsr, _, xerr := converters.HostSizingRequirementsFromStringToAbstract(sizing)
 	if xerr != nil {
@@ -147,9 +137,6 @@ func (s *TemplateListener) Inspect(inctx context.Context, in *protocol.TemplateI
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.template"), "('%s')", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewTemplateHandler(job)
 	at, xerr := handler.Inspect(ref)

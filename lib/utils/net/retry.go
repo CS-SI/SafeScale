@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -129,7 +129,6 @@ func isRaw(in error) bool {
 // If the error is not a communication error, we return a *retry.ErrAborted error
 // containing the causing error in it
 func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // nolint
-	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
 	defer func() {
 		if err != nil {
 			switch err.(type) {
@@ -269,7 +268,6 @@ func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) {
 		default:
 			// doing something based on error's Error() method is always dangerous, so a little log here might help to find problems later
 			logrus.Tracef("trying to normalize based on Error() string of: (%s): %v", reflect.TypeOf(in).String(), in)
-			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
 			str := in.Error()
 			switch str {
 			case objectstorage.NotFound: // stow may return that error message if it does not find something

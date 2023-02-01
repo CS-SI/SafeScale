@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
@@ -75,9 +74,6 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	// Checks if CIDR is valid...
 	if req.CIDR != "" {
 		_, _, err := net.ParseCIDR(req.CIDR)
@@ -85,9 +81,9 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 			return nil, fail.Wrap(err, "failed to create subnet '%s (%s)': %s", req.Name, req.CIDR)
 		}
 	} else { // CIDR is empty, choose the first Class C one possible
-		tracer.Trace("CIDR is empty, choosing one...")
+		logrus.WithContext(ctx).Tracef("CIDR is empty, choosing one...")
 		req.CIDR = "192.168.1.0/24"
-		tracer.Trace("CIDR chosen for network is '%s'", req.CIDR)
+		logrus.WithContext(ctx).Tracef("CIDR chosen for network is '%s'", req.CIDR)
 	}
 
 	// We specify a name and that it should forward packets
@@ -148,8 +144,6 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (*abstract
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
-
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -194,8 +188,6 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (*abstract.Network
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-
 	// If not found, we look for any network from provider
 	// 1st try with id
 	var network *networks.Network
@@ -230,12 +222,9 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (*abstract.Network
 
 // ListNetworks lists available networks
 func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error) {
-	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "").WithStopwatch().Entering().Exiting()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	var netList []*abstract.Network
@@ -267,7 +256,7 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	return netList, nil
@@ -281,8 +270,6 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	var network *networks.Network
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -363,9 +350,6 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (ne
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// Checks if CIDR is valid...
 	if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
@@ -486,8 +470,6 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (_ *abstract.Subnet
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-
 	as := abstract.NewSubnet()
 	var sn *subnets.Subnet
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -519,8 +501,6 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, name string)
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
 	listOpts := subnets.ListOpts{
 		Name: name,
@@ -594,12 +574,9 @@ func (s stack) InspectSubnetByName(ctx context.Context, networkRef, name string)
 
 // ListSubnets lists available subnets in a network
 func (s stack) ListSubnets(ctx context.Context, networkID string) ([]*abstract.Subnet, fail.Error) {
-	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "").WithStopwatch().Entering().Exiting()
 
 	listOpts := subnets.ListOpts{}
 	if networkID != "" {
@@ -628,9 +605,9 @@ func (s stack) ListSubnets(ctx context.Context, networkID string) ([]*abstract.S
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
-	// VPL: empty subnet list is not an abnormal situation, do not log
+	// empty subnet list is not an abnormal situation, do not log
 	return subnetList, nil
 }
 
@@ -642,8 +619,6 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.openstack"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -768,9 +743,8 @@ func (s stack) createRouter(ctx context.Context, req RouterRequest) (*Router, fa
 
 // ListRouters lists available routers
 func (s stack) ListRouters(ctx context.Context) ([]Router, fail.Error) {
-	var emptySlice []Router
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var ns []Router

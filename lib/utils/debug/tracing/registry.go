@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 var settings map[string]map[string]bool
 
 // RegisterTraceSettings keeps track of what has to be traced
-func RegisterTraceSettings(jsonSettings string) error {
+func RegisterTraceSettings(jsonSettings string) error { // FIXME: Delete this
 	if settings != nil {
 		return fmt.Errorf("trace settings are already defined")
 	}

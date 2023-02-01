@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -463,57 +463,6 @@ func Test_WhileSuccessful(t *testing.T) {
 	}, 50*time.Millisecond, -1)
 	require.Nil(t, err)
 	require.EqualValues(t, tries, maxtries)
-
-}
-
-func Test_WhileSuccessfulWithNotify(t *testing.T) {
-
-	var notify Notify
-
-	// no waitfor
-	maxtries := 5
-	tries := 0
-	err := WhileSuccessfulWithNotify(func() error {
-		tries++
-		if tries >= maxtries {
-			return nil
-		} else {
-			return errors.New("Any errior")
-		}
-	}, 50*time.Millisecond, -1, nil)
-	require.Contains(t, err.Error(), "cannot be nil")
-	require.NotEqual(t, tries, maxtries)
-
-	notify = func(Try, verdict.Enum) {
-
-	}
-
-	// no waitfor
-	maxtries = 5
-	tries = 0
-	err = WhileSuccessfulWithNotify(func() error {
-		tries++
-		if tries >= maxtries {
-			return nil
-		} else {
-			return errors.New("Any error")
-		}
-	}, 50*time.Millisecond, -1, notify)
-	require.Contains(t, err.Error(), "Any error")
-	require.NotEqual(t, tries, maxtries)
-
-	maxtries = 5
-	tries = 0
-	err = WhileSuccessfulWithNotify(func() error {
-		tries++
-		if tries >= maxtries {
-			return nil
-		} else {
-			return errors.New("Any error")
-		}
-	}, 50*time.Millisecond, -1, notify)
-	require.Contains(t, err.Error(), "Any error")
-	require.NotEqual(t, tries, maxtries)
 
 }
 

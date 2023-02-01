@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,6 @@ package handlers
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -37,11 +35,11 @@ type ImageHandler interface {
 
 // imageHandler image service
 type imageHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewImageHandler creates a host service
-func NewImageHandler(job server.Job) ImageHandler {
+func NewImageHandler(job backend.Job) ImageHandler {
 	return &imageHandler{job: job}
 }
 
@@ -60,10 +58,6 @@ func (handler *imageHandler) List(all bool) (images []*abstract.Image, ferr fail
 	if handler.job == nil {
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	return handler.job.Service().ListImages(handler.job.Context(), all)
 }

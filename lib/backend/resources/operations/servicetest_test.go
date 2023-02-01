@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,7 +68,6 @@ import (
 	"github.com/eko/gocache/v2/store"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/taskqueue"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -129,7 +128,6 @@ type ServiceTestCacheDataMap struct {
 type ServiceTestCacheData struct {
 	svc  *ServiceTest
 	data ServiceTestCacheDataMap
-	tq   *taskqueue.TaskQueue
 }
 
 func (e *ServiceTestCacheData) Get(ctx context.Context, key interface{}) (interface{}, error) {
@@ -156,50 +154,9 @@ func (e *ServiceTestCacheData) Get(ctx context.Context, key interface{}) (interf
 	//	return value, nil
 	// }, 10*time.Second)
 }
-func (e *ServiceTestCacheData) Set(ctx context.Context, key interface{}, object interface{}, options *store.Options) error {
-	skey, ok := key.(string)
-	if !ok {
-		return fail.InvalidParameterCannotBeEmptyStringError("key")
-	}
-	e.svc._surveyf("ServiceTestCacheData::Set { key: \"%s\" }", skey)
-	_, err := e.tq.Push(func() (interface{}, fail.Error) {
-		e.data.mu.Lock()
-		defer e.data.mu.Unlock()
-		e.data.data[skey] = object
-		return nil, nil
-	}, 10*time.Second)
-	return err
-}
-func (e *ServiceTestCacheData) Delete(ctx context.Context, key interface{}) error {
-	skey, ok := key.(string)
-	if !ok {
-		return fail.InvalidParameterCannotBeEmptyStringError("key")
-	}
-	e.svc._surveyf("ServiceTestCacheData::Delete { key: \"%s\" }", skey)
-	_, err := e.tq.Push(func() (interface{}, fail.Error) {
-		e.data.mu.Lock()
-		defer e.data.mu.Unlock()
-		_, ok := e.data.data[skey]
-		if ok {
-			delete(e.data.data, skey)
-		}
-		return nil, nil
-	}, 10*time.Second)
-	return err
-}
 func (e *ServiceTestCacheData) Invalidate(ctx context.Context, options store.InvalidateOptions) error {
 	e.svc._survey("ServiceTestCacheData::Invalidate (not implemented)")
 	return nil
-}
-func (e *ServiceTestCacheData) Clear(ctx context.Context) error {
-	e.svc._survey("ServiceTestCacheData::Clear")
-	_, err := e.tq.Push(func() (interface{}, fail.Error) {
-		e.data.mu.Lock()
-		defer e.data.mu.Unlock()
-		e.data.data = make(map[string]interface{})
-		return nil, nil
-	}, 10*time.Second)
-	return err
 }
 func (e *ServiceTestCacheData) GetType() string {
 	return "ServiceTestCacheData"
@@ -562,14 +519,6 @@ func NewServiceTest(t *testing.T, routine func(svc *ServiceTest)) error {
 				data: make(map[string]string),
 				mu:   sync.Mutex{},
 			},
-			cache: &ServiceTestCacheData{
-				svc: nil,
-				tq:  taskqueue.CreateTaskQueue(32),
-				data: ServiceTestCacheDataMap{
-					data: make(map[string]interface{}),
-					mu:   &sync.RWMutex{},
-				},
-			},
 			nocache: &ServiceTestNoCacheData{
 				svc: nil,
 			},
@@ -590,7 +539,6 @@ func NewServiceTest(t *testing.T, routine func(svc *ServiceTest)) error {
 			mu: &sync.RWMutex{},
 		},
 	}
-	svc.internals.cache.svc = svc
 	svc.internals.nocache.svc = svc
 	svc._reset()
 
@@ -609,8 +557,6 @@ func (e *ServiceTest) _reset() {
 	e.internals.bucketData.mu.Lock()
 	e.internals.bucketData.data = make(map[string]string) // Empty bucket data
 	e.internals.bucketData.mu.Unlock()
-
-	e.internals.cache.Clear(context.Background())
 
 	e.internals.fsCache.mu.Lock()
 	e.internals.fsCache.data = make(map[string][]byte)
@@ -1010,6 +956,11 @@ func (e *ServiceTest) GetProviderName() (string, fail.Error) {
 	}
 	return providername, nil
 }
+
+func (e *ServiceTest) GetLock(en abstract.Enum) (*sync.Mutex, fail.Error) {
+	return &sync.Mutex{}, nil
+}
+
 func (e *ServiceTest) GetMetadataBucket(ctx context.Context) (abstract.ObjectStorageBucket, fail.Error) {
 
 	e.options.mu.RLock()
@@ -1083,9 +1034,6 @@ func (e *ServiceTest) GetCache(ctx context.Context) (cache.CacheInterface, fail.
 	e.options.mu.RUnlock()
 
 	e._logf("ServiceTest::GetCache { enabled: %t }", enablecache)
-	if e.options.enablecache {
-		return e.internals.cache, nil
-	}
 	return e.internals.nocache, nil
 }
 
@@ -2022,14 +1970,13 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 			},
 		},
 		Sizing: &abstract.HostEffectiveSizing{
-			Cores:       1,
-			RAMSize:     1024.0,
-			DiskSize:    request.DiskSize,
-			GPUNumber:   1,
-			GPUType:     "Nvidia RTX 3080",
-			CPUFreq:     4033.0,
-			ImageID:     "",
-			Replaceable: false,
+			Cores:     1,
+			RAMSize:   1024.0,
+			DiskSize:  request.DiskSize,
+			GPUNumber: 1,
+			GPUType:   "Nvidia RTX 3080",
+			CPUFreq:   4033.0,
+			ImageID:   "",
 		},
 		Networking: &abstract.HostNetworking{
 			IsGateway:               request.IsGateway,
@@ -2145,7 +2092,6 @@ func (e *ServiceTest) CreateHost(ctx context.Context, request abstract.HostReque
 				MinDiskSize: ahf.Sizing.DiskSize,
 				MinGPU:      ahf.Sizing.GPUNumber,
 				MinCPUFreq:  ahf.Sizing.CPUFreq,
-				Replaceable: ahf.Sizing.Replaceable,
 			}
 			hostSizingV2.Template = request.TemplateRef
 			return nil
@@ -2273,7 +2219,6 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 			ahf.Sizing.GPUType = hostSizingV2.AllocatedSize.GPUType
 			ahf.Sizing.CPUFreq = hostSizingV2.AllocatedSize.CPUFreq
 			ahf.Sizing.ImageID = ""
-			ahf.Sizing.Replaceable = false
 			return nil
 		})
 		if xerr != nil {
@@ -2328,10 +2273,6 @@ func (e *ServiceTest) InspectHostByName(ctx context.Context, name string) (ahf *
 }
 func (e *ServiceTest) GetHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	e._survey("ServiceTest::GetHostState (not implemented)")
-	return hoststate.Enum(0), nil
-}
-func (e *ServiceTest) GetTrueHostState(context.Context, stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	e._survey("ServiceTest::GetTrueHostState (not implemented)")
 	return hoststate.Enum(0), nil
 }
 func (e *ServiceTest) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
@@ -2607,7 +2548,6 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			PublicIP:      true,
 			IsGateway:     true,
 			KeepOnFailure: false,
-			Preemptible:   false,
 			SecurityGroupIDs: map[string]struct{}{
 				"PublicIPSecurityGroupID": {},
 				"GWSecurityGroupID":       {},
@@ -2665,7 +2605,6 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			PublicIP:      true,
 			IsGateway:     true,
 			KeepOnFailure: false,
-			Preemptible:   false,
 			SecurityGroupIDs: map[string]struct{}{
 				"PublicIPSecurityGroupID": {},
 				"GWSecurityGroupID":       {},
@@ -2767,7 +2706,6 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				PublicIP:      false,
 				IsGateway:     false,
 				KeepOnFailure: false,
-				Preemptible:   false,
 				SecurityGroupIDs: map[string]struct{}{
 					"PublicIPSecurityGroupID": {},
 					"GWSecurityGroupID":       {},
@@ -2836,7 +2774,6 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 				PublicIP:      false,
 				IsGateway:     false,
 				KeepOnFailure: false,
-				Preemptible:   false,
 				SecurityGroupIDs: map[string]struct{}{
 					"PublicIPSecurityGroupID": {},
 					"GWSecurityGroupID":       {},
@@ -2907,7 +2844,6 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 					MinDiskSize: 1,
 					MinGPU:      0,
 					MinCPUFreq:  4033,
-					Replaceable: true,
 				}
 				defaultsV3.Image = ""
 				return nil
@@ -3085,6 +3021,11 @@ func (e *ServiceTest) Timings() (temporal.Timings, fail.Error) {
 	return timings, nil
 }
 
+func (e *ServiceTest) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
+	e._survey("ServiceTest::ListTags (not implemented)")
+	return nil, nil
+}
+
 func (e *ServiceTest) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
 	e._survey("ServiceTest::UpdateTags (not implemented)")
 	return nil
@@ -3244,10 +3185,6 @@ func (e *ServiceTest) GetRawConfigurationOptions(ctx context.Context) (stacks.Co
 		DefaultSecurityGroupName:  "securitygroup-default",
 		DefaultNetworkName:        "network-default",
 		DefaultNetworkCIDR:        "192.168.0.1/24",
-		WhitelistTemplateRegexp:   nil,
-		BlacklistTemplateRegexp:   nil,
-		WhitelistImageRegexp:      nil,
-		BlacklistImageRegexp:      nil,
 		MaxLifeTime:               MaxLifeTimeInHours,
 		Timings:                   SHORTEN_TIMINGS,
 	}
@@ -3374,29 +3311,6 @@ func (e *ServiceTest) CreateBucket(ctx context.Context, name string) (abstract.O
 	if err != nil {
 		return b, fail.Wrap(err)
 	}
-
-	/*
-		 bucket, xerr := NewCore(e, "bucket", "buckets", &b)
-		 if xerr != nil {
-			 return b, xerr
-		 }
-		 xerr = bucket.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			 return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-				 mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
-				 if !ok {
-					 return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				 }
-				 mountsV1.ByHostID
-				 mountsV1.ByHostName
-				 return nil
-			 })
-
-			 return nil
-		 })
-		 if xerr != nil {
-			 return b, xerr
-		 }
-	*/
 
 	return b, nil
 }

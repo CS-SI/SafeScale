@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,13 @@ package openstack
 import (
 	"context"
 	"encoding/json"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
@@ -29,11 +33,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/portsecurity"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
-	"github.com/sirupsen/logrus"
-
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 )
 
 func (s stack) rpcGetHostByID(ctx context.Context, id string) (*servers.Server, fail.Error) {
@@ -113,9 +112,8 @@ func (s stack) rpcGetHostByName(ctx context.Context, name string) (*servers.Serv
 
 // rpcGetMetadataOfInstance returns the metadata associated with the instance
 func (s stack) rpcGetMetadataOfInstance(ctx context.Context, id string) (map[string]string, fail.Error) {
-	emptyMap := map[string]string{}
 	if id = strings.TrimSpace(id); id == "" {
-		return emptyMap, fail.InvalidParameterError("id", "cannpt be empty string")
+		return nil, fail.InvalidParameterError("id", "cannpt be empty string")
 	}
 
 	var out map[string]string
@@ -130,11 +128,11 @@ func (s stack) rpcGetMetadataOfInstance(ctx context.Context, id string) (map[str
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return emptyMap, fail.Wrap(fail.Cause(xerr), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		case *retry.ErrStopRetry:
-			return emptyMap, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		default:
-			return emptyMap, xerr
+			return nil, xerr
 		}
 	}
 
@@ -273,6 +271,7 @@ func (s stack) rpcCreateServer(ctx context.Context, name string, networks []serv
 	metadata["Image"] = imageID
 	metadata["Template"] = templateID
 	metadata["CreationDate"] = time.Now().Format(time.RFC3339)
+	metadata["Revision"] = lib.Revision
 
 	srvOpts := servers.CreateOpts{
 		Name:             name,
@@ -413,7 +412,6 @@ func (s stack) rpcChangePortSecurity(ctx context.Context, portID string, state b
 
 			innerErr := ports.Update(s.NetworkClient, portID, updateOpts).ExtractInto(&portWithPortSecurityExtensions)
 			if innerErr != nil {
-				logrus.WithContext(ctx).Warningf(innerErr.Error())
 				return innerErr
 			}
 
@@ -450,7 +448,6 @@ func (s stack) rpcRemoveSGFromPort(ctx context.Context, portID string) (_ *ports
 
 			innerErr := ports.Update(s.NetworkClient, portID, updateOpts).ExtractInto(&portWithPortSecurityExtensions)
 			if innerErr != nil {
-				logrus.WithContext(ctx).Warningf(innerErr.Error())
 				return innerErr
 			}
 
@@ -484,8 +481,7 @@ func (s stack) rpcDeletePort(ctx context.Context, id string) fail.Error {
 // rpcListPorts lists all ports available
 func (s stack) rpcListPorts(ctx context.Context, options ports.ListOpts) ([]ports.Port, fail.Error) {
 	var (
-		emptyList []ports.Port
-		allPages  pagination.Page
+		allPages pagination.Page
 	)
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
@@ -495,12 +491,12 @@ func (s stack) rpcListPorts(ctx context.Context, options ports.ListOpts) ([]port
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	r, err := ports.ExtractPorts(allPages)
 	if err != nil {
-		return emptyList, NormalizeError(err)
+		return nil, NormalizeError(err)
 	}
 	return r, nil
 }
@@ -590,6 +586,26 @@ func (s stack) rpcDeleteFloatingIP(ctx context.Context, id string) fail.Error {
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
 			return floatingips.Delete(s.ComputeClient, id).ExtractErr()
+		},
+		NormalizeError,
+	)
+}
+
+func (s stack) rpcGetFloatingIP(ctx context.Context, id string) (*floatingips.FloatingIP, fail.Error) {
+	if id == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
+	}
+
+	var res *floatingips.FloatingIP
+
+	return res, stacks.RetryableRemoteCall(ctx,
+		func() error {
+			a, b := floatingips.Get(s.ComputeClient, id).Extract()
+			if b != nil {
+				return b
+			}
+			res = a
+			return b
 		},
 		NormalizeError,
 	)

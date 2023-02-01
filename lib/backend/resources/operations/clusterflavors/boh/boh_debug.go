@@ -2,7 +2,7 @@
 // +build debug
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,8 +60,8 @@ func minimumRequiredServers(ctx context.Context, clusterIdentity abstract.Cluste
 		privateNodeCount = 3
 		masterNodeCount = 2
 	case clustercomplexity.Large:
-		privateNodeCount = 7
-		masterNodeCount = 3
+		privateNodeCount = 17
+		masterNodeCount = 5
 	}
 	return masterNodeCount, privateNodeCount, 0, nil
 }

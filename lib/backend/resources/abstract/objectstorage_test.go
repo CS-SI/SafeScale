@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,8 +27,8 @@ import (
 func TestObjectStorageBucket_NewObjectStorageBucket(t *testing.T) {
 
 	n := NewObjectStorageBucket()
-	if !n.IsNull() {
-		t.Error("ObjectStorageBucket is null !")
+	if n.IsNull() {
+		t.Error("ObjectStorageBucket is not null, it's just empty !")
 		t.Fail()
 	}
 	if n.IsConsistent() {

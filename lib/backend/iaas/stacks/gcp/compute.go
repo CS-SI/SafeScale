@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
@@ -48,9 +47,6 @@ func (s stack) ListImages(ctx context.Context, _ bool) (out []*abstract.Image, f
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(ctx, &ferr)
 
 	resp, xerr := s.rpcListImages(ctx)
 	if xerr != nil {
@@ -82,9 +78,6 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(ctx, &ferr)
-
 	resp, xerr := s.rpcGetImageByID(ctx, id)
 	if xerr != nil {
 		return nil, xerr
@@ -99,9 +92,6 @@ func (s stack) ListTemplates(ctx context.Context, _ bool) (templates []*abstract
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(ctx, &ferr)
 
 	resp, xerr := s.rpcListMachineTypes(ctx)
 	if xerr != nil {
@@ -136,9 +126,6 @@ func (s stack) InspectTemplate(ctx context.Context, id string) (_ *abstract.Host
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(ctx, &ferr)
-
 	resp, xerr := s.rpcGetMachineType(ctx, id)
 	if xerr != nil {
 		return nil, xerr
@@ -157,9 +144,6 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (_ *abstract.KeyP
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(ctx, &ferr)
 
 	return abstract.NewKeyPair(name)
 }
@@ -186,9 +170,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	if valid.IsNil(s) {
 		return nil, nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(ctx, &ferr)
 
 	resourceName := request.ResourceName
 	subnets := request.Subnets
@@ -406,21 +387,17 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 }
 
 // WaitHostReady waits until a host reaches ready state
-// hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter.
+// hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return a utils.ErrInvalidParameter.
 func (s stack) WaitHostReady(ctx context.Context, hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -510,7 +487,7 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.Host
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
@@ -525,9 +502,6 @@ func (s stack) ClearHostStartupScript(ctx context.Context, hostParam stacks.Host
 	if err != nil {
 		return fail.ConvertError(err)
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
-	defer tracer.Exiting()
 
 	return s.rpcResetStartupScriptOfInstance(ctx, ahfid)
 }
@@ -554,9 +528,6 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 			"must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field",
 		)
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
-	defer tracer.Exiting()
 
 	var (
 		tryByName = true
@@ -713,12 +684,10 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -753,16 +722,13 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 
 // ListHosts lists available hosts
 func (s stack) ListHosts(ctx context.Context, detailed bool) (_ abstract.HostList, ferr fail.Error) {
-	var emptyList abstract.HostList
 	if valid.IsNil(s) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(detailed=%v)", detailed).Entering().Exiting()
 
 	resp, xerr := s.rpcListInstances(ctx)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	out := make(abstract.HostList, 0, len(resp))
@@ -797,20 +763,16 @@ func (s stack) StopHost(ctx context.Context, hostParam stacks.HostParameter, gra
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
 
 	return s.rpcStopInstance(ctx, ahf.Core.ID)
 }
 
 // StartHost starts the host identified by id
 func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostParam).Entering().Exiting()
-
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -824,8 +786,6 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) fa
 
 // RebootHost reboot the host identified by id
 func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) fail.Error {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostParam).Entering().Exiting()
-
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -841,25 +801,7 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) f
 	return s.rpcStartInstance(ctx, ahf.Core.ID)
 }
 
-// GetHostState returns the host identified by id
 func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-
-	if valid.IsNil(s) {
-		return hoststate.Error, fail.InvalidInstanceError()
-	}
-
-	host, xerr := s.InspectHost(ctx, hostParam)
-	if xerr != nil {
-		return hoststate.Error, xerr
-	}
-
-	return host.CurrentState, nil
-}
-
-func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-
 	if valid.IsNil(s) {
 		return hoststate.Error, fail.InvalidInstanceError()
 	}
@@ -876,16 +818,13 @@ func (s stack) GetTrueHostState(ctx context.Context, hostParam stacks.HostParame
 
 // ListAvailabilityZones lists the usable AvailabilityZones
 func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-
-	emptyMap := make(map[string]bool)
 	if valid.IsNil(s) {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	resp, xerr := s.rpcListZones(ctx)
 	if xerr != nil {
-		return emptyMap, xerr
+		return nil, xerr
 	}
 
 	zones := make(map[string]bool, len(resp))
@@ -897,16 +836,13 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, fe
 
 // ListRegions ...
 func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-
-	var emptySlice []string
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	resp, xerr := s.rpcListRegions(ctx)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	out := make([]string, 0, len(resp))
@@ -918,8 +854,6 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 
 // BindSecurityGroupToHost ...
 func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -952,8 +886,6 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, sgParam stacks.Secur
 
 // UnbindSecurityGroupFromHost unbinds a Security Group from a Host
 func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}

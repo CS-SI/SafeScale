@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -42,17 +41,11 @@ import (
 
 // Object interface
 type Object interface {
-	Stored(context.Context) (bool, fail.Error)
-
 	Read(context.Context, io.Writer, int64, int64) fail.Error
 	Write(context.Context, io.Reader, int64) fail.Error
-	WriteMultiPart(context.Context, io.Reader, int64, int) fail.Error
 	Reload(context.Context) fail.Error
 	Delete(context.Context) fail.Error
 	AddMetadata(context.Context, abstract.ObjectStorageItemMetadata) fail.Error
-	ForceAddMetadata(context.Context, abstract.ObjectStorageItemMetadata) fail.Error
-	ReplaceMetadata(context.Context, abstract.ObjectStorageItemMetadata) fail.Error
-
 	GetID(context.Context) (string, fail.Error)
 	GetName(context.Context) (string, fail.Error)
 	GetLastUpdate(context.Context) (time.Time, fail.Error)
@@ -98,34 +91,21 @@ func newObject(bucket *bucket, objectName string) (object, fail.Error) {
 	return o, nil
 }
 
-// nullObject returns an instance of object corresponding to null value
-func nullObject() object {
-	return object{}
-}
-
 // IsNull tells if the instance correspond to null value
 func (instance *object) IsNull() bool {
 	return instance == nil || instance.name == ""
 }
 
 // newObjectFromStow ...
-func newObjectFromStow(b *bucket, item stow.Item) object {
+func newObjectFromStow(b *bucket, item stow.Item) *object {
 	if valid.IsNil(b) || item == nil {
-		return nullObject()
+		return nil
 	}
-	return object{
+	return &object{
 		bucket: b,
 		item:   item,
 		name:   item.Name(),
 	}
-}
-
-// Stored return true if the object exists in Object Storage
-func (instance object) Stored(ctx context.Context) (bool, fail.Error) {
-	if valid.IsNil(instance) {
-		return false, fail.InvalidInstanceError()
-	}
-	return instance.item != nil, nil
 }
 
 // Reload reloads the data of the Object from the Object Storage
@@ -133,8 +113,6 @@ func (instance *object) Reload(ctx context.Context) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	item, err := instance.bucket.stowContainer.Item(instance.name)
 	if err != nil {
@@ -173,8 +151,6 @@ func (instance *object) Read(ctx context.Context, target io.Writer, from int64, 
 	if from > to {
 		return fail.InvalidParameterError("from", "cannot be greater than 'to'")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%d, %d)", from, to).Entering().Exiting()
 
 	var seekTo int64
 	var length int64
@@ -261,49 +237,11 @@ func (instance *object) Write(ctx context.Context, source io.Reader, sourceSize 
 		return fail.InvalidInstanceContentError("instance.bucket", "cannot be nil")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().Exiting()
-
 	item, err := instance.bucket.stowContainer.Put(instance.name, source, sourceSize, instance.metadata)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
 	return instance.reloadFromItem(item)
-}
-
-// WriteMultiPart writes big data to Object, by parts (also called chunks)
-// Note: nothing to do with multi-chunk abilities of various object storage technologies
-func (instance *object) WriteMultiPart(
-	ctx context.Context, source io.Reader, sourceSize int64, chunkSize int,
-) fail.Error {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-	if source == nil { // If source is nil, do nothing and don't trigger an error
-		return nil
-	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().Exiting()
-
-	metadataCopy := instance.metadata.Clone()
-
-	var chunkIndex int
-	remaining := sourceSize
-	for {
-		if remaining < int64(chunkSize) {
-			chunkSize = int(remaining)
-		}
-		err := writeChunk(instance.bucket.stowContainer, instance.name, source, chunkSize, metadataCopy, chunkIndex)
-		if err != nil {
-			return err
-		}
-		remaining -= int64(chunkSize)
-		// client.NbItem = client.NbItem + 1
-		if remaining <= 0 {
-			break
-		}
-		chunkIndex++
-	}
-	return nil
 }
 
 // writeChunk writes a chunk of data for object
@@ -333,29 +271,11 @@ func (instance *object) Delete(ctx context.Context) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
-
 	err := instance.bucket.stowContainer.RemoveItem(instance.name)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
 	instance.item = nil
-	return nil
-}
-
-// ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
-func (instance *object) ForceAddMetadata(
-	ctx context.Context, newMetadata abstract.ObjectStorageItemMetadata,
-) fail.Error {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
-
-	for k, v := range newMetadata {
-		instance.metadata[k] = v
-	}
 	return nil
 }
 
@@ -365,28 +285,12 @@ func (instance *object) AddMetadata(ctx context.Context, newMetadata abstract.Ob
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
-
 	for k, v := range newMetadata {
 		_, found := instance.metadata[k]
 		if !found {
 			instance.metadata[k] = v
 		}
 	}
-	return nil
-}
-
-// ReplaceMetadata replaces object metadata with the ones provided in parameter
-func (instance *object) ReplaceMetadata(
-	ctx context.Context, newMetadata abstract.ObjectStorageItemMetadata,
-) fail.Error {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
-
-	instance.metadata = newMetadata
 	return nil
 }
 

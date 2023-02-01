@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package resources
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
@@ -32,15 +33,15 @@ type Callback = func(data.Clonable, *serialize.JSONProperties) fail.Error
 // Metadata contains the core functions of a persistent object
 type Metadata interface {
 	IsNull() bool
-	Alter(ctx context.Context, callback Callback, options ...data.ImmutableKeyValue) fail.Error // protects the data for exclusive write
-	BrowseFolder(ctx context.Context, callback func(buf []byte) fail.Error) fail.Error          // walks through host folder and executes a callback for each entry
-	Deserialize(ctx context.Context, buf []byte) fail.Error                                     // Transforms a slice of bytes in struct
-	Inspect(ctx context.Context, callback Callback) fail.Error                                  // protects the data for shared read with first reloading data from Object Storage
-	Review(ctx context.Context, callback Callback) fail.Error                                   // protects the data for shared read without reloading first (uses in-memory data); use with caution
-	Read(ctx context.Context, ref string) fail.Error                                            // reads the data from Object Storage using ref as id or name
-	ReadByID(ctx context.Context, id string) fail.Error                                         // reads the data from Object Storage by id
-	Reload(ctx context.Context) fail.Error                                                      // Reloads the metadata from the Object Storage, overriding what is in the object
+	Alter(ctx context.Context, callback Callback) fail.Error                           // protects the data for exclusive write
+	BrowseFolder(ctx context.Context, callback func(buf []byte) fail.Error) fail.Error // walks through host folder and executes a callback for each entry
+	Deserialize(ctx context.Context, buf []byte) fail.Error                            // Transforms a slice of bytes in struct
+	Inspect(ctx context.Context, callback Callback) fail.Error                         // protects the data for shared read with first reloading data from Object Storage
+	Read(ctx context.Context, ref string) fail.Error                                   // reads the data from Object Storage using ref as id or name
+	ReadByID(ctx context.Context, id string) fail.Error                                // reads the data from Object Storage by id
+	Reload(ctx context.Context) fail.Error                                             // Reloads the metadata from the Object Storage, overriding what is in the object
 	Sdump(ctx context.Context) (string, fail.Error)
+	Service() iaas.Service // Undocumented implicit dependency
 }
 
 type Consistent interface {

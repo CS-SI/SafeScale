@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,8 +33,6 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 )
@@ -57,11 +55,11 @@ type VolumeHandler interface {
 
 // volumeHandler volume service
 type volumeHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewVolumeHandler creates a Volume service
-func NewVolumeHandler(job server.Job) VolumeHandler {
+func NewVolumeHandler(job backend.Job) VolumeHandler {
 	return &volumeHandler{job: job}
 }
 
@@ -82,9 +80,6 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr f
 	}
 
 	ctx := handler.job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.volume"), "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	browseInstance, xerr := volumefactory.New(handler.job.Service())
 	if xerr != nil {
@@ -127,9 +122,6 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 	}
 
 	ctx := handler.job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.volume"), "(%s)", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -187,9 +179,6 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr
 	}
 
 	ctx := handler.job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -229,10 +218,6 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty!")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.volume"), "('%s', %d, %s)", name, size, speed.String()).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	var xerr fail.Error
 	objv, xerr = volumefactory.New(handler.job.Service())
@@ -278,10 +263,6 @@ func (handler *volumeHandler) Attach(volumeRef string, hostRef string, path stri
 		return fail.InvalidParameterCannotBeEmptyStringError("format")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.volume"), "('%s', '%s', '%s', '%s', %v)", volumeRef, hostRef, path, format, doNotFormat)
-	defer tracer.WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
 	volumeInstance, xerr := volumefactory.Load(ctx, svc, volumeRef)
@@ -318,10 +299,6 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error
 	if hostRef == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.volume"), "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
 	ctx := handler.job.Context()

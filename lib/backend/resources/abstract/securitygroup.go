@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ type SecurityGroupRule struct {
 
 // IsNull tells if the Security Group Rule is a null value
 func (instance *SecurityGroupRule) IsNull() bool {
-	return instance == nil || (len(instance.Sources) == 0 && len(instance.Targets) == 0 /*&& instance.Protocol == "" && instance.PortFrom == 0*/)
+	return instance == nil || (len(instance.Sources) == 0 && len(instance.Targets) == 0 && instance.Protocol == "" && instance.PortFrom == 0)
 }
 
 // EqualTo is a strict equality tester between 2 rules
@@ -235,8 +235,7 @@ func concernsGroups(in []string) (bool, fail.Error) {
 
 // Validate returns an error if the content of the rule is incomplete
 func (instance *SecurityGroupRule) Validate() fail.Error {
-	// Note: DO NOT USE SecurityGroupRule.IsNull() here
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 

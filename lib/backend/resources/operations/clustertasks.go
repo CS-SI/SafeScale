@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ package operations
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
+	"github.com/sony/gobreaker"
 	"math"
 	"net"
 	"reflect"
@@ -26,6 +28,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/callstack"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -97,6 +100,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			}
 
 			// this is the real constructor of the cluster, the one that populates the cluster with meaningful data
+			// FIXME: OPP Having this function here is a severe problem, this function should be IN LoadCluster
 			// Create first metadata of Cluster after initialization
 			xerr = instance.firstLight(ctx, req)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -137,7 +141,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			}()
 
 			// Obtain number of nodes to create
-			_, privateNodeCount, _, xerr := instance.determineRequiredNodes(ctx)
+			privateMasterCount, privateNodeCount, _, xerr := instance.determineRequiredNodes(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -149,6 +153,14 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
 				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
 				req.InitialNodeCount = privateNodeCount
+			}
+
+			if req.InitialMasterCount == 0 {
+				req.InitialMasterCount = privateMasterCount
+			}
+			if req.InitialMasterCount > 0 && req.InitialMasterCount < privateMasterCount {
+				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialMasterCount, privateMasterCount, req.Flavor.String())
+				req.InitialMasterCount = privateMasterCount
 			}
 
 			// Define the sizing dependencies for Cluster hosts
@@ -166,6 +178,40 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
+			}
+
+			if req.Flavor == clusterflavor.K8S {
+				lowerOS := strings.ToLower(req.GatewaysDef.Image)
+				if strings.Contains(lowerOS, "centos 7") {
+					return nil, fail.NewError("Sorry, K8s with CentOS 7 not supported")
+				}
+
+				lowerOS = strings.ToLower(req.MastersDef.Image)
+				if strings.Contains(lowerOS, "centos 7") {
+					return nil, fail.NewError("Sorry, K8s with CentOS 7 not supported")
+				}
+
+				lowerOS = strings.ToLower(req.NodesDef.Image)
+				if strings.Contains(lowerOS, "centos 7") {
+					return nil, fail.NewError("Sorry, K8s with CentOS 7 not supported")
+				}
+			}
+
+			if req.Flavor != 0 {
+				lowerOS := strings.ToLower(req.GatewaysDef.Image)
+				if strings.Contains(lowerOS, "ubuntu 22.04") {
+					return nil, fail.NewError("Sorry, Ubuntu 22.04 not supported")
+				}
+
+				lowerOS = strings.ToLower(req.MastersDef.Image)
+				if strings.Contains(lowerOS, "ubuntu 22.04") {
+					return nil, fail.NewError("Sorry, Ubuntu 22.04 not supported")
+				}
+
+				lowerOS = strings.ToLower(req.NodesDef.Image)
+				if strings.Contains(lowerOS, "ubuntu 22.04") {
+					return nil, fail.NewError("Sorry, Ubuntu 22.04 not supported")
+				}
 			}
 
 			var networkInstance resources.Network
@@ -224,8 +270,15 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 				return nil, xerr
 			}
 
+			mas := mapset.NewSet()
 			for _, agw := range gws {
-				instance.gateways = append(instance.gateways, agw.Core.ID)
+				mas.Add(agw.Core.ID)
+			}
+
+			instance.gateways = []string{}
+			mi := mas.Iter()
+			for v := range mi {
+				instance.gateways = append(instance.gateways, v.(string))
 			}
 
 			// Starting from here, exiting with error deletes hosts if req.keepOnFailure is false
@@ -268,8 +321,13 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 				}
 			}()
 
+			efe, serr := ExtractFeatureParameters(req.FeatureParameters)
+			if serr != nil {
+				return nil, fail.ConvertError(serr)
+			}
+
 			// Creates and configures hosts
-			xerr = instance.createHostResources(ctx, subnetInstance, *mastersDef, *nodesDef, req, ExtractFeatureParameters(req.FeatureParameters), req.KeepOnFailure)
+			xerr = instance.createHostResources(ctx, subnetInstance, *mastersDef, *nodesDef, req, efe, req.KeepOnFailure)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -381,12 +439,6 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 								reflect.TypeOf(clonable).String(),
 							)
 						}
-						// VPL: For now, always disable addition of feature proxycache
-						featuresV1.Disabled["proxycache"] = struct{}{}
-						// ENDVPL
-
-						// FIXME: Also disable remotedesktop by default
-						// featuresV1.Disabled["remotedesktop"] = struct{}{}
 
 						for k := range req.DisabledDefaultFeatures {
 							featuresV1.Disabled[k] = struct{}{}
@@ -395,7 +447,7 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 					},
 				)
 				if innerXErr != nil {
-					return fail.Wrap(innerXErr, "failed to disable feature 'proxycache'")
+					return fail.Wrap(innerXErr, "failed to disable features")
 				}
 
 				// Sets initial state of the new Cluster and create metadata
@@ -538,7 +590,11 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 					}
 				}
 			}
-			makers, _ := instance.getMaker(ctx)
+			makers, xerr := instance.getMaker(ctx)
+			if xerr != nil {
+				return result{nil, nil, nil, xerr}, xerr
+			}
+
 			if imageQuery == "" && makers.DefaultImage != nil {
 				imageQuery = makers.DefaultImage(ctx, instance)
 			}
@@ -813,6 +869,8 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				return ar, xerr
 			}
 
+			cid, _ := instance.GetID()
+
 			// Creates Subnet
 			logrus.WithContext(ctx).Debugf("[Cluster %s] creating Subnet '%s'", req.Name, req.Name)
 			subnetReq := abstract.SubnetRequest{
@@ -822,6 +880,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				HA:             !gwFailoverDisabled,
 				ImageRef:       gatewaysDef.Image,
 				DefaultSSHPort: uint32(req.DefaultSshPort),
+				ClusterID:      cid,
 				KeepOnFailure:  false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
 			}
 
@@ -857,7 +916,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrInvalidRequest:
-					// Some cloud providers do not allow to create a Subnet with the same CIDR than the Network; try with a sub-CIDR once
+					// Some cloud providers do not allow to create a Subnet with the same CIDR as the Network; try with a sub-CIDR once
 					logrus.WithContext(ctx).Warnf("Cloud Provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
 					_, ipNet, err := net.ParseCIDR(subnetReq.CIDR)
 					err = debug.InjectPlannedError(err)
@@ -1070,6 +1129,15 @@ func (instance *Cluster) createHostResources(
 				return result{xerr}, xerr
 			}
 
+			// FIXME: that's a bad practice -> overwriting initial request (what could be go wrong?)
+			if cluReq.InitialMasterCount == 0 {
+				cluReq.InitialMasterCount = masterCount
+			}
+			if cluReq.InitialMasterCount > 0 && cluReq.InitialMasterCount < masterCount {
+				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", cluReq.Name, cluReq.InitialMasterCount, masterCount, cluReq.Flavor.String())
+				cluReq.InitialMasterCount = masterCount
+			}
+
 			// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
@@ -1127,7 +1195,7 @@ func (instance *Cluster) createHostResources(
 			egMas := new(errgroup.Group)
 			egMas.Go(func() error {
 				masters, xerr := instance.taskCreateMasters(ctx, taskCreateMastersParameters{
-					count:         masterCount,
+					count:         cluReq.InitialMasterCount,
 					mastersDef:    mastersDef,
 					keepOnFailure: keepOnFailure,
 					clusterName:   cluReq.Name,
@@ -1574,7 +1642,8 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 
 			logrus.WithContext(ctx).Debugf("Creating %d master%s...", p.count, strprocess.Plural(p.count))
 
-			timeout := time.Duration(p.count) * timings.HostCreationTimeout() // FIXME: OPP This became the timeout for the whole cluster creation....
+			tcount := uint(math.Max(4, float64(p.count)))
+			timeout := time.Duration(tcount) * timings.HostCreationTimeout() // FIXME: OPP This became the timeout for the whole cluster creation....
 
 			winSize := 8
 			st, xerr := instance.Service().GetProviderName()
@@ -1597,9 +1666,12 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 			}
 
 			var theMasters []*Host
-			masterChan := make(chan StdResult, p.count)
+			masterChan := make(chan StdResult, 4*p.count)
 
-			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), timeout, masterChan, instance.taskCreateMaster, taskCreateMasterParameters{
+			ctx, tc := context.WithTimeout(ctx, timeout)
+			defer tc()
+
+			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), masterChan, instance.taskCreateMaster, taskCreateMasterParameters{
 				masterDef:     p.mastersDef,
 				timeout:       timings.HostCreationTimeout(),
 				keepOnFailure: p.keepOnFailure,
@@ -2135,9 +2207,13 @@ func drainChannel(dch chan struct{}) {
 	close(dch)
 }
 
-func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.Duration, uat chan StdResult, runner func(context.Context, interface{}) (interface{}, fail.Error), data interface{}) error {
+func runWindow(inctx context.Context, count uint, windowSize uint, uat chan StdResult, runner func(context.Context, interface{}) (interface{}, fail.Error), data interface{}) error {
 	if windowSize > count {
 		return errors.Errorf("window size cannot be greater than task size: %d, %d", count, windowSize)
+	}
+
+	if uint32(cap(uat)) < uint32(2*count+windowSize) { // Account for a 50% success ratio creating machines
+		return errors.Errorf("channel must hold count + windowSize")
 	}
 
 	if windowSize == count {
@@ -2145,6 +2221,16 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 			windowSize -= 2
 		}
 	}
+
+	var st gobreaker.Settings
+	st.Name = "window"
+	st.MaxRequests = uint32(count + windowSize)
+	st.ReadyToTrip = func(counts gobreaker.Counts) bool {
+		failureRatio := float64(counts.TotalFailures) / float64(counts.Requests)
+		return counts.Requests >= 6 && failureRatio >= 0.8
+	}
+
+	cb := gobreaker.NewCircuitBreaker(st)
 
 	window := make(chan struct{}, windowSize) // Sliding window of windowSize
 	target := make(chan struct{}, count)
@@ -2169,15 +2255,32 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 
 		go func() {
 			defer func() {
+				if r := recover(); r != nil {
+					logrus.WithContext(treeCtx).Errorf("Unexpected panic: %v", r)
+				}
+			}()
+
+			if sta := cb.State(); sta == gobreaker.StateOpen {
+				logrus.WithContext(treeCtx).Error("Too many consecutive failures")
+				cancel()
+				return
+			}
+
+			defer func() {
 				<-window
 			}()
 
-			res, err := runner(treeCtx, data)
-			if err != nil {
-				// log the error
-				logrus.WithContext(treeCtx).Errorf("window runner failed with: %s", err)
-				return
-			}
+			res, err := cb.Execute(func() (interface{}, error) {
+				ares, aerr := runner(treeCtx, data)
+				if aerr != nil {
+					if strings.Contains(aerr.Error(), "context canceled") {
+						return ares, aerr
+					}
+					logrus.WithContext(treeCtx).Errorf("window runner failed with: %s", aerr)
+					return ares, aerr
+				}
+				return ares, nil
+			})
 
 			select {
 			case <-done:
@@ -2199,6 +2302,9 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 					Content:     res,
 					Err:         err,
 					ToBeDeleted: false,
+				}
+				if err != nil { // only when err != nil our target should decrease
+					return
 				}
 			}
 
@@ -2225,10 +2331,16 @@ func runWindow(inctx context.Context, count uint, windowSize uint, timeout time.
 
 	select {
 	case <-done:
+		if sta := cb.State(); sta == gobreaker.StateOpen {
+			return errors.Errorf("Too many errors")
+		}
 		return nil
 	case <-inctx.Done():
 		return errors.Errorf("Task was cancelled by parent: %s", inctx.Err())
 	case <-treeCtx.Done():
+		if sta := cb.State(); sta == gobreaker.StateOpen {
+			return errors.Errorf("Too many errors")
+		}
 		if len(uat) == int(count) {
 			return nil
 		}
@@ -2278,7 +2390,8 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 
 			logrus.WithContext(ctx).Debugf("Creating %d node%s...", p.count, strprocess.Plural(p.count))
 
-			timeout := time.Duration(p.count) * timings.HostCreationTimeout()
+			tcount := uint(math.Max(4, float64(p.count)))
+			timeout := time.Duration(tcount) * timings.HostCreationTimeout()
 
 			// another tweak for Stein
 			winSize := 8
@@ -2302,9 +2415,11 @@ func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface
 				}
 			}
 
-			nodesChan := make(chan StdResult, p.count)
+			nodesChan := make(chan StdResult, 4*p.count)
+			ctx, tc := context.WithTimeout(ctx, timeout)
+			defer tc()
 
-			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), timeout, nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
+			err := runWindow(ctx, p.count, uint(math.Min(float64(p.count), float64(winSize))), nodesChan, instance.taskCreateNode, taskCreateNodeParameters{
 				nodeDef:       p.nodesDef,
 				timeout:       timings.HostOperationTimeout(),
 				keepOnFailure: p.keepOnFailure,
@@ -2383,8 +2498,6 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
-
-	// FIXME: OPP perhaps we should return something Identifiable, that's what really need
 
 	type result struct {
 		rTr  *propertiesv3.ClusterNode
@@ -2857,7 +2970,11 @@ func (instance *Cluster) taskConfigureNode(inctx context.Context, params interfa
 			}
 
 			// Now configures node specifically for Cluster flavor
-			makers, _ := instance.getMaker(ctx)
+			makers, xerr := instance.getMaker(ctx)
+			if xerr != nil {
+				return result{nil, xerr}, xerr
+			}
+
 			if makers.ConfigureNode == nil {
 				return result{nil, nil}, nil
 			}
@@ -3136,15 +3253,15 @@ func (instance *Cluster) taskDeleteMaster(inctx context.Context, params interfac
 	}
 }
 
-type taskUpdateClusterInventoryMasterParameters struct {
+type taskRegenerateClusterInventoryParameters struct {
 	ctx           context.Context
 	master        resources.Host
 	inventoryData string
 	clusterName   string
 }
 
-// taskUpdateClusterInventoryMaster task to update a Host (master) ansible inventory
-func (instance *Cluster) taskUpdateClusterInventoryMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+// taskRegenerateClusterInventory task to update a Host (master) ansible inventory
+func (instance *Cluster) taskRegenerateClusterInventory(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -3162,9 +3279,9 @@ func (instance *Cluster) taskUpdateClusterInventoryMaster(inctx context.Context,
 		gres, _ := func() (_ result, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 			// Convert and validate params
-			casted, ok := params.(taskUpdateClusterInventoryMasterParameters)
+			casted, ok := params.(taskRegenerateClusterInventoryParameters)
 			if !ok {
-				ar := result{nil, fail.InvalidParameterError("params", "must be a 'taskUpdateClusterInventoryMasterParameters'")}
+				ar := result{nil, fail.InvalidParameterError("params", "must be a 'taskRegenerateClusterInventoryParameters'")}
 				return ar, ar.rErr
 			}
 
@@ -3186,7 +3303,7 @@ func (instance *Cluster) taskUpdateClusterInventoryMaster(inctx context.Context,
 }
 
 // updateClusterInventoryMaster updates a Host (master) ansible inventory
-func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, param taskUpdateClusterInventoryMasterParameters) (ferr fail.Error) {
+func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, param taskRegenerateClusterInventoryParameters) (ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 

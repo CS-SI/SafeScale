@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,6 @@ func NormalizeError(err error) fail.Error {
 	if err != nil {
 		switch e := err.(type) {
 		case fail.Error:
-			// Note: must check if the cause is a gophercloud error...
 			cause := e.Cause()
 			if cause != nil {
 				return NormalizeError(cause)
@@ -105,6 +104,9 @@ func NormalizeError(err error) fail.Error {
 			if strings.Contains(err.Error(), "NeutronError") {
 				return fail.InvalidRequestError(e.Error())
 			}
+			if strings.Contains(err.Error(), "Unexpected API Error") {
+				return fail.InvalidRequestError(e.Error())
+			}
 			return fail.ConvertError(defaultErrorInterpreter(err))
 		}
 	}
@@ -116,7 +118,6 @@ func OldNormalizeError(err error) fail.Error {
 	if err != nil {
 		switch e := err.(type) {
 		case fail.Error:
-			// Note: must check if the cause is a gophercloud error...
 			cause := e.Cause()
 			if cause != nil {
 				return NormalizeError(cause)

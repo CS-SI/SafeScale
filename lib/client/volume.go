@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,7 +109,7 @@ func (v volumeConsumer) Delete(names []string, timeout time.Duration) error {
 		defer fail.SilentOnPanic(&crash)
 
 		defer wg.Done()
-		_, err := service.Delete(newCtx, &protocol.Reference{Name: aname})
+		_, err := service.Delete(newCtx, &protocol.VolumeDeleteRequest{Name: aname})
 
 		if err != nil {
 			mutex.Lock()

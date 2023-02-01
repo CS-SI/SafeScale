@@ -4,8 +4,11 @@ GO?=go
 
 all: generate
 
+minimock: generate
+
 generate: clean
 	@mkdir -p mocks || true
+	@$(GO) generate ./... || true
 	@(cd objectstorage && $(MAKE) $(@))
 	@(cd providers && $(MAKE) $(@))
 	@(cd userdata && $(MAKE) $(@))

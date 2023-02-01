@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -141,6 +141,10 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 	if masterSizing == nil {
 		masterSizing = &abstract.HostSizingRequirements{MinGPU: -1}
 	}
+	masterCount, xerr := NodeCountFromStringToInteger(in.MasterSizing)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	if in.NodeSizing != "" {
 		nodeSizing, _, xerr = HostSizingRequirementsFromStringToAbstract(in.NodeSizing)
@@ -176,6 +180,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 		Force:                   in.Force,
 		DisabledDefaultFeatures: disabled,
 		InitialNodeCount:        uint(nodeCount),
+		InitialMasterCount:      uint(masterCount),
 		FeatureParameters:       in.GetParameters(),
 		DefaultSshPort:          uint(in.DefaultSshPort),
 	}

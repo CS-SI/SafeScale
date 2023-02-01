@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,6 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -40,9 +38,6 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 	if name = strings.TrimSpace(name); name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale"), "(%s, '%s')", subnetID, name).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	subnet, xerr := s.InspectSubnet(ctx, subnetID)
 	if xerr != nil {
@@ -137,9 +132,6 @@ func (s stack) DeleteVIP(ctx context.Context, vip *abstract.VirtualIP) (ferr fai
 	if vip == nil {
 		return fail.InvalidParameterCannotBeNilError("vip")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale"), "(%v)", vip).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	if xerr := s.rpcDeleteNic(ctx, vip.ID); xerr != nil {
 		return xerr

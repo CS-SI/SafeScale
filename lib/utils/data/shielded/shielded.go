@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,6 +66,12 @@ func (instance *Shielded) UnWrap() (data.Clonable, error) {
 		return nil, err
 	}
 	return ak.witness, nil
+}
+
+func (instance *Shielded) RollBack(in data.Clonable) error {
+	instance.witness = in
+
+	return nil
 }
 
 func (instance *Shielded) Sdump() (string, error) {
@@ -144,7 +150,6 @@ func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (ferr fa
 }
 
 // Serialize transforms content of Shielded instance to data suitable for serialization
-// Note: doesn't follow interface data.Serializable (task parameter not used in it)
 func (instance *Shielded) Serialize() (_ []byte, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -170,7 +175,6 @@ func (instance *Shielded) Serialize() (_ []byte, ferr fail.Error) {
 }
 
 // Deserialize transforms serialization data to valid content of Shielded instance
-// Note: doesn't follow interface data.Serializable (task parameter not used in it)
 func (instance *Shielded) Deserialize(buf []byte) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

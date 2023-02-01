@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/openstack"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/davecgh/go-spew/spew"
@@ -162,9 +161,8 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 
 // ListRouters lists available routers
 func (s stack) ListRouters(ctx context.Context) ([]Router, fail.Error) {
-	var emptySlice []Router
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var ns []Router
@@ -306,9 +304,8 @@ func (s stack) InspectNetworkByName(ctx context.Context, name string) (_ *abstra
 
 // ListNetworks lists all the Network/VPC created
 func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error) {
-	var emptySlice []*abstract.Network
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	r := vpcCommonResult{}
@@ -327,7 +324,7 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	var list []*abstract.Network
@@ -335,21 +332,21 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 		for _, v := range vpcs {
 			item, ok := v.(map[string]interface{})
 			if !ok {
-				return emptySlice, fail.InconsistentError("vpc should be a map[string]interface{}")
+				return nil, fail.InconsistentError("vpc should be a map[string]interface{}")
 			}
 
 			an := abstract.NewNetwork()
 			an.Name, ok = item["name"].(string)
 			if !ok {
-				return emptySlice, fail.InconsistentError("name should NOT be empty")
+				return nil, fail.InconsistentError("name should NOT be empty")
 			}
 			an.ID, ok = item["id"].(string)
 			if !ok {
-				return emptySlice, fail.InconsistentError("id should NOT be empty")
+				return nil, fail.InconsistentError("id should NOT be empty")
 			}
 			an.CIDR, ok = item["cidr"].(string)
 			if !ok {
-				return emptySlice, fail.InconsistentError("cidr should NOT be empty")
+				return nil, fail.InconsistentError("cidr should NOT be empty")
 			}
 			if an.Name == "" || an.ID == "" || an.CIDR == "" {
 				continue
@@ -392,9 +389,6 @@ func (s stack) CreateSubnet(ctx context.Context, req abstract.SubnetRequest) (su
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, true, "(%s)", req.Name).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	var xerr fail.Error
 	if _, xerr = s.InspectSubnetByName(ctx, req.NetworkID, req.Name); xerr != nil {
@@ -574,8 +568,6 @@ func (s stack) inspectOpenstackSubnet(ctx context.Context, id string) (*abstract
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-
 	as := abstract.NewSubnet()
 	var sn *subnets.Subnet
 	xerr := stacks.RetryableRemoteCall(ctx,
@@ -601,9 +593,8 @@ func (s stack) inspectOpenstackSubnet(ctx context.Context, id string) (*abstract
 
 // ListSubnets lists networks
 func (s stack) ListSubnets(ctx context.Context, networkRef string) ([]*abstract.Subnet, fail.Error) {
-	var emptySlice []*abstract.Subnet
 	if valid.IsNil(s) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets" // FIXME: Hardcoded endpoint

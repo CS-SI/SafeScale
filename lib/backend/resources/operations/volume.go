@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,13 +21,11 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	mapset "github.com/deckarep/golang-set"
-	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
@@ -44,7 +42,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
@@ -76,109 +73,6 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, ferr fail.Error) {
 		MetadataCore: coreInstance,
 	}
 	return instance, nil
-}
-
-// LoadVolume loads the metadata of a subnet
-func LoadVolume(inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (resources.Volume, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if ref = strings.TrimSpace(ref); ref == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  resources.Volume
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		ga, gerr := func() (_ resources.Volume, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			// trick to avoid collisions
-			var kt *volume
-			cacheref := fmt.Sprintf("%T/%s", kt, ref)
-
-			cache, xerr := svc.GetCache(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(resources.Volume)
-					if ok {
-						return casted, nil
-					}
-				}
-			}
-
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, svc, ref) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			var ok bool
-			volumeInstance, ok := anon.(resources.Volume)
-			if !ok {
-				return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
-			}
-			if volumeInstance == nil {
-				return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = volumeInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, volumeInstance.GetName()), volumeInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-				hid, err := volumeInstance.GetID()
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), volumeInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(resources.Volume)
-					if ok {
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.Volume")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("volume cache response (%s): %v", cacheref, xerr)
-				}
-			}
-
-			return volumeInstance, nil
-		}()
-		chRes <- result{ga, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
 }
 
 // onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'
@@ -321,8 +215,7 @@ func (instance *volume) GetAttachments(ctx context.Context) (_ *propertiesv1.Vol
 func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -331,9 +224,6 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume")).Entering()
-	defer tracer.Exiting()
 
 	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		av := abstract.NewVolume()
@@ -358,8 +248,14 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume")).Entering()
-	defer tracer.Exiting()
+	defer func() {
+		// drop the cache when we are done creating the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
 
 	// instance.lock.Lock()
 	// defer instance.lock.Unlock()
@@ -436,7 +332,7 @@ func (instance *volume) Delete(ctx context.Context) (ferr fail.Error) {
 func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -454,9 +350,6 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	if req.Size <= 0 {
 		return fail.InvalidParameterError("req.Size", "must be an integer > 0")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s', %f, %s)", req.Name, req.Size, req.Speed.String()).Entering()
-	defer tracer.Exiting()
 
 	// Check if Volume exists and is managed by SafeScale
 	svc := instance.Service()
@@ -542,9 +435,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	if xerr != nil {
 		return xerr
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s', %s, %s, %v)", host.GetName(), path, format, doNotFormat).Entering()
-	defer tracer.Exiting()
 
 	var (
 		volumeID, volumeName, deviceName, volumeUUID, mountPoint, vaID string
@@ -967,8 +857,6 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 	if err != nil {
 		return fail.ConvertError(err)
 	}
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s')", targetID).Entering()
-	defer tracer.Exiting()
 
 	var (
 		volumeID, volumeName string
@@ -987,7 +875,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (ferr f
 	}
 
 	// -- retrieves volume data --
-	xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		volume, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())

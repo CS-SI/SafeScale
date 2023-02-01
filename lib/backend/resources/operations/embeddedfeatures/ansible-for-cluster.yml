@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+# Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        host: no
+        host: none
         cluster: all
 
     requirements:
@@ -30,10 +30,10 @@ feature:
                 steps:
                     config:
                         targets:
-                            hosts: no
-                            gateways: no
+                            hosts: none
+                            gateways: none
                             masters: all
-                            nodes: no
+                            nodes: none
                         run: |
                             [[ ! -f ${SF_ETCDIR}/ansible/inventory/inventory.py ]] && sfFail 1
                             sfExit
@@ -43,10 +43,10 @@ feature:
                 steps:
                     config:
                         targets:
-                            hosts: no
-                            gateways: no
+                            hosts: none
+                            gateways: none
                             masters: all
-                            nodes: no
+                            nodes: none
                         run: |
                             mv ${SF_ETCDIR}/ansible/ansible.cfg ${SF_ETCDIR}/ansible/ansible.cfg.host_only
                             mkdir -p ${SF_ETCDIR}/ansible/inventory
@@ -118,7 +118,7 @@ feature:
                     ansible:
                         targets:
                             gateways: all
-                            hosts: no
+                            hosts: none
                             masters: all
                             nodes: all
                         run: |
@@ -145,10 +145,10 @@ feature:
 
                     config:
                         targets:
-                            gateways: no
-                            hosts: yes
+                            gateways: none
+                            hosts: all
                             masters: all
-                            nodes: no
+                            nodes: none
                         run: |
                             rm -rf ${SF_ETCDIR}/ansible/cluster.cfg ${SF_ETCDIR}/ansible/inventory/inventory.py ${SF_ETCDIR}/ansible/ansible.cfg
                             [ -r ${SF_ETCDIR}/ansible/ansible.cfg.host_only ] && mv ${SF_ETCDIR}/ansible/ansible.cfg.host_only ${SF_ETCDIR}/ansible/ansible.cfg 

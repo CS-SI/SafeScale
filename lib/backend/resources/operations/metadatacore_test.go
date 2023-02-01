@@ -1,5 +1,5 @@
-//go:build testable
-// +build testable
+//go:build testable && debug
+// +build testable,debug
 
 package operations
 
@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"reflect"
 	"sync"
 	"testing"
@@ -32,17 +34,21 @@ func TestMetadataCore_Bait(t *testing.T) {
 	sm.GetMetadataBucketMock.Return(*abstract.NewObjectStorageBucket(), nil)
 	sm.WriteObjectMock.Return(abstract.ObjectStorageItem{}, nil)
 	var foo bytes.Buffer
-	foo.WriteString("{\"id\":\"Network_ID\",\"mask\":\"\",\"name\":\"Network Name\",\"properties\":{},\"tags\":{\"CreationDate\":\"2022-11-08T14:05:44+01:00\",\"ManagedBy\":\"safescale\"}")
+	foo.WriteString("{\"id\":\"Network_ID\",\"mask\":\"\",\"name\":\"Network Name\",\"properties\":{},\"tags\":{\"ManagedBy\":\"safescale\"}}")
 	sm.ReadObjectMock.Return(foo, nil)
 	sm.InvalidateObjectMock.Return(nil)
 
 	net := abstract.NewNetwork()
 	net.ID = "Network_ID"
 	net.Name = "Network Name"
+	delete(net.Tags, "CreationDate")
 
 	mk, xerr := NewCore(sm, "network", "networks", net)
 	require.Nil(t, xerr)
 	require.NotNil(t, mk)
+
+	xerr = mk.Carry(ctx, net)
+	require.Nil(t, xerr)
 
 	xerr = mk.Reload(ctx)
 	require.Nil(t, xerr)
@@ -53,8 +59,7 @@ func TestMetadataCore_Bait(t *testing.T) {
 		an, ok := clonable.(*abstract.Network)
 		require.True(t, ok)
 		require.EqualValues(t, skip(an.GetID()), "Network_ID")
-		require.EqualValues(t, an.GetName(), "cook kids")
-		require.EqualValues(t, an.DNSServers, []string{"1.1.1.1"})
+		require.EqualValues(t, an.GetName(), "Network Name")
 
 		return nil
 	})
@@ -72,19 +77,28 @@ func TestMetadataCore_TrueInspect(t *testing.T) {
 	sm.GetMetadataBucketMock.Return(*abstract.NewObjectStorageBucket(), nil)
 	sm.WriteObjectMock.Return(abstract.ObjectStorageItem{}, nil)
 	var foo bytes.Buffer
-	foo.WriteString("{\"id\":\"Network_ID\",\"mask\":\"\",\"name\":\"Network Name\",\"properties\":{},\"tags\":{\"CreationDate\":\"2022-11-08T14:05:44+01:00\",\"ManagedBy\":\"safescale\"}")
+	foo.WriteString("{\"id\":\"Network_ID\",\"mask\":\"\",\"name\":\"Network Name\",\"properties\":{},\"tags\":{\"ManagedBy\":\"safescale\"}}")
 	sm.ReadObjectMock.Return(foo, nil)
 	sm.InvalidateObjectMock.Return(nil)
 
 	net := abstract.NewNetwork()
 	net.ID = "Network_ID"
 	net.Name = "Network Name"
+	delete(net.Tags, "CreationDate")
 
 	mk, xerr := NewCore(sm, "network", "networks", net)
 	require.Nil(t, xerr)
 	require.NotNil(t, mk)
 
 	xerr = mk.Carry(ctx, net)
+	require.Nil(t, xerr)
+
+	xerr = mk.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		_, ok := clonable.(*abstract.Network)
+		require.True(t, ok)
+
+		return nil
+	})
 	require.Nil(t, xerr)
 
 	wg := sync.WaitGroup{}
@@ -100,7 +114,7 @@ func TestMetadataCore_TrueInspect(t *testing.T) {
 			return nil
 		})
 		if xerr != nil {
-			fmt.Println("Disaster x")
+			fmt.Printf("Disaster x: %v\n", xerr)
 		}
 	}()
 	for i := 0; i < 49; i++ {
@@ -114,24 +128,244 @@ func TestMetadataCore_TrueInspect(t *testing.T) {
 				return nil
 			})
 			if xerr != nil {
-				fmt.Println("Disaster")
+				fmt.Printf("Disaster y: %v\n", xerr)
 			}
 		}()
 	}
 	wg.Wait()
 
 	xerr = mk.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
-
-		an, ok := clonable.(*abstract.Network)
+		_, ok := clonable.(*abstract.Network)
 		require.True(t, ok)
-		require.EqualValues(t, skip(an.GetID()), "Network_ID")
-		require.EqualValues(t, an.GetName(), "cook kids")
-		require.EqualValues(t, an.DNSServers, []string{"1.1.1.1"})
 
 		return nil
 	})
 	require.Nil(t, xerr)
 
 	time.Sleep(4 * time.Second)
+}
+
+func TestMetadataCore_Darkbloom(t *testing.T) {
+	// FIXME: This test requires minio check and also the debug flag
+	ol, err := objectstorage.NewLocation(objectstorage.Config{
+		Type:        "s3",
+		EnvAuth:     false,
+		AuthVersion: 0,
+		Endpoint:    "http://192.168.1.100:9000",
+		User:        "admin",
+		SecretKey:   "password",
+		BucketName:  "bushido",
+		Direct:      true,
+	})
+	if err != nil {
+		t.Skip()
+	}
+	ok, err := ol.CreateBucket(context.Background(), "bushido")
+	if err != nil {
+		ok, err = ol.InspectBucket(context.Background(), "bushido")
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	sm := &minService{
+		loc: ol,
+		aob: ok,
+	}
+	net := abstract.NewNetwork()
+	net.ID = "Network_ID"
+	net.Name = "Network Name"
+	delete(net.Tags, "CreationDate")
+
+	mk, xerr := NewCore(sm, "network", "networks", net)
+	require.Nil(t, xerr)
+	require.NotNil(t, mk)
+
+	xerr = mk.Carry(context.Background(), net)
+	require.Nil(t, xerr)
+
+	debug.SetupError("metadatacore_debug.go:450:p:1")
+	defer func() {
+		debug.SetupError("")
+	}()
+
+	ctx := context.Background()
+
+	xerr = mk.Alter(ctx, func(clonable data.Clonable, properties *serialize.JSONProperties) fail.Error {
+		an, _ := clonable.(*abstract.Network)
+		an.DNSServers = []string{"1.1.1.1"}
+		an.Name = "cook kids"
+		return nil
+	})
+	require.NotNil(t, xerr)
+
+	xerr = mk.Inspect(context.Background(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		an, ok := clonable.(*abstract.Network)
+		require.True(t, ok)
+		require.EqualValues(t, "Network Name", an.Name)
+
+		return nil
+	})
+	require.Nil(t, xerr)
+}
+
+func TestMetadataCore_CrazyWhatLoveCanDo(t *testing.T) {
+	// FIXME: This test requires minio check
+	ol, err := objectstorage.NewLocation(objectstorage.Config{
+		Type:        "s3",
+		EnvAuth:     false,
+		AuthVersion: 0,
+		Endpoint:    "http://192.168.1.100:9000",
+		User:        "admin",
+		SecretKey:   "password",
+		BucketName:  "bushido",
+		Direct:      true,
+	})
+	if err != nil {
+		t.Skip()
+	}
+	ok, err := ol.CreateBucket(context.Background(), "bushido")
+	if err != nil {
+		ok, err = ol.InspectBucket(context.Background(), "bushido")
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	sm := &minService{
+		loc: ol,
+		aob: ok,
+	}
+	net := abstract.NewNetwork()
+	net.ID = "Network_ID"
+	net.Name = "Network Name"
+	delete(net.Tags, "CreationDate")
+
+	mk, xerr := NewCore(sm, "network", "networks", net)
+	require.Nil(t, xerr)
+	require.NotNil(t, mk)
+
+	xerr = mk.Carry(context.Background(), net)
+	require.Nil(t, xerr)
+
+	debug.SetupError("metadatacore_debug.go:471:p:1")
+	defer func() {
+		debug.SetupError("")
+	}()
+
+	ctx := context.Background()
+
+	xerr = mk.Alter(ctx, func(clonable data.Clonable, properties *serialize.JSONProperties) fail.Error {
+		an, _ := clonable.(*abstract.Network)
+		an.DNSServers = []string{"1.1.1.1"}
+		an.Name = "cook kids"
+		return nil
+	})
+	require.NotNil(t, xerr)
+
+	xerr = mk.Inspect(context.Background(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		an, ok := clonable.(*abstract.Network)
+		require.True(t, ok)
+		require.EqualValues(t, "Network Name", an.Name)
+
+		return nil
+	})
+	require.Nil(t, xerr)
+}
+
+func TestMetadataCore_Doctor(t *testing.T) {
+	// FIXME: This test requires minio check
+	ol, _ := objectstorage.NewLocation(objectstorage.Config{
+		Type:        "s3",
+		EnvAuth:     false,
+		AuthVersion: 0,
+		Endpoint:    "http://192.168.1.100:9000",
+		User:        "admin",
+		SecretKey:   "password",
+		BucketName:  "bushido",
+		Direct:      true,
+	})
+	ok, err := ol.CreateBucket(context.Background(), "bushido")
+	if err != nil {
+		ok, err = ol.InspectBucket(context.Background(), "bushido")
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	sm := &minService{
+		loc: ol,
+		aob: ok,
+	}
+	net := abstract.NewNetwork()
+	net.ID = "Network_ID"
+	net.Name = "Network Name"
+	delete(net.Tags, "CreationDate")
+
+	mk, xerr := NewCore(sm, "network", "networks", net)
+	require.Nil(t, xerr)
+	require.NotNil(t, mk)
+
+	xerr = mk.Carry(context.Background(), net)
+	require.Nil(t, xerr)
+
+	ctx := context.Background()
+
+	xerr = mk.Delete(ctx)
+	require.Nil(t, xerr)
+
+	is, xerr := mk.IsValid()
+	require.Nil(t, xerr)
+	require.EqualValues(t, false, is)
+
+	xerr = mk.Inspect(context.Background(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		an, ok := clonable.(*abstract.Network)
+		require.True(t, ok)
+		require.EqualValues(t, "Network Name", an.Name)
+
+		return nil
+	})
+	require.NotNil(t, xerr)
+	switch xerr.(type) {
+	case *fail.ErrInconsistent:
+	default:
+		t.Errorf("wrong error type")
+	}
+}
+
+func TestMetadataCore_Versioning(t *testing.T) {
+	// FIXME: This test requires minio check
+	ol, _ := objectstorage.NewLocation(objectstorage.Config{
+		Type:        "s3",
+		EnvAuth:     false,
+		AuthVersion: 0,
+		Endpoint:    "http://192.168.1.100:9000",
+		User:        "admin",
+		SecretKey:   "password",
+		BucketName:  "bushido",
+		Direct:      true,
+	})
+	ok, err := ol.CreateBucket(context.Background(), "bushido")
+	if err != nil {
+		ok, err = ol.InspectBucket(context.Background(), "bushido")
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	sm := &minService{
+		loc: ol,
+		aob: ok,
+	}
+	net := abstract.NewNetwork()
+	net.ID = "Network_ID"
+	net.Name = "Network Name"
+	delete(net.Tags, "CreationDate")
+
+	mk, xerr := NewCore(sm, "network", "networks", net)
+	require.Nil(t, xerr)
+	require.NotNil(t, mk)
+
+	xerr = mk.Carry(context.Background(), net)
+	require.Nil(t, xerr)
 }

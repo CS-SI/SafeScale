@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,8 +114,7 @@ func (s stack) rpcGetHostByName(ctx context.Context, name string) (*servers.Serv
 // rpcListPorts lists all ports available
 func (s stack) rpcListPorts(ctx context.Context, options ports.ListOpts) ([]ports.Port, fail.Error) {
 	var (
-		emptyList []ports.Port
-		allPages  pagination.Page
+		allPages pagination.Page
 	)
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
@@ -125,12 +124,12 @@ func (s stack) rpcListPorts(ctx context.Context, options ports.ListOpts) ([]port
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	r, err := ports.ExtractPorts(allPages)
 	if err != nil {
-		return emptyList, NormalizeError(err)
+		return nil, NormalizeError(err)
 	}
 	return r, nil
 }

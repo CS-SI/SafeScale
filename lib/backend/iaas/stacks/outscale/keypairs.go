@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,6 @@ import (
 	"encoding/base64"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -35,9 +33,6 @@ func (s stack) CreateKeyPair(ctx context.Context, name string) (akp *abstract.Ke
 	if name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	var xerr fail.Error
 	akp, xerr = abstract.NewKeyPair(name)
@@ -56,9 +51,6 @@ func (s stack) ImportKeyPair(ctx context.Context, keypair *abstract.KeyPair) (fe
 		return fail.InvalidParameterError("keyair", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale"), "'%s')", keypair.Name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	return s.rpcCreateKeypair(ctx, keypair.Name, base64.StdEncoding.EncodeToString([]byte(keypair.PublicKey)))
 }
 
@@ -70,9 +62,6 @@ func (s stack) InspectKeyPair(ctx context.Context, id string) (akp *abstract.Key
 	if id == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadKeypairByName(ctx, id)
 	if xerr != nil {
@@ -91,9 +80,6 @@ func (s stack) ListKeyPairs(ctx context.Context) (_ []*abstract.KeyPair, ferr fa
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadKeypairs(ctx, nil)
 	if xerr != nil {
@@ -119,9 +105,6 @@ func (s stack) DeleteKeyPair(ctx context.Context, id string) (ferr fail.Error) {
 	if id == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	return s.rpcDeleteKeypair(ctx, id)
 }

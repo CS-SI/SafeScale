@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1352,7 +1352,14 @@ var subnetInspect = cli.Command{
 		}
 
 		mapped["state_label"] = subnetstate.Enum(mapped["state"].(float64)).String()
-		mapped["gateway-failover"] = len(mapped["gateways"].(map[string]string)) > 1
+		mapped["gateway-failover"] = false
+		if gws, ok := mapped["gateways"]; ok {
+			if ok {
+				if gws != nil {
+					mapped["gateway-failover"] = len(mapped["gateways"].(map[string]string)) > 1
+				}
+			}
+		}
 		return clitools.SuccessResponse(mapped)
 	},
 }
@@ -1684,9 +1691,7 @@ var subnetSecurityGroupCommands = cli.Command{
 	Subcommands: cli.Commands{
 		subnetSecurityGroupAddCommand,
 		subnetSecurityGroupRemoveCommand,
-		subnetSecurityGroupEnableCommand,
 		subnetSecurityGroupListCommand,
-		subnetSecurityGroupDisableCommand,
 	},
 }
 
@@ -1873,134 +1878,5 @@ var subnetSecurityGroupListCommand = cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "listing bound security groups of subnet", false).Error())))
 		}
 		return clitools.SuccessResponse(list.Subnets)
-	},
-}
-
-var subnetSecurityGroupEnableCommand = cli.Command{
-	Name:      "enable",
-	Aliases:   []string{"activate"},
-	Usage:     "Enables a security group on a subnet",
-	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
-
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		case 2:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
-		networkRef := c.Args().First()
-		if networkRef == "-" {
-			networkRef = ""
-		}
-
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Enabling subnet security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
-
-		err := ClientSession.Subnet.EnableSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "enabling security group on network", false,
-						).Error(),
-					),
-				),
-			)
-		}
-		return clitools.SuccessResponse(nil)
-	},
-}
-
-var subnetSecurityGroupDisableCommand = cli.Command{
-	Name:      "disable",
-	Aliases:   []string{"deactivate"},
-	Usage:     "disable SUBNETREF GROUPREF",
-	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef(
-			"SafeScale command: %s %s %s %s %s with args '%s'", hostCmdLabel, subnetCmdLabel, securityCmdLabel,
-			groupCmdLabel, c.Command.Name, c.Args(),
-		)
-
-		switch c.NArg() {
-		case 0:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument NETWORKREF."))
-		case 1:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SUBNETREF."))
-		case 2:
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
-		}
-		networkRef := c.Args().First()
-		if networkRef == "-" {
-			networkRef = ""
-		}
-
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Disabling subnet security group"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
-
-		err := ClientSession.Subnet.DisableSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "disabling bound security group on network", false,
-						).Error(),
-					),
-				),
-			)
-		}
-		return clitools.SuccessResponse(nil)
 	},
 }

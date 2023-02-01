@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -147,7 +147,7 @@ func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, f
 	}
 
 	var stdout string
-	// FIXME: Add a retry here only if we catch an executionerror of a connection error
+	// FIXME: Add a retry here only if we catch an execution error or a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
 		select {
 		case <-ctx.Done():

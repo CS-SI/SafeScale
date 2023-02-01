@@ -8,11 +8,13 @@ on:
       - hotfixes
       - 'release/**'
       - 'review/**'
+      - 'pr/**'
   pull_request:
     branches:
       - master
       - develop
       - 'release/**'
+      - 'pr/**'
 
 env:
   PROTOCVERSION: 3.17.3
@@ -23,7 +25,7 @@ jobs:
 
     strategy:
       matrix:
-        go: [ 1.17.12, 1.18.4 ]
+        go: [ 1.18.4 ]
         tags: [ releasetags, debug, tunnel ]
 
     runs-on: ubuntu-latest

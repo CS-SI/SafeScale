@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,6 @@ import (
 	"expvar"
 	"fmt"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -46,7 +45,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
 )
@@ -126,7 +124,7 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("ComplementFeatureParameters")()
+	defer elapsed(inctx, "ComplementFeatureParameters")()
 
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -332,9 +330,8 @@ func (instance *Cluster) UnregisterFeature(inctx context.Context, feat string) (
 func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptySlice []resources.Feature
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	// instance.lock.RLock()
@@ -654,7 +651,17 @@ func (instance *Cluster) installNodeRequirements(
 			return
 		}
 
+		// logrus.WithContext(ctx).Warningf("When this was reached, we had the parameters: %s", litter.Sdump(pars))
+
 		params := data.NewMap()
+		efe, serr := ExtractFeatureParameters(pars.FeatureParameters)
+		if serr != nil {
+			chRes <- result{fail.ConvertError(serr)}
+			return
+		}
+
+		params = params.Merge(efe)
+
 		if nodeType == clusternodetype.Master {
 			tp, xerr := instance.Service().GetTenantParameters()
 			if xerr != nil {
@@ -672,70 +679,6 @@ func (instance *Cluster) installNodeRequirements(
 			}
 			params["reserved_TenantJSON"] = string(jsoned)
 
-			// Finds the MetadataFolder where the current binary resides
-			var (
-				binaryDir string
-				path      string
-			)
-			exe, _ := os.Executable()
-			if exe != "" {
-				binaryDir = filepath.Dir(exe)
-			}
-
-			_, _ = binaryDir, path
-			/* FIXME: VPL: disable binaries upload until proper solution (does not work with different architectures between client and remote),
-			               probably a feature safescale-binaries to build SafeScale from source...
-					// Uploads safescale binary
-					if binaryDir != "" {
-						path = binaryDir + "/safescale"
-					}
-					if path == "" {
-						path, err = exec.LookPath("safescale")
-						err = debug.InjectPlannedError((err)
-			if err != nil {
-							return fail.Wrap(err, "failed to find local binary 'safescale', make sure its path is in environment variable PATH")
-						}
-					}
-
-					retcode, stdout, stderr, xerr := host.Push(task, path, "/opt/safescale/bin/safescale", "root:root", "0755", temporal.ExecutionTimeout())
-					if xerr != nil {
-						return fail.Wrap(xerr, "failed to upload 'safescale' binary")
-					}
-					if retcode != 0 {
-						output := stdout
-						if output != "" && stderr != "" {
-							output += "\n" + stderr
-						} else if stderr != "" {
-							output = stderr
-						}
-						return fail.NewError("failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.GetName(), retcode, output)
-					}
-
-					// Uploads safescaled binary
-					path = ""
-					if binaryDir != "" {
-						path = binaryDir + "/safescaled"
-					}
-					if path == "" {
-						path, err = exec.LookPath("safescaled")
-						err = debug.InjectPlannedError((err)
-			if err != nil {
-							return fail.Wrap(err, "failed to find local binary 'safescaled', make sure its path is in environment variable PATH")
-						}
-					}
-					if retcode, stdout, stderr, xerr = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.ExecutionTimeout()); xerr != nil {
-						return fail.Wrap(xerr, "failed to submit content of 'safescaled' binary to host '%s'", host.GetName())
-					}
-					if retcode != 0 {
-						output := stdout
-						if output != "" && stderr != "" {
-							output += "\n" + stderr
-						} else if stderr != "" {
-							output = stderr
-						}
-						return fail.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.GetName(), retcode, output)
-					}
-			*/
 			// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
 			if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
 				cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
@@ -788,6 +731,7 @@ func (instance *Cluster) installNodeRequirements(
 		params["SSHPublicKey"] = identity.Keypair.PublicKey
 		params["SSHPrivateKey"] = identity.Keypair.PrivateKey
 
+		// logrus.WithContext(ctx).Warningf("When this was reached, we had the parameters: %s", litter.Sdump(params))
 		retcode, stdout, stderr, xerr := instance.ExecuteScript(ctx, "node_install_requirements.sh", params, host)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -803,6 +747,21 @@ func (instance *Cluster) installNodeRequirements(
 
 		// if docker is not disabled then is installed by default
 		if _, ok := pars.DisabledDefaultFeatures["docker"]; !ok {
+			// Another mitigation
+			if _, ok := params["DockerHubUsername"]; !ok {
+				params["DockerHubUsername"] = ""
+			}
+
+			// And another
+			if _, ok := params["DockerHubPassword"]; !ok {
+				params["DockerHubPassword"] = ""
+			}
+
+			// And another
+			if _, ok := params["DockerComposeVersion"]; !ok {
+				params["DockerComposeVersion"] = "latest"
+			}
+
 			retcode, stdout, stderr, xerr = instance.ExecuteScript(ctx, "node_install_docker.sh", params, host)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -832,6 +791,60 @@ func (instance *Cluster) installNodeRequirements(
 				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
 				chRes <- result{xerr}
 				return
+			}
+		}
+
+		if nodeType == clusternodetype.Master {
+			// if ansible is not disabled then is installed by default
+			if _, ok := pars.DisabledDefaultFeatures["ansible-for-cluster"]; !ok {
+				if _, ok := pars.DisabledDefaultFeatures["ansible"]; !ok {
+					xerr = instance.ComplementFeatureParameters(ctx, params)
+					if xerr != nil {
+						chRes <- result{fail.Wrap(xerr, "system ansible installation failed")}
+						return
+					}
+
+					xerr = host.ComplementFeatureParameters(ctx, params)
+					if xerr != nil {
+						chRes <- result{fail.Wrap(xerr, "system ansible installation failed")}
+						return
+					}
+
+					params["Username"] = "cladm"
+					params["Password"] = identity.AdminPassword
+
+					retcode, stdout, stderr, xerr = instance.ExecuteScript(ctx, "master_install_ansible.sh", params, host)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						chRes <- result{fail.Wrap(xerr, "system ansible installation failed")}
+						return
+					}
+					if retcode != 0 {
+						xerr = fail.ExecutionError(nil, "failed to install common ansible dependencies")
+						xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+						chRes <- result{xerr}
+						return
+					}
+
+					xerr = host.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+						return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+							featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+							if !ok {
+								return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							}
+
+							featuresV1.Installed["ansible"] = &propertiesv1.HostInstalledFeature{}
+							featuresV1.Installed["ansible-for-cluster"] = &propertiesv1.HostInstalledFeature{}
+							return nil
+						})
+					})
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+						chRes <- result{xerr}
+						return
+					}
+				}
 			}
 		}
 
@@ -1169,100 +1182,6 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 		}
 		chRes <- result{nil}
 
-	}()
-	select {
-	case res := <-chRes:
-		return res.rErr
-	case <-ctx.Done():
-		return fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return fail.ConvertError(inctx.Err())
-	}
-}
-
-// installDocker installs docker and docker-compose
-func (instance *Cluster) installDocker(
-	inctx context.Context, host resources.Host, hostLabel string, params data.Map, pars abstract.ClusterRequest,
-) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
-		if oldKey := ctx.Value("ID"); oldKey != nil {
-			ctx = context.WithValue(ctx, "ID", fmt.Sprintf("%s/feature/install/docker/%s", oldKey, hostLabel)) // nolint
-		}
-
-		if _, ok := pars.DisabledDefaultFeatures["docker"]; ok {
-			chRes <- result{nil}
-			return
-		}
-
-		// uses NewFeature() to let a chance to the user to use its own docker feature
-		feat, xerr := NewFeature(ctx, instance.Service(), "docker")
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		params, _ := data.FromMap(params)
-		r, xerr := feat.Add(ctx, host, params, resources.FeatureSettings{})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		reason := false
-		if !r.Successful() {
-			for _, k := range r.Keys() {
-				rk := r.ResultsOfKey(k)
-				if !rk.Successful() {
-					if len(rk.ErrorMessages()) == 0 {
-						logrus.WithContext(ctx).Warnf("This is a false warning for %s !!: %s", k, rk.ErrorMessages())
-					} else {
-						reason = true
-						logrus.WithContext(ctx).Warnf("This failed: %s with %s", k, spew.Sdump(rk))
-					}
-				}
-			}
-
-			if reason {
-				chRes <- result{fail.NewError("[%s] failed to add feature 'docker' on host '%s': %s", hostLabel, host.GetName(), r.AllErrorMessages())}
-				return
-			}
-		}
-
-		xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				featuresV1.Installed[feat.GetName()] = &propertiesv1.ClusterInstalledFeature{
-					Name: feat.GetName(),
-				}
-				return nil
-			})
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-			chRes <- result{xerr}
-			return
-		}
-
-		logrus.WithContext(ctx).Debugf("[%s] feature 'docker' addition successful.", hostLabel)
-		chRes <- result{nil}
 	}()
 	select {
 	case res := <-chRes:

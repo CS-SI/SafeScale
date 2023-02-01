@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ type Makers struct {
 	DefaultImage           func(ctx context.Context, c resources.Cluster) string                                              // default image of server(s)
 	ConfigureNode          func(ctx context.Context, c resources.Cluster, host resources.Host) fail.Error
 	UnconfigureNode        func(ctx context.Context, c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
-	ConfigureCluster       func(ctx context.Context, c resources.Cluster, params data.Map) fail.Error
+	ConfigureCluster       func(ctx context.Context, c resources.Cluster, params data.Map, b bool) fail.Error
 	UnconfigureCluster     func(ctx context.Context, c resources.Cluster) fail.Error
 	JoinMasterToCluster    func(ctx context.Context, c resources.Cluster, host resources.Host) fail.Error
 	JoinNodeToCluster      func(ctx context.Context, c resources.Cluster, host resources.Host) fail.Error

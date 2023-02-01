@@ -74,7 +74,7 @@ make generate
 sleep 4
 
 echo "Make All"
-make all
+make release
 [ $? -ne 0 ] && echo "Build failure" && exit 1
 
 echo "Install"

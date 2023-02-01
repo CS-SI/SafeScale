@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry/enums/verdict"
@@ -67,11 +66,11 @@ type SSHHandler interface {
 
 // sshHandler SSH service
 type sshHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewSSHHandler ...
-func NewSSHHandler(job server.Job) SSHHandler {
+func NewSSHHandler(job backend.Job) SSHHandler {
 	return &sshHandler{job: job}
 }
 
@@ -110,10 +109,6 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	host, xerr := hostfactory.Load(ctx, svc, hostRef)
 	if xerr != nil {
@@ -209,7 +204,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 			return nil, fail.NotFoundError("failed to find default Subnet of Host")
 		}
 		if isGateway {
-			hs, err := host.GetState(ctx)
+			hs, err := host.ForceGetState(ctx)
 			if err != nil {
 				return nil, fail.Wrap(err, "cannot retrieve host properties")
 			}
@@ -324,9 +319,6 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 	}
 
 	ctx := handler.job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	sshCfg, xerr := handler.GetConfig(hostParam)
 	if xerr != nil {
@@ -364,11 +356,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 	stdErr := ""
 
 	ctx := handler.job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
-
-	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
+	logrus.WithContext(ctx).Tracef(fmt.Sprintf("<command>=[%s]", cmd))
 
 	timings, xerr := handler.job.Service().Timings()
 	if xerr != nil {
@@ -537,9 +525,6 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	}
 
 	ctx := handler.job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	hostName := ""
 	var upload bool
@@ -665,6 +650,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 				if finnerXerr != nil {
 					return fail.WarningError(finnerXerr, "cannot create md5 command")
 				}
+
 				fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, timings.HostLongOperationTimeout())
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
@@ -705,93 +691,3 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	)
 	return retcode, stdout, stderr, xerr
 }
-
-/*
- * VPL: new Copy implementation... Why commented?
-
-// Copy copies file/directory from/to remote host
-func (handler *sshHandler) Copy(from, to, owner, mode string) (_ int, _ string, _ string, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-	const invalid = -1
-
-	if handler == nil {
-		return invalid, "", "", fail.InvalidInstanceError()
-	}
-	if handler.job == nil {
-		return invalid, "", "", fail.InvalidInstanceContentError("handler.job", "cannot be nil")
-	}
-	if from == "" {
-		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("from")
-	}
-	if to == "" {
-		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("to")
-	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
-
-	var (
-		pull                bool
-		hostRef             string
-		hostPath, localPath string
-		retcode             int
-		stdout, stderr      string
-	)
-
-	// If source contains remote host, we pull
-	parts := strings.Split(from, ":")
-	if len(parts) > 1 {
-		pull = true
-		hostRef = parts[0]
-		hostPath = strings.Join(parts[1:], ":")
-	} else {
-		localPath = from
-	}
-
-	// if destination contains remote host, we push (= !pull)
-	parts = strings.Split(to, ":")
-	if len(parts) > 1 {
-		if pull {
-			return invalid, "", "", fail.InvalidRequestError("file copy from one remote host to another one is not supported")
-		}
-		hostRef = parts[0]
-		hostPath = strings.Join(parts[1:], ":")
-	} else {
-		if !pull {
-			return invalid, "", "", fail.InvalidRequestError("failed to find a remote host in the request")
-		}
-		localPath = to
-	}
-
-	timings, xerr := handler.job.Service().Timings()
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-
-	if pull {
-		retcode, stdout, stderr, xerr = hostInstance.Pull(handler.job.Context(), hostPath, localPath, timings.HostLongOperationTimeout())
-	} else {
-		retcode, stdout, stderr, xerr = hostInstance.Push(handler.job.Context(), localPath, hostPath, owner, mode, timings.HostLongOperationTimeout())
-	}
-	if xerr != nil {
-		return invalid, "", "", xerr
-	}
-	if retcode != 0 {
-		return retcode, stdout, stderr, fail.NewError("copy failed: retcode=%d: %s", retcode, stderr)
-	}
-
-	return retcode, stdout, stderr, nil
-}
-
-*/

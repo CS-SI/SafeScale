@@ -2,7 +2,7 @@
 // +build integration,sharetests allintegration
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,23 +47,11 @@ func Standard(t *testing.T) {
 	fmt.Println(out)
 	require.Nil(t, err)
 
-	// Note: we are not testing network here, so no need to check that same network cannot be created
-	// out, err = helpers.GetOutput("safescale network create " + names.Networks[0] + " --cidr 192.168.40.0/24")
-	// fmt.Println(out)
-	// require.NotNil(t, err)
-	// require.True(t, strings.Contains(out, "already exist"))
-
 	fmt.Println("Creating VM " + names.Hosts[0])
 
 	out, err = helpers.GetOutput("safescale host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-
-	// Note: we are not testing host here, so no need to check that same host cannot be created
-	// out, err = helpers.GetOutput("safescale host create " + names.Hosts[0] + " --public --net " + names.Networks[0])
-	// fmt.Println(out)
-	// require.NotNil(t, err)
-	// require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
 	out, err = helpers.GetOutput("safescale host inspect " + names.Hosts[0] + " | jq -r .result")
 	fmt.Println(out)
@@ -77,12 +65,6 @@ func Standard(t *testing.T) {
 	out, err = helpers.GetOutput("safescale host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
 	fmt.Println(out)
 	require.Nil(t, err)
-
-	// Note: we are not testing host here, so no need to check that same host cannot be created
-	// out, err = helpers.GetOutput("safescale host create " + names.Hosts[1] + " --public --net " + names.Networks[0])
-	// fmt.Println(out)
-	// require.NotNil(t, err)
-	// require.True(t, strings.Contains(out, "already exist") || strings.Contains(out, "already used"))
 
 	out, err = helpers.GetOutput("safescale share list")
 	fmt.Println(out)

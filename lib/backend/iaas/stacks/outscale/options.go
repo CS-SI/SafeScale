@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,10 +47,6 @@ func (s stack) GetRawConfigurationOptions(context.Context) (stacks.Configuration
 		DefaultSecurityGroupName: "",
 		DefaultNetworkName:       "",
 		DefaultNetworkCIDR:       "",
-		WhitelistTemplateRegexp:  nil,
-		BlacklistTemplateRegexp:  nil,
-		WhitelistImageRegexp:     nil,
-		BlacklistImageRegexp:     nil,
 		MaxLifeTime:              0,
 		Timings:                  s.Options.Timings,
 		Safe:                     s.Options.Compute.Safe,

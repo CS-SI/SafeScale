@@ -2,7 +2,7 @@
 // +build !debug
 
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,4 +29,8 @@ func InjectPlannedError(in error, calldepth ...int) (err error) {
 
 func InjectPlannedFail(in fail.Error, calldepth ...int) fail.Error {
 	return in
+}
+
+func SetupError(spec string) error {
+	return nil
 }

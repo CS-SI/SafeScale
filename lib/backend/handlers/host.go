@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -65,11 +64,11 @@ type HostHandler interface {
 
 // hostHandler is an implementation of interface HostHandler
 type hostHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewHostHandler is the constructor for HostHandler
-func NewHostHandler(job server.Job) HostHandler {
+func NewHostHandler(job backend.Job) HostHandler {
 	return &hostHandler{job}
 }
 
@@ -88,10 +87,6 @@ func (handler *hostHandler) Start(ref string) (ferr fail.Error) {
 	if ref == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -122,10 +117,6 @@ func (handler *hostHandler) Stop(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
 		return xerr
@@ -154,10 +145,6 @@ func (handler *hostHandler) Reboot(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
 		return xerr
@@ -184,15 +171,10 @@ func (handler *hostHandler) List(all bool) (_ abstract.HostList, ferr fail.Error
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	return hostfactory.List(handler.job.Context(), handler.job.Service(), all)
 }
 
 // Create creates a new host
-// Note: returned resources.Host has to be .Released() by caller
 func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.HostSizingRequirements) (_ resources.Host, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -204,10 +186,6 @@ func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.Hos
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "('%s')", req.ResourceName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.New(handler.job.Service())
 	if xerr != nil {
@@ -237,10 +215,6 @@ func (handler *hostHandler) Status(ref string) (_ hoststate.Enum, ferr fail.Erro
 	if ref == "" {
 		return hoststate.Unknown, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
@@ -297,10 +271,6 @@ func (handler *hostHandler) Delete(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", ref).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
 	if xerr != nil {
 		return xerr
@@ -332,10 +302,6 @@ func (handler *hostHandler) BindSecurityGroup(hostRef, sgRef string, enable reso
 	if sgRef == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -374,10 +340,6 @@ func (handler *hostHandler) UnbindSecurityGroup(hostRef, sgRef string) (ferr fai
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
 		return xerr
@@ -409,10 +371,6 @@ func (handler *hostHandler) EnableSecurityGroup(hostRef, sgRef string) (ferr fai
 	if sgRef == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -450,10 +408,6 @@ func (handler *hostHandler) DisableSecurityGroup(hostRef, sgRef string) (ferr fa
 	if sgRef == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, sgRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
@@ -511,10 +465,6 @@ func (handler *hostHandler) ListSecurityGroups(hostRef string) (_ []*propertiesv
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s)", hostRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
@@ -532,17 +482,13 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, kind=%s)", hostRef, kind).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	var list []*protocol.LabelInspectResponse
-	xerr = hostInstance.Review(handler.job.Context(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = hostInstance.Inspect(handler.job.Context(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
 			hlV1, ok := clonable.(*propertiesv1.HostLabels)
 			if !ok {
@@ -584,10 +530,6 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 		return nil, "", fail.InvalidParameterCannotBeEmptyStringError("labelRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
 		return nil, "", xerr
@@ -599,7 +541,7 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 	}
 
 	var outValue string
-	xerr = labelInstance.Review(handler.job.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = labelInstance.Inspect(handler.job.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			lhV1, ok := clonable.(*propertiesv1.LabelHosts)
 			if !ok {
@@ -643,10 +585,6 @@ func (handler *hostHandler) BindLabel(hostRef, labelRef, value string) (ferr fai
 		return fail.InvalidParameterCannotBeEmptyStringError("labelRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
 		return xerr
@@ -683,10 +621,6 @@ func (handler *hostHandler) UnbindLabel(hostRef, labelRef string) (ferr fail.Err
 		return fail.InvalidParameterCannotBeEmptyStringError("labelRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
 		return xerr
@@ -717,10 +651,6 @@ func (handler *hostHandler) UpdateLabel(hostRef, labelRef, value string) (ferr f
 		return fail.InvalidRequestError("neither name nor id given as reference of Label")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {
 		return xerr
@@ -750,10 +680,6 @@ func (handler *hostHandler) ResetLabel(hostRef, labelRef string) (ferr fail.Erro
 	if labelRef == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("labelRef")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.host"), "(%s, %s)", hostRef, labelRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
 	if xerr != nil {

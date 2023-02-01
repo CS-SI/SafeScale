@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,15 +20,12 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	clusterfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/cluster"
 	featurefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/feature"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
-	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 //go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/backend/handlers.FeatureHandler -o mocks/mock_feature.go
@@ -37,23 +34,20 @@ import (
 type FeatureHandler interface {
 	Add(featuretargettype.Enum, string, string, data.Map, resources.FeatureSettings) fail.Error
 	Check(featuretargettype.Enum, string, string, data.Map, resources.FeatureSettings) fail.Error
-	Export(featuretargettype.Enum, string, string, bool) (*protocol.FeatureExportResponse, fail.Error)
-	Inspect(featuretargettype.Enum, string, string) (resources.Feature, fail.Error)
 	List(featuretargettype.Enum, string, bool) ([]resources.Feature, fail.Error)
 	Remove(featuretargettype.Enum, string, string, data.Map, resources.FeatureSettings) fail.Error
 }
 
 // featureHandler is an implementation of FeatureHandler
 type featureHandler struct {
-	job server.Job
+	job backend.Job
 }
 
-func NewFeatureHandler(job server.Job) FeatureHandler {
+func NewFeatureHandler(job backend.Job) FeatureHandler {
 	return &featureHandler{job: job}
 }
 
 // List ...
-// Note: returned []resources.Feature must be .Released by caller
 func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef string, installedOnly bool) (_ []resources.Feature, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -68,10 +62,6 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 	if targetRef == "" {
 		return nil, fail.InvalidParameterError("in.TargetRef", "neither Name nor ID fields are provided")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s)", targetType, targetRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	switch targetType {
 	case featuretargettype.Host:
@@ -109,122 +99,6 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 		}
 
 		return list, nil
-	}
-
-	// Should not reach this
-	return nil, fail.InconsistentError("reached theoretically unreachable point")
-}
-
-// Inspect ...
-// Note: returned resources.Feature must be .Released() by the caller
-func (handler *featureHandler) Inspect(targetType featuretargettype.Enum, targetRef, featureName string) (_ resources.Feature, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
-	if handler == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if targetRef == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("targetRef")
-	}
-	if featureName == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("featureName")
-	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
-	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if valid.IsNil(feat) {
-		return nil, fail.InconsistentError("invalid feature %s", featureName)
-	}
-
-	switch targetType {
-	case featuretargettype.Host:
-		_ /*hostInstance*/, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		return nil, fail.NotImplementedError()
-
-	case featuretargettype.Cluster:
-		_ /*clusterInstance*/, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		return nil, fail.NotImplementedError()
-
-	default:
-		return nil, fail.InvalidParameterError("targetType", "invalid value %d", targetType)
-	}
-}
-
-// Export exports the content of the feature file
-func (handler *featureHandler) Export(targetType featuretargettype.Enum, targetRef, featureName string, embedded bool) (_ *protocol.FeatureExportResponse, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
-	if handler == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if targetRef == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("targetRef")
-	}
-	if featureName == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("featureName")
-	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
-	var (
-		feat resources.Feature
-		xerr fail.Error
-	)
-	if embedded {
-		feat, xerr = featurefactory.NewEmbedded(handler.job.Context(), handler.job.Service(), featureName)
-	} else {
-		feat, xerr = featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
-	}
-	if xerr != nil {
-		return nil, xerr
-	}
-	if valid.IsNil(feat) {
-		return nil, fail.InconsistentError("invalid feature: %s", featureName)
-	}
-
-	switch targetType {
-	case featuretargettype.Host:
-		_ /*hostInstance*/, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		return nil, fail.NotImplementedError()
-
-	case featuretargettype.Cluster:
-		_ /*clusterInstance*/, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		return nil, fail.NotImplementedError()
-
 	default:
 		return nil, fail.InvalidParameterError("targetType", "invalid value %d", targetType)
 	}
@@ -249,10 +123,6 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
 	if xerr != nil {
 		return xerr
@@ -263,6 +133,14 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
 		if xerr != nil {
 			return xerr
+		}
+
+		st, xerr := hostInstance.ForceGetState(handler.job.Context())
+		if xerr != nil {
+			return xerr
+		}
+		if st != hoststate.Started {
+			return fail.NewError("Host MUST be in started state in order to check a feature")
 		}
 
 		results, xerr := feat.Check(handler.job.Context(), hostInstance, variables, settings)
@@ -337,10 +215,6 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
 	if xerr != nil {
 		return xerr
@@ -351,6 +225,14 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
 		if xerr != nil {
 			return xerr
+		}
+
+		st, xerr := hostInstance.ForceGetState(handler.job.Context())
+		if xerr != nil {
+			return xerr
+		}
+		if st != hoststate.Started {
+			return fail.NewError("Host MUST be in started state in order to add a feature")
 		}
 
 		results, xerr := feat.Add(handler.job.Context(), hostInstance, variables, settings)
@@ -401,10 +283,6 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.feature"), "(%s, %s, %s)", targetType.String(), targetRef, featureName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
 	if xerr != nil {
 		return xerr
@@ -415,6 +293,14 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
 		if xerr != nil {
 			return xerr
+		}
+
+		st, xerr := hostInstance.ForceGetState(handler.job.Context())
+		if xerr != nil {
+			return xerr
+		}
+		if st != hoststate.Started {
+			return fail.NewError("Host MUST be in started state in order to remove a feature")
 		}
 
 		results, xerr := feat.Remove(handler.job.Context(), hostInstance, variables, settings)

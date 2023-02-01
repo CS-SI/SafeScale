@@ -7,15 +7,17 @@ on:
       - develop
       - 'review/**'
       - 'release/**'
+      - 'pr/**'
   pull_request:
     branches:
       - master
       - develop
       - 'review/**'
       - 'release/**'
+      - 'pr/**'
 
 env:
-  GOVERSION: '1.17.12' # The Go version to download (if necessary) and use.
+  GOVERSION: '1.18.4' # The Go version to download (if necessary) and use.
   PROTOCVERSION: 3.17.3
 
 jobs:

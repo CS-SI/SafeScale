@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ import (
 	networkfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/network"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/sirupsen/logrus"
@@ -48,11 +47,11 @@ type NetworkHandler interface {
 
 // networkHandler is one implementation of NetworkHandler interface
 type networkHandler struct {
-	job server.Job
+	job backend.Job
 }
 
 // NewNetworkHandler returns an instance of *networkHandler that satisfies interface NetworkHandler
-func NewNetworkHandler(job server.Job) NetworkHandler {
+func NewNetworkHandler(job backend.Job) NetworkHandler {
 	return &networkHandler{job}
 }
 
@@ -72,10 +71,6 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 	if networkReq.Name == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkReq.Name")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), true, "('%s')", networkReq.Name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	if networkReq.CIDR == "" {
 		networkReq.CIDR = defaultCIDR
@@ -157,10 +152,6 @@ func (handler *networkHandler) List(all bool) (_ []*abstract.Network, ferr fail.
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.network"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	if all {
 		return handler.job.Service().ListNetworks(handler.job.Context())
 	}
@@ -185,10 +176,6 @@ func (handler *networkHandler) Inspect(networkRef string) (_ resources.Network, 
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
 	return networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
 }
 
@@ -211,10 +198,6 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 	if force {
 		logrus.Tracef("forcing network deletion")
 	}
-
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.network"), "('%s')", networkRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
 	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
 	if xerr != nil {

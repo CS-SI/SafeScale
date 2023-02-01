@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -396,6 +396,12 @@ func DefaultNotifierWithContext(ctx context.Context) (func(t Try, v verdict.Enum
 
 	ctxID := ""
 
+	if aID := ctx.Value("ID"); aID != nil {
+		if aVal, ok := aID.(string); ok {
+			ctxID = aVal
+		}
+	}
+
 	if ctxID == "" {
 		return func(t Try, v verdict.Enum) {
 			switch v {
@@ -461,41 +467,6 @@ func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duratio
 			Officer: BackoffSelector()(delay),
 			Run:     run,
 			Notify:  nil,
-			Timeout: timeout,
-			Other:   make(map[string]interface{}),
-		},
-	)
-}
-
-// WhileSuccessfulWithNotify retries while 'run' is successful (ie 'run' returns an error == nil),
-// waiting a duration of 'delay' after each try, expiring after a duration of 'timeout'.
-// 'notify' is called after each try for feedback.
-func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
-	if delay > timeout && timeout != 0 {
-		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
-		delay = timeout / 2
-	}
-
-	if notify == nil {
-		return fail.InvalidParameterError("notify", "cannot be nil!")
-	}
-
-	if delay <= 0 {
-		delay = time.Second
-	}
-	var arbiter Arbiter
-	if timeout <= 0 {
-		arbiter = Successful()
-	} else {
-		arbiter = PrevailDone(Successful(), Timeout(timeout))
-	}
-	selector := DefaultTimeoutSelector()
-	return selector(
-		action{
-			Arbiter: arbiter,
-			Officer: BackoffSelector()(delay),
-			Run:     run,
-			Notify:  notify,
 			Timeout: timeout,
 			Other:   make(map[string]interface{}),
 		},

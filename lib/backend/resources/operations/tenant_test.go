@@ -1,5 +1,5 @@
 /*
-* Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+* Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -22,8 +22,30 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	mapset "github.com/deckarep/golang-set"
 )
+
+func Test_MapSet(t *testing.T) {
+	joder := mapset.NewSet()
+
+	var caps []string
+
+	var rey []string = []string{"a", "b", "brother", "cholera", "b", "brother"}
+	for _, v := range rey {
+		joder.Add(v)
+	}
+
+	ite := joder.Iter()
+	for v := range ite {
+		caps = append(caps, v.(string))
+	}
+
+	assert.Equal(t, 4, joder.Cardinality())
+	assert.Equal(t, 4, len(caps))
+}
 
 func Test_CurrentTenant(t *testing.T) {
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"reflect"
 	"strings"
 
@@ -36,8 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -79,7 +78,7 @@ func (s *HostListener) Start(inctx context.Context, in *protocol.Reference) (emp
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
@@ -92,11 +91,6 @@ func (s *HostListener) Start(inctx context.Context, in *protocol.Reference) (emp
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.Start(ref)
@@ -117,7 +111,7 @@ func (s *HostListener) Stop(inctx context.Context, in *protocol.Reference) (empt
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx").ToGRPCStatus()
 	}
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, fail.InvalidRequestError("neither name nor id of host has been provided")
 	}
@@ -127,11 +121,6 @@ func (s *HostListener) Stop(inctx context.Context, in *protocol.Reference) (empt
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.Stop(ref)
@@ -150,7 +139,7 @@ func (s *HostListener) Reboot(inctx context.Context, in *protocol.Reference) (em
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, fail.InvalidRequestError("neither name nor id of host has been provided")
 	}
@@ -160,11 +149,6 @@ func (s *HostListener) Reboot(inctx context.Context, in *protocol.Reference) (em
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.Reboot(ref)
@@ -190,11 +174,6 @@ func (s *HostListener) List(inctx context.Context, in *protocol.HostListRequest)
 	defer job.Close()
 
 	all := in.GetAll()
-	ctx := job.Context()
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	hosts, xerr := handler.List(all)
@@ -235,9 +214,6 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	var sizing *abstract.HostSizingRequirements
 	if in.SizingAsString != "" {
@@ -270,7 +246,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 				return nil, xerr
 			}
 
-			xerr = subnetInstance.Review(ctx,
+			xerr = subnetInstance.Inspect(ctx,
 				func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					as, ok := clonable.(*abstract.Subnet)
 					if !ok {
@@ -294,7 +270,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 			return nil, xerr
 		}
 
-		xerr = subnetInstance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		xerr = subnetInstance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -352,7 +328,7 @@ func (s *HostListener) Status(inctx context.Context, in *protocol.Reference) (ht
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference").ToGRPCStatus()
 	}
@@ -362,11 +338,6 @@ func (s *HostListener) Status(inctx context.Context, in *protocol.Reference) (ht
 		return nil, err
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	state, xerr := handler.Status(ref)
@@ -390,7 +361,7 @@ func (s *HostListener) Inspect(inctx context.Context, in *protocol.Reference) (h
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -402,9 +373,6 @@ func (s *HostListener) Inspect(inctx context.Context, in *protocol.Reference) (h
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	hostInstance, xerr := handler.Inspect(ref)
@@ -422,7 +390,7 @@ func (s *HostListener) Inspect(inctx context.Context, in *protocol.Reference) (h
 }
 
 // Delete a host
-func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *HostListener) Delete(inctx context.Context, in *protocol.HostDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete host")
 	defer fail.OnPanic(&err)
@@ -438,7 +406,11 @@ func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (em
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(&protocol.Reference{
+		TenantId: in.GetTenantId(),
+		Id:       in.GetId(),
+		Name:     in.GetName(),
+	})
 	if ref == "" {
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
 	}
@@ -448,12 +420,6 @@ func (s *HostListener) Delete(inctx context.Context, in *protocol.Reference) (em
 		return nil, err
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.Delete(ref)
@@ -487,9 +453,6 @@ func (s *HostListener) SSH(inctx context.Context, in *protocol.Reference) (_ *pr
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	sshHandler := handlers.NewSSHHandler(job)
 	sshConfig, xerr := sshHandler.GetConfig(ref)
@@ -497,7 +460,7 @@ func (s *HostListener) SSH(inctx context.Context, in *protocol.Reference) (_ *pr
 		return nil, xerr
 	}
 
-	tracer.Trace("SSH config of host %s successfully loaded: %s", refLabel, spew.Sdump(sshConfig))
+	logrus.WithContext(ctx).Tracef("SSH config of host %s successfully loaded: %s", refLabel, spew.Sdump(sshConfig))
 	cfg, xerr := sshConfig.Config()
 	if xerr != nil {
 		return nil, xerr
@@ -522,12 +485,12 @@ func (s *HostListener) BindSecurityGroup(inctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	hostRef, _ := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Host")
 	}
 
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	sgRef, _ := srvutils.GetReference(in.GetGroup())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
@@ -539,11 +502,6 @@ func (s *HostListener) BindSecurityGroup(inctx context.Context, in *protocol.Sec
 		return empty, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
@@ -574,12 +532,12 @@ func (s *HostListener) UnbindSecurityGroup(inctx context.Context, in *protocol.S
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	hostRef, _ := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of host")
 	}
 
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	sgRef, _ := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
@@ -591,11 +549,6 @@ func (s *HostListener) UnbindSecurityGroup(inctx context.Context, in *protocol.S
 		return empty, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.UnbindSecurityGroup(hostRef, sgRef)
@@ -618,12 +571,12 @@ func (s *HostListener) EnableSecurityGroup(inctx context.Context, in *protocol.S
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	hostRef, _ := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of host")
 	}
 
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	sgRef, _ := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
@@ -633,11 +586,6 @@ func (s *HostListener) EnableSecurityGroup(inctx context.Context, in *protocol.S
 		return empty, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.EnableSecurityGroup(hostRef, sgRef)
@@ -660,12 +608,12 @@ func (s *HostListener) DisableSecurityGroup(inctx context.Context, in *protocol.
 		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	hostRef, _ := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of host")
 	}
 
-	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	sgRef, _ := srvutils.GetReference(in.GetGroup())
 	if sgRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
@@ -676,11 +624,6 @@ func (s *HostListener) DisableSecurityGroup(inctx context.Context, in *protocol.
 	}
 	defer job.Close()
 
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
 	handler := handlers.NewHostHandler(job)
 	return empty, handler.EnableSecurityGroup(hostRef, sgRef)
 }
@@ -688,7 +631,7 @@ func (s *HostListener) DisableSecurityGroup(inctx context.Context, in *protocol.
 // ListSecurityGroups applies a Security Group already attached (if not already applied)
 func (s *HostListener) ListSecurityGroups(inctx context.Context, in *protocol.SecurityGroupHostBindRequest) (_ *protocol.SecurityGroupBondsResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot disable security group on host")
+	defer fail.OnExitWrapError(inctx, &err, "cannot list security group on host")
 	defer fail.OnPanic(&err)
 
 	if s == nil {
@@ -701,7 +644,7 @@ func (s *HostListener) ListSecurityGroups(inctx context.Context, in *protocol.Se
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	hostRef, _ := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
@@ -711,11 +654,6 @@ func (s *HostListener) ListSecurityGroups(inctx context.Context, in *protocol.Se
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s)", hostRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewHostHandler(job)
 	bonds, xerr := handler.ListSecurityGroups(hostRef)
@@ -742,7 +680,7 @@ func (s *HostListener) ListLabels(inctx context.Context, in *protocol.LabelBound
 		return nil, fail.InvalidParameterCannotBeNilError("inctx").ToGRPCStatus()
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	hostRef, _ := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
@@ -753,11 +691,6 @@ func (s *HostListener) ListLabels(inctx context.Context, in *protocol.LabelBound
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, kind=%s)", hostRefLabel, kind).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	hostHandler := handlers.NewHostHandler(job)
 	list, xerr := hostHandler.ListLabels(hostRef, kind)
@@ -794,12 +727,12 @@ func (s *HostListener) InspectLabel(inctx context.Context, in *protocol.HostLabe
 		return nil, fail.InvalidParameterCannotBeNilError("inctx").ToGRPCStatus()
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	hostRef, _ := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
 
-	labelRef, labelRefLabel := srvutils.GetReference(in.GetLabel())
+	labelRef, _ := srvutils.GetReference(in.GetLabel())
 	if labelRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Label")
 	}
@@ -811,9 +744,6 @@ func (s *HostListener) InspectLabel(inctx context.Context, in *protocol.HostLabe
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	hostHandler := handlers.NewHostHandler(job)
 	labelInstance, hostValue, xerr := hostHandler.InspectLabel(hostRef, labelRef)
@@ -868,18 +798,13 @@ func (s *HostListener) BindLabel(inctx context.Context, in *protocol.LabelBindRe
 	}
 	defer job.Close()
 
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
 	hostHandler := handlers.NewHostHandler(job)
 	xerr = hostHandler.BindLabel(hostRef, labelRef, in.GetValue())
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	tracer.Trace("Label %s successfully bound to Host %s", labelRefLabel, hostRefLabel)
+	logrus.WithContext(job.Context()).Tracef("Label %s successfully bound to Host %s", labelRefLabel, hostRefLabel)
 	return empty, nil
 }
 
@@ -916,9 +841,6 @@ func (s *HostListener) UnbindLabel(inctx context.Context, in *protocol.LabelBind
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	hostHandler := handlers.NewHostHandler(job)
 	xerr = hostHandler.UnbindLabel(hostRef, labelRef)
@@ -926,7 +848,7 @@ func (s *HostListener) UnbindLabel(inctx context.Context, in *protocol.LabelBind
 		return empty, xerr
 	}
 
-	tracer.Trace("Label %s successfully unbound from Host %s", hostRefLabel, labelRefLabel)
+	logrus.WithContext(ctx).Tracef("Label %s successfully unbound from Host %s", hostRefLabel, labelRefLabel)
 	return empty, nil
 }
 
@@ -963,9 +885,6 @@ func (s *HostListener) UpdateLabel(inctx context.Context, in *protocol.LabelBind
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	hostHandler := handlers.NewHostHandler(job)
 	xerr = hostHandler.UpdateLabel(hostRef, labelRef, in.GetValue())
@@ -973,7 +892,7 @@ func (s *HostListener) UpdateLabel(inctx context.Context, in *protocol.LabelBind
 		return empty, xerr
 	}
 
-	tracer.Trace("Value of Label %s successfully updated for Host %s", labelRefLabel, hostRefLabel)
+	logrus.WithContext(ctx).Tracef("Value of Label %s successfully updated for Host %s", labelRefLabel, hostRefLabel)
 	return empty, nil
 }
 
@@ -1010,9 +929,6 @@ func (s *HostListener) ResetLabel(inctx context.Context, in *protocol.LabelBindR
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, labelRefLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	hostHandler := handlers.NewHostHandler(job)
 	xerr = hostHandler.ResetLabel(hostRef, labelRef)
@@ -1020,6 +936,6 @@ func (s *HostListener) ResetLabel(inctx context.Context, in *protocol.LabelBindR
 		return empty, xerr
 	}
 
-	tracer.Trace("Value of Label %s for Host %s successfully reset to Label default value", hostRefLabel, labelRefLabel)
+	logrus.WithContext(ctx).Tracef("Value of Label %s for Host %s successfully reset to Label default value", hostRefLabel, labelRefLabel)
 	return empty, nil
 }

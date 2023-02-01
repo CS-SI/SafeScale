@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,10 +21,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
@@ -41,7 +39,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -75,111 +72,6 @@ func NewSecurityGroup(svc iaas.Service) (*SecurityGroup, fail.Error) {
 		MetadataCore: coreInstance,
 	}
 	return instance, nil
-}
-
-// LoadSecurityGroup ...
-func LoadSecurityGroup(
-	inctx context.Context, svc iaas.Service, ref string, options ...data.ImmutableKeyValue,
-) (*SecurityGroup, fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rTr  *SecurityGroup
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		ga, gerr := func() (_ *SecurityGroup, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			if svc == nil {
-				return nil, fail.InvalidParameterError("svc", "cannot be nil")
-			}
-			if ref == "" {
-				return nil, fail.InvalidParameterError("ref", "cannot be empty string")
-			}
-
-			// trick to avoid collisions
-			var kt *SecurityGroup
-			cacheref := fmt.Sprintf("%T/%s", kt, ref)
-
-			cache, xerr := svc.GetCache(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(*SecurityGroup)
-					if ok {
-						return casted, nil
-					}
-				}
-			}
-
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSGCacheMiss(ctx, svc, ref) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			var ok bool
-			sgInstance, ok := anon.(*SecurityGroup)
-			if !ok {
-				return nil, fail.InconsistentError("cache content should be a *SecurityGroup", ref)
-			}
-			if sgInstance == nil {
-				return nil, fail.InconsistentError("nil value found in Security Group cache for key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = sgInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, sgInstance.GetName()), sgInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-				hid, err := sgInstance.GetID()
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), sgInstance, &store.Options{Expiration: 120 * time.Minute})
-				if err != nil {
-					return nil, fail.ConvertError(err)
-				}
-				time.Sleep(50 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(*SecurityGroup)
-					if ok {
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.SecurityGroup")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("sg cache response (%s): %v", cacheref, xerr)
-				}
-			}
-
-			return sgInstance, nil
-		}()
-		chRes <- result{ga, gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.ConvertError(inctx.Err())
-	}
 }
 
 // onSGCacheMiss is called when there is no instance in cache of Security Group 'ref'
@@ -248,7 +140,6 @@ func (instance *SecurityGroup) carry(ctx context.Context, clonable data.Clonable
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -264,8 +155,7 @@ func (instance *SecurityGroup) Browse(
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Do not test with IsNull here, as Browse may be used from null value
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -293,7 +183,7 @@ func (instance *SecurityGroup) Browse(
 func (instance *SecurityGroup) Create(
 	inctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules,
 ) (_ fail.Error) {
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -331,9 +221,6 @@ func (instance *SecurityGroup) Create(
 				return ar, ar.rErr
 			}
 
-			tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.security-group"), "('%s')", name).WithStopwatch().Entering()
-			defer tracer.Exiting()
-
 			// Check if SecurityGroup exists and is managed by SafeScale
 			svc := instance.Service()
 			_, xerr := LoadSecurityGroup(ctx, svc, name)
@@ -363,7 +250,7 @@ func (instance *SecurityGroup) Create(
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotImplemented:
-					// not all providers implement security groups, and I do not want to see it even in !release mode, so no debug.IgnoreError()
+					debug.IgnoreError2(ctx, xerr)
 				case *fail.ErrNotFound:
 					// continue
 					debug.IgnoreError2(ctx, xerr)
@@ -512,6 +399,15 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (ferr fai
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
+
+	defer func() {
+		// drop the cache when we are done creating the cluster
+		if ka, err := instance.Service().GetCache(context.Background()); err == nil {
+			if ka != nil {
+				_ = ka.Clear(context.Background())
+			}
+		}
+	}()
 
 	return instance.unsafeDelete(ctx, force)
 }
@@ -692,7 +588,7 @@ func (instance *SecurityGroup) unbindFromSubnets(
 						}
 					}
 
-					xerr = subnetInstance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+					xerr = subnetInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 						return inspectFunc(props)
 					})
 					if xerr != nil {
@@ -947,11 +843,6 @@ func (instance *SecurityGroup) GetBoundSubnets(ctx context.Context) (
 	return list, xerr
 }
 
-// CheckConsistency checks the rules in the security group on provider side are identical to the ones registered in metadata
-func (instance *SecurityGroup) CheckConsistency(_ context.Context) fail.Error {
-	return fail.NotImplementedError() // FIXME: Technical debt
-}
-
 // ToProtocol converts a Security Group to protobuf message
 func (instance *SecurityGroup) ToProtocol(ctx context.Context) (_ *protocol.SecurityGroupResponse, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -1126,7 +1017,7 @@ func (instance *SecurityGroup) BindToSubnet(
 		return fail.InvalidParameterCannotBeNilError("rh")
 	}
 
-	xerr := subnetInstance.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := subnetInstance.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var subnetHosts *propertiesv1.SubnetHosts
 		innerXErr := props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
@@ -1287,7 +1178,7 @@ func (instance *SecurityGroup) UnbindFromSubnet(
 	}
 
 	var subnetHosts *propertiesv1.SubnetHosts
-	xerr := subnetInstance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := subnetInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
@@ -1349,7 +1240,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(
 					}
 					return nil
 				})
-			}, data.NewImmutableKeyValue("Reload", !params.onRemoval))
+			})
 			if xerr != nil {
 				return xerr
 			}

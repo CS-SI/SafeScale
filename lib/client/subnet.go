@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2022, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -240,63 +240,6 @@ func (s subnetConsumer) UnbindSecurityGroup(networkRef, subnetRef, sgRef string,
 	}
 	service := protocol.NewSubnetServiceClient(s.session.connection)
 	_, err := service.UnbindSecurityGroup(newCtx, req)
-	return err
-}
-
-// EnableSecurityGroup calls the gRPC server to enable a bound security group of a subnet
-func (s subnetConsumer) EnableSecurityGroup(networkRef, subnetRef, sgRef string, timeout time.Duration) error {
-	s.session.Connect()
-	defer s.session.Disconnect()
-
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return xerr
-	}
-
-	// finally, using context
-	newCtx := ctx
-	if timeout != 0 {
-		aCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		newCtx = aCtx
-	}
-
-	req := &protocol.SecurityGroupSubnetBindRequest{
-		Group:   &protocol.Reference{Name: sgRef},
-		Network: &protocol.Reference{Name: networkRef},
-		Subnet:  &protocol.Reference{Name: subnetRef},
-	}
-	service := protocol.NewSubnetServiceClient(s.session.connection)
-	_, err := service.EnableSecurityGroup(newCtx, req)
-	return err
-}
-
-// DisableSecurityGroup calls the gRPC server to disable a bound security group of a subnet
-func (s subnetConsumer) DisableSecurityGroup(networkRef, subnetRef, sgRef string, timeout time.Duration) error {
-	s.session.Connect()
-	defer s.session.Disconnect()
-
-	ctx, xerr := utils.GetContext(true)
-	if xerr != nil {
-		return xerr
-	}
-
-	// finally, using context
-	newCtx := ctx
-	if timeout != 0 {
-		aCtx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		newCtx = aCtx
-	}
-
-	service := protocol.NewSubnetServiceClient(s.session.connection)
-
-	req := &protocol.SecurityGroupSubnetBindRequest{
-		Group:   &protocol.Reference{Name: sgRef},
-		Network: &protocol.Reference{Name: networkRef},
-		Subnet:  &protocol.Reference{Name: subnetRef},
-	}
-	_, err := service.DisableSecurityGroup(newCtx, req)
 	return err
 }
 
