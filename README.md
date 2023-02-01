@@ -76,7 +76,7 @@ Supplemental software and/or configurations can be installed in 3 ways on SafeSc
 - using "SafeScale `Feature`", that can be seen as the "ansible" for SafeScale:
 
   ```
-  $ safescale cluster feature add mycluster keycloak
+  $ safescale cluster feature add mycluster ntpclient
   ```
 - and using ansible, which is the PREFERRED method to install your software in a SafeScale cluster:
   installing a simple script:
@@ -113,7 +113,6 @@ A `Feature` can describe operations using different methods:
 
 Additionally, a `Feature` is able to apply:
 - reverse proxy rules
-- Security Group rules
 
 ## Available features
 SafeScale is currently under active development and does not yet offer all the abilities planned. However, we are already publishing it with the following ones:
@@ -155,7 +154,7 @@ As much as possible, try following these guides:
 - [Go style guide](https://github.com/golang/go/wiki/CodeReviewComments)
 - [Effective Go](https://golang.org/doc/effective_go)
 
-For bugs and feature requests, [please create an issue](../../issues/new).
+For bugs and feature requests, [please create an issue](https://github.com/CS-SI/SafeScale/issues/new/choose).
 
 ## Build
   [See Build file](doc/build/BUILDING.md)

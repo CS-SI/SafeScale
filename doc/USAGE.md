@@ -1196,11 +1196,6 @@ The following actions are proposed:
   "status": "success"
 }
       </pre>
-      response on failure:
-      <pre>
-{
-  "error":
-      </pre>
   </td>
 </tr>
 <tr>
@@ -1229,11 +1224,6 @@ The following actions are proposed:
   "result":null,
   "status":"success"
 }
-      </pre>
-      response on failure:
-      <pre>
-{
-  "error": {
       </pre>
   </td>
 </tr>
