@@ -15,15 +15,15 @@ The command to create a Subnet takes this form:
 $ safescale network subnet create [options] <network reference> <subnet name>
 ```
 
-| Options      ||
-| ---          | --- |
-| `--cidr`     | Defines the CIDR to use. If not used, SafeScale will choose the first CIDR available by manipulating the netmask part of the Network CIDR.
-|              | For example, if the Network CIDR is set to 172.16.0.0/16, then SafeScale will search for an available CIDR in 172.16.0.0/17. |
-| `--gwname`   | Defines the name of the gateway (default: gw-<subnet name>) |
-| `--os`       | Defines the Image to use as Operating System |
-| `--sizing`   | Defines the sizing of the gateway |
-| `--failover` | Tells that 2 gateways and an internal Virtual IP have to be created. |
-|              | These gateways will work in primary/secondary mode, and the default route will be the IP address of the VIP |
+| Option      | Description                                                                                                             |
+| ---          |-------------------------------------------------------------------------------------------------------------------------|
+| `--cidr`    | Defines the CIDR to use. If not used, SafeScale will choose the first CIDR available by manipulating the netmask part of the Network CIDR. 
+|             | For example, if the Network CIDR is set to 172.16.0.0/16, then SafeScale will search for an available CIDR in 172.16.0.0/17. |
+| `--gwname`  | Defines the name of the gateway (default: gw-<subnet name>)                                                             |
+| `--os`      | Defines the Image to use as Operating System                                                                            |
+| `--sizing`  | Defines the sizing of the gateway                                                                                       |
+| `--failover` | Tells that 2 gateways and an internal Virtual IP have to be created.                                                    |
+|             | These gateways will work in primary/secondary mode, and the default route will be the IP address of the VIP             |
 | 
 
 Example:

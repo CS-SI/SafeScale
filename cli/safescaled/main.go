@@ -36,7 +36,6 @@ import (
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/listeners"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	appwide "github.com/CS-SI/SafeScale/v22/lib/utils/app"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -140,8 +139,6 @@ func work(c *cli.Context) {
 	// - /debug/metrics
 	// - /debug/fgprof
 	expose()
-
-	operations.StartFeatureFileWatcher()
 
 	version := Version + ", build " + Revision + " (" + BuildDate + ")"
 	if              //goland:noinspection GoBoolExpressions

@@ -35,7 +35,7 @@ type bashInstaller struct{}
 // Check checks if the Feature is installed, using the check script in Specs
 func (i *bashInstaller) Check(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("bashInstaller.Check")()
+	defer elapsed(ctx, "bashInstaller.Check")()
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")

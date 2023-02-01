@@ -274,7 +274,6 @@ func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(inctx context.Cont
 }
 
 // unsafeClear is the non goroutine-safe implementation for Clear, that does the real work faster (no locking, less if no parameter validations)
-// Note: must be used wisely
 func (instance *SecurityGroup) unsafeClear(inctx context.Context) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()

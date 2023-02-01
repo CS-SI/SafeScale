@@ -128,6 +128,11 @@ func (s stack) CreateSecurityGroup(ctx context.Context, networkRef, name, descri
 		}
 	}()
 
+	asg, xerr = s.InspectSecurityGroup(ctx, asg)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// In OpenStack, freshly created security group may contain default rules; we do not want them
 	asg, xerr = s.ClearSecurityGroup(ctx, asg)
 	if xerr != nil {
@@ -568,16 +573,4 @@ func (s stack) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Er
 	}
 
 	return cfg.DefaultSecurityGroupName, nil
-}
-
-// EnableSecurityGroup enables a Security Group
-// Does actually nothing for openstack
-func (s stack) EnableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
-	return fail.NotAvailableError("openstack cannot enable a Security Group")
-}
-
-// DisableSecurityGroup disables a Security Group
-// Does actually nothing for openstack
-func (s stack) DisableSecurityGroup(context.Context, *abstract.SecurityGroup) fail.Error {
-	return fail.NotAvailableError("openstack cannot disable a Security Group")
 }

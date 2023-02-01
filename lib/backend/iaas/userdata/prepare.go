@@ -1,3 +1,6 @@
+//go:build !debug
+// +build !debug
+
 /*
  * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
@@ -246,7 +249,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 
 	anon, ok := userdataScriptTemplates[phase]
 	if !ok {
-		return nil, fail.NotImplementedError("phase '%s' not managed", phase)
+		return nil, fail.InvalidParameterError("phase '%s' not managed", phase)
 	}
 
 	var tmpl *txttmpl.Template

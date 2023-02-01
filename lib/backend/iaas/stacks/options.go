@@ -17,8 +17,6 @@
 package stacks
 
 import (
-	"regexp"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
@@ -135,17 +133,6 @@ type ConfigurationOptions struct {
 
 	DefaultNetworkName string // contains the name of the Networking/VPC that is used by default (corresponds to keywords 'DefaultNetworkName' or 'NetworkName' in tenant section 'compute')
 	DefaultNetworkCIDR string // contains the CIDR of the default Networking/VPC
-
-	// Customizations map[string]string
-
-	// WhitelistTemplateRegexp contains the regexp string to white list host templates
-	WhitelistTemplateRegexp *regexp.Regexp
-	// BlacklistTemplateRegexp contains the regexp string to black list host templates
-	BlacklistTemplateRegexp *regexp.Regexp
-	// WhitelistImageRegexp contains the regexp string to white list images
-	WhitelistImageRegexp *regexp.Regexp
-	// BlacklistImageRegexp contains the regexp string to black list images
-	BlacklistImageRegexp *regexp.Regexp
 
 	MaxLifeTime int
 

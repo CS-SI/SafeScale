@@ -26,10 +26,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func elapsed(what string) func() { // nolint
+func elapsed(ctx context.Context, what string) func() { // nolint
 	start := time.Now()
-	logrus.WithContext(context.Background()).Debugf("starting %s", what)
+	logrus.WithContext(ctx).Debugf("starting %s", what)
 	return func() {
-		logrus.WithContext(context.Background()).Debugf("%s took %v\n", what, time.Since(start))
+		logrus.WithContext(ctx).Debugf("%s took %v\n", what, time.Since(start))
 	}
 }

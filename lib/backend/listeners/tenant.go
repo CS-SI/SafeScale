@@ -24,8 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -34,8 +32,6 @@ import (
 type TenantListener struct {
 	protocol.UnimplementedTenantServiceServer
 }
-
-// VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
 
 // List lists registered tenants
 func (s *TenantListener) List(inctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {
@@ -124,49 +120,6 @@ func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantName) (em
 	return empty, nil
 }
 
-// Cleanup removes everything corresponding to SafeScale from tenant (metadata in particular)
-func (s *TenantListener) Cleanup(inctx context.Context, in *protocol.TenantCleanupRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot cleanup tenant")
-
-	empty = &googleprotobuf.Empty{}
-	if s == nil {
-		return empty, fail.InvalidInstanceError()
-	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterError("inctx", "cannot be nil")
-	}
-	if in == nil {
-		return empty, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	name := in.GetName()
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("tenant/%s/metadata/delete", name))
-	if xerr != nil {
-		return nil, xerr
-	}
-	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
-	currentTenant := operations.CurrentTenant(ctx)
-	if currentTenant != nil && currentTenant.Name == in.GetName() {
-		return empty, nil
-	}
-
-	// no need to set metadataVersion in UseService, we will remove content...
-	service, xerr := iaas.UseService(ctx, in.GetName(), "")
-	if xerr != nil {
-		return empty, xerr
-	}
-
-	xerr = service.TenantCleanup(ctx, in.Force)
-	return empty, xerr
-}
-
 // Scan proceeds a scan of host corresponding to each template to gather real data(metadata in particular)
 func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequest) (_ *protocol.ScanResultList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
@@ -185,11 +138,6 @@ func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequ
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewTenantHandler(job)
 	var resultList *protocol.ScanResultList
@@ -219,11 +167,6 @@ func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName)
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	handler := handlers.NewTenantHandler(job)
 	tenantInfo, err := handler.Inspect(name)

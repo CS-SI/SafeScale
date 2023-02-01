@@ -34,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -113,7 +112,6 @@ func (instance *label) carry(ctx context.Context, clonable data.Clonable) (ferr 
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	// Note: do not validate parameters, this call will do it
 	xerr := instance.MetadataCore.Carry(ctx, clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -127,8 +125,7 @@ func (instance *label) carry(ctx context.Context, clonable data.Clonable) (ferr 
 func (instance *label) Browse(ctx context.Context, callback func(*abstract.Label) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
-	if instance == nil {
+	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -137,9 +134,6 @@ func (instance *label) Browse(ctx context.Context, callback func(*abstract.Label
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label")).Entering()
-	defer tracer.Exiting()
 
 	return instance.MetadataCore.BrowseFolder(ctx, func(buf []byte) fail.Error {
 		at := abstract.NewLabel()
@@ -171,9 +165,6 @@ func (instance *label) Delete(inctx context.Context) fail.Error {
 		}
 	}()
 
-	tracer := debug.NewTracer(inctx, tracing.ShouldTrace("resources.label")).Entering()
-	defer tracer.Exiting()
-
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -186,7 +177,7 @@ func (instance *label) Delete(inctx context.Context) fail.Error {
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			xerr := instance.Review(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 					lhV1, ok := clonable.(*propertiesv1.LabelHosts)
 					if !ok {
@@ -249,7 +240,7 @@ func (instance *label) Delete(inctx context.Context) fail.Error {
 func (instance *label) Create(ctx context.Context, name string, hasDefault bool, defaultValue string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	// NOTE: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -261,9 +252,6 @@ func (instance *label) Create(ctx context.Context, name string, hasDefault bool,
 	if ctx == nil {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "('%s')", name).Entering()
-	defer tracer.Exiting()
 
 	var kind string
 	switch hasDefault {
@@ -364,7 +352,7 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 // IsTag tells of the Label represents a Tag (ie a Label that does not carry a default value)
 func (instance label) IsTag(ctx context.Context) (bool, fail.Error) {
 	var out bool
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		alabel, ok := clonable.(*abstract.Label)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -383,7 +371,7 @@ func (instance label) IsTag(ctx context.Context) (bool, fail.Error) {
 // DefaultValue returns the default value of the Label
 func (instance label) DefaultValue(ctx context.Context) (string, fail.Error) {
 	var out string
-	xerr := instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		alabel, ok := clonable.(*abstract.Label)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Label' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -411,8 +399,23 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 		return fail.InvalidParameterError("hostInstance", "cannot be null value of 'resources.Host'")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "('%s', '%s')", instance.GetName(), hostInstance.GetName()).Entering()
-	defer tracer.Exiting()
+	if does, _ := hostInstance.Exists(ctx); does {
+		xerr := hostInstance.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			ahc, ok := clonable.(*abstract.HostCore)
+			if !ok {
+				return fail.InconsistentError(
+					"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
+				)
+			}
+
+			ahc.Tags[instance.GetName()] = value
+			return nil
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+	}
 
 	xerr := instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		alabel, ok := clonable.(*abstract.Label)
@@ -454,7 +457,6 @@ func (instance *label) BindToHost(ctx context.Context, hostInstance resources.Ho
 }
 
 // UnbindFromHost removes Host from Label metadata, unbinding Host from Label
-// Note: still need to call Host.UnbindLabel to remove reference of Label in Host...
 func (instance *label) UnbindFromHost(ctx context.Context, hostInstance resources.Host) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
@@ -466,8 +468,25 @@ func (instance *label) UnbindFromHost(ctx context.Context, hostInstance resource
 		return fail.InvalidParameterError("hostInstance", "cannot be null value of 'resources.Host'")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.label"), "(label='%s', host='%s')", instance.GetName(), hostInstance.GetName()).Entering()
-	defer tracer.Exiting()
+	if v, k := ctx.Value("cleanup").(bool); !v && k {
+		if does, _ := hostInstance.Exists(ctx); does {
+			xerr := hostInstance.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				ahc, ok := clonable.(*abstract.HostCore)
+				if !ok {
+					return fail.InconsistentError(
+						"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
+					)
+				}
+
+				delete(ahc.Tags, instance.GetName())
+				return nil
+			})
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+		}
+	}
 
 	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {

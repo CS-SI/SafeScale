@@ -15,13 +15,11 @@ feature | description | specificities
 `docker` |  Install docker and docker-compose     |
 `ntpclient` |  Install NTP client     |
 `ntpserver` |  Install NTP server     |
-`remotedesktop` |  Install a remote desktop using guacamole with tigerVNC and xfce desktop   |  On a cluster a remote desktop will be installed on all masters. In this context, Username is automatically set to `cladm` and the associated password is stored in the cluster information, viewable with `safescale cluster inspect <cluster_name>`<br><br>When installed on single host, youy will need to set these parameters (this corresponding user must exist on the host before installation of the feature): <br> `Username="existing_user"` <br> `Password="user_password"`
-`edgeproxy4subnet` |  Install a Kong reverse proxy for SafeScale use<br>Corresponds to `reverseproxy`  | Automatically installed on gateways of clusters
+`remotedesktop` |  Install a remote desktop using guacamole with tigerVNC and xfce desktop   |  On a cluster a remote desktop will be installed on all masters. In this context, Username is automatically set to `cladm` and the associated password is stored in the cluster information, viewable with `safescale cluster inspect <cluster_name>`<br><br>When installed on single host, you will need to set these parameters (this corresponding user must exist on the host before installation of the feature): <br> `Username="existing_user"` <br> `Password="user_password"`
+`edgeproxy4subnet` |  Install a Kong reverse proxy for SafeScale use<br>Corresponds to `reverseproxy`  | Only available for clusters
 `postgresql4gateway` |  Install a postgresql v9 server on gateways  | Dependency of `edgeproxy4subnet`
 `kubernetes` |  Install and configure a kubernetes cluster   |  Only available for clusters
 `helm3` |   Install helm packet manager v3  |  Only meaningful on a kubernetes flavored cluster
-
-_Note_: the `edgeproxy4subnet` feature is automatically installed on the gateway when a cluster is created by SafeScale.
 
 ## How to install a feature
 
@@ -41,8 +39,8 @@ _Note 2_: it's possible to use subfolder(s) inside ```features``` folder; when u
 
 ### feature.yaml file
 
-Features are provided as a yaml file which is detailing where, how and which code should be exectuted to check installation, install or remove the tool
-The file have to follow this struture.
+Features are provided as a yaml file which is detailing where, how and which code should be executed to check installation, install or remove the tool
+The file have to follow this structure.
 
 ```
 ---
@@ -58,13 +56,13 @@ feature:
         - mandatory_parameter1
         - ...
     install:
-        <apt | bash | yum>:
+        bash:
             check:
                 pace: step1_name[,...]
                 steps:
                     step1_name:
                         targets:
-                            hosts: <true (default) | false>
+                            hosts: <all (default) | none>
                             masters: <none (default) | one | all>
                             nodes: <none (default) | one | all>
                             gateways: <none (default) | one | all>
@@ -78,7 +76,7 @@ feature:
                         serialized: <true | false>
                         timeout: time_in_minutes
                         targets:
-                            hosts: <true (default) | false>
+                            hosts: <all (default) | none>
                             masters: <none (default) | one | all>
                             nodes: <none (default) | one | all>
                             gateways: <none (default) | one | all>
@@ -88,7 +86,7 @@ feature:
                         serialized: <true | false>
                         timeout: time_in_minutes
                         targets:
-                            hosts: <true (default) | false>
+                            hosts: <all (default) | none>
                             masters: <none (default) | one | all>
                             nodes: <none (default) | one | all>
                             gateways: <none (default) | one | all>
@@ -101,7 +99,7 @@ feature:
                 steps:
                     step1_name:
                         targets:
-                            hosts: <true (default) | false>
+                            hosts: <all (default) | none>
                             masters: <none (default) | one | all>
                             nodes: <none (default) | one | all>
                             gateways: <none (default) | one | all>
@@ -114,7 +112,7 @@ feature:
             - name: rule_name_1
               type: <service | route | upstream >
               targets:
-                  hosts: <true (default) | false>
+                  hosts: <all (default) | none>
                   masters: <none (default) | one | all>
                   nodes: <none (default) | one | all>
                   gateways: <none (default) | one | all>
@@ -127,7 +125,7 @@ feature:
             - name: rule_name_2
               type: <service | route | upstream >
               targets:
-                  hosts: <true (default) | false>
+                  hosts: <all (default) | none>
                   masters: <none (default) | one | all>
                   nodes: <none (default) | one | all>
                   gateways: <none (default) | one | all>

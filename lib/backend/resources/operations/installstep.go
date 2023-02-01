@@ -124,6 +124,8 @@ func (st stepTargets) parse() (string, string, string, string, fail.Error) {
 			hostT = "0"
 		case "yes":
 			fallthrough
+		case "all":
+			fallthrough
 		case "true":
 			fallthrough
 		case "1":
@@ -257,10 +259,6 @@ func (is *step) Run(inctx context.Context, hosts []resources.Host, v data.Map, s
 }
 
 func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
-	tracer := debug.NewTracer(ctx, true, "").Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
-
 	outcomes := &unitResults{}
 
 	for _, h := range hosts {
@@ -272,7 +270,6 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 		default:
 		}
 
-		tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
 		clonedV, xerr := is.initLoopTurnForHost(ctx, h, v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -289,16 +286,16 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 
 		if !outcomes.Successful() {
 			if is.Worker.action == installaction.Check { // Checks can fail and it's ok
-				tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present",
+				logrus.WithContext(ctx).Tracef("%s(%s):step(%s)@%s finished in %s: not present",
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
 					temporal.FormatDuration(time.Since(is.Worker.GetStartTime())))
 			} else { // other steps are expected to succeed
-				tracer.Trace("%s(%s):step(%s)@%s failed in %s: %s",
+				logrus.WithContext(ctx).Errorf("%s(%s):step(%s)@%s failed in %s: %s",
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
 					temporal.FormatDuration(time.Since(is.Worker.GetStartTime())), outcomes.ErrorMessages())
 			}
 		} else {
-			tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
+			logrus.WithContext(ctx).Infof("%s(%s):step(%s)@%s succeeded in %s.",
 				is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
 				temporal.FormatDuration(time.Since(is.Worker.GetStartTime())))
 		}
@@ -308,10 +305,6 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []resources.Host,
 }
 
 func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []resources.Host, v data.Map) (_ resources.UnitResults, ferr fail.Error) {
-	tracer := debug.NewTracer(inctx, true, "").Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(inctx, &ferr, tracer.TraceMessage())
-
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -392,7 +385,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host resources.Host, v 
 
 	clonedV["ShortHostname"] = host.GetName()
 	domain := ""
-	xerr = host.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 			if !ok {
@@ -447,7 +440,7 @@ type runOnHostParameters struct {
 
 func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("taskRunOnHostWithLoop")()
+	defer elapsed(inctx, "taskRunOnHostWithLoop")()
 
 	if params == nil {
 		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")
@@ -476,7 +469,7 @@ func (is *step) taskRunOnHostWithLoop(inctx context.Context, params interface{})
 // taskRunOnHost ...
 func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ stepResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	defer elapsed("taskRunOnHost")()
+	defer elapsed(inctx, "taskRunOnHost")()
 
 	if params == nil {
 		return stepResult{}, fail.InvalidParameterCannotBeNilError("params")
@@ -630,22 +623,25 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 		return nil, fail.Wrap(cerr)
 	}
 
+	// FIXME: This never actually worked as feature_test.go shows
 	for k, v := range cloneV {
-		if variable, ok := v.(string); ok && variable != "" {
-			varTemplate, xerr := template.Parse("realize_var", variable)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return cloneV, fail.SyntaxError("error parsing variable '%s': %s", k, xerr.Error())
-			}
+		if variable, ok := v.(string); ok {
+			if strings.Contains(variable, "{{") && strings.Contains(variable, "}}") {
+				varTemplate, xerr := template.Parse("realize_var", variable)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return cloneV, fail.SyntaxError("error parsing variable '%s': %s", k, xerr.Error())
+				}
 
-			buffer := bytes.NewBufferString("")
-			err := varTemplate.Option("missingkey=error").Execute(buffer, variables)
-			err = debug.InjectPlannedError(err)
-			if err != nil {
-				return cloneV, fail.ConvertError(err)
-			}
+				buffer := bytes.NewBufferString("")
+				err := varTemplate.Option("missingkey=error").Execute(buffer, variables)
+				err = debug.InjectPlannedError(err)
+				if err != nil {
+					return cloneV, fail.ConvertError(err)
+				}
 
-			cloneV[k] = buffer.String()
+				cloneV[k] = buffer.String()
+			}
 		}
 	}
 

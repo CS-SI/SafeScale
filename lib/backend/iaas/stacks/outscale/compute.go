@@ -72,9 +72,6 @@ func (s stack) ListImages(ctx context.Context, _ bool) (_ []*abstract.Image, fer
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	resp, xerr := s.rpcReadImages(ctx, nil)
 	if xerr != nil {
 		return nil, xerr
@@ -207,9 +204,6 @@ func (s stack) ListTemplates(ctx context.Context, _ bool) (_ []*abstract.HostTem
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	templates := make([]*abstract.HostTemplate, len(s.templates))
 	_ = copy(templates, s.templates)
 	return templates, nil
@@ -337,9 +331,6 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
@@ -373,9 +364,6 @@ func (s stack) InspectTemplate(ctx context.Context, id string) (_ *abstract.Host
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	return s.parseTemplateID(id)
 }
@@ -515,14 +503,10 @@ func (s stack) WaitHostState(ctx context.Context, hostParam stacks.HostParameter
 		return nil, fail.InvalidInstanceError()
 	}
 
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s, %v)",
-		hostLabel, state.String(), timeout).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	timings, xerr := s.Timings()
 	if xerr != nil {
@@ -789,9 +773,6 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 			"host creation", "cannot create a host without public IP or without attached subnet",
 		)
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", request).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	// Get or create password
 	password, xerr := s.getOrCreatePassword(request)
@@ -1112,13 +1093,10 @@ func (s stack) DeleteHost(ctx context.Context, hostParam stacks.HostParameter) (
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostLabel, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	publicIPs, xerr := s.rpcReadPublicIPsOfVM(ctx, ahf.Core.ID)
 	if xerr != nil {
@@ -1185,15 +1163,11 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 
 	incrementExpVar("host.inspections")
 
-	var hostLabel string
 	var xerr fail.Error
-	ahf, hostLabel, xerr = stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr = stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	var vm osc.Vm
 	if ahf.Core.ID != "" {
@@ -1243,8 +1217,6 @@ func (s stack) GetHostState(ctx context.Context, hostParam stacks.HostParameter)
 	if valid.IsNil(s) {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
@@ -1259,9 +1231,6 @@ func (s stack) ListHosts(ctx context.Context, details bool) (_ abstract.HostList
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadVMs(ctx, nil)
 	if xerr != nil {
@@ -1310,13 +1279,10 @@ func (s stack) StopHost(ctx context.Context, host stacks.HostParameter, graceful
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, host)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, host)
 	if xerr != nil {
 		return xerr
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	return s.rpcStopVMs(ctx, []string{ahf.Core.ID})
 }
@@ -1326,13 +1292,10 @@ func (s stack) StartHost(ctx context.Context, hostParam stacks.HostParameter) (f
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	return s.rpcStartVMs(ctx, []string{ahf.Core.ID})
 }
@@ -1342,13 +1305,10 @@ func (s stack) RebootHost(ctx context.Context, hostParam stacks.HostParameter) (
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	ahf, hostRef, xerr := stacks.ValidateHostParameter(ctx, hostParam)
+	ahf, _, xerr := stacks.ValidateHostParameter(ctx, hostParam)
 	if xerr != nil {
 		return xerr
 	}
-
-	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	return s.rpcRebootVMs(ctx, []string{ahf.Core.ID})
 }

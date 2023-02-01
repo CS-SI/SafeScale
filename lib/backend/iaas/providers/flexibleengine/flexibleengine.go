@@ -211,17 +211,13 @@ next:
 			"SATA": volumespeed.Cold,
 			"Ssd":  volumespeed.Ssd,
 		},
-		MetadataBucket:           metadataBucketName,
-		OperatorUsername:         operatorUsername,
-		ProviderName:             providerName,
-		DefaultSecurityGroupName: "default",
-		DefaultNetworkName:       vpcName,
-		DefaultNetworkCIDR:       vpcCIDR,
-		DefaultImage:             defaultImage,
-		// WhitelistTemplateRegexp: whitelistTemplatePattern,
-		// BlacklistTemplateRegexp: blacklistTemplatePattern,
-		// WhitelistImageRegexp:    whitelistImagePattern,
-		// BlacklistImageRegexp:    blacklistImagePattern,
+		MetadataBucket:                 metadataBucketName,
+		OperatorUsername:               operatorUsername,
+		ProviderName:                   providerName,
+		DefaultSecurityGroupName:       "default",
+		DefaultNetworkName:             vpcName,
+		DefaultNetworkCIDR:             vpcCIDR,
+		DefaultImage:                   defaultImage,
 		MaxLifeTime:                    maxLifeTime,
 		Timings:                        timings,
 		Safe:                           isSafe,
@@ -232,8 +228,6 @@ next:
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	// Note: if timings have to be tuned, update stack.MutableTimings
 
 	wrapped := api.StackProxy{
 		FullStack: stack,
@@ -374,7 +368,6 @@ func (p *provider) GetName() (string, fail.Error) {
 }
 
 // GetStack returns the stack object used by the provider
-// Note: use with caution, last resort option
 func (p provider) GetStack() (api.Stack, fail.Error) {
 	return p.Stack, nil
 }

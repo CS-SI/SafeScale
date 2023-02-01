@@ -45,6 +45,37 @@ type HostInfo struct {
 	PrivateKey string `json:"private_key"`
 }
 
+type SgInspect struct {
+	Result SgResult `json:"result"`
+	Status string   `json:"status"`
+}
+
+type SgResult struct {
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Rules       []SgRule `json:"rules"`
+}
+
+type SgRule struct {
+	Description string   `json:"description"`
+	Direction   int      `json:"direction"`
+	EtherType   int      `json:"ether_type"`
+	Involved    []string `json:"involved"`
+	PortFrom    int      `json:"port_from"`
+	PortTo      int      `json:"port_to"`
+}
+
+type HostSgLs struct {
+	Result []SgLs `json:"result"`
+	Status string `json:"status"`
+}
+
+type SgLs struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // IsSafescaledLaunched ...
 func IsSafescaledLaunched() (bool, error) {
 	cmd := "ps -ef | grep safescaled | grep -v grep"

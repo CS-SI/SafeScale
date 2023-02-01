@@ -41,7 +41,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	netutils "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -396,11 +395,6 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		gwPort = ssh.SSHPort
 	}
 
-	// VPL: never used
-	// if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
-	// 	scfg.SecondaryGatewayConfig.Port = 22
-	// }
-
 	targetHost, xerr := scfg.GetHostname()
 	if xerr != nil {
 		return nil, xerr
@@ -629,8 +623,7 @@ func (scmd *CliCommand) Start() fail.Error {
 //     . *fail.ErrTimeout if 'timeout' is reached
 //
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
-//
-//	you risk to call twice os/exec.Wait, which may panic
+// you risk to call twice os/exec.Wait, which may panic
 func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -653,10 +646,6 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 			chRes <- result{invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")}
 			return
 		}
-
-		tracer := debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
-		tracer.Trace("host='%s', command=%s", scmd.hostname, scmd.runCmdString)
-		defer tracer.Exiting()
 
 		subtask := new(errgroup.Group)
 
@@ -1223,7 +1212,6 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 		return "", fail.InvalidInstanceContentError("sconf.IPAddress", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname, temporal.FormatDuration(timeout))
 
 	originalPhase := phase

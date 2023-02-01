@@ -37,8 +37,6 @@ import (
 	_ "gomodules.xyz/stow/swift"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -105,10 +103,6 @@ type Location interface {
 	HasObject(context.Context, string, string) (bool, fail.Error)
 	// ReadObject ...
 	ReadObject(context.Context, string, string, io.Writer, int64, int64) (bytes.Buffer, fail.Error)
-	// WriteMultiPartObject ...
-	WriteMultiPartObject(
-		context.Context, string, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata,
-	) (abstract.ObjectStorageItem, fail.Error)
 	// WriteObject ...
 	WriteObject(
 		context.Context, string, string, io.Reader, int64, abstract.ObjectStorageItemMetadata,
@@ -277,8 +271,6 @@ func (instance location) ListBuckets(ctx context.Context, prefix string) (_ []st
 		return []string{}, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", prefix).Entering().Exiting()
-
 	var list []string
 
 	estimatedPageSize, err := instance.estimateSize(prefix)
@@ -313,8 +305,6 @@ func (instance location) FindBucket(ctx context.Context, bucketName string) (_ b
 	if bucketName == "" {
 		return false, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "(%s)", bucketName).Entering().Exiting()
 
 	found := false
 
@@ -353,8 +343,6 @@ func (instance location) InspectBucket(ctx context.Context, bucketName string) (
 	if bucketName == "" {
 		return abstract.ObjectStorageBucket{}, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%s)", bucketName).Entering().Exiting()
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
@@ -415,8 +403,6 @@ func (instance location) CreateBucket(ctx context.Context, bucketName string) (
 		return aosb, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", bucketName).Entering().Exiting()
-
 	c, err := instance.stowLocation.CreateContainer(bucketName)
 	if err != nil {
 		return aosb, fail.Wrap(err, fmt.Sprintf("failure creating bucket '%s'", bucketName))
@@ -437,8 +423,6 @@ func (instance location) DeleteBucket(ctx context.Context, bucketName string) (f
 	if bucketName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", bucketName).Entering().Exiting()
 
 	err := instance.stowLocation.RemoveContainer(bucketName)
 	if err != nil {
@@ -466,8 +450,6 @@ func (instance location) InspectObject(
 	if objectName == "" {
 		return aosi, fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
@@ -505,8 +487,6 @@ func (instance location) DeleteObject(ctx context.Context, bucketName string, ob
 		return fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
-
 	has, err := instance.HasObject(ctx, bucketName, objectName)
 	if err != nil {
 		return err
@@ -534,8 +514,6 @@ func (instance location) ListObjects(ctx context.Context, bucketName string, pat
 		return []string{}, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
-
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		return nil, err
@@ -554,8 +532,6 @@ func (instance location) BrowseBucket(
 	if bucketName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
@@ -635,8 +611,6 @@ func (instance location) DownloadBucket(ctx context.Context, bucketName, decrypt
 
 	path := ""
 	prefix := ""
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
 
 	zippedBucket, err := os.CreateTemp("", "bucketcontent.*.zip")
 	if err != nil {
@@ -719,8 +693,6 @@ func (instance location) ClearBucket(
 		return fail.InvalidParameterCannotBeEmptyStringError("bucketName")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', '%s')", bucketName, path, prefix).Entering().Exiting()
-
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		return err
@@ -741,8 +713,6 @@ func (instance location) ItemEtag(ctx context.Context, bucketName string, object
 	if objectName == "" {
 		return "", fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
 	has, err := instance.HasObject(ctx, bucketName, objectName)
 	if err != nil {
@@ -780,8 +750,6 @@ func (instance location) HasObject(ctx context.Context, bucketName string, objec
 		return false, fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
-
 	b, xerr := instance.GetBucket(bucketName)
 	if xerr != nil {
 		return false, xerr
@@ -813,8 +781,6 @@ func (instance location) ReadObject(ctx context.Context, bucketName string, obje
 	if objectName == "" {
 		return bytes.Buffer{}, fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s')", bucketName, objectName).Entering().Exiting()
 
 	has, err := instance.HasObject(ctx, bucketName, objectName)
 	if err != nil {
@@ -868,8 +834,6 @@ func (instance location) WriteObject(
 		return aosi, fail.InvalidParameterCannotBeNilError("source")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d)", bucketName, objectName, size).Entering().Exiting()
-
 	b, err := instance.GetBucket(bucketName)
 	if err != nil {
 		if err.Error() == NotFound {
@@ -888,43 +852,6 @@ func (instance location) WriteObject(
 		return aosi, err
 	}
 
-	aosi.BucketName = bucketName
-	return aosi, nil
-}
-
-// WriteMultiPartObject writes data from 'source' to an object in Object Storage, splitting data in parts of 'chunkSize' bytes
-// Note: nothing to do with multi-chunk abilities of various object storage technologies
-func (instance location) WriteMultiPartObject(
-	ctx context.Context, bucketName string, objectName string, source io.Reader, sourceSize int64, chunkSize int,
-	metadata abstract.ObjectStorageItemMetadata,
-) (aosi abstract.ObjectStorageItem, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-	aosi = abstract.ObjectStorageItem{}
-	if valid.IsNil(instance) {
-		return aosi, fail.InvalidInstanceError()
-	}
-	if bucketName == "" {
-		return aosi, fail.InvalidParameterCannotBeEmptyStringError("bucketName")
-	}
-	if objectName == "" {
-		return aosi, fail.InvalidParameterCannotBeEmptyStringError("objectName")
-	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s', '%s', %d, %d)", bucketName, objectName, sourceSize, chunkSize).Entering()
-	defer tracer.Exiting()
-
-	b, err := instance.GetBucket(bucketName)
-	if err != nil {
-		return aosi, err
-	}
-	o, err := b.WriteMultiPartObject(ctx, objectName, source, sourceSize, chunkSize, metadata)
-	if err != nil {
-		return aosi, err
-	}
-	aosi, err = convertObjectToAbstract(ctx, o)
-	if err != nil {
-		return aosi, err
-	}
 	aosi.BucketName = bucketName
 	return aosi, nil
 }

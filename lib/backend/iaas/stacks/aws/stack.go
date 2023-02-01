@@ -20,6 +20,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -51,7 +52,7 @@ type stack struct {
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
-func NullStack() *stack { // nolint
+func NullStack() api.Stack { // nolint
 	return nil
 }
 
@@ -131,7 +132,6 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 	stack.SSMService = ssm.New(sssm, &aws.Config{})
 	stack.PricingService = pricing.New(spricing, &aws.Config{})
 
-	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 	if cfg.Timings != nil {
 		stack.MutableTimings = cfg.Timings
 	} else {
@@ -167,6 +167,10 @@ func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, l
 
 	xerr := s.rpcCreateTags(ctx, []*string{&id}, tags)
 	return xerr
+}
+
+func (s *stack) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
+	panic("implement me")
 }
 
 func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {

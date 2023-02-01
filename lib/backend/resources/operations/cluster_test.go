@@ -65,7 +65,6 @@ func createClusterRequest() abstract.ClusterRequest {
 			MinDiskSize: 1024,
 			MinGPU:      1,
 			MinCPUFreq:  2033,
-			Replaceable: false,
 			Image:       "HostSizingRequirements Image",
 			Template:    "HostSizingRequirements Template",
 		},
@@ -77,7 +76,6 @@ func createClusterRequest() abstract.ClusterRequest {
 			MinDiskSize: 1024,
 			MinGPU:      1,
 			MinCPUFreq:  2033,
-			Replaceable: false,
 			Image:       "HostSizingRequirements Image",
 			Template:    "HostSizingRequirements Template",
 		},
@@ -89,7 +87,6 @@ func createClusterRequest() abstract.ClusterRequest {
 			MinDiskSize: 1024,
 			MinGPU:      1,
 			MinCPUFreq:  2033,
-			Replaceable: false,
 			Image:       "HostSizingRequirements Image",
 			Template:    "HostSizingRequirements Template",
 		},
@@ -326,7 +323,6 @@ func TestCluster_Create(t *testing.T) {
 			PublicIP:      true,
 			IsGateway:     true,
 			KeepOnFailure: false,
-			Preemptible:   false,
 			SecurityGroupIDs: map[string]struct{}{
 				"PublicIPSecurityGroupID": {},
 				"GWSecurityGroupID":       {},
@@ -353,7 +349,6 @@ func TestCluster_Create(t *testing.T) {
 			PublicIP:      true,
 			IsGateway:     true,
 			KeepOnFailure: false,
-			Preemptible:   false,
 			SecurityGroupIDs: map[string]struct{}{
 				"PublicIPSecurityGroupID": {},
 				"GWSecurityGroupID":       {},
@@ -852,7 +847,6 @@ func TestCluster_AddNodes(t *testing.T) {
 		MinDiskSize: 1024,
 		MinGPU:      1,
 		MinCPUFreq:  2033,
-		Replaceable: false,
 		Image:       "HostSizingRequirements Image",
 		Template:    "HostSizingRequirements Template",
 	}
@@ -986,74 +980,6 @@ func TestCluster_ListNodes(t *testing.T) {
 		require.Nil(t, xerr)
 		require.EqualValues(t, len(nodes), 1)
 		require.EqualValues(t, nodes[0].Name, "ClusterName-node-1")
-
-	})
-	require.Nil(t, err)
-
-}
-
-func TestCluster_FindAvailableNode(t *testing.T) {
-
-	ctx := context.Background()
-
-	err := NewServiceTest(t, func(svc *ServiceTest) {
-
-		svc._setLogLevel(0)
-
-		_, xerr := svc._CreateCluster(ctx, createClusterRequest(), true)
-		require.Nil(t, xerr)
-
-		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
-		require.Nil(t, xerr)
-
-		ocluster, ok := cluster.(*Cluster)
-		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
-			t.FailNow()
-		}
-
-		node, xerr := ocluster.FindAvailableNode(ctx)
-		require.Nil(t, xerr)
-		require.EqualValues(t, node.GetName(), "ClusterName-node-1")
-
-	})
-	require.Nil(t, err)
-
-}
-
-func TestCluster_LookupNode(t *testing.T) {
-
-	ctx := context.Background()
-
-	err := NewServiceTest(t, func(svc *ServiceTest) {
-
-		svc._setLogLevel(0)
-
-		_, xerr := svc._CreateCluster(ctx, createClusterRequest(), true)
-		require.Nil(t, xerr)
-
-		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
-		require.Nil(t, xerr)
-
-		ocluster, ok := cluster.(*Cluster)
-		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
-			t.FailNow()
-		}
-
-		found, xerr := ocluster.LookupNode(nil, "ClusterName-node-1")
-		require.Contains(t, xerr.Error(), "invalid parameter: ctx")
-
-		found, xerr = ocluster.LookupNode(ctx, "")
-		require.Contains(t, xerr.Error(), "invalid parameter: ref")
-
-		found, xerr = ocluster.LookupNode(ctx, "ClusterName-node-1")
-		require.Nil(t, xerr)
-		require.True(t, found)
-
-		found, xerr = ocluster.LookupNode(ctx, "ClusterName-node-2")
-		require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrNotFound")
-		require.False(t, found)
 
 	})
 	require.Nil(t, err)

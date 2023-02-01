@@ -22,7 +22,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -53,11 +52,6 @@ func (s *ImageListener) List(inctx context.Context, in *protocol.ImageListReques
 		return nil, err
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewImageHandler(job)
 	images, xerr := handler.List(in.GetAll())

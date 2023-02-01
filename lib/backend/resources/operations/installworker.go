@@ -248,7 +248,7 @@ func (w *worker) CanProceed(inctx context.Context, s resources.FeatureSettings) 
 // identifyAvailableMaster finds a master available, and keep track of it
 // for all the life of the action (prevent to request too often)
 func (w *worker) identifyAvailableMaster(ctx context.Context) (_ resources.Host, ferr fail.Error) {
-	defer elapsed("identifyAvailableMaster")()
+	defer elapsed(ctx, "identifyAvailableMaster")()
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
@@ -265,7 +265,7 @@ func (w *worker) identifyAvailableMaster(ctx context.Context) (_ resources.Host,
 
 // identifyAvailableNode finds a node available and will use this one during all the installation session
 func (w *worker) identifyAvailableNode(ctx context.Context) (_ resources.Host, ferr fail.Error) {
-	defer elapsed("identifyAvailableNode")()
+	defer elapsed(ctx, "identifyAvailableNode")()
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
@@ -283,7 +283,7 @@ func (w *worker) identifyAvailableNode(ctx context.Context) (_ resources.Host, f
 // identifyConcernedMasters returns a list of all the hosts acting as masters and keep this list
 // during all the installation session
 func (w *worker) identifyConcernedMasters(ctx context.Context) ([]resources.Host, fail.Error) {
-	defer elapsed("identifyConcernedMasters")()
+	defer elapsed(ctx, "identifyConcernedMasters")()
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
@@ -359,7 +359,7 @@ func (w *worker) extractHostsFailingCheck(ctx context.Context, hosts []resources
 // identifyAllMasters returns a list of all the hosts acting as masters and keep this list
 // during all the installation session
 func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail.Error) {
-	defer elapsed("identifyAllMasters")()
+	defer elapsed(ctx, "identifyAllMasters")()
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
@@ -392,7 +392,7 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 // identifyConcernedNodes returns a list of all the hosts acting nodes and keep this list
 // during all the installation session
 func (w *worker) identifyConcernedNodes(ctx context.Context) ([]resources.Host, fail.Error) {
-	defer elapsed("identifyConcernedNodes")()
+	defer elapsed(ctx, "identifyConcernedNodes")()
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
@@ -424,7 +424,7 @@ func (w *worker) identifyConcernedNodes(ctx context.Context) ([]resources.Host, 
 // identifyAllNodes returns a list of all the hosts acting as public of private nodes and keep this list
 // during all the installation session
 func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.Error) {
-	defer elapsed("identifyAllNodes")()
+	defer elapsed(ctx, "identifyAllNodes")()
 	if w.cluster == nil {
 		return []resources.Host{}, nil
 	}
@@ -477,7 +477,7 @@ func (w *worker) loadHost(ctx context.Context, id string) (resources.Host, fail.
 // identifyAvailableGateway finds a gateway available, and keep track of it
 // for all the life of the action (prevent to request too often)
 func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, fail.Error) {
-	defer elapsed("identifyAvailableGateway")()
+	defer elapsed(ctx, "identifyAvailableGateway")()
 	if w.availableGateway != nil {
 		return w.availableGateway, nil
 	}
@@ -565,7 +565,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 // identifyConcernedGateways returns a list of all the hosts acting as gateway that can accept the action
 // and keep this list during all the installation session
 func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.Host, ferr fail.Error) {
-	defer elapsed("identifyConcernedGateways")()
+	defer elapsed(ctx, "identifyConcernedGateways")()
 	var hosts []resources.Host
 
 	var xerr fail.Error
@@ -595,7 +595,7 @@ func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.H
 // identifyAllGateways returns a list of all the hosts acting as gateways and keep this list
 // during all the installation session
 func (w *worker) identifyAllGateways(inctx context.Context) (_ []resources.Host, ferr fail.Error) {
-	defer elapsed("identifyAllGateways")()
+	defer elapsed(inctx, "identifyAllGateways")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1148,7 +1148,7 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 	const yamlKey = "feature.suitableFor.host"
 	if w.feature.Specs().IsSet(yamlKey) {
 		value := strings.ToLower(w.feature.Specs().GetString(yamlKey))
-		ok = value == "ok" || value == "yes" || value == "true" || value == "1"
+		ok = value == "ok" || value == "yes" || value == "true" || value == "1" || value == "all" || value == "one"
 	}
 	if ok {
 		return nil
@@ -1533,7 +1533,7 @@ func taskApplyProxyRule(inctx context.Context, params interface{}) (
 
 // identifyHosts identifies hosts concerned based on 'targets' and returns a list of hosts
 func (w *worker) identifyHosts(inctx context.Context, targets stepTargets) ([]resources.Host, fail.Error) {
-	defer elapsed("identifyHosts")()
+	defer elapsed(inctx, "identifyHosts")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 

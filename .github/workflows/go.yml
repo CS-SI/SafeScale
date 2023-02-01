@@ -8,11 +8,13 @@ on:
       - hotfixes
       - 'release/**'
       - 'review/**'
+      - 'pr/**'
   pull_request:
     branches:
       - master
       - develop
       - 'release/**'
+      - 'pr/**'
 
 env:
   PROTOCVERSION: 3.17.3

@@ -268,8 +268,6 @@ next:
 		return nil, fail.ConvertError(err)
 	}
 
-	// Note: if timings have to be tuned, update awsStack.MutableTimings
-
 	wrapped := api.StackProxy{
 		FullStack: awsStack,
 		Name:      "amazon",
@@ -346,7 +344,6 @@ func (p provider) GetName() (string, fail.Error) {
 }
 
 // GetStack returns the stack object used by the provider
-// Note: use with caution, last resort option
 func (p provider) GetStack() (api.Stack, fail.Error) {
 	return p.Stack, nil
 }

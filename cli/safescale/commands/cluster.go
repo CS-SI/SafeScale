@@ -69,8 +69,6 @@ var ClusterCommand = cli.Command{
 		clusterDeleteCommand,
 		clusterInspectCommand,
 		clusterStateCommand,
-		clusterRunCommand,
-		// clusterSshCommand,
 		clusterStartCommand,
 		clusterStopCommand,
 		clusterExpandCommand,
@@ -158,7 +156,8 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) (map[stri
 		delete(config, "last_state")
 		delete(config, "last_state_label")
 	} else {
-		remotedesktopInstalled := true
+		// FIXME: There is no actual check for features, the check is implicit, this is wrong, ALL checks MUST be EXPLICIT
+		remotedesktopInstalled := false
 		disabledFeatures, ok := config["disabled_features"].(*protocol.FeatureListResponse)
 		if ok {
 			for _, v := range disabledFeatures.Features {
@@ -205,7 +204,7 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) (map[stri
 				return nil, fail.InconsistentError("'nodes' should be a map[string][]*protocol.Host")
 			}
 		} else {
-			config["remote_desktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
+			config["remote_desktop"] = fmt.Sprintf("no remote desktop available")
 		}
 	}
 	return config, nil
@@ -515,10 +514,6 @@ var clusterCreateCommand = cli.Command{
 			}
 		}
 		if c.IsSet("master-sizing") {
-			if strings.Contains(c.String("master-sizing"), "count") {
-				return clitools.FailureResponse(clitools.ExitOnInvalidArgument("the number of masters cannot be changed yet: count cannot be included in 'master-sizing' flag"))
-			}
-
 			mastersDef, err = constructHostDefinitionStringFromCLI(c, "master-sizing")
 			if err != nil {
 				return err
@@ -1087,24 +1082,6 @@ var clusterHelmCommand = cli.Command{
 	},
 }
 
-var clusterRunCommand = cli.Command{
-	Name:      "run",
-	Aliases:   []string{"execute", "exec"},
-	Usage:     "run CLUSTERNAME COMMAND",
-	ArgsUsage: "CLUSTERNAME",
-
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
-		err := extractClusterName(c)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "clusterRunCmd not yet implemented"))
-	},
-}
-
 func executeCommand(clientSession *client.Session, command string, files *client.RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
 
@@ -1347,8 +1324,10 @@ var clusterNodeInspectCommand = cli.Command{
 
 // clusterNodeDeleteCmd handles 'deploy cluster <clustername> delete'
 var clusterNodeDeleteCommand = cli.Command{
-	Name:    "delete",
-	Aliases: []string{"destroy", "remove", "rm"},
+	Name:      "delete",
+	Usage:     "Deletes a cluster node",
+	ArgsUsage: "CLUSTERNAME HOSTNAME",
+	Aliases:   []string{"destroy", "remove", "rm"},
 
 	Flags: []cli.Flag{
 		cli.BoolFlag{
@@ -1386,11 +1365,8 @@ var clusterNodeDeleteCommand = cli.Command{
 		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node%s '%s' of the cluster '%s'", strprocess.Plural(uint(len(nodeList))), strings.Join(nodeList, ","), clusterName)) {
 			return clitools.SuccessResponse("Aborted")
 		}
-		if force {
-			logrus.Println("'-f,--force' does nothing yet")
-		}
 
-		err = ClientSession.Cluster.DeleteNode(clusterName, nodeList, 0)
+		err = ClientSession.Cluster.DeleteNode(clusterName, nodeList, force, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1511,7 +1487,7 @@ var clusterNodeStateCommand = cli.Command{
 
 const clusterMasterCmdLabel = "master"
 
-// clusterMasterCommands handles 'safescale cluster master ...
+// clusterMasterCommands handles 'safescale cluster master ...'
 var clusterMasterCommands = cli.Command{
 	Name:      clusterMasterCmdLabel,
 	Usage:     "manage cluster masters",
@@ -1620,7 +1596,7 @@ var clusterMasterInspectCommand = cli.Command{
 			}()
 		}
 
-		host, err := ClientSession.Cluster.InspectNode(clusterName, hostName, 0)
+		host, err := ClientSession.Cluster.InspectMaster(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1748,8 +1724,6 @@ var clusterFeatureCommands = cli.Command{
 	ArgsUsage: "COMMAND",
 	Subcommands: cli.Commands{
 		clusterFeatureListCommand,
-		clusterFeatureInspectCommand,
-		clusterFeatureExportCommand,
 		clusterFeatureCheckCommand,
 		clusterFeatureAddCommand,
 		clusterFeatureRemoveCommand,
@@ -1812,139 +1786,6 @@ func clusterFeatureListAction(c *cli.Context) (ferr error) {
 	return clitools.SuccessResponse(features)
 }
 
-// clusterFeatureInspectCommand handles 'safescale cluster feature inspect <cluster name or id> <feature name>'
-// Displays information about the feature (parameters, if eligible on cluster, if installed, ...)
-var clusterFeatureInspectCommand = cli.Command{
-	Name:      "inspect",
-	Aliases:   []string{"show"},
-	Usage:     "Inspects the feature",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name: "embedded",
-			// Value: false,
-			Usage: "if used, tells to show details of embedded feature (if it exists)",
-		},
-	},
-
-	Action: clusterFeatureInspectAction,
-}
-
-func clusterFeatureInspectAction(c *cli.Context) (ferr error) {
-	defer fail.OnPanic(&ferr)
-	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
-
-	if err := extractClusterName(c); err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	featureName, err := extractFeatureArgument(c)
-	if err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Inspecting features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
-
-	details, err := ClientSession.Cluster.InspectFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
-	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-	}
-
-	return clitools.SuccessResponse(details)
-}
-
-// clusterFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
-var clusterFeatureExportCommand = cli.Command{
-	Name:      "list",
-	Aliases:   []string{"ls"},
-	Usage:     "List features installed on the cluster",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name: "embedded",
-			// Value: false,
-			Usage: "if used, tells to export embedded feature (if it exists)",
-		},
-		cli.BoolFlag{
-			Name: "raw",
-			// Value: false,
-			Usage: "outputs only the feature content, without json",
-		},
-	},
-
-	Action: clusterFeatureExportAction,
-}
-
-func clusterFeatureExportAction(c *cli.Context) (ferr error) {
-	defer fail.OnPanic(&ferr)
-	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
-
-	if err := extractClusterName(c); err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	featureName := c.Args().Get(1)
-	if featureName == "" {
-		_ = cli.ShowSubcommandHelp(c)
-		return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME.")
-	}
-
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Exporting feature"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
-
-	export, err := ClientSession.Cluster.ExportFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
-	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-	}
-
-	if c.Bool("raw") {
-		return clitools.SuccessResponse(export.Export)
-	}
-
-	return clitools.SuccessResponse(export)
-}
-
 // clusterFeatureAddCommand handles 'safescale cluster feature add CLUSTERNAME FEATURENAME'
 var clusterFeatureAddCommand = cli.Command{
 	Name:      "add",
@@ -1978,7 +1819,11 @@ func clusterFeatureAddAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 	settings.SkipProxy = c.Bool("skip-proxy")
 
@@ -2012,15 +1857,26 @@ func clusterFeatureAddAction(c *cli.Context) (ferr error) {
 }
 
 // parametersToMap transforms parameters slice to map
-func parametersToMap(params []string) map[string]string {
-	values := map[string]string{}
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
+func parametersToMap(params []string) (map[string]string, error) {
+	re := regexp.MustCompile(`([A-Za-z0-9]+:)?([A-Za-z0-9]+)=([A-Za-z0-9]+)`)
+	parsed := make(map[string]string)
+	for _, v := range params {
+		october := re.FindAllStringSubmatch(v, -1)
+		if len(october) > 0 {
+			switch len(october[0]) {
+			case 3:
+				parsed[october[0][1]] = october[0][2]
+			case 4:
+				parsed[october[0][2]] = october[0][3]
+			default:
+				continue
+			}
+		} else {
+			return nil, fmt.Errorf("invalid expression: %s", v)
 		}
 	}
-	return values
+
+	return parsed, nil
 }
 
 // clusterFeatureCheckCommand handles 'deploy cluster check-feature CLUSTERNAME FEATURENAME'
@@ -2051,7 +1907,11 @@ func clusterFeatureCheckAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 
 	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
@@ -2112,7 +1972,11 @@ func clusterFeatureRemoveAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 	// TODO: Reverse proxy rules are not yet purged when feature is removed, but current code
 	// will try to apply them... Quick fix: Setting SkipProxy to true prevent this

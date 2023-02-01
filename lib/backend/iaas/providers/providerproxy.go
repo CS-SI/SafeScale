@@ -311,27 +311,6 @@ func (s ProviderProxy) GetDefaultSecurityGroupName(ctx context.Context) (_ strin
 	}
 	return cfg, xerr
 }
-
-func (s ProviderProxy) EnableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.Provider.EnableSecurityGroup(ctx, group)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}
-
-func (s ProviderProxy) DisableSecurityGroup(ctx context.Context, group *abstract.SecurityGroup) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := s.Provider.DisableSecurityGroup(ctx, group)
-	if xerr != nil {
-		xerr.WithContext(ctx)
-	}
-	return xerr
-}
-
 func (s ProviderProxy) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (_ *abstract.Network, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

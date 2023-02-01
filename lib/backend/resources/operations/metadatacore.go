@@ -311,58 +311,6 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 	}
 }
 
-// Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
-// to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
-// change through time).
-func (myself *MetadataCore) Review(inctx context.Context, callback resources.Callback) (rerr fail.Error) {
-	if valid.IsNil(myself) {
-		return fail.InvalidInstanceError()
-	}
-
-	if itis, xerr := myself.IsValid(); xerr == nil && !itis {
-		return fail.InconsistentError("the instance is not valid")
-	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	myself.RLock()
-	defer myself.RUnlock()
-
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		gerr := func() (ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			if callback == nil {
-				return fail.InvalidParameterCannotBeNilError("callback")
-			}
-			if myself.properties == nil {
-				return fail.InvalidInstanceContentError("myself.properties", "cannot be nil")
-			}
-
-			return myself.shielded.Inspect(func(clonable data.Clonable) fail.Error {
-				return callback(clonable, myself.properties)
-			})
-		}()
-		chRes <- result{gerr}
-	}()
-	select {
-	case res := <-chRes:
-		return res.rErr
-	case <-ctx.Done():
-		<-chRes
-		return fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		<-chRes
-		return fail.ConvertError(inctx.Err())
-	}
-}
-
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow disabling reloading from Object Storage if set to false (default is true)
@@ -587,11 +535,7 @@ func (myself *MetadataCore) updateIdentity() fail.Error {
 			if !ok {
 				return fail.InconsistentError("expected Identifiable and Named")
 			}
-			if myself.kindSplittedStore {
-				myself.id.Store(idd)
-			} else {
-				myself.id.Store(named.GetName())
-			}
+			myself.id.Store(idd)
 			myself.name.Store(named.GetName())
 			myself.taken.Store(true)
 
@@ -1093,7 +1037,6 @@ func (myself *MetadataCore) Reload(inctx context.Context) (ferr fail.Error) {
 }
 
 // unsafeReload loads the content from the Object Storage
-// Note: must be called after locking the instance
 func (myself *MetadataCore) unsafeReload(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -1456,7 +1399,6 @@ func (myself *MetadataCore) Sdump(inctx context.Context) (string, fail.Error) {
 }
 
 // unsafeSerialize serializes instance into bytes (output json code)
-// Note: must be called after locking the instance
 func (myself *MetadataCore) unsafeSerialize(inctx context.Context) ([]byte, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -1564,7 +1506,6 @@ func (myself *MetadataCore) Deserialize(inctx context.Context, buf []byte) fail.
 }
 
 // unsafeDeserialize reads json code and instantiates a MetadataCore
-// Note: must be called after locking the instance
 func (myself *MetadataCore) unsafeDeserialize(inctx context.Context, buf []byte) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()

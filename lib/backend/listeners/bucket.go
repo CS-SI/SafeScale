@@ -24,8 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -62,11 +60,6 @@ func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequ
 	}
 	defer job.Close()
 
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
 	handler := handlers.NewBucketHandler(job)
 	bucketList, xerr := handler.List(in.GetAll())
 	if xerr != nil {
@@ -101,11 +94,6 @@ func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketReques
 	}
 	defer job.Close()
 
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
 	xerr = handlers.NewBucketHandler(job).Create(bucketName)
 	if xerr != nil {
 		return empty, xerr
@@ -115,7 +103,7 @@ func (s *BucketListener) Create(inctx context.Context, in *protocol.BucketReques
 }
 
 // Delete a bucket
-func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketRequest) (
+func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketDeleteRequest) (
 	empty *googleprotobuf.Empty, err error,
 ) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
@@ -138,11 +126,6 @@ func (s *BucketListener) Delete(inctx context.Context, in *protocol.BucketReques
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	return empty, handlers.NewBucketHandler(job).Delete(bucketName)
 }
@@ -176,11 +159,6 @@ func (s *BucketListener) Download(
 		return empty, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewBucketHandler(job)
 	empty.Content, xerr = handler.Download(bucketName)
@@ -221,11 +199,6 @@ func (s *BucketListener) Clear(inctx context.Context, in *protocol.BucketRequest
 	}
 	defer job.Close()
 
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
 	handler := handlers.NewBucketHandler(job)
 	xerr = handler.Clear(bucketName)
 	if xerr != nil {
@@ -259,11 +232,6 @@ func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketReque
 	}
 	defer job.Close()
 
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
-
 	handler := handlers.NewBucketHandler(job)
 	resp, xerr := handler.Inspect(bucketName)
 	if xerr != nil {
@@ -275,7 +243,7 @@ func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketReque
 		return nil, fail.NotFoundError("bucket '%s' not found", bucketName)
 	}
 
-	return resp.ToProtocol(ctx)
+	return resp.ToProtocol(job.Context())
 }
 
 // Mount a bucket on the filesystem of the host
@@ -303,11 +271,6 @@ func (s *BucketListener) Mount(inctx context.Context, in *protocol.BucketMountRe
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	return empty, handlers.NewBucketHandler(job).Mount(bucketName, hostRef, in.GetPath())
 }
@@ -337,11 +300,6 @@ func (s *BucketListener) Unmount(inctx context.Context, in *protocol.BucketMount
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	return empty, handlers.NewBucketHandler(job).Unmount(bucketName, hostRef)
 }

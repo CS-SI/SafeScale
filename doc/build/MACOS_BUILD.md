@@ -62,15 +62,15 @@ $ unset GOBIN
 $ export GOOS=linux GOARCH=amd64
 $ make clean && make all
 ```
-Binaries will be saved in cli/safescale/safescale, cli/safescaled/safescaled, cli/scanner/scanner
-Note: cross-compiled go binaries will not be able tyo handle data races...
+Binaries will be saved in cli/safescale/safescale, cli/safescaled/safescaled
+Note: cross-compiled go binaries will not be able to handle data races...
 
 #### Using docker container
 ```bash
 $ cd build
 $ build-safescale.sh
 ```
-Binaries will be saved to ???
+Binaries will be saved to a new directory: ./exported
 Note: these binaries will include data race handling.
 
 ### Linux ARMv5 binaries (Raspberry)
@@ -81,4 +81,4 @@ $ make clean && make all
 ```
 
 Generated binaries will not contain data race handling
-Note: cross-compiled go binaries will not be able tyo handle data races...
+Note: cross-compiled go binaries will not be able to handle data races...

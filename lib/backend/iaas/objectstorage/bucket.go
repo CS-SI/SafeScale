@@ -26,8 +26,6 @@ import (
 	"gomodules.xyz/stow"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
@@ -60,10 +58,6 @@ type Bucket interface {
 	ReadObject(context.Context, string, io.Writer, int64, int64) (Object, fail.Error)
 	// WriteObject writes into an object
 	WriteObject(context.Context, string, io.Reader, int64, abstract.ObjectStorageItemMetadata) (Object, fail.Error)
-	// WriteMultiPartObject writes a lot of data into an object, cut in pieces
-	WriteMultiPartObject(context.Context, string, io.Reader, int64, int, abstract.ObjectStorageItemMetadata) (
-		Object, fail.Error,
-	)
 	// // CopyObject copies an object
 	// CopyObject(string, string) fail.Error
 
@@ -103,8 +97,6 @@ func (instance bucket) CreateObject(ctx context.Context, objectName string) (_ O
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
-
 	o, err := newObject(&instance, objectName)
 	if err != nil {
 		return nil, err
@@ -118,8 +110,6 @@ func (instance bucket) InspectObject(ctx context.Context, objectName string) (_ 
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%s)", objectName).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -176,8 +166,6 @@ func (instance bucket) ListObjects(ctx context.Context, path string, prefix stri
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "(%s, %s)", path, prefix).Entering().Exiting()
-
 	var list []string
 
 	fullPath := buildFullPath(path, prefix)
@@ -215,8 +203,6 @@ func (instance bucket) Browse(
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
-
 	fullPath := buildFullPath(path, prefix)
 
 	estimatedPageSize, err := instance.estimateSize(path, prefix)
@@ -245,8 +231,6 @@ func (instance bucket) Clear(ctx context.Context, path, prefix string) (ferr fai
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
 
 	fullPath := buildFullPath(path, prefix)
 
@@ -282,8 +266,6 @@ func (instance bucket) DeleteObject(ctx context.Context, objectName string) (fer
 		return fail.InvalidParameterCannotBeEmptyStringError("objectName")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s')", objectName).Entering().Exiting()
-
 	o, err := newObject(&instance, objectName)
 	if err != nil {
 		return err
@@ -299,8 +281,6 @@ func (instance bucket) ReadObject(
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', %d, %d)", objectName, from, to).Entering().Exiting()
 
 	o, err := newObject(&instance, objectName)
 	if err != nil {
@@ -323,8 +303,6 @@ func (instance bucket) WriteObject(
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', %d)", objectName, sourceSize).Entering().Exiting()
-
 	o, err := newObject(&instance, objectName)
 	if err != nil {
 		return nil, err
@@ -340,33 +318,6 @@ func (instance bucket) WriteObject(
 		return nil, err
 	}
 
-	return &o, nil
-}
-
-// WriteMultiPartObject ...
-func (instance bucket) WriteMultiPartObject(
-	ctx context.Context, objectName string, source io.Reader, sourceSize int64, chunkSize int,
-	metadata abstract.ObjectStorageItemMetadata,
-) (_ Object, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-	if valid.IsNil(instance) {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', <source>, %d, %d, <metadata>)", objectName, sourceSize, chunkSize).Entering().Exiting()
-
-	o, err := newObject(&instance, objectName)
-	if err != nil {
-		return nil, err
-	}
-	err = o.AddMetadata(ctx, metadata)
-	if err != nil {
-		return nil, err
-	}
-	err = o.WriteMultiPart(ctx, source, sourceSize, chunkSize)
-	if err != nil {
-		return nil, err
-	}
 	return &o, nil
 }
 
@@ -386,8 +337,6 @@ func (instance bucket) GetCount(ctx context.Context, path string, prefix string)
 	if valid.IsNil(instance) {
 		return 0, fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
 
 	var count int64
 	fullPath := buildFullPath(path, prefix)
@@ -420,8 +369,6 @@ func (instance bucket) GetSize(ctx context.Context, path string, prefix string) 
 	if valid.IsNil(instance) {
 		return 0, "", fail.InvalidInstanceError()
 	}
-
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("objectstorage"), "('%s', '%s')", path, prefix).Entering().Exiting()
 
 	fullPath := buildFullPath(path, prefix)
 

@@ -19,6 +19,7 @@ package outscale // Package outscale contains stack implementation for Outscale
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -27,8 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
@@ -103,7 +102,7 @@ type stack struct {
 }
 
 // NullStack returns a null value of the stack
-func NullStack() *stack { // nolint
+func NullStack() api.Stack { // nolint
 	return nil
 }
 
@@ -117,9 +116,6 @@ func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 	if options == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("options")
 	}
-
-	tracer := debug.NewTracer(context.Background(), tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	config := osc.NewConfiguration()
 	config.BasePath = options.Compute.URL
@@ -167,7 +163,6 @@ func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 	}
 	s.buildTemplateList()
 
-	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 	if options.Timings != nil {
 		s.MutableTimings = options.Timings
 		_ = s.MutableTimings.Update(temporal.NewTimings())
@@ -233,9 +228,6 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 		return []string{}, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
 	resp, _, err := s.client.RegionApi.ReadRegions(s.auth, nil)
 	if err != nil {
 		return []string{}, normalizeError(err)
@@ -254,9 +246,6 @@ func (s stack) ListAvailabilityZones(ctx context.Context) (az map[string]bool, f
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)
 	if err != nil {
@@ -292,6 +281,10 @@ func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, l
 
 	_, xerr := s.rpcCreateTags(ctx, id, lmap)
 	return xerr
+}
+
+func (s *stack) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
+	panic("implement me")
 }
 
 func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {

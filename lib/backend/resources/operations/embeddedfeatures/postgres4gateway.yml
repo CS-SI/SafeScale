@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        host: yes
+        host: all
         cluster: all
     requirements:
         features:
@@ -33,10 +33,10 @@ feature:
                 steps:
                     docker:
                         targets:
-                            hosts: no
+                            hosts: none
                             gateways: all
-                            masters: no
-                            nodes: no
+                            masters: none
+                            nodes: none
                         run: |
                             sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || sfFail 192
                             sfExit
@@ -47,10 +47,10 @@ feature:
                     config:
                         timeout: 10
                         targets:
-                            hosts: yes
+                            hosts: all
                             gateways: all
-                            masters: no
-                            nodes: no
+                            masters: none
+                            nodes: none
                         run: |
                             {{ if .HostIsGateway }}
                             mkdir -p ${SF_ETCDIR}/postgres4gateway ${SF_VARDIR}/postgres4gateway/
@@ -85,10 +85,10 @@ feature:
 
                     start:
                         targets:
-                            hosts: no
+                            hosts: none
                             gateways: all
-                            masters: no
-                            nodes: no
+                            masters: none
+                            nodes: none
                         run: |
                             {{ if .HostIsGateway }}
                             sleep 0.$((200 + RANDOM%600))
@@ -108,10 +108,10 @@ feature:
                 steps:
                     compose:
                         targets:
-                            hosts: yes
-                            gateways: any
-                            masters: no
-                            nodes: no
+                            hosts: all
+                            gateways: one
+                            masters: none
+                            nodes: none
                         run: |
                             {{ if .HostIsGateway }}
                             echo "docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
@@ -124,10 +124,10 @@ feature:
 
                     cleanup:
                         targets:
-                            hosts: no
+                            hosts: none
                             gateways: all
-                            masters: no
-                            nodes: no
+                            masters: none
+                            nodes: none
                         run: |
                             {{ if .HostIsGateway }}
                             PURGE_ON_REMOVAL="{{ .PurgeOnRemoval }}"

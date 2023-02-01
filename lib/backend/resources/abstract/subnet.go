@@ -19,6 +19,7 @@ package abstract
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -42,6 +43,7 @@ type SubnetRequest struct {
 	ImageRef       string         // contains the reference (ID or name) of the image requested for gateway(s)
 	DefaultSSHPort uint32         // contains the port to use for SSH on all hosts of the subnet by default
 	KeepOnFailure  bool           // tells if resources have to be kept in case of failure (default behavior is to delete them)
+	ClusterID      string
 }
 
 // Subnet represents a subnet
@@ -73,6 +75,7 @@ func NewSubnet() *Subnet {
 	}
 	sn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	sn.Tags["ManagedBy"] = "safescale"
+	sn.Tags["Revision"] = lib.Revision
 	return sn
 }
 

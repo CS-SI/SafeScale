@@ -114,7 +114,7 @@ func (t labelConsumer) Delete(names []string, selectTags bool, timeout time.Dura
 
 		defer wg.Done()
 
-		req := &protocol.LabelInspectRequest{
+		req := &protocol.LabelDeleteRequest{
 			Label: &protocol.Reference{TenantId: t.session.tenant, Name: aname},
 			IsTag: selectTags,
 		}

@@ -39,7 +39,7 @@ func LoadHost(inctx context.Context, svc iaas.Service, ref string) (resources.Ho
 
 // LoadHost ...
 func loadHost(inctx context.Context, svc iaas.Service, ref string) (resources.Host, fail.Error) {
-	defer elapsed(fmt.Sprintf("LoadHost of %s", ref))()
+	defer elapsed(inctx, fmt.Sprintf("LoadHost of %s", ref))()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -407,7 +407,7 @@ func LoadCluster(inctx context.Context, svc iaas.Service, ref string) (resources
 
 // LoadCluster loads cluster information from metadata
 func loadCluster(inctx context.Context, svc iaas.Service, name string) (_ resources.Cluster, ferr fail.Error) {
-	defer elapsed("LoadCluster")()
+	defer elapsed(inctx, "LoadCluster")()
 	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
@@ -553,6 +553,16 @@ func loadCluster(inctx context.Context, svc iaas.Service, name string) (_ resour
 			return
 		}
 
+		if val, ok := aclupro[clusterproperty.NodesV3]; !ok {
+			chRes <- result{nil, fail.NewError("corrupted metadata")}
+			return
+		} else {
+			if val == nil {
+				chRes <- result{nil, fail.NewError("corrupted metadata")}
+				return
+			}
+		}
+
 		foo, err := aclupro[clusterproperty.NodesV3].UnWrap()
 		if err != nil {
 			chRes <- result{nil, fail.ConvertError(err)}
@@ -569,6 +579,16 @@ func loadCluster(inctx context.Context, svc iaas.Service, name string) (_ resour
 		}
 		for k := range gotta.MasterByID {
 			clusterInstance.masters = append(clusterInstance.masters, k)
+		}
+
+		if val, ok := aclupro[clusterproperty.StateV1]; !ok {
+			chRes <- result{nil, fail.NewError("corrupted metadata")}
+			return
+		} else {
+			if val == nil {
+				chRes <- result{nil, fail.NewError("corrupted metadata")}
+				return
+			}
 		}
 
 		asta, err := aclupro[clusterproperty.StateV1].UnWrap()

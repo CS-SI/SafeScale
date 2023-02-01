@@ -28,21 +28,18 @@ import (
 	"time"
 
 	"github.com/eko/gocache/v2/cache"
-	"github.com/gofrs/uuid"
 	"github.com/oscarpicas/scribble"
 	"github.com/oscarpicas/smetrics"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	imagefilters "github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract/filters/images"
 	templatefilters "github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract/filters/templates"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/crypt"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -66,7 +63,6 @@ type Service interface {
 	ListTemplatesBySizing(context.Context, abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
 	ObjectStorageConfiguration(ctx context.Context) (objectstorage.Config, fail.Error)
 	SearchImage(context.Context, string) (*abstract.Image, fail.Error)
-	TenantCleanup(context.Context, bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
 
 	GetLock(abstract.Enum) (*sync.Mutex, fail.Error)
 
@@ -131,8 +127,8 @@ const (
 	DiskDRFWeight float32 = 1.0 / 16.0
 )
 
-// NullService creates a service instance corresponding to null value
-func NullService() *service { // nolint
+// nullService creates a service instance corresponding to null value
+func nullService() *service { // nolint
 	return nil
 }
 
@@ -469,11 +465,9 @@ func (instance service) reduceTemplates(
 ) []*abstract.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if len(whitelistREs) > 0 {
-		// finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(instance.whitelistTemplateREs))
 		finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(whitelistREs))
 	}
 	if len(blacklistREs) > 0 {
-		//		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(instance.blacklistTemplateREs))
 		blackFilter := templatefilters.NewFilter(filterTemplatesByRegexSlice(blacklistREs))
 		if finalFilter == nil {
 			finalFilter = blackFilter.Not()
@@ -482,7 +476,13 @@ func (instance service) reduceTemplates(
 		}
 	}
 	if finalFilter != nil {
-		return templatefilters.FilterTemplates(tpls, finalFilter)
+		// here we filter first, then we sort using white lists
+		res := templatefilters.FilterTemplates(tpls, finalFilter)
+		if len(whitelistREs) > 0 {
+			newRes := searchRegexAdaptor(whitelistREs[0].String(), res)
+			return newRes
+		}
+		return res
 	}
 	return tpls
 }
@@ -506,9 +506,6 @@ func (instance service) ListTemplatesBySizing(
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(inctx, true, "").Entering()
-	defer tracer.Exiting()
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -824,7 +821,6 @@ func (instance service) reduceImages(imgs []*abstract.Image) []*abstract.Image {
 		}
 	}
 	if finalFilter != nil {
-		// templateFilter := templatefilters.NewFilter(finalFilter)
 		return imagefilters.FilterImages(imgs, finalFilter)
 	}
 	return imgs
@@ -973,91 +969,6 @@ func addPadding(in string, maxLength int) string {
 		in += strings.Repeat(" ", paddingRight)
 	}
 	return in
-}
-
-// CreateHostWithKeyPair creates a host
-func (instance service) CreateHostWithKeyPair(inctx context.Context, request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
-	if valid.IsNil(instance) {
-		return nil, nil, nil, fail.InvalidInstanceError()
-	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		hf   *abstract.HostFull
-		uc   *userdata.Content
-		ak   *abstract.KeyPair
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
-		found := true
-		ah := abstract.NewHostCore()
-		ah.Name = request.ResourceName
-		_, rerr := instance.InspectHost(ctx, ah)
-		var nilErrNotFound *fail.ErrNotFound = nil // nolint
-		if rerr != nil && rerr != nilErrNotFound {
-			if _, ok := rerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care in previous line
-				chRes <- result{nil, nil, nil, fail.ConvertError(rerr)}
-				return
-			}
-			found = false
-			debug.IgnoreError(rerr)
-		}
-
-		if found {
-			chRes <- result{nil, nil, nil, abstract.ResourceDuplicateError("host", request.ResourceName)}
-			return
-		}
-
-		// Create temporary key pair
-		kpNameuuid, err := uuid.NewV4()
-		if err != nil {
-			chRes <- result{nil, nil, nil, fail.ConvertError(err)}
-			return
-		}
-
-		kpName := kpNameuuid.String()
-		kp, rerr := instance.CreateKeyPair(ctx, kpName)
-		if rerr != nil {
-			chRes <- result{nil, nil, nil, rerr}
-			return
-		}
-
-		// Create host
-		hostReq := abstract.HostRequest{
-			ResourceName:   request.ResourceName,
-			HostName:       request.HostName,
-			ImageID:        request.ImageID,
-			ImageRef:       request.ImageID,
-			KeyPair:        kp,
-			PublicIP:       request.PublicIP,
-			Subnets:        request.Subnets,
-			DefaultRouteIP: request.DefaultRouteIP,
-			DiskSize:       request.DiskSize,
-			// DefaultGateway: request.DefaultGateway,
-			TemplateID: request.TemplateID,
-		}
-		host, userData, rerr := instance.CreateHost(ctx, hostReq, nil)
-		if rerr != nil {
-			chRes <- result{nil, nil, nil, rerr}
-			return
-		}
-		chRes <- result{host, userData, kp, nil}
-
-	}()
-	select {
-	case res := <-chRes:
-		return res.hf, res.uc, res.ak, res.rErr
-	case <-ctx.Done():
-		return nil, nil, nil, fail.ConvertError(ctx.Err())
-	case <-inctx.Done():
-		return nil, nil, nil, fail.ConvertError(inctx.Err())
-	}
-
 }
 
 // ListHostsWithTags list hosts with tags

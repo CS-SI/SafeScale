@@ -19,6 +19,7 @@ package abstract
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -68,6 +69,7 @@ func NewNetwork() *Network {
 	}
 	nn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 	nn.Tags["ManagedBy"] = "safescale"
+	nn.Tags["Revision"] = lib.Revision
 	return nn
 }
 

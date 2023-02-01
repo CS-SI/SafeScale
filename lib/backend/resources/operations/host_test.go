@@ -687,7 +687,6 @@ func TestHost_setSecurityGroups(t *testing.T) {
 			PublicIP: false,
 			// IsGateway        bool                // IsGateway tells if the host will act as a gateway
 			// KeepOnFailure    bool                // KeepOnFailure tells if resource must be kept on failure
-			// Preemptible      bool                // Use spot-like instance
 			// SecurityGroupIDs map[string]struct{} // List of Security Groups to attach to Host (using map as dict)
 		}
 
@@ -1815,7 +1814,7 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		xerr = host.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 				hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 				if !ok {
@@ -1867,7 +1866,7 @@ func TestHost_BindSecurityGroup(t *testing.T) {
 
 		svc._setLogLevel(0)
 
-		xerr = host.Review(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 				hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 				if !ok {

@@ -10,6 +10,7 @@ vet:
 DIRECTORIES := $(sort $(dir $(wildcard */)))
 
 generate:
+	@(mkdir -p mocks) || true
 	@$(GO) generate -run stringer ./...
 
 clean:

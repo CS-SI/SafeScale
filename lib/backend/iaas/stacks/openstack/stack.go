@@ -18,6 +18,7 @@ package openstack // Package openstack contains the implemenation of a stack for
 
 import (
 	context2 "context"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"strings"
 
 	"github.com/gophercloud/gophercloud"
@@ -60,7 +61,7 @@ type stack struct {
 }
 
 // NullStack returns a null value of the stack
-func NullStack() *stack { // nolint
+func NullStack() api.Stack { // nolint
 	return nil
 }
 
@@ -243,7 +244,6 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 
 	}
 
-	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 	if cfg.Timings != nil {
 		s.MutableTimings = cfg.Timings
 		_ = s.MutableTimings.Update(temporal.NewTimings())
@@ -284,6 +284,9 @@ func (s *stack) UpdateTags(ctx context2.Context, kind abstract.Enum, id string, 
 	return xerr
 }
 
+func (s *stack) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
+	panic("implement me")
+}
 func (s *stack) DeleteTags(ctx context2.Context, kind abstract.Enum, id string, keys []string) fail.Error {
 	if kind != abstract.HostResource {
 		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")

@@ -19,13 +19,12 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/handlers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/v22/lib/backend/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
@@ -66,12 +65,8 @@ func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareDefiniti
 	defer job.Close()
 
 	ctx := job.Context()
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	hostRef, _ := srvutils.GetReference(in.GetHost())
 	sharePath := in.GetPath()
-	shareType := in.GetType()
-	tracer := debug.NewTracer(ctx, true, "('%s', %s, '%s', %s)", shareName, hostRefLabel, sharePath, shareType).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	// LEGACY: NFSExportOptions of protocol has been deprecated and replaced by OptionsAsString
 	if in.OptionsAsString == "" && in.Options != nil {
@@ -93,7 +88,7 @@ func (s *ShareListener) Create(inctx context.Context, in *protocol.ShareDefiniti
 }
 
 // Delete call share service deletion
-func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
+func (s *ShareListener) Delete(inctx context.Context, in *protocol.ShareDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
 	defer fail.OnExitWrapError(inctx, &err, "cannot delete share")
 	defer fail.OnPanic(&err)
@@ -115,11 +110,6 @@ func (s *ShareListener) Delete(inctx context.Context, in *protocol.Reference) (e
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "('%s')", shareName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
 	return empty, handler.Delete(shareName)
@@ -143,11 +133,6 @@ func (s *ShareListener) List(inctx context.Context, in *protocol.Reference) (_ *
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
 	shares, xerr := handler.List()
@@ -181,7 +166,7 @@ func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountDefi
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	hostRef, _ := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
 	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/mount", shareRef, hostRef))
 	if xerr != nil {
@@ -189,12 +174,7 @@ func (s *ShareListener) Mount(inctx context.Context, in *protocol.ShareMountDefi
 	}
 	defer job.Close()
 
-	ctx := job.Context()
 	hostPath := in.GetPath()
-	shareType := in.GetType()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
 	mount, xerr := handler.Mount(shareRef, hostRef, hostPath, in.GetWithCache())
@@ -221,20 +201,13 @@ func (s *ShareListener) Unmount(inctx context.Context, in *protocol.ShareMountDe
 		return empty, fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
+	hostRef, _ := srvutils.GetReference(in.GetHost())
 	shareRef, _ := srvutils.GetReference(in.GetShare())
 	job, xerr := PrepareJob(inctx, in.GetHost().GetTenantId(), fmt.Sprintf("/share/%s/host/%s/unmount", shareRef, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-
-	ctx := job.Context()
-	hostPath := in.GetPath()
-	shareType := in.GetType()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
 	if xerr = handler.Unmount(shareRef, hostRef); xerr != nil {
@@ -267,9 +240,6 @@ func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (
 	defer job.Close()
 
 	ctx := job.Context()
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("listeners.share"), "('%s')", shareRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(ctx, &err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
 	shareInstance, xerr := handler.Inspect(shareRef)
@@ -277,11 +247,9 @@ func (s *ShareListener) Inspect(inctx context.Context, in *protocol.Reference) (
 		return nil, xerr
 	}
 
-	// VPL: operations.Host should filter these behavioral differences
-	// // DEFENSIVE CODING: this _must not_ happen, but InspectShare has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
-	// if shareInstance == nil {
-	//	return nil, abstract.ResourceNotFoundError("share", shareRef)
-	// }
+	if shareInstance == nil {
+		return nil, abstract.ResourceNotFoundError("share", shareRef)
+	}
 
 	return shareInstance.ToProtocol(ctx)
 }

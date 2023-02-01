@@ -36,9 +36,9 @@ import (
 )
 
 type taskCreateGatewayParameters struct {
-	request     abstract.HostRequest
-	sizing      abstract.HostSizingRequirements
-	clusterName string
+	request   abstract.HostRequest
+	sizing    abstract.HostSizingRequirements
+	clusterID string
 }
 
 func (instance *Subnet) taskCreateGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
@@ -90,10 +90,9 @@ func (instance *Subnet) taskCreateGateway(inctx context.Context, params interfac
 				return ar, ar.rErr
 			}
 
-			cluID, _ := instance.GetID()
 			userData, createXErr := rgw.Create(ctx, hostReq, hostSizing, map[string]string{
 				"type":      "gateway",
-				"clusterID": cluID,
+				"clusterID": castedParams.clusterID,
 			}) // createXErr is tested later
 
 			// Set link to Subnet before testing if Host has been successfully created;
@@ -179,7 +178,7 @@ func (instance *Subnet) taskCreateGateway(inctx context.Context, params interfac
 			}()
 
 			// Binds gateway to VIP if needed
-			xerr = instance.Review(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr = instance.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				as, ok := clonable.(*abstract.Subnet)
 				if !ok {
 					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -275,9 +274,6 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(inctx context.Context, 
 			gwname := objgw.GetName()
 
 			// Executes userdata phase2 script to finalize host installation
-			tracer := debug.NewTracer(ctx, true, "(%s)", gwname).WithStopwatch().Entering()
-			defer tracer.Exiting()
-			defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 			defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Starting final configuration phases on the gateway '%s' with err '%s' ...", gwname, ferr), fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname))()
 
 			waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())

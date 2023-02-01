@@ -48,7 +48,6 @@ var HostCommand = cli.Command{
 	Subcommands: cli.Commands{
 		hostList,
 		hostCreate,
-		//		hostResize,
 		hostDelete,
 		hostInspect,
 		hostStatus,
@@ -56,10 +55,6 @@ var HostCommand = cli.Command{
 		hostReboot,
 		hostStart,
 		hostStop,
-		hostCheckFeatureCommand,  // DEPRECATED: deprecated
-		hostAddFeatureCommand,    // DEPRECATED: deprecated
-		hostRemoveFeatureCommand, // DEPRECATED: deprecated
-		hostListFeaturesCommand,  // DEPRECATED: deprecated
 		hostSecurityCommands,
 		hostFeatureCommands,
 		hostTagCommands,
@@ -221,8 +216,17 @@ var hostInspect = cli.Command{
 				}
 			}
 		}
+
+		kvs := make(map[string]string)
+		for _, v := range resp.Kvs {
+			kvs[v.Key] = v.Value
+		}
+
 		output["labels"] = labels
 		output["tags"] = tags
+		output["kvs"] = kvs
+		// delete(output, "kvs")
+
 		return clitools.SuccessResponse(output)
 	},
 }
@@ -361,90 +365,6 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 		}
 
 		resp, err := ClientSession.Host.Create(&req, 0)
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
-		}
-		return clitools.SuccessResponse(resp)
-	},
-}
-
-var hostResize = cli.Command{ // nolint
-	Name:      "resize",
-	Aliases:   []string{"upgrade"},
-	Usage:     "resizes a host",
-	ArgsUsage: "<Host_name>",
-	Flags: []cli.Flag{
-		cli.IntFlag{
-			Name:  "cpu",
-			Value: 1,
-			Usage: "Number of return CPU for the host",
-		},
-		cli.Float64Flag{
-			Name:  "ram",
-			Value: 1,
-			Usage: "RAM for the host (GB)",
-		},
-		cli.IntFlag{
-			Name:  "disk",
-			Value: 16,
-			Usage: "Disk space for the host (GB)",
-		},
-		cli.IntFlag{
-			Name:  "gpu",
-			Value: 0,
-			Usage: "Number of GPU for the host",
-		},
-		cli.Float64Flag{
-			Name:  "cpu-freq, cpufreq",
-			Value: 0,
-			Usage: "Minimum cpu frequency required for the host (GHz)",
-		},
-	},
-	Action: func(c *cli.Context) (ferr error) {
-		defer fail.OnPanic(&ferr)
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
-		}
-		if c.NumFlags() == 0 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing arguments, a resize command requires that at least one argument (cpu, ram, disk, gpu, freq) is specified"))
-		}
-
-		def := protocol.HostDefinition{
-			Name:     c.Args().First(),
-			CpuCount: int32(c.Int("cpu")),
-			Disk:     int32(c.Float64("disk")),
-			Ram:      float32(c.Float64("ram")),
-			GpuCount: int32(c.Int("gpu")),
-			CpuFreq:  float32(c.Float64("cpu-freq")),
-			Force:    c.Bool("force"),
-		}
-
-		if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-			description := "Resizing host"
-			pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-			go func() {
-				for {
-					if pb.IsFinished() {
-						return
-					}
-					err := pb.Add(1)
-					if err != nil {
-						return
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}()
-
-			defer func() {
-				_ = pb.Finish()
-			}()
-		}
-
-		resp, err := ClientSession.Host.Resize(&def, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of host", true).Error())))
@@ -835,8 +755,8 @@ func reformatHostGroups(in []*protocol.SecurityGroupBond) ([]interface{}, fail.E
 var hostSecurityGroupEnableCommand = cli.Command{
 	Name:      "enable",
 	Aliases:   []string{"activate"},
-	Usage:     "enable NETWORKNAME GROUPNAME",
-	ArgsUsage: "NETWORKNAME GROUPNAME",
+	Usage:     "enable HOSTNAME GROUPNAME",
+	ArgsUsage: "HOSTNAME GROUPNAME",
 	Action: func(c *cli.Context) (ferr error) {
 		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
@@ -926,8 +846,6 @@ var hostFeatureCommands = cli.Command{
 	Usage: hostFeatureCmdLabel + " COMMAND",
 	Subcommands: cli.Commands{
 		hostFeatureCheckCommand,
-		hostFeatureInspectCommand,
-		hostFeatureExportCommand,
 		hostFeatureAddCommand,
 		hostFeatureRemoveCommand,
 		hostFeatureListCommand,
@@ -990,137 +908,6 @@ func hostFeatureListAction(c *cli.Context) (ferr error) {
 	return clitools.SuccessResponse(list)
 }
 
-// hostFeatureInspectCommand handles 'safescale host feature inspect <cluster name or id> <feature name>'
-// Displays information about the feature (parameters, if eligible on host, if installed, ...)
-var hostFeatureInspectCommand = cli.Command{
-	Name:      "inspect",
-	Aliases:   []string{"show"},
-	Usage:     "Inspects the feature",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "embedded",
-			Usage: "if used, tells to show details of embedded feature (if it exists)",
-		},
-	},
-
-	Action: hostFeatureInspectAction,
-}
-
-func hostFeatureInspectAction(c *cli.Context) (ferr error) {
-	defer fail.OnPanic(&ferr)
-	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
-
-	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
-	if err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	featureName, err := extractFeatureArgument(c)
-	if err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Inspecting host features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
-
-	details, err := ClientSession.Host.InspectFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
-	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-	}
-
-	return clitools.SuccessResponse(details)
-}
-
-// hostFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
-var hostFeatureExportCommand = cli.Command{
-	Name:      "export",
-	Aliases:   []string{"dump"},
-	Usage:     "Export feature file content",
-	ArgsUsage: "",
-
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "embedded",
-			Usage: "if used, tells to export embedded feature (if it exists)",
-		},
-		cli.BoolFlag{
-			Name:  "raw",
-			Usage: "outputs only the feature content, without json",
-		},
-	},
-
-	Action: hostFeatureExportAction,
-}
-
-func hostFeatureExportAction(c *cli.Context) (ferr error) {
-	defer fail.OnPanic(&ferr)
-	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
-
-	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
-	if err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	featureName, err := extractFeatureArgument(c)
-	if err != nil {
-		return clitools.FailureResponse(err)
-	}
-
-	if beta := os.Getenv("SAFESCALE_BETA"); beta != "" {
-		description := "Exporting host features"
-		pb := progressbar.NewOptions(-1, progressbar.OptionFullWidth(), progressbar.OptionClearOnFinish(), progressbar.OptionSetDescription(description))
-		go func() {
-			for {
-				if pb.IsFinished() {
-					return
-				}
-				err := pb.Add(1)
-				if err != nil {
-					return
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
-
-		defer func() {
-			_ = pb.Finish()
-		}()
-	}
-
-	export, err := ClientSession.Host.ExportFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
-	if err != nil {
-		err = fail.FromGRPCStatus(err)
-		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-	}
-
-	if c.Bool("raw") {
-		return clitools.SuccessResponse(export.Export)
-	}
-
-	return clitools.SuccessResponse(export)
-}
-
 // hostAddFeatureCommand handles 'deploy host <host name or id> package <pkgname> add'
 var hostFeatureAddCommand = cli.Command{
 	Name:      "add",
@@ -1156,7 +943,11 @@ func hostFeatureAddAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 	settings.SkipProxy = c.Bool("skip-proxy")
 
@@ -1201,7 +992,11 @@ func hostFeatureCheckAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 
 	if err = ClientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0); err != nil {
@@ -1247,7 +1042,11 @@ func hostFeatureRemoveAction(c *cli.Context) (ferr error) {
 		return clitools.FailureResponse(err)
 	}
 
-	values := parametersToMap(c.StringSlice("param"))
+	values, err := parametersToMap(c.StringSlice("param"))
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
 	settings := protocol.FeatureSettings{}
 
 	err = ClientSession.Host.RemoveFeature(hostInstance.Id, featureName, values, &settings, 0)

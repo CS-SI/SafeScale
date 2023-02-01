@@ -18,6 +18,8 @@ package host
 
 import (
 	"context"
+	"github.com/sanity-io/litter"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -38,7 +40,33 @@ func List(ctx context.Context, svc iaas.Service, all bool) (abstract.HostList, f
 	}
 
 	if all {
-		return svc.ListHosts(ctx, all)
+		theList, err := svc.ListHosts(ctx, all)
+		if err != nil {
+			return theList, err
+		}
+
+		var newList abstract.HostList
+		for _, v := range theList {
+			hID, err := v.GetID()
+			if err != nil {
+				continue
+			}
+
+			_, xerr := svc.InspectHost(ctx, hID)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					logrus.WithContext(ctx).Debugf("Metadata only instance: %s", litter.Sdump(v))
+					continue
+				default:
+					logrus.WithContext(ctx).Debugf("problem browsing: %v", xerr)
+					continue
+				}
+			}
+
+			newList = append(newList, v)
+		}
+		return newList, nil
 	}
 
 	hostSvc, xerr := New(svc)
@@ -49,6 +77,24 @@ func List(ctx context.Context, svc iaas.Service, all bool) (abstract.HostList, f
 	hosts := nullList
 	xerr = hostSvc.Browse(ctx, func(hc *abstract.HostCore) fail.Error {
 		hf := converters.HostCoreToHostFull(*hc)
+
+		hID, err := hf.GetID()
+		if err != nil {
+			return nil
+		}
+
+		_, xerr = svc.InspectHost(ctx, hID)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				logrus.WithContext(ctx).Debugf("Metadata only instance: %s", litter.Sdump(hf))
+				return nil
+			default:
+				logrus.WithContext(ctx).Debugf("problem browsing: %v", xerr)
+				return nil
+			}
+		}
+
 		hosts = append(hosts, hf)
 		return nil
 	})

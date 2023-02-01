@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        host: yes
+        host: all
         cluster: all
     requirements:
         features:
@@ -30,8 +30,8 @@ feature:
                 steps:
                     pkg:
                         targets:
-                            hosts: yes
-                            masters: no
+                            hosts: all
+                            masters: none
                             nodes: all
                         run: |
                             case $LINUX_KIND in
@@ -53,8 +53,8 @@ feature:
                 steps:
                     fromdist:
                         targets:
-                            hosts: yes
-                            masters: no
+                            hosts: all
+                            masters: none
                             nodes: all
                         run: |
                             lspci | grep -i nvidia &>/dev/null || {
@@ -154,8 +154,8 @@ feature:
                 steps:
                     pkg:
                         targets:
-                            hosts: yes
-                            masters: no
+                            hosts: all
+                            masters: none
                             nodes: all
                         run: |
                             case $LINUX_KIND in
