@@ -18,7 +18,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/gofuzz v1.2.0
 	github.com/gophercloud/gophercloud v0.25.0
-	github.com/itchyny/gojq v0.12.9
+	github.com/itchyny/gojq v0.12.11
 	github.com/json-iterator/go v1.1.12
 	github.com/magiconair/properties v1.8.7
 	github.com/mitchellh/mapstructure v1.5.0
@@ -81,7 +81,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/imdario/mergo v0.3.11 // indirect
-	github.com/itchyny/timefmt-go v0.1.4 // indirect
+	github.com/itchyny/timefmt-go v0.1.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/keybase/go-ps v0.0.0-20190827175125-91aafc93ba19 // indirect
 	github.com/kr/fs v0.1.0 // indirect
