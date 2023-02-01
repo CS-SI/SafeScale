@@ -105,7 +105,7 @@ func configureCluster(ctx context.Context, c clusterflavors.ClusterTarget, param
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'kubernetes'", clusterName)
 	}
 
-	if !results.Successful() {
+	if !results.IsSuccessful() {
 		xerr = fail.NewError(fmt.Errorf(results.ErrorMessage()), nil, "failed to add feature 'kubernetes' to cluster '%s'", clusterName)
 		logrus.WithContext(ctx).Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, xerr.Error())
 		return xerr
@@ -116,7 +116,7 @@ func configureCluster(ctx context.Context, c clusterflavors.ClusterTarget, param
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'helm3'", clusterName)
 	}
 
-	if !results.Successful() {
+	if !results.IsSuccessful() {
 		xerr = fail.NewError(fmt.Errorf(results.ErrorMessage()), nil, "failed to add feature 'helm3' to cluster '%s'", clusterName)
 		logrus.WithContext(ctx).Errorf("[cluster %s] failed to add feature 'helm3': %s", clusterName, xerr.Error())
 		return xerr
