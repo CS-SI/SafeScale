@@ -27,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
@@ -102,77 +103,109 @@ func LoadNetwork(inctx context.Context, ref string) (*Network, fail.Error) {
 
 			// trick to avoid collisions
 			var kt *Network
-			cacheref := fmt.Sprintf("%T/%s", kt, ref)
+			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
 			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
 
+			var (
+				networkInstance *Network
+				inCache         bool
+				err             error
+			)
 			if cache != nil {
-				val, xerr := cache.Get(ctx, cacheref)
-				if xerr == nil {
-					casted, err := lang.Cast[*Network](val)
-					if err == nil {
-						return casted, nil
-					}
-				}
-			}
-
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onNetworkCacheMiss(ctx, ref) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					// do not want to propagate the reason that let us know the Network was not found to the caller... but we want to log it
-					logrus.Debugf(xerr.Error())
-					return nil, fail.NotFoundError("failed to find Network %s", ref)
-				default:
-					return nil, xerr
-				}
-			}
-
-			networkInstance, err := lang.Cast[*Network](anon)
-			if err != nil {
-				return nil, fail.Wrap(err)
-			}
-			if networkInstance == nil {
-				return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = networkInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, networkInstance.GetName()), networkInstance, &store.Options{Expiration: 1 * time.Minute})
-				if err != nil {
-					return nil, fail.Wrap(err)
-				}
-
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
-				hid, err := networkInstance.GetID()
-				if err != nil {
-					return nil, fail.Wrap(err)
-				}
-
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), networkInstance, &store.Options{Expiration: 1 * time.Minute})
-				if err != nil {
-					return nil, fail.Wrap(err)
-				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
-
-				// check cache has been correctly updated
-				val, xerr := cache.Get(ctx, cacheref)
-				if xerr == nil {
-					_, err := lang.Cast[*Network](val)
+				entry, err := cache.Get(ctx, refcache)
+				if err == nil {
+					networkInstance, err = lang.Cast[*Network](entry)
 					if err != nil {
-						logrus.WithContext(ctx).Warn(err.Error())
+						return nil, fail.Wrap(err)
+					}
+
+					inCache = true
+
+					// -- reload from metadata storage
+					xerr := networkInstance.Core.Reload(ctx)
+					if xerr != nil {
+						return nil, xerr
 					}
 				} else {
 					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+				}
+			}
+			if networkInstance == nil {
+				anon, xerr := onNetworkCacheMiss(ctx, ref)
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				networkInstance, err = lang.Cast[*Network](anon)
+				if err != nil {
+					return nil, fail.Wrap(err)
+				}
+			}
+
+			if cache != nil {
+				if !inCache {
+					// -- add host instance in cache by name
+					err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, networkInstance.GetName()), networkInstance, &store.Options{Expiration: 1 * time.Minute})
+					if err != nil {
+						return nil, fail.Wrap(err)
+					}
+
+					time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+					hid, err := networkInstance.GetID()
+					if err != nil {
+						return nil, fail.Wrap(err)
+					}
+
+					// -- add host instance in cache by id
+					err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), networkInstance, &store.Options{Expiration: 1 * time.Minute})
+					if err != nil {
+						return nil, fail.Wrap(err)
+					}
+
+					time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+
+					val, xerr := cache.Get(ctx, refcache)
+					if xerr == nil {
+						if _, ok := val.(*Network); !ok {
+							logrus.WithContext(ctx).Warnf("wrong type of *Network")
+						}
+					} else {
+						logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					}
+				}
+			}
+
+			if myjob.Service().Capabilities().UseTerraformer {
+				networkTrx, xerr := newNetworkTransaction(ctx, networkInstance)
+				if xerr != nil {
+					return nil, xerr
+				}
+				defer networkTrx.TerminateFromError(ctx, &ferr)
+
+				xerr = reviewNetworkMetadataAbstract(ctx, networkTrx, func(an *abstract.Network) fail.Error {
+					prov, xerr := myjob.Service().ProviderDriver()
+					if xerr != nil {
+						return xerr
+					}
+					castedProv, innerErr := lang.Cast[providers.ReservedForTerraformerUse](prov)
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
+					}
+
+					innerXErr := castedProv.ConsolidateNetworkSnippet(an)
+					if innerXErr != nil {
+						return innerXErr
+					}
+
+					_, innerXErr = myjob.Scope().RegisterAbstractIfNeeded(an)
+					return innerXErr
+				})
+				if xerr != nil {
+					return nil, xerr
 				}
 			}
 
@@ -193,18 +226,19 @@ func LoadNetwork(inctx context.Context, ref string) (*Network, fail.Error) {
 
 // onNetworkCacheMiss is called when there is no instance in cache of Network 'ref'
 func onNetworkCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail.Error) {
-	networkInstance, innerXErr := NewNetwork(ctx)
-	if innerXErr != nil {
-		return nil, innerXErr
+	networkInstance, xerr := NewNetwork(ctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	blank, innerXErr := NewNetwork(ctx)
-	if innerXErr != nil {
-		return nil, innerXErr
+	blank, xerr := NewNetwork(ctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	if innerXErr = networkInstance.Read(ctx, ref); innerXErr != nil {
-		return nil, innerXErr
+	xerr = networkInstance.Read(ctx, ref)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	if strings.Compare(fail.IgnoreError(networkInstance.String()).(string), fail.IgnoreError(blank.String()).(string)) == 0 {
@@ -379,9 +413,9 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 			}
 
 			// Write subnet object metadata
-			logrus.WithContext(ctx).Debugf("Saving Subnet metadata '%s' ...", abstractNetwork.Name)
+			logrus.WithContext(ctx).Debugf("Saving Network '%s' metadata...", abstractNetwork.Name)
 			abstractNetwork.Imported = false
-			xerr = instance.carry(ctx, abstractNetwork)
+			xerr = instance.Core.Carry(ctx, abstractNetwork)
 			if xerr != nil {
 				ar := result{xerr}
 				return ar, ar.rErr
@@ -406,24 +440,27 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 	}
 }
 
-// carry registers clonable as core value and deals with cache
-func (instance *Network) carry(ctx context.Context, clonable *abstract.Network) (ferr fail.Error) {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-	if instance.Core.IsTaken() {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
-	}
-
-	// Note: do not validate parameters, this call will do it
-	xerr := instance.Core.Carry(ctx, clonable)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	return nil
-}
+// // carry registers clonable as core value and deals with cache
+// func (instance *Network) carry(ctx context.Context, an *abstract.Network) (ferr fail.Error) {
+// 	if valid.IsNil(instance) {
+// 		return fail.InvalidInstanceError()
+// 	}
+// 	if instance.Core.IsTaken() {
+// 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+// 	}
+// 	if an == nil {
+// 		return fail.InvalidParameterCannotBeNilError("an")
+// 	}
+//
+// 	// Note: do not validate parameters, this call will do it
+// 	xerr := instance.Core.Carry(ctx, an)
+// 	xerr = debug.InjectPlannedFail(xerr)
+// 	if xerr != nil {
+// 		return xerr
+// 	}
+//
+// 	return nil
+// }
 
 // Import imports an existing Network in SafeScale metadata
 func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Error) {
@@ -474,10 +511,10 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 		}
 	}
 
-	// Write subnet object metadata
+	// Write Network metadata
 	// logrus.WithContext(ctx).Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
 	abstractNetwork.Imported = true
-	return instance.carry(ctx, abstractNetwork)
+	return instance.Carry(ctx, abstractNetwork)
 }
 
 // Browse walks through all the metadata objects in subnet
@@ -534,14 +571,14 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 	go func() {
 		defer close(chRes)
 
-		trx, xerr := newNetworkTransaction(ctx, instance)
+		networkTrx, xerr := newNetworkTransaction(ctx, instance)
 		if xerr != nil {
 			chRes <- result{xerr}
 			return
 		}
-		defer trx.TerminateBasedOnError(ctx, &ferr)
+		defer networkTrx.TerminateFromError(ctx, &ferr)
 
-		ctx := context.WithValue(ctx, CurrentNetworkTransactionContextKey, trx) // nolint
+		ctx := context.WithValue(ctx, CurrentNetworkTransactionContextKey, networkTrx) // nolint
 
 		tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
 		defer tracer.Exiting()
@@ -554,7 +591,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 
 		var abstractNetwork *abstract.Network
 		svc := instance.Service()
-		xerr = alterNetworkMetadata(ctx, trx, func(an *abstract.Network, props *serialize.JSONProperties) fail.Error {
+		xerr = alterNetworkMetadata(ctx, networkTrx, func(an *abstract.Network, props *serialize.JSONProperties) fail.Error {
 			abstractNetwork = an
 
 			var subnets map[string]string
@@ -641,7 +678,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 						if lvl2XErr != nil {
 							return lvl2XErr
 						}
-						defer func(trx securityGroupTransaction) { trx.TerminateBasedOnError(ctx, &innerFErr) }(sgTrx)
+						defer func(trx securityGroupTransaction) { trx.TerminateFromError(ctx, &innerFErr) }(sgTrx)
 
 						propsXErr = sgInstance.trxDelete(ctx, sgTrx, true)
 						if propsXErr != nil {
@@ -727,7 +764,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 				debug.IgnoreErrorWithContext(ctx, xerr)
 				// continue
 			default:
-				derr := trx.Rollback(ctx)
+				derr := networkTrx.Rollback(ctx)
 				if derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to rollback transaction"))
 				}
@@ -737,12 +774,8 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 			}
 		}
 
-		xerr = trx.Commit(ctx)
-		if xerr != nil {
-			xerr.WithContext(ctx)
-			chRes <- result{xerr}
-			return
-		}
+		// Need to terminate network transaction to be able to delete metadata (dead-lock otherwise)
+		networkTrx.SilentTerminate(ctx)
 
 		// Remove metadata
 		xerr = instance.Core.Delete(ctx)
@@ -781,7 +814,7 @@ func (instance *Network) GetCIDR(ctx context.Context) (cidr string, ferr fail.Er
 	if xerr != nil {
 		return cidr, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = reviewNetworkMetadataAbstract(ctx, trx, func(an *abstract.Network) fail.Error {
 		cidr = an.CIDR
@@ -802,7 +835,7 @@ func (instance *Network) ToProtocol(ctx context.Context) (out *protocol.Network,
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = reviewNetworkMetadata(ctx, trx, func(an *abstract.Network, props *serialize.JSONProperties) fail.Error {
 		out = &protocol.Network{
@@ -877,7 +910,7 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet *Subnet) (ferr 
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return alterNetworkMetadataProperty(ctx, trx, networkproperty.SubnetsV1, func(nsV1 *propertiesv1.NetworkSubnets) fail.Error {
 		name := subnet.GetName()
@@ -907,7 +940,7 @@ func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (fe
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return alterNetworkMetadataProperty(ctx, trx, networkproperty.SubnetsV1, func(nsV1 *propertiesv1.NetworkSubnets) fail.Error {
 		id := subnetID

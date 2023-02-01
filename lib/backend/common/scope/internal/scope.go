@@ -23,21 +23,14 @@ import (
 	"sync"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/host"
 	labelfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/label"
 	networkfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/network"
 	securitygroupfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/securitygroup"
 	subnetfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/subnet"
 	volumefactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/volume"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
-	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/puzpuzpuz/xsync"
 	"github.com/sirupsen/logrus"
@@ -66,18 +59,19 @@ type (
 
 	// scope contains information about context of the Job
 	scope struct {
-		resources    *xsync.MapOf[string, terraformerapi.Resource]
-		mu           *sync.Mutex
-		consulClient *consumer.Client
-		consulKV     *consumer.KV
-		service      iaasapi.Service
-		organization string
-		project      string
-		tenant       string
-		description  string
-		kvPath       string
-		fsPath       string
-		loaded       bool
+		abstractsByID   *xsync.MapOf[string, abstract.Abstract]
+		abstractsByName *xsync.MapOf[string, abstract.Abstract]
+		mu              *sync.Mutex
+		consulClient    *consumer.Client
+		consulKV        *consumer.KV
+		service         iaasapi.Service
+		organization    string
+		project         string
+		tenant          string
+		description     string
+		kvPath          string
+		fsPath          string
+		loaded          bool
 	}
 )
 
@@ -125,14 +119,15 @@ func New(organization, project, tenant, description string) (*scope, fail.Error)
 	}
 
 	out := &scope{
-		organization: organization,
-		project:      project,
-		tenant:       tenant,
-		description:  description,
-		fsPath:       filepath.Join(organization, project, tenant),
-		kvPath:       strings.Join([]string{organization, project, tenant}, "/"),
-		resources:    xsync.NewMapOf[terraformerapi.Resource](),
-		mu:           &sync.Mutex{},
+		organization:    organization,
+		project:         project,
+		tenant:          tenant,
+		description:     description,
+		fsPath:          filepath.Join(organization, project, tenant),
+		kvPath:          strings.Join([]string{organization, project, tenant}, "/"),
+		abstractsByID:   xsync.NewMapOf[abstract.Abstract](),
+		abstractsByName: xsync.NewMapOf[abstract.Abstract](),
+		mu:              &sync.Mutex{},
 	}
 
 	_, loaded := scopeList.LoadOrStore(out.kvPath, out)
@@ -156,7 +151,7 @@ func New(organization, project, tenant, description string) (*scope, fail.Error)
 
 // IsNull tells if the scope is considered as null value
 func (s *scope) IsNull() bool {
-	return s == nil || s.organization == "" || s.project == "" || s.tenant == "" || s.resources == nil
+	return s == nil || s.organization == "" || s.project == "" || s.tenant == "" || s.abstractsByID == nil || s.abstractsByName == nil
 }
 
 // IsLoaded tells if resources of the scope have been browsed
@@ -274,6 +269,7 @@ func (s *scope) Service() iaasapi.Service {
 	return s.service
 }
 
+// ConsulKV returns the instance of lib.externals.consul.consumer.KV to access consul Key/Value store
 func (s *scope) ConsulKV() *consumer.KV {
 	if valid.IsNull(s) {
 		return nil
@@ -285,6 +281,7 @@ func (s *scope) ConsulKV() *consumer.KV {
 	return s.consulKV
 }
 
+// LoadAbstracts loads the existing abstracts when Scope is instanciated by jobmanager
 func (s *scope) LoadAbstracts(ctx context.Context) fail.Error {
 	if valid.IsNull(s) {
 		return fail.InvalidInstanceError()
@@ -362,7 +359,7 @@ func (s *scope) loadNetworks(ctx context.Context, provider providerUsingTerrafor
 			return innerXErr
 		}
 
-		innerXErr = s.registerResource(an)
+		innerXErr = s.registerAbstract(an)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -421,7 +418,7 @@ func (s *scope) loadSubnets(ctx context.Context, provider providerUsingTerraform
 			return innerXErr
 		}
 
-		innerXErr = s.registerResource(as)
+		innerXErr = s.registerAbstract(as)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -446,7 +443,7 @@ func (s *scope) loadSecurityGroups(ctx context.Context, provider providerUsingTe
 			return innerXErr
 		}
 
-		innerXErr = s.registerResource(asg)
+		innerXErr = s.RegisterAbstract(asg)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -465,7 +462,7 @@ func (s *scope) loadHosts(ctx context.Context, provider providerUsingTerraform) 
 		return xerr
 	}
 
-	svc := browser.Service()
+	// svc := browser.Service()
 
 	return browser.Browse(ctx, func(ahc *abstract.HostCore) (ferr fail.Error) {
 		innerXErr := provider.ConsolidateHostSnippet(ahc)
@@ -473,72 +470,8 @@ func (s *scope) loadHosts(ctx context.Context, provider providerUsingTerraform) 
 			return innerXErr
 		}
 
-		ahf, innerXErr := svc.InspectHost(ctx, ahc)
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		// -- Need to add bound Security Groups of the Host as Extra data to abstract.HostFull
-		host, innerXErr := hostfactory.Load(ctx, ahc.ID)
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		hostTrx, innerXErr := metadata.NewTransaction[*abstract.HostCore, *resources.Host](ctx, host)
-		if innerXErr != nil {
-			return innerXErr
-		}
-		defer hostTrx.TerminateBasedOnError(ctx, &ferr)
-
-		innerXErr = metadata.InspectProperties[*abstract.HostCore](ctx, hostTrx, func(props *serialize.JSONProperties) fail.Error {
-			inspectXErr := props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-				networkV2, inspectErr := clonable.Cast[*propertiesv2.HostNetworking](p)
-				if inspectErr != nil {
-					return fail.Wrap(inspectErr)
-				}
-
-				subnetList := make([]*abstract.Subnet, 0, len(networkV2.SubnetsByName))
-				for k := range networkV2.SubnetsByName {
-					entry, found := s.resources.Load("subnet:" + k)
-					if !found {
-						logrus.WithContext(ctx).Errorf("inconsistency detected in metadata: Host '%s' is bound to Subnet '%s', which does not exist", ahc.Name, k)
-						continue
-					}
-
-					casted, inspectErr := lang.Cast[*abstract.Subnet](entry)
-					if inspectErr != nil {
-						return fail.Wrap(inspectErr)
-					}
-
-					cloned, inspectErr := clonable.CastedClone[*abstract.Subnet](casted)
-					if inspectErr != nil {
-						return fail.Wrap(inspectErr)
-					}
-
-					subnetList = append(subnetList, cloned)
-				}
-				return ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", subnetList))
-			})
-			if inspectXErr != nil {
-				return inspectXErr
-			}
-
-			return props.Inspect(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-				sgsV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				list := make(map[string]string, len(sgsV1.ByName))
-				for k, v := range sgsV1.ByName {
-					list[v] = k
-				}
-				return ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", list))
-			})
-		})
-
-		// -- register resource in scope
-		_, innerXErr = s.RegisterResourceIfNeeded(ahf)
+		// Need to add bound Security Groups and Subnets of the Host as Extra data to abstract.HostFull; done using Host Factory Load call
+		_, innerXErr = hostfactory.Load(ctx, ahc.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -559,7 +492,7 @@ func (s *scope) loadLabels(ctx context.Context, _ providerUsingTerraform) (ferr 
 
 	return browser.Browse(ctx, func(al *abstract.Label) fail.Error {
 		// provider.ConsolidateLabelSnippet(al)
-		innerXErr := s.registerResource(al)
+		innerXErr := s.RegisterAbstract(al)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -584,7 +517,7 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 			return innerXErr
 		}
 
-		innerXErr = s.registerResource(av)
+		innerXErr = s.RegisterAbstract(av)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -605,7 +538,7 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 // 	}
 //
 // 	return browser.Browse(ctx, func(ac *abstract.Cluster) fail.Error {
-// 		innerXErr := s.registerResource(ac)
+// 		innerXErr := s.registerAbstract(ac)
 // 		if innerXErr != nil {
 // 			return innerXErr
 // 		}
@@ -625,7 +558,7 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 // 	}
 //
 // 	return browser.Browse(ctx, func(ab *abstract.Bucket) fail.Error {
-// 		innerXErr := s.registerResource(ab)
+// 		innerXErr := s.registerAbstract(ab)
 // 		if innerXErr != nil {
 // 			return innerXErr
 // 		}
@@ -635,8 +568,8 @@ func (s *scope) loadVolumes(ctx context.Context, provider providerUsingTerraform
 // 	})
 // }
 
-// AllResources returns all abstracts registered in Scope
-func (s *scope) AllResources() (map[string]terraformerapi.Resource, fail.Error) {
+// AllAbstracts returns all abstracts registered in Scope
+func (s *scope) AllAbstracts() (map[string]abstract.Abstract, fail.Error) {
 	if valid.IsNull(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -644,8 +577,8 @@ func (s *scope) AllResources() (map[string]terraformerapi.Resource, fail.Error) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	list := make(map[string]terraformerapi.Resource, s.resources.Size())
-	s.resources.Range(func(key string, value terraformerapi.Resource) bool {
+	list := make(map[string]abstract.Abstract, s.abstractsByID.Size())
+	s.abstractsByName.Range(func(key string, value abstract.Abstract) bool {
 		list[key] = value
 		return true
 	})
@@ -653,8 +586,8 @@ func (s *scope) AllResources() (map[string]terraformerapi.Resource, fail.Error) 
 	return list, nil
 }
 
-// Resource returns the resource with kind and name
-func (s *scope) Resource(kind, name string) (terraformerapi.Resource, fail.Error) {
+// AbstractByName returns the resource with kind and name
+func (s *scope) AbstractByName(kind, name string) (abstract.Abstract, fail.Error) {
 	if valid.IsNull(s) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -666,7 +599,7 @@ func (s *scope) Resource(kind, name string) (terraformerapi.Resource, fail.Error
 	}
 
 	queryName := kind + ":" + name
-	entry, found := s.resources.Load(queryName)
+	entry, found := s.abstractsByName.Load(queryName)
 	if !found {
 		return nil, fail.NotFoundError("failed to find %s resource '%s' in Scope", kind, name)
 	}
@@ -676,7 +609,7 @@ func (s *scope) Resource(kind, name string) (terraformerapi.Resource, fail.Error
 		return nil, fail.InconsistentError("failed to cast resource to 'clonable.Clonable'")
 	}
 
-	cloned, err := clonable.CastedClone[terraformerapi.Resource](value)
+	cloned, err := clonable.CastedClone[abstract.Abstract](value)
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
@@ -684,8 +617,39 @@ func (s *scope) Resource(kind, name string) (terraformerapi.Resource, fail.Error
 	return cloned, nil
 }
 
-// RegisterResource ...
-func (s *scope) RegisterResource(rsc terraformerapi.Resource) fail.Error {
+// AbstractByID returns the resource with kind and id
+func (s *scope) AbstractByID(kind, id string) (abstract.Abstract, fail.Error) {
+	if valid.IsNull(s) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if kind == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("kind")
+	}
+	if id == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
+	}
+
+	queryName := kind + ":" + id
+	entry, found := s.abstractsByID.Load(queryName)
+	if !found {
+		return nil, fail.NotFoundError("failed to find %s abstract with ID '%s' in Scope", kind, id)
+	}
+
+	value, ok := entry.(clonable.Clonable)
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast resource to 'clonable.Clonable'")
+	}
+
+	cloned, err := clonable.CastedClone[abstract.Abstract](value)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	return cloned, nil
+}
+
+// RegisterAbstract ...
+func (s *scope) RegisterAbstract(rsc abstract.Abstract) fail.Error {
 	if valid.IsNull(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -693,11 +657,11 @@ func (s *scope) RegisterResource(rsc terraformerapi.Resource) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("rsc")
 	}
 
-	return s.registerResource(rsc)
+	return s.registerAbstract(rsc)
 }
 
-// RegisterResourceIfNeeded ...
-func (s *scope) RegisterResourceIfNeeded(rsc terraformerapi.Resource) (bool, fail.Error) {
+// RegisterAbstractIfNeeded ...
+func (s *scope) RegisterAbstractIfNeeded(rsc abstract.Abstract) (bool, fail.Error) {
 	if valid.IsNull(s) {
 		return false, fail.InvalidInstanceError()
 	}
@@ -705,7 +669,7 @@ func (s *scope) RegisterResourceIfNeeded(rsc terraformerapi.Resource) (bool, fai
 		return false, fail.InvalidParameterCannotBeNilError("rsc")
 	}
 
-	xerr := s.registerResource(rsc)
+	xerr := s.registerAbstract(rsc)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrDuplicate:
@@ -719,37 +683,45 @@ func (s *scope) RegisterResourceIfNeeded(rsc terraformerapi.Resource) (bool, fai
 	return true, nil
 }
 
-// registerResource ...
-func (s *scope) registerResource(rsc terraformerapi.Resource) fail.Error {
-	kind, name, queryName, xerr := s.extractResourceIndex(rsc)
+// registerAbstract ...
+func (s *scope) registerAbstract(rsc abstract.Abstract) fail.Error {
+	kind, name, id, queryByName, queryByID, xerr := s.extractAbstractIndexes(rsc)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Check duplicate by name
-	_, found := s.resources.Load(queryName)
+	_, found := s.abstractsByName.Load(queryByName)
 	if found {
-		return fail.DuplicateError("a %s named '%s' is already registered", kind, name)
+		return fail.DuplicateError("a %s with name '%s' is already registered", kind, name)
 	}
 
-	// Now registers resource
-	s.resources.Store(queryName, rsc)
+	_, found = s.abstractsByID.Load(queryByID)
+	if found {
+		return fail.DuplicateError("a %s with ID '%s' is already registered", kind, id)
+	}
+
+	// Now registers abstract
+	s.abstractsByName.Store(queryByName, rsc)
+	s.abstractsByID.Store(queryByID, rsc)
 	return nil
 }
 
-// ReplaceResource does replace a resource already there, or register it if not present
-func (s *scope) ReplaceResource(rsc terraformerapi.Resource) fail.Error {
-	_, _, queryName, xerr := s.extractResourceIndex(rsc)
-	if xerr != nil {
-		return xerr
-	}
+// // ReplaceAbstract does replace a resource already there, or register it if not present
+// func (s *scope) ReplaceAbstract(rsc abstract.Abstract) fail.Error {
+// 	kind, _, _, queryByName, queryByID, xerr := s.extractAbstractIndexes(rsc)
+// 	if xerr != nil {
+// 		return xerr
+// 	}
+// 	_ = kind
+//
+// 	s.abstractsByName.Store(queryByName, rsc)
+// 	s.abstractsByID.Store(queryByID, rsc)
+// 	return nil
+// }
 
-	s.resources.Store(queryName, rsc)
-	return nil
-}
-
-// UnregisterResource unregisters a resource from Scope
-func (s *scope) UnregisterResource(rsc terraformerapi.Resource) fail.Error {
+// UnregisterAbstract unregisters a resource from Scope
+func (s *scope) UnregisterAbstract(rsc abstract.Abstract) fail.Error {
 	if valid.IsNull(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -757,23 +729,36 @@ func (s *scope) UnregisterResource(rsc terraformerapi.Resource) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("rsc")
 	}
 
-	_, _, queryName, xerr := s.extractResourceIndex(rsc)
+	_, _, _, queryByName, queryByID, xerr := s.extractAbstractIndexes(rsc)
 	if xerr != nil {
 		return xerr
 	}
 
-	s.resources.Delete(queryName)
+	s.abstractsByName.Delete(queryByName)
+	s.abstractsByID.Delete(queryByID)
 	return nil
 }
 
-// extractResourceIndex returns kind, name and index corresponding to resource
-func (s *scope) extractResourceIndex(rsc terraformerapi.Resource) (string, string, string, fail.Error) {
+// extractAbstractIndexes extract some information from abstract
+// returns:
+// - kind: the kind of abstract
+// - name: the name of abstract
+// - id: the id of abstract
+// - indexByName: the index used to find abstract by name in Scope
+// - indexByID: the index used to find abstract by id in Scope
+// - error: if error occurs, none of the returned values are pertinent
+func (s *scope) extractAbstractIndexes(rsc abstract.Abstract) (kind, name, id, indexByName, indexByID string, ferr fail.Error) {
 	if valid.IsNull(s) {
-		return "", "", "", fail.InvalidInstanceError()
+		return "", "", "", "", "", fail.InvalidInstanceError()
 	}
 	if valid.IsNull(rsc) {
-		return "", "", "", fail.InvalidParameterCannotBeNilError("rsc")
+		return "", "", "", "", "", fail.InvalidParameterCannotBeNilError("rsc")
 	}
 
-	return rsc.Kind(), rsc.GetName(), rsc.UniqueID(), nil
+	id, err := rsc.GetID()
+	if err != nil {
+		return "", "", "", "", "", fail.Wrap(err)
+	}
+
+	return rsc.Kind(), rsc.GetName(), id, rsc.Kind() + ":" + rsc.GetName(), rsc.Kind() + ":" + id, nil
 }

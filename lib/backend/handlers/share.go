@@ -193,7 +193,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 			return nil, xerr
 		}
 		defer func(trx metadata.Transaction[*abstract.HostCore, *resources.Host]) {
-			trx.TerminateBasedOnError(ctx, &ferr)
+			trx.TerminateFromError(ctx, &ferr)
 		}(hostTrx)
 
 		xerr = metadata.InspectProperty[*abstract.HostCore](ctx, hostTrx, hostproperty.SharesV1, func(hostSharesV1 *propertiesv1.HostShares) fail.Error {

@@ -105,64 +105,74 @@ func LoadBucket(inctx context.Context, name string) (*Bucket, fail.Error) {
 
 			// trick to avoid collisions
 			var kt *Bucket
-			cachename := fmt.Sprintf("%T/%s", kt, name)
+			refcache := fmt.Sprintf("%T/%s", kt, name)
 
 			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
 
+			var (
+				bucketInstance *Bucket
+				err            error
+				inCache        bool
+			)
 			if cache != nil {
-				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-					casted, ok := val.(*Bucket)
-					if ok {
-						return casted, nil
+				entry, err := cache.Get(ctx, refcache)
+				if err == nil {
+					bucketInstance, err = lang.Cast[*Bucket](entry)
+					if err != nil {
+						return nil, fail.Wrap(err)
 					}
+
+					inCache = true
+
+					// -- reload from metadata storage
+					xerr := bucketInstance.Core.Reload(ctx)
+					if xerr != nil {
+						return nil, xerr
+					}
+				} else {
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
 			}
+			if bucketInstance == nil {
+				anon, xerr := onBucketCacheMiss(ctx, name)
+				if xerr != nil {
+					return nil, xerr
+				}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onBucketCacheMiss(ctx, name) }
-			entry, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			b, err := lang.Cast[*Bucket](entry)
-			if err != nil {
-				return nil, fail.Wrap(err)
-			}
-
-			if b == nil {
-				return nil, fail.InconsistentError("nil value found in Bucket cache for key '%s'", name)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = b.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, b.GetName()), b, &store.Options{Expiration: 1 * time.Minute})
+				bucketInstance, err = lang.Cast[*Bucket](anon)
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
+			}
+
+			if cache != nil && !inCache {
+				// -- add host instance in cache by name
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, bucketInstance.GetName()), bucketInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.Wrap(err)
+				}
+
 				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
-				hid, err := b.GetID()
+				hid, err := bucketInstance.GetID()
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), b, &store.Options{Expiration: 1 * time.Minute})
+
+				// -- add host instance in cache by id
+				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), bucketInstance, &store.Options{Expiration: 1 * time.Minute})
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
+
 				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 
-				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-					casted, ok := val.(*Bucket)
-					if ok {
-						return casted, nil
-					} else {
+				entry, xerr := cache.Get(ctx, refcache)
+				if xerr == nil {
+					_, err := lang.Cast[*Network](entry)
+					if err != nil {
 						logrus.WithContext(ctx).Warnf("wrong type of *Bucket")
 					}
 				} else {
@@ -170,10 +180,27 @@ func LoadBucket(inctx context.Context, name string) (*Bucket, fail.Error) {
 				}
 			}
 
-			return b, nil
+			if myjob.Service().Capabilities().UseTerraformer {
+				bucketTrx, xerr := newBucketTransaction(ctx, bucketInstance)
+				if xerr != nil {
+					return nil, xerr
+				}
+				defer bucketTrx.TerminateFromError(ctx, &ferr)
+
+				xerr = reviewBucketMetadataAbstract(ctx, bucketTrx, func(ab *abstract.Bucket) fail.Error {
+					_, innerXErr := myjob.Scope().RegisterAbstractIfNeeded(ab)
+					return innerXErr
+				})
+				if xerr != nil {
+					return nil, xerr
+				}
+			}
+
+			return bucketInstance, nil
 		}()
 		chRes <- result{gb, gerr}
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -331,7 +358,7 @@ func (instance *Bucket) GetHost(ctx context.Context) (_ string, ferr fail.Error)
 	if xerr != nil {
 		return "", xerr
 	}
-	defer bucketTrx.TerminateBasedOnError(ctx, &ferr)
+	defer bucketTrx.TerminateFromError(ctx, &ferr)
 
 	var res string
 	xerr = inspectBucketMetadataAbstract(ctx, bucketTrx, func(ab *abstract.Bucket) fail.Error {
@@ -362,7 +389,7 @@ func (instance *Bucket) GetMountPoint(ctx context.Context) (_ string, ferr fail.
 	if xerr != nil {
 		return "", xerr
 	}
-	defer bucketTrx.TerminateBasedOnError(ctx, &ferr)
+	defer bucketTrx.TerminateFromError(ctx, &ferr)
 
 	var res string
 	xerr = inspectBucketMetadataAbstract(ctx, bucketTrx, func(ab *abstract.Bucket) fail.Error {
@@ -472,14 +499,14 @@ func (instance *Bucket) Delete(ctx context.Context) (ferr fail.Error) {
 
 	bun := instance.GetName()
 
-	trx, xerr := metadata.NewTransaction[*abstract.Bucket, *Bucket](ctx, instance)
+	bucketTrx, xerr := metadata.NewTransaction[*abstract.Bucket, *Bucket](ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer bucketTrx.TerminateFromError(ctx, &ferr)
 
 	// -- check Bucket is not still mounted
-	xerr = inspectBucketMetadataProperty(ctx, trx, bucketproperty.MountsV1, func(mountsV1 *propertiesv1.BucketMounts) fail.Error {
+	xerr = inspectBucketMetadataProperty(ctx, bucketTrx, bucketproperty.MountsV1, func(mountsV1 *propertiesv1.BucketMounts) fail.Error {
 		if len(mountsV1.ByHostID) > 0 {
 			return fail.NotAvailableError("still mounted on some Hosts")
 		}
@@ -499,6 +526,8 @@ func (instance *Bucket) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
+	// Need to explicitly terminate bucket transaction to be able to delete metadata (dead-lock otherwise)
+	bucketTrx.SilentTerminate(ctx)
 	return instance.Core.Delete(ctx)
 }
 
@@ -549,7 +578,7 @@ func (instance *Bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	if xerr != nil {
 		return xerr
 	}
-	defer bucketTrx.TerminateBasedOnError(ctx, &ferr)
+	defer bucketTrx.TerminateFromError(ctx, &ferr)
 
 	// -- check if Bucket is already mounted on any Host (only one Mount by Bucket allowed by design, to mitigate sync issues induced by Object Storage)
 	xerr = reviewBucketMetadataProperty(ctx, bucketTrx, bucketproperty.MountsV1, func(mountsV1 *propertiesv1.BucketMounts) fail.Error {
@@ -652,7 +681,7 @@ func (instance *Bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return alterHostMetadataProperty(ctx, hostTrx, hostproperty.MountsV1, func(mountsV1 *propertiesv1.HostMounts) fail.Error {
 		mountsV1.BucketMounts[hostName] = mountPoint
@@ -685,7 +714,7 @@ func (instance *Bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 	if xerr != nil {
 		return xerr
 	}
-	defer bucketTrx.TerminateBasedOnError(ctx, &ferr)
+	defer bucketTrx.TerminateFromError(ctx, &ferr)
 
 	hostInstance, xerr := LoadHost(ctx, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -702,7 +731,7 @@ func (instance *Bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	var mountPoint string
 	bucketName := instance.GetName()
@@ -776,7 +805,7 @@ func (instance *Bucket) ToProtocol(ctx context.Context) (_ *protocol.BucketRespo
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer bucketTrx.TerminateBasedOnError(ctx, &ferr)
+	defer bucketTrx.TerminateFromError(ctx, &ferr)
 
 	xerr = reviewBucketMetadataProperty(ctx, bucketTrx, bucketproperty.MountsV1, func(mountsV1 *propertiesv1.BucketMounts) fail.Error {
 		out.Mounts = make([]*protocol.BucketMount, 0, len(mountsV1.ByHostID))

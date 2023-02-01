@@ -242,7 +242,7 @@ func (instance *stack) InspectTemplate(ctx context.Context, id string) (template
 }
 
 // ListTemplates lists available Host templates
-// Host templates are sorted using Dominant Resource Fairness Algorithm
+// Host templates are sorted using Dominant AbstractByName Fairness Algorithm
 func (instance *stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()

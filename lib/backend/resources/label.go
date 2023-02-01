@@ -99,67 +99,95 @@ func LoadLabel(inctx context.Context, ref string) (*Label, fail.Error) {
 
 			// trick to avoid collisions
 			var kt *Label
-			cacheref := fmt.Sprintf("%T/%s", kt, ref)
+			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
 			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
 
+			var (
+				labelInstance *Label
+				inCache       bool
+				err           error
+			)
 			if cache != nil {
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(*Label)
-					if ok {
-						return casted, nil
+				entry, err := cache.Get(ctx, refcache)
+				if err == nil {
+					labelInstance, err = lang.Cast[*Label](entry)
+					if err != nil {
+						return nil, fail.Wrap(err)
 					}
-				}
-			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onLabelCacheMiss(ctx, ref) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
+					inCache = true
 
-			labelInstance, ok := anon.(*Label)
-			if !ok {
-				return nil, fail.InconsistentError("value in cache for Label with key '%s' is not a resources.Label", ref)
-			}
-			if labelInstance == nil {
-				return nil, fail.InconsistentError("nil value in cache for Label with key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = labelInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, labelInstance.GetName()), labelInstance, &store.Options{Expiration: 1 * time.Minute})
-				if err != nil {
-					return nil, fail.Wrap(err)
-				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
-				hid, err := labelInstance.GetID()
-				if err != nil {
-					return nil, fail.Wrap(err)
-				}
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), labelInstance, &store.Options{Expiration: 1 * time.Minute})
-				if err != nil {
-					return nil, fail.Wrap(err)
-				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(*Label)
-					if ok {
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of resources.Label")
+					// -- reload from metadata storage
+					xerr := labelInstance.Core.Reload(ctx)
+					if xerr != nil {
+						return nil, xerr
 					}
 				} else {
 					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+				}
+			}
+			if labelInstance == nil {
+				anon, xerr := onLabelCacheMiss(ctx, ref)
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				labelInstance, err = lang.Cast[*Label](anon)
+				if err != nil {
+					return nil, fail.Wrap(err)
+				}
+			}
+
+			if cache != nil {
+				if !inCache {
+					// -- add host instance in cache by name
+					err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, labelInstance.GetName()), labelInstance, &store.Options{Expiration: 1 * time.Minute})
+					if err != nil {
+						return nil, fail.Wrap(err)
+					}
+
+					time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+					hid, err := labelInstance.GetID()
+					if err != nil {
+						return nil, fail.Wrap(err)
+					}
+
+					// -- add host instance in cache by id
+					err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), labelInstance, &store.Options{Expiration: 1 * time.Minute})
+					if err != nil {
+						return nil, fail.Wrap(err)
+					}
+
+					time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+
+					val, xerr := cache.Get(ctx, refcache)
+					if xerr == nil {
+						if _, ok := val.(*Network); !ok {
+							logrus.WithContext(ctx).Warnf("wrong type of *Label")
+						}
+					} else {
+						logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					}
+				}
+			}
+
+			if myjob.Service().Capabilities().UseTerraformer {
+				labelTrx, xerr := newLabelTransaction(ctx, labelInstance)
+				if xerr != nil {
+					return nil, xerr
+				}
+				defer labelTrx.TerminateFromError(ctx, &ferr)
+
+				xerr = reviewLabelMetadataAbstract(ctx, labelTrx, func(al *abstract.Label) fail.Error {
+					_, innerXErr := myjob.Scope().RegisterAbstractIfNeeded(al)
+					return innerXErr
+				})
+				if xerr != nil {
+					return nil, xerr
 				}
 			}
 
@@ -306,7 +334,7 @@ func (instance *Label) Delete(inctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
+	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	type result struct {
 		rErr fail.Error
@@ -338,6 +366,9 @@ func (instance *Label) Delete(inctx context.Context) (ferr fail.Error) {
 					return xerr
 				}
 			}
+
+			// Need to terminate label transaction to be able to delete metadata (dead-lock otherwise)
+			labelTrx.SilentTerminate(ctx)
 
 			// remove metadata
 			return instance.Core.Delete(ctx)
@@ -424,7 +455,7 @@ func (instance *Label) ToProtocol(ctx context.Context, withHosts bool) (_ *proto
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
+	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	var labelHostsV1 *propertiesv1.LabelHosts
 	out := &protocol.LabelInspectResponse{}
@@ -482,7 +513,7 @@ func (instance *Label) IsTag(ctx context.Context) (_ bool, ferr fail.Error) {
 	if xerr != nil {
 		return false, xerr
 	}
-	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
+	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	var out bool
 	xerr = reviewLabelMetadataAbstract(ctx, labelTrx, func(alabel *abstract.Label) fail.Error {
@@ -506,7 +537,7 @@ func (instance *Label) DefaultValue(ctx context.Context) (_ string, ferr fail.Er
 	if xerr != nil {
 		return "", xerr
 	}
-	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
+	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	var out string
 	xerr = inspectLabelMetadataAbstract(ctx, labelTrx, func(alabel *abstract.Label) fail.Error {
@@ -539,13 +570,13 @@ func (instance *Label) BindToHost(ctx context.Context, hostInstance *Host, value
 	if xerr != nil {
 		return xerr
 	}
-	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
+	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	hostTrx, xerr := newHostTransaction(ctx, hostInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxBindToHost(ctx, labelTrx, hostTrx, value)
 }
@@ -607,13 +638,13 @@ func (instance *Label) UnbindFromHost(ctx context.Context, hostInstance *Host) (
 	if xerr != nil {
 		return xerr
 	}
-	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
+	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	hostTrx, xerr := newHostTransaction(ctx, hostInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxUnbindFromHost(ctx, labelTrx, hostTrx)
 }

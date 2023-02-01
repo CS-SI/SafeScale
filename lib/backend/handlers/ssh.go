@@ -151,7 +151,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	if isSingle || isGateway {
 		xerr = metadata.InspectAbstract[*abstract.HostCore](ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
@@ -229,7 +229,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 			if xerr != nil {
 				return nil, xerr
 			}
-			defer gwTrx.TerminateBasedOnError(ctx, &ferr)
+			defer gwTrx.TerminateFromError(ctx, &ferr)
 
 			xerr = metadata.InspectAbstract[*abstract.HostCore](ctx, gwTrx, func(ahc *abstract.HostCore) fail.Error {
 				sshConfig.GatewayConfig = ssh.NewConfig(ahc.Name, ip, int(ahc.SSHPort), user, ahc.PrivateKey, 0, "", nil, nil)
@@ -263,7 +263,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 			if xerr != nil {
 				return nil, xerr
 			}
-			defer gwTrx.TerminateBasedOnError(ctx, &ferr)
+			defer gwTrx.TerminateFromError(ctx, &ferr)
 
 			xerr = metadata.InspectAbstract[*abstract.HostCore](ctx, gwTrx, func(ahc *abstract.HostCore) fail.Error {
 				sshConfig.SecondaryGatewayConfig = ssh.NewConfig(gw.GetName(), ip, int(ahc.SSHPort), user, ahc.PrivateKey, 0, "", nil, nil)

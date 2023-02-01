@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/sirupsen/logrus"
 
 	"github.com/hashicorp/terraform-exec/tfexec"
@@ -126,7 +127,7 @@ func (instance *renderer) AddEnv(key, value string) fail.Error {
 }
 
 // Assemble creates a main.tf file in the appropriate folder
-func (instance *renderer) Assemble(ctx context.Context, resources ...api.Resource) (_ string, ferr fail.Error) {
+func (instance *renderer) Assemble(ctx context.Context, resources ...abstract.Abstract) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	defer fail.OnExitLogError(ctx, &ferr)
 
@@ -175,7 +176,7 @@ func (instance *renderer) Assemble(ctx context.Context, resources ...api.Resourc
 		return "", xerr
 	}
 
-	allAbstracts, xerr := instance.scope.AllResources()
+	allAbstracts, xerr := instance.scope.AllAbstracts()
 	if xerr != nil {
 		return "", xerr
 	}
@@ -190,7 +191,6 @@ func (instance *renderer) Assemble(ctx context.Context, resources ...api.Resourc
 	resourceContent := data.NewSlice[string](len(allAbstracts))
 	for _, r := range allAbstracts {
 		lvars := variables.Clone()
-		// lvars.Merge(map[string]any{"Resource": r.ToMap()})
 		lvars.Merge(map[string]any{"Resource": r})
 		lvars["Extra"] = r.Extra()
 
@@ -697,7 +697,7 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 //
 // 	err = instance.executor.Import(ctx, resourceAddress, id, tfexec.AllowMissingConfig(true))
 // 	if err != nil {
-// 		if strings.Contains(err.Error(), "Resource already managed") {
+// 		if strings.Contains(err.Error(), "resource already managed") {
 // 			return fail.DuplicateError()
 // 		}
 // 		if strings.Contains(err.Error(), "Cannot import non-existent remote object") {
@@ -823,7 +823,7 @@ func retryableTerraformExecutorCall(inctx context.Context, callback func() error
 
 			plannedAction := retry.NewAction(
 				retry.Fibonacci(temporal.MinDelay()), // waiting time between retries follows Fibonacci numbers x MinDelay()
-				nil,
+				retry.PrevailDone(retry.Unsuccessful(), retry.Max(5)),
 				func() (nested error) {
 					defer fail.OnPanic(&nested)
 
@@ -910,7 +910,7 @@ func normalizeError(err error) error {
 					return fail.SyntaxError(err.Error())
 				}
 				if strings.Contains(lowered, "connection reset by peer") {
-					return fail.NewError("connection reset by peer")
+					return fail.NotAvailableError(err.Error())
 				}
 			default:
 			}

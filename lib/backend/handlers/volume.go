@@ -142,7 +142,7 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer volumeTrx.TerminateBasedOnError(ctx, &ferr)
+	defer volumeTrx.TerminateFromError(ctx, &ferr)
 
 	// FIXME: introduce a volumeInstance.GetAttachments() to replace the code below
 	attachments, xerr := volumeInstance.GetAttachments(ctx)

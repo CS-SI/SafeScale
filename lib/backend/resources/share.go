@@ -107,64 +107,74 @@ func LoadShare(inctx context.Context, ref string) (*Share, fail.Error) {
 
 			// trick to avoid collisions
 			var kt *Share
-			cacheref := fmt.Sprintf("%T/%s", kt, ref)
+			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
 			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
 
+			var (
+				shareInstance *Share
+				inCache       bool
+				err           error
+			)
 			if cache != nil {
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(*Share)
-					if ok {
-						return casted, nil
+				entry, err := cache.Get(ctx, refcache)
+				if err == nil {
+					shareInstance, err = lang.Cast[*Share](entry)
+					if err != nil {
+						return nil, fail.Wrap(err)
 					}
+
+					inCache = true
+
+					// -- reload from metadata storage
+					xerr := shareInstance.Core.Reload(ctx)
+					if xerr != nil {
+						return nil, xerr
+					}
+				} else {
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+				}
+			}
+			if shareInstance == nil {
+				anon, xerr := onShareCacheMiss(ctx, ref)
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				shareInstance, err = lang.Cast[*Share](anon)
+				if err != nil {
+					return nil, fail.Wrap(err)
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onShareCacheMiss(ctx, ref) }
-			entry, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			var ok bool
-			var shareInstance *Share
-			if shareInstance, ok = entry.(*Share); !ok {
-				return nil, fail.InconsistentError("cache content should be a *Share", ref)
-			}
-			if shareInstance == nil {
-				return nil, fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = shareInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
+			if cache != nil && !inCache {
+				// -- add host instance in cache by name
 				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, shareInstance.GetName()), shareInstance, &store.Options{Expiration: 1 * time.Minute})
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
+
 				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 				hid, err := shareInstance.GetID()
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
+
+				// -- add host instance in cache by id
 				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), shareInstance, &store.Options{Expiration: 1 * time.Minute})
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
+
 				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(*Share)
-					if ok {
-						return casted, nil
-					} else {
+				entry, xerr := cache.Get(ctx, refcache)
+				if xerr == nil {
+					_, err := lang.Cast[*Share](entry)
+					if err != nil {
 						logrus.WithContext(ctx).Warnf("wrong type of *Share")
 					}
 				} else {
@@ -362,7 +372,7 @@ func (instance *Share) Create(
 	if xerr != nil {
 		return xerr
 	}
-	defer serverTrx.TerminateBasedOnError(ctx, &ferr)
+	defer serverTrx.TerminateFromError(ctx, &ferr)
 
 	// -- make some validations --
 	xerr = inspectHostMetadataProperty(ctx, serverTrx, hostproperty.MountsV1, func(serverMountsV1 *propertiesv1.HostMounts) fail.Error {
@@ -528,7 +538,7 @@ func (instance *Share) GetServer(ctx context.Context) (_ *Host, ferr fail.Error)
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer shareTrx.TerminateBasedOnError(ctx, &ferr)
+	defer shareTrx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxGetServer(ctx, shareTrx)
 }
@@ -659,13 +669,13 @@ func (instance *Share) Mount(ctx context.Context, target *Host, spath string, wi
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer targetTrx.TerminateBasedOnError(ctx, &ferr)
+	defer targetTrx.TerminateFromError(ctx, &ferr)
 
 	shareTrx, xerr := newShareTransaction(ctx, instance)
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer shareTrx.TerminateBasedOnError(ctx, &ferr)
+	defer shareTrx.TerminateFromError(ctx, &ferr)
 
 	// Retrieve info about the Share
 	xerr = reviewShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
@@ -682,7 +692,7 @@ func (instance *Share) Mount(ctx context.Context, target *Host, spath string, wi
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer serverTrx.TerminateBasedOnError(ctx, &ferr)
+	defer serverTrx.TerminateFromError(ctx, &ferr)
 
 	serverPrivateIP, xerr := serverInstance.GetPrivateIP(ctx)
 	if xerr != nil {
@@ -895,7 +905,7 @@ func (instance *Share) Unmount(ctx context.Context, target *Host) (ferr fail.Err
 	if xerr != nil {
 		return xerr
 	}
-	defer shareTrx.TerminateBasedOnError(ctx, &ferr)
+	defer shareTrx.TerminateFromError(ctx, &ferr)
 
 	// Retrieve info about the Share
 	xerr = reviewShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
@@ -913,7 +923,7 @@ func (instance *Share) Unmount(ctx context.Context, target *Host) (ferr fail.Err
 	if xerr != nil {
 		return xerr
 	}
-	defer serverTrx.TerminateBasedOnError(ctx, &ferr)
+	defer serverTrx.TerminateFromError(ctx, &ferr)
 
 	serverName := serverInstance.GetName()
 	serverPrivateIP, xerr := serverInstance.GetPrivateIP(ctx)
@@ -946,7 +956,7 @@ func (instance *Share) Unmount(ctx context.Context, target *Host) (ferr fail.Err
 	if xerr != nil {
 		return xerr
 	}
-	defer targetTrx.TerminateBasedOnError(ctx, &ferr)
+	defer targetTrx.TerminateFromError(ctx, &ferr)
 
 	xerr = alterHostMetadataProperty(ctx, targetTrx, hostproperty.MountsV1, func(targetMountsV1 *propertiesv1.HostMounts) fail.Error {
 		mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
@@ -1021,7 +1031,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer shareTrx.TerminateBasedOnError(ctx, &ferr)
+	defer shareTrx.TerminateFromError(ctx, &ferr)
 
 	// -- Retrieve info about the Share --
 	// Note: we do not use GetName() and ID() to avoid 2 consecutive instance.Inspect()
@@ -1040,7 +1050,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer serverTrx.TerminateBasedOnError(ctx, &ferr)
+	defer serverTrx.TerminateFromError(ctx, &ferr)
 
 	targetName := serverInstance.GetName()
 
@@ -1100,6 +1110,9 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
+
+	// Share Transaction must be terminated to be able to delete metadata
+	shareTrx.SilentTerminate(ctx)
 
 	// Remove Share metadata
 	return instance.Core.Delete(ctx)

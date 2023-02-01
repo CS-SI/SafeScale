@@ -30,8 +30,9 @@ import (
 	"time"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/userdata"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/consts"
@@ -146,65 +147,87 @@ func LoadHost(inctx context.Context, ref string) (*Host, fail.Error) {
 				return nil, xerr
 			}
 
+			var (
+				hostInstance *Host
+				inCache      bool
+				err          error
+			)
 			if cache != nil {
-				if val, xerr := cache.Get(ctx, refcache); xerr == nil {
-					casted, ok := val.(*Host)
-					if ok {
-						incrementExpVar("newhost.cache.hit")
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of *Host")
+				entry, err := cache.Get(ctx, refcache)
+				if err == nil {
+					hostInstance, err = lang.Cast[*Host](entry)
+					if err != nil {
+						return nil, fail.Wrap(err)
+					}
+
+					inCache = true
+					incrementExpVar("newhost.cache.hit")
+
+					// -- reload from metadata storage
+					xerr = hostInstance.Core.Reload(ctx)
+					if xerr != nil {
+						return nil, xerr
 					}
 				} else {
 					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
 			}
+			if hostInstance == nil {
+				anon, xerr := onHostCacheMiss(ctx, ref)
+				if xerr != nil {
+					return nil, xerr
+				}
 
-			anon, xerr := onHostCacheMiss(ctx, ref)
+				hostInstance, err = lang.Cast[*Host](anon)
+				if err != nil {
+					return nil, fail.Wrap(err)
+				}
+			}
+
+			if cache != nil {
+				if !inCache {
+					// -- add host instance in cache by name
+					err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hostInstance.GetName()), hostInstance, &store.Options{Expiration: 1 * time.Minute})
+					if err != nil {
+						return nil, fail.Wrap(err)
+					}
+
+					time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+					hid, err := hostInstance.GetID()
+					if err != nil {
+						return nil, fail.Wrap(err)
+					}
+
+					// -- add host instance in cache by id
+					err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), hostInstance, &store.Options{Expiration: 1 * time.Minute})
+					if err != nil {
+						return nil, fail.Wrap(err)
+					}
+
+					time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+
+					val, xerr := cache.Get(ctx, refcache)
+					if xerr == nil {
+						if _, ok := val.(*Host); ok {
+							incrementExpVar("newhost.cache.hit")
+						} else {
+							logrus.WithContext(ctx).Warnf("wrong type of *Host")
+						}
+					} else {
+						logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+					}
+				}
+			}
+
+			trx, innerErr := newHostTransaction(ctx, hostInstance)
+			if innerErr != nil {
+				return nil, innerErr
+			}
+			defer trx.TerminateFromError(ctx, &ferr)
+
+			xerr = hostInstance.trxUpdateCachedInformation(ctx, trx)
 			if xerr != nil {
 				return nil, xerr
-			}
-
-			hostInstance, err := lang.Cast[*Host](anon)
-			if err != nil {
-				return nil, fail.Wrap(err)
-			}
-
-			// // if cache failed we are here, so we better retrieve updated information...
-			// xerr = hostInstance.Reload(ctx)
-			// if xerr != nil {
-			// 	return nil, xerr
-			// }
-
-			if cache != nil {
-				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hostInstance.GetName()), hostInstance, &store.Options{Expiration: 1 * time.Minute})
-				if err != nil {
-					return nil, fail.Wrap(err)
-				}
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
-				hid, err := hostInstance.GetID()
-				if err != nil {
-					return nil, fail.Wrap(err)
-				}
-
-				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), hostInstance, &store.Options{Expiration: 1 * time.Minute})
-				if err != nil {
-					return nil, fail.Wrap(err)
-				}
-
-				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
-
-				if val, xerr := cache.Get(ctx, refcache); xerr == nil {
-					casted, ok := val.(*Host)
-					if ok {
-						incrementExpVar("newhost.cache.hit")
-						return casted, nil
-					} else {
-						logrus.WithContext(ctx).Warnf("wrong type of *Host")
-					}
-				} else {
-					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
-				}
 			}
 
 			return hostInstance, nil
@@ -236,72 +259,40 @@ func LoadHost(inctx context.Context, ref string) (*Host, fail.Error) {
 // }
 
 // onHostCacheMiss is called when host 'ref' is not found in cache
-func onHostCacheMiss(inctx context.Context, ref string) (data.Identifiable, fail.Error) {
+func onHostCacheMiss(inctx context.Context, ref string) (_ data.Identifiable, ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	// FIXME: replace with result.Holder
-	type localresult struct {
-		a    data.Identifiable
-		rErr fail.Error
+	defer fail.OnPanic(&ferr)
+
+	hostInstance, xerr := NewHost(ctx)
+	if xerr != nil {
+		return nil, xerr
 	}
-	chRes := make(chan localresult)
-	go func() {
-		defer close(chRes)
-		ga, gerr := func() (_ data.Identifiable, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
 
-			hostInstance, xerr := NewHost(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			serialized, xerr := hostInstance.String()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			incrementExpVar("host.load.hits")
-			incrementExpVar("newhost.cache.read")
-
-			xerr = hostInstance.Read(ctx, ref)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			trx, innerErr := newHostTransaction(ctx, hostInstance)
-			if innerErr != nil {
-				return nil, innerErr
-			}
-			defer trx.TerminateBasedOnError(ctx, &ferr)
-
-			xerr = hostInstance.trxUpdateCachedInformation(ctx, trx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			afterSerialized, xerr := hostInstance.String()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if strings.Compare(serialized, afterSerialized) == 0 {
-				return nil, fail.NotFoundError("something is very wrong, either read or trxUpdateCachedInformation should have failed: %s", serialized)
-			}
-
-			return hostInstance, nil
-		}()
-		chRes <- localresult{ga, gerr}
-	}()
-
-	select {
-	case res := <-chRes:
-		return res.a, res.rErr
-	case <-ctx.Done():
-		return nil, fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.Wrap(inctx.Err())
+	xerr = hostInstance.Read(ctx, ref)
+	if xerr != nil {
+		return nil, xerr
 	}
+
+	serialized, xerr := hostInstance.String()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	incrementExpVar("host.load.hits")
+	incrementExpVar("newhost.cache.read")
+
+	afterSerialized, xerr := hostInstance.String()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if strings.Compare(serialized, afterSerialized) == 0 {
+		return nil, fail.NotFoundError("something is very wrong, either read or trxUpdateCachedInformation should have failed: %s", serialized)
+	}
+
+	return hostInstance, nil
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -327,6 +318,7 @@ func (instance *Host) Exists(ctx context.Context) (bool, fail.Error) {
 // trxUpdateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
 func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx metadata.Transaction[*abstract.HostCore, *Host]) fail.Error {
 	svc := instance.Service()
+	scope := instance.Job().Scope()
 
 	opUser, opUserErr := getOperatorUsernameFromCfg(ctx, svc)
 	if opUserErr != nil {
@@ -336,9 +328,32 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 	instance.localCache.Lock()
 	defer instance.localCache.Unlock()
 
-	xerr := metadata.Inspect[*abstract.HostCore](ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
-		var primaryGatewayConfig, secondaryGatewayConfig sshapi.Config
-		innerXErr := props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) (ferr fail.Error) {
+	return reviewHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
+		var (
+			abstractHostFull                             *abstract.HostFull
+			primaryGatewayConfig, secondaryGatewayConfig sshapi.Config
+		)
+
+		entry, innerXErr := scope.AbstractByName(abstract.HostKind, ahc.Name)
+		if innerXErr != nil {
+			switch innerXErr.(type) {
+			case *fail.ErrNotFound:
+				abstractHostFull, innerXErr = svc.InspectHost(ctx, ahc)
+				if innerXErr != nil {
+					return innerXErr
+				}
+			default:
+				return innerXErr
+			}
+		} else {
+			var innerErr error
+			abstractHostFull, innerErr = lang.Cast[*abstract.HostFull](entry)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
+			}
+		}
+
+		innerXErr = props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) (ferr fail.Error) {
 			hnV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
@@ -364,8 +379,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 				instance.localCache.accessIP = instance.localCache.publicIP
 			}
 
-			// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
-			// Do not execute iff Host is single or is a gateway
+			// Do not execute if Host is single or is a gateway
 			if !hnV2.Single && !hnV2.IsGateway && hnV2.DefaultSubnetID != "" {
 				subnetInstance, xerr := LoadSubnet(ctx, "", hnV2.DefaultSubnetID)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -377,7 +391,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 				if xerr != nil {
 					return xerr
 				}
-				defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
+				defer subnetTrx.TerminateFromError(ctx, &ferr)
 
 				gwInstance, xerr := subnetInstance.trxInspectGateway(ctx, subnetTrx, true)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -394,7 +408,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 				if xerr != nil {
 					return xerr
 				}
-				defer gwTrx.TerminateBasedOnError(ctx, &ferr)
+				defer gwTrx.TerminateFromError(ctx, &ferr)
 
 				gwErr := inspectHostMetadataAbstract(ctx, gwTrx, func(gwahc *abstract.HostCore) fail.Error {
 					primaryGatewayConfig = ssh.NewConfig(gwahc.Name, ip, int(gwahc.SSHPort), opUser, gwahc.PrivateKey, 0, "", nil, nil)
@@ -425,7 +439,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 					if xerr != nil {
 						return xerr
 					}
-					defer trx.TerminateBasedOnError(ctx, &ferr)
+					defer trx.TerminateFromError(ctx, &ferr)
 
 					gwErr = inspectHostMetadataAbstract(ctx, trx, func(ahf *abstract.HostCore) fail.Error {
 						secondaryGatewayConfig = ssh.NewConfig(gwInstance.GetName(), ip, int(ahf.SSHPort), opUser, ahf.PrivateKey, 0, "", nil, nil)
@@ -436,11 +450,51 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 					}
 				}
 			}
+
+			if svc.Capabilities().UseTerraformer {
+				cfg, propXErr := svc.ConfigurationOptions()
+				if propXErr != nil {
+					return propXErr
+				}
+
+				// -- updates terraformer extra subnet in abstract
+				subnetList := make([]*abstract.Subnet, 0, len(hnV2.SubnetsByName))
+				for k := range hnV2.SubnetsByName {
+					if cfg.ProviderNetwork == k {
+						// Provider's default network is not listed as not managed by SafeScale...
+						continue
+					}
+
+					entry, propXErr := scope.AbstractByName(abstract.SubnetKind, k)
+					if propXErr != nil {
+						switch propXErr.(type) {
+						case *fail.ErrNotFound:
+							logrus.WithContext(ctx).Errorf("inconsistency detected in metadata: Host '%s' is bound to Subnet '%s', which is not registered in Scope", ahc.Name, k)
+							continue
+						default:
+							return propXErr
+						}
+					}
+
+					casted, inspectErr := lang.Cast[*abstract.Subnet](entry)
+					if inspectErr != nil {
+						return fail.Wrap(inspectErr)
+					}
+
+					cloned, inspectErr := clonable.CastedClone[*abstract.Subnet](casted)
+					if inspectErr != nil {
+						return fail.Wrap(inspectErr)
+					}
+
+					subnetList = append(subnetList, cloned)
+				}
+				innerXErr = abstractHostFull.AddOptions(abstract.WithExtraData("Subnets", subnetList))
+				if innerXErr != nil {
+					return innerXErr
+				}
+			}
 			return nil
 		})
-		if innerXErr != nil {
-			return innerXErr
-		}
 
 		cfg := ssh.NewConfig(instance.GetName(), instance.localCache.accessIP, int(ahc.SSHPort), opUser, ahc.PrivateKey, 0, "", primaryGatewayConfig, secondaryGatewayConfig)
 		conn, innerXErr := sshfactory.NewConnector(cfg)
@@ -451,6 +505,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 		instance.localCache.sshCfg = cfg
 		instance.localCache.sshProfile = conn
 
+		// -- updates available install methods
 		var index uint8
 		innerXErr = props.Inspect(hostproperty.SystemV1, func(p clonable.Clonable) fail.Error {
 			systemV1, innerErr := clonable.Cast[*propertiesv1.HostSystem](p)
@@ -482,14 +537,46 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 		instance.localCache.installMethods.Store(index, installmethod.Bash)
 		index++
 		instance.localCache.installMethods.Store(index, installmethod.None)
+
+		// -- updates terraformer extra security groups data in abstract
+		if svc.Capabilities().UseTerraformer {
+			prov, xerr := svc.ProviderDriver()
+			if xerr != nil {
+				return innerXErr
+			}
+			castedProv, innerErr := lang.Cast[providers.ReservedForTerraformerUse](prov)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
+			}
+
+			innerXErr := castedProv.ConsolidateHostSnippet(abstractHostFull.HostCore)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			innerXErr = props.Inspect(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+				sgsV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				list := make(map[string]string, len(sgsV1.ByName))
+				for k, v := range sgsV1.ByName {
+					list[v] = k
+				}
+				return abstractHostFull.AddOptions(abstract.WithExtraData("SecurityGroupByID", list))
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			// -- update abstract in scope
+			_, innerXErr = instance.Job().Scope().RegisterAbstractIfNeeded(abstractHostFull)
+			return innerXErr
+		}
+
 		return nil
 	})
-
-	if xerr != nil {
-		return xerr
-	}
-
-	return nil
 }
 
 func getOperatorUsernameFromCfg(ctx context.Context, svc iaasapi.Service) (string, fail.Error) {
@@ -622,7 +709,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 	if xerr != nil {
 		return state, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = metadata.AlterAbstract[*abstract.HostCore](ctx, trx, func(ahc *abstract.HostCore) fail.Error {
 		abstractHostFull, innerXErr := instance.Service().InspectHost(ctx, ahc)
@@ -661,7 +748,7 @@ func (instance *Host) Reload(ctx context.Context) (ferr fail.Error) {
 	if err != nil {
 		return fail.Wrap(err)
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxReload(ctx, trx)
 }
@@ -710,6 +797,7 @@ func (instance *Host) trxReload(ctx context.Context, hostTrx hostTransaction) (f
 			if err != nil {
 				return fail.Wrap(err)
 			}
+
 			time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 		} else if _, ok := thing.(*Host); !ok {
 			return fail.NewError("cache stored the wrong type")
@@ -781,11 +869,6 @@ func (instance *Host) trxReload(ctx context.Context, hostTrx hostTransaction) (f
 		}
 	}
 
-	// xerr = instance.Job().Scope().RegisterResource(ahf)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	//
 	return instance.trxUpdateCachedInformation(ctx, hostTrx)
 }
 
@@ -800,7 +883,7 @@ func (instance *Host) GetState(ctx context.Context) (_ hoststate.Enum, ferr fail
 	if xerr != nil {
 		return state, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = inspectHostMetadataAbstract(ctx, trx, func(ahc *abstract.HostCore) fail.Error {
 		state = ahc.LastState
@@ -823,7 +906,7 @@ func (instance *Host) GetView(ctx context.Context) (_ *abstract.HostCore, _ *ser
 	if xerr != nil {
 		return nil, nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	var (
 		propsClone *serialize.JSONProperties
@@ -995,7 +1078,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 					ar := localresult{nil, xerr}
 					return ar, ar.err
 				}
-				defer defaultSubnetTrx.TerminateBasedOnError(ctx, &ferr)
+				defer defaultSubnetTrx.TerminateFromError(ctx, &ferr)
 
 				xerr = reviewSubnetMetadataAbstract(ctx, defaultSubnetTrx, func(as *abstract.Subnet) fail.Error {
 					hostReq.Subnets = append(hostReq.Subnets, as)
@@ -1030,7 +1113,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 					ar := localresult{nil, xerr}
 					return ar, ar.err
 				}
-				defer defaultSubnetTrx.TerminateBasedOnError(ctx, &ferr)
+				defer defaultSubnetTrx.TerminateFromError(ctx, &ferr)
 
 				if !hostReq.IsGateway && hostReq.DefaultRouteIP == "" {
 					s, err := lang.Cast[*Subnet](defaultSubnet)
@@ -1099,7 +1182,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				ar := localresult{nil, xerr}
 				return ar, ar.err
 			}
-			defer defaultSubnetTrx.TerminateBasedOnError(ctx, &ferr)
+			defer defaultSubnetTrx.TerminateFromError(ctx, &ferr)
 
 			ahf, userdataContent, xerr := svc.CreateHost(ctx, hostReq, extra)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -1155,16 +1238,10 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				}
 			}()
 
-			xerr = instance.Job().Scope().ReplaceResource(ahf)
-			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
-			}
-
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && hostReq.CleanOnFailure() {
-					derr := instance.Job().Scope().UnregisterResource(ahf)
+					derr := instance.Job().Scope().UnregisterAbstract(ahf)
 					if derr != nil {
 						logrus.WithContext(ctx).Errorf("cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Name, derr)
 						_ = ferr.AddConsequence(derr)
@@ -1178,7 +1255,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				ar := localresult{nil, xerr}
 				return ar, ar.err
 			}
-			defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+			defer hostTrx.TerminateFromError(ctx, &ferr)
 
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
@@ -1601,7 +1678,7 @@ func (instance *Host) trxSetSecurityGroups(ctx context.Context, hostTrx hostTran
 		if req.Single {
 			hostName := instance.GetName()
 			xerr := alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-				entry, innerXErr := instance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
+				entry, innerXErr := instance.Job().Scope().AbstractByName(ahc.Kind(), ahc.Name)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -1751,7 +1828,7 @@ func (instance *Host) trxSetSecurityGroups(ctx context.Context, hostTrx hostTran
 						_ = finnerXErr.AddConsequence(deeperXErr)
 						continue
 					}
-					defer func(trx subnetTransaction) { trx.TerminateBasedOnError(ctx, &finnerXErr) }(subnetTrx)
+					defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &finnerXErr) }(subnetTrx)
 
 					sgName := sg.GetName()
 					deeperXErr = inspectSubnetMetadataAbstract(uncancellableContext, subnetTrx, func(abstractSubnet *abstract.Subnet) fail.Error {
@@ -1795,7 +1872,7 @@ func (instance *Host) trxSetSecurityGroups(ctx context.Context, hostTrx hostTran
 			if innerXErr != nil {
 				return innerXErr
 			}
-			defer func(trx subnetTransaction) { trx.TerminateBasedOnError(ctx, &finnerXErr) }(otherSubnetTrx)
+			defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &finnerXErr) }(otherSubnetTrx)
 
 			var otherAbstractSubnet *abstract.Subnet
 			innerXErr = inspectSubnetMetadataAbstract(ctx, otherSubnetTrx, func(as *abstract.Subnet) fail.Error {
@@ -1934,11 +2011,11 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(ctx context.Context, ho
 		if xerr != nil {
 			return xerr
 		}
-		defer sgTrx.TerminateBasedOnError(ctx, &ferr)
+		defer sgTrx.TerminateFromError(ctx, &ferr)
 
 		xerr = alterSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
 			return alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-				entry, innerXErr := instance.Job().Scope().Resource("host", ahc.Name)
+				entry, innerXErr := instance.Job().Scope().AbstractByName("host", ahc.Name)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -2138,6 +2215,7 @@ func (instance *Host) waitInstallPhase(inctx context.Context, phase userdata.Pha
 	chRes := make(chan localresult)
 	go func() {
 		defer close(chRes)
+
 		var xerr fail.Error
 		defer temporal.NewStopwatch().OnExitLogInfo(ctx, fmt.Sprintf("Waiting install phase %s on '%s'...", phase, instance.GetName()), fmt.Sprintf("Finish Waiting install phase %s on '%s' with err '%v' ...", phase, instance.GetName(), xerr))()
 
@@ -2256,7 +2334,7 @@ func (instance *Host) trxUpdateSubnets(ctx context.Context, hostTrx hostTransact
 				if innerXErr != nil {
 					return innerXErr
 				}
-				defer func(trx subnetTransaction) { trx.TerminateBasedOnError(ctx, &ferr) }(subnetTrx)
+				defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &ferr) }(subnetTrx)
 
 				innerXErr = alterSubnetMetadataProperty(ctx, subnetTrx, subnetproperty.HostsV1, func(subnetHostsV1 *propertiesv1.SubnetHosts) fail.Error {
 					subnetHostsV1.ByName[hostName] = hostID
@@ -2301,7 +2379,7 @@ func (instance *Host) trxUndoUpdateSubnets(inctx context.Context, hostTrx hostTr
 				if innerXErr != nil {
 					return innerXErr
 				}
-				defer func(trx subnetTransaction) { trx.TerminateBasedOnError(ctx, &innerFErr) }(subnetTrx)
+				defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &innerFErr) }(subnetTrx)
 
 				innerXErr = alterSubnetMetadataProperty(ctx, subnetTrx, subnetproperty.HostsV1, func(subnetHostsV1 *propertiesv1.SubnetHosts) fail.Error {
 					delete(subnetHostsV1.ByID, hostID)
@@ -2324,7 +2402,9 @@ func (instance *Host) trxUndoUpdateSubnets(inctx context.Context, hostTrx hostTr
 	}
 }
 
-func (instance *Host) trxFinalizeProvisioning(ctx context.Context, hostTrx hostTransaction, userdataContent *userdata.Content) fail.Error {
+func (instance *Host) trxFinalizeProvisioning(ctx context.Context, hostTrx hostTransaction, userdataContent *userdata.Content) (ferr fail.Error) {
+	defer fail.OnExitLogError(ctx, &ferr)
+
 	instance.localCache.RLock()
 	notok := instance.localCache.sshProfile == nil
 	instance.localCache.RUnlock() // nolint
@@ -2575,7 +2655,7 @@ func createSingleHostNetworking(ctx context.Context, singleHostRequest abstract.
 	if xerr != nil {
 		return nil, nil, xerr
 	}
-	defer networkTrx.TerminateBasedOnError(ctx, &ferr)
+	defer networkTrx.TerminateFromError(ctx, &ferr)
 
 	// Check if Subnet exists
 	var (
@@ -2633,7 +2713,7 @@ func createSingleHostNetworking(ctx context.Context, singleHostRequest abstract.
 			if xerr != nil {
 				return nil, nil, xerr
 			}
-			defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
+			defer subnetTrx.TerminateFromError(ctx, &ferr)
 
 			// Sets the CIDR index in instance metadata
 			xerr = alterSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
@@ -2725,7 +2805,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	hname := hostTrx.GetName()
 	hid, err := hostTrx.GetID()
@@ -3123,6 +3203,9 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
+	// Need to explicitly terminate host transaction to be able to delete metadata (dead-lock otherwise)
+	hostTrx.SilentTerminate(ctx)
+
 	// Deletes metadata from Object Storage
 	xerr = instance.Core.Delete(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -3170,7 +3253,7 @@ func (instance *Host) GetSSHConfig(ctx context.Context) (_ sshapi.Config, ferr f
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxRefreshLocalCacheIfNeeded(ctx, hostTrx)
 	if xerr != nil {
@@ -3367,7 +3450,7 @@ func (instance *Host) GetShare(ctx context.Context, shareRef string) (_ *propert
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	var (
 		hostShare *propertiesv1.HostShare
@@ -3417,7 +3500,7 @@ func (instance *Host) GetVolumes(ctx context.Context) (_ *propertiesv1.HostVolum
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxGetVolumes(ctx, hostTrx)
 }
@@ -3486,7 +3569,7 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	// Now reload
 	xerr = instance.trxReload(ctx, hostTrx)
@@ -3569,7 +3652,7 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxReload(ctx, hostTrx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -3731,7 +3814,7 @@ func (instance *Host) GetPublicIP(ctx context.Context) (_ string, ferr fail.Erro
 	if xerr != nil {
 		return "", xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxRefreshLocalCacheIfNeeded(ctx, hostTrx)
 	if xerr != nil {
@@ -3761,7 +3844,7 @@ func (instance *Host) GetPrivateIP(ctx context.Context) (_ string, ferr fail.Err
 	if xerr != nil {
 		return "", xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxRefreshLocalCacheIfNeeded(ctx, hostTrx)
 	if xerr != nil {
@@ -3780,28 +3863,34 @@ func (instance *Host) GetPrivateIP(ctx context.Context) (_ string, ferr fail.Err
 }
 
 // GetPrivateIPOnSubnet returns the private IP of the Host on its default Subnet
-func (instance *Host) GetPrivateIPOnSubnet(ctx context.Context, subnetID string) (_ string, ferr fail.Error) {
+func (instance *Host) GetPrivateIPOnSubnet(ctx context.Context, subnetRef string) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ip := ""
 	if valid.IsNil(instance) {
 		return ip, fail.InvalidInstanceError()
 	}
-	if subnetID = strings.TrimSpace(subnetID); subnetID == "" {
-		return ip, fail.InvalidParameterError("subnetID", "cannot be empty string")
+	if subnetRef = strings.TrimSpace(subnetRef); subnetRef == "" {
+		return ip, fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
 	}
 
 	hostTrx, xerr := newHostTransaction(ctx, instance)
 	if xerr != nil {
 		return ip, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return ip, inspectHostMetadataProperty(ctx, hostTrx, hostproperty.NetworkV2, func(hostNetworkV2 *propertiesv2.HostNetworking) fail.Error {
 		var ok bool
-		ip, ok = hostNetworkV2.IPv4Addresses[subnetID]
+		ip, ok = hostNetworkV2.IPv4Addresses[subnetRef]
 		if !ok {
-			return fail.InvalidRequestError("Host '%s' does not have an IP address on subnet '%s'", instance.GetName(), subnetID)
+			id, ok := hostNetworkV2.SubnetsByName[subnetRef]
+			if ok {
+				ip, ok = hostNetworkV2.IPv4Addresses[id]
+			}
+		}
+		if !ok {
+			return fail.InvalidRequestError("Host '%s' does not have an IP address on Subnet '%s'", instance.GetName(), subnetRef)
 		}
 
 		return nil
@@ -3820,7 +3909,7 @@ func (instance *Host) GetAccessIP(ctx context.Context) (_ string, ferr fail.Erro
 	if xerr != nil {
 		return "", xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxRefreshLocalCacheIfNeeded(ctx, hostTrx)
 	if xerr != nil {
@@ -3851,7 +3940,7 @@ func (instance *Host) GetShares(ctx context.Context) (shares *propertiesv1.HostS
 	if xerr != nil {
 		return shares, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return shares, inspectHostMetadataProperty(ctx, hostTrx, hostproperty.SharesV1, func(hostSharesV1 *propertiesv1.HostShares) fail.Error {
 		shares = hostSharesV1
@@ -3872,7 +3961,7 @@ func (instance *Host) GetMounts(ctx context.Context) (mounts *propertiesv1.HostM
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxGetMounts(ctx, hostTrx)
 }
@@ -3890,7 +3979,7 @@ func (instance *Host) IsClusterMember(ctx context.Context) (yes bool, ferr fail.
 	if xerr != nil {
 		return false, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return yes, inspectHostMetadataProperty(ctx, hostTrx, hostproperty.ClusterMembershipV1, func(hostClusterMembershipV1 *propertiesv1.HostClusterMembership) fail.Error {
 		yes = hostClusterMembershipV1.Cluster != ""
@@ -3910,7 +3999,7 @@ func (instance *Host) IsGateway(ctx context.Context) (_ bool, ferr fail.Error) {
 	if xerr != nil {
 		return false, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	var state bool
 	return state, inspectHostMetadataProperty(ctx, hostTrx, hostproperty.NetworkV2, func(hnV2 *propertiesv2.HostNetworking) fail.Error {
@@ -3931,7 +4020,7 @@ func (instance *Host) IsSingle(ctx context.Context) (_ bool, ferr fail.Error) {
 	if xerr != nil {
 		return false, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	var state bool
 	return state, inspectHostMetadataProperty(ctx, hostTrx, hostproperty.NetworkV2, func(hnV2 *propertiesv2.HostNetworking) fail.Error {
@@ -3990,7 +4079,7 @@ func (instance *Host) GetDefaultSubnet(ctx context.Context) (_ *Subnet, ferr fai
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxGetDefaultSubnet(ctx, hostTrx)
 }
@@ -4017,7 +4106,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	xerr = inspectHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
 		abstractHostCore = ahc
@@ -4111,12 +4200,8 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance *Securit
 	if sgInstance == nil {
 		return fail.InvalidParameterCannotBeNilError("sgInstance")
 	}
-	castedSGInstance, err := lang.Cast[*SecurityGroup](sgInstance)
-	if err != nil {
-		return fail.Wrap(err)
-	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(sgInstance='%s', enable=%v)", sgInstance.GetName(), enable).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(sg='%s', enable=%v)", sgInstance.GetName(), enable).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	sgID, err := sgInstance.GetID()
@@ -4128,13 +4213,13 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance *Securit
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	sgTrx, xerr := newSecurityGroupTransaction(ctx, castedSGInstance)
+	sgTrx, xerr := newSecurityGroupTransaction(ctx, sgInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer sgTrx.TerminateBasedOnError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
 	// If the Security Group is already bound to the Host with the exact same state, considered as a success
 	return alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
@@ -4150,7 +4235,7 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance *Securit
 		}
 		item.Disabled = bool(!enable)
 
-		innerXErr := castedSGInstance.trxBindToHost(ctx, sgTrx, hostTrx, enable, MarkSecurityGroupAsSupplemental)
+		innerXErr := sgInstance.trxBindToHost(ctx, sgTrx, hostTrx, enable, MarkSecurityGroupAsSupplemental)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrDuplicate:
@@ -4188,13 +4273,13 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance *Secur
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	sgTrx, xerr := newSecurityGroupTransaction(ctx, sgInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer sgTrx.TerminateBasedOnError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
 	xerr = alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
 		sgID, innerErr := sgInstance.GetID()
@@ -4259,7 +4344,7 @@ func (instance *Host) ListSecurityGroups(ctx context.Context, state securitygrou
 	if xerr != nil {
 		return emptySlice, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return list, inspectHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
 		list = FilterBondsByKind(hsgV1.ByID, state)
@@ -4289,16 +4374,16 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sgInstance *Secur
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	sgTrx, xerr := newSecurityGroupTransaction(ctx, sgInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer sgTrx.TerminateBasedOnError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
 	return alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
-		entry, innerXErr := instance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
+		entry, innerXErr := instance.Job().Scope().AbstractByName(ahc.Kind(), ahc.Name)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -4378,16 +4463,16 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance *Secu
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	sgTrx, xerr := newSecurityGroupTransaction(ctx, sgInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer sgTrx.TerminateBasedOnError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
 	return alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
-		entry, innerXErr := instance.Job().Scope().Resource("host", ahc.Name)
+		entry, innerXErr := instance.Job().Scope().AbstractByName("host", ahc.Name)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -4544,7 +4629,7 @@ func (instance *Host) ListLabels(ctx context.Context) (_ map[string]string, ferr
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	var labelsV1 *propertiesv1.HostLabels
 	return labelsV1.ByID, alterHostMetadataProperty(ctx, hostTrx, hostproperty.LabelsV1, func(p *propertiesv1.HostLabels) fail.Error {
@@ -4576,13 +4661,13 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance *Label, value
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	labelTrx, xerr := newLabelTransaction(ctx, labelInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
+	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	labelID, err := labelInstance.GetID()
 	if err != nil {
@@ -4685,13 +4770,13 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance *Label) (fe
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	labelTrx, xerr := newLabelTransaction(ctx, labelInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
+	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	hostID, err := hostTrx.GetID()
 	if err != nil {
@@ -4781,13 +4866,13 @@ func (instance *Host) UpdateLabel(ctx context.Context, labelInstance *Label, val
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	labelTrx, xerr := newLabelTransaction(ctx, labelInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
+	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	hostName := instance.GetName()
 	xerr = alterLabelMetadata(ctx, labelTrx, func(al *abstract.Label, props *serialize.JSONProperties) fail.Error {
@@ -4840,7 +4925,7 @@ func (instance *Host) GetDomain(ctx context.Context) (_ string, ferr fail.Error)
 	if xerr != nil {
 		return "", xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	domain := ""
 	xerr = inspectHostMetadataProperty(ctx, hostTrx, hostproperty.DescriptionV1, func(hostDescriptionV1 *propertiesv1.HostDescription) fail.Error {

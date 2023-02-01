@@ -28,7 +28,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata/storage"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -62,7 +61,7 @@ type (
 	}
 
 	// Core contains the core functions of a persistent object
-	Core[T clonable.Clonable] struct {
+	Core[T abstract.Abstract] struct {
 		lock              *sync.RWMutex
 		id                atomic.Value
 		name              atomic.Value
@@ -77,11 +76,11 @@ type (
 	}
 )
 
-// verify that Label satisfies resources.Label
-var _ Metadata[*abstract.HostCore] = (*Core[*abstract.HostCore])(nil)
+// verify that Core implements Metadata
+var _ Metadata[abstract.Abstract] = (*Core[abstract.Abstract])(nil)
 
 // NewCore creates an instance of Core
-func NewCore[T clonable.Clonable](ctx context.Context, method string, kind string, path string, abstractRsc T) (_ *Core[T], ferr fail.Error) {
+func NewCore[T abstract.Abstract](ctx context.Context, method string, kind string, path string, abstractRsc T) (_ *Core[T], ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -311,53 +310,32 @@ func (instance *Core[T]) Carry(inctx context.Context, abstractResource T) (_ fai
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-			var xerr fail.Error
-
-			var cerr error
-			instance.carried, cerr = shielded.NewShielded(abstractResource)
-			if cerr != nil {
-				return fail.Wrap(cerr)
-			}
-
-			instance.loaded = true
-
-			xerr = instance.updateIdentity()
-			xerr = debug.InjectPlannedFail(xerr)
+			xerr := instance.carry(ctx, abstractResource)
 			if xerr != nil {
 				return xerr
 			}
 
 			instance.committed = false
-
 			xerr = instance.write(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 
-			// Registers the abstract in scope
-			myjob, xerr := jobapi.FromContext(inctx)
-			if xerr != nil {
-				return xerr
-			}
-
-			tfResource, ok := any(abstractResource).(terraformerapi.Resource)
-			if !ok {
-				return fail.InconsistentError("failed to cast '%s' to 'terraformerapi.Resource'", reflect.TypeOf(abstractResource).String())
-			}
-
-			xerr = myjob.Scope().RegisterResource(tfResource)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrDuplicate:
-					debug.IgnoreError(xerr)
-					// continue
-				default:
-					return xerr
-				}
-			}
-
+			// VPL: done by instance.write()
+			// // Registers the abstract in scope
+			// myjob, xerr := jobapi.FromContext(inctx)
+			// if xerr != nil {
+			// 	return xerr
+			// }
+			//
+			// tfResource, ok := any(abstractResource).(abstract.Abstract)
+			// if !ok {
+			// 	return fail.InconsistentError("failed to cast '%s' to 'terraformerapi.AbstractByName'", reflect.TypeOf(abstractResource).String())
+			// }
+			//
+			// _, xerr = myjob.Scope().RegisterAbstractIfNeeded(tfResource)
+			// return xerr
 			return nil
 		}()
 		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
@@ -372,6 +350,27 @@ func (instance *Core[T]) Carry(inctx context.Context, abstractResource T) (_ fai
 	case <-inctx.Done():
 		return fail.Wrap(inctx.Err())
 	}
+}
+
+// carry ...
+func (instance *Core[T]) carry(inctx context.Context, abstractResource T) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	var err error
+	instance.carried, err = shielded.NewShielded(abstractResource)
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
+	instance.loaded = true
+
+	xerr := instance.updateIdentity()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // updateIdentity updates instance cached identity
@@ -412,7 +411,7 @@ func (instance *Core[T]) updateIdentity() fail.Error {
 	return fail.InconsistentError("uninitialized data should NOT be updated")
 }
 
-// Read gets the data from metadata Storage
+// Read gets the data from Metadata Storage
 func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
@@ -426,6 +425,11 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
+
+	// myjob, innerXErr := jobapi.FromContext(ctx)
+	// if innerXErr != nil {
+	// 	return innerXErr
+	// }
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
@@ -504,35 +508,25 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 				return xerr
 			}
 
-			trx, xerr := NewTransaction[T, *Core[T]](ctx, instance)
-			if xerr != nil {
-				return xerr
-			}
-			defer trx.TerminateBasedOnError(ctx, &ferr)
+			// if myjob.Service().Capabilities().UseTerraformer {
+			// 	trx, xerr := NewTransaction[T, *Core[T]](ctx, instance)
+			// 	if xerr != nil {
+			// 		return xerr
+			// 	}
+			// 	defer trx.TerminateFromError(ctx, &ferr)
+			//
+			// 	return trx.reviewAbstract(ctx, func(p T) fail.Error {
+			// 		innerErr := instance.consolidateSnippet(p)
+			// 		if innerErr != nil {
+			// 			return fail.Wrap(innerErr)
+			// 		}
+			//
+			// 		_, innerXErr := myjob.Scope().RegisterAbstractIfNeeded(p)
+			// 		return innerXErr
+			// 	})
+			// }
 
-			return trx.reviewAbstract(ctx, func(p T) fail.Error {
-				myjob, innerXErr := jobapi.FromContext(ctx)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				tfResource, innerErr := lang.Cast[terraformerapi.Resource](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				innerErr = instance.consolidateSnippet(tfResource)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				innerXErr = myjob.Scope().ReplaceResource(tfResource)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				return nil
-			})
+			return nil
 		}()
 		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
@@ -549,7 +543,7 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 }
 
 // consolidateSnippet does what its name suggest: update terraformer snippet information of the resource
-func (instance *Core[T]) consolidateSnippet(p terraformerapi.Resource) fail.Error {
+func (instance *Core[T]) consolidateSnippet(p abstract.Abstract) fail.Error {
 	if !instance.Service().Capabilities().UseTerraformer {
 		return nil
 	}
@@ -600,8 +594,18 @@ func (instance *Core[T]) consolidateSnippet(p terraformerapi.Resource) fail.Erro
 	return nil
 }
 
-// ReadByID reads a metadata identified by ID from Object Storage
+// ReadByID reads a metadata identified by ID from Metadata Storage
 func (instance *Core[T]) ReadByID(inctx context.Context, id string) (_ fail.Error) {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if id = strings.TrimSpace(id); id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty string")
+	}
+	if instance.loaded {
+		return fail.NotAvailableError("metadata is already carrying a value")
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -613,16 +617,6 @@ func (instance *Core[T]) ReadByID(inctx context.Context, id string) (_ fail.Erro
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
-
-			if instance == nil {
-				return fail.InvalidInstanceError()
-			}
-			if id = strings.TrimSpace(id); id == "" {
-				return fail.InvalidParameterError("id", "cannot be empty string")
-			}
-			if instance.loaded {
-				return fail.NotAvailableError("metadata is already carrying a value")
-			}
 
 			timings, xerr := instance.Service().Timings()
 			if xerr != nil {
@@ -714,107 +708,57 @@ func (instance *Core[T]) readByID(inctx context.Context, id string) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
 	chRes := make(chan result.Holder[struct{}])
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
+
+			// Check if we have an abstract in Scope with that id
+			entry, xerr := myjob.Scope().AbstractByID(instance.Kind(), id)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					debug.IgnoreError(xerr)
+					// continue
+				default:
+					return xerr
+				}
+			}
+
+			// if we find an entry in Scope, carry it in instance then reload from Metadata Storage.
+			// This way, the "serialized" part of the abstract is refreshed, and the not-serialized part
+			// is kept (mandatory for provider using terraform)
+			if entry != nil {
+				value, err := lang.Cast[T](entry)
+				if err != nil {
+					return fail.Wrap(err)
+				}
+
+				xerr := instance.carry(ctx, value)
+				if xerr != nil {
+					return xerr
+				}
+
+				instance.loaded = true
+				instance.committed = true
+			}
+
+			// check in Scope failed, read the metadata storage
+			timings, xerr := instance.Service().Timings()
+			if xerr != nil {
+				return xerr
+			}
 
 			var path string
 			if instance.kindSplittedStore {
 				path = byIDFolderName
 			}
-
-			timings, xerr := instance.Service().Timings()
-			if xerr != nil {
-				return xerr
-			}
-
-			rerr := retry.WhileUnsuccessful(func() error {
-				select {
-				case <-ctx.Done():
-					return retry.StopRetryError(ctx.Err())
-				default:
-				}
-
-				werr := instance.folder.Read(
-					ctx, path, id,
-					func(buf []byte) fail.Error {
-						select {
-						case <-ctx.Done():
-							return retry.StopRetryError(ctx.Err())
-						default:
-						}
-
-						if innerXErr := instance.deserialize(ctx, buf); innerXErr != nil {
-							switch innerXErr.(type) {
-							case *fail.ErrNotAvailable:
-								return fail.Wrap(innerXErr, "failed to deserialize %s resource", instance.kind)
-							case *fail.ErrSyntax:
-								return fail.Wrap(innerXErr, "failed to deserialize %s resource", instance.kind)
-							case *fail.ErrInconsistent, *fail.ErrInvalidParameter, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
-								return retry.StopRetryError(innerXErr)
-							default:
-								return fail.Wrap(innerXErr, "failed to deserialize %s resource", instance.kind)
-							}
-						}
-						return nil
-					})
-				if werr != nil {
-					switch werr.Cause().(type) {
-					case *fail.ErrNotFound:
-						return retry.StopRetryError(werr, "quit trying")
-					default:
-						return werr
-					}
-				}
-				return nil
-			},
-				timings.SmallDelay(),
-				timings.ContextTimeout(),
-			)
-
-			if rerr != nil {
-				return fail.Wrap(rerr.Cause())
-			}
-
-			return nil
-		}()
-		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
-		chRes <- res
-	}()
-
-	select {
-	case res := <-chRes:
-		return fail.Wrap(res.Error())
-	case <-ctx.Done():
-		return fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		return fail.Wrap(inctx.Err())
-	}
-}
-
-// readByName reads a metadata identified by name
-func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Error {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	chRes := make(chan result.Holder[struct{}])
-	go func() {
-		defer close(chRes)
-		gerr := func() (ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			var path string
-			if instance.kindSplittedStore {
-				path = byNameFolderName
-			}
-
-			timings, xerr := instance.Service().Timings()
-			if xerr != nil {
-				return xerr
-			}
-
 			rerr := retry.WhileUnsuccessful(
 				func() error {
 					select {
@@ -822,8 +766,9 @@ func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Err
 						return retry.StopRetryError(ctx.Err())
 					default:
 					}
+
 					werr := instance.folder.Read(
-						ctx, path, name,
+						ctx, path, id,
 						func(buf []byte) fail.Error {
 							select {
 							case <-ctx.Done():
@@ -831,10 +776,19 @@ func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Err
 							default:
 							}
 
-							if innerXErr := instance.deserialize(ctx, buf); innerXErr != nil {
-								return fail.Wrap(innerXErr, "failed to deserialize %s '%s'", instance.kind, name)
+							innerXErr := instance.deserialize(ctx, buf)
+							if innerXErr != nil {
+								switch innerXErr.(type) {
+								case *fail.ErrNotAvailable:
+									return fail.Wrap(innerXErr, "failed to deserialize %s resource", instance.kind)
+								case *fail.ErrSyntax:
+									return fail.Wrap(innerXErr, "failed to deserialize %s resource", instance.kind)
+								case *fail.ErrInconsistent, *fail.ErrInvalidParameter, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
+									return retry.StopRetryError(innerXErr)
+								default:
+									return fail.Wrap(innerXErr, "failed to deserialize %s resource", instance.kind)
+								}
 							}
-
 							return nil
 						},
 					)
@@ -871,10 +825,125 @@ func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Err
 	}
 }
 
+// readByName reads a metadata identified by name
+func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Error {
+	ctx, cancel := context.WithCancel(inctx)
+	defer cancel()
+
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	chRes := make(chan result.Holder[struct{}])
+	go func() {
+		defer close(chRes)
+		gerr := func() (ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
+
+			// Check if we have an abstract in Scope with that name
+			entry, xerr := myjob.Scope().AbstractByName(instance.Kind(), name)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					debug.IgnoreError(xerr)
+					// continue
+				default:
+					return xerr
+				}
+			}
+
+			// if we find an entry in Scope, carry it in instance then reload from Metadata Storage.
+			// This way, the "serialized" part of the abstract is refreshed, and the not-serialized part
+			// is kept (mandatory for provider using terraform)
+			if entry != nil {
+				value, err := lang.Cast[T](entry)
+				if err != nil {
+					return fail.Wrap(err)
+				}
+
+				xerr := instance.carry(ctx, value)
+				if xerr != nil {
+					return xerr
+				}
+
+				instance.loaded = true
+				instance.committed = true
+			}
+
+			// check in Scope failed, read the metadata storage
+			timings, xerr := instance.Service().Timings()
+			if xerr != nil {
+				return xerr
+			}
+
+			var path string
+			if instance.kindSplittedStore {
+				path = byNameFolderName
+			}
+			return retry.WhileUnsuccessful(
+				func() error {
+					select {
+					case <-ctx.Done():
+						return retry.StopRetryError(ctx.Err())
+					default:
+					}
+
+					// -- No abstract in Scope with the name, so we read the metadata content
+					werr := instance.folder.Read(
+						ctx, path, name,
+						func(buf []byte) fail.Error {
+							select {
+							case <-ctx.Done():
+								return retry.StopRetryError(ctx.Err())
+							default:
+							}
+
+							if innerXErr := instance.deserialize(ctx, buf); innerXErr != nil {
+								return fail.Wrap(innerXErr, "failed to deserialize %s '%s'", instance.kind, name)
+							}
+
+							return nil
+						},
+					)
+					if werr != nil {
+						switch werr.Cause().(type) {
+						case *fail.ErrNotFound:
+							return retry.StopRetryError(werr, "quit trying")
+						default:
+							return werr
+						}
+					}
+
+					return nil
+				},
+				timings.SmallDelay(),
+				timings.ContextTimeout(),
+			)
+		}()
+		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
+		chRes <- res
+	}()
+
+	select {
+	case res := <-chRes:
+		return fail.Wrap(res.Error())
+	case <-ctx.Done():
+		return fail.Wrap(ctx.Err())
+	case <-inctx.Done():
+		return fail.Wrap(inctx.Err())
+	}
+}
+
 // write updates the metadata corresponding to the host in the Object Storage
 func (instance *Core[T]) write(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
+
+	// myjob, xerr := jobapi.FromContext(ctx)
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
 	chRes := make(chan result.Holder[struct{}])
 	go func() {
@@ -919,6 +988,16 @@ func (instance *Core[T]) write(inctx context.Context) fail.Error {
 					}
 				}
 
+				// if myjob.Service().Capabilities().UseTerraformer {
+				// 	xerr = instance.carried.Inspect(func(p T) fail.Error {
+				// 		_, innerXErr := myjob.Scope().RegisterAbstractIfNeeded(p)
+				// 		return innerXErr
+				// 	})
+				// 	if xerr != nil {
+				// 		return xerr
+				// 	}
+				// }
+				//
 				instance.loaded = true
 				instance.committed = true
 			}
@@ -944,37 +1023,31 @@ func (instance *Core[T]) Reload(inctx context.Context) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	chRes := make(chan result.Holder[struct{}])
-	go func() {
-		defer close(chRes)
-		gerr := func() (ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			return instance.reload(ctx)
-		}()
-		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
-		chRes <- res
-	}()
-
-	select {
-	case res := <-chRes:
-		return fail.Wrap(res.Error())
-	case <-ctx.Done():
-		return fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		return fail.Wrap(inctx.Err())
-	}
+	return instance.reload(inctx)
 }
 
 // reload loads the content from the Object Storage
 // Note: must be called after locking the instance
-func (instance *Core[T]) reload(inctx context.Context) fail.Error {
+func (instance *Core[T]) reload(inctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	timings, xerr := instance.Service().Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	if instance.loaded && !instance.committed {
+		name, ok := instance.name.Load().(string)
+		if ok {
+			return fail.InconsistentError("cannot reload a not committed data with name %s", name)
+		}
+
+		return fail.InconsistentError("cannot reload a not committed data")
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -983,19 +1056,6 @@ func (instance *Core[T]) reload(inctx context.Context) fail.Error {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
-
-			timings, xerr := instance.Service().Timings()
-			if xerr != nil {
-				return xerr
-			}
-
-			if instance.loaded && !instance.committed {
-				name, ok := instance.name.Load().(string)
-				if ok {
-					return fail.InconsistentError("cannot reload a not committed data with name %s", name)
-				}
-				return fail.InconsistentError("cannot reload a not committed data")
-			}
 
 			if instance.kindSplittedStore {
 				id, ok := instance.id.Load().(string)
@@ -1217,18 +1277,18 @@ func (instance *Core[T]) Delete(inctx context.Context) (_ fail.Error) {
 
 			// First remove entry from scope registered abstracts
 			xerr := instance.carried.Inspect(func(p T) fail.Error {
-				abstractResource, ok := any(p).(terraformerapi.Resource)
+				abstractResource, ok := any(p).(abstract.Abstract)
 				if !ok {
-					return fail.InconsistentError("failed to cast '%s' to 'terraformerapi.Resource'", reflect.TypeOf(p).String())
+					return fail.InconsistentError("failed to cast '%s' to 'abstract.AbstractByName'", reflect.TypeOf(p).String())
 				}
 
 				// Registers the abstract in scope
-				myjob, innerXErr := jobapi.FromContext(inctx)
+				myjob, innerXErr := jobapi.FromContext(ctx)
 				if innerXErr != nil {
 					return innerXErr
 				}
 
-				return myjob.Scope().UnregisterResource(abstractResource)
+				return myjob.Scope().UnregisterAbstract(abstractResource)
 			})
 			if xerr != nil {
 				return xerr

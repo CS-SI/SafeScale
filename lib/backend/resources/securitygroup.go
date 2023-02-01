@@ -28,7 +28,8 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
@@ -126,64 +127,73 @@ func LoadSecurityGroup(inctx context.Context, ref string) (*SecurityGroup, fail.
 
 			// trick to avoid collisions
 			var kt *SecurityGroup
-			cacheref := fmt.Sprintf("%T/%s", kt, ref)
+			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
 			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
 
+			var (
+				sgInstance *SecurityGroup
+				inCache    bool
+				err        error
+			)
 			if cache != nil {
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(*SecurityGroup)
-					if ok {
-						return casted, nil
+				entry, err := cache.Get(ctx, refcache)
+				if err == nil {
+					sgInstance, err = lang.Cast[*SecurityGroup](entry)
+					if err != nil {
+						return nil, fail.Wrap(err)
 					}
+
+					inCache = true
+
+					// -- reload from metadata storage
+					xerr := sgInstance.Core.Reload(ctx)
+					if xerr != nil {
+						return nil, xerr
+					}
+				} else {
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+				}
+			}
+			if sgInstance == nil {
+				anon, xerr := onSGCacheMiss(ctx, ref)
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				sgInstance, err = lang.Cast[*SecurityGroup](anon)
+				if err != nil {
+					return nil, fail.Wrap(err)
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onSGCacheMiss(ctx, ref) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			var ok bool
-			sgInstance, ok := anon.(*SecurityGroup)
-			if !ok {
-				return nil, fail.InconsistentError("cache content should be a *SecurityGroup", ref)
-			}
-			if sgInstance == nil {
-				return nil, fail.InconsistentError("nil value found in Security Group cache for key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = sgInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
+			if cache != nil && !inCache {
+				// -- add host instance in cache by name
 				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, sgInstance.GetName()), sgInstance, &store.Options{Expiration: 1 * time.Minute})
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
+
 				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 				hid, err := sgInstance.GetID()
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
+
+				// -- add host instance in cache by id
 				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), sgInstance, &store.Options{Expiration: 1 * time.Minute})
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
+
 				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(*SecurityGroup)
-					if ok {
-						return casted, nil
-					} else {
+				val, xerr := cache.Get(ctx, refcache)
+				if xerr == nil {
+					if _, ok := val.(*Host); !ok {
 						logrus.WithContext(ctx).Warnf("wrong type of *SecurityGroup")
 					}
 				} else {
@@ -191,6 +201,35 @@ func LoadSecurityGroup(inctx context.Context, ref string) (*SecurityGroup, fail.
 				}
 			}
 
+			if myjob.Service().Capabilities().UseTerraformer {
+				sgTrx, xerr := newSecurityGroupTransaction(ctx, sgInstance)
+				if xerr != nil {
+					return nil, xerr
+				}
+				defer sgTrx.TerminateFromError(ctx, &ferr)
+
+				xerr = reviewSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
+					prov, xerr := myjob.Service().ProviderDriver()
+					if xerr != nil {
+						return xerr
+					}
+					castedProv, innerErr := lang.Cast[providers.ReservedForTerraformerUse](prov)
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
+					}
+
+					innerXErr := castedProv.ConsolidateSecurityGroupSnippet(asg)
+					if innerXErr != nil {
+						return innerXErr
+					}
+
+					_, innerXErr = myjob.Scope().RegisterAbstractIfNeeded(asg)
+					return innerXErr
+				})
+				if xerr != nil {
+					return nil, xerr
+				}
+			}
 			return sgInstance, nil
 		}()
 		chRes <- result{ga, gerr}
@@ -485,7 +524,7 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 					ar := result{xerr}
 					return ar, ar.rErr
 				}
-				defer networkTrx.TerminateBasedOnError(ctx, &ferr)
+				defer networkTrx.TerminateFromError(ctx, &ferr)
 			}
 
 			// -- update SecurityGroups in Network metadata
@@ -527,11 +566,14 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (ferr fai
 		return fail.InvalidInstanceError()
 	}
 
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup"), "(force=%v)", force).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	trx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxDelete(ctx, trx, force)
 }
@@ -603,11 +645,14 @@ func (instance *SecurityGroup) Clear(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	trx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxClear(ctx, trx)
 }
@@ -623,11 +668,14 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	trx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	var rules abstract.SecurityGroupRules
 	xerr = inspectSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
@@ -670,11 +718,14 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules ...*abstract.
 		return fail.InvalidParameterError("rules", "cannot be empty slice")
 	}
 
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	trx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return alterSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
 		for k, v := range rules {
@@ -688,7 +739,12 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules ...*abstract.
 			}
 		}
 
-		return instance.Service().AddRulesToSecurityGroup(ctx, asg, rules...)
+		innerXErr := instance.Service().AddRulesToSecurityGroup(ctx, asg, rules...)
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		return nil
 	})
 }
 
@@ -706,6 +762,9 @@ func (instance *SecurityGroup) DeleteRules(ctx context.Context, rules ...*abstra
 		return fail.InvalidParameterCannotBeNilError("rules")
 	}
 
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	for k, v := range rules {
 		xerr := v.Validate()
 		if xerr != nil {
@@ -717,7 +776,7 @@ func (instance *SecurityGroup) DeleteRules(ctx context.Context, rules ...*abstra
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return alterSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
 		innerXErr := instance.Service().DeleteRulesFromSecurityGroup(ctx, asg, rules...)
@@ -749,7 +808,7 @@ func (instance *SecurityGroup) GetBoundHosts(ctx context.Context) (_ []*properti
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	var list []*propertiesv1.SecurityGroupBond
 	xerr = inspectSecurityGroupMetadataProperty(ctx, trx, securitygroupproperty.HostsV1, func(sghV1 *propertiesv1.SecurityGroupHosts) fail.Error {
@@ -777,7 +836,7 @@ func (instance *SecurityGroup) GetBoundSubnets(ctx context.Context) (list []*pro
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = inspectSecurityGroupMetadataProperty(ctx, trx, securitygroupproperty.SubnetsV1, func(sgnV1 *propertiesv1.SecurityGroupSubnets) fail.Error {
 		list = make([]*propertiesv1.SecurityGroupBond, 0, len(sgnV1.ByID))
@@ -806,7 +865,7 @@ func (instance *SecurityGroup) ToProtocol(ctx context.Context) (_ *protocol.Secu
 	if xerr != nil {
 		return nil, xerr
 	}
-	trx.TerminateBasedOnError(ctx, &ferr)
+	trx.TerminateFromError(ctx, &ferr)
 
 	out := &protocol.SecurityGroupResponse{}
 	return out, inspectSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
@@ -831,22 +890,21 @@ func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance *Hos
 	if hostInstance == nil {
 		return fail.InvalidParameterError("hostInstance", "cannot be nil")
 	}
-	castedHostInstance, err := lang.Cast[*Host](hostInstance)
-	if err != nil {
-		return fail.Wrap(err)
-	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup"), "(host='%s', enable=%v, mark=%v)", hostInstance.GetName(), enable, mark).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
 	sgTrx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer sgTrx.TerminateBasedOnError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
-	hostTrx, xerr := newHostTransaction(ctx, castedHostInstance)
+	hostTrx, xerr := newHostTransaction(ctx, hostInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxBindToHost(ctx, sgTrx, hostTrx, enable, mark)
 }
@@ -865,22 +923,21 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 	if hostInstance == nil {
 		return fail.InvalidParameterError("hostInstance", "cannot be nil")
 	}
-	castedHostInstance, err := lang.Cast[*Host](hostInstance)
-	if err != nil {
-		return fail.Wrap(err)
-	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup"), "(host='%s')", hostInstance.GetName()).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
 	sgTrx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer sgTrx.TerminateBasedOnError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
-	hostTrx, xerr := newHostTransaction(ctx, castedHostInstance)
+	hostTrx, xerr := newHostTransaction(ctx, hostInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxUnbindFromHost(ctx, sgTrx, hostTrx)
 }
@@ -899,11 +956,14 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 		return fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup"), "(host='%s', enable=%v, mark=%v)", hostRef).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	sgTrx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer sgTrx.TerminateBasedOnError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
 	hostInstance, xerr := LoadHost(ctx, hostRef)
 	if xerr != nil {
@@ -914,7 +974,7 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return alterSecurityGroupMetadata(ctx, sgTrx, func(asg *abstract.SecurityGroup, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
@@ -936,7 +996,7 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 			}
 			if hostID != "" {
 				innerXErr := alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-					entry, innerXErr := instance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
+					entry, innerXErr := instance.Job().Scope().AbstractByName(ahc.Kind(), ahc.Name)
 					if innerXErr != nil {
 						return innerXErr
 					}
@@ -987,22 +1047,21 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 	if subnetInstance == nil {
 		return fail.InvalidParameterCannotBeNilError("rh")
 	}
-	castedSubnetInstance, err := lang.Cast[*Subnet](subnetInstance)
-	if err != nil {
-		return fail.Wrap(err)
-	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup"), "(subnet='%s', enable=%v, mark=%v)", subnetInstance.GetName(), enable, mark).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
 	sgTrx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer sgTrx.TerminateBasedOnError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
-	subnetTrx, xerr := newSubnetTransaction(ctx, castedSubnetInstance)
+	subnetTrx, xerr := newSubnetTransaction(ctx, subnetInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
+	defer subnetTrx.TerminateFromError(ctx, &ferr)
 
 	xerr = reviewSubnetMetadataProperties(ctx, subnetTrx, func(props *serialize.JSONProperties) fail.Error {
 		var subnetHosts *propertiesv1.SubnetHosts
@@ -1141,22 +1200,21 @@ func (instance *SecurityGroup) UnbindFromSubnet(ctx context.Context, subnetInsta
 	if subnetInstance == nil {
 		return fail.InvalidParameterCannotBeNilError("subnetInstance")
 	}
-	castedSubnetInstance, err := lang.Cast[*Subnet](subnetInstance)
-	if err != nil {
-		return fail.Wrap(err)
-	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup"), "(subnet='%s')", subnetInstance.GetName()).WithStopwatch().Entering()
+	defer tracer.Exiting()
 
 	sgTrx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer sgTrx.TerminateBasedOnError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
-	subnetTrx, xerr := newSubnetTransaction(ctx, castedSubnetInstance)
+	subnetTrx, xerr := newSubnetTransaction(ctx, subnetInstance)
 	if xerr != nil {
 		return xerr
 	}
-	defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
+	defer subnetTrx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxUnbindFromSubnet(ctx, sgTrx, subnetTrx)
 }
@@ -1175,11 +1233,14 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 		return fail.InvalidParameterError("rs", "cannot be empty string")
 	}
 
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup"), "(subnet='%s')", subnetRef).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
 	trx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return alterSecurityGroupMetadataProperty(ctx, trx, securitygroupproperty.SubnetsV1, func(sgsV1 *propertiesv1.SecurityGroupSubnets) fail.Error {
 		var subnetID, subnetName string

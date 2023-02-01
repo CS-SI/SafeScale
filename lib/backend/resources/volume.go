@@ -28,6 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
@@ -108,67 +109,107 @@ func LoadVolume(inctx context.Context, ref string) (*Volume, fail.Error) {
 
 			// trick to avoid collisions
 			var kt *Volume
-			cacheref := fmt.Sprintf("%T/%s", kt, ref)
+			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
 			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
 
+			var (
+				volumeInstance *Volume
+				inCache        bool
+				err            error
+			)
 			if cache != nil {
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(*Volume)
-					if ok {
-						return casted, nil
+				entry, err := cache.Get(ctx, refcache)
+				if err == nil {
+					volumeInstance, err = lang.Cast[*Volume](entry)
+					if err != nil {
+						return nil, fail.Wrap(err)
 					}
+
+					inCache = true
+
+					// -- reload from metadata storage
+					xerr := volumeInstance.Core.Reload(ctx)
+					if xerr != nil {
+						return nil, xerr
+					}
+				} else {
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+				}
+			}
+			if volumeInstance == nil {
+				anon, xerr := onVolumeCacheMiss(ctx, ref)
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				volumeInstance, err = lang.Cast[*Volume](anon)
+				if err != nil {
+					return nil, fail.Wrap(err)
 				}
 			}
 
-			cacheMissLoader := func() (data.Identifiable, fail.Error) { return onVolumeCacheMiss(ctx, ref) }
-			anon, xerr := cacheMissLoader()
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			var ok bool
-			volumeInstance, ok := anon.(*Volume)
-			if !ok {
-				return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
-			}
-			if volumeInstance == nil {
-				return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
-			}
-
-			// if cache failed we are here, so we better retrieve updated information...
-			xerr = volumeInstance.Reload(ctx)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if cache != nil {
+			if cache != nil && !inCache {
+				// -- add host instance in cache by name
 				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, volumeInstance.GetName()), volumeInstance, &store.Options{Expiration: 1 * time.Minute})
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
+
 				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 				hid, err := volumeInstance.GetID()
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
+
+				// -- add host instance in cache by id
 				err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), volumeInstance, &store.Options{Expiration: 1 * time.Minute})
 				if err != nil {
 					return nil, fail.Wrap(err)
 				}
+
 				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
 
-				if val, xerr := cache.Get(ctx, cacheref); xerr == nil {
-					casted, ok := val.(*Volume)
-					if ok {
-						return casted, nil
+				val, xerr := cache.Get(ctx, refcache)
+				if xerr == nil {
+					if _, ok := val.(*Network); !ok {
+						logrus.WithContext(ctx).Warnf("wrong type of *Network")
 					}
-					logrus.WithContext(ctx).Warnf("wrong type of resources.Volume")
 				} else {
 					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+				}
+			}
+
+			if myjob.Service().Capabilities().UseTerraformer {
+				volumeTrx, xerr := newVolumeTransaction(ctx, volumeInstance)
+				if xerr != nil {
+					return nil, xerr
+				}
+				defer volumeTrx.TerminateFromError(ctx, &ferr)
+
+				xerr = reviewVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
+					prov, xerr := myjob.Service().ProviderDriver()
+					if xerr != nil {
+						return xerr
+					}
+					castedProv, innerErr := lang.Cast[providers.ReservedForTerraformerUse](prov)
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
+					}
+
+					innerXErr := castedProv.ConsolidateVolumeSnippet(av)
+					if innerXErr != nil {
+						return innerXErr
+					}
+
+					_, innerXErr = myjob.Scope().RegisterAbstractIfNeeded(av)
+					return innerXErr
+				})
+				if xerr != nil {
+					return nil, xerr
 				}
 			}
 
@@ -292,7 +333,7 @@ func (instance *Volume) GetSpeed(ctx context.Context) (_ volumespeed.Enum, ferr 
 	if xerr != nil {
 		return 0, xerr
 	}
-	defer volumeTrx.TerminateBasedOnError(ctx, &ferr)
+	defer volumeTrx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxGetSpeed(ctx, volumeTrx)
 }
@@ -309,7 +350,7 @@ func (instance *Volume) GetSize(ctx context.Context) (_ int, ferr fail.Error) {
 	if xerr != nil {
 		return 0, xerr
 	}
-	defer volumeTrx.TerminateBasedOnError(ctx, &ferr)
+	defer volumeTrx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxGetSize(ctx, volumeTrx)
 }
@@ -325,7 +366,7 @@ func (instance *Volume) GetAttachments(ctx context.Context) (_ *propertiesv1.Vol
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer volumeTrx.TerminateBasedOnError(ctx, &ferr)
+	defer volumeTrx.TerminateFromError(ctx, &ferr)
 
 	var volatts *propertiesv1.VolumeAttachments
 	xerr = inspectVolumeMetadataProperty(ctx, volumeTrx, volumeproperty.AttachedV1, func(vaV1 *propertiesv1.VolumeAttachments) fail.Error {
@@ -393,7 +434,7 @@ func (instance *Volume) Delete(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer volumeTrx.TerminateBasedOnError(ctx, &ferr)
+	defer volumeTrx.TerminateFromError(ctx, &ferr)
 
 	// check if Volume can be deleted (must not be attached)
 	xerr = inspectVolumeMetadataProperty(ctx, volumeTrx, volumeproperty.AttachedV1, func(vaV1 *propertiesv1.VolumeAttachments) fail.Error {
@@ -430,6 +471,11 @@ func (instance *Volume) Delete(ctx context.Context) (ferr fail.Error) {
 		default:
 			return xerr
 		}
+	}
+
+	volumeTrx.SilentTerminate(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	// remove metadata
@@ -560,13 +606,13 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 	if xerr != nil {
 		return xerr
 	}
-	defer volumeTrx.TerminateBasedOnError(ctx, &ferr)
+	defer volumeTrx.TerminateFromError(ctx, &ferr)
 
 	hostTrx, xerr := newHostTransaction(ctx, host)
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	// -- proceed some checks on Volume --
 	xerr = inspectVolumeMetadata(ctx, volumeTrx, func(av *abstract.Volume, props *serialize.JSONProperties) fail.Error {
@@ -989,13 +1035,13 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 	if xerr != nil {
 		return xerr
 	}
-	defer volumeTrx.TerminateBasedOnError(ctx, &ferr)
+	defer volumeTrx.TerminateFromError(ctx, &ferr)
 
 	hostTrx, xerr := newHostTransaction(ctx, castedHost)
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	// -- retrieves Volume data --
 	xerr = reviewVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
@@ -1182,7 +1228,7 @@ func (instance *Volume) ToProtocol(ctx context.Context) (_ *protocol.VolumeInspe
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer volumeTrx.TerminateBasedOnError(ctx, &ferr)
+	defer volumeTrx.TerminateFromError(ctx, &ferr)
 
 	out := &protocol.VolumeInspectResponse{
 		Id:          volumeID,

@@ -19,6 +19,7 @@ package api
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/hashicorp/terraform-exec/tfexec"
 	tfjson "github.com/hashicorp/terraform-json"
@@ -28,21 +29,9 @@ import (
 )
 
 type (
-	Resource interface {
-		Kind() string
-		GetID() (string, error)
-		GetName() string
-		Extra() map[string]any
-		TerraformSnippet() string
-		TerraformTypes() []string
-		UniqueID() string
-		// ToMap() map[string]any
-		// String() string
-	}
-
 	Terraformer interface {
 		Apply(ctx context.Context, def string) (map[string]tfexec.OutputMeta, fail.Error)
-		Assemble(ctx context.Context, resources ...Resource) (string, fail.Error)
+		Assemble(ctx context.Context, resources ...abstract.Abstract) (string, fail.Error)
 		Close() fail.Error
 		Destroy(ctx context.Context, def string, opts ...options.Option) fail.Error
 		// Import(ctx context.Context, resourceAddress, id string) fail.Error
@@ -62,7 +51,7 @@ type (
 	RequiredProviders data.Map[string, RequiredProvider]
 
 	ScopeLimitedToTerraformerUse interface {
-		AllResources() (map[string]Resource, fail.Error)
+		AllAbstracts() (map[string]abstract.Abstract, fail.Error)
 		IsLoaded() bool
 		LoadAbstracts(ctx context.Context) fail.Error
 	}

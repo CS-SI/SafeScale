@@ -988,7 +988,7 @@ func (instance stack) ListImages(ctx context.Context, _ bool) (imgList []*abstra
 }
 
 // ListTemplates lists available Host templates
-// Host templates are sorted using Dominant Resource Fairness Algorithm
+// Host templates are sorted using Dominant AbstractByName Fairness Algorithm
 func (instance stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -1341,7 +1341,7 @@ func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostIden
 				if innerRetryErr != nil {
 					switch innerRetryErr.(type) {
 					case *fail.ErrNotFound:
-						// Resource not found, consider deletion succeeded (if the entry doesn't exist at all,
+						// AbstractByName not found, consider deletion succeeded (if the entry doesn't exist at all,
 						// metadata deletion will return an error)
 						return nil
 					default:

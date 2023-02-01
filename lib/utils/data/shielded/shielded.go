@@ -198,7 +198,8 @@ func (instance *Shielded[T]) Deserialize(buf []byte) (ferr fail.Error) {
 	}
 
 	return instance.Alter(func(p T) fail.Error {
-		if innerErr := json.Unmarshal(buf, p); innerErr != nil {
+		innerErr := json.Unmarshal(buf, p)
+		if innerErr != nil {
 			return fail.SyntaxError("failed to unmarshal: %s", innerErr.Error())
 		}
 

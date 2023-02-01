@@ -68,7 +68,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	feat, xerr := NewFeature(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -168,7 +168,7 @@ func (instance *Host) DeleteFeature(inctx context.Context, name string, vars dat
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	feat, xerr := NewFeature(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -243,7 +243,7 @@ func (instance *Host) RegisterFeature(ctx context.Context, feat *Feature, requir
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return alterHostMetadataProperty(ctx, hostTrx, hostproperty.FeaturesV1, func(featuresV1 *propertiesv1.HostFeatures) fail.Error {
 		item, ok := featuresV1.Installed[feat.GetName()]
@@ -292,7 +292,7 @@ func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr 
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return alterHostMetadataProperty(ctx, hostTrx, hostproperty.FeaturesV1, func(featuresV1 *propertiesv1.HostFeatures) fail.Error {
 		delete(featuresV1.Installed, feat)
@@ -355,7 +355,7 @@ func (instance *Host) InstalledFeatures(ctx context.Context) (_ []string, ferr f
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	var out []string
 	xerr = inspectHostMetadataProperty(ctx, hostTrx, hostproperty.FeaturesV1, func(featuresV1 *propertiesv1.HostFeatures) fail.Error {
@@ -412,7 +412,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 	if xerr != nil {
 		return xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	// FIXME: Bug mitigation
 	if _, ok := v["DefaultRouteIP"]; !ok { // FIXME: Hardcoded stuff everywhere !!
@@ -538,7 +538,7 @@ func (instance *Host) IsFeatureInstalled(ctx context.Context, name string) (foun
 	if xerr != nil {
 		return false, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	return found, inspectHostMetadataProperty(ctx, hostTrx, hostproperty.FeaturesV1, func(featuresV1 *propertiesv1.HostFeatures) fail.Error {
 		_, found = featuresV1.Installed[name]

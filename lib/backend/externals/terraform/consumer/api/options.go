@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
@@ -8,7 +9,7 @@ import (
 
 const OptionTargets = "targets"
 
-func WithTarget(rsc Resource) options.Option {
+func WithTarget(rsc abstract.Abstract) options.Option {
 	return func(o options.Options) fail.Error {
 		if rsc == nil {
 			return fail.InvalidParameterCannotBeEmptyStringError("rsc")

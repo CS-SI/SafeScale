@@ -69,7 +69,7 @@ func (instance *SecurityGroup) trxUnbindFromHost(inctx context.Context, sgTrx se
 		defer close(chRes)
 
 		xerr := alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, hostProps *serialize.JSONProperties) fail.Error {
-			entry, innerXErr := instance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
+			entry, innerXErr := instance.Job().Scope().AbstractByName(ahc.Kind(), ahc.Name)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -176,7 +176,7 @@ func (instance *SecurityGroup) trxUnbindFromHostsAttachedToSubnet(inctx context.
 							if xerr != nil {
 								return xerr
 							}
-							defer func(trx hostTransaction) { trx.TerminateBasedOnError(ctx, &ferr) }(hostTrx)
+							defer func(trx hostTransaction) { trx.TerminateFromError(ctx, &ferr) }(hostTrx)
 
 							return instance.trxUnbindFromHost(ctx, sgTrx, hostTrx)
 						})

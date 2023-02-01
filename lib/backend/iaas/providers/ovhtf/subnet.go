@@ -165,7 +165,6 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		return nil, xerr
 	}
 
-	// FIXME: should be necessary to add local Resource for router, and add it to Assemble... Otherwise it will be difficult to remove routers during Destroy...
 	def, xerr := renderer.Assemble(ctx, abstractSubnet)
 	if xerr != nil {
 		return nil, xerr

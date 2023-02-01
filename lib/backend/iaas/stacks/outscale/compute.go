@@ -201,7 +201,7 @@ func (instance *stack) parseTemplateID(id string) (*abstract.HostTemplate, fail.
 }
 
 // ListTemplates lists available host templates
-// Host templates are sorted using Dominant Resource Fairness Algorithm
+// Host templates are sorted using Dominant AbstractByName Fairness Algorithm
 func (instance *stack) ListTemplates(ctx context.Context, _ bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()

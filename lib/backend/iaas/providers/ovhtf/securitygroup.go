@@ -376,15 +376,24 @@ func (p *provider) DeleteRulesFromSecurityGroup(ctx context.Context, asg *abstra
 }
 
 func (p *provider) GetDefaultSecurityGroupName(ctx context.Context) (string, fail.Error) {
-	return "", fail.NotImplementedError("GetDefaultSecurityGroupName() not implemented")
+	if valid.IsNil(p) {
+		return "", fail.InvalidInstanceError()
+	}
+
+	cfg, err := p.ConfigurationOptions()
+	if err != nil {
+		return "", err
+	}
+
+	return cfg.DefaultSecurityGroupName, nil
 }
 
 func (p *provider) EnableSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
-	return fail.NotImplementedError("EnableSecurityGroup() not implemented")
+	return fail.NotAvailableError("ovhtf cannot enable a Security Group")
 }
 
 func (p *provider) DisableSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
-	return fail.NotImplementedError("DisableSecurityGroup() not implemented")
+	return fail.NotAvailableError("ovhtf cannot disable a Security Group")
 }
 
 func (p *provider) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, s string, s2 string) fail.Error {

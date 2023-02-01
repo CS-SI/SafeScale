@@ -227,7 +227,7 @@ func LoadFeatureFile(inctx context.Context, name string, embeddedOnly bool) (*Fe
 				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
 					casted, ok := val.(*FeatureFile)
 					if ok {
-						incrementExpVar("newhost.cache.hit")
+						incrementExpVar("ost.cache.hit")
 						return casted, nil
 					}
 				}

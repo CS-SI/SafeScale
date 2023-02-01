@@ -101,6 +101,13 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 				return ar, ar.rErr
 			}
 
+			// need to commit right now the changes in Subnet so far
+			xerr = subnetTrx.Commit(ctx)
+			if xerr != nil {
+				ar := result{nil, xerr}
+				return ar, ar.rErr
+			}
+
 			// Now test localresult of gateway creation
 			if createXErr != nil {
 				ar := result{nil, createXErr}
@@ -135,7 +142,7 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 					} else {
 						rgwTrx, derr := newHostTransaction(ctx, rgw)
 						if derr == nil {
-							defer rgwTrx.TerminateBasedOnError(ctx, &ferr)
+							defer rgwTrx.TerminateFromError(ctx, &ferr)
 
 							derr = alterHostMetadataAbstract(cleanupContextFrom(ctx), rgwTrx, func(as *abstract.HostCore) fail.Error {
 								as.LastState = hoststate.Failed

@@ -340,7 +340,6 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		}
 	}()
 
-	// FIXME: restore that
 	newHost, xerr := p.complementHost(inctx, ahf.HostCore, hostOutputs)
 	if xerr != nil {
 		return nil, nil, xerr
@@ -587,8 +586,7 @@ func (p *provider) toHostSize(tpl *abstract.HostTemplate) (_ *abstract.HostEffec
 
 // ClearHostStartupScript ...
 func (p *provider) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
-	// TODO implement me
-	return fail.NotImplementedError("ClearHostStartupScript() not yet implemented")
+	return nil
 }
 
 // InspectHost ...
@@ -613,8 +611,13 @@ func (p *provider) InspectHost(ctx context.Context, hostParam iaasapi.HostIdenti
 
 // GetHostState ...
 func (p *provider) GetHostState(ctx context.Context, hostParam iaasapi.HostIdentifier) (hoststate.Enum, fail.Error) {
-	// TODO implement me
-	return hoststate.Unknown, fail.NotImplementedError("GetHostState() not yet implemented")
+	if valid.IsNull(p) {
+		return hoststate.Unknown, fail.InvalidInstanceError()
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.compute"), "()").WithStopwatch().Entering().Exiting()
+
+	return p.MiniStack.GetHostState(ctx, hostParam)
 }
 
 // ListHosts ...
@@ -781,13 +784,30 @@ func (p *provider) RebootHost(ctx context.Context, hostParam iaasapi.HostIdentif
 }
 
 func (p *provider) ResizeHost(ctx context.Context, hostParam iaasapi.HostIdentifier, requirements abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
-	// TODO implement me
-	return nil, fail.NotImplementedError("ResizeHost() not yet implemented")
+	if valid.IsNil(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+	_ /*ahf*/, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+
+	// TODO: RESIZE Call this
+	// servers.Resize()
+
+	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
 func (p *provider) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIdentifier, timeout time.Duration) (*abstract.HostCore, fail.Error) {
-	// TODO implement me
-	return nil, fail.NotImplementedError("WaitHostReady() not yet implemented")
+	if valid.IsNull(p) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.compute"), "()").WithStopwatch().Entering().Exiting()
+
+	return p.MiniStack.WaitHostReady(ctx, hostParam, timeout)
 }
 
 // BindSecurityGroupToHost ...

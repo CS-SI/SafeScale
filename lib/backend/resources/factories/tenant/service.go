@@ -69,15 +69,15 @@ type service struct {
 }
 
 const (
-	// CoreDRFWeight is the Dominant Resource Fairness weight of a core
+	// CoreDRFWeight is the Dominant AbstractByName Fairness weight of a core
 	CoreDRFWeight float32 = 1.0
-	// RAMDRFWeight is the Dominant Resource Fairness weight of 1 GB of RAM
+	// RAMDRFWeight is the Dominant AbstractByName Fairness weight of 1 GB of RAM
 	RAMDRFWeight float32 = 1.0 / 8.0
-	// DiskDRFWeight is the Dominant Resource Fairness weight of 1 GB of Disk
+	// DiskDRFWeight is the Dominant AbstractByName Fairness weight of 1 GB of Disk
 	DiskDRFWeight float32 = 1.0 / 16.0
 )
 
-// RankDRF computes the Dominant Resource Fairness Rank of a host template
+// RankDRF computes the Dominant AbstractByName Fairness Rank of a host template
 func RankDRF(t *abstract.HostTemplate) float32 {
 	fc := float32(t.Cores)
 	fr := t.RAMSize
@@ -86,7 +86,7 @@ func RankDRF(t *abstract.HostTemplate) float32 {
 }
 
 // ByRankDRF implements sort.Interface for []HostTemplate based on
-// the Dominant Resource Fairness
+// the Dominant AbstractByName Fairness
 type ByRankDRF []*abstract.HostTemplate
 
 func (a ByRankDRF) Len() int      { return len(a) }
@@ -317,7 +317,7 @@ func (instance service) WaitVolumeState(inctx context.Context, volumeID string, 
 }
 
 // ListTemplates lists available host templates, if all bool is true, all templates are returned, if not, templates are filtered using blacklists and whitelists
-// Host templates are sorted using Dominant Resource Fairness Algorithm
+// Host templates are sorted using Dominant AbstractByName Fairness Algorithm
 func (instance service) ListTemplates(inctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()

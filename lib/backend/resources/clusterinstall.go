@@ -99,7 +99,7 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) (_ []string, fer
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	var out []string
 	xerr = inspectClusterMetadataProperty(ctx, trx, clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
@@ -134,7 +134,7 @@ func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v da
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	identity, xerr := trxGetIdentity(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -273,7 +273,7 @@ func (instance *Cluster) RegisterFeature(ctx context.Context, feat *Feature, req
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return alterClusterMetadataProperty(ctx, trx, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
 		item, ok := featuresV1.Installed[feat.GetName()]
@@ -315,7 +315,7 @@ func (instance *Cluster) UnregisterFeature(inctx context.Context, feat string) (
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = alterClusterMetadataProperty(ctx, trx, clusterproperty.FeaturesV1, func(featuresV1 *propertiesv1.ClusterFeatures) fail.Error {
 		delete(featuresV1.Installed, feat)

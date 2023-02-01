@@ -251,7 +251,7 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	reduce := false
 	xerr = metadata.InspectProperty[*abstract.HostCore](ctx, hostTrx, hostproperty.SizingV2, func(hostSizingV2 *propertiesv2.HostSizing) fail.Error {
@@ -607,7 +607,7 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	var list []*protocol.LabelInspectResponse
 	xerr = metadata.ReviewProperty[*abstract.HostCore](ctx, hostTrx, hostproperty.LabelsV1, func(hlV1 *propertiesv1.HostLabels) fail.Error {
@@ -664,7 +664,7 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ *resources
 	if xerr != nil {
 		return nil, "", xerr
 	}
-	defer labelTrx.TerminateBasedOnError(ctx, &ferr)
+	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	var outValue string
 	xerr = metadata.ReviewProperty[*abstract.Label](ctx, labelTrx, labelproperty.HostsV1, func(lhV1 *propertiesv1.LabelHosts) fail.Error {

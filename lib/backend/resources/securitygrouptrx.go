@@ -104,7 +104,7 @@ func (instance *SecurityGroup) trxUnbindFromHosts(ctx context.Context, sgTrx sec
 				if xerr != nil {
 					return xerr
 				}
-				defer func(trx hostTransaction) { trx.TerminateBasedOnError(ctx, &ferr) }(hostTrx)
+				defer func(trx hostTransaction) { trx.TerminateFromError(ctx, &ferr) }(hostTrx)
 
 				return instance.trxUnbindFromHost(ctx, sgTrx, hostTrx)
 			})
@@ -140,7 +140,7 @@ func (instance *SecurityGroup) trxUnbindFromSubnets(ctx context.Context, sgTrx s
 	if len(in.ByID) > 0 {
 		tg := new(errgroup.Group)
 
-		// recover from context the Subnet Abstract and properties (if it exists)
+		// recover from context the Subnet AbstractByName and properties (if it exists)
 		var (
 			currentSubnetTrx subnetTransaction
 			err              error
@@ -184,7 +184,7 @@ func (instance *SecurityGroup) trxUnbindFromSubnets(ctx context.Context, sgTrx s
 					if xerr != nil {
 						return xerr
 					}
-					defer func(trx subnetTransaction) { trx.TerminateBasedOnError(ctx, &ferr) }(subnetTrx)
+					defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &ferr) }(subnetTrx)
 				}
 
 				xerr := instance.trxUnbindFromHostsAttachedToSubnet(ctx, sgTrx, subnetTrx)
@@ -386,8 +386,6 @@ func (instance *SecurityGroup) trxDelete(inctx context.Context, sgTrx securityGr
 				}
 			}
 
-			// FIXME: how to restore bindings in case of failure or abortion ? This would prevent the use of DisarmAbortSignal here...
-
 			// unbind from Subnets (which will unbind from Hosts attached to these Subnets...)
 			innerXErr := props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
 				sgnV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
@@ -422,6 +420,9 @@ func (instance *SecurityGroup) trxDelete(inctx context.Context, sgTrx securityGr
 			return
 		}
 
+		// Need to terminate Security Group transaction to be able to delete metadata
+		sgTrx.SilentTerminate(ctx)
+
 		// delete Security Group metadata
 		xerr = instance.Core.Delete(ctx)
 		if xerr != nil {
@@ -444,7 +445,7 @@ func (instance *SecurityGroup) trxDelete(inctx context.Context, sgTrx securityGr
 			}
 
 			xerr = instance.updateNetworkMetadataOnRemoval(ctx, networkTrx)
-			networkTrx.TerminateBasedOnError(ctx, &xerr)
+			networkTrx.TerminateFromError(ctx, &xerr)
 
 			chRes <- result{xerr}
 			return
@@ -721,7 +722,7 @@ func (instance *SecurityGroup) trxBindToHost(inctx context.Context, sgTrx securi
 				}
 
 				return alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-					entry, lvl3xerr := instance.Job().Scope().Resource(ahc.Kind(), ahc.Name)
+					entry, lvl3xerr := instance.Job().Scope().AbstractByName(ahc.Kind(), ahc.Name)
 					if lvl3xerr != nil {
 						return lvl3xerr
 					}

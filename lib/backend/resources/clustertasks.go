@@ -1758,7 +1758,7 @@ func (instance *Cluster) trxCreateMaster(inctx context.Context, clusterTrx clust
 			if xerr != nil {
 				return result{nil, xerr}, xerr
 			}
-			defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
+			defer subnetTrx.TerminateFromError(ctx, &ferr)
 
 			// -- Create the Host --
 			xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
@@ -2445,7 +2445,7 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, clusterTrx cluste
 				ar := result{nil, xerr}
 				return ar, ar.rErr
 			}
-			defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
+			defer subnetTrx.TerminateFromError(ctx, &ferr)
 
 			// -- Create the Host instance corresponding to the new node --
 			xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {

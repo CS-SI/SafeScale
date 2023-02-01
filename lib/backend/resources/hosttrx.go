@@ -61,5 +61,5 @@ func alterHostMetadataProperty[P clonable.Clonable](ctx context.Context, ht host
 }
 
 func alterHostMetadataProperties(ctx context.Context, ht hostTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.InspectProperties[*abstract.HostCore](ctx, ht, callback)
+	return metadata.AlterProperties[*abstract.HostCore](ctx, ht, callback)
 }

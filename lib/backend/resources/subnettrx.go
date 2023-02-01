@@ -649,7 +649,7 @@ func (instance *Subnet) trxFinalizeSubnetCreation(inctx context.Context, trx sub
 	}
 }
 
-func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTransaction, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]string) (_ fail.Error) {
+func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subnetTransaction, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]string) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -755,7 +755,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 			}
 
 			var abstractSubnet *abstract.Subnet
-			xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+			xerr = reviewSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 				abstractSubnet = as
 
 				// IDs of Security Groups to attach to Host used as gateway
@@ -808,7 +808,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 				defer func() {
 					close(waitForFirstGw)
 				}()
-				tr, err := instance.trxCreateGateway(ctx, trx, primaryRequest, *gwSizing)
+				tr, err := instance.trxCreateGateway(ctx, subnetTrx, primaryRequest, *gwSizing)
 				if err != nil {
 					gws <- gwRes{
 						num: 1,
@@ -844,7 +844,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 					if req.Domain != "" {
 						secondaryRequest.HostName = secondaryGatewayName + domain
 					}
-					tr, err := instance.trxCreateGateway(ctx, trx, secondaryRequest, *gwSizing)
+					tr, err := instance.trxCreateGateway(ctx, subnetTrx, secondaryRequest, *gwSizing)
 					if err != nil {
 						gws <- gwRes{
 							num: 2,
@@ -925,7 +925,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 					ar := result{xerr}
 					return ar, ar.rErr
 				}
-				defer primaryGatewayTrx.TerminateBasedOnError(ctx, &ferr)
+				defer primaryGatewayTrx.TerminateFromError(ctx, &ferr)
 
 				primaryUserdata, err = lang.Cast[*userdata.Content](primaryMap["userdata"])
 				if err != nil {
@@ -964,14 +964,14 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 					}
 
 					defer func() {
-						derr := instance.trxUndoBindInternalSecurityGroupToGateway(cleanupContextFrom(ctx), trx, primaryGatewayTrx, req.KeepOnFailure, &ferr)
+						derr := instance.trxUndoBindInternalSecurityGroupToGateway(cleanupContextFrom(ctx), subnetTrx, primaryGatewayTrx, req.KeepOnFailure, &ferr)
 						if derr != nil {
 							logrus.WithContext(ctx).Warnf(derr.Error())
 						}
 					}()
 
 					// Bind Internal Security Group to gateway
-					xerr = instance.trxBindInternalSecurityGroupToGateway(ctx, trx, primaryGatewayTrx)
+					xerr = instance.trxBindInternalSecurityGroupToGateway(ctx, subnetTrx, primaryGatewayTrx)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						ar := result{xerr}
@@ -1046,7 +1046,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 						ar := result{xerr}
 						return ar, ar.rErr
 					}
-					defer secondaryGatewayTrx.TerminateBasedOnError(ctx, &ferr)
+					defer secondaryGatewayTrx.TerminateFromError(ctx, &ferr)
 
 					secondaryUserdata, ok = secondaryMap["userdata"].(*userdata.Content)
 					if !ok {
@@ -1057,7 +1057,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 					secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
 
 					defer func() {
-						derr := instance.trxUndoBindInternalSecurityGroupToGateway(cleanupContextFrom(ctx), trx, secondaryGatewayTrx, req.KeepOnFailure, &ferr)
+						derr := instance.trxUndoBindInternalSecurityGroupToGateway(cleanupContextFrom(ctx), subnetTrx, secondaryGatewayTrx, req.KeepOnFailure, &ferr)
 						if derr != nil {
 							logrus.WithContext(cleanupContextFrom(ctx)).Warn(derr.Error())
 						}
@@ -1072,7 +1072,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 						}
 					}
 
-					xerr = instance.trxBindInternalSecurityGroupToGateway(ctx, trx, secondaryGatewayTrx)
+					xerr = instance.trxBindInternalSecurityGroupToGateway(ctx, subnetTrx, secondaryGatewayTrx)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						ar := result{xerr}
@@ -1090,7 +1090,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 			}
 
 			// Update userdata of gateway(s)
-			xerr = inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) (innerXErr fail.Error) {
+			xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) (innerXErr fail.Error) {
 				// Updates userdatas to use later
 				var inErr fail.Error
 				primaryUserdata.PrimaryGatewayPrivateIP, inErr = primaryGateway.GetPrivateIP(ctx)
@@ -1145,7 +1145,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, trx subnetTrans
 			}
 
 			// As hosts are marked as gateways, the configuration stopped on phase 2 'netsec', the remaining 3 phases have to be run explicitly
-			xerr = alterSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+			xerr = alterSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 				as.State = subnetstate.GatewayConfiguration
 				return nil
 			})

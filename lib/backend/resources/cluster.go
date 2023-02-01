@@ -136,7 +136,7 @@ func (instance *Cluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 	if xerr != nil {
 		return false, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	// begin by inspecting all hosts...
 	ci, xerr := trxGetIdentity(ctx, trx)
@@ -277,104 +277,109 @@ func LoadCluster(inctx context.Context, name string) (_ *Cluster, ferr fail.Erro
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
+	type localresult struct {
 		rTr  *Cluster
 		rErr fail.Error
 	}
 
-	chRes := make(chan result)
+	chRes := make(chan localresult)
 	go func() {
 		defer close(chRes)
 
-		// trick to avoid collisions
-		var kt *Cluster
-		cachename := fmt.Sprintf("%T/%s", kt, name)
+		ga, gerr := func() (_ *Cluster, ferr fail.Error) {
+			defer fail.OnPanic(&ferr)
 
-		cache, xerr := myjob.Service().Cache(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+			// trick to avoid collisions
+			var kt *Cluster
+			refcache := fmt.Sprintf("%T/%s", kt, name)
 
-		if cache != nil {
-			if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-				casted, ok := val.(*Cluster)
-				if ok {
-					chRes <- result{casted, nil}
-					return
-				}
-			}
-		}
-
-		cacheMissLoader := func() (data.Identifiable, fail.Error) { return onClusterCacheMiss(ctx, name) }
-		anon, xerr := cacheMissLoader()
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		var (
-			clusterInstance *Cluster
-			ok              bool
-		)
-		if clusterInstance, ok = anon.(*Cluster); !ok {
-			chRes <- result{nil, fail.InconsistentError("value found in Cluster cache for key '%s' is not a Cluster", name)}
-			return
-		}
-		if clusterInstance == nil {
-			chRes <- result{nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)}
-			return
-		}
-
-		if clusterInstance.randomDelayCh == nil {
-			xerr = clusterInstance.startRandomDelayGenerator(ctx, 0, 2000)
+			cache, xerr := myjob.Service().Cache(ctx)
 			if xerr != nil {
-				chRes <- result{nil, xerr}
-				return
+				return nil, xerr
 			}
-		}
 
-		// if cache failed we are here, so we better retrieve updated information...
-		xerr = clusterInstance.Reload(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
+			var (
+				clusterInstance *Cluster
+				inCache         bool
+				err             error
+			)
+			if cache != nil {
+				entry, err := cache.Get(ctx, refcache)
+				if err == nil {
+					clusterInstance, err = lang.Cast[*Cluster](entry)
+					if err != nil {
+						return nil, fail.Wrap(err)
+					}
 
-		if cache != nil {
-			err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, clusterInstance.GetName()), clusterInstance, &store.Options{Expiration: 1 * time.Minute})
-			if err != nil {
-				chRes <- result{nil, fail.Wrap(err)}
-				return
-			}
-			time.Sleep(10 * time.Millisecond) // consolidate cache.Set
-			hid, err := clusterInstance.GetID()
-			if err != nil {
-				chRes <- result{nil, fail.Wrap(err)}
-				return
-			}
-			err = cache.Set(ctx, fmt.Sprintf("%T/%s", kt, hid), clusterInstance, &store.Options{Expiration: 1 * time.Minute})
-			if err != nil {
-				chRes <- result{nil, fail.Wrap(err)}
-				return
-			}
-			time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+					inCache = true
 
-			if val, xerr := cache.Get(ctx, cachename); xerr == nil {
-				casted, ok := val.(*Cluster)
-				if ok {
-					chRes <- result{casted, nil}
-					return
+					// -- reload from metadata storage
+					xerr := clusterInstance.Core.Reload(ctx)
+					if xerr != nil {
+						return nil, xerr
+					}
 				} else {
-					logrus.WithContext(ctx).Warnf("wrong type of *Host")
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 				}
-			} else {
-				logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
 			}
-		}
+			if clusterInstance == nil {
+				anon, xerr := onClusterCacheMiss(ctx, name)
+				if xerr != nil {
+					return nil, xerr
+				}
 
-		chRes <- result{clusterInstance, nil}
+				clusterInstance, err = lang.Cast[*Cluster](anon)
+				if err != nil {
+					return nil, fail.Wrap(err)
+				}
+			}
+
+			if clusterInstance.randomDelayCh == nil {
+				xerr = clusterInstance.startRandomDelayGenerator(ctx, 0, 2000)
+				if xerr != nil {
+					return nil, xerr
+				}
+			}
+
+			if cache != nil && !inCache {
+				err := cache.Set(ctx, fmt.Sprintf("%T/%s", kt, clusterInstance.GetName()), clusterInstance, &store.Options{Expiration: 1 * time.Minute})
+				if err != nil {
+					return nil, fail.Wrap(err)
+				}
+
+				time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+				entry, xerr := cache.Get(ctx, name)
+				if xerr == nil {
+					_, err := lang.Cast[*Cluster](entry)
+					if err != nil {
+						logrus.WithContext(ctx).Warnf("wrong type of *Cluster")
+					}
+				} else {
+					logrus.WithContext(ctx).Warnf("cache response: %v", xerr)
+				}
+			}
+
+			if myjob.Service().Capabilities().UseTerraformer {
+				clusterTrx, xerr := newClusterTransaction(ctx, clusterInstance)
+				if xerr != nil {
+					return nil, xerr
+				}
+				defer clusterTrx.TerminateFromError(ctx, &ferr)
+
+				xerr = reviewClusterMetadataAbstract(ctx, clusterTrx, func(ac *abstract.Cluster) fail.Error {
+					_, innerXErr := myjob.Scope().RegisterAbstractIfNeeded(ac)
+					return innerXErr
+				})
+				if xerr != nil {
+					return nil, xerr
+				}
+			}
+
+			return clusterInstance, nil
+		}()
+		chRes <- localresult{ga, gerr}
 	}()
+
 	select {
 	case res := <-chRes:
 		return res.rTr, res.rErr
@@ -390,60 +395,38 @@ func onClusterCacheMiss(inctx context.Context, name string) (_ data.Identifiable
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
-		rTr  *Cluster
-		rErr fail.Error
+	clusterInstance, xerr := NewCluster(ctx)
+	if xerr != nil {
+		return nil, xerr
 	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		clusterInstance, xerr := NewCluster(ctx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
 
-		if xerr = clusterInstance.Read(ctx, name); xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		trx, xerr := metadata.NewTransaction[*abstract.Cluster, *Cluster](ctx, clusterInstance)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-		defer trx.TerminateBasedOnError(ctx, &ferr)
-
-		flavor, xerr := trxGetFlavor(ctx, trx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		xerr = clusterInstance.bootstrap(flavor)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		xerr = clusterInstance.trxUpdateCachedInformation(ctx, trx)
-		if xerr != nil {
-			chRes <- result{nil, xerr}
-			return
-		}
-
-		chRes <- result{clusterInstance, nil}
-	}()
-
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		return nil, fail.Wrap(inctx.Err())
+	xerr = clusterInstance.Read(ctx, name)
+	if xerr != nil {
+		return nil, xerr
 	}
+
+	trx, xerr := metadata.NewTransaction[*abstract.Cluster, *Cluster](ctx, clusterInstance)
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer trx.TerminateFromError(ctx, &ferr)
+
+	flavor, xerr := trxGetFlavor(ctx, trx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = clusterInstance.bootstrap(flavor)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = clusterInstance.trxUpdateCachedInformation(ctx, trx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return clusterInstance, nil
 }
 
 // trxUpdateCachedInformation updates information cached in the instance
@@ -595,7 +578,7 @@ func (instance *Cluster) Create(inctx context.Context, req abstract.ClusterReque
 			if xerr != nil {
 				return xerr
 			}
-			defer trx.TerminateBasedOnError(ctx, &ferr)
+			defer trx.TerminateFromError(ctx, &ferr)
 
 			res, xerr := instance.taskCreateCluster(ctx, trx, req)
 			if xerr != nil {
@@ -695,7 +678,7 @@ func (instance *Cluster) GetIdentity(ctx context.Context) (clusterIdentity abstr
 	if xerr != nil {
 		return abstract.Cluster{}, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return trxGetIdentity(ctx, trx)
 }
@@ -715,7 +698,7 @@ func (instance *Cluster) GetFlavor(ctx context.Context) (flavor clusterflavor.En
 	if xerr != nil {
 		return 0, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return trxGetFlavor(ctx, trx)
 }
@@ -735,7 +718,7 @@ func (instance *Cluster) GetComplexity(ctx context.Context) (_ clustercomplexity
 	if xerr != nil {
 		return 0, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return trxGetComplexity(ctx, trx)
 }
@@ -792,7 +775,7 @@ func (instance *Cluster) GetNetworkConfig(ctx context.Context) (config *properti
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = inspectClusterMetadataProperty(ctx, trx, clusterproperty.NetworkV3, func(networkV3 *propertiesv3.ClusterNetwork) fail.Error {
 		config = networkV3
@@ -833,7 +816,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	// If the Cluster is in state Stopping or Stopped, do nothing
 	var prevState clusterstate.Enum
@@ -1052,7 +1035,7 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 	if err != nil {
 		return fail.Wrap(err)
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	// If the Cluster is stopped, do nothing
 	var prevState clusterstate.Enum
@@ -1236,7 +1219,7 @@ func (instance *Cluster) GetState(ctx context.Context) (state clusterstate.Enum,
 	if xerr != nil {
 		return state, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	return instance.trxGetState(ctx, trx)
 }
@@ -1262,7 +1245,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1274,7 +1257,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		hostImage             string
 		nodeDefaultDefinition *propertiesv2.HostSizingRequirements
 	)
-	xerr = metadata.Inspect[*abstract.Cluster](ctx, trx, func(_ *abstract.Cluster, props *serialize.JSONProperties) fail.Error {
+	xerr = inspectClusterMetadata(ctx, trx, func(_ *abstract.Cluster, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(clusterproperty.DefaultsV3) {
 			return props.Inspect(clusterproperty.DefaultsV3, func(p clonable.Clonable) fail.Error {
 				defaultsV3, innerErr := clonable.Cast[*propertiesv3.ClusterDefaults](p)
@@ -1492,7 +1475,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1549,7 +1532,7 @@ func (instance *Cluster) ListMasters(ctx context.Context) (list rscapi.IndexedLi
 	if xerr != nil {
 		return emptyList, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1576,7 +1559,7 @@ func (instance *Cluster) ListMasterNames(ctx context.Context) (list data.Indexed
 	if xerr != nil {
 		return emptyList, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1617,7 +1600,7 @@ func (instance *Cluster) ListMasterIDs(ctx context.Context) (list data.IndexedLi
 	if xerr != nil {
 		return emptyList, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1644,7 +1627,7 @@ func (instance *Cluster) ListMasterIPs(ctx context.Context) (list data.IndexedLi
 	if xerr != nil {
 		return emptyList, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1674,7 +1657,7 @@ func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master *Host,
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1743,7 +1726,7 @@ func (instance *Cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 	if xerr != nil {
 		return emptyList, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1784,7 +1767,7 @@ func (instance *Cluster) ListNodeIDs(ctx context.Context) (list data.IndexedList
 	if xerr != nil {
 		return emptyList, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1811,7 +1794,7 @@ func (instance *Cluster) ListNodeIPs(ctx context.Context) (list data.IndexedList
 	if xerr != nil {
 		return emptyList, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1840,7 +1823,7 @@ func (instance *Cluster) FindAvailableNode(ctx context.Context) (node *Host, fer
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1869,7 +1852,7 @@ func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool
 	if xerr != nil {
 		return false, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1911,7 +1894,7 @@ func (instance *Cluster) CountNodes(ctx context.Context) (count uint, ferr fail.
 	if xerr != nil {
 		return 0, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1952,7 +1935,7 @@ func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (_ *Hos
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -2171,7 +2154,7 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Erro
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	if !force {
 		xerr := instance.trxBeingRemoved(ctx, trx)
@@ -2189,19 +2172,19 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
+	type localresult struct {
 		rErr fail.Error
 	}
-	chRes := make(chan result)
+	chRes := make(chan localresult)
 	go func() {
 		defer close(chRes)
-		gres, _ := func() (_ result, ferr fail.Error) {
+		gres, _ := func() (_ localresult, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 			var cleaningErrors []error
 
 			if valid.IsNil(instance) {
 				xerr := fail.InvalidInstanceError()
-				return result{xerr}, xerr
+				return localresult{xerr}, xerr
 			}
 
 			// Special treatment for cluster state, it must be updated, so we need to first rollback changes then alter state followed by a commit
@@ -2263,12 +2246,12 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				return result{xerr}, xerr
+				return localresult{xerr}, xerr
 			}
 
 			xerr = clusterTrx.Commit(ctx)
 			if xerr != nil {
-				return result{xerr}, xerr
+				return localresult{xerr}, xerr
 			}
 
 			masterCount, nodeCount := len(masters), len(nodes)
@@ -2310,7 +2293,7 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 			}
 			if len(cleaningErrors) > 0 {
 				xerr = fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to delete Hosts")
-				return result{xerr}, xerr
+				return localresult{xerr}, xerr
 			}
 
 			// From here, make sure there is nothing in nodesV3.ByNumericalID; if there is something, delete all the remaining
@@ -2320,7 +2303,7 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				return result{xerr}, xerr
+				return localresult{xerr}, xerr
 			}
 
 			allCount := len(all)
@@ -2342,7 +2325,7 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 				}
 				if len(cleaningErrors) > 0 {
 					xerr = fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to delete Hosts")
-					return result{xerr}, xerr
+					return localresult{xerr}, xerr
 				}
 			}
 
@@ -2355,14 +2338,14 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 					// missing Network and Subnet is considered as a successful deletion, continue
 					debug.IgnoreErrorWithContext(ctx, xerr)
 				default:
-					return result{xerr}, xerr
+					return localresult{xerr}, xerr
 				}
 			}
 
 			svc := instance.Service()
 			timings, xerr := svc.Timings()
 			if xerr != nil {
-				return result{xerr}, xerr
+				return localresult{xerr}, xerr
 			}
 
 			if subnetInstance != nil && !valid.IsNil(subnetInstance) {
@@ -2403,11 +2386,11 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 							debug.IgnoreErrorWithContext(ctx, nerr)
 						default:
 							xerr = fail.Wrap(nerr, "failed to delete Subnet '%s'", subnetName)
-							return result{xerr}, xerr
+							return localresult{xerr}, xerr
 						}
 					default:
 						xerr = fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
-						return result{xerr}, xerr
+						return localresult{xerr}, xerr
 					}
 				}
 			}
@@ -2445,26 +2428,29 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 						debug.IgnoreErrorWithContext(ctx, xerr)
 					case *retry.ErrStopRetry:
 						xerr = fail.Wrap(xerr.Cause(), "stopping retries")
-						return result{xerr}, xerr
+						return localresult{xerr}, xerr
 					case *retry.ErrTimeout:
 						xerr = fail.Wrap(xerr.Cause(), "timeout")
-						return result{xerr}, xerr
+						return localresult{xerr}, xerr
 					default:
 						xerr = fail.Wrap(xerr, "failed to delete Network '%s'", networkName)
 						logrus.WithContext(ctx).Errorf(xerr.Error())
-						return result{xerr}, xerr
+						return localresult{xerr}, xerr
 					}
 				}
 				logrus.WithContext(ctx).Infof("Network '%s' successfully deleted.", networkName)
 			}
 
+			// Need to explicitly terminate cluster transaction to be able to delete metadata (dead-lock otherwise)
+			clusterTrx.SilentTerminate(ctx)
+
 			// --- Delete metadata ---
 			xerr = instance.Core.Delete(cleanupContextFrom(ctx))
 			if xerr != nil {
-				return result{xerr}, xerr
+				return localresult{xerr}, xerr
 			}
 
-			return result{nil}, nil // nolint
+			return localresult{nil}, nil // nolint
 		}() // nolint
 		chRes <- gres
 	}()
@@ -2760,7 +2746,7 @@ func (instance *Cluster) trxUpdateClusterInventory(inctx context.Context, cluste
 				if innerXErr != nil {
 					return innerXErr
 				}
-				defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+				defer hostTrx.TerminateFromError(ctx, &ferr)
 
 				innerXErr = inspectHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
 					params["PrimaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
@@ -2783,7 +2769,7 @@ func (instance *Cluster) trxUpdateClusterInventory(inctx context.Context, cluste
 					if innerXErr != nil {
 						return innerXErr
 					}
-					defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+					defer hostTrx.TerminateFromError(ctx, &ferr)
 
 					innerXErr = inspectHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
 						params["SecondaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
@@ -3035,7 +3021,7 @@ func (instance *Cluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterRes
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -3044,7 +3030,7 @@ func (instance *Cluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterRes
 	}
 
 	out := &protocol.ClusterResponse{}
-	xerr = metadata.Inspect[*abstract.Cluster](ctx, trx, func(aci *abstract.Cluster, props *serialize.JSONProperties) fail.Error {
+	xerr = inspectClusterMetadata(ctx, trx, func(aci *abstract.Cluster, props *serialize.JSONProperties) fail.Error {
 		out.Identity = converters.ClusterFromAbstractToProtocol(*aci)
 
 		innerXErr := props.Inspect(clusterproperty.ControlPlaneV1, func(p clonable.Clonable) fail.Error {
@@ -3191,7 +3177,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateBasedOnError(ctx, &ferr)
+	defer trx.TerminateFromError(ctx, &ferr)
 
 	xerr = instance.trxBeingRemoved(ctx, trx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -3333,7 +3319,7 @@ func (instance *Cluster) IsFeatureInstalled(inctx context.Context, name string) 
 				ar := result{false, xerr}
 				return ar, ar.rErr
 			}
-			defer trx.TerminateBasedOnError(ctx, &ferr)
+			defer trx.TerminateFromError(ctx, &ferr)
 
 			xerr = instance.trxBeingRemoved(ctx, trx)
 			xerr = debug.InjectPlannedFail(xerr)

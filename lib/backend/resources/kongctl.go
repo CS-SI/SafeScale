@@ -111,7 +111,7 @@ func NewKongController(ctx context.Context, subnet *Subnet, addressPrimaryGatewa
 		if xerr != nil {
 			return nil, xerr
 		}
-		defer addressedGatewayTrx.TerminateBasedOnError(ctx, &ferr)
+		defer addressedGatewayTrx.TerminateFromError(ctx, &ferr)
 
 		if results.IsSuccessful() {
 			xerr = alterHostMetadataProperty(ctx, addressedGatewayTrx, hostproperty.FeaturesV1, func(featuresV1 *propertiesv1.HostFeatures) fail.Error {
@@ -194,7 +194,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 	if xerr != nil {
 		return "", xerr
 	}
-	defer subnetTrx.TerminateBasedOnError(ctx, &ferr)
+	defer subnetTrx.TerminateFromError(ctx, &ferr)
 
 	xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 		if as.VIP != nil {

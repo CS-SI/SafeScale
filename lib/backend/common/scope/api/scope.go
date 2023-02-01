@@ -18,13 +18,15 @@ package scopeapi
 
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
 // Scope ...
 type Scope interface {
+	AbstractByName(kind, name string) (abstract.Abstract, fail.Error)
+	AbstractByID(kind, id string) (abstract.Abstract, fail.Error)
 	ConsulKV() *consumer.KV
 	Description() string
 	ID() string
@@ -34,11 +36,10 @@ type Scope interface {
 	KVPath() string
 	Organization() string
 	Project() string
-	RegisterResource(terraformerapi.Resource) fail.Error
-	RegisterResourceIfNeeded(terraformerapi.Resource) (bool, fail.Error)
-	ReplaceResource(terraformerapi.Resource) fail.Error
-	Resource(kind, name string) (terraformerapi.Resource, fail.Error)
+	RegisterAbstract(abstract.Abstract) fail.Error
+	RegisterAbstractIfNeeded(abstract.Abstract) (bool, fail.Error)
+	// ReplaceAbstract(abstract.Abstract) fail.Error
 	Service() iaasapi.Service
 	Tenant() string
-	UnregisterResource(terraformerapi.Resource) fail.Error
+	UnregisterAbstract(abstract.Abstract) fail.Error
 }

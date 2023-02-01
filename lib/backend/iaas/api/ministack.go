@@ -18,16 +18,18 @@ package iaasapi
 
 import (
 	"context"
+	"time"
 
 	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
 //go:generate minimock -o mocks/mock_stack.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api.Stack
 
-// MiniStack is the interface to minimum set of Cloud stack to complete terraform (list, inspect, ...)
+// MiniStack is the interface to missing abilities from terraform that are needed by higher level code
 type MiniStack interface {
 	AuthenticationOptions() (iaasoptions.Authentication, fail.Error)
 	ConfigurationOptions() (iaasoptions.Configuration, fail.Error)
@@ -72,6 +74,10 @@ type MiniStack interface {
 	InspectHost(context.Context, HostIdentifier) (*abstract.HostFull, fail.Error)
 	// ListHosts lists all hosts
 	ListHosts(context.Context, bool) (abstract.HostList, fail.Error)
+	// GetHostState ...
+	GetHostState(context.Context, HostIdentifier) (hoststate.Enum, fail.Error)
+	// WaitHostReady ...
+	WaitHostReady(context.Context, HostIdentifier, time.Duration) (*abstract.HostCore, fail.Error)
 
 	// InspectVolume returns the volume identified by id
 	InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error)

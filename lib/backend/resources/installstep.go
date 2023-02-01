@@ -410,7 +410,7 @@ func (is *step) initLoopTurnForHost(ctx context.Context, host *Host, v data.Map[
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer hostTrx.TerminateBasedOnError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	is.Worker.SetStartTime(time.Now())
 

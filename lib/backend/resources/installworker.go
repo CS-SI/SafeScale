@@ -1475,7 +1475,7 @@ func (w *worker) identifyHosts(inctx context.Context, targets stepTargets) ([]*H
 			if xerr != nil {
 				return list, xerr
 			}
-			defer clusterTrx.TerminateBasedOnError(ctx, &ferr)
+			defer clusterTrx.TerminateFromError(ctx, &ferr)
 
 			switch masterT {
 			case "1":

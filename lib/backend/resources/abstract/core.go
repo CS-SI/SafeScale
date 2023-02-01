@@ -27,6 +27,21 @@ import (
 
 // Core represents a virtual network
 type (
+	Abstract interface {
+		clonable.Clonable
+		data.Identifiable
+
+		Kind() string
+		GetID() (string, error)
+		GetName() string
+		Extra() map[string]any
+		TerraformSnippet() string
+		TerraformTypes() []string
+		UniqueID() string
+		// ToMap() map[string]any
+		// String() string
+	}
+
 	core struct {
 		Name string                   `json:"name"` // name of the abstract resource
 		Tags data.Map[string, string] `json:"tags,omitempty"`
@@ -186,8 +201,8 @@ func (c *core) TerraformTypes() []string {
 // 	return nil
 // }
 
-// // AllResources returns the scope
-// func (c *Core) AllResources(ctx context.Context) ([]terraformerapi.Resource, fail.Error) {
+// // AllAbstracts returns the scope
+// func (c *Core) AllAbstracts(ctx context.Context) ([]terraformerapi.AbstractByName, fail.Error) {
 // 	if valid.IsNull(c) {
 // 		return nil, fail.InvalidInstanceError()
 // 	}
@@ -202,7 +217,7 @@ func (c *core) TerraformTypes() []string {
 // 		return nil, fail.InconsistentError("failed to cast '%s' to 'ScopeLimitedToAbstractUse'", reflect.TypeOf(scope).String())
 // 	}
 //
-// 	return castedScope.AllResources()
+// 	return castedScope.AllAbstracts()
 // }
 
 func (c *core) GetName() string {
@@ -239,7 +254,7 @@ func (c *core) Extra() map[string]any {
 	return c.extra
 }
 
-// UniqueID returns the index that uniquely identifiy an abstract
+// UniqueID returns the index that uniquely identify an abstract
 func (c *core) UniqueID() string {
 	if valid.IsNull(c) {
 		return ""

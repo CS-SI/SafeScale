@@ -332,7 +332,7 @@ func (instance *Feature) Check(ctx context.Context, target Targetable, v data.Ma
 		if xerr != nil {
 			return nil, xerr
 		}
-		defer targetTrx.TerminateBasedOnError(ctx, &ferr)
+		defer targetTrx.TerminateFromError(ctx, &ferr)
 
 		// xerr := inspectHostMetadataProperty(ctx, targetTrx, ...)
 		// where:
@@ -340,7 +340,7 @@ func (instance *Feature) Check(ctx context.Context, target Targetable, v data.Ma
 		// func inspectHostMetadataProperty[P clonable.Clonable](xtx context.Context, trx *hostMetadataTransaction, property string,callback func(p P) fail.Error {
 		//    return metadata.InspectProperty[*abstract.HostCore](ctx, trx, property, callback)
 		// }
-		xerr = metadata.InspectProperty[*abstract.HostCore](ctx, targetTrx, hostproperty.FeaturesV1, func(hostFeaturesV1 *propertiesv1.HostFeatures) fail.Error {
+		xerr = inspectHostMetadataProperty(ctx, targetTrx, hostproperty.FeaturesV1, func(hostFeaturesV1 *propertiesv1.HostFeatures) fail.Error {
 			_, found = hostFeaturesV1.Installed[instance.GetName()]
 			return nil
 		})
