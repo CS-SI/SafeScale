@@ -853,6 +853,7 @@ message ClusterCreateRequest {
 	bool force = 17;                 // ignore cluster sizing recommendations
 	repeated string parameters = 18; // contains optional parameters for automatically installed Features
 	uint32 default_ssh_port = 19;    // contains the default ssh port for cluster gateways
+	repeated string enabled = 20;
 }
 
 message ClusterResizeRequest {

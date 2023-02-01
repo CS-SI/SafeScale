@@ -2247,17 +2247,19 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 
 		// FIXME: Enable this ONLY after remotedesktop feature is UPDATED AND TESTED
 		// Also, EOL, unsafe, undocumented, 4 releases have passed since 1.0.0 was published
-		/*
-			xerr := instance.installRemoteDesktop(ctx, parameters, req)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
-				if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
-					chRes <- result{xerr}
-					return
+		for _, v := range req.Enabled { // if some explicitly asks for it
+			if v == "remotedesktop" {
+				xerr := instance.installRemoteDesktop(ctx, parameters, req)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
+					if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
+						chRes <- result{xerr}
+						return
+					}
 				}
 			}
-		*/
+		}
 
 		// Install ansible feature on Cluster (all masters) // aaaand it's gone...
 		/*

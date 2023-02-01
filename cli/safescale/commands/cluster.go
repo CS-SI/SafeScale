@@ -415,6 +415,10 @@ var clusterCreateCommand = cli.Command{
 			Name:  "disable",
 			Usage: "Allows to disable addition of default features (can be used several times to disable several features)",
 		},
+		cli.StringSliceFlag{
+			Name:  "enable",
+			Usage: "Allows to enable addition of features (can be used several times to enable several features)",
+		},
 		cli.StringFlag{
 			Name:  "os",
 			Usage: "Defines the operating system to use",
@@ -492,6 +496,7 @@ var clusterCreateCommand = cli.Command{
 		keep := c.Bool("keep-on-failure")
 		cidr := c.String("cidr")
 		disable := c.StringSlice("disable")
+		enable := c.StringSlice("enable")
 		los := c.String("os")
 		gatewaySSHPort := uint32(c.Int("gwport"))
 
@@ -533,6 +538,7 @@ var clusterCreateCommand = cli.Command{
 			KeepOnFailure:  keep,
 			Cidr:           cidr,
 			Disabled:       disable,
+			Enabled:        enable,
 			Os:             los,
 			GlobalSizing:   globalDef,
 			GatewaySizing:  gatewaysDef,
