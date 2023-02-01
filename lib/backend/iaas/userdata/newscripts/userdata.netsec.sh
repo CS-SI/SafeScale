@@ -96,6 +96,148 @@ uptime > /opt/safescale/var/state/user_data.netsec.done
 rm -f /opt/safescale/var/state/user_data.netsec.done
 
 function reset_fw() {
+  {{- if .WithoutFirewall }}
+  return 0
+  {{- end }}
+
+  is_network_reachable || failure 206 "reset_fw(): failure resetting firewall because network is not reachable"
+
+  case $LINUX_KIND in
+  debian)
+    echo "Reset firewall"
+    sfRetry4 "sfApt update" || failure 207 "reset_fw(): failure running apt update"
+    sfRetry4 "sfApt -y autoclean autoremove" || failure 210 "reset_fw(): failure running cleanup"
+    sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 210 "reset_fw(): failure installing iptables"
+    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3 python3-pip" || failure 211 "reset_fw(): failure installing firewalld"
+
+    systemctl is-active ufw &> /dev/null && {
+      echo "Stopping ufw"
+      systemctl stop ufw || true # set to true to fix issues
+    }
+    systemctl is-enabled ufw &> /dev/null && {
+      systemctl disable ufw || true # set to true to fix issues
+    }
+    dpkg --purge --force-remove-reinstreq ufw &>/dev/null || failure 212 "reset_fw(): failure purging ufw"
+    ;;
+
+  ubuntu)
+    echo "Reset firewall"
+    sfRetry4 "sfApt update" || failure 213 "reset_fw(): failure running apt update"
+    sfRetry4 "sfApt -y autoclean autoremove" || failure 213 "reset_fw(): failure running cleanup"
+    sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 214 "reset_fw(): failure installing iptables"
+    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3 python3-pip" || failure 215 "reset_fw(): failure installing firewalld"
+
+    systemctl is-active ufw &> /dev/null && {
+      echo "Stopping ufw"
+      systemctl stop ufw || true # set to true to fix issues
+    }
+    systemctl is-enabled ufw &> /dev/null && {
+      systemctl disable ufw || true # set to true to fix issues
+    }
+    dpkg --purge --force-remove-reinstreq ufw &>/dev/null || failure 216 "reset_fw(): failure purging ufw"
+    ;;
+
+  redhat | rhel | centos | fedora)
+    # firewalld may not be installed
+    if ! systemctl is-active firewalld &> /dev/null; then
+      if ! systemctl status firewalld &> /dev/null; then
+        is_network_reachable || failure 219 "reset_fw(): failure installing firewalld because repositories are not reachable"
+        if [ $(versionchk ${VERSION_ID}) -ge $(versionchk "8.0") ]; then
+          sudo dnf config-manager -y --disable epel-modular
+          sudo dnf config-manager -y --disable epel
+        fi
+        sfRetry4 "sfYum install -q -y firewalld python3 python3-pip" || failure 220 "reset_fw(): failure installing firewalld"
+      fi
+    fi
+    ;;
+  esac
+
+  {{- if .DefaultFirewall }}
+  firewall-cmd --add-service={ssh,dhcpv6-client,dns,mdns} || failure 221 "reset_fw(): firewall-offline-cmd failed with $? adding services"
+  firewall-cmd --runtime-to-permanent || failure 221 "reset_fw(): firewall-offline-cmd failed with $? making permanent"
+  sudo sed -i 's/^LogDenied=.*$/LogDenied=all/g' /etc/firewalld/firewalld.conf
+  sudo systemctl restart firewalld.service
+  return 0
+  {{- end }}
+
+  # Clear interfaces attached to zones
+  for zone in public trusted; do
+    for nic in $(firewall-offline-cmd --zone=$zone --list-interfaces || true); do
+      firewall-offline-cmd --zone=$zone --remove-interface=$nic &> /dev/null || true
+    done
+  done
+
+  # Attach Internet interface or source IP to zone public if host is gateway
+  [[ ! -z ${PU_IF} ]] && {
+    firewall-offline-cmd --zone=public --add-interface=${PU_IF} || failure 221 "reset_fw(): firewall-offline-cmd failed with $? adding interfaces"
+  }
+
+  {{- if or .PublicIP .IsGateway }}
+  [[ -z ${PU_IF} ]] && {
+    firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || failure 222 "reset_fw(): firewall-offline-cmd failed with $? adding sources"
+  }
+  {{- end }}
+
+  # Sets the default target of packets coming from public interface to DROP
+  firewall-offline-cmd --zone=public --set-target=DROP || failure 223 "reset_fw(): firewall-offline-cmd failed with $? dropping public zone"
+
+  # Enable masquerade
+  # firewall-offline-cmd --zone=public --add-masquerade
+
+  {{- if or .PublicIP .IsGateway }}
+  # Attach LAN interfaces to zone public, adding to trusted zone results in all ports visible from internet using nmap
+  [[ ! -z ${PR_IFs} ]] && {
+    for i in ${PR_IFs}; do
+      firewall-offline-cmd --zone=trusted --add-interface=${PR_IFs} || failure 224 "reset_fw(): firewall-offline-cmd failed with $? adding ${PR_IFs} to trusted"
+    done
+  }
+  {{- else }}
+  # Other machines can trust internal network...
+  [[ ! -z ${PR_IFs} ]] && {
+      for i in ${PR_IFs}; do
+        firewall-offline-cmd --zone=trusted --add-interface=${PR_IFs} || failure 224 "reset_fw(): firewall-offline-cmd failed with $? adding ${PR_IFs} to trusted"
+      done
+    }
+  {{- end }}
+
+  # Attach lo interface to zone trusted
+  firewall-offline-cmd --zone=trusted --add-interface=lo || failure 225 "reset_fw(): firewall-offline-cmd failed with $? adding lo to trusted"
+
+  # Allow service ssh on public zone
+  op=-1
+  SSHEC=$(firewall-offline-cmd --zone=public --add-service=ssh) && op=$? || true
+  if [[ $op -eq 11 ]] || [[ $op -eq 12 ]] || [[ $op -eq 16 ]]; then
+    op=0
+  fi
+
+  if [[ $(echo $SSHEC | grep "ALREADY_ENABLED") ]]; then
+    op=0
+  fi
+
+  if [[ $op -ne 0 ]]; then
+    failure 226 "reset_fw(): firewall-offline-cmd failed with $op adding ssh service"
+  fi
+
+  sfService enable firewalld &> /dev/null || failure 227 "reset_fw(): service firewalld enable failed with $?"
+  sfService start firewalld &> /dev/null || failure 228 "reset_fw(): service firewalld start failed with $?"
+
+  sop=-1
+  firewall-cmd --runtime-to-permanent && sop=$? || sop=$?
+  if [[ $sop -ne 0 ]]; then
+    if [[ $sop -ne 31 ]]; then
+      failure 229 "reset_fw(): saving rules with firewall-cmd failed with $sop"
+    fi
+  fi
+
+  # Log dropped packets
+  sudo sed -i 's/^LogDenied=.*$/LogDenied=all/g' /etc/firewalld/firewalld.conf
+
+  # Save current fw settings as permanent
+  sfFirewallReload || (echo "reloading firewall failed with $?" && return 1)
+
+  firewall-cmd --list-all --zone=trusted > /tmp/firewall-trusted.cfg || true
+  firewall-cmd --list-all --zone=public > /tmp/firewall-public.cfg || true
+
   return 0
 }
 
@@ -763,6 +905,141 @@ function configure_network_redhat() {
   }
 
   echo "done"
+}
+
+# Configure network for redhat 6- alike distributions (rhel, centos, ...)
+function configure_network_redhat_without_nmcli() {
+  echo "Configuring network (RedHat 6- alike)..."
+
+  # We don't want NetworkManager if RedHat/CentOS < 7
+  stop_svc NetworkManager &> /dev/null
+  disable_svc NetworkManager &> /dev/null
+  if [[ ${FEN} -eq 0 ]]; then
+    sfRetry4 "sfYum remove -y NetworkManager &>/dev/null"
+    echo "exclude=NetworkManager" >> /etc/yum.conf
+
+    if which dnf; then
+      dnf install -q -y network-scripts || {
+        dnf install -q -y NetworkManager-config-routing-rules
+        echo net.ipv4.ip_forward=1 >> /etc/sysctl.d/90-override.conf
+        sysctl -w net.ipv4.ip_forward=1
+        sysctl -p
+        firewall-cmd --complete-reload
+      }
+    else
+      sfYum install -q -y network-scripts || {
+        sfYum install -q -y NetworkManager-config-routing-rules
+        echo net.ipv4.ip_forward=1 >> /etc/sysctl.d/90-override.conf
+        sysctl -w net.ipv4.ip_forward=1
+        sysctl -p
+        firewall-cmd --complete-reload
+      }
+    fi
+  else
+    sfYum remove -y NetworkManager &> /dev/null
+  fi
+
+  # Configure all network interfaces in dhcp
+  for IF in $NICS; do
+    if [[ ${IF} != "lo" ]]; then
+      cat > /etc/sysconfig/network-scripts/ifcfg-${IF} <<- EOF
+				DEVICE=$IF
+				BOOTPROTO=dhcp
+				ONBOOT=yes
+				NM_CONTROLLED=no
+EOF
+      {{- if .DNSServers }}
+      i=1
+      {{- range .DNSServers }}
+      echo "DNS${i}={{ . }}" >> /etc/sysconfig/network-scripts/ifcfg-${IF}
+      i=$((i + 1))
+      {{- end }}
+      {{- else }}
+      EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
+      if [[ -z ${EXISTING_DNS} ]]; then
+        echo "DNS1=1.1.1.1" >> /etc/sysconfig/network-scripts/ifcfg-${IF}
+      else
+        echo "DNS1=$EXISTING_DNS" >> /etc/sysconfig/network-scripts/ifcfg-${IF}
+      fi
+      {{- end }}
+
+      {{- if .AddGateway }}
+      echo "GATEWAY={{ .DefaultRouteIP }}" >> /etc/sysconfig/network-scripts/ifcfg-${IF}
+      {{- end }}
+    fi
+  done
+
+  configure_dhclient
+  sleep 5
+
+  {{- if .AddGateway }}
+  echo "GATEWAY={{ .DefaultRouteIP }}" > /etc/sysconfig/network
+  {{- end }}
+
+  enable_svc network
+  restart_svc network
+
+  echo "exclude=NetworkManager" >> /etc/yum.conf
+  sleep 5
+
+  reset_fw || failure 206 "problem resetting firewall"
+
+  echo "done"
+}
+
+# Configure network for redhat7+ alike distributions (rhel, centos, ...)
+function configure_network_redhat_with_nmcli() {
+  echo "Configuring network (RedHat 7+ alike with Network Manager)..."
+
+  # Do some cleanup inside /etc/sysconfig/network-scripts
+  CONNECTIONS=$(nmcli -f "NAME,DEVICE" -c no -t con)
+  for i in $CONNECTIONS; do
+    NAME=$(echo ${i} | cut -d':' -f1)
+    DEVICE=$(echo ${i} | cut -d':' -f2)
+    [[ -z "${DEVICE}" ]] && mv /etc/sysconfig/network-scripts/ifcfg-${NAME} /etc/sysconfig/network-scripts/disabled.ifcfg-${NAME}
+  done
+
+  # Configure all network interfaces
+  for IF in $(nmcli -f 'DEVICE' -c no -t dev); do
+    # We change nothing on device lo
+    [[ "${IF}" == "lo" ]] && continue
+
+    DEV_IP=$(nmcli -g IP4.ADDRESS dev show "${IF}")
+    # We change nothing on device with Public IP Address
+    is_ip_private $(echo ${DEV_IP} | cut -d/ -f1) || continue
+
+    CONN=$(nmcli -c no -t -f "NAME,DEVICE" con | grep ${IF} | cut -d: -f1)
+    nmcli con mod "${CONN}" connection.autoconnect yes || return 1
+    # Assume the IP Address cannot change even if the first time it is affected by DHCP
+    nmcli con mod "${CONN}" ipv4.addresses "${DEV_IP}" || return 1
+    nmcli con mod "${CONN}" ipv4.method manual || return 1
+    {{- if .DNSServers }}
+    {{- range .DNSServers }}
+    nmcli con mod "${CONN}" +ipv4.dns {{ . }} || return 1
+    {{- end }}
+    {{- else }}
+    EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
+    if [[ -z ${EXISTING_DNS} ]]; then
+      ${NMCLI} con mod "${CONN}" +ipv4.dns 1.1.1.1 || return 1
+    else
+      ${NMCLI} con mod "${CONN}" +ipv4.dns ${EXISTING_DNS} || return 1
+    fi
+    {{- end }}
+
+    {{- if .AddGateway }}
+    nmcli con mod "${CONN}" ipv4.gateway "{{ .DefaultRouteIP }}"
+    {{- end}}
+
+  done
+
+  nmcli con reload
+
+  configure_dhclient || return 1
+
+  enable_svc NetworkManager
+  restart_svc NetworkManager
+
+  return 0
 }
 
 function check_for_ip() {
