@@ -11,7 +11,6 @@ require (
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/dgraph-io/ristretto v0.1.1
 	github.com/eko/gocache/v2 v2.3.1
-	github.com/farmergreg/rfsnotify v0.0.0-20200716145600-b37be6e4177f
 	github.com/felixge/fgprof v0.9.3
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gofrs/uuid v4.3.1+incompatible
@@ -53,7 +52,6 @@ require (
 	google.golang.org/api v0.107.0
 	google.golang.org/grpc v1.52.3
 	google.golang.org/protobuf v1.28.1
-	gopkg.in/fsnotify.v1 v1.4.7
 )
 
 require (

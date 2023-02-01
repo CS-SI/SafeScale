@@ -24,10 +24,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/farmergreg/rfsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"gopkg.in/fsnotify.v1"
 	"io/fs"
 	"os"
 	"path"
@@ -36,8 +34,7 @@ import (
 )
 
 var (
-	featureFileController = make(map[string]interface{})
-	featureFileFolders    = []string{
+	featureFileFolders = []string{
 		"$HOME/.safescale/features",
 		"$HOME/.config/safescale/features",
 		"/etc/safescale/features",
@@ -607,143 +604,4 @@ func setViperConfigPathes(v *viper.Viper) {
 			v.AddConfigPath(i)
 		}
 	}
-}
-
-// watchFeatureFileFolders watches folders that may contain Feature Files and react to changes (invalidating cache entry
-// already loaded)
-func watchFeatureFileFolders(ctx context.Context) error {
-	watcher, err := rfsnotify.NewWatcher()
-	if err != nil {
-		return err
-	}
-	defer func() { _ = watcher.Close() }()
-
-	done := make(chan bool)
-	go func() {
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				onFeatureFileEvent(ctx, watcher, event)
-
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-				logrus.WithContext(ctx).Error("Feature File watcher returned an error: ", err)
-			}
-		}
-	}()
-
-	for _, v := range getFeatureFileFolders(false) {
-		err = addPathToWatch(ctx, watcher, v)
-		if err != nil {
-			return err
-		}
-	}
-
-	<-done
-	return nil
-}
-
-func addPathToWatch(ctx context.Context, w *rfsnotify.RWatcher, path string) error {
-	err := w.AddRecursive(path)
-	if err != nil {
-		switch casted := err.(type) {
-		case *fs.PathError:
-			switch casted.Err {
-			case NOTFOUND:
-				// folder not found, ignore it
-				debug.IgnoreError2(ctx, err)
-				return nil
-			default:
-				logrus.WithContext(ctx).Error(err)
-				return err
-			}
-		default:
-			logrus.WithContext(ctx).Error(err)
-			return err
-		}
-	}
-
-	logrus.WithContext(ctx).Debugf("adding monitoring of folder '%s' for Feature file changes", path)
-	return nil
-}
-
-// onFeatureFileEvent reacts to filesystem change event
-func onFeatureFileEvent(ctx context.Context, w *rfsnotify.RWatcher, e fsnotify.Event) {
-	switch {
-	case e.Op&fsnotify.Chmod == fsnotify.Chmod:
-		fallthrough
-	case e.Op&fsnotify.Remove == fsnotify.Remove:
-		fallthrough
-	case e.Op&fsnotify.Rename == fsnotify.Rename:
-		fallthrough
-	case e.Op&fsnotify.Write == fsnotify.Write:
-		relativeName := reduceFilename(e.Name)
-		stat, err := os.Stat(e.Name)
-		if err == nil {
-			if stat.IsDir() {
-				// If the fs object is a folder, do nothing more
-				return
-			}
-
-			// If the fs object is a file and is still readable, do nothing more
-			if e.Op&fsnotify.Chmod == fsnotify.Chmod {
-				fd, err := os.Open(e.Name)
-				if err == nil {
-					_ = fd.Close()
-					return
-				}
-			}
-		}
-
-		// invalidate only .yml/.yaml files from cache
-		extension := path.Ext(relativeName)
-		if extension != ".yml" && extension != ".yaml" {
-			return
-		}
-
-		// From here, we need to invalidate cache entry, either because content has changed or file have been removed/renamed or updated
-		featureName := strings.TrimPrefix(strings.TrimSuffix(relativeName, extension), "/")
-		if len(featureName) != len(relativeName) {
-			delete(featureFileController, featureName)
-		}
-
-	case e.Op&fsnotify.Create == fsnotify.Create:
-		// If the object created is a path, add it to RWatcher (if it's a file, nothing more to do, cache miss will
-		// do the necessary in time
-		fi, err := os.Stat(e.Name)
-		if err == nil && fi.IsDir() {
-			_ = w.AddRecursive(e.Name)
-		}
-	}
-}
-
-// reduceFilename removes the absolute part of 'name' corresponding to folder
-func reduceFilename(name string) string {
-	folders := getFeatureFileFolders(false)
-	last := name
-	for _, v := range folders {
-		if strings.HasPrefix(name, v) {
-			reduced := strings.TrimPrefix(name, v)
-			if len(reduced) < len(last) {
-				last = reduced
-			}
-		}
-	}
-	return strings.TrimLeft(last, "/")
-}
-
-// StartFeatureFileWatcher inits the watcher of Feature File changes
-func StartFeatureFileWatcher() {
-	// Starts go routine watching changes in Feature File folders
-	go func() {
-		err := watchFeatureFileFolders(context.Background())
-		if err != nil {
-			logrus.WithContext(context.Background()).Error(err)
-		}
-	}()
 }

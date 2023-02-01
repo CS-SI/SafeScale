@@ -20,17 +20,15 @@ SafeScale is an Infrastructure and Platform as Code tool.
   - [Description](#description)
     - [SafeScale Infra](#safescale-infra)
     - [SafeScale Platform](#safescale-platform)
-    - [SafeScale Security](#safescale-security)
   - [Available features](#available-features)
   - [Contributing](#contributing)
   - [License](#license)
 
 ## Description
-SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters that span multiple Clouds. These APIs and CLIs are divided in 3 service layers:
+SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters that span multiple Clouds. These APIs and CLIs are divided in 2 service layers:
 
 - SafeScale Infra to manage Cloud infrastructure (IaaS - Infrastructure as a Service)
 - SafeScale Platform to manage Cloud computing platforms (PaaS - Platform as a Service)
-- SafeScale Security to secure user environments
 
 ![SafeScale](doc/img/SafeScale.png "SafeScale")
 
@@ -70,7 +68,7 @@ For example the following command creates a Kubernetes cluster named `k8s-cluste
 $ safescale cluster create --flavor k8s --complexity Normal k8s-cluster
 ```
 
-Supplemental software and/or configurations can be installed in 2 ways on SafeScale Hosts or Clusters:
+Supplemental software and/or configurations can be installed in 3 ways on SafeScale Hosts or Clusters:
 - using ssh command (the old and manual way):
   ```
   $ safescale ssh run -c "apt install nginx" my-host
@@ -78,7 +76,31 @@ Supplemental software and/or configurations can be installed in 2 ways on SafeSc
 - using "SafeScale `Feature`", that can be seen as the "ansible" for SafeScale:
 
   ```
-  $ safescale cluster feature add mycluster keycloak
+  $ safescale cluster feature add mycluster ntpclient
+  ```
+- and using ansible, which is the PREFERRED method to install your software in a SafeScale cluster:
+  installing a simple script:
+  ```
+  $ safescale cluster ansible playbook my-cluster my-ansible-script.yml
+  ```
+
+  where my-ansible-script.yml is something like:
+```yml
+---
+- hosts: nodes
+  tasks:
+    - name: Install golang
+      become: yes
+      apt:
+        pkg:
+          - golang
+          - bison
+
+```
+
+  or a more complex one (put all your files in a .zip)
+  ```
+  $ safescale cluster ansible playbook my-cluster my-zipped-scripts.zip
   ```
 
 A "SafeScale `Feature`" is a file in YAML format that describes the operations to check/add/remove software and/or configuration on a target (Host or Cluster).
@@ -91,17 +113,6 @@ A `Feature` can describe operations using different methods:
 
 Additionally, a `Feature` is able to apply:
 - reverse proxy rules
-- Security Group rules
-
-### SafeScale Security
-
-SafeScale Security is a Web API and a Web Portal to create on-demand security gateways to protect Web services along 5 axes: Encryption, Authentication, Authorization, Auditability and Intrusion detection.
-SafeScale Security relies on Kong, an open source generic proxy to be put in between user and service. Kong intercepts user requests and service responses and executes plugins to empower any API. To build a SafeScale Security gateway 3 plugins are used:
-- Dynamic SSL plugin to encrypt traffic between the user and the service protected
-- Open ID plugin to connect the Identity and Access Management server, KeyCloak
-- UDP Log plugin to connect the Log management system, Logstash
-The design of a SafeScale Security gateway can be depicted as below:
-![SafeScale Security](doc/img/SafeScale_Security.png "SafeScale Security")
 
 ## Available features
 SafeScale is currently under active development and does not yet offer all the abilities planned. However, we are already publishing it with the following ones:
@@ -143,7 +154,7 @@ As much as possible, try following these guides:
 - [Go style guide](https://github.com/golang/go/wiki/CodeReviewComments)
 - [Effective Go](https://golang.org/doc/effective_go)
 
-For bugs and feature requests, [please create an issue](../../issues/new).
+For bugs and feature requests, [please create an issue](https://github.com/CS-SI/SafeScale/issues/new/choose).
 
 ## Build
   [See Build file](doc/build/BUILDING.md)

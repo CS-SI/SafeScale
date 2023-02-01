@@ -1,5 +1,5 @@
-//go:build !debug
-// +build !debug
+//go:build debug
+// +build debug
 
 /*
  * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
@@ -92,12 +92,12 @@ var (
 	}
 	userdataScriptTemplatesLock sync.RWMutex
 	userdataScriptProvider      string
-	userdataScripts             = map[Phase]string{
-		PHASE1_INIT:                      "scripts/userdata%s.init.sh",
-		PHASE2_NETWORK_AND_SECURITY:      "scripts/userdata%s.netsec.sh",
-		PHASE3_GATEWAY_HIGH_AVAILABILITY: "scripts/userdata%s.gwha.sh",
-		PHASE4_SYSTEM_FIXES:              "scripts/userdata%s.sysfix.sh",
-		PHASE5_FINAL:                     "scripts/userdata%s.final.sh",
+	userdataScripts             = map[Phase]string{ // FIXME: OPP Time to read this shit from a directory
+		PHASE1_INIT:                      "newscripts/userdata%s.init.sh",
+		PHASE2_NETWORK_AND_SECURITY:      "newscripts/userdata%s.netsec.sh",
+		PHASE3_GATEWAY_HIGH_AVAILABILITY: "newscripts/userdata%s.gwha.sh",
+		PHASE4_SYSTEM_FIXES:              "newscripts/userdata%s.sysfix.sh",
+		PHASE5_FINAL:                     "newscripts/userdata%s.final.sh",
 	}
 )
 
@@ -234,7 +234,7 @@ func (ud Content) ToMap() (map[string]interface{}, fail.Error) {
 	return mapped, nil
 }
 
-//go:embed scripts/*
+//go:embed newscripts/*
 var scripts embed.FS
 
 // Generate generates the script file corresponding to the phase

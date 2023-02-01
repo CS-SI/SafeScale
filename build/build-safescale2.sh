@@ -73,6 +73,9 @@ make generate
 
 sleep 4
 
+export GOOS=$GOOSX
+export GOARCH=$GOARCHX
+
 echo "Make All"
 make release
 [ $? -ne 0 ] && echo "Build failure" && exit 1
@@ -82,13 +85,13 @@ make install
 [ $? -ne 0 ] && echo "Install failure" && exit 1
 
 echo "Export"
-export CIBIN=/exported
-mkdir -p /exported
+export CIBIN=/exported-$GOOS-$GOARCH
+mkdir -p /exported-$GOOS-$GOARCH
 
-CIBIN=/exported make installci
+CIBIN=/exported-$GOOS-$GOARCH make installci
 [ $? -ne 0 ] && echo "Export failure" && exit 1
 
-cp ${WRKDIR}/SafeScale/go.mod /exported
-cp ${WRKDIR}/SafeScale/go.sum /exported
+cp ${WRKDIR}/SafeScale/go.mod /exported-$GOOS-$GOARCH
+cp ${WRKDIR}/SafeScale/go.sum /exported-$GOOS-$GOARCH
 
 exit 0
