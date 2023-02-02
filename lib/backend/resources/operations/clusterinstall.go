@@ -1013,7 +1013,9 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 			params["GuacamolePort"] = 63011
 			params["TomcatPort"] = 9009
 
-			r, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
+			r, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{
+				IgnoreTainted: true,
+			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				chRes <- result{xerr}
