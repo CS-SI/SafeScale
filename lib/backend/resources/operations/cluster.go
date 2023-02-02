@@ -1795,6 +1795,10 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Erro
 
 	xerr := instance.delete(cleanupContextFrom(ctx), clusterName)
 	if xerr != nil {
+		logrus.WithContext(cleanupContextFrom(ctx)).Error(xerr)
+		if strings.Contains(xerr.Error(), "Alter") {
+			return fail.NewError("severe metadata corruption")
+		}
 		return xerr
 	}
 
@@ -2093,8 +2097,6 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 				logrus.WithContext(ctx).Infof("Network '%s' successfully deleted.", networkName)
 			}
 
-			theID, _ := instance.GetID()
-
 			// --- Delete metadata ---
 			xerr = instance.MetadataCore.Delete(cleanupContextFrom(ctx))
 			if xerr != nil {
@@ -2102,6 +2104,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 			}
 
 			if ka, err := instance.Service().GetCache(ctx); err == nil {
+				theID, _ := instance.GetID()
 				if ka != nil {
 					if theID != "" {
 						_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
