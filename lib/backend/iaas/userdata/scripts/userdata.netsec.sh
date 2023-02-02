@@ -108,7 +108,7 @@ function reset_fw() {
     sfRetry4 "sfApt update" || failure 207 "reset_fw(): failure running apt update"
     sfRetry4 "sfApt -y autoclean autoremove" || failure 210 "reset_fw(): failure running cleanup"
     sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 210 "reset_fw(): failure installing iptables"
-    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3 python3-pip" || failure 211 "reset_fw(): failure installing firewalld"
+    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3" || failure 211 "reset_fw(): failure installing firewalld"
 
     systemctl is-active ufw &> /dev/null && {
       echo "Stopping ufw"
@@ -125,7 +125,7 @@ function reset_fw() {
     sfRetry4 "sfApt update" || failure 213 "reset_fw(): failure running apt update"
     sfRetry4 "sfApt -y autoclean autoremove" || failure 213 "reset_fw(): failure running cleanup"
     sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 214 "reset_fw(): failure installing iptables"
-    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3 python3-pip" || failure 215 "reset_fw(): failure installing firewalld"
+    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3" || failure 215 "reset_fw(): failure installing firewalld"
 
     systemctl is-active ufw &> /dev/null && {
       echo "Stopping ufw"
@@ -146,7 +146,7 @@ function reset_fw() {
           sudo dnf config-manager -y --disable epel-modular
           sudo dnf config-manager -y --disable epel
         fi
-        sfRetry4 "sfYum install -q -y firewalld python3 python3-pip" || failure 220 "reset_fw(): failure installing firewalld"
+        sfRetry4 "sfYum install -q -y firewalld python3" || failure 220 "reset_fw(): failure installing firewalld"
       fi
     fi
     ;;

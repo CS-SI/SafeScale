@@ -135,6 +135,10 @@ sharetests:
 	@echo "settings go build tags for sharetests"
 	@$(eval BUILD_TAGS = "sharetests,$(BUILD_TAGS)")
 
+labeltests:
+	@echo "settings go build tags for labeltests"
+	@$(eval BUILD_TAGS = "labeltests,$(BUILD_TAGS)")
+
 ifeq ($(OS),Windows_NT)
 releasearchive:
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Creating release archive $(NO_COLOR)\n";
@@ -539,12 +543,12 @@ gofmt: begin
 
 err: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) list ./... 2>&1 | grep -v mock | grep -v rules | grep -v cli | xargs errcheck -asserts | grep -v test | grep -v .pb. | grep -v nolint | $(TEE) err_results.log
+	@$(GO) list ./... 2>&1 | grep -v mock | grep -v rules | grep -v cli | xargs errcheck -asserts | grep -v test | grep -v .pb. | grep -v nolint 2>&1 | $(TEE) err_results.log
 	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
 
 vet: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running vet checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) list ./... | grep -v mock | grep -v rules | grep -v cli | xargs $(GO) vet | $(TEE) vet_results.log
+	@$(GO) list ./... | grep -v mock | grep -v rules | grep -v cli | xargs $(GO) vet 2>&1 | $(TEE) vet_results.log
 	@if [ -s ./vet_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) vet FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
 semgrep: begin
@@ -553,9 +557,9 @@ semgrep: begin
 	@($(WHICH) ruleguard > /dev/null || (echo "ruleguard not installed in your system" && exit 1))
 ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) semgrep_results.log || true
-	@ruleguard -c=0 -rules build/rules/ruleguard.rules.$(CERR).go ./... 2>&1 | tr '\n' '\0' | xargs -0 -n2 | grep -v nolint | grep -v _test.go | grep -v mock | grep -v .pb. | awk 'NF' | $(TEE) semgrep_results.log
-	@ruleguard -c=0 -rules build/rules/ruleguard.rules.json.go ./... 2>&1 | tr '\n' '\0' | xargs -0 -n2 | grep -v nolint | grep -v mock | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) -a semgrep_results.log
-	@ruleguard -c=0 -rules build/rules/ruleguard.rules.locks.go ./... 2>&1 | tr '\n' '\0' | xargs -0 -n2 | grep -v defer | grep -v nolint | grep -v mock | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) -a semgrep_results.log
+	@ruleguard -c=0 -rules build/rules/ruleguard.rules.$(CERR).go ./... 2>&1 | tr '\n' '\0' | xargs -0 -n2 | grep -v nolint | grep -v _test.go | grep -v mock | grep -v .pb. | awk 'NF' 2>&1 | $(TEE) semgrep_results.log
+	@ruleguard -c=0 -rules build/rules/ruleguard.rules.json.go ./... 2>&1 | tr '\n' '\0' | xargs -0 -n2 | grep -v nolint | grep -v mock | grep -v _test.go | grep -v .pb. | awk 'NF' 2>&1 | $(TEE) -a semgrep_results.log
+	@ruleguard -c=0 -rules build/rules/ruleguard.rules.locks.go ./... 2>&1 | tr '\n' '\0' | xargs -0 -n2 | grep -v defer | grep -v nolint | grep -v mock | grep -v _test.go | grep -v .pb. | awk 'NF' 2>&1 | $(TEE) -a semgrep_results.log
 	@if [ -s ./semgrep_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) semgrep FAILED, look at semgrep_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -569,7 +573,7 @@ metalint: begin
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
 ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) metalint_results.log || true
-	@golangci-lint --color never --timeout=16m --no-config --disable=unused --disable=goconst --disable=maligned --enable=unparam --enable=deadcode --disable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --disable=typecheck --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --disable=funlen --disable=gochecknoglobals --enable=depguard run ./lib/... 2>/dev/null | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | grep -v "\s*^\s*" | grep -v ^[[:space:]]*$ | $(TEE) metalint_results.log
+	@golangci-lint --color never --timeout=16m --no-config --disable=unused --disable=goconst --disable=maligned --enable=unparam --enable=deadcode --disable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --disable=typecheck --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --disable=funlen --disable=gochecknoglobals --enable=depguard run ./lib/... 2>/dev/null | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | grep -v "\s*^\s*" | grep -v ^[[:space:]]*$ 2>&1 | $(TEE) metalint_results.log
 	@if [ -s ./metalint_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) metalint FAILED, look at metalint_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -590,7 +594,7 @@ style: begin
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
 ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) style_results.log || true
-	@golangci-lint --color never --timeout=10m --no-config --disable=unused --disable=goconst --disable=gocyclo --enable=errcheck --enable=stylecheck --disable=typecheck --enable=deadcode --enable=revive --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ./... 2>/dev/null | tr '\n' ' ' | tr "^" '\0' | xargs -0 -n1 | grep -v _test.go | grep -v nolint | grep -v .pb. | grep -v typecheck | awk 'NF' | $(TEE) style_results.log
+	@golangci-lint --color never --timeout=10m --no-config --disable=unused --disable=goconst --disable=gocyclo --enable=errcheck --enable=stylecheck --disable=typecheck --enable=deadcode --enable=revive --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ./... 2>/dev/null | tr '\n' ' ' | tr "^" '\0' | xargs -0 -n1 | grep -v _test.go | grep -v nolint | grep -v .pb. | grep -v typecheck | awk 'NF' 2>&1 | $(TEE) style_results.log
 	@if [ -s ./style_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) style FAILED, look at style_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -614,7 +618,7 @@ badpractices: begin
 	@($(WHICH) ireturn > /dev/null || (echo "ireturn not installed in your system" && exit 1))
 ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) practices_results.log || true
-	@ireturn ./... 2>&1 | grep -v mock_ | grep -v fail.Error | $(TEE) practices_results.log
+	@ireturn ./... 2>&1 | grep -v mock_ | grep -v fail.Error 2>&1 | $(TEE) practices_results.log
 	@if [ -s ./practices_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at practices_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -627,7 +631,7 @@ ctxcheck: begin
 	@($(WHICH) contextcheck > /dev/null || (echo "contextcheck not installed in your system" && exit 1))
 ifeq ($(shell $(MD5) --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(RM) ctxcheck_results.log || true
-	@contextcheck ./lib/backend/resources/operations/... 2>&1 | grep -v mock_ | grep -v fail.Error | grep -v nolint | $(TEE) ctxcheck_results.log
+	@contextcheck ./lib/backend/resources/operations/... 2>&1 | grep -v mock_ | grep -v fail.Error | grep -v nolint 2>&1 | $(TEE) ctxcheck_results.log
 	@if [ -s ./ctxcheck_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) maint FAILED, look at ctxcheck_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 else
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Nothing to do $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -637,7 +641,7 @@ warnings: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running warnings checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
 	@$(RM) warnings_results.log || true
-	@golangci-lint --color never --timeout=16m run ./... 2>/dev/null | tr '\n' ' ' | sed -e "s/\^/\n/g" | grep -v nolint | grep -v rangeValCopy | grep -v json.camel | grep -v magic.numbers | grep -v _test.go | grep -v .pb. | $(TEE) warnings_results.log
+	@golangci-lint --color never --timeout=16m run ./... 2>/dev/null | tr '\n' ' ' | sed -e "s/\^/\n/g" | grep -v nolint | grep -v rangeValCopy | grep -v json.camel | grep -v magic.numbers | grep -v _test.go | grep -v .pb. 2>&1 | $(TEE) warnings_results.log
 	@if [ -s ./warnings_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) warnings FAILED, look at warnings_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
 show-cov: begin
