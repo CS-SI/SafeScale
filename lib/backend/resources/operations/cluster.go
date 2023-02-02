@@ -22,6 +22,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/consts"
 	"math"
 	mrand "math/rand"
 	"reflect"
@@ -1198,6 +1199,10 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 	nodeDef := complementHostDefinition(def, *nodeDefaultDefinition)
 	if def.Image != "" {
 		hostImage = def.Image
+	}
+
+	if hostImage == "" {
+		hostImage = consts.DEFAULTOS
 	}
 
 	svc := instance.Service()
