@@ -53,3 +53,6 @@ If you want to remove `""` around the results, you need to add `-r` option after
 
 ## To list all nodes into a cluster
 `safescale cluster inspect <cluster_name> | jq '.result.nodes.nodes'` 
+
+# Get started on AWS:
+https://github.com/CS-SI/SafeScale/blob/master/doc/getstarted/started.md
