@@ -415,7 +415,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 			// Write subnet object metadata
 			logrus.WithContext(ctx).Debugf("Saving Network '%s' metadata...", abstractNetwork.Name)
 			abstractNetwork.Imported = false
-			xerr = instance.Core.Carry(ctx, abstractNetwork)
+			xerr = instance.Carry(ctx, abstractNetwork)
 			if xerr != nil {
 				ar := result{xerr}
 				return ar, ar.rErr
@@ -440,27 +440,33 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 	}
 }
 
-// // carry registers clonable as core value and deals with cache
-// func (instance *Network) carry(ctx context.Context, an *abstract.Network) (ferr fail.Error) {
-// 	if valid.IsNil(instance) {
-// 		return fail.InvalidInstanceError()
-// 	}
-// 	if instance.Core.IsTaken() {
-// 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
-// 	}
-// 	if an == nil {
-// 		return fail.InvalidParameterCannotBeNilError("an")
-// 	}
-//
-// 	// Note: do not validate parameters, this call will do it
-// 	xerr := instance.Core.Carry(ctx, an)
-// 	xerr = debug.InjectPlannedFail(xerr)
-// 	if xerr != nil {
-// 		return xerr
-// 	}
-//
-// 	return nil
-// }
+// Carry registers clonable as core value and deals with cache
+func (instance *Network) Carry(ctx context.Context, an *abstract.Network) (ferr fail.Error) {
+	if valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if instance.Core.IsTaken() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+	}
+	if an == nil {
+		return fail.InvalidParameterCannotBeNilError("an")
+	}
+
+	// Note: do not validate parameters, this call will do it
+	xerr := instance.Core.Carry(ctx, an)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.Job().Scope().RegisterAbstract(an)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
+}
 
 // Import imports an existing Network in SafeScale metadata
 func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Error) {
@@ -478,9 +484,6 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 
 	tracer := debug.NewTracer(ctx, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	// Check if Network already exists and is managed by SafeScale
 	svc := instance.Service()

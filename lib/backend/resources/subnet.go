@@ -515,21 +515,6 @@ func (instance *Subnet) Exists(ctx context.Context) (bool, fail.Error) {
 	return true, nil
 }
 
-// Carry wraps rv.core.Carry() to add Subnet to service cache
-func (instance *Subnet) Carry(ctx context.Context, as *abstract.Subnet) (ferr fail.Error) {
-	if as == nil {
-		return fail.InvalidParameterCannotBeNilError("as")
-	}
-
-	xerr := instance.Core.Carry(ctx, as)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	return nil
-}
-
 // Create creates a Subnet
 func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, extra interface{}) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -589,7 +574,11 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}
 	xerr = instance.trxCreateGateways(ctx, subnetTrx, req, gwname, gwSizing, nil)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failure in 'unsafe' creating gateways")
+		gateway := "gateway"
+		if req.HA {
+			gateway += "s"
+		}
+		return fail.Wrap(xerr, "failed to create %s", gateway)
 	}
 
 	// --- Updates Subnet state in metadata ---
@@ -2439,7 +2428,7 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 			}()
 
 			// Write Subnet object metadata and updates the service cache
-			xerr = instance.carry(ctx, abstractSubnet)
+			xerr = instance.Carry(ctx, abstractSubnet)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				ar := localresult{nil, xerr}
@@ -2481,10 +2470,15 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 				ar := localresult{nil, xerr}
 				return ar, ar.rErr
 			}
+			// Note: DO NOT TERMINATE subnetTrx here, the transaction is returned to the caller, that will have the responsability to terminate it
+			// Starting from here, delete Subnet metadata on error
 			defer func() {
-				if ferr != nil {
-					// terminating transaction only when returning error
-					subnetTrx.TerminateFromError(ctx, &ferr)
+				if ferr != nil && !req.CleanOnFailure() {
+					subnetTrx.SilentTerminate(ctx)
+					derr := instance.Core.Delete(ctx)
+					if derr != nil {
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete metadata of Subnet '%s'", ActionFromError(ferr), req.Name))
+					}
 				}
 			}()
 
@@ -2625,22 +2619,6 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 
 			// FIXME: OPP Disable VIP SG and port security
 
-			// VPL: networkTrx.TerminateFromError() will rollback changes
-			// // Starting from here, remove Subnet from Network metadata if exiting with error
-			// defer func() {
-			// 	ferr = debug.InjectPlannedFail(ferr)
-			// 	if ferr != nil && req.CleanOnFailure() {
-			// 		derr := alterNetworkMetadataProperty(cleanupContextFrom(ctx), networkTrx, networkproperty.SubnetsV1, func(nsV1 *propertiesv1.NetworkSubnets) fail.Error {
-			// 			delete(nsV1.ByID, abstractSubnet.ID)
-			// 			delete(nsV1.ByName, abstractSubnet.Name)
-			// 			return nil
-			// 		})
-			// 		if derr != nil {
-			// 			_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Subnet from Network", ActionFromError(ferr)))
-			// 		}
-			// 	}
-			// }()
-
 			ar := localresult{subnetTrx, nil}
 			return ar, ar.rErr
 		}()
@@ -2659,8 +2637,8 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 	}
 }
 
-// carry registers 'as' as Core value of Subnet
-func (instance *Subnet) carry(ctx context.Context, as *abstract.Subnet) (ferr fail.Error) {
+// Carry registers 'as' as Core value of Subnet and register abstract in scope
+func (instance *Subnet) Carry(ctx context.Context, as *abstract.Subnet) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -2673,6 +2651,12 @@ func (instance *Subnet) carry(ctx context.Context, as *abstract.Subnet) (ferr fa
 
 	// Note: do not validate parameters, this call will do it
 	xerr := instance.Core.Carry(ctx, as)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.Job().Scope().RegisterAbstract(as)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

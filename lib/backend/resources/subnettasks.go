@@ -53,15 +53,15 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
+	type localresult struct {
 		rTr  data.Map[string, any]
 		rErr fail.Error
 	}
-	chRes := make(chan result)
+	chRes := make(chan localresult)
 	go func() {
 		defer close(chRes)
 
-		gres, _ := func() (_ result, ferr fail.Error) {
+		gres, gerr := func() (_ data.Map[string, any], ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
 			logrus.WithContext(ctx).Infof("Requesting the creation of gateway '%s' using template ID '%s', template name '%s', with image ID '%s'", request.ResourceName, request.TemplateID, request.TemplateRef, request.ImageID)
@@ -72,8 +72,7 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 			rgw, xerr := NewHost(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := result{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 
 			cluID, _ := instance.GetID()
@@ -97,21 +96,18 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := result{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 
 			// need to commit right now the changes in Subnet so far
 			xerr = subnetTrx.Commit(ctx)
 			if xerr != nil {
-				ar := result{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 
 			// Now test localresult of gateway creation
 			if createXErr != nil {
-				ar := result{nil, createXErr}
-				return ar, ar.rErr
+				return nil, createXErr
 			}
 
 			// Starting from here, deletes the gateway if exiting with error
@@ -183,18 +179,16 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := result{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 
 			r := data.Map[string, any]{
 				"host":     rgw,
 				"userdata": userData,
 			}
-			ar := result{r, nil}
-			return ar, ar.rErr
+			return r, nil
 		}()
-		chRes <- gres
+		chRes <- localresult{gres, gerr}
 	}() // nolint
 
 	select {

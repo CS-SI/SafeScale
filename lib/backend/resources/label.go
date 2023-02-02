@@ -263,8 +263,8 @@ func (instance *Label) Exists(_ context.Context) (bool, fail.Error) {
 	return false, fail.NotImplementedError()
 }
 
-// carry overloads rv.core.Carry() to add Label to service cache
-func (instance *Label) carry(ctx context.Context, al *abstract.Label) (ferr fail.Error) {
+// Carry ...
+func (instance *Label) Carry(ctx context.Context, al *abstract.Label) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -277,6 +277,12 @@ func (instance *Label) carry(ctx context.Context, al *abstract.Label) (ferr fail
 
 	// Note: do not validate parameters, this call will do it
 	xerr := instance.Core.Carry(ctx, al)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.Job().Scope().RegisterAbstract(al)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -442,7 +448,7 @@ func (instance *Label) Create(ctx context.Context, name string, hasDefault bool,
 	at.DefaultValue = defaultValue
 
 	// Sets err to possibly trigger defer calls
-	return instance.carry(ctx, at)
+	return instance.Carry(ctx, at)
 }
 
 // ToProtocol converts the Label to protocol message LabelInspectResponse
@@ -503,7 +509,7 @@ func (instance *Label) ToProtocol(ctx context.Context, withHosts bool) (_ *proto
 	return out, nil
 }
 
-// IsTag tells of the Label represents a Tag (ie a Label that does not carry a default value)
+// IsTag tells of the Label represents a Tag (ie a Label that does not Carry a default value)
 func (instance *Label) IsTag(ctx context.Context) (_ bool, ferr fail.Error) {
 	if valid.IsNull(instance) {
 		return false, fail.InvalidInstanceError()

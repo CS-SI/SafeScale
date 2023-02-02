@@ -63,5 +63,5 @@ func alterNetworkMetadataProperty[P clonable.Clonable](ctx context.Context, trx 
 }
 
 func alterNetworkMetadataProperties(ctx context.Context, trx networkTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.InspectProperties[*abstract.Network](ctx, trx, callback)
+	return metadata.AlterProperties[*abstract.Network](ctx, trx, callback)
 }

@@ -204,7 +204,7 @@ func TestNetwork_Carry(t *testing.T) {
 		require.EqualValues(t, skip(network.GetID()), "mynetwork")
 
 		onetwork := network.(*Network)
-		xerr = onetwork.carry(ctx, anetwork)
+		xerr = onetwork.Carry(ctx, anetwork)
 		require.Contains(t, xerr.Error(), "is not null value, cannot overwrite")
 
 		svc._reset()
@@ -222,7 +222,7 @@ func TestNetwork_Carry(t *testing.T) {
 			}
 		}()
 
-		xerr = onetwork.carry(ctx, anetwork)
+		xerr = onetwork.Carry(ctx, anetwork)
 		require.Nil(t, xerr)
 
 	})

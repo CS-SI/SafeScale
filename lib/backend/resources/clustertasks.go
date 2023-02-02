@@ -103,16 +103,15 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, clusterTrx clu
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && req.CleanOnFailure() && !cleanFailure {
+					ctx := cleanupContextFrom(inctx)
 					logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
-					if derr := instance.Core.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
-						logrus.WithContext(context.Background()).Errorf(
-							"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
-						)
+					clusterTrx.SilentTerminate(ctx)
+					derr := instance.Core.Delete(ctx)
+					if derr != nil {
+						logrus.WithContext(context.Background()).Errorf("cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name)
 						_ = ferr.AddConsequence(derr)
 					} else {
-						logrus.WithContext(ctx).Debugf(
-							"Cleaning up on %s, successfully deleted metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
-						)
+						logrus.WithContext(ctx).Debugf("Cleaning up on %s, successfully deleted metadata of Cluster '%s'", ActionFromError(ferr), req.Name)
 					}
 				}
 			}()
@@ -156,6 +155,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, clusterTrx clu
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && req.CleanOnFailure() && subnetInstance != nil && networkInstance != nil {
+					ctx := cleanupContextFrom(inctx)
 					logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting Subnet '%s'...", subnetInstance.GetName())
 					if derr := subnetInstance.Delete(jobapi.NewContextPropagatingJob(inctx)); derr != nil {
 						switch derr.(type) {
@@ -164,7 +164,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, clusterTrx clu
 							debug.IgnoreErrorWithContext(ctx, derr)
 						default:
 							cleanFailure = true
-							logrus.WithContext(context.Background()).Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr), subnetInstance.GetName())
+							logrus.WithContext(ctx).Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr), subnetInstance.GetName())
 							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 						}
 					} else {
@@ -340,7 +340,7 @@ func (instance *Cluster) firstLight(inctx context.Context, clusterTrx clusterTra
 			ci.Complexity = req.Complexity
 			ci.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
 
-			xerr = instance.carry(ctx, ci)
+			xerr = instance.Carry(ctx, ci)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr

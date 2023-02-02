@@ -292,8 +292,8 @@ func (instance *SecurityGroup) Replace(in clonable.Clonable) error {
 		return err
 	}
 
-	instance.Core, err = clonable.CastedClone[*metadata.Core[*abstract.SecurityGroup]](src.Core)
-	return err
+	// instance.Core, err = clonable.CastedClone[*metadata.Core[*abstract.SecurityGroup]](src.Core)
+	return instance.Core.Replace(src.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -318,7 +318,7 @@ func (instance *SecurityGroup) Exists(ctx context.Context) (bool, fail.Error) {
 }
 
 // Carry overloads rv.core.Carry() to add Volume to service cache
-func (instance *SecurityGroup) carry(ctx context.Context, asg *abstract.SecurityGroup) (ferr fail.Error) {
+func (instance *SecurityGroup) Carry(ctx context.Context, asg *abstract.SecurityGroup) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -331,6 +331,12 @@ func (instance *SecurityGroup) carry(ctx context.Context, asg *abstract.Security
 
 	// Note: do not validate parameters, this call will do it
 	xerr := instance.Core.Carry(ctx, asg)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.Job().Scope().RegisterAbstract(asg)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -483,19 +489,20 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 			}()
 
 			// Creates metadata
-			xerr = instance.carry(ctx, asg)
+			xerr = instance.Carry(ctx, asg)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				ar := result{xerr}
 				return ar, ar.rErr
 			}
 
+			// Starting from here, delete Subnet metadata on error
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil {
 					derr := instance.Core.Delete(cleanupContextFrom(ctx))
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(ferr)))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete metadata of Security Group '%s'", ActionFromError(ferr), name))
 					}
 				}
 			}()
@@ -725,7 +732,9 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules ...*abstract.
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateFromError(ctx, &ferr)
+	defer func() {
+		trx.TerminateFromError(ctx, &ferr)
+	}()
 
 	return alterSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
 		for k, v := range rules {

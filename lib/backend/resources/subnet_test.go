@@ -248,7 +248,7 @@ func TestSubnet_Carry(t *testing.T) {
 		asubnet.Network = "mynetwork"
 
 		xerr = subnet.Carry(ctx, asubnet)
-		require.Contains(t, xerr.Error(), "cannot carry, already carries something")
+		require.Contains(t, xerr.Error(), "cannot Carry, already carries something")
 
 		svc._reset()
 

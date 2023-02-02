@@ -63,5 +63,5 @@ func alterLabelMetadataProperty[P clonable.Clonable](ctx context.Context, trx la
 }
 
 func alterLabelMetadataProperties(ctx context.Context, trx labelTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.InspectProperties[*abstract.Label](ctx, trx, callback)
+	return metadata.AlterProperties[*abstract.Label](ctx, trx, callback)
 }

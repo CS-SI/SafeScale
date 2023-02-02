@@ -89,7 +89,6 @@ func NewTransaction[A abstract.Abstract, T Metadata[A]](ctx context.Context, ori
 	coreOriginal.lock.RLock()
 
 	// -- Reload reloads data from object storage to be sure to have the last revision
-
 	xerr = coreOriginal.reload(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -137,9 +136,9 @@ func (trx *transaction[A, T]) Commit(ctx context.Context) fail.Error {
 
 // commit saves the changes
 func (trx *transaction[A, T]) commit(ctx context.Context) fail.Error {
-	if trx.closed {
-		return fail.NotAvailableError("transaction is closed")
-	}
+	// if trx.closed {
+	// 	return fail.NotAvailableError("transaction is closed")
+	// }
 
 	if !trx.dirty {
 		return nil
@@ -307,7 +306,6 @@ func (trx *transaction[A, T]) TerminateFromError(ctx context.Context, ferr *fail
 	trx.coreOriginal.lock.RUnlock()
 
 	trx.closed = true
-	return
 }
 
 // Service returns the iaasapi.Service used to create/load the persistent object

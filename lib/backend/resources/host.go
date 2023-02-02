@@ -117,7 +117,6 @@ func LoadHost(inctx context.Context, ref string) (*Host, fail.Error) {
 	if ref == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
-
 	myjob, xerr := jobapi.FromContext(inctx)
 	if xerr != nil {
 		return nil, xerr
@@ -330,7 +329,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 
 	return reviewHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
 		var (
-			abstractHostFull                             *abstract.HostFull
+			abstractHostCore                             *abstract.HostCore
 			primaryGatewayConfig, secondaryGatewayConfig sshapi.Config
 		)
 
@@ -338,16 +337,17 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
-				abstractHostFull, innerXErr = svc.InspectHost(ctx, ahc)
+				abstractHostFull, innerXErr := svc.InspectHost(ctx, ahc)
 				if innerXErr != nil {
 					return innerXErr
 				}
+				abstractHostCore = abstractHostFull.HostCore
 			default:
 				return innerXErr
 			}
 		} else {
 			var innerErr error
-			abstractHostFull, innerErr = lang.Cast[*abstract.HostFull](entry)
+			abstractHostCore, innerErr = lang.Cast[*abstract.HostCore](entry)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -441,8 +441,8 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 					}
 					defer trx.TerminateFromError(ctx, &ferr)
 
-					gwErr = inspectHostMetadataAbstract(ctx, trx, func(ahf *abstract.HostCore) fail.Error {
-						secondaryGatewayConfig = ssh.NewConfig(gwInstance.GetName(), ip, int(ahf.SSHPort), opUser, ahf.PrivateKey, 0, "", nil, nil)
+					gwErr = inspectHostMetadataAbstract(ctx, trx, func(ahc *abstract.HostCore) fail.Error {
+						secondaryGatewayConfig = ssh.NewConfig(gwInstance.GetName(), ip, int(ahc.SSHPort), opUser, ahc.PrivateKey, 0, "", nil, nil)
 						return nil
 					})
 					if gwErr != nil {
@@ -488,7 +488,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 
 					subnetList = append(subnetList, cloned)
 				}
-				innerXErr = abstractHostFull.AddOptions(abstract.WithExtraData("Subnets", subnetList))
+				innerXErr = abstractHostCore.AddOptions(abstract.WithExtraData("Subnets", subnetList))
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -549,7 +549,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 				return fail.Wrap(innerErr)
 			}
 
-			innerXErr := castedProv.ConsolidateHostSnippet(abstractHostFull.HostCore)
+			innerXErr := castedProv.ConsolidateHostSnippet(abstractHostCore)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -564,14 +564,14 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 				for k, v := range sgsV1.ByName {
 					list[v] = k
 				}
-				return abstractHostFull.AddOptions(abstract.WithExtraData("SecurityGroupByID", list))
+				return abstractHostCore.AddOptions(abstract.WithExtraData("SecurityGroupByID", list))
 			})
 			if innerXErr != nil {
 				return innerXErr
 			}
 
 			// -- update abstract in scope
-			_, innerXErr = instance.Job().Scope().RegisterAbstractIfNeeded(abstractHostFull)
+			_, innerXErr = instance.Job().Scope().RegisterAbstractIfNeeded(abstractHostCore)
 			return innerXErr
 		}
 
@@ -639,8 +639,8 @@ func (instance *Host) Replace(in clonable.Clonable) error {
 	return nil
 }
 
-// carry ...
-func (instance *Host) carry(ctx context.Context, ahc *abstract.HostCore) (ferr fail.Error) {
+// Carry ...
+func (instance *Host) Carry(ctx context.Context, ahc *abstract.HostCore) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -648,11 +648,17 @@ func (instance *Host) carry(ctx context.Context, ahc *abstract.HostCore) (ferr f
 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if ahc == nil {
-		return fail.InvalidParameterCannotBeNilError("ahc")
+		return fail.InvalidParameterCannotBeNilError("ahf")
 	}
 
 	// Note: do not validate parameters, this call will do it
 	xerr := instance.Core.Carry(ctx, ahc)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.Job().Scope().RegisterAbstract(ahc)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -968,7 +974,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 	go func() {
 		defer close(chRes)
 
-		gres, _ := func() (_ localresult, ferr fail.Error) {
+		ud, gerr := func() (_ *userdata.Content, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 			svc := instance.Service()
 
@@ -981,19 +987,16 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 					// continue
 					debug.IgnoreErrorWithContext(ctx, xerr)
 				default:
-					ar := localresult{nil, fail.Wrap(xerr, "failed to check if Host '%s' already exists", hostReq.ResourceName)}
-					return ar, ar.err
+					return nil, fail.Wrap(xerr, "failed to check if Host '%s' already exists", hostReq.ResourceName)
 				}
 			} else {
-				ar := localresult{nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)}
-				return ar, ar.err
+				return nil, fail.DuplicateError("'%s' already exists", hostReq.ResourceName)
 			}
 
 			// Check if Host exists but is not managed by SafeScale
 			ahc, xerr := abstract.NewHostCore(abstract.WithName(hostReq.ResourceName))
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 
 			_, xerr = svc.InspectHost(ctx, ahc)
@@ -1004,12 +1007,10 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 					// continue
 					debug.IgnoreErrorWithContext(ctx, xerr)
 				default:
-					ar := localresult{nil, fail.Wrap(xerr, "failed to check if Host resource name '%s' is already used", hostReq.ResourceName)}
-					return ar, ar.err
+					return nil, fail.Wrap(xerr, "failed to check if Host resource name '%s' is already used", hostReq.ResourceName)
 				}
 			} else {
-				ar := localresult{nil, fail.DuplicateError("found an existing Host named '%s' (but not managed by SafeScale)", hostReq.ResourceName)}
-				return ar, ar.err
+				return nil, fail.DuplicateError("found an existing Host named '%s' (but not managed by SafeScale)", hostReq.ResourceName)
 			}
 
 			// select new template based on hostDef and hostReq
@@ -1024,8 +1025,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				tmpl, xerr := svc.FindTemplateBySizing(ctx, newHostDef)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					ar := localresult{nil, fail.NotFoundErrorWithCause(xerr, nil, "failed to find template to match requested sizing")}
-					return ar, ar.err
+					return nil, fail.NotFoundErrorWithCause(xerr, nil, "failed to find template to match requested sizing")
 				}
 
 				hostDef.Template = tmpl.ID
@@ -1044,8 +1044,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 
 				hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(ctx, svc, imageQuery)
 				if xerr != nil {
-					ar := localresult{nil, xerr}
-					return ar, ar.err
+					return nil, xerr
 				}
 			}
 			hostDef.Image = hostReq.ImageID
@@ -1059,8 +1058,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				defaultSubnet, undoCreateSingleHostNetworking, xerr = createSingleHostNetworking(ctx, hostReq)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					ar := localresult{nil, xerr}
-					return ar, ar.err
+					return nil, xerr
 				}
 
 				defer func() {
@@ -1075,8 +1073,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 
 				defaultSubnetTrx, xerr := newSubnetTransaction(ctx, defaultSubnet)
 				if xerr != nil {
-					ar := localresult{nil, xerr}
-					return ar, ar.err
+					return nil, xerr
 				}
 				defer defaultSubnetTrx.TerminateFromError(ctx, &ferr)
 
@@ -1090,42 +1087,36 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 					return nil
 				})
 				if xerr != nil {
-					ar := localresult{nil, xerr}
-					return ar, ar.err
+					return nil, xerr
 				}
 			} else {
 				// By convention, default subnet is the first of the list
 				as := hostReq.Subnets[0]
 				if as == nil {
-					ar := localresult{nil, fail.InvalidParameterError("hostReq.Subnet[0] cannot be nil")}
-					return ar, ar.err
+					return nil, fail.InvalidParameterError("hostReq.Subnet[0] cannot be nil")
 				}
 
 				defaultSubnet, xerr = LoadSubnet(ctx, "", as.ID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					ar := localresult{nil, xerr}
-					return ar, ar.err
+					return nil, xerr
 				}
 
 				defaultSubnetTrx, xerr := newSubnetTransaction(ctx, defaultSubnet)
 				if xerr != nil {
-					ar := localresult{nil, xerr}
-					return ar, ar.err
+					return nil, xerr
 				}
 				defer defaultSubnetTrx.TerminateFromError(ctx, &ferr)
 
 				if !hostReq.IsGateway && hostReq.DefaultRouteIP == "" {
 					s, err := lang.Cast[*Subnet](defaultSubnet)
 					if err != nil {
-						ar := localresult{nil, fail.Wrap(err)}
-						return ar, ar.err
+						return nil, fail.Wrap(err)
 					}
 
 					hostReq.DefaultRouteIP, xerr = s.trxGetDefaultRouteIP(ctx, defaultSubnetTrx)
 					if xerr != nil {
-						ar := localresult{nil, xerr}
-						return ar, ar.err
+						return nil, xerr
 					}
 				}
 
@@ -1139,8 +1130,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 					opts, xerr := svc.ConfigurationOptions()
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
-						ar := localresult{nil, xerr}
-						return ar, ar.err
+						return nil, xerr
 					}
 
 					if hostReq.PublicIP || opts.UseNATService {
@@ -1152,8 +1142,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 						})
 						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
-							ar := localresult{nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())}
-							return ar, ar.err
+							return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
 						}
 					}
 				}
@@ -1173,14 +1162,12 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			// instruct Cloud Provider to create host
 			defaultSubnetID, err := defaultSubnet.GetID()
 			if err != nil {
-				ar := localresult{nil, fail.Wrap(err)}
-				return ar, ar.err
+				return nil, fail.Wrap(err)
 			}
 
 			defaultSubnetTrx, xerr := newSubnetTransaction(ctx, defaultSubnet)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 			defer defaultSubnetTrx.TerminateFromError(ctx, &ferr)
 
@@ -1189,11 +1176,9 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrInvalidRequest:
-					ar := localresult{nil, xerr}
-					return ar, ar.err
+					return nil, xerr
 				default:
-					ar := localresult{nil, fail.Wrap(xerr, "failed to create Host '%s'", hostReq.ResourceName)}
-					return ar, ar.err
+					return nil, fail.Wrap(xerr, "failed to create Host '%s'", hostReq.ResourceName)
 				}
 			}
 
@@ -1220,48 +1205,24 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			}
 
 			// Creates metadata early to "reserve" Host name
-			xerr = instance.carry(ctx, ahf.HostCore)
+			xerr = instance.Carry(ctx, ahf.HostCore)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
-
-			defer func() {
-				ferr = debug.InjectPlannedFail(ferr)
-				if ferr != nil && hostReq.CleanOnFailure() {
-					derr := instance.Core.Delete(cleanupContextFrom(ctx))
-					if derr != nil {
-						logrus.WithContext(ctx).Errorf("cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Name, derr)
-						_ = ferr.AddConsequence(derr)
-					}
-				}
-			}()
-
-			defer func() {
-				ferr = debug.InjectPlannedFail(ferr)
-				if ferr != nil && hostReq.CleanOnFailure() {
-					derr := instance.Job().Scope().UnregisterAbstract(ahf)
-					if derr != nil {
-						logrus.WithContext(ctx).Errorf("cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Name, derr)
-						_ = ferr.AddConsequence(derr)
-					}
-				}
-			}()
 
 			// Starting from here, using metadata.Transaction
 			hostTrx, xerr := newHostTransaction(ctx, instance)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 			defer hostTrx.TerminateFromError(ctx, &ferr)
 
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
-				if ferr != nil && ahf.IsConsistent() {
-					if ahf.LastState != hoststate.Deleted {
-						ctx := cleanupContextFrom(ctx)
+				if ferr != nil {
+					ctx := cleanupContextFrom(ctx)
+					if ahf.IsConsistent() && ahf.LastState != hoststate.Deleted {
 						logrus.WithContext(ctx).Warnf("Marking instance '%s' as FAILED", ahf.GetName())
 						derr := alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
 							ahc.LastState = hoststate.Failed
@@ -1278,7 +1239,14 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 								logrus.WithContext(ctx).Warnf("Instance now should be in FAILED state")
 							}
 						}
+					}
 
+					if hostReq.CleanOnFailure() {
+						hostTrx.SilentTerminate(ctx)
+						derr := instance.Core.Delete(ctx)
+						if derr != nil {
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete metadata of Host '%s'", ActionFromError(derr), hostReq.ResourceName))
+						}
 					}
 				}
 			}()
@@ -1355,28 +1323,24 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 
 			xerr = hostTrx.Commit(ctx)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 
 			xerr = instance.trxUpdateCachedInformation(ctx, hostTrx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 
 			xerr = instance.trxSetSecurityGroups(ctx, hostTrx, hostReq, defaultSubnetTrx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 			defer func() {
 				derr := instance.undoSetSecurityGroups(cleanupContextFrom(ctx), hostTrx, &ferr, hostReq.KeepOnFailure)
@@ -1393,8 +1357,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			{
 				st, xerr := svc.ProviderName()
 				if xerr != nil {
-					ar := localresult{nil, xerr}
-					return ar, ar.err
+					return nil, xerr
 				}
 				if st != "ovh" {
 					safe = true
@@ -1408,15 +1371,13 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			if !safe {
 				xerr = svc.ChangeSecurityGroupSecurity(ctx, true, false, hostReq.Subnets[0].Network, "")
 				if xerr != nil {
-					ar := localresult{nil, xerr}
-					return ar, ar.err
+					return nil, xerr
 				}
 			}
 
 			timings, xerr := svc.Timings()
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 
 			// A Host claimed ready by a Cloud provider is not necessarily ready
@@ -1433,27 +1394,20 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 					maybePackerFailure = true
 				default:
 					if abstract.IsProvisioningError(xerr) {
-						ar := localresult{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", hostReq.ResourceName)}
-						return ar, ar.err
+						return nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", hostReq.ResourceName)
 					}
-					ar := localresult{nil, xerr}
-					return ar, ar.err
+
+					return nil, xerr
 				}
 			}
 
 			for numReboots := 0; numReboots < 2; numReboots++ { // 2 reboots at most
 				if maybePackerFailure {
 					logrus.WithContext(ctx).Warningf("Hard Rebooting the host %s", hostReq.ResourceName)
-					hostID, err := instance.GetID()
-					if err != nil {
-						ar := localresult{nil, fail.Wrap(err)}
-						return ar, ar.err
-					}
 
-					xerr = svc.RebootHost(ctx, hostID)
+					xerr = svc.RebootHost(ctx, ahf)
 					if xerr != nil {
-						ar := localresult{nil, xerr}
-						return ar, ar.err
+						return nil, xerr
 					}
 
 					status, xerr = instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, timings.HostBootTimeout())
@@ -1462,18 +1416,16 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 						switch xerr.(type) {
 						case *fail.ErrTimeout:
 							if numReboots == 1 {
-								ar := localresult{nil, fail.Wrap(xerr, "timeout after Host creation waiting for SSH availability")}
-								return ar, ar.err
+								return nil, fail.Wrap(xerr, "timeout after Host creation waiting for SSH availability")
 							} else {
 								continue
 							}
 						default:
 							if abstract.IsProvisioningError(xerr) {
-								ar := localresult{nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", hostReq.ResourceName)}
-								return ar, ar.err
+								return nil, fail.Wrap(xerr, "error provisioning the new Host '%s', please check safescaled logs", hostReq.ResourceName)
 							}
-							ar := localresult{nil, xerr}
-							return ar, ar.err
+
+							return nil, xerr
 						}
 					} else {
 						break
@@ -1492,16 +1444,14 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 
 			// -- Updates Host link with subnets --
 			xerr = instance.trxUpdateSubnets(ctx, hostTrx, hostReq)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 
 			defer func() {
@@ -1519,44 +1469,37 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			xerr = instance.trxFinalizeProvisioning(ctx, hostTrx, userdataContent)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 
 			// Unbind default security group if needed
 			networkInstance, xerr := defaultSubnet.InspectNetwork(ctx)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 
 			nid, err := networkInstance.GetID()
 			if err != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 
 			xerr = instance.unbindDefaultSecurityGroupIfNeeded(ctx, hostTrx, nid)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.err
+				return nil, xerr
 			}
 
 			hostID, err := instance.GetID()
 			if err != nil {
-				ar := localresult{nil, fail.Wrap(err)}
-				return ar, ar.err
+				return nil, fail.Wrap(err)
 			}
 
 			trueState, err := svc.GetHostState(ctx, hostID)
 			if err != nil {
-				ar := localresult{nil, fail.Wrap(err)}
-				return ar, ar.err
+				return nil, fail.Wrap(err)
 			}
 			if trueState == hoststate.Error {
-				ar := localresult{nil, fail.Wrap(fmt.Errorf("broken machine"))}
-				return ar, ar.err
+				return nil, fail.Wrap(fmt.Errorf("broken machine"))
 			}
 
 			if !valid.IsNil(ahf) && !valid.IsNil(ahf.HostCore) {
@@ -1566,16 +1509,15 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 					return nil
 				})
 				if rerr != nil {
-					ar := localresult{userdataContent, rerr}
-					return ar, ar.err
+					return userdataContent, rerr
 				}
 			}
 
 			logrus.WithContext(ctx).Infof("Host '%s' created successfully", hostReq.ResourceName)
-			ar := localresult{userdataContent, nil}
-			return ar, nil
+			return userdataContent, nil
 		}()
-		chRes <- gres
+
+		chRes <- localresult{ud, gerr}
 	}() // nolint
 
 	select {
@@ -1583,6 +1525,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 		if res.ct == nil && res.err == nil {
 			return nil, fail.NewError("creation failed unexpectedly")
 		}
+
 		return res.ct, res.err
 	case <-ctx.Done():
 		return nil, fail.Wrap(ctx.Err())
@@ -1690,12 +1633,12 @@ func (instance *Host) trxSetSecurityGroups(ctx context.Context, hostTrx hostTran
 
 				for k := range req.SecurityGroupByID {
 					if k != "" {
-						sg, innerXErr := LoadSecurityGroup(ctx, k)
+						sgInstance, innerXErr := LoadSecurityGroup(ctx, k)
 						if innerXErr != nil {
 							return fail.Wrap(innerXErr, "failed to load Security Group with id '%s'", k)
 						}
 
-						sgTrx, innerXErr := newSecurityGroupTransaction(ctx, sg)
+						sgTrx, innerXErr := newSecurityGroupTransaction(ctx, sgInstance)
 						if innerXErr != nil {
 							return innerXErr
 						}

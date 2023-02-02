@@ -65,7 +65,7 @@ func alterVolumeMetadataProperty[P clonable.Clonable](ctx context.Context, trx v
 }
 
 func alterVolumeMetadataProperties(ctx context.Context, trx volumeTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.InspectProperties[*abstract.Volume](ctx, trx, callback)
+	return metadata.AlterProperties[*abstract.Volume](ctx, trx, callback)
 }
 
 // trxGetSpeed ...

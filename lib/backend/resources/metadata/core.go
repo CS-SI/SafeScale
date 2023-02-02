@@ -50,15 +50,15 @@ const (
 )
 
 type (
-	// providerUsingTerraform interface for use by metadata
-	providerUsingTerraform interface {
-		ConsolidateNetworkSnippet(*abstract.Network) fail.Error             // configures if needed Terraform Snippet to use for abstract.Network in parameter
-		ConsolidateSubnetSnippet(*abstract.Subnet) fail.Error               // configures if needed Terraform Snippet to use for abstract.Subnet in parameter
-		ConsolidateSecurityGroupSnippet(*abstract.SecurityGroup) fail.Error // configures if needed Terraform Snippet to use for abstract.SecurityGroup in parameter
-		ConsolidateHostSnippet(*abstract.HostCore) fail.Error               // configures if needed Terraform Snippet to use for abstract.Host in parameter
-		// ConsolidateLabelSnippet(*abstract.Label) fail.Error                // configures if needed Terraform Snippet to use for abstract.Label in parameter
-		ConsolidateVolumeSnippet(*abstract.Volume) fail.Error // configures if needed Terraform Snippet to use for abstract.Volume
-	}
+	// // providerUsingTerraform interface for use by metadata
+	// providerUsingTerraform interface {
+	// 	ConsolidateNetworkSnippet(*abstract.Network) fail.Error             // configures if needed Terraform Snippet to use for abstract.Network in parameter
+	// 	ConsolidateSubnetSnippet(*abstract.Subnet) fail.Error               // configures if needed Terraform Snippet to use for abstract.Subnet in parameter
+	// 	ConsolidateSecurityGroupSnippet(*abstract.SecurityGroup) fail.Error // configures if needed Terraform Snippet to use for abstract.SecurityGroup in parameter
+	// 	ConsolidateHostSnippet(*abstract.HostCore) fail.Error               // configures if needed Terraform Snippet to use for abstract.Host in parameter
+	// 	// ConsolidateLabelSnippet(*abstract.Label) fail.Error                // configures if needed Terraform Snippet to use for abstract.Label in parameter
+	// 	ConsolidateVolumeSnippet(*abstract.Volume) fail.Error // configures if needed Terraform Snippet to use for abstract.Volume
+	// }
 
 	// Core contains the core functions of a persistent object
 	Core[T abstract.Abstract] struct {
@@ -154,16 +154,13 @@ func (instance *Core[T]) Replace(in clonable.Clonable) error {
 		return fail.InvalidParameterError("invalid 'in' type")
 	}
 
-	properties, err := clonable.CastedClone[*serialize.JSONProperties](src.properties)
+	casted, err := lang.Cast[*Core[T]](in)
 	if err != nil {
 		return err
 	}
 
-	carried, err := clonable.CastedClone[*shielded.Shielded[T]](src.carried)
-	if err != nil {
-		return err
-	}
-
+	// DO NOT CLONE in.carried; this field HAS TO BE propagated as-is by design, the pointer is also referenced by Scope
+	instance.carried = casted.carried
 	instance.id = src.id
 	instance.name = src.name
 	instance.kind = src.kind
@@ -172,9 +169,14 @@ func (instance *Core[T]) Replace(in clonable.Clonable) error {
 	instance.kindSplittedStore = src.kindSplittedStore
 	instance.loaded = src.loaded
 	instance.taken = src.taken
-	instance.properties = properties
-	instance.carried = carried
 
+	// Properties are not referenced by Scope, so we can clone properties
+	properties, err := clonable.CastedClone[*serialize.JSONProperties](src.properties)
+	if err != nil {
+		return err
+	}
+
+	instance.properties = properties
 	return nil
 }
 
@@ -310,7 +312,7 @@ func (instance *Core[T]) Carry(inctx context.Context, abstractResource T) (_ fai
 	go func() {
 		defer close(chRes)
 		gerr := func() (ferr fail.Error) {
-			xerr := instance.carry(ctx, abstractResource)
+			xerr := instance.carry(abstractResource)
 			if xerr != nil {
 				return xerr
 			}
@@ -322,20 +324,6 @@ func (instance *Core[T]) Carry(inctx context.Context, abstractResource T) (_ fai
 				return xerr
 			}
 
-			// VPL: done by instance.write()
-			// // Registers the abstract in scope
-			// myjob, xerr := jobapi.FromContext(inctx)
-			// if xerr != nil {
-			// 	return xerr
-			// }
-			//
-			// tfResource, ok := any(abstractResource).(abstract.Abstract)
-			// if !ok {
-			// 	return fail.InconsistentError("failed to cast '%s' to 'terraformerapi.AbstractByName'", reflect.TypeOf(abstractResource).String())
-			// }
-			//
-			// _, xerr = myjob.Scope().RegisterAbstractIfNeeded(tfResource)
-			// return xerr
 			return nil
 		}()
 		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
@@ -353,7 +341,7 @@ func (instance *Core[T]) Carry(inctx context.Context, abstractResource T) (_ fai
 }
 
 // carry ...
-func (instance *Core[T]) carry(inctx context.Context, abstractResource T) (ferr fail.Error) {
+func (instance *Core[T]) carry(abstractResource T) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	var err error
@@ -425,11 +413,6 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
-
-	// myjob, innerXErr := jobapi.FromContext(ctx)
-	// if innerXErr != nil {
-	// 	return innerXErr
-	// }
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
@@ -542,57 +525,57 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 	}
 }
 
-// consolidateSnippet does what its name suggest: update terraformer snippet information of the resource
-func (instance *Core[T]) consolidateSnippet(p abstract.Abstract) fail.Error {
-	if !instance.Service().Capabilities().UseTerraformer {
-		return nil
-	}
-
-	prov, xerr := instance.Service().ProviderDriver()
-	if xerr != nil {
-		return xerr
-	}
-
-	castedProv, ok := prov.(providerUsingTerraform)
-	if !ok {
-		return fail.InconsistentError("failed to wrap provider to private interface 'providerUsingTerraform'")
-	}
-
-	switch p.Kind() {
-	case abstract.HostKind:
-		ahc, err := lang.Cast[*abstract.HostCore](p)
-		if err != nil {
-			return fail.Wrap(err)
-		}
-		return castedProv.ConsolidateHostSnippet(ahc)
-	case abstract.NetworkKind:
-		an, err := lang.Cast[*abstract.Network](p)
-		if err != nil {
-			return fail.Wrap(err)
-		}
-		return castedProv.ConsolidateNetworkSnippet(an)
-	case abstract.SecurityGroupKind:
-		asg, err := lang.Cast[*abstract.SecurityGroup](p)
-		if err != nil {
-			return fail.Wrap(err)
-		}
-		return castedProv.ConsolidateSecurityGroupSnippet(asg)
-	case abstract.SubnetKind:
-		as, err := lang.Cast[*abstract.Subnet](p)
-		if err != nil {
-			return fail.Wrap(err)
-		}
-		return castedProv.ConsolidateSubnetSnippet(as)
-	case abstract.VolumeKind:
-		av, err := lang.Cast[*abstract.Volume](p)
-		if err != nil {
-			return fail.Wrap(err)
-		}
-		return castedProv.ConsolidateVolumeSnippet(av)
-	}
-
-	return nil
-}
+// // consolidateSnippet does what its name suggest: update terraformer snippet information of the resource
+// func (instance *Core[T]) consolidateSnippet(p abstract.Abstract) fail.Error {
+// 	if !instance.Service().Capabilities().UseTerraformer {
+// 		return nil
+// 	}
+//
+// 	prov, xerr := instance.Service().ProviderDriver()
+// 	if xerr != nil {
+// 		return xerr
+// 	}
+//
+// 	castedProv, ok := prov.(providerUsingTerraform)
+// 	if !ok {
+// 		return fail.InconsistentError("failed to wrap provider to private interface 'providerUsingTerraform'")
+// 	}
+//
+// 	switch p.Kind() {
+// 	case abstract.HostKind:
+// 		ahc, err := lang.Cast[*abstract.HostCore](p)
+// 		if err != nil {
+// 			return fail.Wrap(err)
+// 		}
+// 		return castedProv.ConsolidateHostSnippet(ahc)
+// 	case abstract.NetworkKind:
+// 		an, err := lang.Cast[*abstract.Network](p)
+// 		if err != nil {
+// 			return fail.Wrap(err)
+// 		}
+// 		return castedProv.ConsolidateNetworkSnippet(an)
+// 	case abstract.SecurityGroupKind:
+// 		asg, err := lang.Cast[*abstract.SecurityGroup](p)
+// 		if err != nil {
+// 			return fail.Wrap(err)
+// 		}
+// 		return castedProv.ConsolidateSecurityGroupSnippet(asg)
+// 	case abstract.SubnetKind:
+// 		as, err := lang.Cast[*abstract.Subnet](p)
+// 		if err != nil {
+// 			return fail.Wrap(err)
+// 		}
+// 		return castedProv.ConsolidateSubnetSnippet(as)
+// 	case abstract.VolumeKind:
+// 		av, err := lang.Cast[*abstract.Volume](p)
+// 		if err != nil {
+// 			return fail.Wrap(err)
+// 		}
+// 		return castedProv.ConsolidateVolumeSnippet(av)
+// 	}
+//
+// 	return nil
+// }
 
 // ReadByID reads a metadata identified by ID from Metadata Storage
 func (instance *Core[T]) ReadByID(inctx context.Context, id string) (_ fail.Error) {
@@ -740,7 +723,7 @@ func (instance *Core[T]) readByID(inctx context.Context, id string) fail.Error {
 					return fail.Wrap(err)
 				}
 
-				xerr := instance.carry(ctx, value)
+				xerr := instance.carry(value)
 				if xerr != nil {
 					return xerr
 				}
@@ -862,7 +845,7 @@ func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Err
 					return fail.Wrap(err)
 				}
 
-				xerr := instance.carry(ctx, value)
+				xerr := instance.carry(value)
 				if xerr != nil {
 					return xerr
 				}
@@ -899,7 +882,8 @@ func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Err
 							default:
 							}
 
-							if innerXErr := instance.deserialize(ctx, buf); innerXErr != nil {
+							innerXErr := instance.deserialize(ctx, buf)
+							if innerXErr != nil {
 								return fail.Wrap(innerXErr, "failed to deserialize %s '%s'", instance.kind, name)
 							}
 

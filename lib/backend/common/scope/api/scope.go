@@ -38,7 +38,6 @@ type Scope interface {
 	Project() string
 	RegisterAbstract(abstract.Abstract) fail.Error
 	RegisterAbstractIfNeeded(abstract.Abstract) (bool, fail.Error)
-	// ReplaceAbstract(abstract.Abstract) fail.Error
 	Service() iaasapi.Service
 	Tenant() string
 	UnregisterAbstract(abstract.Abstract) fail.Error

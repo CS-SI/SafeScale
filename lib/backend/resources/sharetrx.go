@@ -63,5 +63,5 @@ func alterShareMetadataProperty[P clonable.Clonable](ctx context.Context, trx sh
 }
 
 func alterShareMetadataProperties(ctx context.Context, trx shareTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.InspectProperties[*abstract.Share](ctx, trx, callback)
+	return metadata.AlterProperties[*abstract.Share](ctx, trx, callback)
 }

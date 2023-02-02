@@ -245,8 +245,7 @@ func (instance *Share) Replace(in clonable.Clonable) error {
 		return err
 	}
 
-	instance.Core, err = clonable.CastedClone[*metadata.Core[*abstract.Share]](src.Core)
-	return err
+	return instance.Core.Replace(src.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -255,8 +254,8 @@ func (instance *Share) Exists(_ context.Context) (bool, fail.Error) {
 	return true, nil
 }
 
-// carry creates metadata and add Volume to service cache
-func (instance *Share) carry(ctx context.Context, as *abstract.Share) (ferr fail.Error) {
+// Carry creates metadata and add Volume to service cache
+func (instance *Share) Carry(ctx context.Context, as *abstract.Share) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -273,6 +272,12 @@ func (instance *Share) carry(ctx context.Context, as *abstract.Share) (ferr fail
 	if xerr != nil {
 		return xerr
 	}
+
+	// xerr = instance.Job().Scope().RegisterAbstract(as)
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
 	return nil
 }
@@ -521,8 +526,7 @@ func (instance *Share) Create(
 	abstractShare.HostName = server.GetName()
 	abstractShare.ID = hostShare.ID
 
-	xerr = instance.carry(ctx, abstractShare)
-	return xerr
+	return instance.Carry(ctx, abstractShare)
 }
 
 // GetServer returns the Host acting as Share server, with error handling

@@ -205,8 +205,9 @@ func LoadVolume(inctx context.Context, ref string) (*Volume, fail.Error) {
 						return innerXErr
 					}
 
-					_, innerXErr = myjob.Scope().RegisterAbstractIfNeeded(av)
-					return innerXErr
+					// _, innerXErr = myjob.Scope().RegisterAbstractIfNeeded(av)
+					// return innerXErr
+					return nil
 				})
 				if xerr != nil {
 					return nil, xerr
@@ -299,27 +300,27 @@ func (instance *Volume) Exists(ctx context.Context) (bool, fail.Error) {
 	return true, nil
 }
 
-// carry overloads rv.core.Carry() to add Volume to service cache
-func (instance *Volume) carry(ctx context.Context, av *abstract.Volume) (ferr fail.Error) {
-	if instance == nil {
-		return fail.InvalidInstanceError()
-	}
-	if !valid.IsNil(instance) && instance.Core.IsTaken() {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
-	}
-	if av == nil {
-		return fail.InvalidParameterCannotBeNilError("av")
-	}
-
-	// Note: do not validate parameters, this call will do it
-	xerr := instance.Core.Carry(ctx, av)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	return nil
-}
+// // Carry overloads rv.core.Carry() to add Volume to service cache
+// func (instance *Volume) Carry(ctx context.Context, av *abstract.Volume) (ferr fail.Error) {
+// 	if instance == nil {
+// 		return fail.InvalidInstanceError()
+// 	}
+// 	if !valid.IsNil(instance) && instance.Core.IsTaken() {
+// 		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+// 	}
+// 	if av == nil {
+// 		return fail.InvalidParameterCannotBeNilError("av")
+// 	}
+//
+// 	// Note: do not validate parameters, this call will do it
+// 	xerr := instance.Core.Carry(ctx, av)
+// 	xerr = debug.InjectPlannedFail(xerr)
+// 	if xerr != nil {
+// 		return xerr
+// 	}
+//
+// 	return nil
+// }
 
 // GetSpeed ...
 func (instance *Volume) GetSpeed(ctx context.Context) (_ volumespeed.Enum, ferr fail.Error) {
@@ -559,7 +560,35 @@ func (instance *Volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 		}
 	}()
 
-	return instance.carry(ctx, av)
+	return instance.Carry(ctx, av)
+}
+
+// Carry registers 'as' as Core value of Subnet and register abstract in scope
+func (instance *Volume) Carry(ctx context.Context, av *abstract.Volume) (ferr fail.Error) {
+	if valid.IsNil(instance) {
+		return fail.InvalidInstanceError()
+	}
+	if instance.Core.IsTaken() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+	}
+	if av == nil {
+		return fail.InvalidParameterCannotBeNilError("ac")
+	}
+
+	// Note: do not validate parameters, this call will do it
+	xerr := instance.Core.Carry(ctx, av)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.Job().Scope().RegisterAbstract(av)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // Attach a Volume to a host

@@ -63,5 +63,5 @@ func alterBucketMetadataProperty[P clonable.Clonable](ctx context.Context, trx b
 }
 
 func alterBucketMetadataProperties(ctx context.Context, trx bucketTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.InspectProperties[*abstract.Bucket](ctx, trx, callback)
+	return metadata.AlterProperties[*abstract.Bucket](ctx, trx, callback)
 }

@@ -282,8 +282,8 @@ func (instance *Bucket) Exists(ctx context.Context) (bool, fail.Error) {
 	return true, nil
 }
 
-// carry ...
-func (instance *Bucket) carry(ctx context.Context, ab *abstract.Bucket) (ferr fail.Error) {
+// Carry ...
+func (instance *Bucket) Carry(ctx context.Context, ab *abstract.Bucket) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -295,7 +295,7 @@ func (instance *Bucket) carry(ctx context.Context, ab *abstract.Bucket) (ferr fa
 	}
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.Carry(ctx, ab)
+	xerr := instance.Core.Carry(ctx, ab)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -471,7 +471,7 @@ func (instance *Bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- write metadata
-	xerr = instance.carry(ctx, ab)
+	xerr = instance.Carry(ctx, ab)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

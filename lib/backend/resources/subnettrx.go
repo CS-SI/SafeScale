@@ -271,6 +271,21 @@ func (instance *Subnet) trxCreateSecurityGroups(inctx context.Context, subnetTrx
 				}
 			}()
 
+			xerr = subnetPublicIPSG.BindToSubnet(ctx, instance, SecurityGroupEnable, KeepCurrentSecurityGroupMark)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				ar := result{nil, nil, nil, xerr}
+				return ar, ar.rErr
+			}
+			defer func() {
+				ferr = debug.InjectPlannedFail(ferr)
+				if ferr != nil && !keepOnFailure {
+					if derr := subnetPublicIPSG.UnbindFromSubnet(cleanupContextFrom(ctx), instance); derr != nil {
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateways from Subnet", ActionFromError(ferr)))
+					}
+				}
+			}()
+
 			xerr = subnetInternalSG.BindToSubnet(ctx, instance, SecurityGroupEnable, MarkSecurityGroupAsDefault)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -497,20 +512,20 @@ func (instance *Subnet) trxCreateInternalSecurityGroup(ctx context.Context, subn
 
 	subnetName := subnetTrx.GetName()
 	sgName := fmt.Sprintf(subnetInternalSecurityGroupNamePattern, subnetName, networkName)
-	sg, xerr := NewSecurityGroup(ctx)
+	sgInstance, xerr := NewSecurityGroup(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	description := fmt.Sprintf(subnetInternalSecurityGroupDescriptionPattern, subnetName, networkName)
-	xerr = sg.Create(ctx, networkID, sgName, description, nil)
+	xerr = sgInstance.Create(ctx, networkID, sgName, description, nil)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	sgid, err := sg.GetID()
+	sgid, err := sgInstance.GetID()
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
@@ -518,7 +533,7 @@ func (instance *Subnet) trxCreateInternalSecurityGroup(ctx context.Context, subn
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && !keepOnFailure {
-			derr := sg.Delete(cleanupContextFrom(ctx), true)
+			derr := sgInstance.Delete(cleanupContextFrom(ctx), true)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Security Group '%s'", ActionFromError(ferr), sgName))
 			}
@@ -556,13 +571,13 @@ func (instance *Subnet) trxCreateInternalSecurityGroup(ctx context.Context, subn
 			Targets:     []string{sgid},
 		},
 	}
-	xerr = sg.AddRules(ctx, rules...)
+	xerr = sgInstance.AddRules(ctx, rules...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return sg, nil
+	return sgInstance, nil
 }
 
 // trxUpdateSubnetStatus ...

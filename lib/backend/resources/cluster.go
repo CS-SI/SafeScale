@@ -527,8 +527,8 @@ func (instance *Cluster) Replace(in clonable.Clonable) error {
 	return nil
 }
 
-// carry ...
-func (instance *Cluster) carry(inctx context.Context, ac *abstract.Cluster) (ferr fail.Error) {
+// Carry ...
+func (instance *Cluster) Carry(inctx context.Context, ac *abstract.Cluster) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -540,7 +540,7 @@ func (instance *Cluster) carry(inctx context.Context, ac *abstract.Cluster) (fer
 	defer cancel()
 
 	// Note: do not validate parameters, this call will do it
-	xerr := instance.Carry(ctx, ac)
+	xerr := instance.Core.Carry(ctx, ac)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

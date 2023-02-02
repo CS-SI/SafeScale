@@ -707,19 +707,6 @@ func (s *scope) registerAbstract(rsc abstract.Abstract) fail.Error {
 	return nil
 }
 
-// // ReplaceAbstract does replace a resource already there, or register it if not present
-// func (s *scope) ReplaceAbstract(rsc abstract.Abstract) fail.Error {
-// 	kind, _, _, queryByName, queryByID, xerr := s.extractAbstractIndexes(rsc)
-// 	if xerr != nil {
-// 		return xerr
-// 	}
-// 	_ = kind
-//
-// 	s.abstractsByName.Store(queryByName, rsc)
-// 	s.abstractsByID.Store(queryByID, rsc)
-// 	return nil
-// }
-
 // UnregisterAbstract unregisters a resource from Scope
 func (s *scope) UnregisterAbstract(rsc abstract.Abstract) fail.Error {
 	if valid.IsNull(s) {

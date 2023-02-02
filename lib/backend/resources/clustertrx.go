@@ -63,5 +63,5 @@ func alterClusterMetadataProperty[P clonable.Clonable](ctx context.Context, trx 
 }
 
 func alterClusterMetadataProperties(ctx context.Context, trx clusterTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.InspectProperties[*abstract.Cluster](ctx, trx, callback)
+	return metadata.AlterProperties[*abstract.Cluster](ctx, trx, callback)
 }

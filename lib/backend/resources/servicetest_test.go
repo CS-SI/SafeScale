@@ -3494,7 +3494,7 @@ func (e *ServiceTest) _CreateShare(ctx context.Context, data *ShareIdentity) (re
 		return nil, fail.InconsistentError("*ressource.Share not castable to *operation.Share")
 	}
 
-	xerr := oshare.carry(ctx, data)
+	xerr := oshare.Carry(ctx, data)
 	if xerr != nil {
 		return nil, xerr
 	}

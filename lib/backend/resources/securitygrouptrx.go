@@ -73,7 +73,7 @@ func alterSecurityGroupMetadataProperty[P clonable.Clonable](ctx context.Context
 }
 
 func alterSecurityGroupMetadataProperties(ctx context.Context, trx securityGroupTransaction, callback func(*serialize.JSONProperties) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.InspectProperties[*abstract.SecurityGroup](ctx, trx, callback, opts...)
+	return metadata.AlterProperties[*abstract.SecurityGroup](ctx, trx, callback, opts...)
 }
 
 // trxUnbindFromHosts unbinds security group from all the hosts bound to it and update the host metadata accordingly
@@ -285,183 +285,161 @@ func (instance *SecurityGroup) trxUnbindFromSubnetHosts(inctx context.Context, s
 }
 
 // trxDelete effectively remove a Security Group
-func (instance *SecurityGroup) trxDelete(inctx context.Context, sgTrx securityGroupTransaction, force bool) fail.Error {
+func (instance *SecurityGroup) trxDelete(ctx context.Context, sgTrx securityGroupTransaction, force bool) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if inctx == nil {
-		return fail.InvalidParameterCannotBeNilError("inctx")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
-		var (
-			abstractSG                   *abstract.SecurityGroup
-			networkID, removingNetworkID string
-		)
-
-		value := ctx.Value(CurrentNetworkTransactionContextKey)
-		if value != nil {
-			var err error
-			networkTrx, err := lang.Cast[networkTransaction](value)
-			if err != nil {
-				chRes <- result{fail.Wrap(err)}
-				return
-			}
-
-			removingNetworkID, err = networkTrx.GetID()
-			if err != nil {
-				chRes <- result{fail.Wrap(err)}
-				return
-			}
-		}
-
-		xerr := alterSecurityGroupMetadata(ctx, sgTrx, func(asg *abstract.SecurityGroup, props *serialize.JSONProperties) (innerFErr fail.Error) {
-			abstractSG = asg
-			if networkID == "" {
-				networkID = abstractSG.Network
-			}
-
-			if !force {
-				// check bonds to hosts
-				innerXErr := props.Inspect(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-					hostsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
-					if innerErr != nil {
-						return fail.Wrap(innerErr)
-					}
-
-					// Do not remove a SecurityGroup used on hosts
-					hostCount := len(hostsV1.ByName)
-					if hostCount > 0 {
-						keys := make([]string, 0, hostCount)
-						for k := range hostsV1.ByName {
-							keys = append(keys, k)
-						}
-						return fail.NotAvailableError("security group '%s' is currently bound to %d host%s: %s", instance.GetName(), hostCount, strprocess.Plural(uint(hostCount)), strings.Join(keys, ","))
-					}
-
-					// Do not remove a Security Group marked as default for a host
-					if hostsV1.DefaultFor != "" {
-						return fail.InvalidRequestError("failed to delete Security Group '%s': is default for host identified by %s", hostsV1.DefaultFor)
-					}
-					return nil
-				})
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				// check bonds to subnets
-				innerXErr = props.Inspect(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-					subnetsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
-					if innerErr != nil {
-						return fail.Wrap(innerErr)
-					}
-
-					// Do not remove a SecurityGroup used on subnet(s)
-					subnetCount := len(subnetsV1.ByID)
-					if subnetCount > 0 {
-						keys := make([]string, subnetCount)
-						for k := range subnetsV1.ByName {
-							keys = append(keys, k)
-						}
-						return fail.NotAvailableError("security group is currently bound to %d subnet%s: %s", subnetCount, strprocess.Plural(uint(subnetCount)), strings.Join(keys, ","))
-					}
-
-					// Do not remove a Security Group marked as default for a subnet
-					if subnetsV1.DefaultFor != "" {
-						return fail.InvalidRequestError("failed to delete SecurityGroup '%s': is default for Subnet identified by '%s'", abstractSG.Name, subnetsV1.DefaultFor)
-					}
-					return nil
-				})
-				if innerXErr != nil {
-					return innerXErr
-				}
-			}
-
-			// unbind from Subnets (which will unbind from Hosts attached to these Subnets...)
-			innerXErr := props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-				sgnV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				return instance.trxUnbindFromSubnets(ctx, sgTrx, sgnV1)
-			})
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			// unbind from the Hosts if there are remaining ones
-			innerXErr = props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-				sghV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				return instance.trxUnbindFromHosts(ctx, sgTrx, sghV1)
-			})
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			// delete SecurityGroup resource
-			return deleteProviderSecurityGroup(ctx, instance.Service(), abstractSG)
-		})
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		// Need to terminate Security Group transaction to be able to delete metadata
-		sgTrx.SilentTerminate(ctx)
-
-		// delete Security Group metadata
-		xerr = instance.Core.Delete(ctx)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		// delete Security Groups in Network metadata if the current operation is not to remove this Network (otherwise may deadlock)
-		if removingNetworkID != networkID {
-			networkInstance, xerr := LoadNetwork(ctx, networkID)
-			if xerr != nil {
-				chRes <- result{xerr}
-				return
-			}
-
-			networkTrx, xerr := newNetworkTransaction(ctx, networkInstance)
-			if xerr != nil {
-				chRes <- result{xerr}
-				return
-			}
-
-			xerr = instance.updateNetworkMetadataOnRemoval(ctx, networkTrx)
-			networkTrx.TerminateFromError(ctx, &xerr)
-
-			chRes <- result{xerr}
-			return
-		}
-		chRes <- result{nil}
-		return
-	}()
 
 	select {
-	case res := <-chRes:
-		return res.rErr
 	case <-ctx.Done():
 		return fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		return fail.Wrap(inctx.Err())
+	default:
 	}
+
+	var (
+		abstractSG                   *abstract.SecurityGroup
+		networkID, removingNetworkID string
+	)
+
+	value := ctx.Value(CurrentNetworkTransactionContextKey)
+	if value != nil {
+		var err error
+		networkTrx, err := lang.Cast[networkTransaction](value)
+		if err != nil {
+			return fail.Wrap(err)
+		}
+
+		removingNetworkID, err = networkTrx.GetID()
+		if err != nil {
+			return fail.Wrap(err)
+		}
+	}
+
+	xerr := alterSecurityGroupMetadata(ctx, sgTrx, func(asg *abstract.SecurityGroup, props *serialize.JSONProperties) (innerFErr fail.Error) {
+		abstractSG = asg
+		if networkID == "" {
+			networkID = abstractSG.Network
+		}
+
+		if !force {
+			// check bonds to hosts
+			innerXErr := props.Inspect(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+				hostsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				// Do not remove a SecurityGroup used on hosts
+				hostCount := len(hostsV1.ByName)
+				if hostCount > 0 {
+					keys := make([]string, 0, hostCount)
+					for k := range hostsV1.ByName {
+						keys = append(keys, k)
+					}
+					return fail.NotAvailableError("security group '%s' is currently bound to %d host%s: %s", instance.GetName(), hostCount, strprocess.Plural(uint(hostCount)), strings.Join(keys, ","))
+				}
+
+				// Do not remove a Security Group marked as default for a host
+				if hostsV1.DefaultFor != "" {
+					return fail.InvalidRequestError("failed to delete Security Group '%s': is default for host identified by %s", hostsV1.DefaultFor)
+				}
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			// check bonds to subnets
+			innerXErr = props.Inspect(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
+				subnetsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				// Do not remove a SecurityGroup used on subnet(s)
+				subnetCount := len(subnetsV1.ByID)
+				if subnetCount > 0 {
+					keys := make([]string, subnetCount)
+					for k := range subnetsV1.ByName {
+						keys = append(keys, k)
+					}
+					return fail.NotAvailableError("security group is currently bound to %d subnet%s: %s", subnetCount, strprocess.Plural(uint(subnetCount)), strings.Join(keys, ","))
+				}
+
+				// Do not remove a Security Group marked as default for a subnet
+				if subnetsV1.DefaultFor != "" {
+					return fail.InvalidRequestError("failed to delete SecurityGroup '%s': is default for Subnet identified by '%s'", abstractSG.Name, subnetsV1.DefaultFor)
+				}
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+		}
+
+		// unbind from Subnets (which will unbind from Hosts attached to these Subnets...)
+		innerXErr := props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
+			sgnV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
+			}
+
+			return instance.trxUnbindFromSubnets(ctx, sgTrx, sgnV1)
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		// unbind from the Hosts if there are remaining ones
+		innerXErr = props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+			sghV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
+			}
+
+			return instance.trxUnbindFromHosts(ctx, sgTrx, sghV1)
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		// delete SecurityGroup resource
+		return deleteProviderSecurityGroup(ctx, instance.Service(), abstractSG)
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	// Need to terminate Security Group transaction to be able to delete metadata
+	sgTrx.SilentTerminate(ctx)
+
+	// delete Security Group metadata
+	xerr = instance.Core.Delete(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	// delete Security Groups in Network metadata if the current operation is not to remove this Network (otherwise may deadlock)
+	if removingNetworkID != networkID {
+		networkInstance, xerr := LoadNetwork(ctx, networkID)
+		if xerr != nil {
+			return xerr
+		}
+
+		networkTrx, xerr := newNetworkTransaction(ctx, networkInstance)
+		if xerr != nil {
+			return xerr
+		}
+
+		xerr = instance.updateNetworkMetadataOnRemoval(ctx, networkTrx)
+		networkTrx.TerminateFromError(ctx, &xerr)
+		return xerr
+	}
+
+	return nil
 }
 
 // trxClear is the non goroutine-safe implementation for Clear, that does the real work faster (no locking, less if no parameter validations)

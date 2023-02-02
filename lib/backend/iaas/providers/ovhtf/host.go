@@ -208,26 +208,6 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		return nil, nil, xerr
 	}
 
-	// // Starting from here, delete host if exiting with error
-	// defer func() {
-	// 	ferr = debug.InjectPlannedFail(ferr)
-	// 	if ferr != nil && ahf.IsConsistent() {
-	// 		logrus.WithContext(inctx).Infof("Cleaning up on failure, deleting host '%s'", ahf.Name)
-	// 		derr := p.DeleteHost(jobapi.NewContextPropagatingJob(inctx), ahf.ID)
-	// 		if derr != nil {
-	// 			switch derr.(type) {
-	// 			case *fail.ErrNotFound:
-	// 				logrus.WithContext(inctx).Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
-	// 			case *fail.ErrTimeout:
-	// 				logrus.WithContext(inctx).Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
-	// 			default:
-	// 				logrus.WithContext(inctx).Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
-	// 			}
-	// 			_ = fail.AddConsequence(ferr, derr)
-	// 		}
-	// 	}
-	// }()
-
 	def, xerr := renderer.Assemble(inctx, ahf)
 	if xerr != nil {
 		return nil, nil, xerr
@@ -775,7 +755,7 @@ func (p *provider) StartHost(ctx context.Context, hostParam iaasapi.HostIdentifi
 }
 
 func (p *provider) RebootHost(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
-	xerr := p.StartHost(ctx, hostParam)
+	xerr := p.StopHost(ctx, hostParam, true)
 	if xerr != nil {
 		return xerr
 	}
