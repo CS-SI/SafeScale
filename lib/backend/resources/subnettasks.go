@@ -38,7 +38,7 @@ type taskCreateGatewayParameters struct {
 	sizing  abstract.HostSizingRequirements
 }
 
-func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnetTransaction, request abstract.HostRequest, sizing abstract.HostSizingRequirements) (_ data.Map[string, any], _ fail.Error) {
+func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnetTransaction, request abstract.HostRequest, sizing abstract.HostSizingRequirements, extra interface{}) (_ data.Map[string, any], _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -75,11 +75,7 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 				return nil, xerr
 			}
 
-			cluID, _ := instance.GetID()
-			userData, createXErr := rgw.Create(ctx, request, sizing, map[string]string{
-				"type":      "gateway",
-				"clusterID": cluID,
-			}) // createXErr is tested later
+			userData, createXErr := rgw.Create(ctx, request, sizing, extra) // createXErr is tested later
 
 			// Set link to Subnet before testing if Host has been successfully created;
 			// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
@@ -117,8 +113,9 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 					hid, _ := rgw.GetID()
 
 					if request.CleanOnFailure() {
+						ctx := cleanupContextFrom(ctx)
 						logrus.WithContext(ctx).Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", request.ResourceName)
-						derr := rgw.Delete(cleanupContextFrom(ctx))
+						derr := rgw.Delete(ctx)
 						if derr != nil {
 							msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 							switch derr.(type) {
@@ -126,9 +123,9 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 								// missing Host is considered as a successful deletion, continue
 								debug.IgnoreErrorWithContext(ctx, derr)
 							case *fail.ErrTimeout:
-								logrus.WithContext(cleanupContextFrom(ctx)).Errorf(msgRoot+", timeout: %v", request.ResourceName, derr)
+								logrus.WithContext(ctx).Errorf(msgRoot+", timeout: %v", request.ResourceName, derr)
 							default:
-								logrus.WithContext(cleanupContextFrom(ctx)).Errorf(msgRoot+": %v", request.ResourceName, derr)
+								logrus.WithContext(ctx).Errorf(msgRoot+": %v", request.ResourceName, derr)
 							}
 							_ = ferr.AddConsequence(derr)
 						} else {
@@ -140,12 +137,13 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 						if derr == nil {
 							defer rgwTrx.TerminateFromError(ctx, &ferr)
 
-							derr = alterHostMetadataAbstract(cleanupContextFrom(ctx), rgwTrx, func(as *abstract.HostCore) fail.Error {
+							derr = alterHostMetadataAbstract(ctx, rgwTrx, func(as *abstract.HostCore) fail.Error {
 								as.LastState = hoststate.Failed
 								return nil
 							})
 							derr = debug.InjectPlannedFail(derr)
 							if derr == nil {
+								// Need to commit right now to save host state
 								derr = rgwTrx.Commit(ctx)
 							}
 						}

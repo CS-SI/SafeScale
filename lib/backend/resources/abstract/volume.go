@@ -101,13 +101,11 @@ func (v *Volume) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	*v = *src
-	v.core, err = clonable.CastedClone[*core](src.core)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	v.ID = src.ID
+	v.Size = src.Size
+	v.Speed = src.Speed
+	v.State = src.State
+	return v.core.Replace(src.core)
 }
 
 // OK ...
@@ -126,6 +124,7 @@ func (v *Volume) Serialize() ([]byte, fail.Error) {
 	if v == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+
 	r, err := json.Marshal(v)
 	return r, fail.Wrap(err)
 }

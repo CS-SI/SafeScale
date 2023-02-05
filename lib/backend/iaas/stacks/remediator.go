@@ -518,20 +518,20 @@ func (s Remediator) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIde
 	return host, xerr
 }
 
-func (s Remediator) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
+func (s Remediator) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Stack.BindSecurityGroupToHost(ctx, asg, ahf)
+	xerr := s.Stack.BindSecurityGroupToHost(ctx, asg, ahc)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
 	return xerr
 }
 
-func (s Remediator) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
+func (s Remediator) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Stack.UnbindSecurityGroupFromHost(ctx, asg, ahf)
+	xerr := s.Stack.UnbindSecurityGroupFromHost(ctx, asg, ahc)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}

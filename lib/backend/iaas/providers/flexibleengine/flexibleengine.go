@@ -281,7 +281,7 @@ func (p *provider) InspectTemplate(ctx context.Context, id string) (*abstract.Ho
 }
 
 // ListTemplates lists available host templates
-// Host templates are sorted using Dominant AbstractByName Fairness Algorithm
+// Host templates are sorted using Dominant Resource Fairness Algorithm
 func (p *provider) ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error) {
 	allTemplates, xerr := p.Stack.(providers.StackReservedForProviderUse).ListTemplates(ctx, all)
 	if xerr != nil {

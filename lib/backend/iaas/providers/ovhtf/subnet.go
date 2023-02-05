@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 )
@@ -185,9 +186,20 @@ func (p *provider) CreateSubnet(ctx context.Context, req abstract.SubnetRequest)
 		}
 	}()
 
-	abstractSubnet.ID, xerr = unmarshalOutput[string](outputs["subnet_"+req.Name+"_id"])
+	xerr = abstractSubnet.AddOptions(abstract.ClearMarkForCreation())
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	subnetOutputs, xerr := unmarshalOutput[map[string]any](outputs["subnet_"+req.Name])
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var err error
+	abstractSubnet.ID, err = lang.Cast[string](subnetOutputs["id"])
+	if err != nil {
+		return nil, fail.Wrap(err)
 	}
 
 	return abstractSubnet, nil
@@ -407,8 +419,5 @@ func (p *provider) ConsolidateSubnetSnippet(as *abstract.Subnet) fail.Error {
 		return nil
 	}
 
-	return as.AddOptions(
-		abstract.UseTerraformSnippet(subnetDesignResourceSnippetPath),
-		abstract.WithResourceType("openstack_networking_subnet_v2"),
-	)
+	return as.AddOptions(abstract.UseTerraformSnippet(subnetDesignResourceSnippetPath))
 }

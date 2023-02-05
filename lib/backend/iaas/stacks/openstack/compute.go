@@ -242,7 +242,7 @@ func (instance *stack) InspectTemplate(ctx context.Context, id string) (template
 }
 
 // ListTemplates lists available Host templates
-// Host templates are sorted using Dominant AbstractByName Fairness Algorithm
+// Host templates are sorted using Dominant Resource Fairness Algorithm
 func (instance *stack) ListTemplates(ctx context.Context, _ bool) ([]*abstract.HostTemplate, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -1791,16 +1791,16 @@ func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostIde
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to IPAddress, returns *fail.ErrDuplicate
-func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
+func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahc)
 	if xerr != nil {
 		return xerr
 	}
-	if !ahf.IsComplete() {
-		return fail.InconsistentError("ahf is not complete")
+	if !ahc.IsComplete() {
+		return fail.InconsistentError("ahc is not complete")
 	}
 	_, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(asg)
 	if xerr != nil {
@@ -1816,7 +1816,7 @@ func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstrac
 		func() error {
 			// list ports to be able to remove them
 			req := ports.ListOpts{
-				DeviceID: ahf.ID,
+				DeviceID: ahc.ID,
 			}
 
 			portList, xerr := instance.rpcListPorts(ctx, req)
@@ -1847,14 +1847,14 @@ func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstrac
 			// 	return nil
 			// }
 
-			return secgroups.AddServer(instance.ComputeClient, ahf.ID, asg.ID).ExtractErr()
+			return secgroups.AddServer(instance.ComputeClient, ahc.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,
 	)
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
+func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1865,12 +1865,12 @@ func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abs
 	if !asg.IsComplete() {
 		return fail.InconsistentError("asg is not complete")
 	}
-	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahc)
 	if xerr != nil {
 		return xerr
 	}
-	if !ahf.IsComplete() {
-		return fail.InconsistentError("ahf is not complete")
+	if !ahc.IsComplete() {
+		return fail.InconsistentError("ahc is not complete")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
@@ -1882,7 +1882,7 @@ func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abs
 				return nil
 			}
 
-			return secgroups.RemoveServer(instance.ComputeClient, ahf.ID, asg.ID).ExtractErr()
+			return secgroups.RemoveServer(instance.ComputeClient, ahc.ID, asg.ID).ExtractErr()
 		},
 		NormalizeError,
 	)

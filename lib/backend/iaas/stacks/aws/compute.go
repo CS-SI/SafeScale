@@ -1384,7 +1384,7 @@ func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostIde
 // BindSecurityGroupToHost ...
 // Returns:
 // - *fail.ErrNotFound if the Host is not found
-func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
+func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1398,18 +1398,18 @@ func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstrac
 	if !asg.IsComplete() {
 		return fail.InconsistentError("asg is not complete")
 	}
-	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahc)
 	if xerr != nil {
 		return xerr
 	}
-	if !ahf.IsComplete() {
-		return fail.InconsistentError("ahf is not complete")
+	if !ahc.IsComplete() {
+		return fail.InconsistentError("ahc is not complete")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	hostID, err := ahf.GetID()
+	hostID, err := ahc.GetID()
 	if err != nil {
 		return fail.Wrap(err)
 	}
@@ -1445,7 +1445,7 @@ func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstrac
 // Returns:
 // - nil means success
 // - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
-func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
+func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1459,18 +1459,18 @@ func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abs
 	if !asg.IsComplete() {
 		return fail.InconsistentError("asg is not complete")
 	}
-	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahc)
 	if xerr != nil {
 		return xerr
 	}
-	if !ahf.IsComplete() {
+	if !ahc.IsComplete() {
 		return fail.InconsistentError("ahf is not complete")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(ctx, &ferr)
 
-	hostID, err := ahf.GetID()
+	hostID, err := ahc.GetID()
 	if err != nil {
 		return fail.Wrap(err)
 	}

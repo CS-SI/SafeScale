@@ -76,6 +76,22 @@ func NewBucket(ctx context.Context) (*Bucket, fail.Error) {
 	return instance, nil
 }
 
+// newBulkBucket ...
+func newBulkBucket() (*Bucket, fail.Error) {
+	protected, err := abstract.NewBucket()
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	core, err := metadata.NewEmptyCore(abstract.BucketKind, protected)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	instance := &Bucket{Core: core}
+	return instance, nil
+}
+
 // LoadBucket instantiates a Bucket struct and fill it with Provider metadata of Object Storage Bucket
 func LoadBucket(inctx context.Context, name string) (*Bucket, fail.Error) {
 	if inctx == nil {
@@ -244,7 +260,11 @@ func (instance *Bucket) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newInstance := &Bucket{}
+	newInstance, err := newBulkBucket()
+	if err != nil {
+		return nil, err
+	}
+
 	return newInstance, newInstance.Replace(instance)
 }
 

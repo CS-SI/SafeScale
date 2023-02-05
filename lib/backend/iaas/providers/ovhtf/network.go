@@ -133,13 +133,24 @@ func (p *provider) CreateNetwork(ctx context.Context, req abstract.NetworkReques
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil && req.CleanOnFailure() {
 			logrus.WithContext(ctx).Infof("Cleaning up on failure, deleting Network '%s'", req.Name)
-			derr := renderer.Destroy(ctx, def, terraformerapi.WithTarget(abstractNetwork))
-			if derr != nil {
-				logrus.WithContext(ctx).Errorf("failed to delete Network '%s': %v", req.Name, derr)
+			def, derr := renderer.Assemble(ctx)
+			if xerr != nil {
 				_ = ferr.AddConsequence(derr)
+			} else {
+
+				derr = renderer.Destroy(ctx, def, terraformerapi.WithTarget(abstractNetwork))
+				if derr != nil {
+					logrus.WithContext(ctx).Errorf("failed to delete Network '%s': %v", req.Name, derr)
+					_ = ferr.AddConsequence(derr)
+				}
 			}
 		}
 	}()
+
+	xerr = abstractNetwork.AddOptions(abstract.ClearMarkForCreation())
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	abstractNetwork.ID, xerr = unmarshalOutput[string](outputs["network_"+req.Name+"_id"])
 	if xerr != nil {
@@ -597,8 +608,5 @@ func (p *provider) ConsolidateNetworkSnippet(an *abstract.Network) fail.Error {
 		return nil
 	}
 
-	return an.AddOptions(
-		abstract.UseTerraformSnippet(networkDesignResourceSnippetPath),
-		abstract.WithResourceType("openstack_networking_network_v2"),
-	)
+	return an.AddOptions(abstract.UseTerraformSnippet(networkDesignResourceSnippetPath))
 }

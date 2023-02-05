@@ -139,6 +139,11 @@ func (p *provider) CreateSecurityGroup(ctx context.Context, networkRef, name, de
 	}
 	asg.Rules = rules
 
+	xerr = asg.AddOptions(abstract.ClearMarkForCreation())
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// createOpts := secgroups.CreateOpts{
 	// 	Name:        name,
 	// 	Description: description,
@@ -405,9 +410,5 @@ func (p *provider) ConsolidateSecurityGroupSnippet(asg *abstract.SecurityGroup) 
 		return nil
 	}
 
-	return asg.AddOptions(
-		abstract.UseTerraformSnippet(securityGroupDesignResourceSnippetPath),
-		abstract.WithResourceType("openstack_networking_secgroup_v2"),
-		abstract.WithResourceType("openstack_networking_secgroup_rule_v2"),
-	)
+	return asg.AddOptions(abstract.UseTerraformSnippet(securityGroupDesignResourceSnippetPath))
 }

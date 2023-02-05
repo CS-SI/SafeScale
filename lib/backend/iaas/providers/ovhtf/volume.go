@@ -73,8 +73,5 @@ func (p *provider) ConsolidateVolumeSnippet(av *abstract.Volume) fail.Error {
 		return nil
 	}
 
-	return av.AddOptions(
-		abstract.UseTerraformSnippet(volumeDesignResourceSnippetPath),
-		abstract.WithResourceType("openstack_block_storage_volume_v2"), // FIXME: or v3?
-	)
+	return av.AddOptions(abstract.UseTerraformSnippet(volumeDesignResourceSnippetPath))
 }

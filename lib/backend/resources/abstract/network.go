@@ -119,15 +119,12 @@ func (n *Network) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	*n = *src
-	n.core, err = clonable.CastedClone[*core](src.core)
-	if err != nil {
-		return err
-	}
-
+	n.ID = src.ID
+	n.CIDR = src.CIDR
+	n.Imported = src.Imported
 	n.DNSServers = make([]string, len(src.DNSServers))
 	copy(n.DNSServers, src.DNSServers)
-	return nil
+	return n.core.Replace(src.core)
 }
 
 // OK ...

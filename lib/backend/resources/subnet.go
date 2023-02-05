@@ -469,8 +469,28 @@ func (instance *Subnet) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newInstance := &Subnet{}
+	newInstance, err := newBulkSubnet()
+	if err != nil {
+		return nil, err
+	}
+
 	return newInstance, newInstance.Replace(instance)
+}
+
+// newBulkSubnet ...
+func newBulkSubnet() (*Subnet, fail.Error) {
+	protected, err := abstract.NewSubnet()
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	core, err := metadata.NewEmptyCore(abstract.SubnetKind, protected)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	instance := &Subnet{Core: core}
+	return instance, nil
 }
 
 func (instance *Subnet) Replace(in clonable.Clonable) error {
@@ -572,7 +592,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	if req.DefaultSSHPort <= 0 {
 		req.DefaultSSHPort = 22
 	}
-	xerr = instance.trxCreateGateways(ctx, subnetTrx, req, gwname, gwSizing, nil)
+	xerr = instance.trxCreateGateways(ctx, subnetTrx, req, gwname, gwSizing, nil, extra)
 	if xerr != nil {
 		gateway := "gateway"
 		if req.HA {
@@ -589,11 +609,6 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 
 	return nil
 }
-
-// // CreateSecurityGroups ...
-// func (instance *Subnet) CreateSecurityGroups(ctx context.Context, networkInstance *Network, keepOnFailure bool, defaultSSHPort int32) (subnetGWSG, subnetInternalSG, subnetPublicIPSG *SecurityGroup, ferr fail.Error) {
-// 	return instance.trxCreateSecurityGroups(ctx, networkInstance, keepOnFailure, defaultSSHPort)
-// }
 
 // trxBindInternalSecurityGroupToGateway does what its name says
 func (instance *Subnet) trxBindInternalSecurityGroupToGateway(ctx context.Context, subnetTrx subnetTransaction, hostTrx hostTransaction) fail.Error {
@@ -696,7 +711,7 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(ctx context.Context, subn
 		}
 
 		if asg.GWSecurityGroupName != "" {
-			sgInstance, innerXErr := LoadSecurityGroup(ctx, asg.PublicIPSecurityGroupName)
+			sgInstance, innerXErr := LoadSecurityGroup(ctx, asg.GWSecurityGroupName)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -752,7 +767,12 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(ctx context.Context, subn
 		timings.SmallDelay(),
 		timings.ContextTimeout(),
 	)
-	return xerr
+	if xerr != nil {
+		return xerr
+	}
+
+	subnetTrx.SilentTerminate(ctx)
+	return instance.Core.Delete(ctx)
 }
 
 // validateCIDR tests if CIDR requested is valid, or select one if no CIDR is provided
@@ -1296,14 +1316,11 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.subnet")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	type localresult struct {
-		rErr fail.Error
-	}
-	chRes := make(chan localresult)
+	chRes := make(chan fail.Error)
 	go func() {
 		defer close(chRes)
 
-		gres, _ := func() (_ localresult, ferr fail.Error) {
+		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
 			var force bool
@@ -1311,8 +1328,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			if cv := ctx.Value("force"); cv != nil {
 				force, ok = cv.(bool)
 				if !ok {
-					ar := localresult{fail.InvalidRequestError("force flag must be a bool")}
-					return ar, ar.rErr
+					return fail.InvalidRequestError("force flag must be a bool")
 				}
 			}
 
@@ -1322,8 +1338,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 
 			subnetTrx, xerr := newSubnetTransaction(ctx, instance)
 			if xerr != nil {
-				ar := localresult{xerr}
-				return ar, ar.rErr
+				return xerr
 			}
 			defer subnetTrx.TerminateFromError(ctx, &ferr)
 
@@ -1370,8 +1385,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 				})
 			})
 			if xerr != nil {
-				ar := localresult{xerr}
-				return ar, ar.rErr
+				return xerr
 			}
 
 			xerr = alterSubnetMetadata(ctx, subnetTrx, func(as *abstract.Subnet, props *serialize.JSONProperties) (finnerXErr fail.Error) {
@@ -1445,30 +1459,18 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{xerr}
-				return ar, ar.rErr
-			}
-
-			// Need to terminate transaction to be able to delete metadata
-			subnetTrx.SilentTerminate(ctx)
-
-			// Remove metadata
-			xerr = instance.Core.Delete(ctx)
-			if xerr != nil {
-				ar := localresult{xerr}
-				return ar, ar.rErr
+				return xerr
 			}
 
 			logrus.WithContext(ctx).Infof("Subnet '%s' successfully deleted.", subnetName)
-			ar := localresult{nil}
-			return ar, ar.rErr
+			return nil
 		}()
-		chRes <- gres
+		chRes <- gerr
 	}() // nolint
 
 	select {
-	case res := <-chRes:
-		return res.rErr
+	case xerr := <-chRes:
+		return xerr
 	case <-ctx.Done():
 		<-chRes
 		return fail.Wrap(ctx.Err())
@@ -1613,7 +1615,13 @@ func trxDeleteGateways(ctx context.Context, trx subnetTransaction) (ids []string
 					logrus.WithContext(ctx).Debugf("Deleting gateway '%s'...", name)
 
 					// delete Host
-					xerr := hostInstance.RelaxedDeleteHost(ctx)
+					hostTrx, xerr := newHostTransaction(ctx, hostInstance)
+					if xerr != nil {
+						return xerr
+					}
+					defer func(trx hostTransaction) { trx.TerminateFromError(ctx, &ferr) }(hostTrx)
+
+					xerr = hostInstance.trxRelaxedDeleteHost(ctx, hostTrx)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
@@ -2470,17 +2478,7 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 				ar := localresult{nil, xerr}
 				return ar, ar.rErr
 			}
-			// Note: DO NOT TERMINATE subnetTrx here, the transaction is returned to the caller, that will have the responsability to terminate it
-			// Starting from here, delete Subnet metadata on error
-			defer func() {
-				if ferr != nil && !req.CleanOnFailure() {
-					subnetTrx.SilentTerminate(ctx)
-					derr := instance.Core.Delete(ctx)
-					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete metadata of Subnet '%s'", ActionFromError(ferr), req.Name))
-					}
-				}
-			}()
+			// Note: DO NOT TERMINATE subnetTrx here, the transaction is returned to the caller, that will have the responsibility to terminate it
 
 			xerr = instance.updateCachedInformation(ctx, subnetTrx)
 			xerr = debug.InjectPlannedFail(xerr)

@@ -33,15 +33,10 @@ type Shielded[T clonable.Clonable] struct {
 	lock    *sync.RWMutex
 }
 
-// NewShielded creates a new protected data from a cloned witness
+// NewShielded creates a new protected data from a witness
 func NewShielded[T clonable.Clonable](witness T) (*Shielded[T], error) {
-	cloned, err := clonable.CastedClone[T](witness)
-	if err != nil {
-		return nil, err
-	}
-
 	out := &Shielded[T]{
-		witness: cloned,
+		witness: witness,
 		lock:    &sync.RWMutex{},
 	}
 	return out, nil
@@ -74,13 +69,7 @@ func (instance *Shielded[T]) Replace(in clonable.Clonable) error {
 		return err
 	}
 
-	cloned, err := clonable.CastedClone[T](src.witness)
-	if err != nil {
-		return err
-	}
-
-	instance.witness = cloned
-	return nil
+	return instance.witness.Replace(src.witness)
 }
 
 // String returns a string representation of the Shielded

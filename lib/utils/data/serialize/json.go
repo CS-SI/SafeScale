@@ -140,7 +140,7 @@ func (x *JSONProperties) Replace(in clonable.Clonable) error {
 
 	x.module = src.module
 	x.Properties = make(map[string]*jsonProperty, len(src.Properties))
-	for k, v := range x.Properties {
+	for k, v := range src.Properties {
 		x.Properties[k], err = clonable.CastedClone[*jsonProperty](v)
 		if err != nil {
 			return err

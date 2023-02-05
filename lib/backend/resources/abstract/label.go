@@ -82,9 +82,10 @@ func (instance *Label) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	*instance = *src
-	instance.core, err = clonable.CastedClone[*core](src.core)
-	return err
+	instance.ID = src.ID
+	instance.HasDefault = src.HasDefault
+	instance.DefaultValue = src.DefaultValue
+	return instance.core.Replace(src.core)
 }
 
 // Valid checks if content of Label is valid

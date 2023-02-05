@@ -50,16 +50,6 @@ const (
 )
 
 type (
-	// // providerUsingTerraform interface for use by metadata
-	// providerUsingTerraform interface {
-	// 	ConsolidateNetworkSnippet(*abstract.Network) fail.Error             // configures if needed Terraform Snippet to use for abstract.Network in parameter
-	// 	ConsolidateSubnetSnippet(*abstract.Subnet) fail.Error               // configures if needed Terraform Snippet to use for abstract.Subnet in parameter
-	// 	ConsolidateSecurityGroupSnippet(*abstract.SecurityGroup) fail.Error // configures if needed Terraform Snippet to use for abstract.SecurityGroup in parameter
-	// 	ConsolidateHostSnippet(*abstract.HostCore) fail.Error               // configures if needed Terraform Snippet to use for abstract.Host in parameter
-	// 	// ConsolidateLabelSnippet(*abstract.Label) fail.Error                // configures if needed Terraform Snippet to use for abstract.Label in parameter
-	// 	ConsolidateVolumeSnippet(*abstract.Volume) fail.Error // configures if needed Terraform Snippet to use for abstract.Volume
-	// }
-
 	// Core contains the core functions of a persistent object
 	Core[T abstract.Abstract] struct {
 		lock              *sync.RWMutex
@@ -80,7 +70,7 @@ type (
 var _ Metadata[abstract.Abstract] = (*Core[abstract.Abstract])(nil)
 
 // NewCore creates an instance of Core
-func NewCore[T abstract.Abstract](ctx context.Context, method string, kind string, path string, abstractRsc T) (_ *Core[T], ferr fail.Error) {
+func NewCore[T abstract.Abstract](ctx context.Context, method string, kind string, path string, abstractResource T) (_ *Core[T], ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
@@ -105,7 +95,7 @@ func NewCore[T abstract.Abstract](ctx context.Context, method string, kind strin
 		return nil, err
 	}
 
-	protected, cerr := shielded.NewShielded[T](abstractRsc)
+	protected, cerr := shielded.NewShielded[T](abstractResource)
 	if cerr != nil {
 		return nil, fail.Wrap(cerr)
 	}
@@ -114,6 +104,42 @@ func NewCore[T abstract.Abstract](ctx context.Context, method string, kind strin
 		lock:       &sync.RWMutex{},
 		kind:       kind,
 		folder:     fld,
+		properties: props,
+		carried:    protected,
+	}
+	switch kind {
+	case "organization", "project", "cluster":
+		c.kindSplittedStore = false
+	default:
+		c.kindSplittedStore = true
+	}
+	c.taken.Store(false)
+
+	return &c, nil
+}
+
+// NewEmptyCore ...
+func NewEmptyCore[T abstract.Abstract](kind string, abstractResource T) (_ *Core[T], ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if kind == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("kind")
+	}
+
+	props, err := serialize.NewJSONProperties("resources." + kind)
+	err = debug.InjectPlannedFail(err)
+	if err != nil {
+		return nil, err
+	}
+
+	protected, cerr := shielded.NewShielded[T](abstractResource)
+	if cerr != nil {
+		return nil, fail.Wrap(cerr)
+	}
+
+	c := Core[T]{
+		lock:       &sync.RWMutex{},
+		kind:       kind,
 		properties: props,
 		carried:    protected,
 	}
@@ -149,22 +175,31 @@ func (instance *Core[T]) Replace(in clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, ok := in.(*Core[T])
-	if !ok {
-		return fail.InvalidParameterError("invalid 'in' type")
-	}
-
-	casted, err := lang.Cast[*Core[T]](in)
+	src, err := lang.Cast[*Core[T]](in)
 	if err != nil {
 		return err
 	}
 
-	// DO NOT CLONE in.carried; this field HAS TO BE propagated as-is by design, the pointer is also referenced by Scope
-	instance.carried = casted.carried
-	instance.id = src.id
-	instance.name = src.name
+	// if field 'carried' is nil, we clone the src.carried. This happens when instance is a 'bulk' one, without any data in it initially
+	// (generally used as a copy for alter operations, which will be replacing original content on success)
+	if instance.carried == nil {
+		xerr := src.carried.Inspect(func(p T) fail.Error {
+			var innerErr error
+			instance.carried, innerErr = shielded.NewShielded[T](p)
+			return fail.Wrap(innerErr)
+		})
+		if xerr != nil {
+			return xerr
+		}
+	} else {
+		// otherwise, replace instance.carried with src.carried (which is actually a shallow copy because we need to keep pointer during existence of carried, as it is shared with Scope)
+		instance.carried.Replace(src.carried)
+	}
+
+	instance.id.Store(src.id.Load())
+	instance.name.Store(src.name.Load())
 	instance.kind = src.kind
-	instance.folder = src.folder // Not cloned, it's voluntary
+	instance.folder = src.folder // Note: not cloned, it's wanted
 	instance.committed = src.committed
 	instance.kindSplittedStore = src.kindSplittedStore
 	instance.loaded = src.loaded
@@ -295,6 +330,10 @@ func (instance *Core[T]) Carry(inctx context.Context, abstractResource T) (_ fai
 	if any(abstractResource) == nil {
 		return fail.InvalidParameterCannotBeNilError("abstractResource")
 	}
+
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
 	if instance.carried == nil {
 		return fail.InvalidInstanceContentError("instance.carried", "cannot be nil")
 	}
@@ -304,9 +343,6 @@ func (instance *Core[T]) Carry(inctx context.Context, abstractResource T) (_ fai
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
-
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
 
 	chRes := make(chan result.Holder[struct{}])
 	go func() {
@@ -351,7 +387,6 @@ func (instance *Core[T]) carry(abstractResource T) (ferr fail.Error) {
 	}
 
 	instance.loaded = true
-
 	xerr := instance.updateIdentity()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -375,7 +410,8 @@ func (instance *Core[T]) updateIdentity() fail.Error {
 				return fail.Wrap(err)
 			}
 
-			if loaded, ok := instance.id.Load().(string); ok && idd == loaded {
+			loaded, ok := instance.id.Load().(string)
+			if ok && idd == loaded {
 				return nil
 			}
 
@@ -486,30 +522,7 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 			instance.loaded = true
 			instance.committed = true
 
-			xerr = instance.updateIdentity()
-			if xerr != nil {
-				return xerr
-			}
-
-			// if myjob.Service().Capabilities().UseTerraformer {
-			// 	trx, xerr := NewTransaction[T, *Core[T]](ctx, instance)
-			// 	if xerr != nil {
-			// 		return xerr
-			// 	}
-			// 	defer trx.TerminateFromError(ctx, &ferr)
-			//
-			// 	return trx.reviewAbstract(ctx, func(p T) fail.Error {
-			// 		innerErr := instance.consolidateSnippet(p)
-			// 		if innerErr != nil {
-			// 			return fail.Wrap(innerErr)
-			// 		}
-			//
-			// 		_, innerXErr := myjob.Scope().RegisterAbstractIfNeeded(p)
-			// 		return innerXErr
-			// 	})
-			// }
-
-			return nil
+			return instance.updateIdentity()
 		}()
 		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
 		chRes <- res
@@ -524,58 +537,6 @@ func (instance *Core[T]) Read(inctx context.Context, ref string) (_ fail.Error) 
 		return fail.Wrap(inctx.Err())
 	}
 }
-
-// // consolidateSnippet does what its name suggest: update terraformer snippet information of the resource
-// func (instance *Core[T]) consolidateSnippet(p abstract.Abstract) fail.Error {
-// 	if !instance.Service().Capabilities().UseTerraformer {
-// 		return nil
-// 	}
-//
-// 	prov, xerr := instance.Service().ProviderDriver()
-// 	if xerr != nil {
-// 		return xerr
-// 	}
-//
-// 	castedProv, ok := prov.(providerUsingTerraform)
-// 	if !ok {
-// 		return fail.InconsistentError("failed to wrap provider to private interface 'providerUsingTerraform'")
-// 	}
-//
-// 	switch p.Kind() {
-// 	case abstract.HostKind:
-// 		ahc, err := lang.Cast[*abstract.HostCore](p)
-// 		if err != nil {
-// 			return fail.Wrap(err)
-// 		}
-// 		return castedProv.ConsolidateHostSnippet(ahc)
-// 	case abstract.NetworkKind:
-// 		an, err := lang.Cast[*abstract.Network](p)
-// 		if err != nil {
-// 			return fail.Wrap(err)
-// 		}
-// 		return castedProv.ConsolidateNetworkSnippet(an)
-// 	case abstract.SecurityGroupKind:
-// 		asg, err := lang.Cast[*abstract.SecurityGroup](p)
-// 		if err != nil {
-// 			return fail.Wrap(err)
-// 		}
-// 		return castedProv.ConsolidateSecurityGroupSnippet(asg)
-// 	case abstract.SubnetKind:
-// 		as, err := lang.Cast[*abstract.Subnet](p)
-// 		if err != nil {
-// 			return fail.Wrap(err)
-// 		}
-// 		return castedProv.ConsolidateSubnetSnippet(as)
-// 	case abstract.VolumeKind:
-// 		av, err := lang.Cast[*abstract.Volume](p)
-// 		if err != nil {
-// 			return fail.Wrap(err)
-// 		}
-// 		return castedProv.ConsolidateVolumeSnippet(av)
-// 	}
-//
-// 	return nil
-// }
 
 // ReadByID reads a metadata identified by ID from Metadata Storage
 func (instance *Core[T]) ReadByID(inctx context.Context, id string) (_ fail.Error) {
@@ -920,85 +881,59 @@ func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Err
 }
 
 // write updates the metadata corresponding to the host in the Object Storage
-func (instance *Core[T]) write(inctx context.Context) fail.Error {
+func (instance *Core[T]) write(inctx context.Context) (ferr fail.Error) {
+	select {
+	case <-inctx.Done():
+		return fail.Wrap(inctx.Err())
+	default:
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	// myjob, xerr := jobapi.FromContext(ctx)
-	// if xerr != nil {
-	// 	return xerr
-	// }
+	defer fail.OnPanic(&ferr)
 
-	chRes := make(chan result.Holder[struct{}])
-	go func() {
-		defer close(chRes)
-		gerr := func() (ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
+	if !instance.committed {
+		jsoned, xerr := instance.serialize(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 
-			if !instance.committed {
-				jsoned, xerr := instance.serialize(ctx)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return xerr
-				}
+		name, ok := instance.name.Load().(string)
+		if !ok {
+			return fail.InconsistentError("field 'name' is not set with string")
+		}
 
-				name, ok := instance.name.Load().(string)
-				if !ok {
-					return fail.InconsistentError("field 'name' is not set with string")
-				}
-
-				if instance.kindSplittedStore {
-					xerr = instance.folder.Write(ctx, byNameFolderName, name, jsoned)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return xerr
-					}
-
-					id, ok := instance.id.Load().(string)
-					if !ok {
-						return fail.InconsistentError("field 'id' is not set with string")
-					}
-
-					xerr = instance.folder.Write(ctx, byIDFolderName, id, jsoned)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return xerr
-					}
-				} else {
-					xerr = instance.folder.Write(ctx, "", name, jsoned)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return xerr
-					}
-				}
-
-				// if myjob.Service().Capabilities().UseTerraformer {
-				// 	xerr = instance.carried.Inspect(func(p T) fail.Error {
-				// 		_, innerXErr := myjob.Scope().RegisterAbstractIfNeeded(p)
-				// 		return innerXErr
-				// 	})
-				// 	if xerr != nil {
-				// 		return xerr
-				// 	}
-				// }
-				//
-				instance.loaded = true
-				instance.committed = true
+		if instance.kindSplittedStore {
+			xerr = instance.folder.Write(ctx, byNameFolderName, name, jsoned)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
 			}
-			return nil
-		}()
-		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr))
-		chRes <- res
-	}()
 
-	select {
-	case res := <-chRes:
-		return fail.Wrap(res.Error())
-	case <-ctx.Done():
-		return fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		return fail.Wrap(inctx.Err())
+			id, ok := instance.id.Load().(string)
+			if !ok {
+				return fail.InconsistentError("field 'id' is not set with string")
+			}
+
+			xerr = instance.folder.Write(ctx, byIDFolderName, id, jsoned)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+		} else {
+			xerr = instance.folder.Write(ctx, "", name, jsoned)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+		}
+
+		instance.loaded = true
+		instance.committed = true
 	}
+	return nil
 }
 
 // Reload reloads the content from the Object Storage
@@ -1263,7 +1198,7 @@ func (instance *Core[T]) Delete(inctx context.Context) (_ fail.Error) {
 			xerr := instance.carried.Inspect(func(p T) fail.Error {
 				abstractResource, ok := any(p).(abstract.Abstract)
 				if !ok {
-					return fail.InconsistentError("failed to cast '%s' to 'abstract.AbstractByName'", reflect.TypeOf(p).String())
+					return fail.InconsistentError("failed to cast '%s' to 'abstract.Abstract'", reflect.TypeOf(p).String())
 				}
 
 				// Registers the abstract in scope

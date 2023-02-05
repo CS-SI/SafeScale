@@ -117,28 +117,16 @@ func (instance *Cluster) Replace(p clonable.Clonable) error {
 	}
 
 	*instance = *src
-	instance.core, err = clonable.CastedClone[*core](src.core)
-	if err != nil {
-		return err
-	}
-
 	instance.Keypair = nil
 	if src.Keypair != nil {
 		instance.Keypair = &KeyPair{}
 		*instance.Keypair = *src.Keypair
 	}
-	return nil
+	instance.Flavor = src.Flavor
+	instance.Complexity = src.Complexity
+	instance.AdminPassword = src.AdminPassword
+	return instance.core.Replace(src.core)
 }
-
-// // GetName returns the name of the cluster
-// // Satisfies interface data.Identifiable
-// func (instance *Cluster) GetName() string {
-// 	if instance == nil || valid.IsNull(instance.Core) {
-// 		return ""
-// 	}
-//
-// 	return instance.Name
-// }
 
 // GetID returns the ID of the cluster (== GetName)
 // Satisfies interface data.Identifiable

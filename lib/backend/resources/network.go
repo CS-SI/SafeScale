@@ -258,8 +258,28 @@ func (instance *Network) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newInstance := &Network{}
+	newInstance, err := newBulkNetwork()
+	if err != nil {
+		return nil, err
+	}
+
 	return newInstance, newInstance.Replace(instance)
+}
+
+// newBulkNetwork ...
+func newBulkNetwork() (*Network, fail.Error) {
+	protected, err := abstract.NewNetwork()
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	core, err := metadata.NewEmptyCore(abstract.NetworkKind, protected)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	instance := &Network{Core: core}
+	return instance, nil
 }
 
 func (instance *Network) Replace(in clonable.Clonable) error {
@@ -270,12 +290,12 @@ func (instance *Network) Replace(in clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("in")
 	}
 
-	src, ok := in.(*Network)
-	if !ok {
-		return fail.InvalidParameterError("in must be of type '*Network'")
+	src, err := lang.Cast[*Network](in)
+	if err != nil {
+		return err
 	}
 
-	var err error
+	//var err error
 	instance.Core, err = clonable.CastedClone[*metadata.Core[*abstract.Network]](src.Core)
 	return err
 }

@@ -125,6 +125,22 @@ func NewCluster(ctx context.Context) (_ *Cluster, ferr fail.Error) {
 	return instance, nil
 }
 
+// newEmptyCluster ...
+func newBulkCluster() (*Cluster, fail.Error) {
+	protected, err := abstract.NewCluster()
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	core, err := metadata.NewEmptyCore(abstract.ClusterKind, protected)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	instance := &Cluster{Core: core}
+	return instance, nil
+}
+
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *Cluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 	// FIXME: Requires iteration of quite a few members...
@@ -490,7 +506,7 @@ func (instance *Cluster) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newInstance, xerr := NewCluster(context.Background())
+	newInstance, xerr := newBulkCluster()
 	if xerr != nil {
 		return nil, xerr
 	}

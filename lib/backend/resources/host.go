@@ -328,32 +328,8 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 	defer instance.localCache.Unlock()
 
 	return reviewHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
-		var (
-			abstractHostCore                             *abstract.HostCore
-			primaryGatewayConfig, secondaryGatewayConfig sshapi.Config
-		)
-
-		entry, innerXErr := scope.AbstractByName(abstract.HostKind, ahc.Name)
-		if innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				abstractHostFull, innerXErr := svc.InspectHost(ctx, ahc)
-				if innerXErr != nil {
-					return innerXErr
-				}
-				abstractHostCore = abstractHostFull.HostCore
-			default:
-				return innerXErr
-			}
-		} else {
-			var innerErr error
-			abstractHostCore, innerErr = lang.Cast[*abstract.HostCore](entry)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-		}
-
-		innerXErr = props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) (ferr fail.Error) {
+		var primaryGatewayConfig, secondaryGatewayConfig sshapi.Config
+		innerXErr := props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) (ferr fail.Error) {
 			hnV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
@@ -488,7 +464,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 
 					subnetList = append(subnetList, cloned)
 				}
-				innerXErr = abstractHostCore.AddOptions(abstract.WithExtraData("Subnets", subnetList))
+				innerXErr := ahc.AddOptions(abstract.WithExtraData("Subnets", subnetList))
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -549,7 +525,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 				return fail.Wrap(innerErr)
 			}
 
-			innerXErr := castedProv.ConsolidateHostSnippet(abstractHostCore)
+			innerXErr := castedProv.ConsolidateHostSnippet(ahc)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -564,14 +540,14 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 				for k, v := range sgsV1.ByName {
 					list[v] = k
 				}
-				return abstractHostCore.AddOptions(abstract.WithExtraData("SecurityGroupByID", list))
+				return ahc.AddOptions(abstract.WithExtraData("SecurityGroupByID", list))
 			})
 			if innerXErr != nil {
 				return innerXErr
 			}
 
 			// -- update abstract in scope
-			_, innerXErr = instance.Job().Scope().RegisterAbstractIfNeeded(abstractHostCore)
+			_, innerXErr = instance.Job().Scope().RegisterAbstractIfNeeded(ahc)
 			return innerXErr
 		}
 
@@ -605,8 +581,28 @@ func (instance *Host) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newInstance := &Host{}
+	newInstance, err := newBulkHost()
+	if err != nil {
+		return nil, err
+	}
+
 	return newInstance, newInstance.Replace(instance)
+}
+
+// newBulkHost ...
+func newBulkHost() (*Host, fail.Error) {
+	protected, err := abstract.NewHostCore()
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	core, err := metadata.NewEmptyCore(abstract.HostKind, protected)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	instance := &Host{Core: core}
+	return instance, nil
 }
 
 func (instance *Host) Replace(in clonable.Clonable) error {
@@ -1621,16 +1617,6 @@ func (instance *Host) trxSetSecurityGroups(ctx context.Context, hostTrx hostTran
 		if req.Single {
 			hostName := instance.GetName()
 			xerr := alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-				entry, innerXErr := instance.Job().Scope().AbstractByName(ahc.Kind(), ahc.Name)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
 				for k := range req.SecurityGroupByID {
 					if k != "" {
 						sgInstance, innerXErr := LoadSecurityGroup(ctx, k)
@@ -1645,7 +1631,7 @@ func (instance *Host) trxSetSecurityGroups(ctx context.Context, hostTrx hostTran
 
 						innerXErr = alterSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
 							logrus.WithContext(ctx).Infof("Binding security group with id %s to host '%s'", asg.Name, hostName)
-							return svc.BindSecurityGroupToHost(ctx, asg, ahf)
+							return svc.BindSecurityGroupToHost(ctx, asg, ahc)
 						})
 						if innerXErr != nil {
 							return innerXErr
@@ -1958,17 +1944,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(ctx context.Context, ho
 
 		xerr = alterSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
 			return alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-				entry, innerXErr := instance.Job().Scope().AbstractByName("host", ahc.Name)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				innerXErr = svc.UnbindSecurityGroupFromHost(ctx, asg, ahf)
+				innerXErr := svc.UnbindSecurityGroupFromHost(ctx, asg, ahc)
 				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
@@ -2719,11 +2695,17 @@ func (instance *Host) Delete(ctx context.Context) (ferr fail.Error) {
 		return fail.NotAvailableError("cannot delete Host, it's a gateway that can only be deleted through its Subnet")
 	}
 
-	return instance.RelaxedDeleteHost(ctx)
+	hostTrx, xerr := newHostTransaction(ctx, instance)
+	if xerr != nil {
+		return xerr
+	}
+	defer hostTrx.TerminateFromError(ctx, &ferr)
+
+	return instance.trxRelaxedDeleteHost(ctx, hostTrx)
 }
 
-// RelaxedDeleteHost is the method that really deletes a host, being a gateway or not
-func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
+// trxRelaxedDeleteHost is the method that really deletes a host, being a gateway or not
+func (instance *Host) trxRelaxedDeleteHost(ctx context.Context, hostTrx hostTransaction) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -2744,17 +2726,18 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	hostTrx, xerr := newHostTransaction(ctx, instance)
-	if xerr != nil {
-		return xerr
-	}
-	defer hostTrx.TerminateFromError(ctx, &ferr)
-
 	hname := hostTrx.GetName()
 	hid, err := hostTrx.GetID()
 	if err != nil {
 		return fail.Wrap(err)
 	}
+
+	defer func() {
+		if ferr == nil && cache != nil {
+			_ = cache.Delete(ctx, hid)
+			_ = cache.Delete(ctx, hname)
+		}
+	}()
 
 	var shares map[string]*propertiesv1.HostShare
 	// Do not remove a Host having shared folders that are currently remotely mounted
@@ -2828,7 +2811,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		single         bool
 		singleSubnetID string
 	)
-	xerr = alterHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) fail.Error {
+	xerr = alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
 		// If Host has mounted shares, unmounts them before anything else
 		var mounts []*propertiesv1.HostShare
 		innerXErr := props.Inspect(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
@@ -3052,7 +3035,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 				default:
 				}
 
-				if rerr := svc.DeleteHost(ctx, hid); rerr != nil {
+				if rerr := svc.DeleteHost(ctx, ahc); rerr != nil {
 					switch rerr.(type) {
 					case *fail.ErrNotFound:
 						// A Host not found is considered as a successful deletion
@@ -3089,7 +3072,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 					default:
 					}
 
-					state, stateErr := svc.GetHostState(ctx, hid)
+					state, stateErr := svc.GetHostState(ctx, ahc.ID)
 					if stateErr != nil {
 						switch stateErr.(type) {
 						case *fail.ErrNotFound:
@@ -3161,17 +3144,13 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (ferr fail.Error) {
 		logrus.WithContext(ctx).Tracef("core instance not found, deletion considered as a success")
 	}
 
-	if cache != nil {
-		_ = cache.Delete(ctx, hid)
-		_ = cache.Delete(ctx, hname)
-	}
-
 	return nil
 }
 
+// trxRefreshLocalCacheIfNeeded refreshes instance.localCache if instance.localCache.PrivateIP == ""
 func (instance *Host) trxRefreshLocalCacheIfNeeded(ctx context.Context, hostTrx hostTransaction) fail.Error {
 	instance.localCache.RLock()
-	doRefresh := instance.localCache.sshProfile == nil
+	doRefresh := instance.localCache.privateIP == ""
 	instance.localCache.RUnlock() // nolint
 	if doRefresh {
 		xerr := instance.trxUpdateCachedInformation(ctx, hostTrx)
@@ -4326,16 +4305,6 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sgInstance *Secur
 	defer sgTrx.TerminateFromError(ctx, &ferr)
 
 	return alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
-		entry, innerXErr := instance.Job().Scope().AbstractByName(ahc.Kind(), ahc.Name)
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
-		}
-
 		return props.Alter(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
 			hsgV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
 			if innerErr != nil {
@@ -4364,7 +4333,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sgInstance *Secur
 					}
 				} else {
 					// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), considered as a success
-					innerXErr := instance.Service().BindSecurityGroupToHost(ctx, asg, ahf)
+					innerXErr := instance.Service().BindSecurityGroupToHost(ctx, asg, ahc)
 					innerXErr = debug.InjectPlannedFail(innerXErr)
 					if innerXErr != nil {
 						switch innerXErr.(type) {
@@ -4415,16 +4384,6 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance *Secu
 	defer sgTrx.TerminateFromError(ctx, &ferr)
 
 	return alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
-		entry, innerXErr := instance.Job().Scope().AbstractByName("host", ahc.Name)
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
-		}
-
 		return props.Alter(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
 			hsgV1, innerErr := lang.Cast[*propertiesv1.HostSecurityGroups](p)
 			if innerErr != nil {
@@ -4453,7 +4412,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance *Secu
 					}
 				} else {
 					// Bind the security group on provider side; if security group not binded, considered as a success
-					innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahf)
+					innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahc)
 					innerXErr = debug.InjectPlannedFail(innerXErr)
 					if innerXErr != nil {
 						switch innerXErr.(type) {

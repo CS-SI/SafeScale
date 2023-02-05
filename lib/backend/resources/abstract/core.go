@@ -36,7 +36,6 @@ type (
 		GetName() string
 		Extra() map[string]any
 		TerraformSnippet() string
-		TerraformTypes() []string
 		UniqueID() string
 		// ToMap() map[string]any
 		// String() string
@@ -48,7 +47,6 @@ type (
 
 		kind             string
 		terraformSnippet string
-		terraformTypes   []string
 		extra            map[string]any
 		useTerraform     bool
 	}
@@ -152,8 +150,6 @@ func (c *core) Replace(p clonable.Clonable) error {
 
 	*c = *src
 	c.Tags = src.Tags.Clone()
-	c.terraformTypes = make([]string, 0, len(src.terraformTypes))
-	copy(c.terraformTypes, src.terraformTypes)
 	c.extra = make(map[string]any, len(src.extra))
 	for k, v := range src.extra {
 		c.extra[k] = v
@@ -170,55 +166,6 @@ func (c *core) TerraformSnippet() string {
 
 	return c.terraformSnippet
 }
-
-// TerraformTypes returns the types of the resources in terraform corresponding to the abstract
-func (c *core) TerraformTypes() []string {
-	if valid.IsNull(c) {
-		return nil
-	}
-
-	return c.terraformTypes
-}
-
-// func (c *Core) Prepare(provider terraformer.ProviderUsingTerraform) error {
-// 	if c.useTerraform {
-// 		renderer, variables, xerr := provider.Renderer()
-// 		if xerr != nil {
-// 			return xerr
-// 		}
-// 		defer func() { _ = renderer.Terminate() }()
-//
-// 		// lvars.Merge(map[string]any{"Resource": r.ToMap()})
-// 		variables.Merge(map[string]any{"Resource": c})
-// 		content, xerr := renderer.RealizeSnippet(provider.EmbeddedFS(), c.terraformSnippet, variables)
-// 		if xerr != nil {
-// 			return xerr
-// 		}
-//
-// 		c.terraformData= content
-// 	}
-//
-// 	return nil
-// }
-
-// // AllAbstracts returns the scope
-// func (c *Core) AllAbstracts(ctx context.Context) ([]terraformerapi.AbstractByName, fail.Error) {
-// 	if valid.IsNull(c) {
-// 		return nil, fail.InvalidInstanceError()
-// 	}
-//
-// 	myjob, xerr := jobapi.FromContext(ctx)
-// 	if xerr != nil {
-// 		return nil, xerr
-// 	}
-//  scope := myjob.Scope()
-// 	castedScope, ok := scope.(ScopeLimitedToAbstractUse)
-// 	if !ok {
-// 		return nil, fail.InconsistentError("failed to cast '%s' to 'ScopeLimitedToAbstractUse'", reflect.TypeOf(scope).String())
-// 	}
-//
-// 	return castedScope.AllAbstracts()
-// }
 
 func (c *core) GetName() string {
 	if valid.IsNull(c) {

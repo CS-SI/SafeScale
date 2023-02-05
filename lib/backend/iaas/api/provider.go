@@ -39,7 +39,7 @@ type Provider interface {
 	// ListImages lists available OS images, all bool is unused here but used at upper levels to filter using whitelists and blacklists
 	ListImages(ctx context.Context, all bool) ([]*abstract.Image, fail.Error)
 
-	// ListTemplates lists available host templates, all bool is unused here but used at upper levels to filter using whitelists and blacklists, Host templates are sorted using Dominant AbstractByName Fairness Algorithm
+	// ListTemplates lists available host templates, all bool is unused here but used at upper levels to filter using whitelists and blacklists, Host templates are sorted using Dominant Resource Fairness Algorithm
 	ListTemplates(ctx context.Context, all bool) ([]*abstract.HostTemplate, fail.Error)
 
 	// AuthenticationOptions returns authentication options

@@ -125,12 +125,20 @@ func (s *Subnet) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	*s = *src
-	s.core, err = clonable.CastedClone[*core](src.core)
-	if err != nil {
-		return err
-	}
-
+	s.ID = src.ID
+	s.Network = src.Network
+	s.CIDR = src.CIDR
+	s.Domain = src.Domain
+	s.IPVersion = src.IPVersion
+	s.State = src.State
+	s.GWSecurityGroupID = src.GWSecurityGroupID
+	s.GWSecurityGroupName = src.GWSecurityGroupName
+	s.PublicIPSecurityGroupID = src.PublicIPSecurityGroupID
+	s.PublicIPSecurityGroupName = src.PublicIPSecurityGroupName
+	s.InternalSecurityGroupID = src.InternalSecurityGroupID
+	s.InternalSecurityGroupName = src.InternalSecurityGroupName
+	s.SingleHostCIDRIndex = src.SingleHostCIDRIndex
+	s.DefaultSSHPort = src.DefaultSSHPort
 	if src.VIP != nil {
 		s.VIP, err = clonable.CastedClone[*VirtualIP](src.VIP)
 		if err != nil {
@@ -143,8 +151,7 @@ func (s *Subnet) Replace(p clonable.Clonable) error {
 
 	s.GatewayIDs = make([]string, len(src.GatewayIDs))
 	copy(s.GatewayIDs, src.GatewayIDs)
-
-	return nil
+	return s.core.Replace(src.core)
 }
 
 // OK ...

@@ -45,19 +45,6 @@ func UseTerraformSnippet(snippet string) Option {
 	}
 }
 
-// WithResourceType ...
-func WithResourceType(name string) Option {
-	return func(c *core) fail.Error {
-		if name == "" {
-			return fail.InvalidParameterCannotBeEmptyStringError("snippet")
-		}
-
-		c.terraformTypes = append(c.terraformTypes, name)
-		c.useTerraform = true
-		return nil
-	}
-}
-
 func WithExtraData(name string, value any) Option {
 	return func(c *core) fail.Error {
 		if name == "" {
@@ -72,18 +59,39 @@ func WithExtraData(name string, value any) Option {
 
 // MarkForCreation is used to mark resource as to be created
 func MarkForCreation() Option {
-	return WithExtraData(ExtraMarkedForCreation, true)
+	return func(c *core) fail.Error {
+		xerr := WithExtraData(ExtraMarkedForCreation, true)(c)
+		if xerr != nil {
+			return xerr
+		}
+
+		return WithExtraData(ExtraMarkedForDestruction, false)(c)
+	}
+}
+
+// ClearMarkForCreation is used to "unmark" resource as to be created
+func ClearMarkForCreation() Option {
+	return func(c *core) fail.Error {
+		return WithExtraData(ExtraMarkedForCreation, false)(c)
+	}
 }
 
 // MarkForDestruction is used to mark resource as to be destroyed
 func MarkForDestruction() Option {
-	return WithExtraData(ExtraMarkedForDestruction, true)
+	return func(c *core) fail.Error {
+		xerr := WithExtraData(ExtraMarkedForCreation, false)(c)
+		if xerr != nil {
+			return xerr
+		}
+
+		return WithExtraData(ExtraMarkedForDestruction, true)(c)
+	}
 }
 
 func MarkAsStarted() Option {
-	return WithExtraData("WantedHostState", "started")
+	return WithExtraData("WantedHostState", wantedHostStarted)
 }
 
 func MarkAsStopped() Option {
-	return WithExtraData("WantedHostState", "stopped")
+	return WithExtraData("WantedHostState", wantedHostStopped)
 }

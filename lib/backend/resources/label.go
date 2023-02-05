@@ -240,8 +240,28 @@ func (instance *Label) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newInstance := &Label{}
+	newInstance, err := newBulkLabel()
+	if err != nil {
+		return nil, err
+	}
+
 	return newInstance, newInstance.Replace(instance)
+}
+
+// newBulkLabel ...
+func newBulkLabel() (*Label, fail.Error) {
+	protected, err := abstract.NewLabel()
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	core, err := metadata.NewEmptyCore(abstract.LabelKind, protected)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	instance := &Label{Core: core}
+	return instance, nil
 }
 
 func (instance *Label) Replace(in clonable.Clonable) error {

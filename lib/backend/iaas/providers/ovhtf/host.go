@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
@@ -213,7 +214,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		return nil, nil, xerr
 	}
 
-	var hostOutputs map[string]any
+	var outputs map[string]tfexec.OutputMeta
 	xerr = retry.WhileUnsuccessful(
 		func() (innerFErr error) {
 			select {
@@ -222,7 +223,8 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 			default:
 			}
 
-			outputs, innerXErr := renderer.Apply(inctx, def)
+			var innerXErr fail.Error
+			outputs, innerXErr = renderer.Apply(inctx, def)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrSyntax, *fail.ErrNotFound:
@@ -252,6 +254,12 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 					logrus.WithContext(inctx).Debugf("deleting unresponsive server '%s'...", request.ResourceName)
 
 					// Recreates def without host to destroy what has been created
+					derr := renderer.Reset()
+					if derr != nil {
+						innerFErr = fail.Wrap(innerFErr).AddConsequence(derr)
+						return
+					}
+
 					def, derr := renderer.Assemble(inctx)
 					if derr != nil {
 						innerFErr = fail.Wrap(innerFErr).AddConsequence(derr)
@@ -267,21 +275,6 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 					}
 				}
 			}()
-
-			hostOutputs, innerXErr = unmarshalOutput[map[string]any](outputs["host_"+request.ResourceName])
-			if innerXErr != nil {
-				return retry.StopRetryError(innerXErr)
-			}
-
-			creationZone, innerErr := lang.Cast[string](hostOutputs["availability_zone"])
-			if innerErr != nil {
-				logrus.WithContext(inctx).Tracef("Host '%s' successfully created but cannot confirm AZ: %s", ahf.Name, innerErr)
-			} else {
-				logrus.WithContext(inctx).Tracef("Host '%s' successfully created in requested AZ '%s'", ahf.Name, creationZone)
-				if creationZone != azone && azone != "" {
-					logrus.WithContext(inctx).Warnf("Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'", ahf.Name, azone, creationZone)
-				}
-			}
 
 			return nil
 		},
@@ -304,6 +297,12 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 			logrus.WithContext(inctx).Infof("Cleaning up on failure, deleting Host '%s'", ahf.Name)
 
 			// Recreates def without host to destroy what has been created
+			derr := renderer.Reset()
+			if derr != nil {
+				_ = ferr.AddConsequence(derr)
+				return
+			}
+
 			def, derr := renderer.Assemble(inctx)
 			if derr != nil {
 				_ = ferr.AddConsequence(derr)
@@ -320,7 +319,12 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		}
 	}()
 
-	newHost, xerr := p.complementHost(inctx, ahf.HostCore, hostOutputs)
+	xerr = ahf.AddOptions(abstract.ClearMarkForCreation())
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
+	newHost, xerr := p.complementHost(inctx, ahf.HostCore, outputs, azone)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -334,7 +338,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 	newHost.Networking.IsGateway = request.IsGateway
 	newHost.Sizing = converters.HostTemplateToHostEffectiveSizing(*template)
 
-	// FIXME: Now that OVH supports FloatingIP, reimplement this, with new resource type PublicIP? And may be moved in previous renderer.Assemble to
+	// FIXME: Now that OVH supports FloatingIP, reimplement this, with new resource type PublicIP? And maybe moved in previous renderer.Assemble to
 	//        make a single call to terraform...
 	// // if Floating IP are used and public address is requested
 	// if cfgOpts.UseFloatingIP && request.PublicIP {
@@ -422,10 +426,25 @@ func (p *provider) selectedAvailabilityZone(ctx context.Context) (string, fail.E
 }
 
 // complementHost complements Host data with content of server parameter
-func (p *provider) complementHost(ctx context.Context, hostCore *abstract.HostCore, outputs map[string]any) (_ *abstract.HostFull, ferr fail.Error) {
+func (p *provider) complementHost(ctx context.Context, hostCore *abstract.HostCore, outputs map[string]tfexec.OutputMeta, az string) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	var err error
+
+	hostOutputs, xerr := unmarshalOutput[map[string]any](outputs["host_"+hostCore.Name])
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	creationZone, innerErr := lang.Cast[string](hostOutputs["availability_zone"])
+	if innerErr != nil {
+		logrus.WithContext(ctx).Tracef("Host '%s' successfully created but cannot confirm AZ: %s", hostCore.Name, innerErr)
+	} else {
+		logrus.WithContext(ctx).Tracef("Host '%s' successfully created in requested AZ '%s'", hostCore.Name, creationZone)
+		if creationZone != az && az != "" {
+			logrus.WithContext(ctx).Warnf("Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'", hostCore.Name, az, creationZone)
+		}
+	}
 
 	host, xerr := abstract.NewHostFullFromCore(hostCore)
 	if xerr != nil {
@@ -445,14 +464,14 @@ func (p *provider) complementHost(ctx context.Context, hostCore *abstract.HostCo
 	// }
 
 	if host.ID == "" {
-		host.ID, err = lang.Cast[string](outputs["id"])
+		host.ID, err = lang.Cast[string](hostOutputs["id"])
 		if err != nil {
 			return nil, fail.Wrap(err)
 		}
 	}
 
 	// recover OpenStack metadata into Tags
-	metadata, err := lang.Cast[map[string]any](outputs["metadata"])
+	metadata, err := lang.Cast[map[string]any](hostOutputs["metadata"])
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
@@ -464,17 +483,17 @@ func (p *provider) complementHost(ctx context.Context, hostCore *abstract.HostCo
 		}
 	}
 
-	host.Tags["Template"], err = lang.Cast[string](outputs["flavor_id"])
+	host.Tags["Template"], err = lang.Cast[string](hostOutputs["flavor_id"])
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
 
-	host.Tags["Image"], err = lang.Cast[string](outputs["image_id"])
+	host.Tags["Image"], err = lang.Cast[string](hostOutputs["image_id"])
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
 
-	networks, err := lang.Cast[[]interface{}](outputs["network"])
+	networks, err := lang.Cast[[]interface{}](hostOutputs["network"])
 	if err != nil {
 		return nil, fail.Wrap(err)
 	}
@@ -493,55 +512,73 @@ func (p *provider) complementHost(ctx context.Context, hostCore *abstract.HostCo
 				return nil, fail.Wrap(err)
 			}
 
-			uuid, err := lang.Cast[string](entry["uuid"])
-			if err != nil {
-				return nil, fail.Wrap(err)
-			}
-
 			name, err := lang.Cast[string](entry["name"])
 			if err != nil {
 				return nil, fail.Wrap(err)
 			}
 
-			subnetsByID[uuid] = name
-			subnetsByName[name] = uuid
-
-			ip, err := lang.Cast[string](entry["fixed_ip_v4"])
-			if err == nil && ip != "" {
-				if name == "Ext-Net" {
-					ipv4 = ip
-				} else {
-					ipv4Addresses[uuid] = ip
-				}
-				continue
-			}
-
-			ip, err = lang.Cast[string](entry["fixed_ip_v6"])
-			if err == nil && ip != "" {
-				if name == "Ext-Net" {
-					ipv6 = ip
-				} else {
-					ipv6Addresses[uuid] = ip
-				}
-				continue
-			}
-
-			ip, err = lang.Cast[string](entry["floating_ip"])
-			if err == nil && ip != "" {
-				if valid.IsIPv6(ip) {
-					if name == "Ext-Net" {
-						ipv6 = ip
-					} else {
-						ipv6Addresses[uuid] = ip
+			if name != "Ext-Net" {
+				subnetOutputs, xerr := unmarshalOutput[map[string]any](outputs["subnet_"+name])
+				if xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						continue
+					default:
+						return nil, xerr
 					}
-					continue
 				}
 
-				if name == "Ext-Net" {
-					ipv4 = ip
-				} else {
-					ipv4Addresses[uuid] = ip
+				subnetID, err := lang.Cast[string](subnetOutputs["id"])
+				if err != nil {
+					return nil, fail.Wrap(err)
 				}
+
+				subnetsByID[subnetID] = name
+				subnetsByName[name] = subnetID
+
+				ip, err := lang.Cast[string](entry["fixed_ip_v4"])
+				if err == nil && ip != "" {
+					ipv4Addresses[subnetID] = ip
+				}
+
+				ip, err = lang.Cast[string](entry["fixed_ip_v6"])
+				if err == nil && ip != "" {
+					ipv6Addresses[subnetID] = ip
+				}
+
+				// FIXME: never created floatin IP with OVH, code never tested...
+				// if ipv4 == "" || ipv6 == "" {
+				// 	ip, err = lang.Cast[string](entry["floating_ip"])
+				// 	if err == nil && ip != "" {
+				// 		if valid.IsIPv6(ip) {
+				// 			ipv6Addresses[subnetID] = ip
+				// 		} else {
+				// 			ipv4Addresses[subnetID] = ip
+				// 		}
+				// 	}
+				// }
+			} else {
+				ip, err := lang.Cast[string](entry["fixed_ip_v4"])
+				if err == nil && ip != "" {
+					ipv4 = ip
+				}
+
+				ip, err = lang.Cast[string](entry["fixed_ip_v6"])
+				if err == nil && ip != "" {
+					ipv6 = ip
+				}
+
+				// FIXME: never created floatin IP with OVH, code never tested...
+				// if ipv4 == "" || ipv6 == "" {
+				// 	ip, err = lang.Cast[string](entry["floating_ip"])
+				// 	if err == nil && ip != "" {
+				// 		if valid.IsIPv6(ip) && ipv6 == ""{
+				// 			ipv6 = ip
+				// 		} else if ipv4 == "" {
+				// 			ipv4 = ip
+				// 		}
+				// 	}
+				// }
 			}
 		}
 
@@ -616,6 +653,11 @@ func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostIdentif
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
 	}
+	switch hostParam.(type) {
+	case string:
+		return fail.InvalidParameterError("hostParam", "must be an *abstract.HostCore or *abstract.HostFull")
+	default:
+	}
 	ahf, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
@@ -623,11 +665,6 @@ func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostIdentif
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.compute"), "(%s)", hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
-
-	ahf, xerr = p.InspectHost(ctx, ahf)
-	if xerr != nil {
-		return xerr
-	}
 
 	xerr = ahf.AddOptions(abstract.MarkForDestruction())
 	if xerr != nil {
@@ -645,7 +682,7 @@ func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostIdentif
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(ctx, ahf)
+	def, xerr := renderer.Assemble(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -791,7 +828,7 @@ func (p *provider) WaitHostReady(ctx context.Context, hostParam iaasapi.HostIden
 }
 
 // BindSecurityGroupToHost ...
-func (p *provider) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
+func (p *provider) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) fail.Error {
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
 	}
@@ -801,11 +838,11 @@ func (p *provider) BindSecurityGroupToHost(ctx context.Context, asg *abstract.Se
 	if !asg.IsConsistent() {
 		return fail.InvalidParameterError("asg", "is not consistent")
 	}
-	if ahf == nil {
+	if ahc == nil {
 		return fail.InvalidParameterCannotBeNilError("ahf")
 	}
-	if !ahf.IsConsistent() {
-		return fail.InvalidParameterError("ahf", "is not consistent")
+	if !ahc.IsConsistent() {
+		return fail.InvalidParameterError("ahc", "is not consistent")
 	}
 
 	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
@@ -820,33 +857,33 @@ func (p *provider) BindSecurityGroupToHost(ctx context.Context, asg *abstract.Se
 	}
 
 	var sgs map[string]string
-	entry, ok := ahf.Extra()["SecurityGroupByID"]
+	entry, ok := ahc.Extra()["SecurityGroupByID"]
 	if !ok {
 		sgs = map[string]string{}
 	} else {
 		sgs = entry.(map[string]string)
 	}
 	sgs[asg.ID] = asg.Name
-	xerr = ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", sgs), abstract.WithExtraData("MarkedForCreation", false))
+	xerr = ahc.AddOptions(abstract.WithExtraData("SecurityGroupByID", sgs), abstract.WithExtraData("MarkedForCreation", false))
 	if xerr != nil {
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(ctx, ahf)
+	def, xerr := renderer.Assemble(ctx, ahc)
 	if xerr != nil {
 		return xerr
 	}
 
 	_, xerr = renderer.Apply(ctx, def)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to update Security Groups of Host '%s'", ahf.Name)
+		return fail.Wrap(xerr, "failed to update Security Groups of Host '%s'", ahc.Name)
 	}
 
 	return nil
 }
 
 // UnbindSecurityGroupFromHost ...
-func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
+func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) fail.Error {
 	if valid.IsNull(p) {
 		return fail.InvalidInstanceError()
 	}
@@ -856,11 +893,11 @@ func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstrac
 	if !asg.IsConsistent() {
 		return fail.InvalidParameterError("asg", "is not consistent")
 	}
-	if ahf == nil {
-		return fail.InvalidParameterCannotBeNilError("ahf")
+	if ahc == nil {
+		return fail.InvalidParameterCannotBeNilError("ahc")
 	}
-	if !ahf.IsConsistent() {
-		return fail.InvalidParameterError("ahf", "is not consistent")
+	if !ahc.IsConsistent() {
+		return fail.InvalidParameterError("ahc", "is not consistent")
 	}
 
 	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
@@ -887,19 +924,19 @@ func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstrac
 			newSGs[k] = v
 		}
 	}
-	xerr = ahf.AddOptions(abstract.WithExtraData("SecurityGroupByID", newSGs), abstract.WithExtraData("MarkedForCreation", false))
+	xerr = ahc.AddOptions(abstract.WithExtraData("SecurityGroupByID", newSGs), abstract.WithExtraData("MarkedForCreation", false))
 	if xerr != nil {
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(ctx, ahf)
+	def, xerr := renderer.Assemble(ctx, ahc)
 	if xerr != nil {
 		return xerr
 	}
 
 	_, xerr = renderer.Apply(ctx, def)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to delete Network '%s'", ahf.Name)
+		return fail.Wrap(xerr, "failed to delete Network '%s'", ahc.Name)
 	}
 
 	return nil
@@ -911,9 +948,5 @@ func (p *provider) ConsolidateHostSnippet(ahc *abstract.HostCore) fail.Error {
 		return nil
 	}
 
-	return ahc.AddOptions(
-		abstract.UseTerraformSnippet(hostDesignResourceSnippetPath),
-		abstract.WithResourceType("openstack_networking_port_v2"),
-		abstract.WithResourceType("openstack_compute_instance_v2"),
-	)
+	return ahc.AddOptions(abstract.UseTerraformSnippet(hostDesignResourceSnippetPath))
 }

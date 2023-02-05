@@ -224,7 +224,7 @@ func (instance *Subnet) trxCreateSecurityGroups(inctx context.Context, subnetTrx
 				return ar, ar.rErr
 			}
 			defer func() {
-				derr := instance.trxUndoCreateSecurityGroup(cleanupContextFrom(ctx), subnetTrx, &ferr, keepOnFailure, subnetGWSG)
+				derr := instance.undoCreateSecurityGroup(cleanupContextFrom(ctx), &ferr, keepOnFailure, subnetGWSG)
 				if derr != nil {
 					logrus.WithContext(ctx).Warnf(derr.Error())
 				}
@@ -237,7 +237,7 @@ func (instance *Subnet) trxCreateSecurityGroups(inctx context.Context, subnetTrx
 				return ar, ar.rErr
 			}
 			defer func() {
-				derr := instance.trxUndoCreateSecurityGroup(cleanupContextFrom(ctx), subnetTrx, &ferr, keepOnFailure, subnetPublicIPSG)
+				derr := instance.undoCreateSecurityGroup(cleanupContextFrom(ctx), &ferr, keepOnFailure, subnetPublicIPSG)
 				if derr != nil {
 					logrus.WithContext(ctx).Warnf(derr.Error())
 				}
@@ -250,7 +250,7 @@ func (instance *Subnet) trxCreateSecurityGroups(inctx context.Context, subnetTrx
 				return ar, ar.rErr
 			}
 			defer func() {
-				derr := instance.trxUndoCreateSecurityGroup(cleanupContextFrom(ctx), subnetTrx, &ferr, keepOnFailure, subnetInternalSG)
+				derr := instance.undoCreateSecurityGroup(cleanupContextFrom(ctx), &ferr, keepOnFailure, subnetInternalSG)
 				if derr != nil {
 					logrus.WithContext(ctx).Warnf(derr.Error())
 				}
@@ -484,7 +484,7 @@ func (instance *Subnet) trxCreatePublicIPSecurityGroup(ctx context.Context, subn
 }
 
 // Starting from here, delete the Security Group if exiting with error
-func (instance *Subnet) trxUndoCreateSecurityGroup(ctx context.Context, subnetTrx subnetTransaction, errorPtr *fail.Error, keepOnFailure bool, sg *SecurityGroup) fail.Error {
+func (instance *Subnet) undoCreateSecurityGroup(ctx context.Context, errorPtr *fail.Error, keepOnFailure bool, sg *SecurityGroup) fail.Error {
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -664,7 +664,7 @@ func (instance *Subnet) trxFinalizeSubnetCreation(inctx context.Context, trx sub
 	}
 }
 
-func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subnetTransaction, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]string) (_ fail.Error) {
+func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subnetTransaction, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]string, extra interface{}) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -818,12 +818,18 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subne
 			primaryRequest.ResourceName = primaryGatewayName
 			primaryRequest.HostName = primaryGatewayName + domain
 
+			var castedExtra map[string]any
+			if extra == nil {
+				castedExtra = map[string]any{}
+			}
+			castedExtra["gateway"] = true
+
 			waitForFirstGw := make(chan struct{})
 			egGwCreation.Go(func() error {
 				defer func() {
 					close(waitForFirstGw)
 				}()
-				tr, err := instance.trxCreateGateway(ctx, subnetTrx, primaryRequest, *gwSizing)
+				tr, err := instance.trxCreateGateway(ctx, subnetTrx, primaryRequest, *gwSizing, castedExtra)
 				if err != nil {
 					gws <- gwRes{
 						num: 1,
@@ -859,7 +865,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subne
 					if req.Domain != "" {
 						secondaryRequest.HostName = secondaryGatewayName + domain
 					}
-					tr, err := instance.trxCreateGateway(ctx, subnetTrx, secondaryRequest, *gwSizing)
+					tr, err := instance.trxCreateGateway(ctx, subnetTrx, secondaryRequest, *gwSizing, castedExtra)
 					if err != nil {
 						gws <- gwRes{
 							num: 2,
@@ -900,6 +906,18 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subne
 
 			// handle primary gateway
 			{
+				primaryGateway, err = lang.Cast[*Host](primaryMap["host"])
+				if err != nil {
+					ar := result{fail.Wrap(err)}
+					return ar, ar.rErr
+				}
+				primaryGatewayTrx, xerr := newHostTransaction(ctx, primaryGateway)
+				if xerr != nil {
+					ar := result{xerr}
+					return ar, ar.rErr
+				}
+				defer primaryGatewayTrx.TerminateFromError(ctx, &ferr)
+
 				// Starting from here, deletes the primary gateway if exiting with error
 				defer func() {
 					ferr = debug.InjectPlannedFail(ferr)
@@ -912,7 +930,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subne
 								}
 							}()
 							logrus.WithContext(cleanupContextFrom(ctx)).Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
-							derr = primaryGateway.RelaxedDeleteHost(cleanupContextFrom(ctx))
+							derr = primaryGateway.trxRelaxedDeleteHost(cleanupContextFrom(ctx), primaryGatewayTrx)
 							derr = debug.InjectPlannedFail(derr)
 							if derr != nil {
 								debug.IgnoreErrorWithContext(cleanupContextFrom(ctx), derr)
@@ -929,18 +947,6 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subne
 						}
 					}
 				}()
-
-				primaryGateway, err = lang.Cast[*Host](primaryMap["host"])
-				if err != nil {
-					ar := result{fail.Wrap(err)}
-					return ar, ar.rErr
-				}
-				primaryGatewayTrx, xerr := newHostTransaction(ctx, primaryGateway)
-				if xerr != nil {
-					ar := result{xerr}
-					return ar, ar.rErr
-				}
-				defer primaryGatewayTrx.TerminateFromError(ctx, &ferr)
 
 				primaryUserdata, err = lang.Cast[*userdata.Content](primaryMap["userdata"])
 				if err != nil {
@@ -1024,31 +1030,6 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subne
 						safe = cfg.Safe
 					}
 
-					// Starting from here, deletes the secondary gateway if exiting with error
-					defer func() {
-						ferr = debug.InjectPlannedFail(ferr)
-						if ferr != nil && req.CleanOnFailure() {
-							if secondaryGateway != nil {
-								var derr fail.Error
-								defer func() {
-									if derr != nil {
-										_ = ferr.AddConsequence(derr)
-									}
-								}()
-								derr = secondaryGateway.RelaxedDeleteHost(cleanupContextFrom(ctx))
-								derr = debug.InjectPlannedFail(derr)
-								if derr != nil {
-									debug.IgnoreErrorWithContext(cleanupContextFrom(ctx), derr)
-								}
-								derr = instance.unbindHostFromVIP(cleanupContextFrom(ctx), abstractSubnet.VIP, secondaryGateway)
-								derr = debug.InjectPlannedFail(derr)
-								if derr != nil {
-									debug.IgnoreErrorWithContext(cleanupContextFrom(ctx), derr)
-								}
-							}
-						}
-					}()
-
 					var ok bool
 					secondaryGateway, ok = secondaryMap["host"].(*Host)
 					if !ok {
@@ -1062,6 +1043,28 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subne
 						return ar, ar.rErr
 					}
 					defer secondaryGatewayTrx.TerminateFromError(ctx, &ferr)
+
+					// Starting from here, deletes the secondary gateway if exiting with error
+					defer func() {
+						ferr = debug.InjectPlannedFail(ferr)
+						if ferr != nil && req.CleanOnFailure() {
+							if secondaryGateway != nil {
+								var derr fail.Error
+								defer func() {
+									if derr != nil {
+										_ = ferr.AddConsequence(derr)
+									}
+								}()
+
+								derr = secondaryGateway.trxRelaxedDeleteHost(cleanupContextFrom(ctx), secondaryGatewayTrx)
+								derr = debug.InjectPlannedFail(derr)
+								if derr == nil {
+									derr = instance.unbindHostFromVIP(cleanupContextFrom(ctx), abstractSubnet.VIP, secondaryGateway)
+									derr = debug.InjectPlannedFail(derr)
+								}
+							}
+						}
+					}()
 
 					secondaryUserdata, ok = secondaryMap["userdata"].(*userdata.Content)
 					if !ok {

@@ -278,8 +278,28 @@ func (instance *SecurityGroup) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newInstance := &SecurityGroup{}
+	newInstance, err := newBulkSecurityGroup()
+	if err != nil {
+		return nil, err
+	}
+
 	return newInstance, newInstance.Replace(instance)
+}
+
+// newBulkSecurityGroup ...
+func newBulkSecurityGroup() (*SecurityGroup, fail.Error) {
+	protected, err := abstract.NewSecurityGroup()
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	core, err := metadata.NewEmptyCore(abstract.SecurityGroupKind, protected)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	instance := &SecurityGroup{Core: core}
+	return instance, nil
 }
 
 func (instance *SecurityGroup) Replace(in clonable.Clonable) error {
@@ -1005,18 +1025,8 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 			}
 			if hostID != "" {
 				innerXErr := alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-					entry, innerXErr := instance.Job().Scope().AbstractByName(ahc.Kind(), ahc.Name)
-					if innerXErr != nil {
-						return innerXErr
-					}
-
-					ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
-					if innerErr != nil {
-						return fail.Wrap(innerErr)
-					}
-
 					// Unbind security group on provider side; if not found, considered as a success
-					innerXErr = instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahf)
+					innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahc)
 					if innerXErr != nil {
 						switch innerXErr.(type) {
 						case *fail.ErrNotFound:

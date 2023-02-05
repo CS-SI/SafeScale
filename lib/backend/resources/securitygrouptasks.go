@@ -69,19 +69,9 @@ func (instance *SecurityGroup) trxUnbindFromHost(inctx context.Context, sgTrx se
 		defer close(chRes)
 
 		xerr := alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, hostProps *serialize.JSONProperties) fail.Error {
-			entry, innerXErr := instance.Job().Scope().AbstractByName(ahc.Kind(), ahc.Name)
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			ahf, innerErr := lang.Cast[*abstract.HostFull](entry)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
 			return alterSecurityGroupMetadata(ctx, sgTrx, func(asg *abstract.SecurityGroup, sgProps *serialize.JSONProperties) fail.Error {
 				// Unbind Security Group from Host on provider side
-				innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahf)
+				innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahc)
 				innerXErr = debug.InjectPlannedFail(innerXErr)
 				if innerXErr != nil {
 					switch innerXErr.(type) {
@@ -115,8 +105,8 @@ func (instance *SecurityGroup) trxUnbindFromHost(inctx context.Context, sgTrx se
 						return fail.Wrap(innerErr)
 					}
 
-					delete(sgphV1.ByID, ahf.ID)
-					delete(sgphV1.ByName, ahf.Name)
+					delete(sgphV1.ByID, ahc.ID)
+					delete(sgphV1.ByName, ahc.Name)
 					return nil
 				})
 

@@ -93,13 +93,11 @@ func (instance *Bucket) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	*instance = *src
-	instance.core, err = clonable.CastedClone[*core](src.core)
-	if err != nil {
-		return err
-	}
+	instance.ID = src.ID
+	instance.Host = src.Host
+	instance.MountPoint = src.MountPoint
 
-	return nil
+	return instance.core.Replace(src.core)
 }
 
 // Serialize serializes Host 'instance' into bytes (output json code)

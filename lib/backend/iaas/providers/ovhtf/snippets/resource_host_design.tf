@@ -28,11 +28,11 @@
 {{-   if hasField $extra "Subnets" }}
 {{-     range $k, $v := $extra.Subnets }}
 resource "openstack_networking_port_v2" "nic_{{ $rsc.Name }}_{{ $v.Name }}" {
-	provider           = openstack.ovh
-	name               = "nic-{{ $rsc.Name }}-{{ $v.Name }}"
-	network_id         = "{{ $v.Network }}"
-	admin_state_up     = true
-	region             = "{{ $region }}"
+	provider       = openstack.ovh
+	name           = "nic-{{ $rsc.Name }}-{{ $v.Name }}"
+	network_id     = "{{ $v.Network }}"
+	admin_state_up = true
+	region         = "{{ $region }}"
 
 	fixed_ip {
 		subnet_id = "{{ $v.ID }}"
@@ -92,6 +92,7 @@ resource "openstack_compute_instance_v2" "{{ $rsc.Name }}" {
 		delete_on_termination = true
 	}
 {{-   end }}
+
 {{- if $extra.MarkedForCreation }}
 	user_data = "${file("{{ $rsc.Name }}_userdata")}"
 {{- end }}
@@ -104,9 +105,6 @@ resource "openstack_compute_instance_v2" "{{ $rsc.Name }}" {
 
 	lifecycle {
 		ignore_changes = [block_device, user_data]
-{{-   if not $extra.MarkedForCreation }}
-		prevent_destroy = true
-{{-   end }}
 	}
 }
 
@@ -114,4 +112,5 @@ output "host_{{ $rsc.Name }}" {
 	value = "${openstack_compute_instance_v2.{{ $rsc.Name }}}"
 	sensitive = true
 }
-{{- end }}
+
+{{ end }}

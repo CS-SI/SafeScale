@@ -263,8 +263,28 @@ func (instance *Volume) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newInstance := &Volume{}
+	newInstance, err := newBulkVolume()
+	if err != nil {
+		return nil, err
+	}
+
 	return newInstance, newInstance.Replace(instance)
+}
+
+// newBulkVolume ...
+func newBulkVolume() (*Volume, fail.Error) {
+	protected, err := abstract.NewVolume()
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	core, err := metadata.NewEmptyCore(abstract.VolumeKind, protected)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	instance := &Volume{Core: core}
+	return instance, nil
 }
 
 func (instance *Volume) Replace(in clonable.Clonable) error {

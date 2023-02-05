@@ -891,7 +891,7 @@ func (s stack) ListRegions(ctx context.Context) (_ []string, ferr fail.Error) {
 }
 
 // BindSecurityGroupToHost ...
-func (s stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
+func (s stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -902,17 +902,17 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.Securi
 	if !asg.IsComplete() {
 		return fail.InconsistentError("asg is not complete")
 	}
-	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahc)
 	if xerr != nil {
 		return xerr
 	}
-	if !ahf.IsComplete() {
-		return fail.InconsistentError("ahf is not complete")
+	if !ahc.IsComplete() {
+		return fail.InconsistentError("ahc is not complete")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).Entering().Exiting()
 
-	hostID, err := ahf.GetID()
+	hostID, err := ahc.GetID()
 	if err != nil {
 		return fail.Wrap(err)
 	}
@@ -926,7 +926,7 @@ func (s stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.Securi
 }
 
 // UnbindSecurityGroupFromHost unbinds a Security Group from a Host
-func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) (ferr fail.Error) {
+func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) (ferr fail.Error) {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
@@ -937,17 +937,17 @@ func (s stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.Se
 	if !asg.IsComplete() {
 		return fail.InconsistentError("asg is not complete")
 	}
-	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahc)
 	if xerr != nil {
 		return xerr
 	}
-	if !ahf.IsComplete() {
-		return fail.InconsistentError("ahf is nort complete")
+	if !ahc.IsComplete() {
+		return fail.InconsistentError("ahc is not complete")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s, %s)", sgLabel, hostLabel).Entering().Exiting()
 
-	hostID, err := ahf.GetID()
+	hostID, err := ahc.GetID()
 	if err != nil {
 		return fail.Wrap(err)
 	}

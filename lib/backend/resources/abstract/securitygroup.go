@@ -119,7 +119,7 @@ func (instance *SecurityGroupRule) EqualTo(in *SecurityGroupRule) bool {
 	return true
 }
 
-// EquivalentTo compares 2 rules, except ID and Description, to tell if the target is comparable
+// EquivalentTo compares 2 rules, except ID and Description, to tell if the rules are comparable
 func (instance *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 	if instance == nil || in == nil {
 		return false
@@ -535,19 +535,18 @@ func (instance *SecurityGroup) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	*instance = *src
-	instance.core, err = clonable.CastedClone[*core](src.core)
-	if err != nil {
-		return fail.Wrap(err)
-	}
-
+	instance.ID = src.ID
+	instance.Network = src.Network
+	instance.Description = src.Description
+	instance.DefaultForSubnet = src.DefaultForSubnet
+	instance.DefaultForHost = src.DefaultForHost
 	nr, xerr := src.Rules.Clone()
 	if xerr != nil {
 		return xerr
 	}
 
 	instance.Rules = nr
-	return nil
+	return instance.core.Replace(src.core)
 }
 
 // Serialize serializes instance into bytes (output json code)

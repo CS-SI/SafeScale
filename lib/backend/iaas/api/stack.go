@@ -143,9 +143,9 @@ type Stack interface {
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
 	WaitHostReady(ctx context.Context, hostParam HostIdentifier, timeout time.Duration) (*abstract.HostCore, fail.Error)
 	// BindSecurityGroupToHost attaches a security group to a host
-	BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error
+	BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) fail.Error
 	// UnbindSecurityGroupFromHost detaches a security group from a host
-	UnbindSecurityGroupFromHost(ctx context.Context, sasg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error
+	UnbindSecurityGroupFromHost(ctx context.Context, sasg *abstract.SecurityGroup, ahc *abstract.HostCore) fail.Error
 
 	// CreateVolume creates a block volume
 	CreateVolume(ctx context.Context, request abstract.VolumeRequest) (*abstract.Volume, fail.Error)

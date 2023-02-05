@@ -201,7 +201,7 @@ func (instance *stack) parseTemplateID(id string) (*abstract.HostTemplate, fail.
 }
 
 // ListTemplates lists available host templates
-// Host templates are sorted using Dominant AbstractByName Fairness Algorithm
+// Host templates are sorted using Dominant Resource Fairness Algorithm
 func (instance *stack) ListTemplates(ctx context.Context, _ bool) (_ []*abstract.HostTemplate, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
@@ -1361,7 +1361,7 @@ func (instance *stack) ResizeHost(ctx context.Context, hostParam iaasapi.HostIde
 }
 
 // BindSecurityGroupToHost ...
-func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
+func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1372,17 +1372,17 @@ func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstrac
 	if !asg.IsComplete() {
 		return fail.InconsistentError("asg is not complete")
 	}
-	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahc)
 	if xerr != nil {
 		return xerr
 	}
-	if !ahf.IsComplete() {
-		return fail.InconsistentError("ahf is not complete")
+	if !ahc.IsComplete() {
+		return fail.InconsistentError("ahc is not complete")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.compute"), "(%s, *s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
 
-	vm, xerr := instance.rpcReadVMByID(ctx, ahf.ID)
+	vm, xerr := instance.rpcReadVMByID(ctx, ahc.ID)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
 	}
@@ -1403,11 +1403,11 @@ func (instance *stack) BindSecurityGroupToHost(ctx context.Context, asg *abstrac
 
 	// Add new SG to Host
 	sgs = append(sgs, asg.ID)
-	return instance.rpcUpdateVMSecurityGroups(ctx, ahf.ID, sgs)
+	return instance.rpcUpdateVMSecurityGroups(ctx, ahc.ID, sgs)
 }
 
 // UnbindSecurityGroupFromHost ...
-func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahf *abstract.HostFull) fail.Error {
+func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstract.SecurityGroup, ahc *abstract.HostCore) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1418,17 +1418,17 @@ func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abs
 	if !asg.IsComplete() {
 		return fail.InconsistentError("asg is not complete")
 	}
-	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahf)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(ahc)
 	if xerr != nil {
 		return xerr
 	}
-	if !ahf.IsComplete() {
-		return fail.InconsistentError("ahf is not complete")
+	if !ahc.IsComplete() {
+		return fail.InconsistentError("ahc is not complete")
 	}
 
 	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.compute"), "(%s, *s)", sgLabel, hostLabel).WithStopwatch().Entering().Exiting()
 
-	vm, xerr := instance.rpcReadVMByID(ctx, ahf.ID)
+	vm, xerr := instance.rpcReadVMByID(ctx, ahc.ID)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1455,5 +1455,5 @@ func (instance *stack) UnbindSecurityGroupFromHost(ctx context.Context, asg *abs
 	}
 
 	// Update Security Groups of Host
-	return instance.rpcUpdateVMSecurityGroups(ctx, ahf.ID, sgs)
+	return instance.rpcUpdateVMSecurityGroups(ctx, ahc.ID, sgs)
 }

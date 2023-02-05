@@ -140,7 +140,7 @@ func (instance *SecurityGroup) trxUnbindFromSubnets(ctx context.Context, sgTrx s
 	if len(in.ByID) > 0 {
 		tg := new(errgroup.Group)
 
-		// recover from context the Subnet AbstractByName and properties (if it exists)
+		// recover from context the Subnet abstract and properties (if it exists)
 		var (
 			currentSubnetTrx subnetTransaction
 			err              error
@@ -413,7 +413,7 @@ func (instance *SecurityGroup) trxDelete(ctx context.Context, sgTrx securityGrou
 		return xerr
 	}
 
-	// Need to terminate Security Group transaction to be able to delete metadata
+	// Need to terminate Security Group transaction to be able to delete metadata (no need to check error as we will delete metadata
 	sgTrx.SilentTerminate(ctx)
 
 	// delete Security Group metadata
@@ -700,20 +700,10 @@ func (instance *SecurityGroup) trxBindToHost(inctx context.Context, sgTrx securi
 				}
 
 				return alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-					entry, lvl3xerr := instance.Job().Scope().AbstractByName(ahc.Kind(), ahc.Name)
-					if lvl3xerr != nil {
-						return lvl3xerr
-					}
-
-					ahf, lvl3err := lang.Cast[*abstract.HostFull](entry)
-					if lvl3err != nil {
-						return fail.Wrap(lvl3err)
-					}
-
 					switch enable {
 					case SecurityGroupEnable:
 						// In case the security group is already bound, we must consider a "duplicate" error has a success
-						lvl3xerr = instance.Service().BindSecurityGroupToHost(ctx, asg, ahf)
+						lvl3xerr := instance.Service().BindSecurityGroupToHost(ctx, asg, ahc)
 						lvl3xerr = debug.InjectPlannedFail(lvl3xerr)
 						if lvl3xerr != nil {
 							switch lvl3xerr.(type) {
@@ -726,7 +716,7 @@ func (instance *SecurityGroup) trxBindToHost(inctx context.Context, sgTrx securi
 						}
 					case SecurityGroupDisable:
 						// In case the security group has to be disabled, we must consider a "not found" error has a success
-						lvl3xerr = instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahf)
+						lvl3xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahc)
 						lvl3xerr = debug.InjectPlannedFail(lvl3xerr)
 						if lvl3xerr != nil {
 							switch lvl3xerr.(type) {
@@ -740,18 +730,18 @@ func (instance *SecurityGroup) trxBindToHost(inctx context.Context, sgTrx securi
 					}
 
 					disable := !bool(enable)
-					item, ok := sghV1.ByID[ahf.ID]
+					item, ok := sghV1.ByID[ahc.ID]
 					if !ok || item.Disabled == disable {
 						item = &propertiesv1.SecurityGroupBond{
-							ID:   ahf.ID,
+							ID:   ahc.ID,
 							Name: hostName,
 						}
-						sghV1.ByID[ahf.ID] = item
-						sghV1.ByName[hostName] = ahf.ID
+						sghV1.ByID[ahc.ID] = item
+						sghV1.ByName[hostName] = ahc.ID
 					}
 
 					// update the state
-					sghV1.ByID[ahf.ID].Disabled = disable
+					sghV1.ByID[ahc.ID].Disabled = disable
 					return nil
 				})
 			})

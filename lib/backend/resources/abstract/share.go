@@ -125,6 +125,8 @@ func (si *Share) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	*si = *src
-	return nil
+	si.HostID = src.HostID
+	si.HostName = src.HostName
+	si.ID = src.ID
+	return si.core.Replace(src.core)
 }

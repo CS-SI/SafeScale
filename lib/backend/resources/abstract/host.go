@@ -255,8 +255,8 @@ func (ht HostTemplate) OK() bool {
 // This information should not change over time, but IT ACTUALLY happens
 type HostCore struct {
 	*core
-	ID string `json:"id,omitempty"`
-	// Name              string            `json:"name,omitempty"`
+
+	ID                string         `json:"id,omitempty"`
 	PrivateKey        string         `json:"private_key,omitempty"`
 	SSHPort           uint32         `json:"ssh_port,omitempty"`
 	Password          string         `json:"password,omitempty"`
@@ -349,13 +349,13 @@ func (hc *HostCore) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	*hc = *src
-	hc.core, err = clonable.CastedClone[*core](src.core)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	hc.ID = src.ID
+	hc.PrivateKey = src.PrivateKey
+	hc.SSHPort = src.SSHPort
+	hc.Password = src.Password
+	hc.LastState = src.LastState
+	hc.ProvisioningState = src.ProvisioningState
+	return hc.core.Replace(src.core)
 }
 
 // Serialize serializes Host instance into bytes (output json code)
@@ -396,12 +396,6 @@ func (hc *HostCore) Deserialize(buf []byte) (ferr fail.Error) {
 	}
 	return nil
 }
-
-// // GetName returns the name of the host
-// // Satisfies interface data.Identifiable
-// func (hc *HostCore) GetName() string {
-// 	return hc.Name
-// }
 
 // GetID returns the ID of the host
 // Satisfies interface data.Identifiable
@@ -590,20 +584,16 @@ func (hf *HostFull) GetID() (string, error) {
 	if hf == nil {
 		return "", fmt.Errorf("invalid instance")
 	}
+
 	return hf.ID, nil
 }
-
-// // GetName returns the name of the host
-// // satisfies interface data.Identifiable
-// func (hf *HostFull) GetName() string {
-// 	return hf.Name
-// }
 
 // SetName is a setter to initialize field 'Name'
 func (hf *HostFull) SetName(name string) *HostFull {
 	if hf != nil && hf.HostCore != nil {
 		hf.HostCore.SetName(name)
 	}
+
 	return hf
 }
 
@@ -634,12 +624,7 @@ func (hf *HostFull) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	*hf = *src
-	hf.core, err = clonable.CastedClone[*core](src.core)
-	if err != nil {
-		return err
-	}
-
+	hf.CurrentState = src.CurrentState
 	hf.Description, err = clonable.CastedClone[*HostDescription](hf.Description)
 	if err != nil {
 		return err
@@ -655,7 +640,7 @@ func (hf *HostFull) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	return nil
+	return hf.HostCore.Replace(src.HostCore)
 }
 
 // HostList contains a list of HostFull

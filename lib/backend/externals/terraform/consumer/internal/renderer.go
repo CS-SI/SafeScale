@@ -331,7 +331,7 @@ func (instance *renderer) Plan(ctx context.Context, def string) (_ map[string]tf
 
 	xerr = retryableTerraformExecutorCall(ctx, func() error { return instance.executor.Init(ctx, tfexec.Upgrade(false)) })
 	if xerr != nil {
-		logrus.Trace("terraform init failed.")
+		logrus.Tracef("terraform init failed (from %s).", instance.buildPath)
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
 			cause := xerr.Cause()
@@ -342,7 +342,7 @@ func (instance *renderer) Plan(ctx context.Context, def string) (_ map[string]tf
 		}
 		return nil, false, xerr
 	}
-	logrus.Trace("terraform init ran successfully.")
+	logrus.Tracef("terraform init ran successfully (from %s).", instance.buildPath)
 
 	// output, err := executor.Validate(ctx)
 	// if err != nil {
@@ -357,7 +357,7 @@ func (instance *renderer) Plan(ctx context.Context, def string) (_ map[string]tf
 		return innerErr
 	})
 	if xerr != nil {
-		logrus.Trace("terraform plan failed.")
+		logrus.Tracef("terraform plan failed (from %s).", instance.buildPath)
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
 			cause := xerr.Cause()
@@ -368,7 +368,7 @@ func (instance *renderer) Plan(ctx context.Context, def string) (_ map[string]tf
 		}
 		return nil, false, xerr
 	}
-	logrus.Trace("terraform plan ran successfully.")
+	logrus.Tracef("terraform plan ran successfully (from %s).", instance.buildPath)
 
 	outputs, err := instance.executor.Output(ctx)
 	if err != nil {
@@ -491,7 +491,7 @@ func (instance *renderer) apply(ctx context.Context, def string) (_ map[string]t
 
 	xerr = retryableTerraformExecutorCall(ctx, func() error { return instance.executor.Init(ctx, tfexec.Upgrade(false)) })
 	if xerr != nil {
-		logrus.Trace("terraform init failed.")
+		logrus.Tracef("terraform init failed (from %s).", instance.buildPath)
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
 			cause := xerr.Cause()
@@ -502,11 +502,11 @@ func (instance *renderer) apply(ctx context.Context, def string) (_ map[string]t
 		}
 		return nil, xerr
 	}
-	logrus.Trace("terraform init ran successfully.")
+	logrus.Tracef("terraform init ran successfully (from %s).", instance.buildPath)
 
 	xerr = retryableTerraformExecutorCall(ctx, func() error { return instance.executor.Apply(ctx) })
 	if xerr != nil {
-		logrus.Trace("terraform apply failed.")
+		logrus.Tracef("terraform apply failed (from %s).", instance.buildPath)
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
 			cause := xerr.Cause()
@@ -517,7 +517,7 @@ func (instance *renderer) apply(ctx context.Context, def string) (_ map[string]t
 		}
 		return nil, xerr
 	}
-	logrus.Trace("terraform apply ran successfully.")
+	logrus.Tracef("terraform apply ran successfully (from %s).", instance.buildPath)
 
 	outputs, err := instance.executor.Output(ctx)
 	if err != nil {
@@ -609,7 +609,7 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 
 		xerr = retryableTerraformExecutorCall(ctx, func() error { return instance.executor.Init(ctx, tfexec.Upgrade(false)) })
 		if xerr != nil {
-			logrus.Trace("terraform init failed.")
+			logrus.Tracef("terraform init failed (from %s).", instance.buildPath)
 			switch xerr.(type) {
 			case *retry.ErrStopRetry:
 				cause := xerr.Cause()
@@ -620,7 +620,7 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 			}
 			return xerr
 		}
-		logrus.Trace("terraform init ran successfully.")
+		logrus.Tracef("terraform init ran successfully (from %s).", instance.buildPath)
 
 		tfOpts := []tfexec.DestroyOption{}
 		for _, v := range targets {
@@ -629,7 +629,7 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 
 		xerr = retryableTerraformExecutorCall(ctx, func() error { return instance.executor.Destroy(ctx, tfOpts...) })
 		if xerr != nil {
-			logrus.Trace("terraform destroy failed.")
+			logrus.Tracef("terraform destroy failed (from %s).", instance.buildPath)
 			switch xerr.(type) {
 			case *retry.ErrStopRetry:
 				cause := xerr.Cause()
@@ -640,7 +640,7 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 			}
 			return xerr
 		}
-		logrus.Trace("terraform destroy ran successfully.")
+		logrus.Tracef("terraform destroy ran successfully (from %s).", instance.buildPath)
 
 	}
 
@@ -686,7 +686,7 @@ func (instance *renderer) Destroy(ctx context.Context, def string, opts ...optio
 // 	if err != nil {
 // 		return fail.Wrap(err, "failed to init terraform executor")
 // 	}
-// 	logrus.Trace("terraform init ran successfully.")
+// logrus.Trace("terraform init ran successfully (from %s).", instance.buildPath)
 //
 // 	// output, err := executor.Validate(ctx)
 // 	// if err != nil {

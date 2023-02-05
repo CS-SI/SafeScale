@@ -44,7 +44,7 @@ func CastedClone[T any](p Clonable) (T, error) {
 
 	casted, ok := clone.(T)
 	if !ok {
-		return empty, fail.InconsistentError("failed to cast clone to type '%s'", reflect.TypeOf(empty).String())
+		return empty, fail.InconsistentError("failed to cast 'clone' of type '%s' to type '%s'", reflect.TypeOf(clone).String(), reflect.TypeOf(empty).String())
 	}
 
 	return casted, nil

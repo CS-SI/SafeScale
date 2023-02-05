@@ -231,8 +231,28 @@ func (instance *Share) Clone() (clonable.Clonable, error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	newInstance := &Share{}
+	newInstance, err := newBulkShare()
+	if err != nil {
+		return nil, err
+	}
+
 	return newInstance, newInstance.Replace(instance)
+}
+
+// newBulkShare ...
+func newBulkShare() (*Share, fail.Error) {
+	protected, err := abstract.NewShare()
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	core, err := metadata.NewEmptyCore(abstract.ShareKind, protected)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	instance := &Share{Core: core}
+	return instance, nil
 }
 
 func (instance *Share) Replace(in clonable.Clonable) error {

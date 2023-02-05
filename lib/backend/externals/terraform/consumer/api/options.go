@@ -14,9 +14,6 @@ func WithTarget(rsc abstract.Abstract) options.Option {
 		if rsc == nil {
 			return fail.InvalidParameterCannotBeEmptyStringError("rsc")
 		}
-		if len(rsc.TerraformTypes()) == 0 {
-			return fail.InconsistentError("abnormal situation: no terraform types associated with the %s '%s'", rsc.Kind(), rsc.GetName())
-		}
 
 		var targets []string
 		value, xerr := o.Load(OptionTargets)
@@ -36,9 +33,6 @@ func WithTarget(rsc abstract.Abstract) options.Option {
 			}
 		}
 
-		for _, v := range rsc.TerraformTypes() {
-			targets = append(targets, v+"."+rsc.GetName())
-		}
 		return o.Store("targets", targets)
 	}
 }
