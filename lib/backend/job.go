@@ -92,10 +92,10 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	} else {
 		u := md.Get("uuid")
 		if len(u) == 0 {
-			logrus.WithContext(ctx).Warnf(fail.InvalidParameterError("ctx", "does not contain a grpc uuid").Error())
+			logrus.WithContext(ctx).Warnf("ctx does not contain a grpc uuid, it's probably a web request")
 		} else { // nolint
 			if id = u[0]; id == "" {
-				logrus.WithContext(ctx).Warnf(fail.InvalidParameterError("ctx", "does not contain a valid gRPC uuid").Error())
+				logrus.WithContext(ctx).Warnf("ctx has an EMPTY grpc uuid, it's probably a bad web request")
 			}
 		}
 
