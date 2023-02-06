@@ -47,6 +47,9 @@ func (s *SecurityGroupListener) List(inctx context.Context, in *protocol.Securit
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}

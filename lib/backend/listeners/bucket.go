@@ -50,6 +50,9 @@ func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequ
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
