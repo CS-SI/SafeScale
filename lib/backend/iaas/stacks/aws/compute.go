@@ -19,6 +19,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"github.com/sanity-io/litter"
 	"reflect"
 	"regexp"
 	"sort"
@@ -185,6 +186,8 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 	if xerr != nil {
 		return nil, xerr
 	}
+
+	logrus.WithContext(ctx).Warnf("Image full info: %s", litter.Sdump(resp)) // FIXME: OPP Remove this later
 
 	return toAbstractImage(*resp), nil
 }
