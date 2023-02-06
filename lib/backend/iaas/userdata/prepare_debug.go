@@ -92,7 +92,7 @@ var (
 	}
 	userdataScriptTemplatesLock sync.RWMutex
 	userdataScriptProvider      string
-	userdataScripts             = map[Phase]string{ // FIXME: OPP Time to read this shit from a directory
+	userdataScripts             = map[Phase]string{
 		PHASE1_INIT:                      "newscripts/userdata%s.init.sh",
 		PHASE2_NETWORK_AND_SECURITY:      "newscripts/userdata%s.netsec.sh",
 		PHASE3_GATEWAY_HIGH_AVAILABILITY: "newscripts/userdata%s.gwha.sh",
@@ -259,6 +259,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 			return nil, fail.NewError("error loading template for phase '%s'", phase)
 		}
 	} else {
+		// FIXME: OPP If /tmp/+ userdataScripts[phase] exists, use the local file
 		var tmplString []byte
 		tmplString, err = scripts.ReadFile(fmt.Sprintf(userdataScripts[phase], userdataScriptProvider))
 		if err != nil {
