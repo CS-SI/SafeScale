@@ -182,7 +182,7 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return nil, err
 	}
 	if tenantName != currentName {
-		return nil, fail.NewError("we only inspect current tenant right now")
+		return nil, fail.NewError("we only inspect current tenant right now") // FIXME: OPP It has to change now
 	}
 
 	ctx := handler.job.Context()

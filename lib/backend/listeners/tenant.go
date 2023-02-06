@@ -109,9 +109,8 @@ func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantName) (em
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
-
 	defer fail.OnExitLogError(inctx, &err)
-
+	// FIXME: OPP Cannot fucking believe it...
 	xerr := operations.SetCurrentTenant(inctx, in.GetName())
 	if xerr != nil {
 		return empty, xerr
