@@ -262,7 +262,7 @@ func onSGCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail.Err
 	}
 
 	if strings.Compare(fail.IgnoreError(sgInstance.String()).(string), fail.IgnoreError(blank.String()).(string)) == 0 {
-		return nil, fail.NotFoundError("security group with ref '%s' does NOT exist", ref)
+		return nil, fail.NotFoundError("failed to find Security Group with ref '%s'", ref)
 	}
 
 	return sgInstance, nil

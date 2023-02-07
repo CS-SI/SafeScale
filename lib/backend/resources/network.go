@@ -242,7 +242,7 @@ func onNetworkCacheMiss(ctx context.Context, ref string) (data.Identifiable, fai
 	}
 
 	if strings.Compare(fail.IgnoreError(networkInstance.String()).(string), fail.IgnoreError(blank.String()).(string)) == 0 {
-		return nil, fail.NotFoundError("network with ref '%s' does NOT exist", ref)
+		return nil, fail.NotFoundError("failed to find Network with ref '%s'", ref)
 	}
 
 	return networkInstance, nil

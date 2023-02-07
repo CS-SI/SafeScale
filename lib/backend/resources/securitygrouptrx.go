@@ -642,14 +642,10 @@ func (instance *SecurityGroup) trxBindToHost(ctx context.Context, sgTrx security
 	default:
 	}
 
-	var hostName, hostID string
-	xerr := inspectHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-		hostName = ahc.Name
-		hostID = ahc.ID
-		return nil
-	})
-	if xerr != nil {
-		return xerr
+	hostName := hostTrx.GetName()
+	hostID, err := hostTrx.GetID()
+	if err != nil {
+		return fail.Wrap(err)
 	}
 
 	logrus.WithContext(ctx).Infof("Binding Security Group '%s' to Host '%s'", instance.GetName(), hostName)

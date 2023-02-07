@@ -215,7 +215,7 @@ func onShareCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail.
 	}
 
 	if strings.Compare(fail.IgnoreError(shareInstance.String()).(string), fail.IgnoreError(blank.String()).(string)) == 0 {
-		return nil, fail.NotFoundError("share with ref '%s' does NOT exist", ref)
+		return nil, fail.NotFoundError("failed to find Share with ref '%s'", ref)
 	}
 
 	return shareInstance, nil

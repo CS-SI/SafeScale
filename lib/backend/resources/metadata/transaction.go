@@ -53,9 +53,10 @@ type Transaction[A abstract.Abstract, T Metadata[A]] interface {
 
 type transaction[A abstract.Abstract, T Metadata[A]] struct {
 	mu           *sync.Mutex // used for concurrency-safety
-	original     T           // contains the original instance on which the transaction applies
-	coreOriginal *Core[A]    // is used to propagate some methods of 'original' to transaction
-	changes      T           // contains the instance with changes
+	name, id     string
+	original     T        // contains the original instance on which the transaction applies
+	coreOriginal *Core[A] // is used to propagate some methods of 'original' to transaction
+	changes      T        // contains the instance with changes
 	coreChanges  *Core[A]
 	dirty        bool // tells there have been changes
 	closed       bool // tells the transaction is closed
@@ -80,7 +81,7 @@ func NewTransaction[A abstract.Abstract, T Metadata[A]](ctx context.Context, ori
 	}
 
 	// -- RLock original instance to prevent other concurrent changes (but still allowing inspection)
-	coreOriginal.lock.RLock()
+	// coreOriginal.lock.RLock()
 
 	// -- Reload reloads data from object storage to be sure to have the last revision
 	xerr = coreOriginal.reload(ctx)
@@ -89,13 +90,20 @@ func NewTransaction[A abstract.Abstract, T Metadata[A]](ctx context.Context, ori
 		return nil, fail.Wrap(xerr, "failed to reload metadata")
 	}
 
+	name := coreOriginal.GetName()
+	id, err := coreOriginal.GetID()
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
 	// -- creates transaction instance
 	trx := &transaction[A, T]{
 		mu:           &sync.Mutex{},
+		name:         name,
+		id:           id,
 		original:     original,
 		coreOriginal: coreOriginal,
 	}
-	var err error
 	trx.changes, err = clonable.CastedClone[T](original)
 	if err != nil {
 		return nil, fail.Wrap(err)
@@ -107,10 +115,14 @@ func NewTransaction[A abstract.Abstract, T Metadata[A]](ctx context.Context, ori
 
 // IsNull returns true if the Core instance represents the null value for Core
 func (trx *transaction[A, T]) IsNull() bool {
+	if trx == nil {
+		return true
+	}
+
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
-	return trx == nil || valid.IsNull(trx.original) || valid.IsNull(trx.changes)
+	return valid.IsNull(trx.original) || valid.IsNull(trx.changes)
 }
 
 // Commit saves the changes
@@ -138,19 +150,16 @@ func (trx *transaction[A, T]) commit(ctx context.Context) fail.Error {
 		return nil
 	}
 
-	trx.coreOriginal.lock.RUnlock()
 	trx.coreOriginal.lock.Lock()
+	defer trx.coreOriginal.lock.Unlock()
+
 	err := trx.original.Replace(trx.changes)
 	if err != nil {
-		trx.coreOriginal.lock.Unlock()
-		trx.coreOriginal.lock.RLock()
 		return fail.Wrap(err)
 	}
 
 	trx.coreOriginal.committed = false
 	xerr := trx.coreOriginal.write(ctx)
-	trx.coreOriginal.lock.Unlock()
-	trx.coreOriginal.lock.RLock()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -182,18 +191,14 @@ func (trx *transaction[A, T]) rollback(_ context.Context) fail.Error {
 	}
 
 	trx.coreChanges.lock.Lock()
+	defer trx.coreChanges.lock.Unlock()
+
 	err := trx.changes.Replace(trx.original)
-	trx.coreChanges.lock.Unlock()
 	if err != nil {
 		return fail.Wrap(err)
 	}
 
-	trx.coreOriginal.lock.RUnlock()
-	trx.coreOriginal.lock.Lock()
 	trx.coreOriginal.committed = false
-	trx.coreOriginal.lock.Unlock()
-	trx.coreOriginal.lock.RLock()
-
 	trx.dirty = false
 	return nil
 }
@@ -220,7 +225,6 @@ func (trx *transaction[A, T]) Terminate(ctx context.Context) fail.Error {
 
 	// FIXME: unlocking storage
 
-	trx.coreOriginal.lock.RUnlock()
 	trx.closed = true
 	return nil
 }
@@ -297,7 +301,6 @@ func (trx *transaction[A, T]) TerminateFromError(ctx context.Context, ferr *fail
 	}
 
 	// FIXME: unlocking storage
-	trx.coreOriginal.lock.RUnlock()
 
 	trx.closed = true
 }
@@ -335,7 +338,7 @@ func (trx *transaction[A, T]) GetID() (string, error) {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
-	return trx.coreOriginal.GetID()
+	return trx.id, nil
 }
 
 // GetName returns the name of the data protected
@@ -349,7 +352,7 @@ func (trx *transaction[A, T]) GetName() string {
 	trx.mu.Lock()
 	defer trx.mu.Unlock()
 
-	return trx.coreOriginal.GetName()
+	return trx.name
 }
 
 // IsTaken ...
@@ -387,7 +390,6 @@ func (trx *transaction[A, T]) inspect(ctx context.Context, callback ResourceCall
 	if trx.closed {
 		return fail.NotAvailableError("transaction is closed")
 	}
-
 	if trx.coreChanges.properties == nil {
 		return fail.InvalidInstanceContentError("trx.coreChanges.properties", "cannot be nil")
 	}
@@ -397,8 +399,8 @@ func (trx *transaction[A, T]) inspect(ctx context.Context, callback ResourceCall
 		return xerr
 	}
 
-	trx.coreChanges.lock.RLock()
-	defer trx.coreChanges.lock.RUnlock()
+	// trx.coreChanges.lock.RLock()
+	// defer trx.coreChanges.lock.RUnlock()
 
 	xerr = retry.WhileUnsuccessfulWithLimitedRetries(
 		func() error {
@@ -453,8 +455,6 @@ func (trx *transaction[A, T]) inspectProperties(ctx context.Context, callback Al
 }
 
 // Alter protects the data for exclusive write
-// Valid options are :
-// - WithoutReload() = disable reloading from metadata storage
 func (trx *transaction[A, T]) alter(ctx context.Context, callback ResourceCallback[A]) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -464,7 +464,6 @@ func (trx *transaction[A, T]) alter(ctx context.Context, callback ResourceCallba
 	if trx.closed {
 		return fail.NotAvailableError("transaction is closed")
 	}
-
 	if trx.coreChanges.carried == nil {
 		return fail.InvalidInstanceContentError("trx.coreChanges.carried", "cannot be nil")
 	}
@@ -486,24 +485,24 @@ func (trx *transaction[A, T]) alter(ctx context.Context, callback ResourceCallba
 	var xerr fail.Error
 
 	// Make sure myself.properties is populated
-	trx.coreChanges.lock.Lock()
+	// trx.coreChanges.lock.Lock()
 	if trx.coreChanges.properties == nil {
 		trx.coreChanges.properties, xerr = serialize.NewJSONProperties("resources." + trx.coreChanges.kind)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			trx.coreChanges.lock.Unlock()
+			// trx.coreChanges.lock.Unlock()
 			return xerr
 		}
 	}
 
-	trx.coreChanges.lock.Unlock()
-	xerr = trx.coreChanges.Reload(ctx)
-	if xerr != nil {
-		return xerr
-	}
+	// trx.coreChanges.lock.Unlock()
+	// xerr = trx.coreChanges.Reload(ctx)
+	// if xerr != nil {
+	// 	return xerr
+	// }
 
-	trx.coreChanges.lock.Lock()
-	defer trx.coreChanges.lock.Unlock()
+	// trx.coreChanges.lock.Lock()
+	// defer trx.coreChanges.lock.Unlock()
 
 	xerr = trx.coreChanges.carried.Alter(func(carried A) fail.Error {
 		return callback(carried, trx.coreChanges.properties)

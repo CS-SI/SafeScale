@@ -247,7 +247,7 @@ func onVolumeCacheMiss(ctx context.Context, ref string) (data.Identifiable, fail
 	}
 
 	if strings.Compare(fail.IgnoreError(volumeInstance.String()).(string), fail.IgnoreError(blank.String()).(string)) == 0 {
-		return nil, fail.NotFoundError("Volume with ref '%s' does NOT exist", ref)
+		return nil, fail.NotFoundError("failed to find Volume with ref '%s'", ref)
 	}
 
 	return volumeInstance, nil
