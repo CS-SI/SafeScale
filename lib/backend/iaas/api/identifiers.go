@@ -24,7 +24,7 @@ import (
 )
 
 type (
-	// NetworkIdentifier can represent a network by a string (containing name or id) or an *abstract.Network
+	// NetworkIdentifier can represent a Network by a string (containing name or id) or an *abstract.Network
 	NetworkIdentifier any
 
 	// SubnetIdentifier can represent a Subnet by a string (containing name or id) or an *abstract.Subnet
@@ -33,8 +33,11 @@ type (
 	// SecurityGroupIdentifier can represent a Security Group by a string as ID or an *abstract.SecurityGroup
 	SecurityGroupIdentifier any
 
-	// HostIdentifier can represent a host by a string (containing name or id), an *abstract.HostCore or an *abstract.HostFull
+	// HostIdentifier can represent a Host by a string (containing name or id), an *abstract.HostCore or an *abstract.HostFull
 	HostIdentifier any
+
+	// VolumeIdentifier can represent a Volume by a string (containing name or id), an *abstract.Volume
+	VolumeIdentifier any
 )
 
 // ValidateNetworkIdentifier validates host parameter that can be a string as ID or an *abstract.Network
@@ -191,4 +194,43 @@ func ValidateSecurityGroupIdentifier(sgParam SecurityGroupIdentifier) (asg *abst
 	}
 
 	return asg, sgLabel, nil
+}
+
+// ValidateVolumleIdentifier validates Volume parameter that can be a string as ID or an *abstract.Volume
+func ValidateVolumeIdentifier(volumeParam VolumeIdentifier) (av *abstract.Volume, volumeLabel string, ferr fail.Error) {
+	switch volumeParam := volumeParam.(type) {
+	case string:
+		if volumeParam == "" {
+			return nil, "", fail.InvalidParameterCannotBeEmptyStringError("volumeParam")
+		}
+
+		av, _ = abstract.NewVolume()
+		av.ID = volumeParam
+		volumeLabel = volumeParam
+	case *abstract.Volume:
+		if valid.IsNil(volumeParam) {
+			return nil, "", fail.InvalidParameterError("volumeParam", "cannot be *abstract.Volume null value")
+		}
+
+		var err error
+		av, err = clonable.CastedClone[*abstract.Volume](volumeParam)
+		if err != nil {
+			return nil, "", fail.Wrap(err)
+		}
+
+		if av.Name != "" {
+			volumeLabel = "'" + av.Name + "'"
+		} else {
+			volumeLabel = av.ID
+		}
+
+	default:
+		return nil, "", fail.InvalidParameterError("volumeParam", "valid types are non-empty string, *abstract.Volume")
+	}
+
+	if volumeLabel == "" {
+		return nil, "", fail.InvalidParameterError("volumeParam", "at least one of fields 'ID' or 'Name' must not be empty string")
+	}
+
+	return av, volumeLabel, nil
 }

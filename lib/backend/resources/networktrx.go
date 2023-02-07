@@ -34,22 +34,6 @@ func inspectNetworkMetadataProperties(ctx context.Context, trx networkTransactio
 	return metadata.InspectProperties[*abstract.Network](ctx, trx, callback)
 }
 
-func reviewNetworkMetadata(ctx context.Context, trx networkTransaction, callback func(*abstract.Network, *serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.Review[*abstract.Network](ctx, trx, callback)
-}
-
-func reviewNetworkMetadataAbstract(ctx context.Context, trx networkTransaction, callback func(ahc *abstract.Network) fail.Error) fail.Error {
-	return metadata.ReviewAbstract[*abstract.Network](ctx, trx, callback)
-}
-
-func reviewNetworkMetadataProperty[P clonable.Clonable](ctx context.Context, trx networkTransaction, property string, callback func(P) fail.Error) fail.Error {
-	return metadata.ReviewProperty[*abstract.Network, P](ctx, trx, property, callback)
-}
-
-func reviewNetworkMetadataProperties(ctx context.Context, trx networkTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.ReviewProperties[*abstract.Network](ctx, trx, callback)
-}
-
 func alterNetworkMetadata(ctx context.Context, trx networkTransaction, callback func(*abstract.Network, *serialize.JSONProperties) fail.Error) fail.Error {
 	return metadata.Alter[*abstract.Network](ctx, trx, callback)
 }

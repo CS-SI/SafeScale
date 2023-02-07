@@ -34,22 +34,6 @@ func inspectBucketMetadataProperties(ctx context.Context, trx bucketTransaction,
 	return metadata.InspectProperties[*abstract.Bucket](ctx, trx, callback)
 }
 
-func reviewBucketMetadata(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket, *serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.Review[*abstract.Bucket](ctx, trx, callback)
-}
-
-func reviewBucketMetadataAbstract(ctx context.Context, trx bucketTransaction, callback func(ahc *abstract.Bucket) fail.Error) fail.Error {
-	return metadata.ReviewAbstract[*abstract.Bucket](ctx, trx, callback)
-}
-
-func reviewBucketMetadataProperty[P clonable.Clonable](ctx context.Context, trx bucketTransaction, property string, callback func(P) fail.Error) fail.Error {
-	return metadata.ReviewProperty[*abstract.Bucket, P](ctx, trx, property, callback)
-}
-
-func reviewBucketMetadataProperties(ctx context.Context, trx bucketTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.ReviewProperties[*abstract.Bucket](ctx, trx, callback)
-}
-
 func alterBucketMetadata(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket, *serialize.JSONProperties) fail.Error) fail.Error {
 	return metadata.Alter[*abstract.Bucket](ctx, trx, callback)
 }

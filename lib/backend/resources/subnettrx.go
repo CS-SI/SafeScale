@@ -49,22 +49,6 @@ func inspectSubnetMetadataProperties(ctx context.Context, trx subnetTransaction,
 	return metadata.InspectProperties[*abstract.Subnet](ctx, trx, callback)
 }
 
-func reviewSubnetMetadata(ctx context.Context, trx subnetTransaction, callback func(*abstract.Subnet, *serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.Review[*abstract.Subnet](ctx, trx, callback)
-}
-
-func reviewSubnetMetadataAbstract(ctx context.Context, trx subnetTransaction, callback func(ahc *abstract.Subnet) fail.Error) fail.Error {
-	return metadata.ReviewAbstract[*abstract.Subnet](ctx, trx, callback)
-}
-
-func reviewSubnetMetadataProperty[P clonable.Clonable](ctx context.Context, trx subnetTransaction, property string, callback func(P) fail.Error) fail.Error {
-	return metadata.ReviewProperty[*abstract.Subnet, P](ctx, trx, property, callback)
-}
-
-func reviewSubnetMetadataProperties(ctx context.Context, trx subnetTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.ReviewProperties[*abstract.Subnet](ctx, trx, callback)
-}
-
 func alterSubnetMetadata(ctx context.Context, trx subnetTransaction, callback func(*abstract.Subnet, *serialize.JSONProperties) fail.Error) fail.Error {
 	return metadata.Alter[*abstract.Subnet](ctx, trx, callback)
 }
@@ -116,7 +100,7 @@ func (instance *Subnet) trxInspectGateway(ctx context.Context, trx subnetTransac
 // unsafeGetDefaultRouteIP ...
 func (instance *Subnet) trxGetDefaultRouteIP(ctx context.Context, trx subnetTransaction) (_ string, ferr fail.Error) {
 	var ip string
-	xerr := reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr := inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		if as.VIP != nil && as.VIP.PrivateIP != "" {
 			ip = as.VIP.PrivateIP
 			return nil
@@ -142,7 +126,7 @@ func (instance *Subnet) trxGetDefaultRouteIP(ctx context.Context, trx subnetTran
 
 // trxGetVirtualIP returns an abstract.VirtualIP used by gateway HA
 func (instance *Subnet) trxGetVirtualIP(ctx context.Context, trx subnetTransaction) (vip *abstract.VirtualIP, ferr fail.Error) {
-	xerr := reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr := inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		vip = as.VIP
 		return nil
 	})
@@ -161,7 +145,7 @@ func (instance *Subnet) trxGetVirtualIP(ctx context.Context, trx subnetTransacti
 // Intended to be used when instance is notoriously not nil (because previously checked)
 func (instance *Subnet) trxGetCIDR(ctx context.Context, trx subnetTransaction) (cidr string, ferr fail.Error) {
 	cidr = ""
-	return cidr, reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	return cidr, inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		cidr = as.CIDR
 		return nil
 	})
@@ -170,7 +154,7 @@ func (instance *Subnet) trxGetCIDR(ctx context.Context, trx subnetTransaction) (
 // trxGetState returns the state of the network
 // Intended to be used when rs is notoriously not null (because previously checked)
 func (instance *Subnet) trxGetState(ctx context.Context, trx subnetTransaction) (state subnetstate.Enum, ferr fail.Error) {
-	xerr := reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr := inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		state = as.State
 		return nil
 	})
@@ -192,7 +176,7 @@ func (instance *Subnet) trxAbandonHost(ctx context.Context, trx subnetTransactio
 // trxHasVirtualIP tells if the Subnet uses a VIP a default route
 func (instance *Subnet) trxHasVirtualIP(ctx context.Context, trx subnetTransaction) (bool, fail.Error) {
 	var found bool
-	xerr := reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr := inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		found = as.VIP != nil
 		return nil
 	})
@@ -349,6 +333,11 @@ func (instance *Subnet) trxCreateGWSecurityGroup(ctx context.Context, subnetTrx 
 			}
 		}
 	}()
+
+	xerr = sgInstance.Clear(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	rules := abstract.SecurityGroupRules{
 		{
@@ -770,7 +759,7 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subne
 			}
 
 			var abstractSubnet *abstract.Subnet
-			xerr = reviewSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
+			xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 				abstractSubnet = as
 
 				// IDs of Security Groups to attach to Host used as gateway
@@ -818,11 +807,11 @@ func (instance *Subnet) trxCreateGateways(inctx context.Context, subnetTrx subne
 			primaryRequest.ResourceName = primaryGatewayName
 			primaryRequest.HostName = primaryGatewayName + domain
 
-			var castedExtra map[string]any
+			var castedExtra map[string]string
 			if extra == nil {
-				castedExtra = map[string]any{}
+				castedExtra = map[string]string{}
 			}
-			castedExtra["gateway"] = true
+			castedExtra["gateway"] = "true"
 
 			waitForFirstGw := make(chan struct{})
 			egGwCreation.Go(func() error {

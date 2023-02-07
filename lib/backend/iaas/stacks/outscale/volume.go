@@ -19,6 +19,7 @@ package outscale
 import (
 	"context"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
@@ -38,7 +39,7 @@ func (instance *stack) CreateVolume(ctx context.Context, request abstract.Volume
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("volume name")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%v)", request).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	v, xerr := instance.InspectVolumeByName(ctx, request.Name)
@@ -132,7 +133,7 @@ func (instance *stack) WaitForVolumeState(ctx context.Context, volumeID string, 
 		return fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", volumeID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s)", volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	timings, xerr := instance.Timings()
@@ -171,7 +172,7 @@ func (instance *stack) InspectVolume(ctx context.Context, id string) (av *abstra
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := instance.rpcReadVolumeByID(ctx, id)
@@ -198,7 +199,7 @@ func (instance *stack) InspectVolumeByName(ctx context.Context, name string) (av
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := instance.rpcReadVolumeByName(ctx, name)
@@ -220,7 +221,7 @@ func (instance *stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := instance.rpcReadVolumes(ctx, nil)
@@ -245,18 +246,23 @@ func (instance *stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, f
 }
 
 // DeleteVolume deletes the volume identified by id
-func (instance *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
+func (instance *stack) DeleteVolume(ctx context.Context, parameter iaasapi.VolumeIdentifier) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("id")
+	switch parameter.(type) {
+	case string:
+		return fail.InvalidParameterError("parameter", "must be an '*abstract.Volume'")
+	}
+	av, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(parameter)
+	if xerr != nil {
+		return xerr
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s)", volumeLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return instance.rpcDeleteVolume(ctx, id)
+	return instance.rpcDeleteVolume(ctx, av.ID)
 }
 
 func freeDevice(usedDevices []string, device string) bool {
@@ -300,7 +306,7 @@ func (instance *stack) CreateVolumeAttachment(ctx context.Context, request abstr
 		return "", fail.InvalidParameterCannotBeEmptyStringError("VolumeID")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%v)", request).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	firstDeviceName, xerr := instance.getFirstFreeDeviceName(ctx, request.HostID)
@@ -327,7 +333,7 @@ func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, vo
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("volumeID")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := instance.rpcReadVolumeByID(ctx, volumeID)
@@ -361,7 +367,7 @@ func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID strin
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s)", serverID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s)", serverID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	volumes, err := instance.ListVolumes(ctx)
@@ -394,7 +400,7 @@ func (instance *stack) DeleteVolumeAttachment(ctx context.Context, serverID, vol
 		return fail.InvalidParameterCannotBeEmptyStringError("volumeID")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.outscale") || tracing.ShouldTrace("stack.volume"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	xerr := instance.rpcUnlinkVolume(ctx, volumeID)

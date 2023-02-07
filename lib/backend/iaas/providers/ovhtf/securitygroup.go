@@ -210,8 +210,56 @@ func (p *provider) InspectSecurityGroup(ctx context.Context, sgParam iaasapi.Sec
 	return asg, p.ConsolidateSecurityGroupSnippet(asg)
 }
 
-func (p *provider) ClearSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) fail.Error {
-	return fail.NotImplementedError()
+func (p *provider) ClearSecurityGroup(ctx context.Context, asg *abstract.SecurityGroup) (ferr fail.Error) {
+	if valid.IsNull(p) {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if valid.IsNull(asg) {
+		return fail.InvalidParameterCannotBeNilError("asg")
+	}
+
+	xerr := p.ConsolidateSecurityGroupSnippet(asg)
+	if xerr != nil {
+		return xerr
+	}
+
+	oldRules := asg.Rules
+	defer func() {
+		if ferr != nil {
+			asg.Rules = oldRules
+		}
+	}()
+
+	asg.Rules = abstract.SecurityGroupRules{}
+
+	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
+	if xerr != nil {
+		return xerr
+	}
+	defer func() { _ = renderer.Close() }()
+
+	// Sets env vars necessary for OVH provider
+	xerr = renderer.SetEnv("OS_AUTH_URL", p.authOptions.IdentityEndpoint)
+	if xerr != nil {
+		return xerr
+	}
+
+	// Creates the terraform definition file
+	def, xerr := renderer.Assemble(ctx, asg)
+	if xerr != nil {
+		return xerr
+	}
+
+	// apply the changes
+	_, xerr = renderer.Apply(ctx, def)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 func (p *provider) DeleteSecurityGroup(ctx context.Context, sgParam iaasapi.SecurityGroupIdentifier) fail.Error {

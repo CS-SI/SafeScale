@@ -34,22 +34,6 @@ func inspectClusterMetadataProperties(ctx context.Context, trx clusterTransactio
 	return metadata.InspectProperties[*abstract.Cluster](ctx, trx, callback)
 }
 
-func reviewClusterMetadata(ctx context.Context, trx clusterTransaction, callback func(*abstract.Cluster, *serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.Review[*abstract.Cluster](ctx, trx, callback)
-}
-
-func reviewClusterMetadataAbstract(ctx context.Context, trx clusterTransaction, callback func(ahc *abstract.Cluster) fail.Error) fail.Error {
-	return metadata.ReviewAbstract[*abstract.Cluster](ctx, trx, callback)
-}
-
-func reviewClusterMetadataProperty[P clonable.Clonable](ctx context.Context, trx clusterTransaction, property string, callback func(P) fail.Error) fail.Error {
-	return metadata.ReviewProperty[*abstract.Cluster, P](ctx, trx, property, callback)
-}
-
-func reviewClusterMetadataProperties(ctx context.Context, trx clusterTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.ReviewProperties[*abstract.Cluster](ctx, trx, callback)
-}
-
 func alterClusterMetadata(ctx context.Context, trx clusterTransaction, callback func(*abstract.Cluster, *serialize.JSONProperties) fail.Error) fail.Error {
 	return alterClusterMetadata(ctx, trx, callback)
 }

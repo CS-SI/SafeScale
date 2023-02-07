@@ -437,7 +437,7 @@ func (instance *Share) Create(
 	}
 
 	// Nothing will be changed in instance, but we do not want more than 1 goroutine to install NFS if needed
-	xerr = reviewHostMetadataProperty(ctx, serverTrx, hostproperty.SharesV1, func(serverSharesV1 *propertiesv1.HostShares) fail.Error {
+	xerr = inspectHostMetadataProperty(ctx, serverTrx, hostproperty.SharesV1, func(serverSharesV1 *propertiesv1.HostShares) fail.Error {
 		if len(serverSharesV1.ByID) == 0 {
 			// Host doesn't have shares yet, so install NFS
 			xerr = nfsServer.Install(ctx)
@@ -577,7 +577,7 @@ func (instance *Share) trxGetServer(ctx context.Context, shareTrx shareTransacti
 	}
 
 	var hostID, hostName string
-	xerr := reviewShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
+	xerr := inspectShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
 		hostID = as.HostID
 		hostName = as.HostName
 		return nil
@@ -611,7 +611,7 @@ func (instance *Share) trxGetServerWithTransaction(ctx context.Context, shareTrx
 	}
 
 	var hostID, hostName string
-	xerr := reviewShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
+	xerr := inspectShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
 		hostID = as.HostID
 		hostName = as.HostName
 		return nil
@@ -702,7 +702,7 @@ func (instance *Share) Mount(ctx context.Context, target *Host, spath string, wi
 	defer shareTrx.TerminateFromError(ctx, &ferr)
 
 	// Retrieve info about the Share
-	xerr = reviewShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
+	xerr = inspectShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
 		shareName = as.Name
 		shareID = as.ID
 		return nil
@@ -932,7 +932,7 @@ func (instance *Share) Unmount(ctx context.Context, target *Host) (ferr fail.Err
 	defer shareTrx.TerminateFromError(ctx, &ferr)
 
 	// Retrieve info about the Share
-	xerr = reviewShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
+	xerr = inspectShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
 		shareName = as.Name
 		shareID = as.ID
 		return nil

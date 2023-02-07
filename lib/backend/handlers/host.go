@@ -610,7 +610,7 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	var list []*protocol.LabelInspectResponse
-	xerr = metadata.ReviewProperty[*abstract.HostCore](ctx, hostTrx, hostproperty.LabelsV1, func(hlV1 *propertiesv1.HostLabels) fail.Error {
+	xerr = metadata.InspectProperty[*abstract.HostCore](ctx, hostTrx, hostproperty.LabelsV1, func(hlV1 *propertiesv1.HostLabels) fail.Error {
 		for k := range hlV1.ByID {
 			labelInstance, innerXErr := labelfactory.Load(ctx, k)
 			if innerXErr != nil {
@@ -667,7 +667,7 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ *resources
 	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	var outValue string
-	xerr = metadata.ReviewProperty[*abstract.Label](ctx, labelTrx, labelproperty.HostsV1, func(lhV1 *propertiesv1.LabelHosts) fail.Error {
+	xerr = metadata.InspectProperty[*abstract.Label](ctx, labelTrx, labelproperty.HostsV1, func(lhV1 *propertiesv1.LabelHosts) fail.Error {
 		hin, err := hostInstance.GetID()
 		if err != nil {
 			return fail.Wrap(err)

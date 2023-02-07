@@ -335,7 +335,7 @@ func LoadSubnet(inctx context.Context, networkRef, subnetRef string) (*Subnet, f
 				}
 				defer subnetTrx.TerminateFromError(ctx, &ferr)
 
-				xerr = reviewSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
+				xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 					prov, innerXErr := myjob.Service().ProviderDriver()
 					if innerXErr != nil {
 						return innerXErr
@@ -503,7 +503,7 @@ func (instance *Subnet) Replace(in clonable.Clonable) error {
 		return err
 	}
 
-	instance.Core, err = clonable.CastedClone[*metadata.Core[*abstract.Subnet]](src.Core)
+	err = instance.Core.Replace(src.Core)
 	if err != nil {
 		return err
 	}
@@ -612,7 +612,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 
 // trxBindInternalSecurityGroupToGateway does what its name says
 func (instance *Subnet) trxBindInternalSecurityGroupToGateway(ctx context.Context, subnetTrx subnetTransaction, hostTrx hostTransaction) fail.Error {
-	return reviewSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) (innerFErr fail.Error) {
+	return inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) (innerFErr fail.Error) {
 		sg, innerXErr := LoadSecurityGroup(ctx, as.InternalSecurityGroupID)
 		if innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", as.Name, as.InternalSecurityGroupID)
@@ -640,7 +640,7 @@ func (instance *Subnet) trxUndoBindInternalSecurityGroupToGateway(ctx context.Co
 	}
 
 	if xerr != nil && *xerr != nil && keepOnFailure {
-		rerr := reviewSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
+		rerr := inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 			sg, derr := LoadSecurityGroup(ctx, as.InternalSecurityGroupID)
 			if derr != nil {
 				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind External Security Group of Subnet '%s' from Host '%s'", as.Name, hostTrx.GetName()))
@@ -685,7 +685,7 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(ctx context.Context, subn
 	}
 
 	// delete subnet Security Groups
-	xerr = reviewSubnetMetadataAbstract(ctx, subnetTrx, func(asg *abstract.Subnet) fail.Error {
+	xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(asg *abstract.Subnet) fail.Error {
 		if asg.PublicIPSecurityGroupName != "" {
 			sgInstance, innerXErr := LoadSecurityGroup(ctx, asg.PublicIPSecurityGroupName)
 			if innerXErr != nil {
@@ -1172,7 +1172,7 @@ func (instance *Subnet) ListHosts(ctx context.Context) (_ []*Host, ferr fail.Err
 	defer trx.TerminateFromError(ctx, &ferr)
 
 	var list []*Host
-	xerr = reviewSubnetMetadataProperty(ctx, trx, subnetproperty.HostsV1, func(shV1 *propertiesv1.SubnetHosts) fail.Error {
+	xerr = inspectSubnetMetadataProperty(ctx, trx, subnetproperty.HostsV1, func(shV1 *propertiesv1.SubnetHosts) fail.Error {
 		for id := range shV1.ByID {
 			hostInstance, innerXErr := LoadHost(ctx, id)
 			if innerXErr != nil {
@@ -1270,7 +1270,7 @@ func (instance *Subnet) GetGatewayPublicIPs(ctx context.Context) (_ []string, fe
 	defer trx.TerminateFromError(ctx, &ferr)
 
 	var gatewayIPs []string
-	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		gatewayIPs = make([]string, 0, len(as.GatewayIDs))
 		for _, v := range as.GatewayIDs {
 			rgw, inErr := LoadHost(ctx, v)
@@ -1297,8 +1297,6 @@ func (instance *Subnet) GetGatewayPublicIPs(ctx context.Context) (_ []string, fe
 
 var (
 	currentSubnetTransactionContextKey = "current_subnet_transaction"
-	// currentSubnetAbstractContextKey   = "removing_subnet_abstract"
-	// currentSubnetPropertiesContextKey = "removing_subnet_properties"
 )
 
 // Delete deletes a Subnet
@@ -1345,7 +1343,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 			ctx := context.WithValue(ctx, currentSubnetTransactionContextKey, subnetTrx) // nolint
 			svc := instance.Service()
 			subnetName := instance.GetName()
-			xerr = reviewSubnetMetadata(ctx, subnetTrx, func(as *abstract.Subnet, props *serialize.JSONProperties) fail.Error {
+			xerr = inspectSubnetMetadata(ctx, subnetTrx, func(as *abstract.Subnet, props *serialize.JSONProperties) fail.Error {
 				// Check if hosts are still attached to Subnet according to metadata
 				var errorMsg string
 				return props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
@@ -1536,7 +1534,7 @@ func (instance *Subnet) InspectNetwork(ctx context.Context) (_ *Network, ferr fa
 	defer trx.TerminateFromError(ctx, &ferr)
 
 	var network string
-	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		network = as.Network
 		return nil
 	})
@@ -1551,7 +1549,7 @@ func (instance *Subnet) InspectNetwork(ctx context.Context) (_ *Network, ferr fa
 // A gateway host that is not found must be considered as a success
 func trxDeleteGateways(ctx context.Context, trx subnetTransaction) (ids []string, ferr fail.Error) {
 	var empty []string
-	return ids, reviewSubnetMetadataAbstract(ctx, trx, func(subnet *abstract.Subnet) fail.Error {
+	return ids, inspectSubnetMetadataAbstract(ctx, trx, func(subnet *abstract.Subnet) fail.Error {
 		if subnet.GatewayIDs == nil { // unlikely, either is an input error or we are dealing with metadata corruption
 			subnet.GatewayIDs = empty
 		}
@@ -1714,7 +1712,7 @@ func (instance *Subnet) GetEndpointIP(ctx context.Context) (ip string, ferr fail
 	}
 	defer trx.TerminateFromError(ctx, &ferr)
 
-	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		if as.VIP != nil && as.VIP.PublicIP != "" {
 			ip = as.VIP.PublicIP
 		} else {
@@ -2267,7 +2265,7 @@ func (instance *Subnet) InspectGatewaySecurityGroup(ctx context.Context) (_ *Sec
 	defer trx.TerminateFromError(ctx, &ferr)
 
 	var abstractSubnet *abstract.Subnet
-	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		abstractSubnet = as
 		return nil
 	})
@@ -2293,7 +2291,7 @@ func (instance *Subnet) InspectInternalSecurityGroup(ctx context.Context) (_ *Se
 	defer trx.TerminateFromError(ctx, &ferr)
 
 	var sgID string
-	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		sgID = as.InternalSecurityGroupID
 		return nil
 	})
@@ -2319,7 +2317,7 @@ func (instance *Subnet) InspectPublicIPSecurityGroup(ctx context.Context) (_ *Se
 	defer trx.TerminateFromError(ctx, &ferr)
 
 	var sgID string
-	xerr = reviewSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
+	xerr = inspectSubnetMetadataAbstract(ctx, trx, func(as *abstract.Subnet) fail.Error {
 		sgID = as.PublicIPSecurityGroupID
 		return nil
 	})
@@ -2380,7 +2378,7 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 	go func() {
 		defer close(chRes)
 
-		gres, _ := func() (_ localresult, ferr fail.Error) {
+		gtrx, gerr := func() (_ subnetTransaction, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
 			logrus.WithContext(ctx).Debugf("Creating Subnet '%s' with CIDR '%s'...", req.Name, req.CIDR)
@@ -2388,8 +2386,7 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 			abstractNetwork, networkTrx, xerr := instance.validateNetwork(ctx, &req)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 			defer networkTrx.TerminateFromError(ctx, &ferr)
 
@@ -2397,31 +2394,21 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 			xerr = instance.checkUnicity(ctx, req)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 
 			// Verify the CIDR is not routable
 			xerr = instance.validateCIDR(ctx, &req, *abstractNetwork)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				xerr := fail.Wrap(xerr, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
-				ar := localresult{nil, xerr}
-				return ar, ar.rErr
+				return nil, fail.Wrap(xerr, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 			}
 
 			svc := instance.Service()
 			abstractSubnet, xerr := svc.CreateSubnet(ctx, req)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				// switch xerr.(type) {
-				// case *fail.ErrNotFound, *fail.ErrInvalidRequest, *fail.ErrTimeout:
-				// 	ar := localresult{xerr}
-				// 	return ar, ar.rErr
-				// default:
-				ar := localresult{nil, xerr}
-				return ar, ar.rErr
-				// }
+				return nil, xerr
 			}
 
 			// Starting from here, delete Subnet if exiting with error
@@ -2439,8 +2426,7 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 			xerr = instance.Carry(ctx, abstractSubnet)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 
 			// Starting from here, delete Subnet metadata if exiting with error
@@ -2462,29 +2448,32 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 
 			// commit as far as possible changes to Network
 			xerr = networkTrx.Commit(ctx)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 
 			subnetTrx, xerr := newSubnetTransaction(ctx, instance)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
-			// Note: DO NOT TERMINATE subnetTrx here, the transaction is returned to the caller, that will have the responsibility to terminate it
+			defer func() {
+				if ferr != nil {
+					// Note: terminate subnetTrx only if error occured
+					subnetTrx.TerminateFromError(ctx, &ferr)
+				} else {
+					ferr = subnetTrx.Commit(ctx)
+				}
+			}()
 
 			xerr = instance.updateCachedInformation(ctx, subnetTrx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 
 			if req.DefaultSSHPort == 0 {
@@ -2494,8 +2483,7 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 			subnetGWSG, subnetInternalSG, subnetPublicIPSG, xerr := instance.trxCreateSecurityGroups(ctx, subnetTrx, networkTrx, req.CIDR, req.KeepOnFailure, int32(req.DefaultSSHPort))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 
 			defer func() {
@@ -2528,16 +2516,13 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 			if failover {
 				a, err := subnetGWSG.GetID()
 				if err != nil {
-					ar := localresult{nil, fail.Wrap(err)}
-					return ar, ar.rErr
+					return nil, xerr
 				}
 
 				avip, xerr = svc.CreateVIP(ctx, abstractSubnet.Network, abstractSubnet.ID, fmt.Sprintf(virtualIPNamePattern, abstractSubnet.Name, networkTrx.GetName()), []string{a})
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					xerr := fail.Wrap(xerr, "failed to create VIP")
-					ar := localresult{nil, xerr}
-					return ar, ar.rErr
+					return nil, fail.Wrap(xerr, "failed to create VIP")
 				}
 
 				// Starting from here, delete VIP if exists with error
@@ -2611,16 +2596,14 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := localresult{nil, xerr}
-				return ar, ar.rErr
+				return nil, xerr
 			}
 
 			// FIXME: OPP Disable VIP SG and port security
 
-			ar := localresult{subnetTrx, nil}
-			return ar, ar.rErr
+			return subnetTrx, nil
 		}()
-		chRes <- gres
+		chRes <- localresult{gtrx, gerr}
 	}() // nolint
 
 	select {

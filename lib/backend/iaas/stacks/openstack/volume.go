@@ -20,6 +20,7 @@ import (
 	"context"
 	"strings"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
@@ -260,17 +261,22 @@ func (instance *stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fai
 }
 
 // DeleteVolume deletes the volume identified by id
-func (instance *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
+func (instance *stack) DeleteVolume(ctx context.Context, parameter iaasapi.VolumeIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if id = strings.TrimSpace(id); id == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("id")
+	switch parameter.(type) {
+	case string:
+		return fail.InvalidParameterError("parameter", "must be an '*abstract.Volume'")
+	}
+	av, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(parameter)
+	if xerr != nil {
+		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "(%s)", volumeLabel).WithStopwatch().Entering().Exiting()
 
 	timings, xerr := instance.Timings()
 	if xerr != nil {
@@ -282,7 +288,7 @@ func (instance *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.E
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() error {
-					return volumesv2.Delete(instance.VolumeClient, id, nil).ExtractErr()
+					return volumesv2.Delete(instance.VolumeClient, av.ID, nil).ExtractErr()
 				},
 				NormalizeError,
 			)

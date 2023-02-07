@@ -382,7 +382,7 @@ func LoadCluster(inctx context.Context, name string) (_ *Cluster, ferr fail.Erro
 				}
 				defer clusterTrx.TerminateFromError(ctx, &ferr)
 
-				xerr = reviewClusterMetadataAbstract(ctx, clusterTrx, func(ac *abstract.Cluster) fail.Error {
+				xerr = inspectClusterMetadataAbstract(ctx, clusterTrx, func(ac *abstract.Cluster) fail.Error {
 					_, innerXErr := myjob.Scope().RegisterAbstractIfNeeded(ac)
 					return innerXErr
 				})
@@ -524,7 +524,7 @@ func (instance *Cluster) Replace(in clonable.Clonable) error {
 		return err
 	}
 
-	instance.Core, err = clonable.CastedClone[*metadata.Core[*abstract.Cluster]](src.Core)
+	err = instance.Core.Replace(src.Core)
 	if err != nil {
 		return err
 	}
@@ -2313,7 +2313,7 @@ func (instance *Cluster) trxDelete(inctx context.Context, clusterTrx clusterTran
 			}
 
 			// From here, make sure there is nothing in nodesV3.ByNumericalID; if there is something, delete all the remaining
-			xerr = metadata.ReviewProperty[*abstract.Cluster](ctx, clusterTrx, clusterproperty.NodesV3, func(nodesV3 *propertiesv3.ClusterNodes) fail.Error {
+			xerr = inspectClusterMetadataProperty(ctx, clusterTrx, clusterproperty.NodesV3, func(nodesV3 *propertiesv3.ClusterNodes) fail.Error {
 				all = nodesV3.ByNumericalID
 				return nil
 			})
@@ -2699,7 +2699,7 @@ func (instance *Cluster) trxUpdateClusterInventory(inctx context.Context, cluste
 			"ClusterNodes":         rscapi.IndexedListOfClusterNodes{},
 		}
 
-		xerr := metadata.Review[*abstract.Cluster](ctx, clusterTrx, func(aci *abstract.Cluster, props *serialize.JSONProperties) fail.Error {
+		xerr := inspectClusterMetadata(ctx, clusterTrx, func(aci *abstract.Cluster, props *serialize.JSONProperties) fail.Error {
 			// Check if feature ansible is installed
 			innerXErr := props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
 				featuresV1, innerErr := clonable.Cast[*propertiesv1.ClusterFeatures](p)

@@ -13,7 +13,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
@@ -28,52 +27,36 @@ func newSecurityGroupTransaction(ctx context.Context, instance *SecurityGroup) (
 	return metadata.NewTransaction[*abstract.SecurityGroup, *SecurityGroup](ctx, instance)
 }
 
-func inspectSecurityGroupMetadata(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup, *serialize.JSONProperties) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.Inspect[*abstract.SecurityGroup](ctx, trx, callback, opts...)
+func inspectSecurityGroupMetadata(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup, *serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.Inspect[*abstract.SecurityGroup](ctx, trx, callback)
 }
 
-func inspectSecurityGroupMetadataAbstract(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.InspectAbstract[*abstract.SecurityGroup](ctx, trx, callback, opts...)
+func inspectSecurityGroupMetadataAbstract(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup) fail.Error) fail.Error {
+	return metadata.InspectAbstract[*abstract.SecurityGroup](ctx, trx, callback)
 }
 
-func inspectSecurityGroupMetadataProperty[P clonable.Clonable](ctx context.Context, trx securityGroupTransaction, property string, callback func(P) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.InspectProperty[*abstract.SecurityGroup, P](ctx, trx, property, callback, opts...)
+func inspectSecurityGroupMetadataProperty[P clonable.Clonable](ctx context.Context, trx securityGroupTransaction, property string, callback func(P) fail.Error) fail.Error {
+	return metadata.InspectProperty[*abstract.SecurityGroup, P](ctx, trx, property, callback)
 }
 
-func inspectSecurityGroupMetadataProperties(ctx context.Context, trx securityGroupTransaction, callback func(*serialize.JSONProperties) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.InspectProperties[*abstract.SecurityGroup](ctx, trx, callback, opts...)
+func inspectSecurityGroupMetadataProperties(ctx context.Context, trx securityGroupTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.InspectProperties[*abstract.SecurityGroup](ctx, trx, callback)
 }
 
-func reviewSecurityGroupMetadata(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup, *serialize.JSONProperties) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.Review[*abstract.SecurityGroup](ctx, trx, callback, opts...)
+func alterSecurityGroupMetadata(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup, *serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.Alter[*abstract.SecurityGroup](ctx, trx, callback)
 }
 
-func reviewSecurityGroupMetadataAbstract(ctx context.Context, trx securityGroupTransaction, callback func(ahc *abstract.SecurityGroup) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.ReviewAbstract[*abstract.SecurityGroup](ctx, trx, callback, opts...)
+func alterSecurityGroupMetadataAbstract(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup) fail.Error) fail.Error {
+	return metadata.AlterAbstract[*abstract.SecurityGroup](ctx, trx, callback)
 }
 
-func reviewSecurityGroupMetadataProperty[P clonable.Clonable](ctx context.Context, trx securityGroupTransaction, property string, callback func(P) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.ReviewProperty[*abstract.SecurityGroup, P](ctx, trx, property, callback, opts...)
+func alterSecurityGroupMetadataProperty[P clonable.Clonable](ctx context.Context, trx securityGroupTransaction, property string, callback func(P) fail.Error) fail.Error {
+	return metadata.AlterProperty[*abstract.SecurityGroup, P](ctx, trx, property, callback)
 }
 
-func reviewSecurityGroupMetadataProperties(ctx context.Context, trx securityGroupTransaction, callback func(*serialize.JSONProperties) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.ReviewProperties[*abstract.SecurityGroup](ctx, trx, callback, opts...)
-}
-
-func alterSecurityGroupMetadata(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup, *serialize.JSONProperties) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.Alter[*abstract.SecurityGroup](ctx, trx, callback, opts...)
-}
-
-func alterSecurityGroupMetadataAbstract(ctx context.Context, trx securityGroupTransaction, callback func(*abstract.SecurityGroup) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.AlterAbstract[*abstract.SecurityGroup](ctx, trx, callback, opts...)
-}
-
-func alterSecurityGroupMetadataProperty[P clonable.Clonable](ctx context.Context, trx securityGroupTransaction, property string, callback func(P) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.AlterProperty[*abstract.SecurityGroup, P](ctx, trx, property, callback, opts...)
-}
-
-func alterSecurityGroupMetadataProperties(ctx context.Context, trx securityGroupTransaction, callback func(*serialize.JSONProperties) fail.Error, opts ...options.Option) fail.Error {
-	return metadata.AlterProperties[*abstract.SecurityGroup](ctx, trx, callback, opts...)
+func alterSecurityGroupMetadataProperties(ctx context.Context, trx securityGroupTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.AlterProperties[*abstract.SecurityGroup](ctx, trx, callback)
 }
 
 // trxUnbindFromHosts unbinds security group from all the hosts bound to it and update the host metadata accordingly
@@ -142,20 +125,21 @@ func (instance *SecurityGroup) trxUnbindFromSubnets(ctx context.Context, sgTrx s
 
 		// recover from context the Subnet abstract and properties (if it exists)
 		var (
+			currentSubnetID  string
 			currentSubnetTrx subnetTransaction
-			err              error
 		)
 		value := ctx.Value(currentSubnetTransactionContextKey)
 		if value != nil {
+			var err error
 			currentSubnetTrx, err = lang.Cast[subnetTransaction](value)
 			if err != nil {
 				return fail.Wrap(err)
 			}
-		}
 
-		currentSubnetID, err := currentSubnetTrx.GetID()
-		if err != nil {
-			return fail.Wrap(err)
+			currentSubnetID, err = currentSubnetTrx.GetID()
+			if err != nil {
+				return fail.Wrap(err)
+			}
 		}
 
 		// iterate on all Subnets bound to the Security Group to unbind Security Group from Hosts attached to those subnets (in parallel)
@@ -444,38 +428,18 @@ func (instance *SecurityGroup) trxDelete(ctx context.Context, sgTrx securityGrou
 
 // trxClear is the non goroutine-safe implementation for Clear, that does the real work faster (no locking, less if no parameter validations)
 // Note: must be used wisely
-func (instance *SecurityGroup) trxClear(inctx context.Context, trx securityGroupTransaction) fail.Error {
+func (instance *SecurityGroup) trxClear(ctx context.Context, trx securityGroupTransaction) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if inctx == nil {
+	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("inctx")
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
+	return alterSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
+		return instance.Service().ClearSecurityGroup(ctx, asg)
+	})
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
-		xerr := alterSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
-			return instance.Service().ClearSecurityGroup(ctx, asg)
-		})
-		chRes <- result{xerr}
-	}()
-
-	select {
-	case res := <-chRes:
-		return res.rErr
-	case <-ctx.Done():
-		return fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		return fail.Wrap(inctx.Err())
-	}
 }
 
 // trxAddRules adds rules to a Security Group
@@ -658,103 +622,98 @@ func (instance *SecurityGroup) trxBindToSubnet(inctx context.Context, sgTrx secu
 
 // trxBindToHost binds the security group to a host.
 // instance is not locked, it must have been done outside to prevent data races
-func (instance *SecurityGroup) trxBindToHost(inctx context.Context, sgTrx securityGroupTransaction, hostTrx hostTransaction, enable SecurityGroupActivation, mark SecurityGroupMark) (ferr fail.Error) {
+func (instance *SecurityGroup) trxBindToHost(ctx context.Context, sgTrx securityGroupTransaction, hostTrx hostTransaction, enable SecurityGroupActivation, mark SecurityGroupMark) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if inctx == nil {
-		return fail.InvalidParameterCannotBeNilError("inctx")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rErr fail.Error
+	if sgTrx == nil {
+		return fail.InvalidParameterCannotBeNilError("sgTrx")
 	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
-		hostName := hostTrx.GetName()
-		hostID, err := hostTrx.GetID()
-		if err != nil {
-			chRes <- result{fail.Wrap(err)}
-			return
-		}
-		logrus.WithContext(ctx).Infof("Binding Security Group '%s' to Host '%s'", instance.GetName(), hostName)
-
-		xerr := alterSecurityGroupMetadata(ctx, sgTrx, func(asg *abstract.SecurityGroup, props *serialize.JSONProperties) fail.Error {
-			if mark == MarkSecurityGroupAsDefault {
-				if asg.DefaultForHost != "" {
-					return fail.InvalidRequestError("security group is already marked as default for host %s", asg.DefaultForHost)
-				}
-
-				asg.DefaultForHost = hostID
-			}
-
-			return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-				sghV1, lvl2err := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
-				if lvl2err != nil {
-					return fail.Wrap(lvl2err)
-				}
-
-				return alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-					switch enable {
-					case SecurityGroupEnable:
-						// In case the security group is already bound, we must consider a "duplicate" error has a success
-						lvl3xerr := instance.Service().BindSecurityGroupToHost(ctx, asg, ahc)
-						lvl3xerr = debug.InjectPlannedFail(lvl3xerr)
-						if lvl3xerr != nil {
-							switch lvl3xerr.(type) {
-							case *fail.ErrDuplicate:
-								debug.IgnoreErrorWithContext(ctx, lvl3xerr)
-								// continue
-							default:
-								return lvl3xerr
-							}
-						}
-					case SecurityGroupDisable:
-						// In case the security group has to be disabled, we must consider a "not found" error has a success
-						lvl3xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahc)
-						lvl3xerr = debug.InjectPlannedFail(lvl3xerr)
-						if lvl3xerr != nil {
-							switch lvl3xerr.(type) {
-							case *fail.ErrNotFound:
-								debug.IgnoreErrorWithContext(ctx, lvl3xerr)
-								// continue
-							default:
-								return lvl3xerr
-							}
-						}
-					}
-
-					disable := !bool(enable)
-					item, ok := sghV1.ByID[ahc.ID]
-					if !ok || item.Disabled == disable {
-						item = &propertiesv1.SecurityGroupBond{
-							ID:   ahc.ID,
-							Name: hostName,
-						}
-						sghV1.ByID[ahc.ID] = item
-						sghV1.ByName[hostName] = ahc.ID
-					}
-
-					// update the state
-					sghV1.ByID[ahc.ID].Disabled = disable
-					return nil
-				})
-			})
-		})
-		chRes <- result{xerr}
-	}()
+	if hostTrx == nil {
+		return fail.InvalidParameterCannotBeNilError("hostTrx")
+	}
 
 	select {
-	case res := <-chRes:
-		return res.rErr
 	case <-ctx.Done():
 		return fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		return fail.Wrap(inctx.Err())
+	default:
 	}
+
+	var hostName, hostID string
+	xerr := inspectHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
+		hostName = ahc.Name
+		hostID = ahc.ID
+		return nil
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	logrus.WithContext(ctx).Infof("Binding Security Group '%s' to Host '%s'", instance.GetName(), hostName)
+
+	return alterSecurityGroupMetadata(ctx, sgTrx, func(asg *abstract.SecurityGroup, props *serialize.JSONProperties) fail.Error {
+		if mark == MarkSecurityGroupAsDefault {
+			if asg.DefaultForHost != "" {
+				return fail.InvalidRequestError("security group is already marked as default for host %s", asg.DefaultForHost)
+			}
+
+			asg.DefaultForHost = hostID
+		}
+
+		return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
+			sghV1, lvl2err := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
+			if lvl2err != nil {
+				return fail.Wrap(lvl2err)
+			}
+
+			return alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
+				switch enable {
+				case SecurityGroupEnable:
+					// In case the security group is already bound, we must consider a "duplicate" error has a success
+					lvl3xerr := instance.Service().BindSecurityGroupToHost(ctx, asg, ahc)
+					lvl3xerr = debug.InjectPlannedFail(lvl3xerr)
+					if lvl3xerr != nil {
+						switch lvl3xerr.(type) {
+						case *fail.ErrDuplicate:
+							debug.IgnoreErrorWithContext(ctx, lvl3xerr)
+							// continue
+						default:
+							return lvl3xerr
+						}
+					}
+				case SecurityGroupDisable:
+					// In case the security group has to be disabled, we must consider a "not found" error has a success
+					lvl3xerr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahc)
+					lvl3xerr = debug.InjectPlannedFail(lvl3xerr)
+					if lvl3xerr != nil {
+						switch lvl3xerr.(type) {
+						case *fail.ErrNotFound:
+							debug.IgnoreErrorWithContext(ctx, lvl3xerr)
+							// continue
+						default:
+							return lvl3xerr
+						}
+					}
+				}
+
+				disable := !bool(enable)
+				item, ok := sghV1.ByID[ahc.ID]
+				if !ok || item.Disabled == disable {
+					item = &propertiesv1.SecurityGroupBond{
+						ID:   ahc.ID,
+						Name: hostName,
+					}
+					sghV1.ByID[ahc.ID] = item
+					sghV1.ByName[hostName] = ahc.ID
+				}
+
+				// update the state
+				sghV1.ByID[ahc.ID].Disabled = disable
+				return nil
+			})
+		})
+	})
 }

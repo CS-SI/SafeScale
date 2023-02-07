@@ -281,15 +281,17 @@ func (instance *stack) ClearSecurityGroup(ctx context.Context, asg *abstract.Sec
 	if xerr != nil {
 		return xerr
 	}
-	if !asg.IsComplete() {
-		return fail.InconsistentError("asg is not complete")
-	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.openstack"), "(%s)", sgLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, true /*tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.openstack")*/, "(%s)", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	newAsg, xerr := instance.InspectSecurityGroup(ctx, asg)
+	if xerr != nil {
+		return xerr
+	}
+
 	// delete security group rules
-	for _, v := range asg.Rules {
+	for _, v := range newAsg.Rules {
 		xerr := stacks.RetryableRemoteCall(ctx,
 			func() error {
 				for _, id := range v.IDs {
@@ -312,6 +314,7 @@ func (instance *stack) ClearSecurityGroup(ctx context.Context, asg *abstract.Sec
 			}
 		}
 	}
+
 	asg.Rules = abstract.SecurityGroupRules{}
 	return nil
 }

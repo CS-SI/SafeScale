@@ -36,22 +36,6 @@ func inspectVolumeMetadataProperties(ctx context.Context, trx volumeTransaction,
 	return metadata.InspectProperties[*abstract.Volume](ctx, trx, callback)
 }
 
-func reviewVolumeMetadata(ctx context.Context, trx volumeTransaction, callback func(*abstract.Volume, *serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.Review[*abstract.Volume](ctx, trx, callback)
-}
-
-func reviewVolumeMetadataAbstract(ctx context.Context, trx volumeTransaction, callback func(ahc *abstract.Volume) fail.Error) fail.Error {
-	return metadata.ReviewAbstract[*abstract.Volume](ctx, trx, callback)
-}
-
-func reviewVolumeMetadataProperty[P clonable.Clonable](ctx context.Context, trx volumeTransaction, property string, callback func(P) fail.Error) fail.Error {
-	return metadata.ReviewProperty[*abstract.Volume, P](ctx, trx, property, callback)
-}
-
-func reviewVolumeMetadataProperties(ctx context.Context, trx volumeTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.ReviewProperties[*abstract.Volume](ctx, trx, callback)
-}
-
 func alterVolumeMetadata(ctx context.Context, trx volumeTransaction, callback func(*abstract.Volume, *serialize.JSONProperties) fail.Error) fail.Error {
 	return metadata.Alter[*abstract.Volume](ctx, trx, callback)
 }
@@ -72,7 +56,7 @@ func alterVolumeMetadataProperties(ctx context.Context, trx volumeTransaction, c
 // Intended to be used when instance is notoriously not nil
 func (instance *Volume) trxGetSpeed(ctx context.Context, volumeTrx volumeTransaction) (volumespeed.Enum, fail.Error) {
 	var speed volumespeed.Enum
-	xerr := reviewVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
+	xerr := inspectVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
 		speed = av.Speed
 		return nil
 	})
@@ -88,7 +72,7 @@ func (instance *Volume) trxGetSpeed(ctx context.Context, volumeTrx volumeTransac
 // Intended to be used when instance is notoriously not nil
 func (instance *Volume) trxGetSize(ctx context.Context, volumeTrx volumeTransaction) (int, fail.Error) {
 	var size int
-	xerr := reviewVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
+	xerr := inspectVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
 		size = av.Size
 		return nil
 	})

@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
@@ -185,18 +186,23 @@ func (s *stack) rpcListDisks(ctx context.Context) ([]*compute.Disk, fail.Error) 
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s *stack) DeleteVolume(ctx context.Context, ref string) fail.Error {
+func (s *stack) DeleteVolume(ctx context.Context, parameter iaasapi.VolumeIdentifier) fail.Error {
 	if valid.IsNil(s) {
 		return fail.InvalidInstanceError()
 	}
-	if ref == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("ref")
+	switch parameter.(type) {
+	case string:
+		return fail.InvalidParameterError("parameter", "must be an '*abstract.Volume'")
+	}
+	av, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(parameter)
+	if xerr != nil {
+		return xerr
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", volumeLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return s.rpcDeleteDisk(ctx, ref)
+	return s.rpcDeleteDisk(ctx, av.ID)
 }
 
 // CreateVolumeAttachment attaches a volume to a host

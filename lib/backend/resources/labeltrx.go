@@ -34,22 +34,6 @@ func inspectLabelMetadataProperties(ctx context.Context, trx labelTransaction, c
 	return metadata.InspectProperties[*abstract.Label](ctx, trx, callback)
 }
 
-func reviewLabelMetadata(ctx context.Context, trx labelTransaction, callback func(*abstract.Label, *serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.Review[*abstract.Label](ctx, trx, callback)
-}
-
-func reviewLabelMetadataAbstract(ctx context.Context, trx labelTransaction, callback func(ahc *abstract.Label) fail.Error) fail.Error {
-	return metadata.ReviewAbstract[*abstract.Label](ctx, trx, callback)
-}
-
-func reviewLabelMetadataProperty[P clonable.Clonable](ctx context.Context, trx labelTransaction, property string, callback func(P) fail.Error) fail.Error {
-	return metadata.ReviewProperty[*abstract.Label, P](ctx, trx, property, callback)
-}
-
-func reviewLabelMetadataProperties(ctx context.Context, trx labelTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.ReviewProperties[*abstract.Label](ctx, trx, callback)
-}
-
 func alterLabelMetadata(ctx context.Context, trx labelTransaction, callback func(*abstract.Label, *serialize.JSONProperties) fail.Error) fail.Error {
 	return metadata.Alter[*abstract.Label](ctx, trx, callback)
 }

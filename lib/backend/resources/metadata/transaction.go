@@ -27,8 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/result"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
@@ -43,18 +41,14 @@ type Transaction[A abstract.Abstract, T Metadata[A]] interface {
 	Terminate(ctx context.Context) fail.Error                 // closes the transaction; will fail if dirty and neither Commit() nor Rollback() has been called
 	TerminateFromError(ctx context.Context, ferr *fail.Error) // closes the transaction, committing if ferr contains no error, rolling back otherwise
 
-	alter(ctx context.Context, callback ResourceCallback[A], opts ...options.Option) fail.Error                            // allows to alter carried value and properties safely
-	alterAbstract(ctx context.Context, callback AbstractCallback[A], opts ...options.Option) fail.Error                    // allows to alter carried value safely
-	alterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error   // allows to alter a property safely
-	alterProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error                // allows to alter all properties safely
-	inspect(ctx context.Context, callback ResourceCallback[A], opts ...options.Option) fail.Error                          // allows to inspect carried value and properties safely (after Reload)
-	inspectAbstract(ctx context.Context, callback AbstractCallback[A], opts ...options.Option) fail.Error                  // allows to inspect a property safely (after Reload)
-	inspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error // allows to alter a property safely (after Reload)
-	inspectProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error              // allows to inspect all properties safely (after Reload)
-	review(ctx context.Context, callback ResourceCallback[A], opts ...options.Option) fail.Error                           // allows to inspect carried value and properties safely (without Reload)
-	reviewAbstract(ctx context.Context, callback AbstractCallback[A], opts ...options.Option) fail.Error                   // allows to inspect a property safely (without Reload)
-	reviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error  // allows to inspect all properties safely (after Reload)
-	reviewProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error               // allows to inspect all properties safely (after Reload)
+	alter(ctx context.Context, callback ResourceCallback[A]) fail.Error                            // allows to alter carried value and properties safely
+	alterAbstract(ctx context.Context, callback AbstractCallback[A]) fail.Error                    // allows to alter carried value safely
+	alterProperty(ctx context.Context, property string, callback AnyPropertyCallback) fail.Error   // allows to alter a property safely
+	alterProperties(ctx context.Context, callback AllPropertiesCallback) fail.Error                // allows to alter all properties safely
+	inspect(ctx context.Context, callback ResourceCallback[A]) fail.Error                          // allows to inspect carried value and properties safely (after Reload)
+	inspectAbstract(ctx context.Context, callback AbstractCallback[A]) fail.Error                  // allows to inspect a property safely (after Reload)
+	inspectProperty(ctx context.Context, property string, callback AnyPropertyCallback) fail.Error // allows to alter a property safely (after Reload)
+	inspectProperties(ctx context.Context, callback AllPropertiesCallback) fail.Error              // allows to inspect all properties safely (after Reload)
 }
 
 type transaction[A abstract.Abstract, T Metadata[A]] struct {
@@ -383,17 +377,12 @@ func (trx *transaction[A, T]) Kind() string {
 	return trx.coreOriginal.Kind()
 }
 
-// Inspect protects the data for shared read
-func (trx *transaction[A, T]) inspect(inctx context.Context, callback ResourceCallback[A], opts ...options.Option) (_ fail.Error) {
-	if valid.IsNil(trx) {
-		return fail.InvalidInstanceError()
-	}
-	if callback == nil {
-		return fail.InvalidParameterCannotBeNilError("callback")
-	}
+// inspect protects the data for shared read
+func (trx *transaction[A, T]) inspect(ctx context.Context, callback ResourceCallback[A]) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	trx.mu.Lock()
-	defer trx.mu.Unlock()
+	// trx.mu.Lock()
+	// defer trx.mu.Unlock()
 
 	if trx.closed {
 		return fail.NotAvailableError("transaction is closed")
@@ -403,125 +392,74 @@ func (trx *transaction[A, T]) inspect(inctx context.Context, callback ResourceCa
 		return fail.InvalidInstanceContentError("trx.coreChanges.properties", "cannot be nil")
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	chRes := make(chan result.Holder[struct{}])
-	go func() {
-		defer close(chRes)
-		gerr := func() (ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-
-			timings, xerr := trx.coreChanges.Service().Timings()
-			if xerr != nil {
-				return xerr
-			}
-
-			trx.coreChanges.lock.RLock()
-			defer trx.coreChanges.lock.RUnlock()
-
-			xerr = retry.WhileUnsuccessfulWithLimitedRetries(
-				func() error {
-					select {
-					case <-ctx.Done():
-						return retry.StopRetryError(ctx.Err())
-					default:
-					}
-
-					return trx.coreChanges.carried.Inspect(func(carried A) fail.Error {
-						return callback(carried, trx.coreChanges.properties)
-					})
-				},
-				timings.SmallDelay(),
-				timings.ConnectionTimeout(),
-				6,
-			)
-			if xerr != nil {
-				return fail.Wrap(xerr.Cause())
-			}
-			return nil
-		}()
-		res, _ := result.NewHolder[struct{}](result.TagCompletedFromError[struct{}](gerr), result.TagSuccessFromCondition[struct{}](gerr == nil))
-		chRes <- res
-	}()
-
-	select {
-	case res := <-chRes:
-		return fail.Wrap(res.Error())
-	case <-ctx.Done():
-		return fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		return fail.Wrap(inctx.Err())
+	timings, xerr := trx.coreChanges.Service().Timings()
+	if xerr != nil {
+		return xerr
 	}
+
+	trx.coreChanges.lock.RLock()
+	defer trx.coreChanges.lock.RUnlock()
+
+	xerr = retry.WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
+			return trx.coreChanges.carried.Inspect(func(carried A) fail.Error {
+				innerXErr := callback(carried, trx.coreChanges.properties)
+				if innerXErr != nil {
+					switch xerr.(type) {
+					case *fail.ErrInvalidParameter, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent:
+						return retry.StopRetryError(innerXErr)
+					default:
+						return innerXErr
+					}
+				}
+
+				return nil
+			})
+		},
+		timings.SmallDelay(),
+		timings.ConnectionTimeout(),
+		6,
+	)
+	if xerr != nil {
+		return fail.Wrap(xerr.Cause())
+	}
+
+	return nil
 }
 
 // InspectAbstract ...
-func (trx *transaction[A, T]) inspectAbstract(ctx context.Context, callback AbstractCallback[A], opts ...options.Option) (_ fail.Error) {
-	return trx.inspect(ctx, func(in A, _ *serialize.JSONProperties) fail.Error { return callback(in) }, opts...)
+func (trx *transaction[A, T]) inspectAbstract(ctx context.Context, callback AbstractCallback[A]) (_ fail.Error) {
+	return trx.inspect(ctx, func(in A, _ *serialize.JSONProperties) fail.Error { return callback(in) })
 }
 
 // InspectProperty allows to inspect directly a single property
-func (trx *transaction[A, T]) inspectProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
+func (trx *transaction[A, T]) inspectProperty(ctx context.Context, property string, callback AnyPropertyCallback) fail.Error {
 	return trx.inspect(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(property, callback)
-	}, opts...)
+	})
 }
 
 // InspectProperties allows to inspect directly properties
-func (trx *transaction[A, T]) inspectProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error {
+func (trx *transaction[A, T]) inspectProperties(ctx context.Context, callback AllPropertiesCallback) fail.Error {
 	return trx.inspect(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
 		return callback(props)
-	}, opts...)
-}
-
-// Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
-// to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
-// change through time).
-func (trx *transaction[A, T]) review(inctx context.Context, callback ResourceCallback[A], opts ...options.Option) (_ fail.Error) {
-	if valid.IsNil(trx) {
-		return fail.InvalidInstanceError()
-	}
-
-	opts = append(opts, WithoutReload())
-	return trx.inspect(inctx, callback, opts...)
-}
-
-// ReviewAbstract ...
-func (trx *transaction[A, T]) reviewAbstract(ctx context.Context, callback AbstractCallback[A], opts ...options.Option) (_ fail.Error) {
-	return trx.review(ctx, func(in A, _ *serialize.JSONProperties) fail.Error {
-		return callback(in)
-	}, opts...)
-}
-
-// ReviewProperty allows to review directly a single property
-func (trx *transaction[A, T]) reviewProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
-	return trx.review(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(property, callback)
-	}, opts...)
-}
-
-// ReviewProperties allows to review directly properties
-func (trx *transaction[A, T]) reviewProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error {
-	return trx.review(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
-		return callback(props)
-	}, opts...)
+	})
 }
 
 // Alter protects the data for exclusive write
 // Valid options are :
 // - WithoutReload() = disable reloading from metadata storage
-func (trx *transaction[A, T]) alter(inctx context.Context, callback ResourceCallback[A], opts ...options.Option) (ferr fail.Error) {
+func (trx *transaction[A, T]) alter(ctx context.Context, callback ResourceCallback[A]) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if valid.IsNil(trx) {
-		return fail.InvalidInstanceError()
-	}
-	if callback == nil {
-		return fail.InvalidParameterCannotBeNilError("callback")
-	}
-
-	trx.mu.Lock()
-	defer trx.mu.Unlock()
+	// trx.mu.Lock()
+	// defer trx.mu.Unlock()
 
 	if trx.closed {
 		return fail.NotAvailableError("transaction is closed")
@@ -545,19 +483,27 @@ func (trx *transaction[A, T]) alter(inctx context.Context, callback ResourceCall
 		return fail.InconsistentError("uninitialized metadata should not be altered")
 	}
 
-	trx.coreChanges.lock.Lock()
-	defer trx.coreChanges.lock.Unlock()
-
 	var xerr fail.Error
 
 	// Make sure myself.properties is populated
+	trx.coreChanges.lock.Lock()
 	if trx.coreChanges.properties == nil {
 		trx.coreChanges.properties, xerr = serialize.NewJSONProperties("resources." + trx.coreChanges.kind)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			trx.coreChanges.lock.Unlock()
 			return xerr
 		}
 	}
+
+	trx.coreChanges.lock.Unlock()
+	xerr = trx.coreChanges.Reload(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	trx.coreChanges.lock.Lock()
+	defer trx.coreChanges.lock.Unlock()
 
 	xerr = trx.coreChanges.carried.Alter(func(carried A) fail.Error {
 		return callback(carried, trx.coreChanges.properties)
@@ -577,22 +523,22 @@ func (trx *transaction[A, T]) alter(inctx context.Context, callback ResourceCall
 }
 
 // AlterAbstract ...
-func (trx *transaction[A, T]) alterAbstract(ctx context.Context, callback AbstractCallback[A], opts ...options.Option) (_ fail.Error) {
+func (trx *transaction[A, T]) alterAbstract(ctx context.Context, callback AbstractCallback[A]) (_ fail.Error) {
 	return trx.alter(ctx, func(carried A, _ *serialize.JSONProperties) fail.Error {
 		return callback(carried)
-	}, opts...)
+	})
 }
 
 // AlterProperty allows to alter directly a single property
-func (trx *transaction[A, T]) alterProperty(ctx context.Context, property string, callback AnyPropertyCallback, opts ...options.Option) fail.Error {
+func (trx *transaction[A, T]) alterProperty(ctx context.Context, property string, callback AnyPropertyCallback) fail.Error {
 	return trx.alter(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(property, callback)
-	}, opts...)
+	})
 }
 
 // AlterProperties allows to alter directly properties
-func (trx *transaction[A, T]) alterProperties(ctx context.Context, callback AllPropertiesCallback, opts ...options.Option) fail.Error {
+func (trx *transaction[A, T]) alterProperties(ctx context.Context, callback AllPropertiesCallback) fail.Error {
 	return trx.alter(ctx, func(_ A, props *serialize.JSONProperties) fail.Error {
 		return callback(props)
-	}, opts...)
+	})
 }

@@ -208,7 +208,7 @@ func LoadSecurityGroup(inctx context.Context, ref string) (*SecurityGroup, fail.
 				}
 				defer sgTrx.TerminateFromError(ctx, &ferr)
 
-				xerr = reviewSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
+				xerr = inspectSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
 					prov, xerr := myjob.Service().ProviderDriver()
 					if xerr != nil {
 						return xerr
@@ -1082,7 +1082,7 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 	}
 	defer subnetTrx.TerminateFromError(ctx, &ferr)
 
-	xerr = reviewSubnetMetadataProperties(ctx, subnetTrx, func(props *serialize.JSONProperties) fail.Error {
+	xerr = inspectSubnetMetadataProperties(ctx, subnetTrx, func(props *serialize.JSONProperties) fail.Error {
 		var subnetHosts *propertiesv1.SubnetHosts
 		innerXErr := props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
 			var innerErr error

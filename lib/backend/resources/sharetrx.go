@@ -34,22 +34,6 @@ func inspectShareMetadataProperties(ctx context.Context, trx shareTransaction, c
 	return metadata.InspectProperties[*abstract.Share](ctx, trx, callback)
 }
 
-func reviewShareMetadata(ctx context.Context, trx shareTransaction, callback func(*abstract.Share, *serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.Review[*abstract.Share](ctx, trx, callback)
-}
-
-func reviewShareMetadataAbstract(ctx context.Context, trx shareTransaction, callback func(ahc *abstract.Share) fail.Error) fail.Error {
-	return metadata.ReviewAbstract[*abstract.Share](ctx, trx, callback)
-}
-
-func reviewShareMetadataProperty[P clonable.Clonable](ctx context.Context, trx shareTransaction, property string, callback func(P) fail.Error) fail.Error {
-	return metadata.ReviewProperty[*abstract.Share, P](ctx, trx, property, callback)
-}
-
-func reviewShareMetadataProperties(ctx context.Context, trx shareTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.ReviewProperties[*abstract.Share](ctx, trx, callback)
-}
-
 func alterShareMetadata(ctx context.Context, trx shareTransaction, callback func(*abstract.Share, *serialize.JSONProperties) fail.Error) fail.Error {
 	return metadata.Alter[*abstract.Share](ctx, trx, callback)
 }

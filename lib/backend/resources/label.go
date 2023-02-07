@@ -182,7 +182,7 @@ func LoadLabel(inctx context.Context, ref string) (*Label, fail.Error) {
 				}
 				defer labelTrx.TerminateFromError(ctx, &ferr)
 
-				xerr = reviewLabelMetadataAbstract(ctx, labelTrx, func(al *abstract.Label) fail.Error {
+				xerr = inspectLabelMetadataAbstract(ctx, labelTrx, func(al *abstract.Label) fail.Error {
 					_, innerXErr := myjob.Scope().RegisterAbstractIfNeeded(al)
 					return innerXErr
 				})
@@ -274,8 +274,7 @@ func (instance *Label) Replace(in clonable.Clonable) error {
 		return err
 	}
 
-	instance.Core, err = clonable.CastedClone[*metadata.Core[*abstract.Label]](src.Core)
-	return err
+	return instance.Core.Replace(src.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -542,7 +541,7 @@ func (instance *Label) IsTag(ctx context.Context) (_ bool, ferr fail.Error) {
 	defer labelTrx.TerminateFromError(ctx, &ferr)
 
 	var out bool
-	xerr = reviewLabelMetadataAbstract(ctx, labelTrx, func(alabel *abstract.Label) fail.Error {
+	xerr = inspectLabelMetadataAbstract(ctx, labelTrx, func(alabel *abstract.Label) fail.Error {
 		out = !alabel.HasDefault
 		return nil
 	})

@@ -248,10 +248,6 @@ func (instance *Core[T]) GetID() (string, error) {
 }
 
 func (instance *Core[T]) getID() (string, fail.Error) {
-	if instance == nil {
-		return "", fail.InvalidInstanceError()
-	}
-
 	id, ok := instance.id.Load().(string) // nolint
 	if !ok {
 		return "", fail.InvalidInstanceError()

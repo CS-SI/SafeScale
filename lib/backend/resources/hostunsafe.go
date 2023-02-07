@@ -525,7 +525,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 func (instance *Host) trxGetDefaultSubnet(ctx context.Context, hostTrx hostTransaction) (subnetInstance *Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := reviewHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr := inspectHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(hostproperty.NetworkV2) {
 			return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
 				networkV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)

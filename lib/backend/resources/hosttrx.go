@@ -32,22 +32,6 @@ func inspectHostMetadataProperties(ctx context.Context, ht hostTransaction, call
 	return metadata.InspectProperties[*abstract.HostCore](ctx, ht, callback)
 }
 
-func reviewHostMetadata(ctx context.Context, ht hostTransaction, callback func(*abstract.HostCore, *serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.Review[*abstract.HostCore](ctx, ht, callback)
-}
-
-func reviewHostMetadataAbstract(ctx context.Context, ht hostTransaction, callback func(ahc *abstract.HostCore) fail.Error) fail.Error {
-	return metadata.ReviewAbstract[*abstract.HostCore](ctx, ht, callback)
-}
-
-func reviewHostMetadataProperty[P clonable.Clonable](ctx context.Context, ht hostTransaction, property string, callback func(P) fail.Error) fail.Error {
-	return metadata.ReviewProperty[*abstract.HostCore, P](ctx, ht, property, callback)
-}
-
-func reviewHostMetadataProperties(ctx context.Context, ht hostTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.ReviewProperties[*abstract.HostCore](ctx, ht, callback)
-}
-
 func alterHostMetadata(ctx context.Context, ht hostTransaction, callback func(*abstract.HostCore, *serialize.JSONProperties) fail.Error) fail.Error {
 	return metadata.Alter[*abstract.HostCore](ctx, ht, callback)
 }

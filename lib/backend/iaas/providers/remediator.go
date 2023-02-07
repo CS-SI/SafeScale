@@ -625,10 +625,10 @@ func (s Remediator) ListVolumes(ctx context.Context) (_ []*abstract.Volume, ferr
 	return volume, xerr
 }
 
-func (s Remediator) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
+func (s Remediator) DeleteVolume(ctx context.Context, parameter iaasapi.VolumeIdentifier) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Provider.DeleteVolume(ctx, id)
+	xerr := s.Provider.DeleteVolume(ctx, parameter)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}

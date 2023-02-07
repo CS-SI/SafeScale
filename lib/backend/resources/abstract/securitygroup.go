@@ -480,7 +480,10 @@ func (instance *SecurityGroup) IsComplete() bool {
 		return false
 	}
 
-	return instance.core.IsComplete() && instance.ID != "" && instance.Network != ""
+	complete := instance.core.IsComplete()
+	complete = complete && instance.ID != ""
+	// complete = complete && instance.Network != ""
+	return complete
 }
 
 // SetID sets the value of field ID in sg

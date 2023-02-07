@@ -142,7 +142,7 @@ func (instance *SecurityGroup) trxUnbindFromHostsAttachedToSubnet(inctx context.
 		defer close(chRes)
 
 		gerr := func() (ferr fail.Error) {
-			return reviewSubnetMetadataProperty(ctx, subnetTrx, subnetproperty.HostsV1, func(shV1 *propertiesv1.SubnetHosts) fail.Error {
+			return inspectSubnetMetadataProperty(ctx, subnetTrx, subnetproperty.HostsV1, func(shV1 *propertiesv1.SubnetHosts) fail.Error {
 				if len(shV1.ByID) > 0 {
 					tg := new(errgroup.Group)
 

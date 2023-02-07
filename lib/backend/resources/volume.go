@@ -190,7 +190,7 @@ func LoadVolume(inctx context.Context, ref string) (*Volume, fail.Error) {
 				}
 				defer volumeTrx.TerminateFromError(ctx, &ferr)
 
-				xerr = reviewVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
+				xerr = inspectVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
 					prov, xerr := myjob.Service().ProviderDriver()
 					if xerr != nil {
 						return xerr
@@ -297,8 +297,7 @@ func (instance *Volume) Replace(in clonable.Clonable) error {
 		return err
 	}
 
-	instance.Core, err = clonable.CastedClone[*metadata.Core[*abstract.Volume]](src.Core)
-	return err
+	return instance.Core.Replace(src.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -1093,7 +1092,7 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	// -- retrieves Volume data --
-	xerr = reviewVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
+	xerr = inspectVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
 		volumeID = av.ID
 		volumeName = av.Name
 		return nil

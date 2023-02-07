@@ -186,7 +186,7 @@ func LoadNetwork(inctx context.Context, ref string) (*Network, fail.Error) {
 				}
 				defer networkTrx.TerminateFromError(ctx, &ferr)
 
-				xerr = reviewNetworkMetadataAbstract(ctx, networkTrx, func(an *abstract.Network) fail.Error {
+				xerr = inspectNetworkMetadataAbstract(ctx, networkTrx, func(an *abstract.Network) fail.Error {
 					prov, xerr := myjob.Service().ProviderDriver()
 					if xerr != nil {
 						return xerr
@@ -295,9 +295,7 @@ func (instance *Network) Replace(in clonable.Clonable) error {
 		return err
 	}
 
-	//var err error
-	instance.Core, err = clonable.CastedClone[*metadata.Core[*abstract.Network]](src.Core)
-	return err
+	return instance.Core.Replace(src.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in metadata)
@@ -839,7 +837,7 @@ func (instance *Network) GetCIDR(ctx context.Context) (cidr string, ferr fail.Er
 	}
 	defer trx.TerminateFromError(ctx, &ferr)
 
-	xerr = reviewNetworkMetadataAbstract(ctx, trx, func(an *abstract.Network) fail.Error {
+	xerr = inspectNetworkMetadataAbstract(ctx, trx, func(an *abstract.Network) fail.Error {
 		cidr = an.CIDR
 		return nil
 	})
@@ -860,7 +858,7 @@ func (instance *Network) ToProtocol(ctx context.Context) (out *protocol.Network,
 	}
 	defer trx.TerminateFromError(ctx, &ferr)
 
-	xerr = reviewNetworkMetadata(ctx, trx, func(an *abstract.Network, props *serialize.JSONProperties) fail.Error {
+	xerr = inspectNetworkMetadata(ctx, trx, func(an *abstract.Network, props *serialize.JSONProperties) fail.Error {
 		out = &protocol.Network{
 			Id:   an.ID,
 			Name: an.Name,

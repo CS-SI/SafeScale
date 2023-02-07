@@ -203,7 +203,7 @@ func LoadBucket(inctx context.Context, name string) (*Bucket, fail.Error) {
 				}
 				defer bucketTrx.TerminateFromError(ctx, &ferr)
 
-				xerr = reviewBucketMetadataAbstract(ctx, bucketTrx, func(ab *abstract.Bucket) fail.Error {
+				xerr = inspectBucketMetadataAbstract(ctx, bucketTrx, func(ab *abstract.Bucket) fail.Error {
 					_, innerXErr := myjob.Scope().RegisterAbstractIfNeeded(ab)
 					return innerXErr
 				})
@@ -278,8 +278,7 @@ func (instance *Bucket) Replace(in clonable.Clonable) error {
 		return err
 	}
 
-	instance.Core, err = clonable.CastedClone[*metadata.Core[*abstract.Bucket]](src.Core)
-	return err
+	return instance.Core.Replace(src.Core)
 }
 
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
@@ -601,7 +600,7 @@ func (instance *Bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	defer bucketTrx.TerminateFromError(ctx, &ferr)
 
 	// -- check if Bucket is already mounted on any Host (only one Mount by Bucket allowed by design, to mitigate sync issues induced by Object Storage)
-	xerr = reviewBucketMetadataProperty(ctx, bucketTrx, bucketproperty.MountsV1, func(mountsV1 *propertiesv1.BucketMounts) fail.Error {
+	xerr = inspectBucketMetadataProperty(ctx, bucketTrx, bucketproperty.MountsV1, func(mountsV1 *propertiesv1.BucketMounts) fail.Error {
 		// First check if mounted on Host...
 		if mountPath, ok := mountsV1.ByHostName[hostName]; ok {
 			return fail.DuplicateError("there is already a mount of Bucket '%s' on Host '%s' in folder '%s'", bun, hostName, mountPath)
@@ -827,7 +826,7 @@ func (instance *Bucket) ToProtocol(ctx context.Context) (_ *protocol.BucketRespo
 	}
 	defer bucketTrx.TerminateFromError(ctx, &ferr)
 
-	xerr = reviewBucketMetadataProperty(ctx, bucketTrx, bucketproperty.MountsV1, func(mountsV1 *propertiesv1.BucketMounts) fail.Error {
+	xerr = inspectBucketMetadataProperty(ctx, bucketTrx, bucketproperty.MountsV1, func(mountsV1 *propertiesv1.BucketMounts) fail.Error {
 		out.Mounts = make([]*protocol.BucketMount, 0, len(mountsV1.ByHostID))
 		for k, v := range mountsV1.ByHostID {
 			hostInstance, innerXErr := LoadHost(ctx, k)

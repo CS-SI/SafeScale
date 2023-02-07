@@ -154,7 +154,7 @@ type Stack interface {
 	// ListVolumes list available volumes
 	ListVolumes(context.Context) ([]*abstract.Volume, fail.Error)
 	// DeleteVolume deletes the volume identified by id
-	DeleteVolume(ctx context.Context, id string) fail.Error
+	DeleteVolume(ctx context.Context, parameter VolumeIdentifier) fail.Error
 
 	// CreateVolumeAttachment attaches a volume to a host
 	CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (string, fail.Error)

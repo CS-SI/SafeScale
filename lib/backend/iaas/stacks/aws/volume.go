@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 
+	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"github.com/sirupsen/logrus"
 
@@ -230,19 +231,24 @@ func (instance *stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, f
 }
 
 // DeleteVolume ...
-func (instance *stack) DeleteVolume(ctx context.Context, id string) (ferr fail.Error) {
+func (instance *stack) DeleteVolume(ctx context.Context, parameter iaasapi.VolumeIdentifier) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	switch parameter.(type) {
+	case string:
+		return fail.InvalidParameterError("parameter", "must be an '*abstract.Volume'")
+	}
+	av, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(parameter)
+	if xerr != nil {
+		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", volumeLabel).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(ctx, &ferr)
 
 	query := ec2.DeleteVolumeInput{
-		VolumeId: aws.String(id),
+		VolumeId: aws.String(av.ID),
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {

@@ -25,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -51,7 +50,7 @@ func trxGetIdentity(inctx context.Context, clusterTrx clusterTransaction) (_ abs
 		defer fail.OnPanic(&ferr)
 
 		var clusterIdentity abstract.Cluster
-		xerr := metadata.ReviewAbstract[*abstract.Cluster](ctx, clusterTrx, func(aci *abstract.Cluster) fail.Error {
+		xerr := inspectClusterMetadataAbstract(ctx, clusterTrx, func(aci *abstract.Cluster) fail.Error {
 			clusterIdentity = *aci
 			return nil
 		})

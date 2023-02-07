@@ -19,6 +19,7 @@ package openstack
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -777,8 +778,9 @@ func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequ
 	if extra != nil {
 		into, ok := extra.(map[string]string)
 		if !ok {
-			return nil, nil, fail.InvalidParameterError("extra", "must be a map[string]string")
+			return nil, nil, fail.InvalidParameterError("extra", "must be a 'map[string]string' instead of '%s'", reflect.TypeOf(extra).String())
 		}
+
 		for k, v := range into {
 			ahc.Tags[k] = v
 		}

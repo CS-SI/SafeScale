@@ -160,7 +160,7 @@ func (instance *Subnet) trxCreateGateway(inctx context.Context, subnetTrx subnet
 			}()
 
 			// Binds gateway to VIP if needed
-			xerr = reviewSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
+			xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 				hid, err := rgw.GetID()
 				if err != nil {
 					return fail.Wrap(err)

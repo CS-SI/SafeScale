@@ -37,12 +37,6 @@ resource "openstack_networking_port_v2" "nic_{{ $rsc.Name }}_{{ $v.Name }}" {
 	fixed_ip {
 		subnet_id = "{{ $v.ID }}"
 	}
-
-	lifecycle {
-{{-       if not $extra.MarkedForCreation }}
-		prevent_destroy = true
-{{-       end }}
-	}
 }
 {{-     end }}
 {{-   end }}
