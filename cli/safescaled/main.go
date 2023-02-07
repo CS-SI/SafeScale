@@ -114,7 +114,7 @@ func work(c *cli.Context) {
 	s := createGrpcServer()
 	ns, xerr := buildGRPCWebServer(s)
 	if xerr != nil {
-		logrus.Fatalf("failed to build grpcwebshit: %v", xerr)
+		logrus.Fatalf("failed to build grpcweb server: %v", xerr)
 	}
 
 	go func() {

@@ -55,8 +55,25 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 			return nil, fail.NotFoundError("no tenant set")
 		}
 	}
+
 	newctx, cancel := context.WithCancel(ctx)
 	job, xerr := backend.NewJob(newctx, cancel, tenant.Service, jobDescription)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return job, nil
+}
+
+func PrepareInspectionJob(ctx context.Context, tenantID string, jobDescription string) (_ backend.Job, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	newctx, cancel := context.WithCancel(ctx)
+	job, xerr := backend.NewJob(newctx, cancel, nil, jobDescription)
 	if xerr != nil {
 		return nil, xerr
 	}

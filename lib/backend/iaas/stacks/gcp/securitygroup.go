@@ -212,7 +212,7 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam stacks.Security
 	}
 
 	// FIXME: This is a mistake
-	return asg, fail.NotImplementedError("no real Security Group resource proposed by gcp") // FIXME: Technical debt
+	return asg, fail.NewError("no real Security Group resource proposed by gcp") // FIXME: Technical debt
 }
 
 // ClearSecurityGroup removes all rules but keep group
