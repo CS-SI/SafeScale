@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -299,7 +300,12 @@ func (s stack) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, f
 		for _, image := range resp {
 			if image != nil {
 				if !aws.BoolValue(image.EnaSupport) {
-					logrus.Debug("ENA filtering does NOT actually work!")
+					logrus.WithContext(ctx).Debugf("ENA not enabled: %s", aws.StringValue(image.ImageId))
+					continue
+				}
+
+				if strings.Contains(aws.StringValue(image.ImageOwnerAlias), "aws-marketplace") {
+					logrus.WithContext(ctx).Debugf("We don't return marketplace images: %s", aws.StringValue(image.ImageId))
 					continue
 				}
 

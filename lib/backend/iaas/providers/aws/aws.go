@@ -86,8 +86,6 @@ func New() providers.Provider {
 
 // Build builds a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
-	// tenantName, _ := params["name"].(string)
-
 	identityCfg, ok := params["identity"].(map[string]interface{})
 	if !ok {
 		return &provider{}, fail.SyntaxError("section 'identity' not found in tenants.toml")
@@ -117,7 +115,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	var owners []string
-	if _, ok = computeCfg["Owners"]; ok {
+	if _, ok = computeCfg["Owners"]; ok { // FIXME: OPP, undocumented....
 		ownerList, ok := computeCfg["Owners"].(string)
 		if !ok {
 			logrus.WithContext(context.Background()).Debugf("error reading owners: %v", computeCfg["Owners"])

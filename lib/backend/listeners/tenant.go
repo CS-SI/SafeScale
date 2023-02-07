@@ -136,9 +136,6 @@ func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequ
 	if in == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
 
 	name := in.GetName()
 	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/tenant/%s/scan", name))
