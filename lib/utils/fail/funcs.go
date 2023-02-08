@@ -205,7 +205,11 @@ func Wrap(cause error, msg ...interface{}) Error {
 		return rerr
 
 	default:
-		return newError(cause, nil, msg...)
+		if IsGRPCError(cause) {
+			return FromGRPCStatus(cause)
+		}
+
+		return newError(cause, nil)
 	}
 }
 

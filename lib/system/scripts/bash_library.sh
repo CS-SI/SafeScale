@@ -347,7 +347,7 @@ function sfRetry4 {
 
 # sfSalvageDBusIfNeeded restarts dbus-daemon if needed (ie there are no or more than 1 dbus-daemon)
 # returns 0 if nothing has been done, 1 if dbus has been salvaged
-# Note: often dbus cannot be restarted automatically. It's necessary to restart a service that has dusb as dependency to
+# Note: often dbus cannot be restarted automatically. It's necessary to restart a service that has dbus as dependency to
 #       effectively restart dbus
 function sfSalvageDBusIfNeeded() {
   count=$(ps ax | grep dbus-daemon | grep -v grep | wc -l)
@@ -798,10 +798,10 @@ function sfDoesDockerRunContainer() {
       FOUND=yes
     elif [ "$INSTANCE_2" != "$INSTANCE" ]; then
       if [ "$INSTANCE_2" == "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE_2" | uniq)" ]; then
-        found=y
+        FOUND=yes
       fi
     fi
-    [ "$FOUND" != "y"] && return 1
+    [ "$FOUND" != "yes" ] && return 1
   fi
   echo $LIST | cut -d'|' -f3 | grep -i "^up" &> /dev/null || return 1
   return 0

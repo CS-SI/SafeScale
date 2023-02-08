@@ -103,14 +103,14 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 		SecondaryGatewayConfig *Profile `json:"secondary_gateway_config,omitempty"`
 	}
 
-	task := handler.job.Task()
+	//task := handler.job.Task()
 	ctx := handler.job.Context()
 	_, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -130,7 +130,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 		user = abstract.DefaultUser
 	}
 
-	ip, xerr := host.GetAccessIP(task.Context())
+	ip, xerr := host.GetAccessIP(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -220,7 +220,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 				return nil, xerr
 			}
 		} else {
-			ip, xerr = gw.GetAccessIP(task.Context())
+			ip, xerr = gw.GetAccessIP(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -254,7 +254,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 				return nil, xerr
 			}
 		} else {
-			ip, xerr = gw.GetAccessIP(task.Context())
+			ip, xerr = gw.GetAccessIP(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}

@@ -365,7 +365,7 @@ func (sc *LibCommand) NewRunWithTimeout(ctx context.Context, outs outputs.Enum, 
 
 		var session *ssh.Session
 
-		err = retry.WhileUnsuccessful(func() error { // FIXME: Turn this into goroutine
+		err = retry.WhileUnsuccessful(func() error {
 			select {
 			case <-ctx.Done():
 				return retry.StopRetryError(ctx.Err())
@@ -1023,7 +1023,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 	hostport := fmt.Sprintf("%s:%d", "localhost", tu.GetLocalEndpoint().Port())
 	conn, err := ssh.Dial("tcp", hostport, config)
 	if err != nil {
-		return fail.Wrap(fmt.Errorf("cannot connect %v: %w", hostport, err))
+		return fail.NewError("cannot connect %v: %w", hostport, err)
 	}
 	defer func() {
 		_ = conn.Close()
@@ -1031,7 +1031,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 
 	session, err := conn.NewSession()
 	if err != nil {
-		return fail.Wrap(fmt.Errorf("cannot open new session: %w", err))
+		return fail.NewError("cannot open new session: %w", err)
 	}
 	defer func() {
 		_ = session.Close()
@@ -1040,7 +1040,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 	fd := int(os.Stdin.Fd())
 	state, err := terminal.MakeRaw(fd)
 	if err != nil {
-		return fail.Wrap(fmt.Errorf("terminal make raw: %s", err))
+		return fail.NewError("terminal make raw: %s", err)
 	}
 	defer func() {
 		_ = terminal.Restore(fd, state)
@@ -1048,7 +1048,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 
 	w, h, err := terminal.GetSize(fd)
 	if err != nil {
-		return fail.Wrap(fmt.Errorf("terminal get size: %s", err))
+		return fail.NewError("terminal get size: %s", err)
 	}
 
 	modes := ssh.TerminalModes{
@@ -1062,7 +1062,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 		term = "xterm-256color"
 	}
 	if err := session.RequestPty(term, h, w, modes); err != nil {
-		return fail.Wrap(fmt.Errorf("session xterm: %s", err))
+		return fail.NewError("session xterm: %s", err)
 	}
 
 	session.Stdout = os.Stdout
@@ -1082,7 +1082,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 	}
 
 	if err := session.Shell(); err != nil {
-		return fail.Wrap(fmt.Errorf("session shell: %s", err))
+		return fail.NewError("session shell: %s", err)
 	}
 
 	if err := session.Wait(); err != nil {
@@ -1092,7 +1092,7 @@ func (sconf *Profile) Enter(ctx context.Context, username string, shell string) 
 				return nil
 			}
 		}
-		return fail.Wrap(fmt.Errorf("sc: %s", err))
+		return fail.NewError("sc: %s", err)
 	}
 
 	return nil

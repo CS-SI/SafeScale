@@ -398,11 +398,6 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		gwPort = ssh.SSHPort
 	}
 
-	// VPL: never used
-	// if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
-	// 	scfg.SecondaryGatewayConfig.Port = 22
-	// }
-
 	targetIPAddr, xerr := scfg.GetIPAddress()
 	if xerr != nil {
 		return nil, xerr
@@ -420,20 +415,17 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
-		"ssh -i \"%s\" -NL %s:%d:%s:%d %s@%s %s -p %d",
+		"ssh -i \"%s\" -NL %s:%d:%s:%d %s -p %d %s@%s",
 		f.Name(),
 		ssh.Loopback,
 		localPort,
 		targetIPAddr,
 		targetPort,
+		options,
+		gwPort,
 		gwUser,
 		gwIPAddr,
-		options,
-		//targetHost,
-		gwPort,
 	)
-
-	// logrus.WithContext(context.Background()).Debugf("Creating SSH tunnel with '%s'", cmdString)
 
 	cmd := exec.Command("bash", "-c", cmdString)
 	cmd.SysProcAttr = getSyscallAttrs()
@@ -442,13 +434,13 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		return nil, fail.Wrap(cerr)
 	}
 
-	// gives 10s to build a tunnel, 1s is not enough as the number of tunnels keeps growing
-	for nbiter := 0; !isTunnelReady(int(localPort)) && nbiter < 100; nbiter++ {
+	// gives 60s to build a tunnel, 1s is not enough as the number of tunnels keeps growing
+	for nbiter := 0; !isTunnelReady(int(localPort)) && nbiter < 600; nbiter++ {
 		time.Sleep(100 * time.Millisecond)
 	}
 
 	if !isTunnelReady(int(localPort)) {
-		xerr := fail.NotAvailableError("the tunnel is not ready")
+		xerr := fail.NotAvailableError("the tunnel is not ready after waiting for port %d 60 sec", localPort)
 		derr := killProcess(cmd.Process)
 		if derr != nil {
 			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to kill SSH process"))
@@ -478,7 +470,7 @@ type CliCommand struct {
 // The returned error is nil if the command runs, has no problems copying stdin, stdout, and stderr, and exits with a zero exit status.
 // If the command fails to run or doesn't complete successfully, the error is of type *ExitError. Other error types may be returned for I/O problems.
 // Wait also waits for the I/O loop copying from c.Stdin into the process's standard input to complete.
-// Wait does not release resources associated with the cmd; Command.Terminate() must be called for that.
+// Wait does not release resources associated with the cmd; Command.Close() must be called for that.
 // !!!WARNING!!!: the error returned is NOT USING fail.Error because we may NEED TO CAST the error to recover return code
 func (scmd *CliCommand) Wait() error {
 	if scmd == nil {
@@ -628,8 +620,7 @@ func (scmd *CliCommand) Start() fail.Error {
 //     . *fail.ErrTimeout if 'timeout' is reached
 //
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
-//
-//	you risk to call twice os/exec.Wait, which may panic
+// you risk to call twice os/exec.Wait, which may panic
 func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -890,7 +881,7 @@ func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (data.
 
 // Close is called to clean Command (close tunnel(s), remove temporary files, ...)
 func (scmd *CliCommand) Close() (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
+	defer fail.SilentOnPanic(&ferr)
 	if scmd == nil {
 		return nil
 	}
@@ -1102,8 +1093,6 @@ func createSSHCommand(sconf *Profile, cmdString, username, shell string, withTty
 	if cmdString != "" {
 		sshCmdString += fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
 	}
-
-	// logrus.WithContext(context.Background()).Debugf("Created SSH command '%s'", strings.Replace(sshCmdString, "\n", "\t", -1))
 
 	return sshCmdString, f, nil
 }

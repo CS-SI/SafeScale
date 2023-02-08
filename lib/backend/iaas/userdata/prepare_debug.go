@@ -1,5 +1,5 @@
-//go:build !debug
-// +build !debug
+//go:build debug
+// +build debug
 
 /*
  * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
@@ -92,12 +92,12 @@ var (
 	}
 	userdataScriptTemplatesLock sync.RWMutex
 	userdataScriptProvider      string
-	userdataScripts             = map[Phase]string{
-		PHASE1_INIT:                      "scripts/userdata%s.init.sh",
-		PHASE2_NETWORK_AND_SECURITY:      "scripts/userdata%s.netsec.sh",
-		PHASE3_GATEWAY_HIGH_AVAILABILITY: "scripts/userdata%s.gwha.sh",
-		PHASE4_SYSTEM_FIXES:              "scripts/userdata%s.sysfix.sh",
-		PHASE5_FINAL:                     "scripts/userdata%s.final.sh",
+	userdataScripts             = map[Phase]string{ // FIXME: OPP Time to read this shit from a directory
+		PHASE1_INIT:                      "newscripts/userdata%s.init.sh",
+		PHASE2_NETWORK_AND_SECURITY:      "newscripts/userdata%s.netsec.sh",
+		PHASE3_GATEWAY_HIGH_AVAILABILITY: "newscripts/userdata%s.gwha.sh",
+		PHASE4_SYSTEM_FIXES:              "newscripts/userdata%s.sysfix.sh",
+		PHASE5_FINAL:                     "newscripts/userdata%s.final.sh",
 	}
 )
 
@@ -231,7 +231,7 @@ func (ud Content) ToMap() (map[string]interface{}, fail.Error) {
 	return mapped, nil
 }
 
-//go:embed scripts/*
+//go:embed newscripts/*
 var scripts embed.FS
 
 // Generate generates the script file corresponding to the phase
@@ -305,21 +305,6 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 
 	return result, nil
 }
-
-// // GenerateToFile is like Generate but output the result in a file
-// func (ud Content) GenerateToFile(phase Phase, filename string) fail.Error {
-// 	content, xerr := ud.Generate(phase)
-// 	if xerr != nil {
-// 		return xerr
-// 	}
-//
-// 	err := ioutil.WriteFile(filename, content, 0600)
-// 	if err != nil {
-// 		return fail.Wrap(err, "failed to generate userdata in file '%s'", filename)
-// 	}
-//
-// 	return nil
-// }
 
 // AddInTag adds some useful code on the end of userdata.netsec.sh just before the end (on the label #insert_tag)
 func (ud Content) AddInTag(phase Phase, tagname string, content string) {

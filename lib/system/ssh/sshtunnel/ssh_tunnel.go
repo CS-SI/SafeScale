@@ -581,7 +581,6 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 				report := true
 				ignored := false
 				if opErr, ok := err.(*net.OpError); ok {
-					/*if opErr.Err == net.ErrClosed {*/
 					if strings.Contains(opErr.Err.Error(), "use of closed network connection") { // nolint
 						report = false
 						ignored = true
