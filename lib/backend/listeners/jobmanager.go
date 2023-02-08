@@ -18,14 +18,12 @@ package listeners
 
 import (
 	"context"
-	"reflect"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope"
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -66,13 +64,8 @@ func prepareJob(ctx context.Context, in scopeFromProtocol, description string) (
 	}
 
 	if j.Service().Capabilities().UseTerraformer {
-		castedScope, ok := scopeHolder.(terraformerapi.ScopeLimitedToTerraformerUse)
-		if !ok {
-			return nil, fail.InconsistentError("failed to cast: expecting 'terraformerapi.ScopeLimitedToTerraformerUse', received '%s'", reflect.TypeOf(scopeHolder).String())
-		}
-
-		if !castedScope.IsLoaded() {
-			xerr = castedScope.LoadAbstracts(j.Context())
+		if !scopeHolder.IsLoaded() {
+			xerr = scopeHolder.LoadAbstracts(j.Context())
 			if xerr != nil {
 				return nil, xerr
 			}

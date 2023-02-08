@@ -1,15 +1,32 @@
+/*
+ * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package listeners
 
 import (
 	"bytes"
 	"fmt"
+	"regexp"
+	"testing"
+
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
 	"github.com/stretchr/testify/require"
-	"regexp"
-	"testing"
 )
 
 func ExtractFeatureParameters(params []string) (map[string]string, error) {
@@ -33,11 +50,8 @@ func ExtractFeatureParameters(params []string) (map[string]string, error) {
 
 	return parsed, nil
 }
-func realizeVariables(variables data.Map) (data.Map, fail.Error) {
-	cloneV, cerr := data.FromMap(variables)
-	if cerr != nil {
-		return nil, fail.Wrap(cerr)
-	}
+func realizeVariables(variables data.Map[string, any]) (data.Map[string, any], fail.Error) {
+	cloneV := variables.Clone()
 
 	for k, v := range cloneV {
 		if variable, ok := v.(string); ok && variable != "" {
@@ -51,7 +65,7 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 			err := varTemplate.Option("missingkey=error").Execute(buffer, variables)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				return cloneV, fail.ConvertError(err)
+				return cloneV, fail.Wrap(err)
 			}
 
 			cloneV[k] = buffer.String()

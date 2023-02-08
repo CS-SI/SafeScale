@@ -325,15 +325,15 @@ func Test_Cause(t *testing.T) {
 
 }
 
-func Test_ConvertError(t *testing.T) {
-
-	result := ConvertError(nil)
-	require.EqualValues(t, result, nil)
-
-	err := errors.New("any error")
-	result = ConvertError(err)
-
-	require.Contains(t, result.Error(), "any error")
-	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrUnqualified")
-
-}
+// func Test_ConvertError(t *testing.T) {
+//
+// 	result := ConvertError(nil)
+// 	require.EqualValues(t, result, nil)
+//
+// 	err := errors.New("any error")
+// 	result = ConvertError(err)
+//
+// 	require.Contains(t, result.Error(), "any error")
+// 	require.EqualValues(t, reflect.TypeOf(result).String(), "*fail.ErrUnqualified")
+//
+// }

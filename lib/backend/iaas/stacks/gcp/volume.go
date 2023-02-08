@@ -291,7 +291,7 @@ func (s *stack) Migrate(ctx context.Context, operation string, params map[string
 	}
 
 	if operation == "removetag" {
-		subnetInstance, ok := params["subnetInstance"].(resources.Subnet)
+		subnetInstance, ok := params["subnetInstance"].(*resources.Subnet)
 		if !ok {
 			return fail.InvalidParameterError("subnetInstance", "should be resources.Subnet")
 		}

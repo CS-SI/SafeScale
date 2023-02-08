@@ -21,12 +21,14 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"golang.org/x/net/context"
 )
 
 // Scope ...
 type Scope interface {
 	AbstractByName(kind, name string) (abstract.Abstract, fail.Error)
 	AbstractByID(kind, id string) (abstract.Abstract, fail.Error)
+	AllAbstracts() (map[string]abstract.Abstract, fail.Error)
 	ConsulKV() *consumer.KV
 	Description() string
 	ID() string
@@ -34,6 +36,7 @@ type Scope interface {
 	IsNull() bool
 	FSPath() string
 	KVPath() string
+	LoadAbstracts(ctx context.Context) fail.Error
 	Organization() string
 	Project() string
 	RegisterAbstract(abstract.Abstract) fail.Error

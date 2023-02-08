@@ -67,6 +67,8 @@ func (e *BrokenError) Valid() bool { return e.msg != "" }
 func (e *BrokenError) UnformattedError() string { return e.msg }
 func (e *BrokenError) ToGRPCStatus() error      { return nil }
 
+func (e *BrokenError) prefixMessage(msg ...any) {}
+
 func Test_IgnoreError(t *testing.T) {
 
 	ret := IgnoreError("any", NewError(errors.New("mayday !")))

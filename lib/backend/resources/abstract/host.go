@@ -477,7 +477,7 @@ type HostDescription struct {
 	Updated time.Time `json:"modified,omitempty"` // tells the last time the host has been modified
 	Purpose string    `json:"purpose,omitempty"`  // contains a description of the use of a host
 	Tenant  string    `json:"tenant"`             // contains the tenant name used to create the host
-	AZ      string    `json="az"`                 // contains the availability zone where the host resides
+	AZ      string    `json:"az"`                 // contains the availability zone where the host resides
 }
 
 func (hd *HostDescription) IsNull() bool {

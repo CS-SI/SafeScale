@@ -15,7 +15,7 @@ const (
 func WithScope(scope terraformerapi.ScopeLimitedToTerraformerUse) options.Option {
 	return func(o options.Options) fail.Error {
 		if valid.IsNull(scope) {
-			return fail.InvalidParameterError("scope", "must be a valid 'terraformerapi.ScopeLimitedToTerraformerUse'")
+			return fail.InvalidParameterError("scope", "must be a valid 'scopeapi.Scope'")
 		}
 
 		return options.Add(o, OptionScope, scope)

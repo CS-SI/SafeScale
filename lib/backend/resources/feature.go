@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"strings"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	rscapi "github.com/CS-SI/SafeScale/v22/lib/backend/resources/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"

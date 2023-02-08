@@ -23,11 +23,11 @@ import (
 	"reflect"
 	"time"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	uuidpkg "github.com/gofrs/uuid"
 	"github.com/puzpuzpuz/xsync"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/versions"

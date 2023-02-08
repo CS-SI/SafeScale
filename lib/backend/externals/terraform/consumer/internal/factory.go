@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	iaasoptions "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
@@ -48,7 +49,7 @@ func New(provider ProviderUsingTerraform, opts options.Options) (api.Terraformer
 		return nil, xerr
 	}
 
-	out.scope, xerr = options.Value[api.ScopeLimitedToTerraformerUse](opts, iaasoptions.OptionScope)
+	out.scope, xerr = options.Value[scopeapi.Scope](opts, iaasoptions.OptionScope)
 	if xerr != nil {
 		return nil, xerr
 	}

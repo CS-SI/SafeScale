@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/sirupsen/logrus"
 
@@ -64,7 +65,7 @@ type renderer struct {
 	mu           *sync.Mutex
 	executor     *tfexec.Terraform
 	provider     ProviderUsingTerraform
-	scope        api.ScopeLimitedToTerraformerUse
+	scope        scopeapi.Scope
 	opts         options.Options
 	config       api.Configuration
 	env          map[string]string // contains environment variables to set at each call

@@ -50,6 +50,7 @@ type (
 
 	RequiredProviders data.Map[string, RequiredProvider]
 
+	// This is mainly used to prevent import cycle with scopeapi
 	ScopeLimitedToTerraformerUse interface {
 		AllAbstracts() (map[string]abstract.Abstract, fail.Error)
 		IsLoaded() bool

@@ -23,11 +23,9 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"time"
 
-	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
@@ -97,13 +95,7 @@ func UseService(ctx context.Context, opts ...options.Option) (_ iaasapi.Service,
 		return nil, xerr
 	}
 
-	scope := myjob.Scope()
-	castedScope, ok := scope.(terraformerapi.ScopeLimitedToTerraformerUse)
-	if !ok {
-		return nil, fail.InconsistentError("failed to cast: expecting 'terraformerapi.ScopeLimitedToTerraformerUse', receiving '%s'", reflect.TypeOf(scope).String())
-	}
-
-	opts = append(opts, iaasoptions.WithScope(castedScope))
+	opts = append(opts, iaasoptions.WithScope(myjob.Scope()))
 	o, xerr := options.New(opts...)
 	if xerr != nil {
 		return nil, xerr

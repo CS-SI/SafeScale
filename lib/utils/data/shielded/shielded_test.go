@@ -26,7 +26,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -73,12 +72,7 @@ func Test_NewShileded(t *testing.T) {
 	c, err := NewShielded(a)
 	require.Nil(t, err)
 
-	err = c.Inspect(func(p clonable.Clonable) fail.Error {
-		data, innerErr := lang.Cast[*SomeClonable](p)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
-		}
-
+	err = c.Inspect(func(data *SomeClonable) fail.Error {
 		if data.GetValue() != "any" {
 			return fail.InconsistentError("expect SomeClonable:value \"any\"")
 		}
@@ -91,7 +85,7 @@ func Test_NewShileded(t *testing.T) {
 
 func TestShielded_IsNull(t *testing.T) {
 
-	var s *Shielded
+	var s *Shielded[*SomeClonable]
 	require.EqualValues(t, s.IsNull(), true)
 
 	a := &SomeClonable{}
@@ -115,41 +109,30 @@ func TestShielded_Clone(t *testing.T) {
 			require.NotEqual(t, r, nil)
 			fmt.Println(r)
 		}()
-		var s *Shielded
+		var s *Shielded[*SomeClonable]
 		_, _ = s.Clone()
 	}()
 
 	a := &SomeClonable{value: "any"}
 	c, err := NewShielded(a)
 	require.Nil(t, err)
-	r, err := c.Clone()
+
+	r, err := clonable.CastedClone[*Shielded[*SomeClonable]](c)
 	require.Nil(t, err)
 
-	err = c.Alter(func(data clonable.Clonable) fail.Error {
-		v, ok := data.(*SomeClonable)
-		if !ok {
-			return fail.InconsistentError("Expect SomeClonable data")
-		}
-		v.SetValue("any 2")
+	err = c.Alter(func(data *SomeClonable) fail.Error {
+		data.SetValue("any 2")
 		return nil
 	})
 	require.Nil(t, err)
-	err = c.Inspect(func(data clonable.Clonable) fail.Error {
-		v, ok := data.(*SomeClonable)
-		if !ok {
-			return fail.InconsistentError("Expect SomeClonable data")
-		}
-		require.EqualValues(t, v.GetValue(), "any 2")
+	err = c.Inspect(func(data *SomeClonable) fail.Error {
+		require.EqualValues(t, data.GetValue(), "any 2")
 		return nil
 	})
 	require.Nil(t, err)
-	err = r.Inspect(func(data clonable.Clonable) fail.Error {
-		v, ok := data.(*SomeClonable)
-		if !ok {
-			return fail.InconsistentError("Expect SomeClonable data")
-		}
+	err = r.Inspect(func(data *SomeClonable) fail.Error {
 		// if is "any 2", is swallow clone
-		require.EqualValues(t, v.GetValue(), "any")
+		require.EqualValues(t, data.GetValue(), "any")
 		return nil
 	})
 	require.Nil(t, err)
@@ -158,17 +141,17 @@ func TestShielded_Clone(t *testing.T) {
 
 func TestShielded_Inpect(t *testing.T) {
 
-	var a *Shielded
+	var a *Shielded[*SomeClonable]
 	var derr error
 
-	err := a.Inspect(func(p clonable.Clonable) fail.Error {
+	err := a.Inspect(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
 	require.Contains(t, err.Error(), "calling method from a nil pointer")
 
-	a = &Shielded{}
-	err = a.Inspect(func(p clonable.Clonable) fail.Error {
+	a = &Shielded[*SomeClonable]{}
+	err = a.Inspect(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
@@ -176,13 +159,13 @@ func TestShielded_Inpect(t *testing.T) {
 
 	a, derr = NewShielded(&SomeClonable{value: "any"})
 	require.EqualValues(t, derr, nil)
-	var f func(p clonable.Clonable) fail.Error
+	var f func(_ *SomeClonable) fail.Error
 	err = a.Inspect(f)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
 	require.Contains(t, err.Error(), "invalid parameter: inspector")
 
-	a = &Shielded{}
-	err = a.Inspect(func(p clonable.Clonable) fail.Error {
+	a = &Shielded[*SomeClonable]{}
+	err = a.Inspect(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
@@ -190,7 +173,7 @@ func TestShielded_Inpect(t *testing.T) {
 
 	a, derr = NewShielded(&SomeClonable{value: "any"})
 	require.EqualValues(t, derr, nil)
-	err = a.Inspect(func(p clonable.Clonable) fail.Error {
+	err = a.Inspect(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
 	require.Nil(t, err)
@@ -199,17 +182,17 @@ func TestShielded_Inpect(t *testing.T) {
 
 func TestShielded_Alter(t *testing.T) {
 
-	var a *Shielded
+	var a *Shielded[*SomeClonable]
 	var derr error
 
-	err := a.Alter(func(p clonable.Clonable) fail.Error {
+	err := a.Alter(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
 	require.Contains(t, err.Error(), "calling method from a nil pointer")
 
-	a = &Shielded{}
-	err = a.Alter(func(p clonable.Clonable) fail.Error {
+	a = &Shielded[*SomeClonable]{}
+	err = a.Alter(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
@@ -218,13 +201,13 @@ func TestShielded_Alter(t *testing.T) {
 	a, derr = NewShielded(&SomeClonable{value: "any"})
 	require.EqualValues(t, derr, nil)
 
-	var f func(p clonable.Clonable) fail.Error
+	var f func(_ *SomeClonable) fail.Error
 	err = a.Alter(f)
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
 	require.Contains(t, err.Error(), "invalid parameter: alterer")
 
-	a = &Shielded{}
-	err = a.Alter(func(p clonable.Clonable) fail.Error {
+	a = &Shielded[*SomeClonable]{}
+	err = a.Alter(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
 	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
@@ -233,22 +216,13 @@ func TestShielded_Alter(t *testing.T) {
 	a, derr = NewShielded(&SomeClonable{value: "any"})
 	require.EqualValues(t, derr, nil)
 
-	err = a.Alter(func(p clonable.Clonable) fail.Error {
-		v, err := lang.Cast[*SomeClonable](p)
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		v.SetValue("any 2")
+	err = a.Alter(func(p *SomeClonable) fail.Error {
+		p.SetValue("any 2")
 		return nil
 	})
 	require.Nil(t, err)
-	err = a.Inspect(func(data clonable.Clonable) fail.Error {
-		v, ok := data.(*SomeClonable)
-		if !ok {
-			return fail.InconsistentError("Expect SomeClonable data")
-		}
-		require.EqualValues(t, v.GetValue(), "any 2")
+	err = a.Inspect(func(data *SomeClonable) fail.Error {
+		require.EqualValues(t, data.GetValue(), "any 2")
 		return nil
 	})
 	require.Nil(t, err)
@@ -257,7 +231,7 @@ func TestShielded_Alter(t *testing.T) {
 
 func TestShielded_Serialize(t *testing.T) {
 
-	var a *Shielded
+	var a *Shielded[*SomeClonable]
 	var derr error
 
 	d, err := a.Serialize()
@@ -276,7 +250,7 @@ func TestShielded_Serialize(t *testing.T) {
 
 func TestShielded_Deserialize(t *testing.T) {
 
-	var a *Shielded
+	var a *Shielded[*SomeClonable]
 	var derr error
 
 	err := a.Deserialize([]byte("{\"Clonable\":null}"))
@@ -333,24 +307,22 @@ func TestTakiTaki(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	go func() { // simulate a goroutine that also can access this armored value and tries to change it
-		inerr := armored.Alter(func(p clonable.Clonable) fail.Error {
+		inerr := armored.Alter(func(p *datatests.StructWithoutPointers) fail.Error {
 			defer wg.Done()
 
-			take := p.(*datatests.StructWithoutPointers)
 			time.Sleep(60 * time.Millisecond)
-			take.Rumba++
+			p.Rumba++
 			return nil
 		})
 		if inerr != nil {
 			t.Errorf("Ouch: %s", inerr)
 		}
 	}()
-	err = armored.Alter(func(p clonable.Clonable) fail.Error {
+	err = armored.Alter(func(p *datatests.StructWithoutPointers) fail.Error {
 		defer wg.Done()
 
 		time.Sleep(80 * time.Millisecond)
-		take := p.(*datatests.StructWithoutPointers)
-		take.Rumba++
+		p.Rumba++
 		return nil
 	})
 	if err != nil {
@@ -359,8 +331,8 @@ func TestTakiTaki(t *testing.T) {
 
 	wg.Wait()
 
-	err = armored.Inspect(func(p clonable.Clonable) fail.Error {
-		assert.Equal(t, 11, p.(*datatests.StructWithoutPointers).Rumba)
+	err = armored.Inspect(func(p *datatests.StructWithoutPointers) fail.Error {
+		assert.Equal(t, 11, p.Rumba)
 		return nil
 	})
 	if err != nil {
@@ -412,10 +384,9 @@ func TestCriminal(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(3) // 2 readers 1 writer
 	go func() {
-		inerr := armored.Inspect(func(p clonable.Clonable) fail.Error {
+		inerr := armored.Inspect(func(take *datatests.StructWithoutPointers) fail.Error {
 			defer wg.Done()
 			time.Sleep(10 * time.Millisecond)
-			take := p.(*datatests.StructWithoutPointers)
 			_ = take.Rumba
 			return nil
 		})
@@ -424,10 +395,9 @@ func TestCriminal(t *testing.T) {
 		}
 	}()
 	go func() {
-		inerr := armored.Inspect(func(p clonable.Clonable) fail.Error {
+		inerr := armored.Inspect(func(take *datatests.StructWithoutPointers) fail.Error {
 			defer wg.Done()
 			time.Sleep(10 * time.Millisecond)
-			take := p.(*datatests.StructWithoutPointers)
 			_ = take.Rumba
 			return nil
 		})
@@ -435,10 +405,9 @@ func TestCriminal(t *testing.T) {
 			t.Errorf("Ouch: %s", inerr)
 		}
 	}()
-	err = armored.Alter(func(p clonable.Clonable) fail.Error {
+	err = armored.Alter(func(take *datatests.StructWithoutPointers) fail.Error {
 		defer wg.Done()
 		time.Sleep(5 * time.Millisecond)
-		take := p.(*datatests.StructWithoutPointers)
 		take.Rumba++
 		time.Sleep(80 * time.Millisecond)
 		return nil
@@ -450,8 +419,7 @@ func TestCriminal(t *testing.T) {
 	wg.Wait()
 
 	// fmt.Println(a.Rumba)
-	err = armored.Inspect(func(p clonable.Clonable) fail.Error {
-		take := p.(*datatests.StructWithoutPointers).Rumba
+	err = armored.Inspect(func(take *datatests.StructWithoutPointers) fail.Error {
 		_ = take // Here take may be 9 or 10, depending on who enters the lock 1st, the 2 readers or the writer
 		return nil
 	})
@@ -511,9 +479,8 @@ func TestSerializeDeserialize(t *testing.T) {
 	err = gotForYou.Deserialize(content)
 	assert.Nil(t, err)
 
-	err = gotForYou.Inspect(func(p clonable.Clonable) fail.Error {
-		take := p.(*datatests.StructWithoutPointers).Content
-		trumba := p.(*datatests.StructWithoutPointers).Rumba
+	err = gotForYou.Inspect(func(take *datatests.StructWithoutPointers) fail.Error {
+		trumba := take.Rumba
 		assert.Equal(t, "Bailame como si fuera la ultima vez", take)
 		assert.Equal(t, 9, trumba)
 		return nil
