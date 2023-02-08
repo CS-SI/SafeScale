@@ -587,7 +587,10 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 	// --- query provider for host creation ---
 
 	// Retry creation until success, for 10 minutes
-	var finalServer *servers.Server
+	var (
+		finalServer  *servers.Server
+		creationZone string
+	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			select {
@@ -652,7 +655,8 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 				return fail.InconsistentError("machine created with empty id")
 			}
 
-			creationZone, zoneErr := instance.GetAvailabilityZoneOfServer(ctx, finalServer.ID)
+			var zoneErr error
+			creationZone, zoneErr = instance.GetAvailabilityZoneOfServer(ctx, finalServer.ID)
 			if zoneErr != nil {
 				logrus.WithContext(ctx).Tracef("Host successfully created but cannot confirm Availability Zone: %s", zoneErr)
 			} else {
@@ -732,6 +736,7 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 		return nil, nil, xerr
 	}
 
+	host.Description.AZ = creationZone
 	host.Networking.DefaultSubnetID = defaultSubnetID
 	// host.Networking.DefaultGatewayID = defaultGatewayID
 	// host.Networking.DefaultGatewayPrivateIP = defaultGatewayPrivateIP

@@ -2,29 +2,12 @@
 {{-   $extra := .Extra }}
 {{-   $rsc := .Resource }}
 {{-   $provider := .Provider }}
-{{-   $template := "" }}
-{{-   $image := "" }}
-{{-   $disksize := 0 }}
-{{-   $publicip := false }}
-{{-   $az := "nova" }}
-{{-   $region := "" }}
-{{-   if hasField $provider "Authentication" }}
-{{-     $region = $provider.Authentication.Region }}
-{{-   end }}
-{{-   if hasField $extra "Request" }}
-{{-     $template = $extra.Request.TemplateRef }}
-{{-     $publicip = default $extra.Request.PublicIP false }}
-{{-   end  }}
-{{-   if hasField $rsc "Sizing" }}
-{{-     $image = $rsc.Sizing.ImageID }}
-{{-     $disksize = $rsc.Sizing.DiskSize }}
-{{-   end }}
-{{-   if hasField $rsc "Networking" }}
-{{-     $publicip = or $publicip $rsc.Networking.IsGateway }}
-{{-   end }}
-{{-   if hasField $extra "AvailabilityZone" }}
-{{-     $az = $extra.AvailabilityZone }}
-{{-   end }}
+{{-   $region := $provider.Authentication.Region }}
+{{-   $template := $extra.Template }}
+{{-   $image := $extra.Image }}
+{{-   $disksize := $extra.DiskSize }}
+{{-   $publicip := default $extra.PublicIP false }}
+{{-   $az := default $extra.AvailabilityZone "nova" }}
 {{-   if hasField $extra "Subnets" }}
 {{-     range $k, $v := $extra.Subnets }}
 resource "openstack_networking_port_v2" "nic_{{ $rsc.Name }}_{{ $v.Name }}" {
@@ -44,12 +27,8 @@ resource "openstack_networking_port_v2" "nic_{{ $rsc.Name }}_{{ $v.Name }}" {
 resource "openstack_compute_instance_v2" "{{ $rsc.Name }}" {
 	provider          = openstack.ovh
 	name              = "{{ $rsc.Name }}"
-{{-   if $template }}
 	flavor_name       = "{{ $template }}"
-{{-   end }}
-{{-   if $image }}
 	image_id          = "{{ $image }}"
-{{-   end }}
 
 {{-   if gt (len $extra.SecurityGroupByID) 0 }}
 {{-      $sep := "" }}
@@ -76,7 +55,6 @@ resource "openstack_compute_instance_v2" "{{ $rsc.Name }}" {
 	}
 {{-   end }}
 
-{{-   if gt $disksize 0 }}
 	block_device {
 		uuid                  = "{{ $image }}"
 		source_type           = "image"
@@ -85,7 +63,6 @@ resource "openstack_compute_instance_v2" "{{ $rsc.Name }}" {
 		boot_index            = 0
 		delete_on_termination = true
 	}
-{{-   end }}
 
 {{- if $extra.MarkedForCreation }}
 	user_data = "${file("{{ $rsc.Name }}_userdata")}"
@@ -98,7 +75,7 @@ resource "openstack_compute_instance_v2" "{{ $rsc.Name }}" {
 	}
 
 	lifecycle {
-		ignore_changes = [block_device, user_data]
+		ignore_changes = [block_device, user_data, flavor_name, image_id, availability_zone]
 	}
 }
 

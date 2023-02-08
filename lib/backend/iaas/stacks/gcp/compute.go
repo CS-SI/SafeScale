@@ -281,12 +281,12 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	logrus.WithContext(ctx).Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
 
 	// Select usable availability zone, the first one in the list
+	var az string
 	if s.GcpConfig.Zone == "" {
 		azList, xerr := s.ListAvailabilityZones(ctx)
 		if xerr != nil {
 			return nil, nil, xerr
 		}
-		var az string
 		for az = range azList {
 			break
 		}
@@ -375,6 +375,7 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 	logrus.WithContext(ctx).Debugf("Host '%s' created.", ahf.GetName())
 
 	// Add to abstract.HostFull data that does not come with creation data from provider
+	ahf.Description.AZ = az
 	ahf.PrivateKey = userData.FirstPrivateKey // Add PrivateKey to Host description
 	ahf.Password = request.Password           // and OperatorUsername's password
 	ahf.Networking.IsGateway = request.IsGateway

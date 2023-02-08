@@ -459,7 +459,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 
 					subnetList = append(subnetList, cloned)
 				}
-				innerXErr := ahc.AddOptions(abstract.WithExtraData("Subnets", subnetList))
+				innerXErr := ahc.AddOptions(abstract.WithExtraData("Subnets", subnetList), abstract.WithExtraData("PublicIP", hnV2.IsGateway))
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -509,39 +509,98 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 		index++
 		instance.localCache.installMethods.Store(index, installmethod.None)
 
-		// -- updates terraformer extra security groups data in abstract
+		// -- updates terraformer extra data in abstract
 		if svc.Capabilities().UseTerraformer {
-			prov, xerr := svc.ProviderDriver()
-			if xerr != nil {
-				return innerXErr
-			}
-			castedProv, innerErr := lang.Cast[providers.ReservedForTerraformerUse](prov)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
+			{
+				prov, xerr := svc.ProviderDriver()
+				if xerr != nil {
+					return innerXErr
+				}
+				castedProv, innerErr := lang.Cast[providers.ReservedForTerraformerUse](prov)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				innerXErr := castedProv.ConsolidateHostSnippet(ahc)
+				if innerXErr != nil {
+					return innerXErr
+				}
 			}
 
-			innerXErr := castedProv.ConsolidateHostSnippet(ahc)
-			if innerXErr != nil {
-				return innerXErr
-			}
-
+			var sgs map[string]string
 			innerXErr = props.Inspect(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
 				sgsV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
 
-				list := make(map[string]string, len(sgsV1.ByName))
+				sgs = make(map[string]string, len(sgsV1.ByName))
 				for k, v := range sgsV1.ByName {
-					list[v] = k
+					sgs[v] = k
 				}
-				return ahc.AddOptions(abstract.WithExtraData("SecurityGroupByID", list))
+				return nil
 			})
 			if innerXErr != nil {
 				return innerXErr
 			}
 
-			// -- update abstract in scope
+			var (
+				template, diskSize string
+			)
+			innerXErr = props.Inspect(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
+				hsV2, innerErr := clonable.Cast[*propertiesv2.HostSizing](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				template = hsV2.Template
+				diskSize = strconv.Itoa(hsV2.AllocatedSize.DiskSize)
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			var image string
+			innerXErr = props.Inspect(hostproperty.SystemV1, func(p clonable.Clonable) fail.Error {
+				systemV1, innerErr := clonable.Cast[*propertiesv1.HostSystem](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				image = systemV1.Image
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			var az string
+			innerXErr = props.Inspect(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
+				descV1, innerErr := clonable.Cast[*propertiesv1.HostDescription](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				az = descV1.AZ
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			innerXErr = ahc.AddOptions(
+				abstract.WithExtraData("SecurityGroupByID", sgs),
+				abstract.WithExtraData("Image", image),
+				abstract.WithExtraData("Template", template),
+				abstract.WithExtraData("DiskSize", diskSize),
+				abstract.WithExtraData("AvailabilityZone", az),
+			)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			// -- register abstract in Scope if needed
 			_, innerXErr = instance.Job().Scope().RegisterAbstractIfNeeded(ahc)
 			return innerXErr
 		}
@@ -1287,6 +1346,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 						}
 					}
 					hostDescriptionV1.Creator = creator
+					hostDescriptionV1.AZ = ahf.Description.AZ
 					return nil
 				})
 				if innerXErr != nil {

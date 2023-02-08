@@ -22,11 +22,6 @@ import (
 
 // ShouldTrace tells if a specific trace is asked for
 func ShouldTrace(key string) bool {
-	// --VPL: temporary trace everything I need right now
-	if strings.Contains(key, "securitygroup") || strings.Contains(key, "network") || strings.Contains(key, "subnet") || strings.Contains(key, "host") {
-		return true
-	}
-	// --ENDVPL
 	if key = strings.TrimSpace(key); key == "" {
 		return false
 	}

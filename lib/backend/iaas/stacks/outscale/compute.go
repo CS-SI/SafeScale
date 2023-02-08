@@ -613,7 +613,7 @@ func (instance *stack) addNICs(ctx context.Context, request *abstract.HostReques
 	return []osc.Nic{}, nil
 }
 
-func (instance *stack) addGPUs(ctx context.Context, request *abstract.HostRequest, tpl abstract.HostTemplate, vmID string) (ferr fail.Error) {
+func (instance *stack) addGPUs(ctx context.Context, _ *abstract.HostRequest, tpl abstract.HostTemplate, vmID string) (ferr fail.Error) {
 	if tpl.GPUNumber <= 0 {
 		return nil
 	}
@@ -1048,6 +1048,7 @@ func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequ
 	ahf.CurrentState, ahf.LastState = hoststate.Started, hoststate.Started
 	ahf.Tags["Template"] = vm.VmType
 	ahf.Tags["Image"] = vm.ImageId
+	ahf.Description.AZ = vmsRequest.Placement.SubregionName
 
 	// recover metadata
 	for _, rt := range vm.Tags {
@@ -1084,11 +1085,11 @@ func (instance *stack) deleteHost(ctx context.Context, id string) fail.Error {
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
-func (instance *stack) ClearHostStartupScript(ctx context.Context, hostParam iaasapi.HostIdentifier) fail.Error {
+func (instance *stack) ClearHostStartupScript(_ context.Context, _ iaasapi.HostIdentifier) fail.Error {
 	return nil
 }
 
-func (instance *stack) ChangeSecurityGroupSecurity(ctx context.Context, b bool, b2 bool, net string, s2 string) fail.Error {
+func (instance *stack) ChangeSecurityGroupSecurity(_ context.Context, _ bool, _ bool, _ string, _ string) fail.Error {
 	return nil
 }
 
@@ -1275,7 +1276,7 @@ func (instance *stack) ListHosts(ctx context.Context, details bool) (_ abstract.
 }
 
 // StopHost stops the host identified by id
-func (instance *stack) StopHost(ctx context.Context, host iaasapi.HostIdentifier, gracefully bool) (ferr fail.Error) {
+func (instance *stack) StopHost(ctx context.Context, host iaasapi.HostIdentifier, _ bool) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}

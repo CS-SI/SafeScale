@@ -1386,25 +1386,26 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 				return xerr
 			}
 
-			xerr = alterSubnetMetadata(ctx, subnetTrx, func(as *abstract.Subnet, props *serialize.JSONProperties) (finnerXErr fail.Error) {
-				// 1st Delete gateway(s)
-				gwIDs, innerXErr := trxDeleteGateways(ctx, subnetTrx)
-				if innerXErr != nil {
-					return innerXErr
-				}
+			// Delete gateway(s)
+			gwIDs, innerXErr := trxDeleteGateways(ctx, subnetTrx)
+			if innerXErr != nil {
+				return innerXErr
+			}
 
-				// FIXME: see if we can adapt relaxedDeleteHost to use context values and prevent duplicated code...
-				// Unbind Host from current Subnet (not done by relaxedDeleteHost as Hosts are gateways, to avoid deadlock as Subnet instance may already be locked)
-				if len(gwIDs) > 0 {
-					for _, v := range gwIDs {
-						innerXErr = instance.trxAbandonHost(ctx, subnetTrx, v)
-						if innerXErr != nil {
-							return innerXErr
-						}
+			// Unbind Host from current Subnet (not done by relaxedDeleteHost as Hosts are gateways, to avoid deadlock as Subnet instance may already be locked)
+			if len(gwIDs) > 0 {
+				for _, v := range gwIDs {
+					innerXErr = instance.trxAbandonHost(ctx, subnetTrx, v)
+					if innerXErr != nil {
+						return innerXErr
 					}
 				}
+			}
 
-				// 2nd delete VIP if needed
+			var abstractSubnet *abstract.Subnet
+			xerr = alterSubnetMetadata(ctx, subnetTrx, func(as *abstract.Subnet, props *serialize.JSONProperties) (finnerXErr fail.Error) {
+				abstractSubnet = as
+				// delete VIP if needed
 				if as.VIP != nil {
 					innerXErr := svc.DeleteVIP(ctx, as.VIP)
 					if innerXErr != nil {
@@ -1412,8 +1413,8 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 					}
 				}
 
-				// 3rd delete security groups associated to Subnet by users (do not include SG created with Subnet, they will be deleted later)
-				innerXErr = props.Alter(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+				// delete security groups associated to Subnet by users (do not include SG created with Subnet, they will be deleted later)
+				return props.Alter(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
 					ssgV1, innerErr := clonable.Cast[*propertiesv1.SubnetSecurityGroups](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
@@ -1421,41 +1422,41 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 
 					return instance.trxUnbindSecurityGroups(ctx, subnetTrx, ssgV1)
 				})
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				// 4st free CIDR index if the Subnet has been created for a single Host
-				if as.SingleHostCIDRIndex > 0 {
-					// networkInstance, innerXErr := instance.unsafeInspectNetwork()
-					networkInstance, innerXErr := LoadNetwork(ctx, as.Network)
-					if innerXErr != nil {
-						return innerXErr
-					}
-
-					networkTrx, innerXErr := newNetworkTransaction(ctx, networkInstance)
-					if innerXErr != nil {
-						return innerXErr
-					}
-					defer networkTrx.TerminateFromError(ctx, &finnerXErr)
-
-					innerXErr = trxFreeCIDRForSingleHost(ctx, networkTrx, as.SingleHostCIDRIndex)
-					if innerXErr != nil {
-						return innerXErr
-					}
-				}
-
-				// finally delete Subnet
-				logrus.WithContext(ctx).Debugf("Deleting Subnet '%s'...", as.Name)
-				innerXErr = instance.deleteSubnetThenWaitCompletion(ctx, subnetTrx)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				// Delete Subnet's own Security Groups
-				return instance.deleteSecurityGroups(ctx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
 			})
 			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+
+			// free CIDR index if the Subnet has been created for a single Host
+			if abstractSubnet.SingleHostCIDRIndex > 0 {
+				// networkInstance, innerXErr := instance.unsafeInspectNetwork()
+				networkInstance, xerr := LoadNetwork(ctx, abstractSubnet.Network)
+				if xerr != nil {
+					return xerr
+				}
+
+				networkTrx, xerr := newNetworkTransaction(ctx, networkInstance)
+				if xerr != nil {
+					return xerr
+				}
+				defer networkTrx.TerminateFromError(ctx, &ferr)
+
+				xerr = trxFreeCIDRForSingleHost(ctx, networkTrx, abstractSubnet.SingleHostCIDRIndex)
+				if xerr != nil {
+					return xerr
+				}
+			}
+
+			// Delete Subnet's own Security Groups
+			xerr = instance.deleteSecurityGroups(ctx, [3]string{abstractSubnet.GWSecurityGroupID, abstractSubnet.InternalSecurityGroupID, abstractSubnet.PublicIPSecurityGroupID})
+			if xerr != nil {
+				return xerr
+			}
+
+			// finally delete Subnet
+			logrus.WithContext(ctx).Debugf("Deleting Subnet '%s'...", abstractSubnet.Name)
+			xerr = instance.deleteSubnetThenWaitCompletion(ctx, subnetTrx)
 			if xerr != nil {
 				return xerr
 			}

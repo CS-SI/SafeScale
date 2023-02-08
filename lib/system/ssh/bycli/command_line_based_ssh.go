@@ -403,11 +403,6 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 	// 	scfg.SecondaryGatewayConfig.Port = 22
 	// }
 
-	targetHost, xerr := scfg.GetHostname()
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	targetIPAddr, xerr := scfg.GetIPAddress()
 	if xerr != nil {
 		return nil, xerr
@@ -434,7 +429,7 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 		gwUser,
 		gwIPAddr,
 		options,
-		targetHost,
+		//targetHost,
 		gwPort,
 	)
 
@@ -897,11 +892,10 @@ func (scmd *CliCommand) taskExecute(inctx context.Context, p interface{}) (data.
 func (scmd *CliCommand) Close() (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if scmd == nil {
-		return fail.InvalidInstanceError()
+		return nil
 	}
 
 	var err1 error
-
 	if len(scmd.tunnels) > 0 {
 		err1 = scmd.tunnels.Close()
 	}
@@ -1259,8 +1253,9 @@ func (sconf *Profile) WaitServerReady(ctx context.Context, phase string, timeout
 			var sshCmd sshapi.Command
 			var innerXErr fail.Error
 			defer func() {
-				if sshCmd != nil {
-					_ = sshCmd.Close()
+				derr := sshCmd.Close()
+				if derr != nil {
+					_ = ferr.AddConsequence(derr)
 				}
 			}()
 

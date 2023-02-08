@@ -122,11 +122,11 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 			diskSize = template.DiskSize
 		} else {
 			if template.Cores < 16 { // nolint
-				template.DiskSize = 100
+				diskSize = 100
 			} else if template.Cores < 32 {
-				template.DiskSize = 200
+				diskSize = 200
 			} else {
-				template.DiskSize = 400
+				diskSize = 400
 			}
 		}
 	}
@@ -175,7 +175,11 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		abstract.WithExtraData("Request", request),
 		abstract.WithExtraData("AvailabilityZone", azone),
 		abstract.WithExtraData("Subnets", request.Subnets),
+		abstract.WithExtraData("PublicIP", request.PublicIP || request.IsGateway),
 		abstract.WithExtraData("SecurityGroupByID", request.SecurityGroupByID),
+		abstract.WithExtraData("DiskSize", ahf.Sizing.DiskSize),
+		abstract.WithExtraData("Image", ahf.Sizing.ImageID),
+		abstract.WithExtraData("Template", template.Name),
 	)
 	if xerr != nil {
 		return nil, nil, xerr
@@ -588,6 +592,8 @@ func (p *provider) complementHost(ctx context.Context, hostCore *abstract.HostCo
 		host.Networking.SubnetsByName = subnetsByName
 		host.Networking.IPv4Addresses = ipv4Addresses
 		host.Networking.IPv6Addresses = ipv6Addresses
+
+		host.Description.AZ = creationZone
 	}
 	return host, nil
 }

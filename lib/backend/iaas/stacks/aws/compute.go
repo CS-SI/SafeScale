@@ -605,12 +605,12 @@ func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequ
 	logrus.WithContext(ctx).Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
 
 	// Select usable availability zone, the first one in the list
+	var az string
 	if instance.AwsConfig.Zone == "" {
 		azList, xerr := instance.ListAvailabilityZones(ctx)
 		if xerr != nil {
 			return nil, nil, xerr
 		}
-		var az string
 		for az = range azList {
 			break
 		}
@@ -627,6 +627,7 @@ func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequ
 
 	ahf.PrivateKey = userData.FirstPrivateKey // Add initial PrivateKey to Host description
 	ahf.Password = request.Password
+	ahf.Description.AZ = az
 
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
 	ahf.Networking.IsGateway = request.IsGateway

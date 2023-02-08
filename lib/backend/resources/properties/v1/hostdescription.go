@@ -37,6 +37,7 @@ type HostDescription struct {
 	Purpose string    `json:"purpose,omitempty"`  // contains a description of the use of a host (not set for now)
 	Tenant  string    `json:"tenant,omitempty"`   // contains the tenant name used to create the host
 	Domain  string    `json:"domain,omitempty"`   // Contains the domain used to define the FQDN of the host at creation (taken from first network attached to the host)
+	AZ      string    `json:"az,omitempty"`       // Contains the availability zone where the Host resides
 }
 
 // NewHostDescription ...

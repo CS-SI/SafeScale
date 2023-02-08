@@ -818,6 +818,7 @@ func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequ
 		finalServer    *servers.Server
 		finalHostNets  []servers.Network
 		finalHostPorts []ports.Port
+		creationZone   string
 	)
 	xerr = retry.WhileUnsuccessful(
 		func() error {
@@ -885,7 +886,7 @@ func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequ
 			ahc.ID = server.ID
 			ahc.Name = request.ResourceName
 
-			creationZone, innerXErr := instance.GetAvailabilityZoneOfServer(ctx, ahc.ID)
+			creationZone, innerXErr = instance.GetAvailabilityZoneOfServer(ctx, ahc.ID)
 			if innerXErr != nil {
 				logrus.WithContext(ctx).Tracef("Host '%s' successfully created but cannot confirm AZ: %s", ahc.Name, innerXErr)
 			} else {
@@ -895,7 +896,8 @@ func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequ
 				}
 			}
 
-			if hs := toHostState(server.Status); hs == hoststate.Error || hs == hoststate.Failed {
+			hs := toHostState(server.Status)
+			if hs == hoststate.Error || hs == hoststate.Failed {
 				if server != nil {
 					_ = instance.DeleteHost(cleanupContextFrom(ctx), server.ID)
 				}
@@ -954,6 +956,7 @@ func (instance *stack) CreateHost(ctx context.Context, request abstract.HostRequ
 	if xerr != nil {
 		return nil, nil, xerr
 	}
+	newHost.Description.AZ = creationZone
 	newHost.Networking.DefaultSubnetID = defaultSubnetID
 	// newHost.Networking.DefaultGatewayID = defaultGatewayID
 	// newHost.Networking.DefaultGatewayPrivateIP = request.DefaultRouteIP
