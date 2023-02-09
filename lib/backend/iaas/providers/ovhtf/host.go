@@ -688,7 +688,7 @@ func (p *provider) DeleteHost(ctx context.Context, hostParam iaasapi.HostIdentif
 		return xerr
 	}
 
-	def, xerr := renderer.Assemble(ctx)
+	def, xerr := renderer.Assemble(ctx, ahf)
 	if xerr != nil {
 		return xerr
 	}
@@ -918,12 +918,6 @@ func (p *provider) UnbindSecurityGroupFromHost(ctx context.Context, asg *abstrac
 	}
 
 	currentSGs := map[string]string{}
-	state, xerr := renderer.State(ctx)
-	if xerr != nil {
-		return xerr
-	}
-	_ = state
-
 	newSGs := map[string]string{}
 	for k, v := range currentSGs {
 		if v != asg.Name {

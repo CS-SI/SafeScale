@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	sshapi "github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/eko/gocache/v2/store"
 	"github.com/gofrs/uuid"
@@ -905,24 +906,15 @@ func (instance *Share) Unmount(ctx context.Context, target *Host) (ferr fail.Err
 	if target == nil {
 		return fail.InvalidParameterCannotBeNilError("target")
 	}
-	castedTarget, err := lang.Cast[*Host](target)
-	if err != nil {
-		return fail.Wrap(err)
-	}
 
-	var (
-		shareName, shareID string
-		hostShare          *propertiesv1.HostShare
-	)
-
-	targetName := castedTarget.GetName()
-	state, xerr := castedTarget.GetState(ctx)
+	targetState, xerr := target.GetState(ctx)
 	if xerr != nil {
 		return xerr
 	}
 
-	if state != hoststate.Started {
-		return fail.InvalidRequestError(fmt.Sprintf("cannot unmount share on '%s', '%s' is NOT started", targetName, targetName))
+	targetSSH, xerr := target.GetSSHConfig(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	shareTrx, xerr := newShareTransaction(ctx, instance)
@@ -931,8 +923,40 @@ func (instance *Share) Unmount(ctx context.Context, target *Host) (ferr fail.Err
 	}
 	defer shareTrx.TerminateFromError(ctx, &ferr)
 
+	targetTrx, xerr := newHostTransaction(ctx, target)
+	if xerr != nil {
+		return xerr
+	}
+	defer targetTrx.TerminateFromError(ctx, &ferr)
+
+	return instance.trxUnmount(ctx, shareTrx, targetTrx, targetState, targetSSH)
+}
+
+// trxUnmount unmounts a Share from local directory of a host
+func (instance *Share) trxUnmount(ctx context.Context, shareTrx shareTransaction, targetTrx hostTransaction, hostState hoststate.Enum, targetSSH sshapi.Config) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if hostState == hoststate.Started && targetSSH == nil {
+		return fail.InvalidParameterCannotBeNilError("targetSSH")
+	}
+
+	var (
+		shareName, shareID string
+		hostShare          *propertiesv1.HostShare
+	)
+
+	targetName := targetTrx.GetName()
+	targetID, err := targetTrx.GetID()
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
+	if hostState != hoststate.Started {
+		return fail.InvalidRequestError(fmt.Sprintf("cannot unmount share on '%s', '%s' is NOT started", targetName, targetName))
+	}
+
 	// Retrieve info about the Share
-	xerr = inspectShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
+	xerr := inspectShareMetadataAbstract(ctx, shareTrx, func(as *abstract.Share) fail.Error {
 		shareName = as.Name
 		shareID = as.ID
 		return nil
@@ -956,45 +980,36 @@ func (instance *Share) Unmount(ctx context.Context, target *Host) (ferr fail.Err
 		return xerr
 	}
 
-	xerr = inspectHostMetadataProperty(ctx, serverTrx, hostproperty.SharesV1, func(hostSharesV1 *propertiesv1.HostShares) fail.Error {
-		var found bool
-		if hostShare, found = hostSharesV1.ByID[shareID]; !found {
-			return fail.NotFoundError("failed to find Share '%s' in Host '%s' metadata", shareName, serverName)
+	if hostState == hoststate.Started {
+		xerr = inspectHostMetadataProperty(ctx, serverTrx, hostproperty.SharesV1, func(hostSharesV1 *propertiesv1.HostShares) fail.Error {
+			var found bool
+			if hostShare, found = hostSharesV1.ByID[shareID]; !found {
+				return fail.NotFoundError("failed to find Share '%s' in Host '%s' metadata", shareName, serverName)
+			}
+
+			return nil
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
 		}
 
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+		var mount *propertiesv1.HostRemoteMount
+		xerr = inspectHostMetadataProperty(ctx, targetTrx, hostproperty.MountsV1, func(targetMountsV1 *propertiesv1.HostMounts) fail.Error {
+			var found bool
+			mount, found = targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
+			if !found {
+				return fail.NotFoundError("not mounted on host '%s'", targetName)
+			}
 
-	var mountPath string
-	remotePath := serverPrivateIP + ":" + hostShare.Path
-	targetID, err := target.GetID()
-	if err != nil {
-		return fail.Wrap(err)
-	}
-
-	targetTrx, xerr := newHostTransaction(ctx, castedTarget)
-	if xerr != nil {
-		return xerr
-	}
-	defer targetTrx.TerminateFromError(ctx, &ferr)
-
-	xerr = alterHostMetadataProperty(ctx, targetTrx, hostproperty.MountsV1, func(targetMountsV1 *propertiesv1.HostMounts) fail.Error {
-		mount, found := targetMountsV1.RemoteMountsByPath[targetMountsV1.RemoteMountsByShareID[shareID]]
-		if !found {
-			return fail.NotFoundError("not mounted on host '%s'", targetName)
+			return nil
+		})
+		if xerr != nil {
+			return xerr
 		}
 
 		// Unmount Share from client
-		sshConfig, inErr := target.GetSSHConfig(ctx)
-		if inErr != nil {
-			return inErr
-		}
-
-		sshProfile, inErr := sshfactory.NewConnector(sshConfig)
+		sshProfile, inErr := sshfactory.NewConnector(targetSSH)
 		if inErr != nil {
 			return inErr
 		}
@@ -1009,16 +1024,17 @@ func (instance *Share) Unmount(ctx context.Context, target *Host) (ferr fail.Err
 			return inErr
 		}
 
-		// Remove mount from mount list
-		mountPath = mount.Path
-		delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
-		delete(targetMountsV1.RemoteMountsByPath, mountPath)
-		delete(targetMountsV1.RemoteMountsByExport, remotePath)
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+		// Remove mount from target mount list
+		xerr = alterHostMetadataProperty(ctx, targetTrx, hostproperty.MountsV1, func(targetMountsV1 *propertiesv1.HostMounts) fail.Error {
+			delete(targetMountsV1.RemoteMountsByShareID, mount.ShareID)
+			delete(targetMountsV1.RemoteMountsByPath, mount.Path)
+			delete(targetMountsV1.RemoteMountsByExport, mount.Path)
+			return nil
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 	}
 
 	// Remove host from client lists of the Share

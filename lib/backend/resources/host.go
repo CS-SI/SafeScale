@@ -761,13 +761,21 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	trx, xerr := newHostTransaction(ctx, instance)
+	hostTrx, xerr := newHostTransaction(ctx, instance)
 	if xerr != nil {
 		return state, xerr
 	}
-	defer trx.TerminateFromError(ctx, &ferr)
+	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	xerr = metadata.AlterAbstract[*abstract.HostCore](ctx, trx, func(ahc *abstract.HostCore) fail.Error {
+	return instance.trxForceGetState(ctx, hostTrx)
+}
+
+// trxForceGetState returns the current state of the provider Host then alter metadata
+func (instance *Host) trxForceGetState(ctx context.Context, hostTrx hostTransaction) (state hoststate.Enum, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	state = hoststate.Unknown
+	xerr := alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
 		abstractHostFull, innerXErr := instance.Service().InspectHost(ctx, ahc)
 		if innerXErr != nil {
 			return innerXErr
@@ -2830,6 +2838,11 @@ func (instance *Host) trxRelaxedDeleteHost(ctx context.Context, hostTrx hostTran
 		return fail.Wrap(err)
 	}
 
+	hostState, xerr := instance.trxForceGetState(ctx, hostTrx)
+	if xerr != nil {
+		return xerr
+	}
+
 	defer func() {
 		if ferr == nil && cache != nil {
 			_ = cache.Delete(ctx, hid)
@@ -2858,6 +2871,7 @@ func (instance *Host) trxRelaxedDeleteHost(ctx context.Context, hostTrx hostTran
 							debug.IgnoreErrorWithContext(ctx, innerErr)
 							continue
 						}
+
 						return fail.NotAvailableError("Host '%s' exports %d share%s and at least one share is mounted", instance.GetName(), shareCount, strprocess.Plural(uint(shareCount)))
 					}
 				}
@@ -2897,6 +2911,7 @@ func (instance *Host) trxRelaxedDeleteHost(ctx context.Context, hostTrx hostTran
 			if nAttached > 0 {
 				return fail.NotAvailableError("Host '%s' has %d Volume%s attached", instance.GetName(), nAttached, strprocess.Plural(uint(nAttached)))
 			}
+
 			return nil
 		})
 	})
@@ -2908,224 +2923,271 @@ func (instance *Host) trxRelaxedDeleteHost(ctx context.Context, hostTrx hostTran
 	var (
 		single         bool
 		singleSubnetID string
+		mounts         []*propertiesv1.HostShare
 	)
-	xerr = alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
-		// If Host has mounted shares, unmounts them before anything else
-		var mounts []*propertiesv1.HostShare
-		innerXErr := props.Inspect(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
+	xerr = inspectHostMetadataProperty(ctx, hostTrx, hostproperty.MountsV1, func(hostMountsV1 *propertiesv1.HostMounts) fail.Error {
+		for _, i := range hostMountsV1.RemoteMountsByPath {
+			// Retrieve Share data
+			shareInstance, loopErr := LoadShare(ctx, i.ShareID)
+			if loopErr != nil {
+				switch loopErr.(type) {
+				case *fail.ErrNotFound:
+					debug.IgnoreError(loopErr)
+					continue
+				default:
+					return loopErr
+				}
 			}
 
-			for _, i := range hostMountsV1.RemoteMountsByPath {
-				// Retrieve Share data
-				shareInstance, loopErr := LoadShare(ctx, i.ShareID)
-				if loopErr != nil {
-					switch loopErr.(type) {
-					case *fail.ErrNotFound:
-						debug.IgnoreError(loopErr)
+			// Retrieve data about the server serving the Share
+			hostServer, loopErr := shareInstance.GetServer(ctx)
+			if loopErr != nil {
+				return loopErr
+			}
+
+			// Retrieve data about v from its server
+			item, loopErr := hostServer.GetShare(ctx, i.ShareID)
+			if loopErr != nil {
+				return loopErr
+			}
+
+			mounts = append(mounts, item)
+		}
+
+		return nil
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	// Unmounts tier shares mounted on Host (done outside the previous Host.properties.Reading() section, because
+	// Unmount() have to lock for write, and won't succeed while Host.properties.Reading() is running,
+	// leading to a deadlock)
+	for _, v := range mounts {
+		shareInstance, loopErr := LoadShare(ctx, v.ID)
+		if loopErr != nil {
+			switch loopErr.(type) {
+			case *fail.ErrNotFound:
+				debug.IgnoreErrorWithContext(ctx, loopErr)
+				continue
+			default:
+				return loopErr
+			}
+		}
+
+		shareTrx, xerr := newShareTransaction(ctx, shareInstance)
+		if xerr != nil {
+			return xerr
+		}
+		defer func(trx shareTransaction) { trx.TerminateFromError(ctx, &ferr) }(shareTrx)
+
+		loopErr = shareInstance.trxUnmount(ctx, shareTrx, hostTrx, hostState, instance.localCache.sshCfg)
+		if loopErr != nil {
+			return loopErr
+		}
+	}
+
+	// if Host exports shares, delete them
+	for _, v := range shares {
+		shareInstance, loopErr := LoadShare(ctx, v.Name)
+		if loopErr != nil {
+			switch loopErr.(type) {
+			case *fail.ErrNotFound:
+				debug.IgnoreErrorWithContext(ctx, loopErr)
+				continue
+			default:
+				return loopErr
+			}
+		}
+
+		loopErr = shareInstance.Delete(ctx)
+		if loopErr != nil {
+			return loopErr
+		}
+	}
+
+	// Walk through property propertiesv1.HostNetworking to remove the reference to the Host in Subnets
+	xerr = inspectHostMetadataProperty(ctx, hostTrx, hostproperty.NetworkV2, func(hostNetworkV2 *propertiesv2.HostNetworking) fail.Error {
+		hostID, err := instance.GetID()
+		if err != nil {
+			return fail.Wrap(err)
+		}
+
+		single = hostNetworkV2.Single
+		if single {
+			singleSubnetID = hostNetworkV2.DefaultSubnetID
+		}
+
+		if !single {
+			var errs []error
+			for k := range hostNetworkV2.SubnetsByID {
+				if !hostNetworkV2.IsGateway && k != hostNetworkV2.DefaultSubnetID {
+					subnetInstance, loopErr := LoadSubnet(ctx, "", k)
+					if loopErr != nil {
+						logrus.WithContext(ctx).Errorf(loopErr.Error())
+						errs = append(errs, loopErr)
 						continue
-					default:
-						return loopErr
 					}
-				}
 
-				// Retrieve data about the server serving the Share
-				hostServer, loopErr := shareInstance.GetServer(ctx)
-				if loopErr != nil {
-					return loopErr
-				}
-
-				// Retrieve data about v from its server
-				item, loopErr := hostServer.GetShare(ctx, i.ShareID)
-				if loopErr != nil {
-					return loopErr
-				}
-
-				mounts = append(mounts, item)
-			}
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		// Unmounts tier shares mounted on Host (done outside the previous Host.properties.Reading() section, because
-		// Unmount() have to lock for write, and won't succeed while Host.properties.Reading() is running,
-		// leading to a deadlock)
-		for _, v := range mounts {
-			shareInstance, loopErr := LoadShare(ctx, v.ID)
-			if loopErr != nil {
-				switch loopErr.(type) {
-				case *fail.ErrNotFound:
-					debug.IgnoreErrorWithContext(ctx, loopErr)
-					continue
-				default:
-					return loopErr
-				}
-			}
-
-			loopErr = shareInstance.Unmount(ctx, instance)
-			if loopErr != nil {
-				return loopErr
-			}
-		}
-
-		// if Host exports shares, delete them
-		for _, v := range shares {
-			shareInstance, loopErr := LoadShare(ctx, v.Name)
-			if loopErr != nil {
-				switch loopErr.(type) {
-				case *fail.ErrNotFound:
-					debug.IgnoreErrorWithContext(ctx, loopErr)
-					continue
-				default:
-					return loopErr
-				}
-			}
-
-			loopErr = shareInstance.Delete(ctx)
-			if loopErr != nil {
-				return loopErr
-			}
-		}
-
-		// Walk through property propertiesv1.HostNetworking to remove the reference to the Host in Subnets
-		innerXErr = props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-			hostNetworkV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			hostID, err := instance.GetID()
-			if err != nil {
-				return fail.Wrap(err)
-			}
-
-			single = hostNetworkV2.Single
-			if single {
-				singleSubnetID = hostNetworkV2.DefaultSubnetID
-			}
-
-			if !single {
-				var errs []error
-				for k := range hostNetworkV2.SubnetsByID {
-					if !hostNetworkV2.IsGateway && k != hostNetworkV2.DefaultSubnetID {
-						subnetInstance, loopErr := LoadSubnet(ctx, "", k)
-						if loopErr != nil {
-							logrus.WithContext(ctx).Errorf(loopErr.Error())
-							errs = append(errs, loopErr)
-							continue
-						}
-
-						loopErr = subnetInstance.DetachHost(ctx, hostID)
-						if loopErr != nil {
-							logrus.WithContext(ctx).Errorf(loopErr.Error())
-							errs = append(errs, loopErr)
-							continue
-						}
-					}
-				}
-				if len(errs) > 0 {
-					return fail.Wrap(fail.NewErrorList(errs), "failed to update metadata for Subnets of Host")
-				}
-			}
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		// Unbind Security Groups from Host
-		innerXErr = props.Alter(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-			hsgV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			// Unbind Security Groups from Host
-			var errs []error
-			for _, v := range hsgV1.ByID {
-				sgInstance, rerr := LoadSecurityGroup(ctx, v.ID)
-				if rerr != nil {
-					switch rerr.(type) {
-					case *fail.ErrNotFound:
-						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreErrorWithContext(ctx, rerr)
-					default:
-						errs = append(errs, rerr)
-					}
-					continue
-				}
-
-				rerr = sgInstance.UnbindFromHost(ctx, instance)
-				if rerr != nil {
-					switch rerr.(type) {
-					case *fail.ErrNotFound:
-						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreErrorWithContext(ctx, rerr)
-					default:
-						errs = append(errs, rerr)
+					loopErr = subnetInstance.DetachHost(ctx, hostID)
+					if loopErr != nil {
+						logrus.WithContext(ctx).Errorf(loopErr.Error())
+						errs = append(errs, loopErr)
+						continue
 					}
 				}
 			}
 			if len(errs) > 0 {
-				return fail.Wrap(fail.NewErrorList(errs), "failed to unbind some Security Groups")
+				return fail.Wrap(fail.NewErrorList(errs), "failed to update metadata for Subnets of Host")
 			}
+		}
+		return nil
+	})
+	if xerr != nil {
+		return xerr
+	}
 
-			return nil
-		})
-		if innerXErr != nil {
-			return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
+	// Unbind Security Groups from Host
+	var hostSGS *propertiesv1.HostSecurityGroups
+	xerr = inspectHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) (finnerXErr fail.Error) {
+		hostSGS = hsgV1
+		return nil
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	// Unbind Security Groups from Host
+	var errs []error
+	for _, v := range hostSGS.ByID {
+		sgInstance, xerr := LoadSecurityGroup(ctx, v.ID)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// Consider that a Security Group that cannot be loaded or is not bound as a success
+				debug.IgnoreErrorWithContext(ctx, xerr)
+			default:
+				errs = append(errs, xerr)
+			}
+			continue
 		}
 
-		// Unbind labels from Host
-		innerXErr = props.Alter(hostproperty.LabelsV1, func(p clonable.Clonable) fail.Error {
-			hlV1, innerErr := clonable.Cast[*propertiesv1.HostLabels](p)
+		sgTrx, xerr := newSecurityGroupTransaction(ctx, sgInstance)
+		if xerr != nil {
+			errs = append(errs, xerr)
+			continue
+		}
+		defer func(trx securityGroupTransaction) { trx.TerminateFromError(ctx, &ferr) }(sgTrx)
+
+		xerr = sgInstance.trxUnbindFromHost(ctx, sgTrx, hostTrx)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// Consider that a Security Group that cannot be loaded or is not bound as a success
+				debug.IgnoreErrorWithContext(ctx, xerr)
+			default:
+				errs = append(errs, xerr)
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return fail.Wrap(fail.NewErrorList(errs), "failed to unbind some Security Groups")
+	}
+
+	// Unbind labels from Host
+	var hostLabels *propertiesv1.HostLabels
+	xerr = inspectHostMetadataProperty(ctx, hostTrx, hostproperty.LabelsV1, func(hlV1 *propertiesv1.HostLabels) fail.Error {
+		hostLabels = hlV1
+		return nil
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	for k := range hostLabels.ByID {
+		labelInstance, innerErr := LoadLabel(ctx, k)
+		if innerErr != nil {
+			switch innerErr.(type) {
+			case *fail.ErrNotFound:
+				// Consider that a Security Group that cannot be loaded or is not bound as a success
+				debug.IgnoreErrorWithContext(ctx, innerErr)
+			default:
+				errs = append(errs, innerErr)
+			}
+			continue
+		}
+
+		labelTrx, xerr := newLabelTransaction(ctx, labelInstance)
+		if xerr != nil {
+			return xerr
+		}
+		defer func(trx labelTransaction) { trx.TerminateFromError(ctx, &ferr) }(labelTrx)
+
+		innerErr = labelInstance.trxUnbindFromHost(ctx, labelTrx, hostTrx)
+		if innerErr != nil {
+			switch innerErr.(type) {
+			case *fail.ErrNotFound:
+				// Consider that a Security Group that cannot be loaded or is not bound as a success
+				debug.IgnoreErrorWithContext(ctx, innerErr)
+			default:
+				errs = append(errs, innerErr)
+			}
+		}
+	}
+	if len(errs) > 0 {
+		return fail.Wrap(fail.NewErrorList(errs), "failed to unbind some Security Groups")
+	}
+
+	// Delete Host
+	var abstractHost *abstract.HostCore
+	xerr = inspectHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
+		abstractHost = ahc
+		return nil
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	waitForDeletion := true
+	xerr = retry.WhileUnsuccessful(
+		func() error {
+			select {
+			case <-ctx.Done():
+				return retry.StopRetryError(ctx.Err())
+			default:
+			}
+
+			innerErr := svc.DeleteHost(ctx, abstractHost)
 			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			// Unbind Security Groups from Host
-			var errs []error
-			for k := range hlV1.ByID {
-				labelInstance, rerr := LoadLabel(ctx, k)
-				if rerr != nil {
-					switch rerr.(type) {
-					case *fail.ErrNotFound:
-						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreErrorWithContext(ctx, rerr)
-					default:
-						errs = append(errs, rerr)
-					}
-					continue
+				switch innerErr.(type) {
+				case *fail.ErrNotFound:
+					// A Host not found is considered as a successful deletion
+					logrus.WithContext(ctx).Tracef("Host not found, deletion considered as a success")
+					debug.IgnoreErrorWithContext(ctx, innerErr)
+				default:
+					return fail.Wrap(innerErr, "cannot delete Host")
 				}
-
-				rerr = labelInstance.UnbindFromHost(ctx, instance)
-				if rerr != nil {
-					switch rerr.(type) {
-					case *fail.ErrNotFound:
-						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						debug.IgnoreErrorWithContext(ctx, rerr)
-					default:
-						errs = append(errs, rerr)
-					}
-				}
+				waitForDeletion = false
 			}
-			if len(errs) > 0 {
-				return fail.Wrap(fail.NewErrorList(errs), "failed to unbind some Security Groups")
-			}
-
 			return nil
-		})
-		if innerXErr != nil {
-			return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
+		},
+		timings.SmallDelay(),
+		timings.HostCleanupTimeout(),
+	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout:
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
 		}
+	}
 
-		// Delete Host
-		waitForDeletion := true
-		innerXErr = retry.WhileUnsuccessful(
+	// wait for effective Host deletion
+	if waitForDeletion {
+		xerr = retry.WhileUnsuccessfulWithHardTimeout(
 			func() error {
 				select {
 				case <-ctx.Done():
@@ -3133,83 +3195,39 @@ func (instance *Host) trxRelaxedDeleteHost(ctx context.Context, hostTrx hostTran
 				default:
 				}
 
-				if rerr := svc.DeleteHost(ctx, ahc); rerr != nil {
-					switch rerr.(type) {
+				state, stateErr := svc.GetHostState(ctx, abstractHost.ID)
+				if stateErr != nil {
+					switch stateErr.(type) {
 					case *fail.ErrNotFound:
-						// A Host not found is considered as a successful deletion
-						logrus.WithContext(ctx).Tracef("Host not found, deletion considered as a success")
-						debug.IgnoreErrorWithContext(ctx, rerr)
+						// If Host is not found anymore, consider this as a success
+						debug.IgnoreErrorWithContext(ctx, stateErr)
+						return nil
 					default:
-						return fail.Wrap(rerr, "cannot delete Host")
+						return stateErr
 					}
-					waitForDeletion = false
+				}
+				if state == hoststate.Error {
+					return fail.NotAvailableError("Host is in state Error")
 				}
 				return nil
 			},
-			timings.SmallDelay(),
-			timings.HostCleanupTimeout(),
+			timings.NormalDelay(),
+			timings.OperationTimeout(),
 		)
-		if innerXErr != nil {
-			switch innerXErr.(type) {
+		if xerr != nil {
+			switch xerr.(type) {
 			case *retry.ErrStopRetry:
-				return fail.Wrap(fail.Cause(innerXErr), "stopping retries")
-			case *retry.ErrTimeout:
-				return fail.Wrap(fail.Cause(innerXErr), "timeout")
-			default:
-				return innerXErr
-			}
-		}
-
-		// wait for effective Host deletion
-		if waitForDeletion {
-			innerXErr = retry.WhileUnsuccessfulWithHardTimeout(
-				func() error {
-					select {
-					case <-ctx.Done():
-						return retry.StopRetryError(ctx.Err())
-					default:
-					}
-
-					state, stateErr := svc.GetHostState(ctx, ahc.ID)
-					if stateErr != nil {
-						switch stateErr.(type) {
-						case *fail.ErrNotFound:
-							// If Host is not found anymore, consider this as a success
-							debug.IgnoreErrorWithContext(ctx, stateErr)
-							return nil
-						default:
-							return stateErr
-						}
-					}
-					if state == hoststate.Error {
-						return fail.NotAvailableError("Host is in state Error")
-					}
-					return nil
-				},
-				timings.NormalDelay(),
-				timings.OperationTimeout(),
-			)
-			if innerXErr != nil {
-				switch innerXErr.(type) {
-				case *retry.ErrStopRetry:
-					innerXErr = fail.Wrap(fail.Cause(innerXErr))
-					if _, ok := innerXErr.(*fail.ErrNotFound); !ok || valid.IsNil(innerXErr) {
-						return innerXErr
-					}
-					debug.IgnoreErrorWithContext(ctx, innerXErr)
-				case *fail.ErrNotFound:
-					debug.IgnoreErrorWithContext(ctx, innerXErr)
-				default:
-					return innerXErr
+				xerr = fail.Wrap(fail.Cause(xerr))
+				if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
+					return xerr
 				}
+				debug.IgnoreErrorWithContext(ctx, xerr)
+			case *fail.ErrNotFound:
+				debug.IgnoreErrorWithContext(ctx, xerr)
+			default:
+				return xerr
 			}
 		}
-
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
 	}
 
 	if single {
