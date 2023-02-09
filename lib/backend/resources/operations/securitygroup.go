@@ -543,9 +543,9 @@ func (instance *SecurityGroup) unbindFromSubnets(
 				return fail.InconsistentError("failed to cast value to '*abstract.Subnet'")
 			}
 		}
-		value = ctx.Value(currentSubnetPropertiesContextKey)
-		if value != nil {
-			currentSubnetAbstract, ok = value.(*abstract.Subnet)
+		vpro := ctx.Value(currentSubnetPropertiesContextKey)
+		if vpro != nil {
+			currentSubnetProps, ok = vpro.(*serialize.JSONProperties)
 			if !ok {
 				return fail.InconsistentError("failed to cast value to '*unsafeSerialize.JSONProperties'")
 			}
