@@ -26,11 +26,10 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	datatests "github.com/CS-SI/SafeScale/v22/lib/utils/data/tests"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type SomeClonable struct {
@@ -39,7 +38,7 @@ type SomeClonable struct {
 }
 
 func (e *SomeClonable) IsNull() bool {
-	return e.value == ""
+	return e == nil || e.value == ""
 }
 func (e *SomeClonable) Clone() (clonable.Clonable, error) {
 	return &SomeClonable{value: e.value}, nil
@@ -56,14 +55,14 @@ func (e *SomeClonable) GetValue() string {
 	return e.value
 }
 
-func Test_NewShileded(t *testing.T) {
-
-	// Expect panic
+func Test_NewShielded(t *testing.T) {
+	// Expect NO panic
 	func() {
 		defer func() {
 			r := recover()
-			require.NotEqual(t, r, nil)
+			require.Nil(t, r)
 		}()
+
 		var a *SomeClonable
 		_, _ = NewShielded(a)
 	}()
@@ -80,28 +79,23 @@ func Test_NewShileded(t *testing.T) {
 		return nil
 	})
 	require.Nil(t, err)
-
 }
 
 func TestShielded_IsNull(t *testing.T) {
-
 	var s *Shielded[*SomeClonable]
 	require.EqualValues(t, s.IsNull(), true)
 
-	a := &SomeClonable{}
-	c, err := NewShielded(a)
-	require.Nil(t, err)
-	require.EqualValues(t, c.IsNull(), true)
+	var a *SomeClonable
+	_, xerr := NewShielded(a)
+	require.NotNil(t, xerr)
 
-	a = &SomeClonable{value: "any"}
-	c, err = NewShielded(a)
-	require.Nil(t, err)
-	require.EqualValues(t, c.IsNull(), false)
-
+	a = &SomeClonable{}
+	require.True(t, a.IsNull())
+	_, xerr = NewShielded(a)
+	require.Nil(t, xerr)
 }
 
 func TestShielded_Clone(t *testing.T) {
-
 	// Expect panic
 	func() {
 		defer func() {
@@ -109,70 +103,77 @@ func TestShielded_Clone(t *testing.T) {
 			require.NotEqual(t, r, nil)
 			fmt.Println(r)
 		}()
+
 		var s *Shielded[*SomeClonable]
 		_, _ = s.Clone()
 	}()
 
 	a := &SomeClonable{value: "any"}
-	c, err := NewShielded(a)
+	c, xerr := NewShielded(a)
+	require.Nil(t, xerr)
+
+	_, err := c.Clone()
 	require.Nil(t, err)
 
 	r, err := clonable.CastedClone[*Shielded[*SomeClonable]](c)
 	require.Nil(t, err)
 
-	err = c.Alter(func(data *SomeClonable) fail.Error {
+	xerr = c.Alter(func(data *SomeClonable) fail.Error {
 		data.SetValue("any 2")
 		return nil
 	})
-	require.Nil(t, err)
-	err = c.Inspect(func(data *SomeClonable) fail.Error {
+	require.Nil(t, xerr)
+
+	xerr = c.Inspect(func(data *SomeClonable) fail.Error {
 		require.EqualValues(t, data.GetValue(), "any 2")
 		return nil
 	})
-	require.Nil(t, err)
-	err = r.Inspect(func(data *SomeClonable) fail.Error {
+	require.Nil(t, xerr)
+
+	xerr = r.Inspect(func(data *SomeClonable) fail.Error {
 		// if is "any 2", is swallow clone
 		require.EqualValues(t, data.GetValue(), "any")
 		return nil
 	})
-	require.Nil(t, err)
+	require.Nil(t, xerr)
 
 }
 
 func TestShielded_Inpect(t *testing.T) {
 
 	var a *Shielded[*SomeClonable]
-	var derr error
-
-	err := a.Inspect(func(_ *SomeClonable) fail.Error {
+	xerr := a.Inspect(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
-	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
-	require.Contains(t, err.Error(), "calling method from a nil pointer")
+	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrInvalidInstance")
+	require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
 	a = &Shielded[*SomeClonable]{}
-	err = a.Inspect(func(_ *SomeClonable) fail.Error {
+	xerr = a.Inspect(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
-	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
-	require.Contains(t, err.Error(), "invalid instance content")
+	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrInvalidInstance")
 
-	a, derr = NewShielded(&SomeClonable{value: "any"})
-	require.EqualValues(t, derr, nil)
+	a, err := NewShielded(&SomeClonable{value: "any"})
+	require.EqualValues(t, err, nil)
 	var f func(_ *SomeClonable) fail.Error
-	err = a.Inspect(f)
-	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.Contains(t, err.Error(), "invalid parameter: inspector")
+	xerr = a.Inspect(f)
+	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrInvalidParameter")
+	require.Contains(t, xerr.Error(), "invalid parameter: inspector")
 
 	a = &Shielded[*SomeClonable]{}
-	err = a.Inspect(func(_ *SomeClonable) fail.Error {
+	xerr = a.Inspect(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
-	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
-	require.Contains(t, err.Error(), "invalid instance content: d.witness")
+	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrInvalidInstance")
 
-	a, derr = NewShielded(&SomeClonable{value: "any"})
-	require.EqualValues(t, derr, nil)
+	var some *SomeClonable
+	a, xerr = NewShielded[*SomeClonable](some)
+	require.NotNil(t, xerr)
+	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrInvalidParameter")
+
+	a, err = NewShielded(&SomeClonable{value: "any"})
+	require.Nil(t, err)
 	err = a.Inspect(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
@@ -183,49 +184,42 @@ func TestShielded_Inpect(t *testing.T) {
 func TestShielded_Alter(t *testing.T) {
 
 	var a *Shielded[*SomeClonable]
-	var derr error
-
-	err := a.Alter(func(_ *SomeClonable) fail.Error {
+	xerr := a.Alter(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
-	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstance")
-	require.Contains(t, err.Error(), "calling method from a nil pointer")
+	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrInvalidInstance")
 
 	a = &Shielded[*SomeClonable]{}
-	err = a.Alter(func(_ *SomeClonable) fail.Error {
+	xerr = a.Alter(func(_ *SomeClonable) fail.Error {
 		return nil
 	})
-	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
-	require.Contains(t, err.Error(), "invalid instance content")
+	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrInvalidInstance")
 
-	a, derr = NewShielded(&SomeClonable{value: "any"})
-	require.EqualValues(t, derr, nil)
+	a, xerr = NewShielded(&SomeClonable{value: "any"})
+	require.Nil(t, xerr)
 
 	var f func(_ *SomeClonable) fail.Error
-	err = a.Alter(f)
-	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidParameter")
-	require.Contains(t, err.Error(), "invalid parameter: alterer")
+	xerr = a.Alter(f)
+	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrInvalidParameter")
 
-	a = &Shielded[*SomeClonable]{}
-	err = a.Alter(func(_ *SomeClonable) fail.Error {
-		return nil
-	})
-	require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrInvalidInstanceContent")
-	require.Contains(t, err.Error(), "invalid instance content: d.witness")
+	var some *SomeClonable
+	a, xerr = NewShielded[*SomeClonable](some)
+	require.NotNil(t, xerr)
+	require.EqualValues(t, reflect.TypeOf(xerr).String(), "*fail.ErrInvalidParameter")
 
-	a, derr = NewShielded(&SomeClonable{value: "any"})
-	require.EqualValues(t, derr, nil)
+	a, xerr = NewShielded(&SomeClonable{value: "any"})
+	require.Nil(t, xerr)
 
-	err = a.Alter(func(p *SomeClonable) fail.Error {
+	xerr = a.Alter(func(p *SomeClonable) fail.Error {
 		p.SetValue("any 2")
 		return nil
 	})
-	require.Nil(t, err)
-	err = a.Inspect(func(data *SomeClonable) fail.Error {
+	require.Nil(t, xerr)
+	xerr = a.Inspect(func(data *SomeClonable) fail.Error {
 		require.EqualValues(t, data.GetValue(), "any 2")
 		return nil
 	})
-	require.Nil(t, err)
+	require.Nil(t, xerr)
 
 }
 
@@ -309,6 +303,7 @@ func TestTakiTaki(t *testing.T) {
 	go func() { // simulate a goroutine that also can access this armored value and tries to change it
 		inerr := armored.Alter(func(p *datatests.StructWithoutPointers) fail.Error {
 			defer wg.Done()
+			assert.Equal(t, p, a)
 
 			time.Sleep(60 * time.Millisecond)
 			p.Rumba++
@@ -320,6 +315,7 @@ func TestTakiTaki(t *testing.T) {
 	}()
 	err = armored.Alter(func(p *datatests.StructWithoutPointers) fail.Error {
 		defer wg.Done()
+		assert.Equal(t, p, a)
 
 		time.Sleep(80 * time.Millisecond)
 		p.Rumba++
@@ -332,14 +328,17 @@ func TestTakiTaki(t *testing.T) {
 	wg.Wait()
 
 	err = armored.Inspect(func(p *datatests.StructWithoutPointers) fail.Error {
+		assert.Equal(t, p, a)
 		assert.Equal(t, 11, p.Rumba)
+
 		return nil
 	})
 	if err != nil {
 		t.Errorf("Ugh: %s", err)
 	}
 
-	assert.Equal(t, 9, a.Rumba)
+	// a.RumbaMUST have the same value than inside the inspect, it's the same pointer, it's the reason for existence of Shielded
+	assert.Equal(t, 11, a.Rumba)
 }
 
 // cri cri criminal, Ozuna
@@ -427,7 +426,7 @@ func TestCriminal(t *testing.T) {
 		t.Errorf("Ugh: %s", err)
 	}
 
-	assert.Equal(t, 9, a.Rumba)
+	assert.Equal(t, 10, a.Rumba)
 }
 
 func TestSerialize(t *testing.T) {
@@ -435,9 +434,9 @@ func TestSerialize(t *testing.T) {
 	a.Rumba = 9
 	a.Content = "Bailame como si fuera la ultima vez"
 
-	armored, err := NewShielded(a)
-	if err != nil {
-		t.Error(err)
+	armored, xerr := NewShielded(a)
+	if xerr != nil {
+		t.Error(xerr)
 		t.FailNow()
 	}
 	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
@@ -451,39 +450,37 @@ func TestSerialize(t *testing.T) {
 }
 
 func TestSerializeDeserialize(t *testing.T) {
+	spanish := "Bailame como si fuera la ultima vez"
+	english := "Dance with me like it's the last time"
+
 	a := datatests.NewStructWithoutPointers()
+	require.NotNil(t, a)
 	a.Rumba = 9
-	a.Content = "Bailame como si fuera la ultima vez"
-	assert.NotNil(t, a)
+	a.Content = spanish
 
 	b := datatests.NewStructWithoutPointers()
-	gotForYou, err := NewShielded(b)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-	assert.NotNil(t, gotForYou)
+	require.NotNil(t, b)
+	b.Rumba = 10
+	b.Content = english
+	gotForYou, xerr := NewShielded(b)
+	require.Nil(t, xerr)
 
-	armored, err := NewShielded(a)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-	assert.NotNil(t, armored)
+	armored, xerr := NewShielded(a)
+	require.Nil(t, xerr)
+	require.NotNil(t, armored)
 	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
 
 	content, err := armored.Serialize()
-	assert.Nil(t, err)
-	assert.NotNil(t, content)
+	require.Nil(t, err)
+	require.NotNil(t, content)
 
 	err = gotForYou.Deserialize(content)
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
-	err = gotForYou.Inspect(func(take *datatests.StructWithoutPointers) fail.Error {
-		trumba := take.Rumba
-		assert.Equal(t, "Bailame como si fuera la ultima vez", take)
-		assert.Equal(t, 9, trumba)
+	xerr = gotForYou.Inspect(func(take *datatests.StructWithoutPointers) fail.Error {
+		require.EqualValues(t, spanish, take.Content)
+		require.EqualValues(t, 9, take.Rumba)
 		return nil
 	})
-	assert.Nil(t, err)
+	require.Nil(t, xerr)
 }

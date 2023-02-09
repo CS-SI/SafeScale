@@ -1371,7 +1371,7 @@ type ErrInvalidInstance struct {
 
 // InvalidInstanceError creates an ErrInvalidInstance error
 func InvalidInstanceError() *ErrInvalidInstance {
-	r := newError(nil, nil, callstack.DecorateWith("invalid instance", "", "calling method from a nil pointer", 0))
+	r := newError(nil, nil, callstack.DecorateWith("invalid instance", "", "calling method from a nil pointer or zero-value", 0))
 	r.grpcCode = codes.FailedPrecondition
 	// Systematically log this kind of error
 	logrus.Error(r.Error())
@@ -1380,7 +1380,7 @@ func InvalidInstanceError() *ErrInvalidInstance {
 
 // InvalidInstanceErrorWithCause creates an ErrInvalidInstance error
 func InvalidInstanceErrorWithCause(cause error, consequences []error, msg ...interface{}) *ErrInvalidInstance {
-	r := newError(cause, consequences, callstack.DecorateWith("invalid instance", "", "calling method from a nil pointer", 0))
+	r := newError(cause, consequences, callstack.DecorateWith("invalid instance", "", "calling method from a nil pointer or zero-value", 0))
 	r.grpcCode = codes.FailedPrecondition
 	return &ErrInvalidInstance{r}
 }

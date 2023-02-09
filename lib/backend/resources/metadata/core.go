@@ -1360,14 +1360,14 @@ func (instance *Core[T]) serialize(inctx context.Context) ([]byte, fail.Error) {
 				propsMapped    = map[string]string{}
 			)
 
-			var xerr fail.Error
-			shieldedJSONed, xerr = instance.carried.Serialize()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
+			var err error
+			shieldedJSONed, err = instance.carried.Serialize()
+			err = debug.InjectPlannedError(err)
+			if err != nil {
+				return nil, fail.Wrap(err)
 			}
 
-			err := json.Unmarshal(shieldedJSONed, &shieldedMapped)
+			err = json.Unmarshal(shieldedJSONed, &shieldedMapped)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return nil, fail.NewErrorWithCause(err, "*Core.Serialize(): Unmarshalling JSONed carried into map failed!")
@@ -1492,10 +1492,10 @@ func (instance *Core[T]) deserialize(inctx context.Context, buf []byte) fail.Err
 				return fail.SyntaxErrorWithCause(err, nil, "failed to marshal Core to JSON")
 			}
 
-			xerr := instance.carried.Deserialize(jsoned)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return fail.Wrap(xerr, "deserializing Core failed")
+			err = instance.carried.Deserialize(jsoned)
+			err = debug.InjectPlannedError(err)
+			if err != nil {
+				return fail.Wrap(err, "deserializing Core failed")
 			}
 
 			if len(props) > 0 {
@@ -1505,10 +1505,10 @@ func (instance *Core[T]) deserialize(inctx context.Context, buf []byte) fail.Err
 					return fail.SyntaxErrorWithCause(err, nil, "failed to marshal properties to JSON")
 				}
 
-				xerr = instance.properties.Deserialize(jsoned)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return fail.Wrap(xerr, "failed to deserialize properties")
+				err = instance.properties.Deserialize(jsoned)
+				err = debug.InjectPlannedError(err)
+				if err != nil {
+					return fail.Wrap(err, "failed to deserialize properties")
 				}
 			}
 			return nil

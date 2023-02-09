@@ -313,7 +313,7 @@ func (ud Content) GenerateToFile(phase Phase, filename string) fail.Error {
 		return xerr
 	}
 
-	err := ioutil.WriteFile(filename, content, 0600)
+	err := os.WriteFile(filename, content, 0600)
 	if err != nil {
 		return fail.Wrap(err, "failed to generate userdata in file '%s'", filename)
 	}

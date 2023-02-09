@@ -34,7 +34,15 @@ type Shielded[T clonable.Clonable] struct {
 }
 
 // NewShielded creates a new protected data from a witness
-func NewShielded[T clonable.Clonable](witness T) (*Shielded[T], error) {
+func NewShielded[T clonable.Clonable](witness T) (*Shielded[T], fail.Error) {
+	casted, err := lang.Cast[any](witness)
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+	if casted == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("witness")
+	}
+
 	out := &Shielded[T]{
 		witness: witness,
 		lock:    &sync.RWMutex{},
@@ -45,7 +53,7 @@ func NewShielded[T clonable.Clonable](witness T) (*Shielded[T], error) {
 // IsNull ...
 // satisfies interface clonable.Clonable
 func (instance *Shielded[T]) IsNull() bool {
-	return instance == nil || valid.IsNil(instance.witness) || instance.lock == nil
+	return instance == nil || instance.lock == nil
 }
 
 // Clone ...
@@ -60,7 +68,7 @@ func (instance *Shielded[T]) Clone() (clonable.Clonable, error) {
 
 // Replace ...
 func (instance *Shielded[T]) Replace(in clonable.Clonable) error {
-	if instance == nil {
+	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -74,6 +82,10 @@ func (instance *Shielded[T]) Replace(in clonable.Clonable) error {
 
 // String returns a string representation of the Shielded
 func (instance *Shielded[T]) String() (string, error) {
+	if valid.IsNull(instance) {
+		return "", fail.InvalidInstanceError()
+	}
+
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
@@ -87,7 +99,7 @@ func (instance *Shielded[T]) String() (string, error) {
 func (instance *Shielded[T]) Inspect(inspector func(p T) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil {
+	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if inspector == nil {
@@ -116,7 +128,7 @@ func (instance *Shielded[T]) Inspect(inspector func(p T) fail.Error) (ferr fail.
 func (instance *Shielded[T]) Alter(alterer func(T) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil {
+	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if alterer == nil {
@@ -125,10 +137,6 @@ func (instance *Shielded[T]) Alter(alterer func(T) fail.Error) (ferr fail.Error)
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
-
-	if any(instance.witness) == any(nil) {
-		return fail.InvalidInstanceContentError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
-	}
 
 	var xerr fail.Error
 	clone, err := clonable.CastedClone[T](instance.witness)
@@ -149,11 +157,11 @@ func (instance *Shielded[T]) Alter(alterer func(T) fail.Error) (ferr fail.Error)
 }
 
 // Serialize transforms content of Shielded instance to data suitable for serialization
-// Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (instance *Shielded[T]) Serialize() (_ []byte, ferr fail.Error) {
+// satisfies interface data.Serializable
+func (instance *Shielded[T]) Serialize() (_ []byte, ferr error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil {
+	if valid.IsNull(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -175,11 +183,11 @@ func (instance *Shielded[T]) Serialize() (_ []byte, ferr fail.Error) {
 }
 
 // Deserialize transforms serialization data to valid content of Shielded instance
-// Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (instance *Shielded[T]) Deserialize(buf []byte) (ferr fail.Error) {
+// satisfies interface data.Serializable
+func (instance *Shielded[T]) Deserialize(buf []byte) (ferr error) {
 	defer fail.OnPanic(&ferr)
 
-	if instance == nil {
+	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
 	if len(buf) == 0 {

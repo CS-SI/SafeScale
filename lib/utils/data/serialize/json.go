@@ -348,7 +348,7 @@ func (x *JSONProperties) Serialize() (_ []byte, ferr fail.Error) {
 	for k, v := range x.Properties {
 		ser, err := v.Serialize()
 		if err != nil {
-			return nil, err
+			return nil, fail.Wrap(err)
 		}
 		mapped[k] = string(ser)
 	}
@@ -413,7 +413,7 @@ func (x *JSONProperties) Deserialize(buf []byte) (ferr fail.Error) {
 		}
 		err := prop.Shielded.Deserialize([]byte(v))
 		if err != nil {
-			return err
+			return fail.Wrap(err)
 		}
 	}
 	return nil
