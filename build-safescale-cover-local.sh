@@ -64,6 +64,7 @@ CIBIN=/exported make installci force_sdk_python force_sdk_js
 
 cp ${WRKDIR}/SafeScale/go.mod /exported
 cp ${WRKDIR}/SafeScale/go.sum /exported
+cp ${WRKDIR}/SafeScale/lib/protocol/safescale.proto /exported
 cp ${WRKDIR}/SafeScale/lib/protocol/javascript/* /exported
 cp ${WRKDIR}/SafeScale/lib/protocol/python3/* /exported
 

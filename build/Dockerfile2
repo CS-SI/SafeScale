@@ -115,5 +115,6 @@ COPY --from=builder /exported-$GOOSX-$GOARCHX/safescaled /exported-$GOOSX-$GOARC
 COPY --from=builder /exported-$GOOSX-$GOARCHX/safescale /exported-$GOOSX-$GOARCHX/safescale
 COPY --from=builder /exported-$GOOSX-$GOARCHX/go.mod /exported-$GOOSX-$GOARCHX/go.mod
 COPY --from=builder /exported-$GOOSX-$GOARCHX/go.sum /exported-$GOOSX-$GOARCHX/go.sum
+COPY --from=builder /exported-$GOOSX-$GOARCHX/safescale.proto /exported-$GOOSX-$GOARCHX/safescale.proto
 COPY --from=builder /exported-$GOOSX-$GOARCHX/safescale_pb.js /exported-$GOOSX-$GOARCHX/safescale_pb.js
 COPY --from=builder /exported-$GOOSX-$GOARCHX/safescale_grpc_web_pb.js /exported-$GOOSX-$GOARCHX/safescale_grpc_web_pb.js

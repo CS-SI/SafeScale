@@ -93,6 +93,7 @@ CIBIN=/exported-$GOOS-$GOARCH make installci force_sdk_js force_sdk_python
 
 cp ${WRKDIR}/SafeScale/go.mod /exported-$GOOS-$GOARCH
 cp ${WRKDIR}/SafeScale/go.sum /exported-$GOOS-$GOARCH
+cp ${WRKDIR}/SafeScale/lib/protocol/safescale.proto /exported-$GOOS-$GOARCH
 cp ${WRKDIR}/SafeScale/lib/protocol/javascript/* /exported-$GOOS-$GOARCH
 cp ${WRKDIR}/SafeScale/lib/protocol/python3/* /exported-$GOOS-$GOARCH
 
