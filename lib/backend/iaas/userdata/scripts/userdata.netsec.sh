@@ -105,7 +105,7 @@ function reset_fw() {
   case $LINUX_KIND in
   debian)
     echo "Reset firewall"
-    sfRetry4 "sfApt update" || failure 207 "reset_fw(): failure running apt update"
+    sfApt update || failure 207 "reset_fw(): failure running apt update"
     sfRetry4 "sfApt -y autoclean autoremove" || failure 210 "reset_fw(): failure running cleanup"
     sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 210 "reset_fw(): failure installing iptables"
     sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3" || failure 211 "reset_fw(): failure installing firewalld"
@@ -122,7 +122,7 @@ function reset_fw() {
 
   ubuntu)
     echo "Reset firewall"
-    sfRetry4 "sfApt update" || failure 213 "reset_fw(): failure running apt update"
+    sfApt update || failure 213 "reset_fw(): failure running apt update"
     sfRetry4 "sfApt -y autoclean autoremove" || failure 213 "reset_fw(): failure running cleanup"
     sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 214 "reset_fw(): failure installing iptables"
     sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3" || failure 215 "reset_fw(): failure installing firewalld"
@@ -1310,7 +1310,7 @@ function install_drivers_nvidia() {
   ubuntu)
     sfFinishPreviousInstall
     add-apt-repository -y ppa:graphics-drivers &> /dev/null
-    sfRetry4 "sfApt update" || failure 201 "apt update failed"
+    sfApt update || failure 201 "apt update failed"
     sfRetry4 "sfApt -y install nvidia-410 &>/dev/null" || {
       sfRetry4 "sfApt -y install nvidia-driver-410 &>/dev/null" || failure 201 "failed nvidia driver install"
     }
@@ -1321,10 +1321,10 @@ function install_drivers_nvidia() {
       echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >> /etc/modprobe.d/blacklist-nouveau.conf
       rmmod nouveau
     fi
-    sfRetry4 "sfApt update"
+    sfApt update
     sfRetry4 "sfApt install -y --no-install-recommends dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null" || failure 202 "failure installing nvdiia requirements"
     dpkg --add-architecture i386 &> /dev/null
-    sfRetry4 "sfApt update"
+    sfApt update
     sfRetry4 "sfApt install -y --no-install-recommends lib32z1 lib32ncurses5 &>/dev/null" || failure 203 "failure installing nvidia requirements"
     wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &> /dev/null || failure 204 "failure downloading nvidia installer"
     bash NVIDIA-Linux-x86_64-410.78.run -s || failure 205 "failure running nvidia installer"
