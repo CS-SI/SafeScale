@@ -22,11 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	"github.com/eko/gocache/v2/store"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
-
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers"
@@ -45,9 +40,12 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"github.com/eko/gocache/v2/store"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -503,7 +501,7 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 				if ferr != nil {
 					derr := svc.DeleteSecurityGroup(cleanupContextFrom(ctx), asg)
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), name))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to Delete Security Group '%s'", ActionFromError(ferr), name))
 					}
 				}
 			}()
@@ -516,13 +514,13 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 				return ar, ar.rErr
 			}
 
-			// Starting from here, delete Subnet metadata on error
+			// Starting from here, Delete Subnet metadata on error
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil {
 					derr := instance.Core.Delete(cleanupContextFrom(ctx))
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete metadata of Security Group '%s'", ActionFromError(ferr), name))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to Delete metadata of Security Group '%s'", ActionFromError(ferr), name))
 					}
 				}
 			}()
@@ -596,13 +594,22 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (ferr fai
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup"), "(force=%v)", force).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	trx, xerr := newSecurityGroupTransaction(ctx, instance)
+	sgTrx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateFromError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxDelete(ctx, trx, force)
+	xerr = sgTrx.Delete(ctx, force)
+	if xerr != nil {
+		return xerr
+	}
+
+	// Need to terminate Security Group transaction to be able to Delete metadata (no need to check error as we will Delete metadata
+	sgTrx.SilentTerminate(ctx)
+
+	// Delete Security Group metadata
+	return instance.Core.Delete(ctx)
 }
 
 // deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on Provider side
@@ -620,7 +627,8 @@ func deleteProviderSecurityGroup(ctx context.Context, svc iaasapi.Service, abstr
 			default:
 			}
 
-			if innerXErr := svc.DeleteSecurityGroup(ctx, abstractSG); innerXErr != nil {
+			innerXErr := svc.DeleteSecurityGroup(ctx, abstractSG)
+			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					return retry.StopRetryError(innerXErr)
@@ -675,13 +683,13 @@ func (instance *SecurityGroup) Clear(ctx context.Context) (ferr fail.Error) {
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	trx, xerr := newSecurityGroupTransaction(ctx, instance)
+	sgTrx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateFromError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxClear(ctx, trx)
+	return sgTrx.Clear(ctx)
 }
 
 // Reset clears a security group and re-adds associated rules as stored in metadata
@@ -698,14 +706,14 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (ferr fail.Error) {
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	trx, xerr := newSecurityGroupTransaction(ctx, instance)
+	sgTrx, xerr := newSecurityGroupTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateFromError(ctx, &ferr)
+	defer sgTrx.TerminateFromError(ctx, &ferr)
 
 	var rules abstract.SecurityGroupRules
-	xerr = inspectSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
+	xerr = inspectSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
 		rules = asg.Rules
 		return nil
 	})
@@ -715,14 +723,14 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Removes all rules...
-	xerr = instance.trxClear(ctx, trx)
+	xerr = sgTrx.Clear(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// ... then re-adds rules from metadata
-	xerr = instance.trxAddRules(ctx, trx, rules...)
+	xerr = sgTrx.AddRules(ctx, rules...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -812,12 +820,13 @@ func (instance *SecurityGroup) DeleteRules(ctx context.Context, rules ...*abstra
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
+				debug.IgnoreError(innerXErr)
 				break
+			default:
+				return innerXErr
 			}
-			return innerXErr
 		}
 
-		// asg.Replace(newAsg)
 		return nil
 	})
 }
@@ -935,7 +944,7 @@ func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance *Hos
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxBindToHost(ctx, sgTrx, hostTrx, enable, mark)
+	return sgTrx.BindToHost(ctx, hostTrx, enable, mark)
 }
 
 // UnbindFromHost unbinds the security group from a host
@@ -968,7 +977,7 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxUnbindFromHost(ctx, sgTrx, hostTrx)
+	return sgTrx.UnbindFromHost(ctx, hostTrx)
 }
 
 // UnbindFromHostByReference unbinds the security group from a host identified by reference (id or name)
@@ -1005,51 +1014,7 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	return alterSecurityGroupMetadata(ctx, sgTrx, func(asg *abstract.SecurityGroup, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			sgphV1, err := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
-			if err != nil {
-				return fail.Wrap(err)
-			}
-
-			var hostID, hostName string
-			b, ok := sgphV1.ByID[hostRef]
-			if ok {
-				hostID = hostRef
-				hostName = b.Name
-			} else {
-				hostID, ok = sgphV1.ByName[hostRef]
-				if ok {
-					hostName = hostRef
-				}
-			}
-			if hostID != "" {
-				innerXErr := alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-					// Unbind security group on provider side; if not found, considered as a success
-					innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahc)
-					if innerXErr != nil {
-						switch innerXErr.(type) {
-						case *fail.ErrNotFound:
-							debug.IgnoreError(innerXErr)
-							return nil
-						default:
-							return innerXErr
-						}
-					}
-
-					return nil
-				})
-				if innerXErr != nil {
-					return innerXErr
-				}
-			}
-
-			// updates security group properties
-			delete(sgphV1.ByID, hostID)
-			delete(sgphV1.ByName, hostName)
-			return nil
-		})
-	})
+	return sgTrx.UnbindFromHost(ctx, hostTrx)
 }
 
 // BindToSubnet binds the security group to a host
@@ -1082,28 +1047,30 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 	}
 	defer subnetTrx.TerminateFromError(ctx, &ferr)
 
-	xerr = inspectSubnetMetadataProperties(ctx, subnetTrx, func(props *serialize.JSONProperties) fail.Error {
-		var subnetHosts *propertiesv1.SubnetHosts
-		innerXErr := props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			var innerErr error
-			subnetHosts, innerErr = clonable.Cast[*propertiesv1.SubnetHosts](p)
-			return fail.Wrap(innerErr)
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		switch enable {
-		case SecurityGroupEnable:
-			innerXErr = instance.enableOnHostsAttachedToSubnet(ctx, subnetHosts)
-		case SecurityGroupDisable:
-			innerXErr = instance.disableOnHostsAttachedToSubnet(ctx, subnetHosts)
-		}
-		innerXErr = debug.InjectPlannedFail(innerXErr)
-		return innerXErr
+	var subnetHosts *propertiesv1.SubnetHosts
+	xerr = inspectSubnetMetadataProperty(ctx, subnetTrx, subnetproperty.HostsV1, func(shV1 *propertiesv1.SubnetHosts) fail.Error {
+		subnetHosts = shV1
+		return nil
 	})
 	if xerr != nil {
 		return xerr
+	}
+
+	switch enable {
+	case SecurityGroupEnable:
+		xerr = sgTrx.EnableOnHostsAttachedToSubnet(ctx, subnetHosts)
+	case SecurityGroupDisable:
+		xerr = sgTrx.DisableOnHostsAttachedToSubnet(ctx, subnetHosts)
+	}
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	subnetName := subnetTrx.GetName()
+	subnetID, err := subnetTrx.GetID()
+	if err != nil {
+		return fail.Wrap(err)
 	}
 
 	return alterSecurityGroupMetadata(ctx, sgTrx, func(asg *abstract.SecurityGroup, props *serialize.JSONProperties) fail.Error {
@@ -1112,11 +1079,7 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 				return fail.InvalidRequestError("security group is already marked as default for subnet %s", asg.DefaultForSubnet)
 			}
 
-			var err error
-			asg.DefaultForSubnet, err = subnetInstance.GetID()
-			if err != nil {
-				return fail.Wrap(err)
-			}
+			asg.DefaultForSubnet = subnetID
 		}
 
 		return props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
@@ -1126,12 +1089,6 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 			}
 
 			// First check if subnet is present with the state requested; if present with same state, consider situation as a success
-			subnetID, err := subnetInstance.GetID()
-			if err != nil {
-				return fail.Wrap(err)
-			}
-
-			subnetName := subnetInstance.GetName()
 			disable := !bool(enable)
 			if item, ok := sgsV1.ByID[subnetID]; !ok || item.Disabled == disable {
 				item = &propertiesv1.SecurityGroupBond{
@@ -1149,62 +1106,24 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 	})
 }
 
-// enableOnHostsAttachedToSubnet enables the security group on hosts attached to the network
-func (instance *SecurityGroup) enableOnHostsAttachedToSubnet(ctx context.Context, subnetHosts *propertiesv1.SubnetHosts) fail.Error {
-	if len(subnetHosts.ByID) > 0 {
-		tg := new(errgroup.Group)
-
-		for _, v := range subnetHosts.ByID {
-			v := v
-			tg.Go(func() error {
-				_, err := instance.taskBindEnabledOnHost(ctx, v)
-				return err
-			})
-		}
-		innerXErr := fail.Wrap(tg.Wait())
-		innerXErr = debug.InjectPlannedFail(innerXErr)
-		return innerXErr
-	}
-	return nil
-}
-
-// disableSecurityGroupOnHosts disables (ie remove) the security group from bound hosts
-func (instance *SecurityGroup) disableOnHostsAttachedToSubnet(ctx context.Context, subnetHosts *propertiesv1.SubnetHosts) fail.Error {
-	if len(subnetHosts.ByID) > 0 {
-		tg := new(errgroup.Group)
-
-		for _, v := range subnetHosts.ByID {
-			v := v
-			tg.Go(func() error {
-				_, err := instance.taskBindDisabledOnHost(ctx, v)
-				return err
-			})
-		}
-		xerr := fail.Wrap(tg.Wait())
-		xerr = debug.InjectPlannedFail(xerr)
-		return xerr
-	}
-	return nil
-}
-
-// unbindFromHostsAttachedToSubnet unbinds (ie remove) the security group from Hosts in a Subnet
-func (instance *SecurityGroup) unbindFromHostsAttachedToSubnet(ctx context.Context, subnetHosts *propertiesv1.SubnetHosts) fail.Error {
-	if len(subnetHosts.ByID) > 0 {
-		tg := new(errgroup.Group)
-
-		for _, v := range subnetHosts.ByID {
-			v := v
-			tg.Go(func() error {
-				_, err := instance.taskBindDisabledOnHost(ctx, v)
-				return err
-			})
-		}
-		xerr := fail.Wrap(tg.Wait())
-		xerr = debug.InjectPlannedFail(xerr)
-		return xerr
-	}
-	return nil
-}
+// // unbindFromHostsAttachedToSubnet unbinds (ie remove) the security group from Hosts in a Subnet
+// func (instance *SecurityGroup) unbindFromHostsAttachedToSubnet(ctx context.Context, subnetHosts *propertiesv1.SubnetHosts) fail.Error {
+// 	if len(subnetHosts.ByID) > 0 {
+// 		tg := new(errgroup.Group)
+//
+// 		for _, v := range subnetHosts.ByID {
+// 			v := v
+// 			tg.Go(func() error {
+// 				_, err := sgTrx.BindAsDisabledOnHost(ctx, v)
+// 				return err
+// 			})
+// 		}
+// 		xerr := fail.Wrap(tg.Wait())
+// 		xerr = debug.InjectPlannedFail(xerr)
+// 		return xerr
+// 	}
+// 	return nil
+// }
 
 // UnbindFromSubnet unbinds the security group from a subnet
 func (instance *SecurityGroup) UnbindFromSubnet(ctx context.Context, subnetInstance *Subnet) (ferr fail.Error) {
@@ -1235,7 +1154,7 @@ func (instance *SecurityGroup) UnbindFromSubnet(ctx context.Context, subnetInsta
 	}
 	defer subnetTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxUnbindFromSubnet(ctx, sgTrx, subnetTrx)
+	return sgTrx.UnbindFromSubnet(ctx, subnetTrx)
 }
 
 // UnbindFromSubnetByReference unbinds the security group from a subnet
@@ -1299,52 +1218,4 @@ func FilterBondsByKind(bonds map[string]*propertiesv1.SecurityGroupBond, state s
 		}
 	}
 	return list
-}
-
-// updateNetworkMetadataOnRemoval removes the reference to instance in Network metadata
-func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(inctx context.Context, networkTrx networkTransaction) fail.Error {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-	if inctx == nil {
-		return fail.InvalidParameterCannotBeNilError("inctx")
-	}
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-
-		sgid, err := instance.GetID()
-		if err != nil {
-			chRes <- result{fail.Wrap(err)}
-			return
-		}
-
-		// -- update Security Groups in Network metadata
-		xerr := alterNetworkMetadataProperty(ctx, networkTrx, networkproperty.SecurityGroupsV1, func(nsgV1 *propertiesv1.NetworkSecurityGroups) fail.Error {
-			delete(nsgV1.ByID, sgid)
-			delete(nsgV1.ByName, instance.GetName())
-			return nil
-		})
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-		chRes <- result{nil}
-	}()
-
-	select {
-	case res := <-chRes:
-		return res.rErr
-	case <-ctx.Done():
-		return fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		return fail.Wrap(inctx.Err())
-	}
 }

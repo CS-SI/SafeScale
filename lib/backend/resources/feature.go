@@ -25,13 +25,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	rscapi "github.com/CS-SI/SafeScale/v22/lib/backend/resources/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/protocol"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
@@ -328,7 +326,7 @@ func (instance *Feature) Check(ctx context.Context, target Targetable, v data.Ma
 			return nil, fail.Wrap(err)
 		}
 
-		targetTrx, xerr := metadata.NewTransaction[*abstract.HostCore, *Host](ctx, castedTarget)
+		targetTrx, xerr := newHostTransaction(ctx, castedTarget)
 		if xerr != nil {
 			return nil, xerr
 		}

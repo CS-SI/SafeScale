@@ -11,11 +11,23 @@ import (
 )
 
 type (
-	shareTransaction = metadata.Transaction[*abstract.Share, *Share]
+	shareTransaction     = *shareTransactionImpl
+	shareTransactionImpl struct {
+		metadata.Transaction[*abstract.Share, *Share]
+	}
 )
 
 func newShareTransaction(ctx context.Context, instance *Share) (shareTransaction, fail.Error) {
-	return metadata.NewTransaction[*abstract.Share, *Share](ctx, instance)
+	if instance == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("instance")
+	}
+
+	trx, xerr := metadata.NewTransaction[*abstract.Share, *Share](ctx, instance)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return &shareTransactionImpl{trx}, nil
 }
 
 func inspectShareMetadata(ctx context.Context, trx shareTransaction, callback func(*abstract.Share, *serialize.JSONProperties) fail.Error) fail.Error {
@@ -48,4 +60,9 @@ func alterShareMetadataProperty[P clonable.Clonable](ctx context.Context, trx sh
 
 func alterShareMetadataProperties(ctx context.Context, trx shareTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
 	return metadata.AlterProperties[*abstract.Share](ctx, trx, callback)
+}
+
+// IsNull ...
+func (shareTrx *shareTransactionImpl) IsNull() bool {
+	return shareTrx == nil || shareTrx.Transaction.IsNull()
 }

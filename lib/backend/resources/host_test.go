@@ -407,7 +407,7 @@ func TestHost_Unsafereload(t *testing.T) {
 
 		svc._setLogLevel(2)
 
-		xerr = ohost.trxReload(ctx)
+		xerr = ohost.reload(ctx)
 		require.Nil(t, xerr)
 
 	})
@@ -724,13 +724,13 @@ func TestHost_setSecurityGroups(t *testing.T) {
 		require.Nil(t, xerr)
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*resources.Host")
 
-		host.GetView(ctx)
+		host.Review(ctx)
 
 		ohost := host.(*Host)
 
 		svc._setLogLevel(2)
 
-		xerr = ohost.trxSetSecurityGroups(ctx, hostReq, subnet)
+		xerr = ohost.SetSecurityGroups(ctx, hostReq, subnet)
 		require.Nil(t, xerr)
 
 	})

@@ -36,6 +36,7 @@ type Transaction[A abstract.Abstract, T Metadata[A]] interface {
 	Commit(ctx context.Context) fail.Error                    // commits the changes
 	GetName() string                                          // returns transactioned object name
 	GetID() (string, error)                                   // returns transactioned object id
+	IsNull() bool                                             // Tells if instance is a zero-value
 	Rollback(ctx context.Context) fail.Error                  // ignores the uncommitted changes
 	SilentTerminate(ctx context.Context)                      // closes the connection without returning error, only log if error occurs
 	Terminate(ctx context.Context) fail.Error                 // closes the transaction; will fail if dirty and neither Commit() nor Rollback() has been called

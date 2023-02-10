@@ -40,9 +40,8 @@ const defaultSecurityGroupName = "default"
 // ListSecurityGroups lists existing security groups
 // Parameter 'networkRef' is not used in Openstack (they are tenant-wide)
 func (instance stack) ListSecurityGroups(ctx context.Context, networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
-	var emptySlice []*abstract.SecurityGroup
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var list []*abstract.SecurityGroup

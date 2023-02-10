@@ -19,12 +19,27 @@ package resources
 import (
 	"context"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
+	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 )
 
-// cleanerCtx copies the task id value into a new context derived from context.Background
-// the idea is to use cleanerCtx for cleanup (or undo) operations -> if the main task is cancelled, it stops, but its cleanup (that initially shared the same task id, and because of that it might be cancelled too, won't)
-func cleanerCtx(ctx context.Context) (context.Context, error) { // nolint
-	derived := context.WithValue(context.Background(), concurrency.KeyForTaskInContext, ctx.Value(concurrency.KeyForTaskInContext)) // nolint
-	return derived, nil
+// // cleanerCtx copies the task id value into a new context derived from context.Background
+// // the idea is to use cleanerCtx for cleanup (or undo) operations -> if the main task is cancelled, it stops, but its cleanup (that initially shared the same task id, and because of that it might be cancelled too, won't)
+// func cleanerCtx(ctx context.Context) (context.Context, error) { // nolint
+// 	derived := context.WithValue(context.Background(), concurrency.KeyForTaskInContext, ctx.Value(concurrency.KeyForTaskInContext)) // nolint
+// 	return derived, nil
+// }
+
+func cleanupContextFrom(inctx context.Context) context.Context {
+	newCtx := jobapi.NewContextPropagatingJob(inctx)
+
+	// FIXME: Make "ID" key a constant, with an explicit key name...
+	oldKey := inctx.Value("ID")
+	if oldKey != nil {
+		newCtx = context.WithValue(newCtx, "ID", oldKey) // nolint
+
+		// cleanup functions can look for "cleanup" to decide if a ctx is a cleanup context
+		newCtx = context.WithValue(newCtx, "cleanup", true) // nolint
+	}
+
+	return newCtx
 }

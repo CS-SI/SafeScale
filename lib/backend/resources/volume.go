@@ -355,7 +355,7 @@ func (instance *Volume) GetSpeed(ctx context.Context) (_ volumespeed.Enum, ferr 
 	}
 	defer volumeTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxGetSpeed(ctx, volumeTrx)
+	return volumeTrx.GetSpeed(ctx)
 }
 
 // GetSize ...
@@ -372,7 +372,7 @@ func (instance *Volume) GetSize(ctx context.Context) (_ int, ferr fail.Error) {
 	}
 	defer volumeTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxGetSize(ctx, volumeTrx)
+	return volumeTrx.GetSize(ctx)
 }
 
 // GetAttachments returns where the Volume is attached
@@ -473,7 +473,7 @@ func (instance *Volume) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	// delete Volume
+	// Delete Volume
 	xerr = instance.Service().DeleteVolume(ctx, volid)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -574,7 +574,7 @@ func (instance *Volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
 			if derr := svc.DeleteVolume(cleanupContextFrom(ctx), av.ID); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Volume '%s'", ActionFromError(ferr), req.Name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to Delete Volume '%s'", ActionFromError(ferr), req.Name))
 			}
 		}
 	}()
@@ -936,10 +936,10 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 			// 			return fail.Wrap(innerErr)
 			// 		}
 			//
-			// 		delete(hostVolumesV1.VolumesByID, volumeID)
-			// 		delete(hostVolumesV1.VolumesByName, volumeName)
-			// 		delete(hostVolumesV1.VolumesByDevice, volumeUUID)
-			// 		delete(hostVolumesV1.DevicesByID, volumeID)
+			// 		Delete(hostVolumesV1.VolumesByID, volumeID)
+			// 		Delete(hostVolumesV1.VolumesByName, volumeName)
+			// 		Delete(hostVolumesV1.VolumesByDevice, volumeUUID)
+			// 		Delete(hostVolumesV1.DevicesByID, volumeID)
 			// 		return nil
 			// 	})
 			// 	if innerXErr != nil {
@@ -951,8 +951,8 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 			// 			return fail.Wrap(innerErr)
 			// 		}
 			//
-			// 		delete(hostMountsV1.LocalMountsByDevice, volumeUUID)
-			// 		delete(hostMountsV1.LocalMountsByPath, mountPoint)
+			// 		Delete(hostMountsV1.LocalMountsByDevice, volumeUUID)
+			// 		Delete(hostMountsV1.LocalMountsByPath, mountPoint)
 			// 		return nil
 			// 	})
 			// })
@@ -1281,8 +1281,8 @@ func (instance *Volume) ToProtocol(ctx context.Context) (_ *protocol.VolumeInspe
 	out := &protocol.VolumeInspectResponse{
 		Id:          volumeID,
 		Name:        volumeName,
-		Speed:       converters.VolumeSpeedFromAbstractToProtocol(func() volumespeed.Enum { out, _ := instance.trxGetSpeed(ctx, volumeTrx); return out }()),
-		Size:        func() int32 { out, _ := instance.trxGetSize(ctx, volumeTrx); return int32(out) }(),
+		Speed:       converters.VolumeSpeedFromAbstractToProtocol(func() volumespeed.Enum { out, _ := volumeTrx.GetSpeed(ctx); return out }()),
+		Size:        func() int32 { out, _ := volumeTrx.GetSize(ctx); return int32(out) }(),
 		Attachments: []*protocol.VolumeAttachmentResponse{},
 	}
 

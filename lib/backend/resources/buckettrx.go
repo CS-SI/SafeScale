@@ -11,11 +11,23 @@ import (
 )
 
 type (
-	bucketTransaction = metadata.Transaction[*abstract.Bucket, *Bucket]
+	bucketTransaction     = *bucketTransactionImpl
+	bucketTransactionImpl struct {
+		metadata.Transaction[*abstract.Bucket, *Bucket]
+	}
 )
 
-func newBucketTransaction(ctx context.Context, instance *Bucket) (bucketTransaction, fail.Error) {
-	return metadata.NewTransaction[*abstract.Bucket, *Bucket](ctx, instance)
+func newBucketTransaction(ctx context.Context, instance *Bucket) (*bucketTransactionImpl, fail.Error) {
+	if instance == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("instance")
+	}
+
+	trx, xerr := metadata.NewTransaction[*abstract.Bucket, *Bucket](ctx, instance)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return &bucketTransactionImpl{trx}, nil
 }
 
 func inspectBucketMetadata(ctx context.Context, trx bucketTransaction, callback func(*abstract.Bucket, *serialize.JSONProperties) fail.Error) fail.Error {
@@ -48,4 +60,9 @@ func alterBucketMetadataProperty[P clonable.Clonable](ctx context.Context, trx b
 
 func alterBucketMetadataProperties(ctx context.Context, trx bucketTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
 	return metadata.AlterProperties[*abstract.Bucket](ctx, trx, callback)
+}
+
+// IsNull ...
+func (bucketTrx *bucketTransactionImpl) IsNull() bool {
+	return bucketTrx == nil || bucketTrx.Transaction.IsNull()
 }

@@ -392,7 +392,7 @@ func (instance *Label) Delete(inctx context.Context) (ferr fail.Error) {
 				}
 			}
 
-			// Need to terminate label transaction to be able to delete metadata (dead-lock otherwise)
+			// Need to terminate label transaction to be able to Delete metadata (dead-lock otherwise)
 			labelTrx.SilentTerminate(ctx)
 
 			// remove metadata
@@ -603,44 +603,7 @@ func (instance *Label) BindToHost(ctx context.Context, hostInstance *Host, value
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxBindToHost(ctx, labelTrx, hostTrx, value)
-}
-
-// trxBindToHost binds Host to the Label
-func (instance *Label) trxBindToHost(ctx context.Context, labelTrx labelTransaction, hostTrx hostTransaction, value string) (ferr fail.Error) {
-	xerr := alterLabelMetadata(ctx, labelTrx, func(alabel *abstract.Label, props *serialize.JSONProperties) fail.Error {
-		isTag := !alabel.HasDefault
-
-		return props.Alter(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			labelHostsV1, innerErr := clonable.Cast[*propertiesv1.LabelHosts](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			hostName := hostTrx.GetName()
-			hostID, err := hostTrx.GetID()
-			if err != nil {
-				return fail.Wrap(err)
-			}
-
-			// If the tag has this host, consider it a success
-			_, ok := labelHostsV1.ByID[hostID]
-			if !ok {
-				if isTag {
-					value = ""
-				}
-				labelHostsV1.ByID[hostID] = value
-				labelHostsV1.ByName[hostName] = value
-			}
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	return nil
+	return labelTrx.BindToHost(ctx, hostTrx, value)
 }
 
 // UnbindFromHost removes Host from Label metadata, unbinding Host from Label
@@ -671,26 +634,5 @@ func (instance *Label) UnbindFromHost(ctx context.Context, hostInstance *Host) (
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxUnbindFromHost(ctx, labelTrx, hostTrx)
-}
-
-// trxUnbindFromHost removes Host from Label metadata, unbinding Host from Label
-// Note: still need to call Host.UnbindLabel to remove reference of Label in Host...
-func (instance *Label) trxUnbindFromHost(ctx context.Context, labelTrx labelTransaction, hostTrx hostTransaction) (ferr fail.Error) {
-	return alterLabelMetadataProperty(ctx, labelTrx, labelproperty.HostsV1, func(labelHostsV1 *propertiesv1.LabelHosts) fail.Error {
-		hID, err := hostTrx.GetID()
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		hName := hostTrx.GetName()
-
-		// If the Label does not reference this Host, consider it a success
-		_, ok := labelHostsV1.ByID[hID]
-		if ok {
-			delete(labelHostsV1.ByID, hID)
-			delete(labelHostsV1.ByName, hName)
-		}
-		return nil
-	})
+	return labelTrx.UnbindFromHost(ctx, hostTrx)
 }

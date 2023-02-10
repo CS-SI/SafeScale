@@ -170,9 +170,8 @@ func (instance stack) CreateNetwork(ctx context.Context, req abstract.NetworkReq
 
 // ListRouters lists available routers
 func (instance stack) ListRouters(ctx context.Context) ([]Router, fail.Error) {
-	var emptySlice []Router
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var ns []Router
@@ -209,6 +208,7 @@ func (instance stack) findOpenStackNetworkBoundToVPC(ctx context.Context, vpcNam
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to list routers")
 	}
+
 	for _, r := range routerList {
 		local := r
 		if r.Name == vpcName {
@@ -316,9 +316,8 @@ func (instance stack) InspectNetworkByName(ctx context.Context, name string) (_ 
 
 // ListNetworks lists all the Network/VPC created
 func (instance stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Error) {
-	var emptySlice []*abstract.Network
 	if valid.IsNil(instance) {
-		return emptySlice, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	r := vpcCommonResult{}
@@ -337,7 +336,7 @@ func (instance stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fa
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return nil, xerr
 	}
 
 	var list []*abstract.Network
@@ -345,23 +344,23 @@ func (instance stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fa
 		for _, v := range vpcs {
 			item, err := lang.Cast[map[string]interface{}](v)
 			if err != nil {
-				return emptySlice, fail.Wrap(err)
+				return nil, fail.Wrap(err)
 			}
 
 			an, _ := abstract.NewNetwork()
 			an.Name, err = lang.Cast[string](item["name"])
 			if err != nil {
-				return emptySlice, fail.Wrap(err)
+				return nil, fail.Wrap(err)
 			}
 
 			an.ID, err = lang.Cast[string](item["id"])
 			if err != nil {
-				return emptySlice, fail.Wrap(err)
+				return nil, fail.Wrap(err)
 			}
 
 			an.CIDR, err = lang.Cast[string](item["cidr"])
 			if err != nil {
-				return emptySlice, fail.Wrap(err)
+				return nil, fail.Wrap(err)
 			}
 
 			if an.Name == "" || an.ID == "" || an.CIDR == "" {
@@ -408,9 +407,6 @@ func (instance stack) CreateSubnet(ctx context.Context, req abstract.SubnetReque
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-
-	tracer := debug.NewTracer(ctx, true, "(%s)", req.Name).WithStopwatch().Entering()
-	defer tracer.Exiting()
 
 	var xerr fail.Error
 	if _, xerr = instance.InspectSubnetByName(ctx, req.NetworkID, req.Name); xerr != nil {

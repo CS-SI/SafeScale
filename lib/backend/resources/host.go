@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"os/user"
 	"reflect"
@@ -28,6 +27,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/eko/gocache/v2/store"
+	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
@@ -42,10 +45,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/labelproperty"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/securitygroupstate"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetproperty"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
@@ -62,15 +63,10 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
-	netretry "github.com/CS-SI/SafeScale/v22/lib/utils/net"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/result"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/eko/gocache/v2/store"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -224,7 +220,7 @@ func LoadHost(inctx context.Context, ref string) (*Host, fail.Error) {
 			}
 			defer trx.TerminateFromError(ctx, &ferr)
 
-			xerr = hostInstance.trxUpdateCachedInformation(ctx, trx)
+			xerr = hostInstance.updateCachedInformation(ctx, trx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -244,18 +240,6 @@ func LoadHost(inctx context.Context, ref string) (*Host, fail.Error) {
 		return nil, fail.Wrap(inctx.Err())
 	}
 }
-
-// VPL: not used
-// func Stack() []byte {
-// 	buf := make([]byte, 1024)
-// 	for {
-// 		n := runtime.Stack(buf, false)
-// 		if n < len(buf) {
-// 			return buf[:n]
-// 		}
-// 		buf = make([]byte, 2*len(buf))
-// 	}
-// }
 
 // onHostCacheMiss is called when host 'ref' is not found in cache
 func onHostCacheMiss(inctx context.Context, ref string) (_ data.Identifiable, ferr fail.Error) {
@@ -309,8 +293,8 @@ func (instance *Host) Exists(ctx context.Context) (bool, fail.Error) {
 	return true, nil
 }
 
-// trxUpdateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
-func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx metadata.Transaction[*abstract.HostCore, *Host]) fail.Error {
+// updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
+func (instance *Host) updateCachedInformation(ctx context.Context, hostTrx hostTransaction) fail.Error {
 	svc := instance.Service()
 	scope := instance.Job().Scope()
 
@@ -364,7 +348,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 				}
 				defer subnetTrx.TerminateFromError(ctx, &ferr)
 
-				gwInstance, xerr := subnetInstance.trxInspectGateway(ctx, subnetTrx, true)
+				gwInstance, xerr := subnetInstance.inspectGateway(ctx, subnetTrx, true)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
@@ -390,7 +374,7 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 				}
 
 				// Secondary gateway may not exist...
-				gwInstance, xerr = subnetInstance.trxInspectGateway(ctx, subnetTrx, false)
+				gwInstance, xerr = subnetInstance.inspectGateway(ctx, subnetTrx, false)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -406,13 +390,13 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 						return inXErr
 					}
 
-					trx, xerr := newHostTransaction(ctx, gwInstance)
+					gwTrx, xerr := newHostTransaction(ctx, gwInstance)
 					if xerr != nil {
 						return xerr
 					}
-					defer trx.TerminateFromError(ctx, &ferr)
+					defer gwTrx.TerminateFromError(ctx, &ferr)
 
-					gwErr = inspectHostMetadataAbstract(ctx, trx, func(ahc *abstract.HostCore) fail.Error {
+					gwErr = inspectHostMetadataAbstract(ctx, gwTrx, func(ahc *abstract.HostCore) fail.Error {
 						secondaryGatewayConfig = ssh.NewConfig(gwInstance.GetName(), ip, int(ahc.SSHPort), opUser, ahc.PrivateKey, 0, "", nil, nil)
 						return nil
 					})
@@ -447,19 +431,22 @@ func (instance *Host) trxUpdateCachedInformation(ctx context.Context, hostTrx me
 						}
 					}
 
-					casted, inspectErr := lang.Cast[*abstract.Subnet](entry)
-					if inspectErr != nil {
-						return fail.Wrap(inspectErr)
-					}
+					// casted, inspectErr := lang.Cast[*abstract.Subnet](entry)
+					// if inspectErr != nil {
+					// 	return fail.Wrap(inspectErr)
+					// }
 
-					cloned, inspectErr := clonable.CastedClone[*abstract.Subnet](casted)
+					cloned, inspectErr := clonable.CastedClone[*abstract.Subnet](entry /*casted*/)
 					if inspectErr != nil {
 						return fail.Wrap(inspectErr)
 					}
 
 					subnetList = append(subnetList, cloned)
 				}
-				innerXErr := ahc.AddOptions(abstract.WithExtraData("Subnets", subnetList), abstract.WithExtraData("PublicIP", hnV2.IsGateway))
+				innerXErr := ahc.AddOptions(
+					abstract.WithExtraData("Subnets", subnetList),
+					abstract.WithExtraData("PublicIP", hnV2.IsGateway),
+				)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -767,37 +754,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxForceGetState(ctx, hostTrx)
-}
-
-// trxForceGetState returns the current state of the provider Host then alter metadata
-func (instance *Host) trxForceGetState(ctx context.Context, hostTrx hostTransaction) (state hoststate.Enum, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	state = hoststate.Unknown
-	xerr := alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-		abstractHostFull, innerXErr := instance.Service().InspectHost(ctx, ahc)
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		if abstractHostFull != nil {
-			state = abstractHostFull.LastState
-			if state != ahc.LastState {
-				ahc.LastState = state
-				return nil
-			}
-
-			return fail.AlteredNothingError()
-		}
-
-		return fail.InconsistentError("Host shouldn't be nil")
-	})
-	if xerr != nil {
-		return hoststate.Unknown, xerr
-	}
-
-	return state, nil
+	return hostTrx.ForceGetState(ctx)
 }
 
 // Reload reloads Host from metadata and current Host state on provider state
@@ -814,126 +771,7 @@ func (instance *Host) Reload(ctx context.Context) (ferr fail.Error) {
 	}
 	defer trx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxReload(ctx, trx)
-}
-
-// trxReload reloads Host from metadata and current Host state on provider state
-func (instance *Host) trxReload(ctx context.Context, hostTrx hostTransaction) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := instance.Core.Reload(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *retry.ErrTimeout: // If retry timed out, log it and return error ErrNotFound
-			return fail.NotFoundError("metadata of Host '%s' not found; Host deleted?", instance.GetName())
-		default:
-			return xerr
-		}
-	}
-
-	hid, err := hostTrx.GetID()
-	if err != nil {
-		return fail.Wrap(err)
-	}
-
-	// Request Host inspection from provider
-	ahf, xerr := instance.Service().InspectHost(ctx, hid)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	cache, xerr := instance.Service().Cache(ctx)
-	if xerr != nil {
-		return xerr
-	}
-
-	if cache != nil {
-		hid, err := instance.GetID()
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		thing, err := cache.Get(ctx, hid)
-		if err != nil || thing == nil { // usually notfound
-			err = cache.Set(ctx, hid, instance, &store.Options{Expiration: 1 * time.Minute})
-			if err != nil {
-				return fail.Wrap(err)
-			}
-
-			time.Sleep(10 * time.Millisecond) // consolidate cache.Set
-		} else if _, ok := thing.(*Host); !ok {
-			return fail.NewError("cache stored the wrong type")
-		}
-	}
-
-	// Updates the Host metadata
-	xerr = alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
-		changed := false
-		if ahc.LastState != ahf.CurrentState {
-			ahf.CurrentState = ahc.LastState
-			changed = true
-		}
-
-		innerXErr := props.Alter(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
-			hostSizingV2, innerErr := clonable.Cast[*propertiesv2.HostSizing](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			allocated := converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
-			if !reflect.DeepEqual(*allocated, *hostSizingV2.AllocatedSize) {
-				*hostSizingV2.AllocatedSize = *allocated
-				changed = true
-			}
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		// Updates Host property propertiesv1.HostNetworking from "ground" (Cloud Provider side)
-		innerXErr = props.Alter(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-			hnV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			if len(ahf.Networking.IPv4Addresses) > 0 {
-				hnV2.IPv4Addresses = ahf.Networking.IPv4Addresses
-			}
-			if len(ahf.Networking.IPv6Addresses) > 0 {
-				hnV2.IPv6Addresses = ahf.Networking.IPv6Addresses
-			}
-			if len(ahf.Networking.SubnetsByID) > 0 {
-				hnV2.SubnetsByID = ahf.Networking.SubnetsByID
-			}
-			if len(ahf.Networking.SubnetsByName) > 0 {
-				hnV2.SubnetsByName = ahf.Networking.SubnetsByName
-			}
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		if !changed {
-			return fail.AlteredNothingError()
-		}
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrAlteredNothing:
-			return nil
-		default:
-			return xerr
-		}
-	}
-
-	return instance.trxUpdateCachedInformation(ctx, hostTrx)
+	return instance.reload(ctx, trx)
 }
 
 // GetState returns the last known state of the Host, without forced inspect
@@ -960,8 +798,8 @@ func (instance *Host) GetState(ctx context.Context) (_ hoststate.Enum, ferr fail
 	return state, nil
 }
 
-// GetView returns a view of the Host, without forced inspect
-func (instance *Host) GetView(ctx context.Context) (_ *abstract.HostCore, _ *serialize.JSONProperties, ferr fail.Error) {
+// Review returns a view of the Host, without forced inspect
+func (instance *Host) Review(ctx context.Context) (_ *abstract.HostCore, _ *serialize.JSONProperties, ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, nil, fail.InvalidInstanceError()
 	}
@@ -1167,12 +1005,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				defer defaultSubnetTrx.TerminateFromError(ctx, &ferr)
 
 				if !hostReq.IsGateway && hostReq.DefaultRouteIP == "" {
-					s, err := lang.Cast[*Subnet](defaultSubnet)
-					if err != nil {
-						return nil, fail.Wrap(err)
-					}
-
-					hostReq.DefaultRouteIP, xerr = s.trxGetDefaultRouteIP(ctx, defaultSubnetTrx)
+					hostReq.DefaultRouteIP, xerr = defaultSubnetTrx.GetDefaultRouteIP(ctx)
 					if xerr != nil {
 						return nil, xerr
 					}
@@ -1211,7 +1044,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				if ferr != nil && hostReq.CleanOnFailure() && ahc != nil && ahc.IsConsistent() {
 					derr := svc.DeleteHost(cleanupContextFrom(ctx), ahc)
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahc.Name))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to Delete Host '%s'", ActionFromError(ferr), ahc.Name))
 					}
 					ahc.LastState = hoststate.Deleted
 				}
@@ -1244,7 +1077,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				if ferr != nil && hostReq.CleanOnFailure() {
 					derr := svc.DeleteHost(ctx, ahf)
 					if derr != nil {
-						logrus.WithContext(ctx).Errorf("cleaning up on %s, failed to delete Host '%s': %v", ActionFromError(ferr), ahf.Name, derr)
+						logrus.WithContext(ctx).Errorf("cleaning up on %s, failed to Delete Host '%s': %v", ActionFromError(ferr), ahf.Name, derr)
 						_ = ferr.AddConsequence(derr)
 					}
 				}
@@ -1303,7 +1136,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 						hostTrx.SilentTerminate(ctx)
 						derr := instance.Core.Delete(ctx)
 						if derr != nil {
-							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete metadata of Host '%s'", ActionFromError(derr), hostReq.ResourceName))
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to Delete metadata of Host '%s'", ActionFromError(derr), hostReq.ResourceName))
 						}
 					}
 				}
@@ -1390,19 +1223,19 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				return nil, xerr
 			}
 
-			xerr = instance.trxUpdateCachedInformation(ctx, hostTrx)
+			xerr = instance.updateCachedInformation(ctx, hostTrx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
 			}
 
-			xerr = instance.trxSetSecurityGroups(ctx, hostTrx, hostReq, defaultSubnetTrx)
+			xerr = hostTrx.SetSecurityGroups(ctx, hostReq, defaultSubnetTrx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
 			}
 			defer func() {
-				derr := instance.undoSetSecurityGroups(cleanupContextFrom(ctx), hostTrx, &ferr, hostReq.KeepOnFailure)
+				derr := hostTrx.UndoSetSecurityGroups(cleanupContextFrom(ctx), &ferr, hostReq.KeepOnFailure)
 				if derr != nil {
 					logrus.WithContext(ctx).Warnf(derr.Error())
 				}
@@ -1507,7 +1340,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			}
 
 			// -- Updates Host link with subnets --
-			xerr = instance.trxUpdateSubnets(ctx, hostTrx, hostReq)
+			xerr = hostTrx.UpdateSubnets(ctx, hostReq)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -1516,7 +1349,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil {
-					instance.trxUndoUpdateSubnets(cleanupContextFrom(ctx), hostTrx, hostReq, &ferr)
+					hostTrx.UndoUpdateSubnets(cleanupContextFrom(ctx), hostReq, &ferr)
 				}
 			}()
 
@@ -1525,7 +1358,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				userdataContent.SSHPort = strconv.Itoa(int(hostReq.SSHPort))
 			}
 
-			xerr = instance.trxFinalizeProvisioning(ctx, hostTrx, userdataContent)
+			xerr = instance.finalizeProvisioning(ctx, hostTrx, userdataContent)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -1542,7 +1375,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 				return nil, xerr
 			}
 
-			xerr = instance.trxUnbindDefaultSecurityGroupIfNeeded(ctx, hostTrx, nid)
+			xerr = hostTrx.UnbindDefaultSecurityGroupIfNeeded(ctx, nid)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -1669,406 +1502,6 @@ func determineImageID(ctx context.Context, svc iaasapi.Service, imageRef string)
 	}
 
 	return imageRef, img.ID, nil
-}
-
-// trxSetSecurityGroups sets the Security Groups for the host
-func (instance *Host) trxSetSecurityGroups(ctx context.Context, hostTrx hostTransaction, req abstract.HostRequest, defaultSubnetTrx subnetTransaction) (ferr fail.Error) {
-	svc := instance.Service()
-	// In case of use of terraform, the security groups have already been set
-	useTerraformer := svc.Capabilities().UseTerraformer
-	if !useTerraformer {
-		if req.Single {
-			hostName := instance.GetName()
-			xerr := alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-				for k := range req.SecurityGroupByID {
-					if k != "" {
-						sgInstance, innerXErr := LoadSecurityGroup(ctx, k)
-						if innerXErr != nil {
-							return fail.Wrap(innerXErr, "failed to load Security Group with id '%s'", k)
-						}
-
-						sgTrx, innerXErr := newSecurityGroupTransaction(ctx, sgInstance)
-						if innerXErr != nil {
-							return innerXErr
-						}
-
-						innerXErr = alterSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
-							logrus.WithContext(ctx).Infof("Binding security group with id %s to host '%s'", asg.Name, hostName)
-							return svc.BindSecurityGroupToHost(ctx, asg, ahc)
-						})
-						if innerXErr != nil {
-							return innerXErr
-						}
-					}
-				}
-				return nil
-			})
-			if xerr != nil {
-				return xerr
-			}
-		}
-	}
-
-	// Updates metadata about SG bonds
-	var defaultAbstractSubnet *abstract.Subnet
-	xerr := inspectHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) (finnerXErr fail.Error) {
-		// get default Subnet core data
-		return inspectSubnetMetadataAbstract(ctx, defaultSubnetTrx, func(as *abstract.Subnet) fail.Error {
-			defaultAbstractSubnet = as
-			return nil
-		})
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	var gwsg, pubipsg, lansg *SecurityGroup
-
-	// Apply Security Group for gateways in default Subnet
-	if req.IsGateway && defaultAbstractSubnet.GWSecurityGroupID != "" {
-		gwsg, xerr = LoadSecurityGroup(ctx, defaultAbstractSubnet.GWSecurityGroupID)
-		if xerr != nil {
-			return fail.Wrap(xerr, "failed to query Subnet '%s' Security Group '%s'", defaultAbstractSubnet.Name, defaultAbstractSubnet.GWSecurityGroupID)
-		}
-
-		gwsgTrx, xerr := newSecurityGroupTransaction(ctx, gwsg)
-		if xerr != nil {
-			return xerr
-		}
-		defer gwsgTrx.TerminateFromError(ctx, &ferr)
-
-		xerr = gwsg.trxBindToHost(ctx, gwsgTrx, hostTrx, SecurityGroupEnable, MarkSecurityGroupAsSupplemental)
-		if xerr != nil {
-			return fail.Wrap(xerr, "failed to apply Subnet's GW Security Group for gateway '%s' on Host '%s'", gwsg.GetName(), req.ResourceName)
-		}
-
-		defer func() {
-			if ferr != nil && req.CleanOnFailure() {
-				derr := gwsg.trxUnbindFromHost(cleanupContextFrom(ctx), gwsgTrx, hostTrx)
-				if derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(ferr), gwsg.GetName(), instance.GetName()))
-				}
-			}
-		}()
-
-		gwid, err := gwsg.GetID()
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		xerr = alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) (finnerXErr fail.Error) {
-			item := &propertiesv1.SecurityGroupBond{
-				ID:         gwid,
-				Name:       gwsg.GetName(),
-				Disabled:   false,
-				FromSubnet: true,
-			}
-			hsgV1.ByID[item.ID] = item
-			hsgV1.ByName[item.Name] = item.ID
-			return nil
-		})
-
-		// Bound Security Group for hosts with public IP in default Subnet
-		if (req.IsGateway || req.PublicIP) && defaultAbstractSubnet.PublicIPSecurityGroupID != "" {
-			pubipsg, xerr = LoadSecurityGroup(ctx, defaultAbstractSubnet.PublicIPSecurityGroupID)
-			if xerr != nil {
-				return fail.Wrap(xerr, "failed to query Subnet '%s' Security Group with ID %s", defaultAbstractSubnet.Name, defaultAbstractSubnet.PublicIPSecurityGroupID)
-			}
-
-			pubipsgTrx, xerr := newSecurityGroupTransaction(ctx, gwsg)
-			if xerr != nil {
-				return xerr
-			}
-			defer pubipsgTrx.TerminateFromError(ctx, &ferr)
-
-			xerr = pubipsg.trxBindToHost(ctx, pubipsgTrx, hostTrx, SecurityGroupEnable, MarkSecurityGroupAsSupplemental)
-			if xerr != nil {
-				return fail.Wrap(xerr, "failed to apply Subnet's Public Security Group for gateway '%s' on Host '%s'", pubipsg.GetName(), req.ResourceName)
-			}
-
-			defer func() {
-				if ferr != nil && req.CleanOnFailure() {
-					derr := pubipsg.trxUnbindFromHost(cleanupContextFrom(ctx), pubipsgTrx, hostTrx)
-					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(ferr), pubipsg.GetName(), instance.GetName()))
-					}
-				}
-			}()
-
-			pubID, err := pubipsg.GetID()
-			if err != nil {
-				return fail.Wrap(err)
-			}
-
-			xerr = alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
-				item := &propertiesv1.SecurityGroupBond{
-					ID:         pubID,
-					Name:       pubipsg.GetName(),
-					Disabled:   false,
-					FromSubnet: true,
-				}
-				hsgV1.ByID[item.ID] = item
-				hsgV1.ByName[item.Name] = item.ID
-				return nil
-			})
-			if xerr != nil {
-				return xerr
-			}
-		}
-
-		// Apply internal Security Group of each other subnets
-		defer func() {
-			if ferr != nil && req.CleanOnFailure() {
-				var (
-					sg   *SecurityGroup
-					derr error
-					errs []error
-				)
-				uncancellableContext := cleanupContextFrom(ctx)
-				for _, v := range req.Subnets {
-					if v.ID == defaultAbstractSubnet.ID {
-						continue
-					}
-
-					subnetInstance, deeperXErr := LoadSubnet(uncancellableContext, "", v.ID)
-					if deeperXErr != nil {
-						_ = ferr.AddConsequence(deeperXErr)
-						continue
-					}
-
-					subnetTrx, deeperXErr := newSubnetTransaction(ctx, subnetInstance)
-					if deeperXErr != nil {
-						_ = ferr.AddConsequence(deeperXErr)
-						continue
-					}
-					defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &ferr) }(subnetTrx)
-
-					sgName := sg.GetName()
-					deeperXErr = inspectSubnetMetadataAbstract(uncancellableContext, subnetTrx, func(abstractSubnet *abstract.Subnet) (fdeeperXErr fail.Error) {
-						if abstractSubnet.InternalSecurityGroupID != "" {
-							sg, derr = LoadSecurityGroup(uncancellableContext, abstractSubnet.InternalSecurityGroupID)
-							if derr != nil {
-								errs = append(errs, derr)
-							} else {
-								sgTrx, derr := newSecurityGroupTransaction(uncancellableContext, sg)
-								if derr != nil {
-									errs = append(errs, derr)
-								} else {
-									defer sgTrx.TerminateFromError(uncancellableContext, &fdeeperXErr)
-
-									derr = sg.trxUnbindFromHost(uncancellableContext, sgTrx, hostTrx)
-									if derr != nil {
-										errs = append(errs, derr)
-									}
-								}
-							}
-						}
-						return nil
-					})
-					if deeperXErr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(deeperXErr, "cleaning up on failure, failed to unbind Security Group '%s' from Host", sgName))
-					}
-				}
-				if len(errs) > 0 {
-					_ = ferr.AddConsequence(fail.Wrap(fail.NewErrorList(errs), "failed to unbind Subnets Security Group from Host '%s'", sg.GetName(), req.ResourceName))
-				}
-			}
-		}()
-
-		for _, v := range req.Subnets {
-			// Do not try to bind defaultSubnet on gateway, because this code is running under a lock on defaultSubnet in this case, and this will lead to deadlock
-			// (binding of gateway on defaultSubnet is done inside Subnet.Create() call)
-			if req.IsGateway && v.ID == defaultAbstractSubnet.ID {
-				continue
-			}
-
-			otherSubnetInstance, xerr := LoadSubnet(ctx, "", v.ID)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-
-			otherSubnetTrx, xerr := newSubnetTransaction(ctx, otherSubnetInstance)
-			if xerr != nil {
-				return xerr
-			}
-			defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &ferr) }(otherSubnetTrx)
-
-			var otherAbstractSubnet *abstract.Subnet
-			xerr = inspectSubnetMetadataAbstract(ctx, otherSubnetTrx, func(as *abstract.Subnet) fail.Error {
-				otherAbstractSubnet = as
-				return nil
-			})
-			if xerr != nil {
-				return xerr
-			}
-
-			safe := false
-
-			// Fix for Stein
-			{
-				st, xerr := svc.ProviderName()
-				if xerr != nil {
-					return xerr
-				}
-
-				if st != "ovh" {
-					safe = true
-				}
-			}
-
-			if cfg, xerr := svc.ConfigurationOptions(); xerr == nil {
-				safe = cfg.Safe
-			}
-
-			if otherAbstractSubnet.InternalSecurityGroupID != "" {
-				lansg, xerr = LoadSecurityGroup(ctx, otherAbstractSubnet.InternalSecurityGroupID)
-				if xerr != nil {
-					return fail.Wrap(xerr, "failed to load Subnet '%s' internal Security Group %s", otherAbstractSubnet.Name, otherAbstractSubnet.InternalSecurityGroupID)
-				}
-
-				if !safe && !useTerraformer {
-					xerr = svc.ChangeSecurityGroupSecurity(ctx, false, true, otherAbstractSubnet.Network, "")
-					if xerr != nil {
-						return fail.Wrap(xerr, "failed to change security group")
-					}
-				}
-
-				lansgTrx, xerr := newSecurityGroupTransaction(ctx, lansg)
-				if xerr != nil {
-					return xerr
-				}
-				defer func(trx securityGroupTransaction) { trx.TerminateFromError(ctx, &ferr) }(lansgTrx)
-
-				xerr = lansg.trxBindToHost(ctx, lansgTrx, hostTrx, SecurityGroupEnable, MarkSecurityGroupAsSupplemental)
-				if xerr != nil {
-					return fail.Wrap(xerr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.Name, lansg.GetName(), req.ResourceName)
-				}
-
-				if !safe && !useTerraformer {
-					xerr = svc.ChangeSecurityGroupSecurity(ctx, true, false, otherAbstractSubnet.Network, "")
-					if xerr != nil {
-						return fail.Wrap(xerr, "failed to change security group")
-					}
-				}
-
-				langID, err := lansg.GetID()
-				if err != nil {
-					return fail.Wrap(err)
-				}
-
-				xerr = alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
-					// register security group in properties
-					item := &propertiesv1.SecurityGroupBond{
-						ID:         langID,
-						Name:       lansg.GetName(),
-						Disabled:   false,
-						FromSubnet: true,
-					}
-					hsgV1.ByID[item.ID] = item
-					hsgV1.ByName[item.Name] = item.ID
-					return nil
-				})
-				if xerr != nil {
-					return xerr
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (instance *Host) undoSetSecurityGroups(ctx context.Context, hostTrx hostTransaction, errorPtr *fail.Error, keepOnFailure bool) fail.Error {
-	if errorPtr == nil {
-		return fail.NewError("trying to call a cancel function from a nil error; cancel not run")
-	}
-
-	if *errorPtr != nil && !keepOnFailure {
-		derr := alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) (finnerXErr fail.Error) {
-			var (
-				opXErr fail.Error
-				sg     *SecurityGroup
-				errs   []error
-			)
-
-			// unbind security groups
-			for _, v := range hsgV1.ByName {
-				if sg, opXErr = LoadSecurityGroup(ctx, v); opXErr != nil {
-					errs = append(errs, opXErr)
-					continue
-				}
-
-				sgTrx, opXErr := newSecurityGroupTransaction(ctx, sg)
-				if opXErr != nil {
-					errs = append(errs, opXErr)
-					continue
-				}
-				defer func(trx securityGroupTransaction) { trx.TerminateFromError(ctx, &finnerXErr) }(sgTrx)
-
-				opXErr = sg.trxUnbindFromHost(ctx, sgTrx, hostTrx)
-				if opXErr != nil {
-					errs = append(errs, opXErr)
-				}
-			}
-			if len(errs) > 0 {
-				return fail.Wrap(fail.NewErrorList(errs), "cleaning up on %s, failed to unbind Security Groups from Host", ActionFromError(*errorPtr))
-			}
-
-			return nil
-		})
-		if derr != nil {
-			_ = (*errorPtr).AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to cleanup Security Groups", ActionFromError(*errorPtr)))
-		}
-	}
-	return nil
-}
-
-// UnbindDefaultSecurityGroupIfNeeded unbinds "default" Security Group from Host if it is bound
-func (instance *Host) trxUnbindDefaultSecurityGroupIfNeeded(ctx context.Context, hostTrx hostTransaction, networkID string) (ferr fail.Error) {
-	svc := instance.Service()
-	if svc.Capabilities().UseTerraformer {
-		return nil
-	}
-
-	sgName, err := svc.GetDefaultSecurityGroupName(ctx)
-	if err != nil {
-		return fail.Wrap(err)
-	}
-
-	if sgName != "" {
-		sgInstance, xerr := LoadSecurityGroup(ctx, sgName)
-		if xerr != nil {
-			return xerr
-		}
-
-		sgTrx, xerr := newSecurityGroupTransaction(ctx, sgInstance)
-		if xerr != nil {
-			return xerr
-		}
-		defer sgTrx.TerminateFromError(ctx, &ferr)
-
-		xerr = alterSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
-			return alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-				innerXErr := svc.UnbindSecurityGroupFromHost(ctx, asg, ahc)
-				if innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrNotFound:
-						// Consider a security group not found as a successful unbind
-						debug.IgnoreErrorWithContext(ctx, innerXErr)
-					default:
-						return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
-					}
-				}
-
-				return nil
-			})
-		})
-		if xerr != nil {
-			return xerr
-		}
-	}
-	return nil
 }
 
 func (instance *Host) thePhaseDoesSomething(_ context.Context, phase userdata.Phase, userdataContent *userdata.Content) bool {
@@ -2338,255 +1771,6 @@ func (instance *Host) waitInstallPhase(inctx context.Context, phase userdata.Pha
 	}
 }
 
-// trxUpdateSubnets updates subnets on which host is attached and host property HostNetworkV2
-func (instance *Host) trxUpdateSubnets(ctx context.Context, hostTrx hostTransaction, req abstract.HostRequest) fail.Error {
-	// If Host is a gateway or is single, do not add it as Host attached to the Subnet, it's considered as part of the subnet
-	if !req.IsGateway && !req.Single {
-		xerr := alterHostMetadataProperty(ctx, hostTrx, hostproperty.NetworkV2, func(hnV2 *propertiesv2.HostNetworking) (ferr fail.Error) {
-			hostID, err := instance.GetID()
-			if err != nil {
-				return fail.Wrap(err)
-			}
-
-			hostName := instance.GetName()
-			for _, as := range req.Subnets {
-				subnetInstance, innerXErr := LoadSubnet(ctx, "", as.ID)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				subnetTrx, innerXErr := newSubnetTransaction(ctx, subnetInstance)
-				if innerXErr != nil {
-					return innerXErr
-				}
-				defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &ferr) }(subnetTrx)
-
-				innerXErr = alterSubnetMetadataProperty(ctx, subnetTrx, subnetproperty.HostsV1, func(subnetHostsV1 *propertiesv1.SubnetHosts) fail.Error {
-					subnetHostsV1.ByName[hostName] = hostID
-					subnetHostsV1.ByID[hostID] = hostName
-					return nil
-				})
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				hnV2.SubnetsByID[as.ID] = as.Name
-				hnV2.SubnetsByName[as.Name] = as.ID
-			}
-			return nil
-		})
-		if xerr != nil {
-			return xerr
-		}
-	}
-	return nil
-}
-
-// trxUndoUpdateSubnets removes what trxUpdateSubnets have done
-func (instance *Host) trxUndoUpdateSubnets(inctx context.Context, hostTrx hostTransaction, req abstract.HostRequest, errorPtr *fail.Error) {
-	ctx := inctx
-
-	if errorPtr != nil && *errorPtr != nil && !req.IsGateway && !req.Single && req.CleanOnFailure() {
-		xerr := alterHostMetadataProperty(ctx, hostTrx, hostproperty.NetworkV2, func(hnV2 *propertiesv2.HostNetworking) (innerFErr fail.Error) {
-			hostID, err := instance.GetID()
-			if err != nil {
-				return fail.Wrap(err)
-			}
-
-			hostName := instance.GetName()
-			for _, as := range req.Subnets {
-				subnetInstance, innerXErr := LoadSubnet(ctx, "", as.ID)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				subnetTrx, innerXErr := newSubnetTransaction(ctx, subnetInstance)
-				if innerXErr != nil {
-					return innerXErr
-				}
-				defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &innerFErr) }(subnetTrx)
-
-				innerXErr = alterSubnetMetadataProperty(ctx, subnetTrx, subnetproperty.HostsV1, func(subnetHostsV1 *propertiesv1.SubnetHosts) fail.Error {
-					delete(subnetHostsV1.ByID, hostID)
-					delete(subnetHostsV1.ByName, hostName)
-					return nil
-				})
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				delete(hnV2.SubnetsByID, as.ID)
-				delete(hnV2.SubnetsByName, as.ID)
-			}
-			return nil
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			_ = (*errorPtr).AddConsequence(fail.Wrap(xerr, "cleaning up on %s, failed to remove Host relationships with Subnets", ActionFromError(xerr)))
-		}
-	}
-}
-
-func (instance *Host) trxFinalizeProvisioning(ctx context.Context, hostTrx hostTransaction, userdataContent *userdata.Content) (ferr fail.Error) {
-	defer fail.OnExitLogError(ctx, &ferr)
-
-	instance.localCache.RLock()
-	notok := instance.localCache.sshProfile == nil
-	instance.localCache.RUnlock() // nolint
-	if notok {
-		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
-	}
-	incrementExpVar("host.cache.hit")
-
-	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
-	svc := instance.Service()
-
-	hostID, err := instance.GetID()
-	if err != nil {
-		return fail.Wrap(err)
-	}
-
-	xerr := svc.ClearHostStartupScript(ctx, hostID)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	timings, xerr := instance.Service().Timings()
-	if xerr != nil {
-		return xerr
-	}
-
-	if userdataContent.Debug {
-		if _, err := os.Stat("/tmp/tss"); !errors.Is(err, os.ErrNotExist) {
-			_, _, _, xerr = instance.unsafePush(ctx, "/tmp/tss", fmt.Sprintf("/home/%s/tss", userdataContent.Username), userdataContent.Username, "755", 10*time.Second)
-			if xerr != nil {
-				debug.IgnoreErrorWithContext(ctx, xerr)
-			}
-		}
-	}
-
-	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure networking and security
-	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, getPhase2Timeout(timings))
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	// Update Keypair of the Host with the final one
-	xerr = alterHostMetadataAbstract(ctx, hostTrx, func(ah *abstract.HostCore) fail.Error {
-		ah.PrivateKey = userdataContent.FinalPrivateKey
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return fail.Wrap(xerr, "failed to update Keypair of machine '%s'", instance.GetName())
-	}
-
-	xerr = hostTrx.Commit(ctx)
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = instance.trxUpdateCachedInformation(ctx, hostTrx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	if inBackground() {
-		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, timings.HostOperationTimeout()+timings.HostBootTimeout())
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-	}
-
-	waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())
-	// If the script doesn't reboot, we force a reboot
-	if !instance.thePhaseReboots(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent) {
-		logrus.WithContext(ctx).Infof("finalizing Host provisioning of '%s': rebooting", instance.GetName())
-
-		// Reboot Host
-		xerr = instance.Reboot(ctx, true)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		time.Sleep(timings.RebootTimeout())
-	}
-
-	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, 90*time.Second) // FIXME: It should be 1:30 min tops, 2*reboot time
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	// if Host is not a gateway, executes userdata.PHASE4/5 scripts
-	// to fix possible system issues and finalize Host creation.
-	// For a gateway, userdata.PHASE3 to 5 have to be run explicitly (cf. operations/subnet.go)
-	if !userdataContent.IsGateway {
-		if instance.thePhaseDoesSomething(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent) {
-			// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
-			xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent, getPhase4Timeout(timings))
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				theCause := fail.Wrap(fail.Cause(xerr))
-				if _, ok := theCause.(*fail.ErrTimeout); !ok || valid.IsNil(theCause) {
-					return xerr
-				}
-
-				debug.IgnoreErrorWithContext(ctx, xerr)
-			}
-
-			// Reboot Host
-			logrus.WithContext(ctx).Infof("finalizing Host provisioning of '%s' (not-gateway): rebooting", instance.GetName())
-			xerr = instance.Reboot(ctx, true)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-
-			time.Sleep(timings.RebootTimeout())
-
-			_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, waitingTime)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-		} else {
-			logrus.WithContext(ctx).Debugf("Nothing to do for the phase '%s'", userdata.PHASE4_SYSTEM_FIXES)
-		}
-
-		// execute userdata.PHASE5_FINAL script to finalize install/configure of the Host (no need to reboot)
-		xerr = instance.runInstallPhase(ctx, userdata.PHASE5_FINAL, userdataContent, waitingTime)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE5_FINAL, timings.HostOperationTimeout())
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) { // nolint
-			case *retry.ErrStopRetry:
-				return fail.Wrap(xerr, "stopping retries")
-			case *fail.ErrTimeout:
-				return fail.Wrap(xerr, "timeout creating a Host")
-			}
-			if abstract.IsProvisioningError(xerr) {
-				logrus.WithContext(ctx).Errorf("%+v", xerr)
-				return fail.Wrap(
-					xerr, "error provisioning the new Host, please check safescaled logs", instance.GetName(),
-				)
-			}
-			return xerr
-		}
-	}
-	return nil
-}
-
 // WaitSSHReady waits until SSH responds successfully
 func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -2700,7 +1884,7 @@ func createSingleHostNetworking(ctx context.Context, singleHostRequest abstract.
 				subnetCIDR string
 			)
 
-			subnetCIDR, cidrIndex, xerr = trxReserveCIDRForSingleHost(ctx, networkTrx)
+			subnetCIDR, cidrIndex, xerr = reserveCIDRForSingleHost(ctx, networkTrx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, nil, xerr
@@ -2729,7 +1913,7 @@ func createSingleHostNetworking(ctx context.Context, singleHostRequest abstract.
 				if ferr != nil && singleHostRequest.CleanOnFailure() {
 					derr := subnetInstance.Delete(cleanupContextFrom(ctx))
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", singleHostRequest.ResourceName))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to Delete Subnet '%s'", singleHostRequest.ResourceName))
 					}
 				}
 			}()
@@ -2761,9 +1945,9 @@ func createSingleHostNetworking(ctx context.Context, singleHostRequest abstract.
 			ctx := cleanupContextFrom(ctx)
 			derr := subnetInstance.Delete(ctx)
 			if derr != nil {
-				errs = append(errs, fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", singleHostRequest.ResourceName))
+				errs = append(errs, fail.Wrap(derr, "cleaning up on failure, failed to Delete Subnet '%s'", singleHostRequest.ResourceName))
 			}
-			derr = trxFreeCIDRForSingleHost(ctx, networkTrx, cidrIndex)
+			derr = networkTrx.FreeCIDRForSingleHost(ctx, cidrIndex)
 			if derr != nil {
 				errs = append(errs, fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot in Network '%s'", networkInstance.GetName()))
 			}
@@ -2798,7 +1982,7 @@ func (instance *Host) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 	if isGateway {
-		return fail.NotAvailableError("cannot delete Host, it's a gateway that can only be deleted through its Subnet")
+		return fail.NotAvailableError("cannot Delete Host, it's a gateway that can only be deleted through its Subnet")
 	}
 
 	hostTrx, xerr := newHostTransaction(ctx, instance)
@@ -2807,445 +1991,12 @@ func (instance *Host) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxRelaxedDeleteHost(ctx, hostTrx)
-}
-
-// trxRelaxedDeleteHost is the method that really deletes a host, being a gateway or not
-func (instance *Host) trxRelaxedDeleteHost(ctx context.Context, hostTrx hostTransaction) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	svc := instance.Service()
-	timings, xerr := svc.Timings()
+	xerr = hostTrx.RelaxedDeleteHost(ctx, instance.localCache.sshProfile)
 	if xerr != nil {
 		return xerr
 	}
 
-	cache, xerr := instance.Service().Cache(ctx)
-	if xerr != nil {
-		return xerr
-	}
-
-	hname := hostTrx.GetName()
-	hid, err := hostTrx.GetID()
-	if err != nil {
-		return fail.Wrap(err)
-	}
-
-	hostState, xerr := instance.trxForceGetState(ctx, hostTrx)
-	if xerr != nil {
-		return xerr
-	}
-
-	defer func() {
-		if ferr == nil && cache != nil {
-			_ = cache.Delete(ctx, hid)
-			_ = cache.Delete(ctx, hname)
-		}
-	}()
-
-	var shares map[string]*propertiesv1.HostShare
-	// Do not remove a Host having shared folders that are currently remotely mounted
-	xerr = inspectHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) fail.Error {
-		innerXErr := props.Inspect(hostproperty.SharesV1, func(p clonable.Clonable) fail.Error {
-			sharesV1, innerErr := clonable.Cast[*propertiesv1.HostShares](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			shares = sharesV1.ByID
-			shareCount := len(shares)
-			for _, hostShare := range shares {
-				count := len(hostShare.ClientsByID)
-				if count > 0 {
-					// clients found, checks if these clients already exists...
-					for _, hostID := range hostShare.ClientsByID {
-						instance, innerErr := LoadHost(ctx, hostID)
-						if innerErr != nil {
-							debug.IgnoreErrorWithContext(ctx, innerErr)
-							continue
-						}
-
-						return fail.NotAvailableError("Host '%s' exports %d share%s and at least one share is mounted", instance.GetName(), shareCount, strprocess.Plural(uint(shareCount)))
-					}
-				}
-			}
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		// Do not delete a Host with Bucket mounted
-		innerXErr = props.Inspect(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			nMounted := len(hostMountsV1.BucketMounts)
-			if nMounted > 0 {
-				return fail.NotAvailableError("Host '%s' has %d Bucket%s mounted", instance.GetName(), nMounted, strprocess.Plural(uint(nMounted)))
-			}
-
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		// Do not delete a Host with Volumes attached
-		return props.Inspect(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
-			hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			nAttached := len(hostVolumesV1.VolumesByID)
-			if nAttached > 0 {
-				return fail.NotAvailableError("Host '%s' has %d Volume%s attached", instance.GetName(), nAttached, strprocess.Plural(uint(nAttached)))
-			}
-
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
-	var (
-		single         bool
-		singleSubnetID string
-		mounts         []*propertiesv1.HostShare
-	)
-	xerr = inspectHostMetadataProperty(ctx, hostTrx, hostproperty.MountsV1, func(hostMountsV1 *propertiesv1.HostMounts) fail.Error {
-		for _, i := range hostMountsV1.RemoteMountsByPath {
-			// Retrieve Share data
-			shareInstance, loopErr := LoadShare(ctx, i.ShareID)
-			if loopErr != nil {
-				switch loopErr.(type) {
-				case *fail.ErrNotFound:
-					debug.IgnoreError(loopErr)
-					continue
-				default:
-					return loopErr
-				}
-			}
-
-			// Retrieve data about the server serving the Share
-			hostServer, loopErr := shareInstance.GetServer(ctx)
-			if loopErr != nil {
-				return loopErr
-			}
-
-			// Retrieve data about v from its server
-			item, loopErr := hostServer.GetShare(ctx, i.ShareID)
-			if loopErr != nil {
-				return loopErr
-			}
-
-			mounts = append(mounts, item)
-		}
-
-		return nil
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	// Unmounts tier shares mounted on Host (done outside the previous Host.properties.Reading() section, because
-	// Unmount() have to lock for write, and won't succeed while Host.properties.Reading() is running,
-	// leading to a deadlock)
-	for _, v := range mounts {
-		shareInstance, loopErr := LoadShare(ctx, v.ID)
-		if loopErr != nil {
-			switch loopErr.(type) {
-			case *fail.ErrNotFound:
-				debug.IgnoreErrorWithContext(ctx, loopErr)
-				continue
-			default:
-				return loopErr
-			}
-		}
-
-		shareTrx, xerr := newShareTransaction(ctx, shareInstance)
-		if xerr != nil {
-			return xerr
-		}
-		defer func(trx shareTransaction) { trx.TerminateFromError(ctx, &ferr) }(shareTrx)
-
-		loopErr = shareInstance.trxUnmount(ctx, shareTrx, hostTrx, hostState, instance.localCache.sshCfg)
-		if loopErr != nil {
-			return loopErr
-		}
-	}
-
-	// if Host exports shares, delete them
-	for _, v := range shares {
-		shareInstance, loopErr := LoadShare(ctx, v.Name)
-		if loopErr != nil {
-			switch loopErr.(type) {
-			case *fail.ErrNotFound:
-				debug.IgnoreErrorWithContext(ctx, loopErr)
-				continue
-			default:
-				return loopErr
-			}
-		}
-
-		loopErr = shareInstance.Delete(ctx)
-		if loopErr != nil {
-			return loopErr
-		}
-	}
-
-	// Walk through property propertiesv1.HostNetworking to remove the reference to the Host in Subnets
-	xerr = inspectHostMetadataProperty(ctx, hostTrx, hostproperty.NetworkV2, func(hostNetworkV2 *propertiesv2.HostNetworking) fail.Error {
-		hostID, err := instance.GetID()
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		single = hostNetworkV2.Single
-		if single {
-			singleSubnetID = hostNetworkV2.DefaultSubnetID
-		}
-
-		if !single {
-			var errs []error
-			for k := range hostNetworkV2.SubnetsByID {
-				if !hostNetworkV2.IsGateway && k != hostNetworkV2.DefaultSubnetID {
-					subnetInstance, loopErr := LoadSubnet(ctx, "", k)
-					if loopErr != nil {
-						logrus.WithContext(ctx).Errorf(loopErr.Error())
-						errs = append(errs, loopErr)
-						continue
-					}
-
-					loopErr = subnetInstance.DetachHost(ctx, hostID)
-					if loopErr != nil {
-						logrus.WithContext(ctx).Errorf(loopErr.Error())
-						errs = append(errs, loopErr)
-						continue
-					}
-				}
-			}
-			if len(errs) > 0 {
-				return fail.Wrap(fail.NewErrorList(errs), "failed to update metadata for Subnets of Host")
-			}
-		}
-		return nil
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	// Unbind Security Groups from Host
-	var hostSGS *propertiesv1.HostSecurityGroups
-	xerr = inspectHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) (finnerXErr fail.Error) {
-		hostSGS = hsgV1
-		return nil
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	// Unbind Security Groups from Host
-	var errs []error
-	for _, v := range hostSGS.ByID {
-		sgInstance, xerr := LoadSecurityGroup(ctx, v.ID)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// Consider that a Security Group that cannot be loaded or is not bound as a success
-				debug.IgnoreErrorWithContext(ctx, xerr)
-			default:
-				errs = append(errs, xerr)
-			}
-			continue
-		}
-
-		sgTrx, xerr := newSecurityGroupTransaction(ctx, sgInstance)
-		if xerr != nil {
-			errs = append(errs, xerr)
-			continue
-		}
-		defer func(trx securityGroupTransaction) { trx.TerminateFromError(ctx, &ferr) }(sgTrx)
-
-		xerr = sgInstance.trxUnbindFromHost(ctx, sgTrx, hostTrx)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// Consider that a Security Group that cannot be loaded or is not bound as a success
-				debug.IgnoreErrorWithContext(ctx, xerr)
-			default:
-				errs = append(errs, xerr)
-			}
-		}
-	}
-	if len(errs) > 0 {
-		return fail.Wrap(fail.NewErrorList(errs), "failed to unbind some Security Groups")
-	}
-
-	// Unbind labels from Host
-	var hostLabels *propertiesv1.HostLabels
-	xerr = inspectHostMetadataProperty(ctx, hostTrx, hostproperty.LabelsV1, func(hlV1 *propertiesv1.HostLabels) fail.Error {
-		hostLabels = hlV1
-		return nil
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	for k := range hostLabels.ByID {
-		labelInstance, innerErr := LoadLabel(ctx, k)
-		if innerErr != nil {
-			switch innerErr.(type) {
-			case *fail.ErrNotFound:
-				// Consider that a Security Group that cannot be loaded or is not bound as a success
-				debug.IgnoreErrorWithContext(ctx, innerErr)
-			default:
-				errs = append(errs, innerErr)
-			}
-			continue
-		}
-
-		labelTrx, xerr := newLabelTransaction(ctx, labelInstance)
-		if xerr != nil {
-			return xerr
-		}
-		defer func(trx labelTransaction) { trx.TerminateFromError(ctx, &ferr) }(labelTrx)
-
-		innerErr = labelInstance.trxUnbindFromHost(ctx, labelTrx, hostTrx)
-		if innerErr != nil {
-			switch innerErr.(type) {
-			case *fail.ErrNotFound:
-				// Consider that a Security Group that cannot be loaded or is not bound as a success
-				debug.IgnoreErrorWithContext(ctx, innerErr)
-			default:
-				errs = append(errs, innerErr)
-			}
-		}
-	}
-	if len(errs) > 0 {
-		return fail.Wrap(fail.NewErrorList(errs), "failed to unbind some Security Groups")
-	}
-
-	// Delete Host
-	var abstractHost *abstract.HostCore
-	xerr = inspectHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-		abstractHost = ahc
-		return nil
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	waitForDeletion := true
-	xerr = retry.WhileUnsuccessful(
-		func() error {
-			select {
-			case <-ctx.Done():
-				return retry.StopRetryError(ctx.Err())
-			default:
-			}
-
-			innerErr := svc.DeleteHost(ctx, abstractHost)
-			if innerErr != nil {
-				switch innerErr.(type) {
-				case *fail.ErrNotFound:
-					// A Host not found is considered as a successful deletion
-					logrus.WithContext(ctx).Tracef("Host not found, deletion considered as a success")
-					debug.IgnoreErrorWithContext(ctx, innerErr)
-				default:
-					return fail.Wrap(innerErr, "cannot delete Host")
-				}
-				waitForDeletion = false
-			}
-			return nil
-		},
-		timings.SmallDelay(),
-		timings.HostCleanupTimeout(),
-	)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *retry.ErrStopRetry:
-			return fail.Wrap(fail.Cause(xerr), "stopping retries")
-		case *retry.ErrTimeout:
-			return fail.Wrap(fail.Cause(xerr), "timeout")
-		default:
-			return xerr
-		}
-	}
-
-	// wait for effective Host deletion
-	if waitForDeletion {
-		xerr = retry.WhileUnsuccessfulWithHardTimeout(
-			func() error {
-				select {
-				case <-ctx.Done():
-					return retry.StopRetryError(ctx.Err())
-				default:
-				}
-
-				state, stateErr := svc.GetHostState(ctx, abstractHost.ID)
-				if stateErr != nil {
-					switch stateErr.(type) {
-					case *fail.ErrNotFound:
-						// If Host is not found anymore, consider this as a success
-						debug.IgnoreErrorWithContext(ctx, stateErr)
-						return nil
-					default:
-						return stateErr
-					}
-				}
-				if state == hoststate.Error {
-					return fail.NotAvailableError("Host is in state Error")
-				}
-				return nil
-			},
-			timings.NormalDelay(),
-			timings.OperationTimeout(),
-		)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *retry.ErrStopRetry:
-				xerr = fail.Wrap(fail.Cause(xerr))
-				if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
-					return xerr
-				}
-				debug.IgnoreErrorWithContext(ctx, xerr)
-			case *fail.ErrNotFound:
-				debug.IgnoreErrorWithContext(ctx, xerr)
-			default:
-				return xerr
-			}
-		}
-	}
-
-	if single {
-		// delete its dedicated Subnet
-		singleSubnetInstance, xerr := LoadSubnet(ctx, "", singleSubnetID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-
-		xerr = singleSubnetInstance.Delete(ctx)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-	}
-
-	// Need to explicitly terminate host transaction to be able to delete metadata (dead-lock otherwise)
+	// Need to explicitly terminate host transaction to be able to Delete metadata (dead-lock otherwise)
 	hostTrx.SilentTerminate(ctx)
 
 	// Deletes metadata from Object Storage
@@ -3256,26 +2007,11 @@ func (instance *Host) trxRelaxedDeleteHost(ctx context.Context, hostTrx hostTran
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
 		}
+
 		debug.IgnoreErrorWithContext(ctx, xerr)
 		logrus.WithContext(ctx).Tracef("core instance not found, deletion considered as a success")
 	}
 
-	return nil
-}
-
-// trxRefreshLocalCacheIfNeeded refreshes instance.localCache if instance.localCache.PrivateIP == ""
-func (instance *Host) trxRefreshLocalCacheIfNeeded(ctx context.Context, hostTrx hostTransaction) fail.Error {
-	instance.localCache.RLock()
-	doRefresh := instance.localCache.privateIP == ""
-	instance.localCache.RUnlock() // nolint
-	if doRefresh {
-		xerr := instance.trxUpdateCachedInformation(ctx, hostTrx)
-		if xerr != nil {
-			return xerr
-		}
-	} else {
-		incrementExpVar("host.cache.hit")
-	}
 	return nil
 }
 
@@ -3293,7 +2029,7 @@ func (instance *Host) GetSSHConfig(ctx context.Context) (_ sshapi.Config, ferr f
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	xerr = instance.trxRefreshLocalCacheIfNeeded(ctx, hostTrx)
+	xerr = instance.refreshLocalCacheIfNeeded(ctx, hostTrx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -3610,7 +2346,7 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	// Now reload
-	xerr = instance.trxReload(ctx, hostTrx)
+	xerr = instance.reload(ctx, hostTrx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3692,7 +2428,7 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	xerr = instance.trxReload(ctx, hostTrx)
+	xerr = instance.reload(ctx, hostTrx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3854,7 +2590,7 @@ func (instance *Host) GetPublicIP(ctx context.Context) (_ string, ferr fail.Erro
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	xerr = instance.trxRefreshLocalCacheIfNeeded(ctx, hostTrx)
+	xerr = instance.refreshLocalCacheIfNeeded(ctx, hostTrx)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -3884,7 +2620,7 @@ func (instance *Host) GetPrivateIP(ctx context.Context) (_ string, ferr fail.Err
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	xerr = instance.trxRefreshLocalCacheIfNeeded(ctx, hostTrx)
+	xerr = instance.refreshLocalCacheIfNeeded(ctx, hostTrx)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -3949,7 +2685,7 @@ func (instance *Host) GetAccessIP(ctx context.Context) (_ string, ferr fail.Erro
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	xerr = instance.trxRefreshLocalCacheIfNeeded(ctx, hostTrx)
+	xerr = instance.refreshLocalCacheIfNeeded(ctx, hostTrx)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -4260,7 +2996,7 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance *Securit
 	defer sgTrx.TerminateFromError(ctx, &ferr)
 
 	// If the Security Group is already bound to the Host with the exact same state, considered as a success
-	return alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
+	xerr = alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
 		item, ok := hsgV1.ByID[sgID]
 		if !ok {
 			// No entry for bind, create one
@@ -4272,20 +3008,13 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance *Securit
 			hsgV1.ByName[item.Name] = item.ID
 		}
 		item.Disabled = bool(!enable)
-
-		innerXErr := sgInstance.trxBindToHost(ctx, sgTrx, hostTrx, enable, MarkSecurityGroupAsSupplemental)
-		if innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrDuplicate:
-				// already bound, consider as a success
-				return fail.AlteredNothingError()
-			default:
-				return innerXErr
-			}
-		}
-
 		return nil
 	})
+	if xerr != nil {
+		return xerr
+	}
+
+	return sgTrx.BindToHost(ctx, hostTrx, enable, MarkSecurityGroupAsSupplemental)
 }
 
 // UnbindSecurityGroup unbinds a security group from the Host
@@ -4341,30 +3070,30 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance *Secur
 			return nil
 		}
 
-		// unbind security group from Host on remote service side
-		innerXErr := sgInstance.UnbindFromHost(ctx, instance)
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		// found, delete it from properties
+		// found, Delete it from properties
 		delete(hsgV1.ByID, sgID)
-		delete(hsgV1.ByName, sgInstance.GetName())
+		delete(hsgV1.ByName, sgTrx.GetName())
 		return nil
 	})
 	if xerr != nil {
 		return xerr
 	}
 
+	// unbind security group from Host on remote service side
+	xerr = sgTrx.UnbindFromHost(ctx, hostTrx)
+	if xerr != nil {
+		return xerr
+	}
+
 	// -- Remove Host referenced in Security Group
 	return alterSecurityGroupMetadataProperty(ctx, sgTrx, securitygroupproperty.HostsV1, func(sghV1 *propertiesv1.SecurityGroupHosts) fail.Error {
-		hid, innerErr := instance.GetID()
+		hostID, innerErr := hostTrx.GetID()
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
 
-		delete(sghV1.ByID, hid)
-		delete(sghV1.ByName, instance.GetName())
+		delete(sghV1.ByID, hostID)
+		delete(sghV1.ByName, hostTrx.GetName())
 		return nil
 	})
 }
@@ -4420,53 +3149,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sgInstance *Secur
 	}
 	defer sgTrx.TerminateFromError(ctx, &ferr)
 
-	return alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-			hsgV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			return inspectSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
-				// First check if the security group is not already registered for the Host with the exact same state
-				var found bool
-				for k := range hsgV1.ByID {
-					if k == asg.ID {
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, instance.GetName())
-				}
-
-				caps := instance.Service().Capabilities()
-				if caps.CanDisableSecurityGroup {
-					innerXErr := instance.Service().EnableSecurityGroup(ctx, asg)
-					innerXErr = debug.InjectPlannedFail(innerXErr)
-					if innerXErr != nil {
-						return innerXErr
-					}
-				} else {
-					// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), considered as a success
-					innerXErr := instance.Service().BindSecurityGroupToHost(ctx, asg, ahc)
-					innerXErr = debug.InjectPlannedFail(innerXErr)
-					if innerXErr != nil {
-						switch innerXErr.(type) {
-						case *fail.ErrDuplicate:
-							debug.IgnoreErrorWithContext(ctx, innerXErr)
-						default:
-							return innerXErr
-						}
-					}
-				}
-
-				// found and updated, update metadata
-				hsgV1.ByID[asg.ID].Disabled = false
-				return nil
-			})
-		})
-	})
+	return hostTrx.EnableSecurityGroup(ctx, sgTrx)
 }
 
 // DisableSecurityGroup disables a bound security group to Host
@@ -4499,88 +3182,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance *Secu
 	}
 	defer sgTrx.TerminateFromError(ctx, &ferr)
 
-	return alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-			hsgV1, innerErr := lang.Cast[*propertiesv1.HostSecurityGroups](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			return inspectSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
-				// First check if the security group is not already registered for the Host with the exact same state
-				var found bool
-				for k := range hsgV1.ByID {
-					if k == asg.ID {
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, instance.GetName())
-				}
-
-				caps := instance.Service().Capabilities()
-				if caps.CanDisableSecurityGroup {
-					innerXErr := instance.Service().DisableSecurityGroup(ctx, asg)
-					innerXErr = debug.InjectPlannedFail(innerXErr)
-					if innerXErr != nil {
-						return innerXErr
-					}
-				} else {
-					// Bind the security group on provider side; if security group not binded, considered as a success
-					innerXErr := instance.Service().UnbindSecurityGroupFromHost(ctx, asg, ahc)
-					innerXErr = debug.InjectPlannedFail(innerXErr)
-					if innerXErr != nil {
-						switch innerXErr.(type) {
-						case *fail.ErrNotFound:
-							debug.IgnoreErrorWithContext(ctx, innerXErr)
-							// continue
-						default:
-							return innerXErr
-						}
-					}
-				}
-
-				// found, update properties
-				hsgV1.ByID[asg.ID].Disabled = true
-				return nil
-			})
-		})
-	})
-}
-
-// trxReserveCIDRForSingleHost returns the first available CIDR and its index inside the Network 'network'
-func trxReserveCIDRForSingleHost(ctx context.Context, networkTrx networkTransaction) (_ string, _ uint, ferr fail.Error) {
-	var index uint
-	xerr := alterNetworkMetadataProperty(ctx, networkTrx, networkproperty.SingleHostsV1, func(nshV1 *propertiesv1.NetworkSingleHosts) fail.Error {
-		index = nshV1.ReserveSlot()
-		return nil
-	})
-	if xerr != nil {
-		return "", 0, xerr
-	}
-
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil {
-			derr := trxFreeCIDRForSingleHost(cleanupContextFrom(ctx), networkTrx, index)
-			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot '%d' in Network '%s'", index, networkTrx.GetName()))
-			}
-		}
-	}()
-
-	_, networkNet, err := net.ParseCIDR(abstract.SingleHostNetworkCIDR)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		return "", 0, fail.Wrap(err, "failed to convert CIDR to net.IPNet")
-	}
-
-	localresult, xerr := netretry.NthIncludedSubnet(*networkNet, propertiesv1.SingleHostsCIDRMaskAddition, index)
-	if xerr != nil {
-		return "", 0, xerr
-	}
-	return localresult.String(), index, nil
+	return hostTrx.DisableSecurityGroup(ctx, sgTrx)
 }
 
 func getCommand(ctx context.Context, file string) string {
@@ -4687,18 +3289,18 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance *Label, value
 	}
 	defer labelTrx.TerminateFromError(ctx, &ferr)
 
-	labelID, err := labelInstance.GetID()
+	labelID, err := labelTrx.GetID()
 	if err != nil {
 		return fail.Wrap(err)
 	}
 
-	instanceID, err := hostTrx.GetID()
+	hostID, err := hostTrx.GetID()
 	if err != nil {
 		return fail.Wrap(err)
 	}
 
 	// Inform Label we want it bound to Host (updates its metadata)
-	xerr = labelInstance.trxBindToHost(ctx, labelTrx, hostTrx, value)
+	xerr = labelTrx.BindToHost(ctx, hostTrx, value)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -4740,7 +3342,7 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance *Label, value
 	}
 
 	svc := instance.Service()
-	xerr = svc.UpdateTags(ctx, abstract.HostResource, instanceID, lmap)
+	xerr = svc.UpdateTags(ctx, abstract.HostResource, hostID, lmap)
 	if xerr != nil {
 		return xerr
 	}
@@ -4801,12 +3403,12 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance *Label) (fe
 		return fail.Wrap(err)
 	}
 
-	xerr = alterHostMetadataProperty(ctx, hostTrx, hostproperty.LabelsV1, func(hostLabelsV1 *propertiesv1.HostLabels) fail.Error {
-		labelID, err := labelInstance.GetID()
-		if err != nil {
-			return fail.Wrap(err)
-		}
+	labelID, err := labelTrx.GetID()
+	if err != nil {
+		return fail.Wrap(err)
+	}
 
+	xerr = alterHostMetadataProperty(ctx, hostTrx, hostproperty.LabelsV1, func(hostLabelsV1 *propertiesv1.HostLabels) fail.Error {
 		// If the host is not bound to this Label, consider it a success
 		_, found := hostLabelsV1.ByID[labelID]
 		if found {
@@ -4820,7 +3422,7 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance *Label) (fe
 		return xerr
 	}
 
-	xerr = labelInstance.trxUnbindFromHost(ctx, labelTrx, hostTrx)
+	xerr = labelTrx.UnbindFromHost(ctx, hostTrx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -4958,4 +3560,301 @@ func (instance *Host) GetDomain(ctx context.Context) (_ string, ferr fail.Error)
 	}
 
 	return domain, nil
+}
+
+// refreshLocalCacheIfNeeded refreshes instance.localCache if instance.localCache.PrivateIP == ""
+func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context, hostTrx hostTransaction) fail.Error {
+	instance.localCache.RLock()
+	doRefresh := instance.localCache.privateIP == ""
+	instance.localCache.RUnlock() // nolint
+	if doRefresh {
+		xerr := instance.updateCachedInformation(ctx, hostTrx)
+		if xerr != nil {
+			return xerr
+		}
+	} else {
+		incrementExpVar("host.cache.hit")
+	}
+	return nil
+}
+
+func (instance *Host) finalizeProvisioning(ctx context.Context, hostTrx hostTransaction, userdataContent *userdata.Content) (ferr fail.Error) {
+	if ctx == nil {
+		return fail.InvalidInstanceError()
+	}
+	if hostTrx == nil {
+		return fail.InvalidParameterCannotBeNilError("hostTrx")
+	}
+	if userdataContent == nil {
+		return fail.InvalidParameterCannotBeNilError("userdataContent")
+	}
+
+	defer fail.OnExitLogError(ctx, &ferr)
+
+	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
+	svc := instance.Service()
+	hostName := hostTrx.GetName()
+	hostID, err := hostTrx.GetID()
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
+	xerr := svc.ClearHostStartupScript(ctx, hostID)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
+	if userdataContent.Debug {
+		if _, err := os.Stat("/tmp/tss"); !errors.Is(err, os.ErrNotExist) {
+			_, _, _, xerr = instance.Push(ctx, "/tmp/tss", fmt.Sprintf("/home/%s/tss", userdataContent.Username), userdataContent.Username, "755", 10*time.Second)
+			if xerr != nil {
+				debug.IgnoreErrorWithContext(ctx, xerr)
+			}
+		}
+	}
+
+	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure networking and security
+	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, getPhase2Timeout(timings))
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	// Update Keypair of the Host with the final one
+	xerr = alterHostMetadataAbstract(ctx, hostTrx, func(ah *abstract.HostCore) fail.Error {
+		ah.PrivateKey = userdataContent.FinalPrivateKey
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to update Keypair of machine '%s'", hostName)
+	}
+
+	xerr = hostTrx.Commit(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = instance.updateCachedInformation(ctx, hostTrx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	if inBackground() {
+		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, timings.HostOperationTimeout()+timings.HostBootTimeout())
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	waitingTime := temporal.MaxTimeout(24*timings.RebootTimeout()/10, timings.HostCreationTimeout())
+	// If the script doesn't reboot, we force a reboot
+	if !instance.thePhaseReboots(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent) {
+		logrus.WithContext(ctx).Infof("finalizing Host provisioning of '%s': rebooting", hostName)
+
+		// Reboot Host
+		xerr = instance.Reboot(ctx, true)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		time.Sleep(timings.RebootTimeout())
+	}
+
+	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, 90*time.Second) // FIXME: It should be 1:30 min tops, 2*reboot time
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	// if Host is not a gateway, executes userdata.PHASE4/5 scripts
+	// to fix possible system issues and finalize Host creation.
+	// For a gateway, userdata.PHASE3 to 5 have to be run explicitly (cf. operations/subnet.go)
+	if !userdataContent.IsGateway {
+		if instance.thePhaseDoesSomething(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent) {
+			// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
+			xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent, getPhase4Timeout(timings))
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				theCause := fail.Wrap(fail.Cause(xerr))
+				if _, ok := theCause.(*fail.ErrTimeout); !ok || valid.IsNil(theCause) {
+					return xerr
+				}
+
+				debug.IgnoreErrorWithContext(ctx, xerr)
+			}
+
+			// Reboot Host
+			logrus.WithContext(ctx).Infof("finalizing Host provisioning of '%s' (not-gateway): rebooting", hostName)
+			xerr = instance.Reboot(ctx, true)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+
+			time.Sleep(timings.RebootTimeout())
+
+			_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, waitingTime)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+		} else {
+			logrus.WithContext(ctx).Debugf("Nothing to do for the phase '%s'", userdata.PHASE4_SYSTEM_FIXES)
+		}
+
+		// execute userdata.PHASE5_FINAL script to finalize install/configure of the Host (no need to reboot)
+		xerr = instance.runInstallPhase(ctx, userdata.PHASE5_FINAL, userdataContent, waitingTime)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE5_FINAL, timings.HostOperationTimeout())
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			switch xerr.(type) { // nolint
+			case *retry.ErrStopRetry:
+				return fail.Wrap(xerr, "stopping retries")
+			case *fail.ErrTimeout:
+				return fail.Wrap(xerr, "timeout creating a Host")
+			}
+			if abstract.IsProvisioningError(xerr) {
+				logrus.WithContext(ctx).Errorf("%+v", xerr)
+				return fail.Wrap(
+					xerr, "error provisioning the new Host, please check safescaled logs", hostName,
+				)
+			}
+			return xerr
+		}
+	}
+	return nil
+}
+
+// reload reloads Host from metadata and current Host state on provider state
+func (instance *Host) reload(ctx context.Context, hostTrx hostTransaction) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	xerr := instance.Core.Reload(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrTimeout: // If retry timed out, log it and return error ErrNotFound
+			return fail.NotFoundError("metadata of Host '%s' not found; Host deleted?", instance.GetName())
+		default:
+			return xerr
+		}
+	}
+
+	hid, err := hostTrx.GetID()
+	if err != nil {
+		return fail.Wrap(err)
+	}
+
+	// Request Host inspection from provider
+	ahf, xerr := instance.Service().InspectHost(ctx, hid)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	cache, xerr := instance.Service().Cache(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if cache != nil {
+		hid, err := instance.GetID()
+		if err != nil {
+			return fail.Wrap(err)
+		}
+
+		thing, err := cache.Get(ctx, hid)
+		if err != nil || thing == nil { // usually notfound
+			err = cache.Set(ctx, hid, instance, &store.Options{Expiration: 1 * time.Minute})
+			if err != nil {
+				return fail.Wrap(err)
+			}
+
+			time.Sleep(10 * time.Millisecond) // consolidate cache.Set
+		} else if _, ok := thing.(*Host); !ok {
+			return fail.NewError("cache stored the wrong type")
+		}
+	}
+
+	// Updates the Host metadata
+	xerr = alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
+		changed := false
+		if ahc.LastState != ahf.CurrentState {
+			ahf.CurrentState = ahc.LastState
+			changed = true
+		}
+
+		innerXErr := props.Alter(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
+			hostSizingV2, innerErr := clonable.Cast[*propertiesv2.HostSizing](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
+			}
+
+			allocated := converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
+			if !reflect.DeepEqual(*allocated, *hostSizingV2.AllocatedSize) {
+				*hostSizingV2.AllocatedSize = *allocated
+				changed = true
+			}
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		// Updates Host property propertiesv1.HostNetworking from "ground" (Cloud Provider side)
+		innerXErr = props.Alter(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
+			hnV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
+			}
+
+			if len(ahf.Networking.IPv4Addresses) > 0 {
+				hnV2.IPv4Addresses = ahf.Networking.IPv4Addresses
+			}
+			if len(ahf.Networking.IPv6Addresses) > 0 {
+				hnV2.IPv6Addresses = ahf.Networking.IPv6Addresses
+			}
+			if len(ahf.Networking.SubnetsByID) > 0 {
+				hnV2.SubnetsByID = ahf.Networking.SubnetsByID
+			}
+			if len(ahf.Networking.SubnetsByName) > 0 {
+				hnV2.SubnetsByName = ahf.Networking.SubnetsByName
+			}
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		if !changed {
+			return fail.AlteredNothingError()
+		}
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrAlteredNothing:
+			return nil
+		default:
+			return xerr
+		}
+	}
+
+	return instance.updateCachedInformation(ctx, hostTrx)
 }

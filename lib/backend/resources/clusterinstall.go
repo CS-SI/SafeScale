@@ -36,7 +36,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/system"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
@@ -95,14 +94,14 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) (_ []string, fer
 		return []string{}, fail.InvalidInstanceError()
 	}
 
-	trx, xerr := metadata.NewTransaction[*abstract.Cluster, *Cluster](ctx, instance)
+	clusterTrx, xerr := newClusterTransaction(ctx, instance)
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer trx.TerminateFromError(ctx, &ferr)
+	defer clusterTrx.TerminateFromError(ctx, &ferr)
 
 	var out []string
-	xerr = inspectClusterMetadataProperty(ctx, trx, clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
+	xerr = inspectClusterMetadataProperty(ctx, clusterTrx, clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
 		featuresV1, innerErr := clonable.Cast[*propertiesv1.ClusterFeatures](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
@@ -130,7 +129,7 @@ func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v da
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	trx, xerr := metadata.NewTransaction[*abstract.Cluster, *Cluster](ctx, instance)
+	trx, xerr := newClusterTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
@@ -311,7 +310,7 @@ func (instance *Cluster) UnregisterFeature(inctx context.Context, feat string) (
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	trx, xerr := metadata.NewTransaction[*abstract.Cluster, *Cluster](ctx, instance)
+	trx, xerr := newClusterTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
@@ -608,8 +607,8 @@ func (instance *Cluster) ExecuteScript(inctx context.Context, tmplName string, v
 	}
 }
 
-// trxInstallNodeRequirements ...
-func (instance *Cluster) trxInstallNodeRequirements(inctx context.Context, clusterTrx clusterTransaction, nodeType clusternodetype.Enum, host *Host, hostLabel string) (ferr fail.Error) {
+// installNodeRequirements ...
+func (instance *Cluster) installNodeRequirements(inctx context.Context, clusterTrx clusterTransaction, nodeType clusternodetype.Enum, host *Host, hostLabel string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)

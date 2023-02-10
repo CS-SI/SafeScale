@@ -1,6 +1,3 @@
-//go:build fixme
-// +build fixme
-
 /*
  * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
  *
@@ -23,19 +20,25 @@ import (
 	"context"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_cleanerCtx(t *testing.T) {
+// func Test_cleanerCtx(t *testing.T) {
+//
+// 	ctx := context.Background()
+// 	task, xerr := concurrency.NewTaskWithContext(ctx)
+// 	ctx = context.WithValue(ctx, "task", task)
+// 	require.Nil(t, xerr)
+//
+// 	derived, err := cleanerCtx(ctx)
+// 	require.Nil(t, err)
+// 	require.NotNil(t, derived.Value("task"))
+//
+// }
 
-	ctx := context.Background()
-	task, xerr := concurrency.NewTaskWithContext(ctx)
-	ctx = context.WithValue(ctx, "task", task)
-	require.Nil(t, xerr)
+func Test_cleanupContextFrom(t *testing.T) {
+	ctx := context.WithValue(context.Background(), "ID", "toto")
 
-	derived, err := cleanerCtx(ctx)
-	require.Nil(t, err)
-	require.NotNil(t, derived.Value("task"))
-
+	derived := cleanupContextFrom(ctx)
+	require.NotNil(t, derived.Value("ID"))
 }

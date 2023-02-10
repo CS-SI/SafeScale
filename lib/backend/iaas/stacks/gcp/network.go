@@ -278,7 +278,7 @@ func (s stack) UnbindHostFromVIP(ctx context.Context, vip *abstract.VirtualIP, h
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%v, %s)", vip, hostID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return fail.NotImplementedError("UnbindHostFromVIP() not implemented yet") // FIXME: Technical debt
+	return fail.NotImplementedError("unbindHostFromVIP() not implemented yet") // FIXME: Technical debt
 }
 
 // DeleteVIP deletes the VIP

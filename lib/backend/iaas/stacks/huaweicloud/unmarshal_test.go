@@ -1,12 +1,13 @@
 package huaweicloud
 
 import (
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"os"
 	"testing"
 
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/stretchr/testify/require"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 )
 
 func Test_recoverImageInfo(t *testing.T) {

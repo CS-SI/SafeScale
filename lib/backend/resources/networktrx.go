@@ -4,18 +4,34 @@ import (
 	"context"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
+	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 type (
-	networkTransaction = metadata.Transaction[*abstract.Network, *Network]
+	networkTransaction = *networkTransactionImpl
+
+	networkTransactionImpl struct {
+		metadata.Transaction[*abstract.Network, *Network]
+	}
 )
 
 func newNetworkTransaction(ctx context.Context, instance *Network) (networkTransaction, fail.Error) {
-	return metadata.NewTransaction[*abstract.Network, *Network](ctx, instance)
+	if instance == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("instance")
+	}
+
+	trx, xerr := metadata.NewTransaction[*abstract.Network, *Network](ctx, instance)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return &networkTransactionImpl{trx}, nil
 }
 
 func inspectNetworkMetadata(ctx context.Context, trx networkTransaction, callback func(*abstract.Network, *serialize.JSONProperties) fail.Error) fail.Error {
@@ -48,4 +64,29 @@ func alterNetworkMetadataProperty[P clonable.Clonable](ctx context.Context, trx 
 
 func alterNetworkMetadataProperties(ctx context.Context, trx networkTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
 	return metadata.AlterProperties[*abstract.Network](ctx, trx, callback)
+}
+
+// IsNull ...
+func (networkTrx *networkTransactionImpl) IsNull() bool {
+	return networkTrx == nil || networkTrx.Transaction.IsNull()
+}
+
+// FreeCIDRForSingleHost frees the CIDR index inside the Network 'Network'
+func (networkTrx *networkTransactionImpl) FreeCIDRForSingleHost(ctx context.Context, index uint) fail.Error {
+	if valid.IsNull(networkTrx) {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	return alterNetworkMetadataProperty(ctx, networkTrx, networkproperty.SingleHostsV1, func(p clonable.Clonable) fail.Error {
+		nshV1, innerErr := clonable.Cast[*propertiesv1.NetworkSingleHosts](p)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
+		}
+
+		nshV1.FreeSlot(index)
+		return nil
+	})
 }

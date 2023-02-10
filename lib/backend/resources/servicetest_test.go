@@ -1542,13 +1542,13 @@ func (e *ServiceTest) UnbindSecurityGroupFromHost(ctx context.Context, sgParam s
 	//		if len(sghV1.ByID) > 0 {
 	//			_, ok = sghV1.ByID[hostName]
 	//			if ok {
-	//				delete(sghV1.ByID, hostName)
+	//				Delete(sghV1.ByID, hostName)
 	//			}
 	//		}
 	//		if len(sghV1.ByName) > 0 {
 	//			_, ok = sghV1.ByName[hostName]
 	//			if ok {
-	//				delete(sghV1.ByName, hostName)
+	//				Delete(sghV1.ByName, hostName)
 	//			}
 	//		}
 	//		return nil
@@ -1939,7 +1939,7 @@ func (e *ServiceTest) BindHostToVIP(ctx context.Context, vip *abstract.VirtualIP
 }
 
 func (e *ServiceTest) UnbindHostFromVIP(_ context.Context, vip *abstract.VirtualIP, target string) fail.Error {
-	e._survey("ServiceTest::UnbindHostFromVIP (not implemented)")
+	e._survey("ServiceTest::unbindHostFromVIP (not implemented)")
 	return nil
 }
 

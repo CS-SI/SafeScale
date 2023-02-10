@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/global"
 	"github.com/davecgh/go-spew/spew"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/sirupsen/logrus"
@@ -305,9 +306,8 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 func (instance stack) ListAvailabilityZones(ctx context.Context) (list map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	var emptyMap map[string]bool
 	if valid.IsNil(instance) {
-		return emptyMap, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.huaweicloud") || tracing.ShouldTrace("stacks.compute"), "").Entering()
@@ -323,12 +323,12 @@ func (instance stack) ListAvailabilityZones(ctx context.Context) (list map[strin
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptyMap, xerr
+		return nil, xerr
 	}
 
 	content, err := az.ExtractAvailabilityZones(allPages)
 	if err != nil {
-		return emptyMap, fail.Wrap(err)
+		return nil, fail.Wrap(err)
 	}
 
 	azList := map[string]bool{}
@@ -542,6 +542,7 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 	metadata["Image"] = request.ImageRef
 	metadata["Template"] = request.TemplateID
 	metadata["CreationDate"] = time.Now().Format(time.RFC3339)
+	metadata["Revision"] = global.Revision
 
 	// defines creation options
 	srvOpts := serverCreateOpts{
@@ -601,7 +602,6 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 
 			innerXErr := stacks.RetryableRemoteCall(ctx,
 				func() (extErr error) {
-					// FIXME: this should be inside retry code before calling the callback...
 					select {
 					case <-ctx.Done():
 						return retry.StopRetryError(ctx.Err())
@@ -692,6 +692,12 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 					return innerXErr
 				}
 			}
+
+			innerXErr = instance.rpcSetMetadataOfInstance(ctx, finalServer.ID, ahc.Tags)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
 			return nil
 		},
 		timings.NormalDelay(),
@@ -756,7 +762,7 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
-			if ferr != nil {
+			if ferr != nil && fip != nil {
 				derr := instance.DeleteFloatingIP(cleanupContextFrom(ctx), fip.ID)
 				if derr != nil {
 					logrus.WithContext(ctx).Errorf("Error deleting Floating IP: %v", derr)
@@ -764,6 +770,13 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 				}
 			}
 		}()
+
+		if fip, xerr = instance.attachFloatingIP(ctx, host); xerr != nil {
+			return nil, userData, fail.Wrap(xerr, "error attaching public IP for host '%s'", request.ResourceName)
+		}
+		if fip == nil {
+			return nil, userData, fail.NewError("error attaching public IP for host: unknown error")
+		}
 
 		if valid.IsIPv4(fip.PublicIPAddress) {
 			host.Networking.PublicIPv4 = fip.PublicIPAddress
@@ -1217,9 +1230,8 @@ func (instance stack) collectAddresses(ctx context.Context, host *abstract.HostC
 
 // ListHosts lists available hosts
 func (instance stack) ListHosts(ctx context.Context, details bool) (abstract.HostList, fail.Error) {
-	var emptyList abstract.HostList
 	if valid.IsNil(instance) {
-		return emptyList, fail.InvalidInstanceError()
+		return nil, fail.InvalidInstanceError()
 	}
 
 	var hostList abstract.HostList
@@ -1254,7 +1266,7 @@ func (instance stack) ListHosts(ctx context.Context, details bool) (abstract.Hos
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	return hostList, nil
@@ -1346,7 +1358,7 @@ func (instance stack) DeleteHost(ctx context.Context, hostParam iaasapi.HostIden
 				if innerRetryErr != nil {
 					switch innerRetryErr.(type) {
 					case *fail.ErrNotFound:
-						// abstract not found, consider deletion succeeded (if the entry doesn't exist at all,
+						// Resource not found, consider deletion succeeded (if the entry doesn't exist at all,
 						// metadata deletion will return an error)
 						return nil
 					default:

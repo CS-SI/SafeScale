@@ -21,19 +21,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// // GetAuthOpts returns the auth options
-// func (s stack) GetAuthOpts() (providers.Config, error) {
-// 	cfg := providers.ConfigMap{}
-//
-// 	cfg.Set("DomainName", s.authOpts.DomainName)
-// 	cfg.Set("Login", s.authOpts.Username)
-// 	cfg.Set("Password", s.authOpts.Password)
-// 	cfg.Set("AuthURL", s.authOpts.IdentityEndpoint)
-// 	cfg.Set("Region", s.authOpts.Region)
-//
-// 	return cfg, nil
-// }
-
 // ConfigurationOptions ...
 func (instance *stack) ConfigurationOptions() (iaasoptions.Configuration, fail.Error) {
 	return instance.cfgOpts, nil

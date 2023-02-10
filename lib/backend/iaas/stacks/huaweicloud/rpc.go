@@ -116,8 +116,7 @@ func (instance stack) rpcGetHostByName(ctx context.Context, name string) (*serve
 // rpcListPorts lists all ports available
 func (instance stack) rpcListPorts(ctx context.Context, options ports.ListOpts) ([]ports.Port, fail.Error) {
 	var (
-		emptyList []ports.Port
-		allPages  pagination.Page
+		allPages pagination.Page
 	)
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
@@ -127,12 +126,12 @@ func (instance stack) rpcListPorts(ctx context.Context, options ports.ListOpts) 
 		NormalizeError,
 	)
 	if xerr != nil {
-		return emptyList, xerr
+		return nil, xerr
 	}
 
 	r, err := ports.ExtractPorts(allPages)
 	if err != nil {
-		return emptyList, NormalizeError(err)
+		return nil, NormalizeError(err)
 	}
 	return r, nil
 }

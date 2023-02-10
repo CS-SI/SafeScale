@@ -703,7 +703,7 @@ func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], se
 				return
 			}
 		case installaction.Remove:
-			// FIXME: currently removing feature does not clear proxy rules...
+			// FIXME: currently removing feature does not Clear proxy rules...
 			// if !settings.SkipProxy {
 			// 	rgw, xerr := w.identifyAvailableGateway()
 			// 	if xerr == nil {

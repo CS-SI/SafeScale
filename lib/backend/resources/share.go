@@ -522,7 +522,7 @@ func (instance *Share) Create(
 		return xerr
 	}
 
-	// Starting from here, delete Share reference in server if exiting with error
+	// Starting from here, Delete Share reference in server if exiting with error
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
@@ -835,19 +835,19 @@ func (instance *Share) Mount(ctx context.Context, target *Host, spath string, wi
 				return nil
 			})
 			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to alter metadata trying to delete Share"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to alter metadata trying to Delete Share"))
 				return
 			}
 
 			var nfsClient *nfs.Client
 			if nfsClient, derr = nfs.NewNFSClient(sshProfile); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to get nfs client trying to delete Share"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to get nfs client trying to Delete Share"))
 				return
 			}
 
 			derr = nfsClient.Unmount(cleanupContextFrom(ctx), instance.Service(), export)
 			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount trying to delete Share"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount trying to Delete Share"))
 				return
 			}
 		}
@@ -912,9 +912,14 @@ func (instance *Share) Unmount(ctx context.Context, target *Host) (ferr fail.Err
 		return xerr
 	}
 
-	targetSSH, xerr := target.GetSSHConfig(ctx)
+	targetSSHConfig, xerr := target.GetSSHConfig(ctx)
 	if xerr != nil {
 		return xerr
+	}
+
+	targetSSH, inErr := sshfactory.NewConnector(targetSSHConfig)
+	if inErr != nil {
+		return inErr
 	}
 
 	shareTrx, xerr := newShareTransaction(ctx, instance)
@@ -933,7 +938,7 @@ func (instance *Share) Unmount(ctx context.Context, target *Host) (ferr fail.Err
 }
 
 // trxUnmount unmounts a Share from local directory of a host
-func (instance *Share) trxUnmount(ctx context.Context, shareTrx shareTransaction, targetTrx hostTransaction, hostState hoststate.Enum, targetSSH sshapi.Config) (ferr fail.Error) {
+func (instance *Share) trxUnmount(ctx context.Context, shareTrx shareTransaction, targetTrx hostTransaction, hostState hoststate.Enum, targetSSH sshapi.Connector) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if hostState == hoststate.Started && targetSSH == nil {
@@ -1009,12 +1014,7 @@ func (instance *Share) trxUnmount(ctx context.Context, shareTrx shareTransaction
 		}
 
 		// Unmount Share from client
-		sshProfile, inErr := sshfactory.NewConnector(targetSSH)
-		if inErr != nil {
-			return inErr
-		}
-
-		nfsClient, inErr := nfs.NewNFSClient(sshProfile)
+		nfsClient, inErr := nfs.NewNFSClient(targetSSH)
 		if inErr != nil {
 			return inErr
 		}
@@ -1101,7 +1101,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	if state != hoststate.Started {
-		return fail.InvalidRequestError(fmt.Sprintf("cannot delete share on '%s', '%s' is NOT started", targetName, targetName))
+		return fail.InvalidRequestError(fmt.Sprintf("cannot Delete share on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
 	xerr = alterHostMetadataProperty(ctx, serverTrx, hostproperty.SharesV1, func(hostSharesV1 *propertiesv1.HostShares) fail.Error {
@@ -1151,7 +1151,7 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	// Share Transaction must be terminated to be able to delete metadata
+	// Share Transaction must be terminated to be able to Delete metadata
 	shareTrx.SilentTerminate(ctx)
 
 	// Remove Share metadata

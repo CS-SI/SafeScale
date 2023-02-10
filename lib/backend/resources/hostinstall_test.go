@@ -193,7 +193,7 @@ func TestHost_DeleteFeature(t *testing.T) {
 
 		// Host not stared
 		_, xerr = ohost.DeleteFeature(ctx, "ansible", data.Map{}, FeatureSettings{})
-		require.Contains(t, xerr.Error(), "cannot delete feature on 'MyHostTest', 'MyHostTest' is NOT started")
+		require.Contains(t, xerr.Error(), "cannot Delete feature on 'MyHostTest', 'MyHostTest' is NOT started")
 
 		xerr = host.Start(ctx)
 		require.Nil(t, xerr)

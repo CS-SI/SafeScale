@@ -415,7 +415,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 					derr := svc.DeleteNetwork(cleanupContextFrom(ctx), abstractNetwork.ID)
 					derr = debug.InjectPlannedFail(derr)
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to Delete Network"))
 					}
 				}
 			}()
@@ -535,6 +535,28 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	// Write Network metadata
 	// logrus.WithContext(ctx).Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
 	abstractNetwork.Imported = true
+
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if myjob.Service().Capabilities().UseTerraformer {
+		prov, xerr := myjob.Service().ProviderDriver()
+		if xerr != nil {
+			return xerr
+		}
+		castedProv, innerErr := lang.Cast[providers.ReservedForTerraformerUse](prov)
+		if innerErr != nil {
+			return fail.Wrap(innerErr)
+		}
+
+		innerXErr := castedProv.ConsolidateNetworkSnippet(abstractNetwork)
+		if innerXErr != nil {
+			return innerXErr
+		}
+	}
+
 	return instance.Carry(ctx, abstractNetwork)
 }
 
@@ -567,8 +589,6 @@ func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Net
 
 var (
 	CurrentNetworkTransactionContextKey = "current_network_transaction"
-	// CurrentNetworkAbstractContextKey   = "current_network_abstract"
-	// CurrentNetworkPropertiesContextKey = "current_network_properties"
 )
 
 // Delete deletes subnet
@@ -585,61 +605,60 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan fail.Error)
 	go func() {
 		defer close(chRes)
 
-		networkTrx, xerr := newNetworkTransaction(ctx, instance)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-		defer networkTrx.TerminateFromError(ctx, &ferr)
+		gerr := func() fail.Error {
+			networkTrx, xerr := newNetworkTransaction(ctx, instance)
+			if xerr != nil {
+				return xerr
+			}
+			defer networkTrx.TerminateFromError(ctx, &ferr)
 
-		ctx := context.WithValue(ctx, CurrentNetworkTransactionContextKey, networkTrx) // nolint
+			ctx := context.WithValue(ctx, CurrentNetworkTransactionContextKey, networkTrx) // nolint
 
-		tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
-		defer tracer.Exiting()
+			tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
+			defer tracer.Exiting()
 
-		timings, xerr := instance.Service().Timings()
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
+			timings, xerr := instance.Service().Timings()
+			if xerr != nil {
+				return xerr
+			}
 
-		var abstractNetwork *abstract.Network
-		svc := instance.Service()
-		xerr = alterNetworkMetadata(ctx, networkTrx, func(an *abstract.Network, props *serialize.JSONProperties) fail.Error {
-			abstractNetwork = an
+			var (
+				abstractNetwork *abstract.Network
+				subnets         map[string]string
+			)
+			svc := instance.Service()
+			xerr = inspectNetworkMetadata(ctx, networkTrx, func(an *abstract.Network, props *serialize.JSONProperties) fail.Error {
+				abstractNetwork = an
 
-			var subnets map[string]string
-			innerXErr := props.Inspect(networkproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-				subnetsV1, innerErr := clonable.Cast[*propertiesv1.NetworkSubnets](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
+				return props.Inspect(networkproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
+					subnetsV1, innerErr := clonable.Cast[*propertiesv1.NetworkSubnets](p)
+					if innerErr != nil {
+						return fail.Wrap(innerErr)
+					}
 
-				subnets = subnetsV1.ByName
-				return nil
+					subnets = subnetsV1.ByName
+					return nil
+				})
 			})
-			if innerXErr != nil {
-				return innerXErr
+			if xerr != nil {
+				return xerr
 			}
 
 			subnetsLen := len(subnets)
 			switch subnetsLen {
 			case 0:
-				// no subnet, continue to delete the Network
+				// no subnet, continue to Delete the Network
 			case 1:
 				var found bool
 				for k, v := range subnets {
 					if k == instance.GetName() {
 						found = true
 						deleted := false
-						// the single subnet present is a subnet named like the Network, delete it first
+						// the single subnet present is a subnet named like the Network, Delete it first
 						subnetInstance, xerr := LoadSubnet(ctx, "", v)
 						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
@@ -658,74 +677,78 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 							xerr = subnetInstance.Delete(ctx)
 							xerr = debug.InjectPlannedFail(xerr)
 							if xerr != nil {
-								return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
+								return fail.Wrap(xerr, "failed to Delete Subnet '%s'", subnetName)
 							}
 						}
 					}
 				}
 				if !found {
-					return fail.InvalidRequestError("failed to delete Network '%s', 1 Subnet still inside", instance.GetName())
+					return fail.InvalidRequestError("failed to Delete Network '%s', 1 Subnet still inside", instance.GetName())
 				}
 			default:
-				return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", instance.GetName(), subnetsLen)
+				return fail.InvalidRequestError("failed to Delete Network '%s', %d Subnets still inside", instance.GetName(), subnetsLen)
 			}
 
-			// delete Network if not imported, with tolerance
+			// Delete Network if not imported, with tolerance
 			if !abstractNetwork.Imported {
-				innerXErr = props.Alter(networkproperty.SecurityGroupsV1, func(p clonable.Clonable) (innerFErr fail.Error) {
-					nsgV1, innerErr := clonable.Cast[*propertiesv1.NetworkSecurityGroups](p)
-					if innerErr != nil {
-						return fail.Wrap(innerErr)
-					}
-
-					for k := range nsgV1.ByID {
-						sgInstance, propsXErr := LoadSecurityGroup(ctx, k)
-						if propsXErr != nil {
-							switch propsXErr.(type) {
-							case *fail.ErrNotFound:
-								debug.IgnoreErrorWithContext(ctx, propsXErr)
-								continue
-							default:
-								return propsXErr
-							}
-						}
-
-						sgid, err := sgInstance.GetID()
-						if err != nil {
-							return fail.Wrap(err)
-						}
-
-						sgTrx, lvl2XErr := newSecurityGroupTransaction(ctx, sgInstance)
-						if lvl2XErr != nil {
-							return lvl2XErr
-						}
-						defer func(trx securityGroupTransaction) { trx.TerminateFromError(ctx, &innerFErr) }(sgTrx)
-
-						propsXErr = sgInstance.trxDelete(ctx, sgTrx, true)
-						if propsXErr != nil {
-							return propsXErr
-						}
-
-						// -- delete reference to Security Group in Network
-						delete(nsgV1.ByID, sgid)
-						delete(nsgV1.ByName, sgInstance.GetName())
-					}
+				var networkSGS map[string]string
+				xerr = inspectNetworkMetadataProperty(ctx, networkTrx, networkproperty.SecurityGroupsV1, func(nsgV1 *propertiesv1.NetworkSecurityGroups) fail.Error {
+					networkSGS = nsgV1.ByID
 					return nil
 				})
-				if innerXErr != nil {
-					return innerXErr
+				if xerr != nil {
+					return xerr
+				}
+
+				for k := range networkSGS {
+					sgInstance, propsXErr := LoadSecurityGroup(ctx, k)
+					if propsXErr != nil {
+						switch propsXErr.(type) {
+						case *fail.ErrNotFound:
+							debug.IgnoreErrorWithContext(ctx, propsXErr)
+							continue
+						default:
+							return propsXErr
+						}
+					}
+
+					sgid, err := sgInstance.GetID()
+					if err != nil {
+						return fail.Wrap(err)
+					}
+
+					sgTrx, lvl2XErr := newSecurityGroupTransaction(ctx, sgInstance)
+					if lvl2XErr != nil {
+						return lvl2XErr
+					}
+					defer func(trx securityGroupTransaction) { trx.TerminateFromError(ctx, &ferr) }(sgTrx)
+
+					propsXErr = sgTrx.Delete(ctx, true)
+					if propsXErr != nil {
+						return propsXErr
+					}
+
+					xerr = alterNetworkMetadataProperty(ctx, networkTrx, networkproperty.SecurityGroupsV1, func(nsgV1 *propertiesv1.NetworkSecurityGroups) (innerFErr fail.Error) {
+						// -- Delete reference to Security Group in Network
+						delete(nsgV1.ByID, sgid)
+						delete(nsgV1.ByName, sgInstance.GetName())
+						return nil
+					})
+					if xerr != nil {
+						return xerr
+					}
 				}
 
 				maybeDeleted := false
-				innerXErr = svc.DeleteNetwork(ctx, abstractNetwork)
-				if innerXErr != nil {
-					switch innerXErr.(type) {
+				xerr = svc.DeleteNetwork(ctx, abstractNetwork)
+				if xerr != nil {
+					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// If Network does not exist anymore on the provider side, do not fail to cleanup the metadata: log and continue
 						logrus.WithContext(ctx).Debugf("failed to find Network on provider side, cleaning up metadata.")
 						maybeDeleted = true
 					case *fail.ErrTimeout:
-						logrus.WithContext(ctx).Error("cannot delete Network due to a timeout")
+						logrus.WithContext(ctx).Error("cannot Delete Network due to a timeout")
 						errWaitMore := retry.WhileUnsuccessful(
 							func() error {
 								select {
@@ -748,12 +771,12 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 							timings.ContextTimeout(),
 						)
 						if errWaitMore != nil {
-							_ = innerXErr.AddConsequence(errWaitMore)
-							return innerXErr
+							_ = xerr.AddConsequence(errWaitMore)
+							return xerr
 						}
 					default:
-						logrus.WithContext(ctx).Errorf(innerXErr.Error())
-						return innerXErr
+						logrus.WithContext(ctx).Errorf(xerr.Error())
+						return xerr
 					}
 				}
 
@@ -776,42 +799,24 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 					time.Sleep(timings.NormalDelay())
 				}
 			}
-			return nil
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				debug.IgnoreErrorWithContext(ctx, xerr)
-				// continue
-			default:
-				derr := networkTrx.Rollback(ctx)
-				if derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to rollback transaction"))
-				}
+
+			// Need to terminate network transaction to be able to Delete metadata (dead-lock otherwise)
+			networkTrx.SilentTerminate(ctx)
+
+			// Remove metadata
+			xerr = instance.Core.Delete(ctx)
+			if xerr != nil {
 				xerr.WithContext(ctx)
-				chRes <- result{xerr}
-				return
+				return xerr
 			}
-		}
-
-		// Need to terminate network transaction to be able to delete metadata (dead-lock otherwise)
-		networkTrx.SilentTerminate(ctx)
-
-		// Remove metadata
-		xerr = instance.Core.Delete(ctx)
-		if xerr != nil {
-			xerr.WithContext(ctx)
-			chRes <- result{xerr}
-			return
-		}
-
-		chRes <- result{nil}
+			return nil
+		}()
+		chRes <- gerr
 	}()
 
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return res
 	case <-ctx.Done():
 		<-chRes
 		return fail.Wrap(ctx.Err())
@@ -975,19 +980,6 @@ func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (fe
 
 		delete(nsV1.ByID, id)
 		delete(nsV1.ByName, name)
-		return nil
-	})
-}
-
-// trxFreeCIDRForSingleHost frees the CIDR index inside the Network 'Network'
-func trxFreeCIDRForSingleHost(ctx context.Context, networkTrx networkTransaction, index uint) fail.Error {
-	return alterNetworkMetadataProperty(ctx, networkTrx, networkproperty.SingleHostsV1, func(p clonable.Clonable) fail.Error {
-		nshV1, innerErr := clonable.Cast[*propertiesv1.NetworkSingleHosts](p)
-		if innerErr != nil {
-			return fail.Wrap(innerErr)
-		}
-
-		nshV1.FreeSlot(index)
 		return nil
 	})
 }

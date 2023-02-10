@@ -10,14 +10,28 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 type (
-	volumeTransaction = metadata.Transaction[*abstract.Volume, *Volume]
+	volumeTransaction = *volumeTransactionImpl
+
+	volumeTransactionImpl struct {
+		metadata.Transaction[*abstract.Volume, *Volume]
+	}
 )
 
 func newVolumeTransaction(ctx context.Context, instance *Volume) (volumeTransaction, fail.Error) {
-	return metadata.NewTransaction[*abstract.Volume, *Volume](ctx, instance)
+	if instance == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("instance")
+	}
+
+	trx, xerr := metadata.NewTransaction[*abstract.Volume, *Volume](ctx, instance)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return &volumeTransactionImpl{trx}, nil
 }
 
 func inspectVolumeMetadata(ctx context.Context, trx volumeTransaction, callback func(*abstract.Volume, *serialize.JSONProperties) fail.Error) fail.Error {
@@ -52,34 +66,41 @@ func alterVolumeMetadataProperties(ctx context.Context, trx volumeTransaction, c
 	return metadata.AlterProperties[*abstract.Volume](ctx, trx, callback)
 }
 
-// trxGetSpeed ...
-// Intended to be used when instance is notoriously not nil
-func (instance *Volume) trxGetSpeed(ctx context.Context, volumeTrx volumeTransaction) (volumespeed.Enum, fail.Error) {
+// IsNull ...
+func (volumeTrx *volumeTransactionImpl) IsNull() bool {
+	return volumeTrx == nil || volumeTrx.Transaction.IsNull()
+}
+
+// GetSpeed ...
+func (volumeTrx *volumeTransactionImpl) GetSpeed(ctx context.Context) (volumespeed.Enum, fail.Error) {
+	if valid.IsNull(volumeTrx) {
+		return 0, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return 0, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
 	var speed volumespeed.Enum
 	xerr := inspectVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
 		speed = av.Speed
 		return nil
 	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return 0, xerr
-	}
-
-	return speed, nil
+	return speed, debug.InjectPlannedFail(xerr)
 }
 
-// unsafeGetSize ...
-// Intended to be used when instance is notoriously not nil
-func (instance *Volume) trxGetSize(ctx context.Context, volumeTrx volumeTransaction) (int, fail.Error) {
+// GetSize ...
+func (volumeTrx *volumeTransactionImpl) GetSize(ctx context.Context) (int, fail.Error) {
+	if valid.IsNull(volumeTrx) {
+		return 0, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return 0, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
 	var size int
 	xerr := inspectVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
 		size = av.Size
 		return nil
 	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return 0, xerr
-	}
-
-	return size, nil
+	return size, debug.InjectPlannedFail(xerr)
 }

@@ -370,9 +370,6 @@ func (instance *Bucket) GetHost(ctx context.Context) (_ string, ferr fail.Error)
 		return "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
-
 	bucketTrx, xerr := newBucketTransaction(ctx, instance)
 	if xerr != nil {
 		return "", xerr
@@ -400,9 +397,6 @@ func (instance *Bucket) GetMountPoint(ctx context.Context) (_ string, ferr fail.
 	if ctx == nil {
 		return "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	// instance.lock.RLock()
-	// defer instance.lock.RUnlock()
 
 	bucketTrx, xerr := newBucketTransaction(ctx, instance)
 	if xerr != nil {
@@ -444,9 +438,6 @@ func (instance *Bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	tracer := debug.NewTracer(ctx, true, "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	// -- check if Bucket already exist in SafeScale
 	bucketInstance, xerr := LoadBucket(ctx, name)
@@ -513,12 +504,8 @@ func (instance *Bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
 	bun := instance.GetName()
-
-	bucketTrx, xerr := metadata.NewTransaction[*abstract.Bucket, *Bucket](ctx, instance)
+	bucketTrx, xerr := newBucketTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
@@ -536,7 +523,7 @@ func (instance *Bucket) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	// -- delete Bucket
+	// -- Delete Bucket
 	xerr = instance.Service().DeleteBucket(ctx, bun)
 	if xerr != nil {
 		if strings.Contains(xerr.Error(), objectstorage.NotFound) {
@@ -545,7 +532,7 @@ func (instance *Bucket) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	// Need to explicitly terminate bucket transaction to be able to delete metadata (dead-lock otherwise)
+	// Need to explicitly terminate bucket transaction to be able to Delete metadata (dead-lock otherwise)
 	bucketTrx.SilentTerminate(ctx)
 	return instance.Core.Delete(ctx)
 }
@@ -576,11 +563,7 @@ func (instance *Bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
 	bun := instance.GetName()
-
 	svc := instance.Service()
 	hostInstance, xerr := LoadHost(ctx, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -725,9 +708,6 @@ func (instance *Bucket) Unmount(ctx context.Context, hostName string) (ferr fail
 	tracer := debug.NewTracer(ctx, true, "('%s')", hostName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
 
 	bucketTrx, xerr := newBucketTransaction(ctx, instance)
 	if xerr != nil {
