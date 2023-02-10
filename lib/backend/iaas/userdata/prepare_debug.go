@@ -195,6 +195,9 @@ func (ud *Content) Prepare(
 	ud.AddGateway = !request.IsGateway && !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
 	ud.DNSServers = dnsList
 	ud.SSHPort = strconv.Itoa(int(request.SSHPort))
+	if request.SSHPort <= 0 {
+		ud.SSHPort = "22"
+	}
 	ud.CIDR = cidr
 	ud.DefaultRouteIP = ip
 	ud.Password = request.Password
