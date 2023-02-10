@@ -321,6 +321,29 @@ func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (d
 				return nil, xerr
 			}
 
+			if val, ok := aclupro[clusterproperty.NetworkV3]; !ok {
+				return nil, fail.NewError("corrupted metadata")
+			} else {
+				if val == nil {
+					return nil, fail.NewError("corrupted metadata")
+				}
+			}
+
+			nev, err := aclupro[clusterproperty.NetworkV3].UnWrap()
+			if err != nil {
+				return nil, fail.ConvertError(err)
+			}
+
+			gottanev, ok := nev.(*propertiesv3.ClusterNetwork)
+			if !ok {
+				return nil, fail.NewError("bad cast")
+			}
+
+			clusterInstance.gateways = append(clusterInstance.gateways, gottanev.GatewayID)
+			if gottanev.SecondaryGatewayID != "" {
+				clusterInstance.gateways = append(clusterInstance.gateways, gottanev.SecondaryGatewayID)
+			}
+
 			if val, ok := aclupro[clusterproperty.NodesV3]; !ok {
 				return nil, fail.NewError("corrupted metadata")
 			} else {
@@ -825,7 +848,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 				)
 			}
 
-			gatewayID = networkV3.GatewayID
+			gatewayID = networkV3.GatewayID // FIXME: OPP I came here for
 			secondaryGatewayID = networkV3.SecondaryGatewayID
 			return nil
 		})
