@@ -66,7 +66,7 @@ func sshRunCommand() *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) (ferr error) {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdLabel, c.Name(), strings.Join(args, ", "))
-			if len(args) != 1 {
+			if len(args) < 1 {
 				_ = c.Usage()
 				return cli.FailureResponse(cli.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 			}
@@ -83,9 +83,12 @@ func sshRunCommand() *cobra.Command {
 				timeout = temporal.HostOperationTimeout()
 			}
 
-			cmd, err := c.Flags().GetString("c")
-			if err != nil {
-				return cli.FailureResponse(err)
+			cmd, err := c.Flags().GetString("command")
+			if err != nil || cmd == "" {
+				cmd = strings.Join(args[1:], " ")
+				if cmd == "" {
+					return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.InvalidOption, "missing command to run"))
+				}
 			}
 
 			retcode, _, _, err := ClientSession.SSH.Run(args[0], cmd, outputs.DISPLAY, temporal.ConnectionTimeout(), timeout)
@@ -103,7 +106,7 @@ func sshRunCommand() *cobra.Command {
 	}
 
 	flags := out.Flags()
-	flags.String("c", "", "Command to execute")
+	flags.StringP("command", "c", "", "Command to execute")
 	flags.Uint("timeout", 5, "timeout in minutes")
 
 	return out

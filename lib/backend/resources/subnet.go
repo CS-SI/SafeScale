@@ -1255,7 +1255,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 				}
 
 				// Delete security groups associated to Subnet by users (do not include SG created with Subnet, they will be deleted later)
-				return props.Inspect(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
+				innerXErr = props.Inspect(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
 					ssgV1, innerErr := clonable.Cast[*propertiesv1.SubnetSecurityGroups](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
@@ -1264,8 +1264,8 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 					subnetSGS = ssgV1
 					return nil
 				})
-				if xerr != nil {
-					return xerr
+				if innerXErr != nil {
+					return innerXErr
 				}
 
 				return subnetTrx.UnbindSecurityGroups(ctx, subnetSGS)

@@ -867,7 +867,11 @@ func (p *provider) BindSecurityGroupToHost(ctx context.Context, asg *abstract.Se
 	if !ok {
 		sgs = map[string]string{}
 	} else {
-		sgs = entry.(map[string]string)
+		var err error
+		sgs, err = lang.Cast[map[string]string](entry)
+		if err != nil {
+			return fail.Wrap(err)
+		}
 	}
 	sgs[asg.ID] = asg.Name
 	xerr = ahc.AddOptions(abstract.WithExtraData("SecurityGroupByID", sgs), abstract.WithExtraData("MarkedForCreation", false))

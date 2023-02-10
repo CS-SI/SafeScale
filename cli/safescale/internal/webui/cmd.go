@@ -74,7 +74,7 @@ func stopCommand() *cobra.Command {
 
 func addCommonFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
-	flags.StringP("config", "c", "", "Provides the configuration file to use (if needed) (default: <root-dir>/etc/settings.yml)")
+	flags.String("config", "", "Provides the configuration file to use (if needed) (default: <root-dir>/etc/settings.yml)")
 	flags.SetAnnotation("config", cobra.BashCompFilenameExt, global.ValidConfigFilenameExts)
 	flags.StringP("root-dir", "R", "/opt/safescale", "Defines the root folder of safescale work tree; will overload content of configuration file (default: /opt/safescale)")
 }

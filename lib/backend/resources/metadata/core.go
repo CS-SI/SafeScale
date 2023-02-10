@@ -193,7 +193,10 @@ func (instance *Core[T]) Replace(in clonable.Clonable) error {
 		}
 	} else {
 		// otherwise, replace instance.carried with src.carried (which is actually a shallow copy because we need to keep pointer during existence of carried, as it is shared with Scope)
-		instance.carried.Replace(src.carried)
+		err := instance.carried.Replace(src.carried)
+		if err != nil {
+			return err
+		}
 	}
 
 	instance.id.Store(src.id.Load())

@@ -456,7 +456,7 @@ func buildTunnel(scfg sshapi.Config) (*Tunnel, fail.Error) {
 	}, nil
 }
 
-// CliCommand defines a SSH command
+// CliCommand defines an SSH command
 type CliCommand struct {
 	hostname     string
 	runCmdString string
@@ -696,8 +696,6 @@ func (scmd *CliCommand) RunWithTimeout(inctx context.Context, outs outputs.Enum,
 		res := <-trch
 		if global.Settings.Debug {
 			logrus.WithContext(ctx).Debugf("run succeeded, retcode=%d, out=%s, err=%s", res["retcode"].(int), res["stdout"].(string), res["stderr"].(string))
-		} else {
-			logrus.WithContext(ctx).Debugf("run succeeded, retcode=%d", res["retcode"].(int))
 		}
 		chRes <- result{res["retcode"].(int), res["stdout"].(string), res["stderr"].(string), nil}
 	}()

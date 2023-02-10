@@ -603,7 +603,7 @@ func (hostTrx *hostTransactionImpl) UpdateSubnets(ctx context.Context, req abstr
 
 // UndoUpdateSubnets removes what UpdateSubnets have done
 func (hostTrx *hostTransactionImpl) UndoUpdateSubnets(ctx context.Context, req abstract.HostRequest, errorPtr *fail.Error) {
-	func() (ferr fail.Error) {
+	_ = func() (ferr fail.Error) {
 		defer func() {
 			if ferr != nil {
 				if *errorPtr == nil {

@@ -354,7 +354,7 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []*Host, v 
 		var outcomes rscapi.UnitResults
 		close(blue)
 		for ur := range blue {
-			outcomes.Add(ur.who, ur.what)
+			_ = outcomes.Add(ur.who, ur.what)
 		}
 
 		if xerr != nil {
