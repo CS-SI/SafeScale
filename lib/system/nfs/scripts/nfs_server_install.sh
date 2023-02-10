@@ -52,7 +52,7 @@ debian | ubuntu)
   touch /var/log/lastlog
   chgrp utmp /var/log/lastlog
   chmod 664 /var/log/lastlog
-  sfApt update
+  sfApt update --allow-insecure-repositories
   sfApt install -qqy nfs-common nfs-kernel-server
   ;;
 

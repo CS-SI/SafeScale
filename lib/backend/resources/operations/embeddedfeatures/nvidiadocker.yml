@@ -89,7 +89,7 @@ feature:
                                         # Second install nvidia-docker
                                         curl -s -L ${NVIDIA_DOCKER_URL}/gpgkey | apt-key add -
                                         curl -s -L ${NVIDIA_DOCKER_URL}/${DIST}/nvidia-docker.list | tee /etc/apt/sources.list.d/nvidia-docker.list
-                                        sfApt update
+                                        sfApt update --allow-insecure-repositories
                                         sfApt install -y nvidia-container-toolkit
                                         systemctl restart docker
                                     else

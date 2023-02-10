@@ -70,18 +70,18 @@ feature:
                             case $LINUX_KIND in
                                 ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry "sfApt update"
+                                    sfRetry "sfApt update --allow-insecure-repositories"
                                     apt-add-repository --yes --update ppa:ansible/ansible
-                                    sfRetry "sfApt update" || sfFail 192
+                                    sfRetry "sfApt update --allow-insecure-repositories" || sfFail 192
                                     sfRetry "sfApt install -y ansible" || sfFail 192
                                     sfRetry "sfApt install -y git" || sfFail 192
                                     ;;
                                 debian)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry "sfApt update"
+                                    sfRetry "sfApt update --allow-insecure-repositories"
                                     echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main" >> /etc/apt/sources.list
                                     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367 -y
-                                    sfRetry "sfApt update" || sfFail 192
+                                    sfRetry "sfApt update --allow-insecure-repositories" || sfFail 192
                                     sfRetry "sfApt install -y ansible" || sfFail 192
                                     sfRetry "sfApt install -y git" || sfFail 192
                                     ;;

@@ -102,7 +102,7 @@ function sfApt() {
   [ $? -ne 0 ] && return $?
   echo "running apt " "$@"
   rc=-1
-  DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt -o Dpkg::Options::=--force-confnew "$@" && rc=$?
+  DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt --ignore-missing --allow-unauthenticated -o Dpkg::Options::=--force-confnew "$@" && rc=$?
   [ $rc -eq -1 ] && return 1
   return $rc
 }
@@ -434,7 +434,7 @@ function sfInstall() {
   debian | ubuntu)
     export DEBIAN_FRONTEND=noninteractive
     export UCF_FORCE_CONFFNEW=1
-    sfRetry4 "sfApt update"
+    sfApt update --allow-insecure-repositories
     sfApt install $1 -y || return 194
     command -v $1 || return 194
     ;;

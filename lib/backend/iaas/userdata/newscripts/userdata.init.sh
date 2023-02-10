@@ -270,8 +270,8 @@ function remove_setuptools() {
   debian | ubuntu)
     # If it's not there, nothing to do
     sudo dpkg -l python3-setuptools || true
-    sudo dpkg -l python3-setuptools | grep ii && echo "python3-setuptools already there"
-    sudo dpkg -l python3-setuptools | grep ii && sudo apt-get remove -y python3-setuptools
+    sudo dpkg -l python3-setuptools | grep -E '^hi|^ii' && echo "python3-setuptools already there"
+    sudo dpkg -l python3-setuptools | grep -E '^hi|^ii' && sudo apt-get remove -y python3-setuptools
     ;;
   redhat | fedora | centos)
     sfYum remove -y python3-setuptools || true

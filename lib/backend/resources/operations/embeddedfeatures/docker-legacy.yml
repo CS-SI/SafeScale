@@ -109,7 +109,7 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry "sfApt update"
+                                    sfRetry "sfApt update --allow-insecure-repositories"
                                     sfRetry "dpkg --remove --force-remove-reinstreq docker docker-engine docker.io containerd runc"
                                     ;;
                                 centos|redhat)
