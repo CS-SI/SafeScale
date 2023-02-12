@@ -32,9 +32,7 @@ resource "openstack_compute_instance_v2" "{{ $rsc.Name }}" {
 
 {{-   if gt (len $extra.SecurityGroupByID) 0 }}
 {{-      $sep := "" }}
-	security_groups   = [ {{- range $k, $v := $extra.SecurityGroupByID }}{{ $sep }}"{{ $v }}"{{ $sep = ", " }}{{- end }} ]
-{{-   else }}
-	security_groups   = [ "default" ]
+	security_groups   = [ "default" {{- range $k, $v := $extra.SecurityGroupByID }}, "{{ $v }}"{{- end }} ]
 {{-   end }}
 	region            = "{{ $region }}"
 	availability_zone = "{{ $az }}"

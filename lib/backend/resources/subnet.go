@@ -397,7 +397,7 @@ func onSubnetCacheMiss(ctx context.Context, subnetID string) (_ data.Identifiabl
 	}
 	defer trx.TerminateFromError(ctx, &ferr)
 
-	xerr = subnetInstance.trxUpdateCachedInformation(ctx, trx)
+	xerr = subnetInstance.updateCachedInformation(ctx, trx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -405,8 +405,8 @@ func onSubnetCacheMiss(ctx context.Context, subnetID string) (_ data.Identifiabl
 	return subnetInstance, nil
 }
 
-// trxUpdateCachedInformation updates the information cached in instance because will be frequently used and will not be changed over time
-func (instance *Subnet) trxUpdateCachedInformation(ctx context.Context, trx subnetTransaction) fail.Error {
+// updateCachedInformation updates the information cached in instance because will be frequently used and will not be changed over time
+func (instance *Subnet) updateCachedInformation(ctx context.Context, trx subnetTransaction) fail.Error {
 	instance.localCache.Lock()
 	defer instance.localCache.Unlock()
 
@@ -2314,7 +2314,7 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 				}
 			}()
 
-			xerr = instance.trxUpdateCachedInformation(ctx, subnetTrx)
+			xerr = instance.updateCachedInformation(ctx, subnetTrx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -2502,7 +2502,7 @@ func (instance *Subnet) inspectGateway(ctx context.Context, subnetTrx subnetTran
 	out := instance.localCache.gateways[gwIdx]
 	instance.localCache.RUnlock() // nolint
 	if out == nil {
-		xerr := instance.trxUpdateCachedInformation(ctx, subnetTrx)
+		xerr := instance.updateCachedInformation(ctx, subnetTrx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -2533,7 +2533,7 @@ func (instance *Subnet) updateSubnetStatus(ctx context.Context, subnetTrx subnet
 		return xerr
 	}
 
-	xerr = instance.trxUpdateCachedInformation(ctx, subnetTrx)
+	xerr = instance.updateCachedInformation(ctx, subnetTrx)
 	return debug.InjectPlannedFail(xerr)
 }
 
@@ -2554,7 +2554,7 @@ func (instance *Subnet) finalizeSubnetCreation(ctx context.Context, subnetTrx su
 		return xerr
 	}
 
-	xerr = instance.trxUpdateCachedInformation(ctx, subnetTrx)
+	xerr = instance.updateCachedInformation(ctx, subnetTrx)
 	return debug.InjectPlannedFail(xerr)
 }
 

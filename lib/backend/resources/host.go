@@ -975,10 +975,10 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 
 				xerr = inspectSubnetMetadataAbstract(ctx, defaultSubnetTrx, func(as *abstract.Subnet) fail.Error {
 					hostReq.Subnets = append(hostReq.Subnets, as)
-					hostReq.SecurityGroupByID = map[string]string{
-						as.PublicIPSecurityGroupID: as.PublicIPSecurityGroupName,
-						as.GWSecurityGroupID:       as.GWSecurityGroupName,
-					}
+					// hostReq.SecurityGroupByID = map[string]string{
+					// 	as.PublicIPSecurityGroupID: as.PublicIPSecurityGroupName,
+					// 	as.GWSecurityGroupID:       as.GWSecurityGroupName,
+					// }
 					hostReq.PublicIP = true
 					return nil
 				})
@@ -1011,32 +1011,32 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 					}
 				}
 
-				// list IDs of Security Groups to apply to Host
-				if len(hostReq.SecurityGroupByID) == 0 {
-					hostReq.SecurityGroupByID = make(map[string]string, len(hostReq.Subnets)+1)
-					for _, v := range hostReq.Subnets {
-						hostReq.SecurityGroupByID[v.InternalSecurityGroupID] = v.InternalSecurityGroupName
-					}
-
-					opts, xerr := svc.ConfigurationOptions()
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return nil, xerr
-					}
-
-					if hostReq.PublicIP || opts.UseNATService {
-						xerr = inspectSubnetMetadataAbstract(ctx, defaultSubnetTrx, func(as *abstract.Subnet) fail.Error {
-							if as.PublicIPSecurityGroupID != "" {
-								hostReq.SecurityGroupByID[as.PublicIPSecurityGroupID] = as.PublicIPSecurityGroupName
-							}
-							return nil
-						})
-						xerr = debug.InjectPlannedFail(xerr)
-						if xerr != nil {
-							return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
-						}
-					}
-				}
+				// // list IDs of Security Groups to apply to Host
+				// if len(hostReq.SecurityGroupByID) == 0 {
+				// 	hostReq.SecurityGroupByID = make(map[string]string, len(hostReq.Subnets)+1)
+				// 	for _, v := range hostReq.Subnets {
+				// 		hostReq.SecurityGroupByID[v.InternalSecurityGroupID] = v.InternalSecurityGroupName
+				// 	}
+				//
+				// 	opts, xerr := svc.ConfigurationOptions()
+				// 	xerr = debug.InjectPlannedFail(xerr)
+				// 	if xerr != nil {
+				// 		return nil, xerr
+				// 	}
+				//
+				// 	if hostReq.PublicIP || opts.UseNATService {
+				// 		xerr = inspectSubnetMetadataAbstract(ctx, defaultSubnetTrx, func(as *abstract.Subnet) fail.Error {
+				// 			if as.PublicIPSecurityGroupID != "" {
+				// 				hostReq.SecurityGroupByID[as.PublicIPSecurityGroupID] = as.PublicIPSecurityGroupName
+				// 			}
+				// 			return nil
+				// 		})
+				// 		xerr = debug.InjectPlannedFail(xerr)
+				// 		if xerr != nil {
+				// 			return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
+				// 		}
+				// 	}
+				// }
 			}
 
 			defer func() {

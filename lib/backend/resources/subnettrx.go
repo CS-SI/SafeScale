@@ -543,7 +543,7 @@ func (subnetTrx *subnetTransactionImpl) createPublicIPSecurityGroup(ctx context.
 			Targets:     []string{"::0/0"},
 		},
 	}
-	xerr = sgInstance.AddRules(ctx, rules...)
+	xerr = sgTrx.AddRules(ctx, rules...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr

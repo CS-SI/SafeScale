@@ -148,39 +148,7 @@ func (hostTrx *hostTransactionImpl) SetSecurityGroups(ctx context.Context, req a
 
 	// In case of use of terraform, the security groups have already been set
 	useTerraformer := svc.Capabilities().UseTerraformer
-	if !useTerraformer {
-		if req.Single {
-			xerr := alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-				for k := range req.SecurityGroupByID {
-					if k != "" {
-						sgInstance, innerXErr := LoadSecurityGroup(ctx, k)
-						if innerXErr != nil {
-							return fail.Wrap(innerXErr, "failed to load Security Group with id '%s'", k)
-						}
 
-						sgTrx, innerXErr := newSecurityGroupTransaction(ctx, sgInstance)
-						if innerXErr != nil {
-							return innerXErr
-						}
-
-						innerXErr = alterSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
-							logrus.WithContext(ctx).Infof("Binding security group with id %s to host '%s'", asg.Name, hostName)
-							return svc.BindSecurityGroupToHost(ctx, asg, ahc)
-						})
-						if innerXErr != nil {
-							return innerXErr
-						}
-					}
-				}
-				return nil
-			})
-			if xerr != nil {
-				return xerr
-			}
-		}
-	}
-
-	// Updates metadata about SG bonds
 	var defaultAbstractSubnet *abstract.Subnet
 	xerr = inspectSubnetMetadataAbstract(ctx, defaultSubnetTrx, func(as *abstract.Subnet) fail.Error {
 		defaultAbstractSubnet = as
@@ -193,7 +161,7 @@ func (hostTrx *hostTransactionImpl) SetSecurityGroups(ctx context.Context, req a
 	var gwsg, pubipsg, lansg *SecurityGroup
 
 	// Apply Security Group for gateways in default Subnet
-	if req.IsGateway && defaultAbstractSubnet.GWSecurityGroupID != "" {
+	if (req.IsGateway || req.Single) && defaultAbstractSubnet.GWSecurityGroupID != "" {
 		gwsg, xerr = LoadSecurityGroup(ctx, defaultAbstractSubnet.GWSecurityGroupID)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to query Subnet '%s' Security Group '%s'", defaultAbstractSubnet.Name, defaultAbstractSubnet.GWSecurityGroupID)
@@ -235,43 +203,204 @@ func (hostTrx *hostTransactionImpl) SetSecurityGroups(ctx context.Context, req a
 			hsgV1.ByName[item.Name] = item.ID
 			return nil
 		})
+	}
 
-		// Bound Security Group for hosts with public IP in default Subnet
-		if (req.IsGateway || req.PublicIP) && defaultAbstractSubnet.PublicIPSecurityGroupID != "" {
-			pubipsg, xerr = LoadSecurityGroup(ctx, defaultAbstractSubnet.PublicIPSecurityGroupID)
-			if xerr != nil {
-				return fail.Wrap(xerr, "failed to query Subnet '%s' Security Group with ID %s", defaultAbstractSubnet.Name, defaultAbstractSubnet.PublicIPSecurityGroupID)
+	// Bound Security Group for hosts with public IP in default Subnet
+	if (req.IsGateway || req.PublicIP) && defaultAbstractSubnet.PublicIPSecurityGroupID != "" {
+		pubipsg, xerr = LoadSecurityGroup(ctx, defaultAbstractSubnet.PublicIPSecurityGroupID)
+		if xerr != nil {
+			return fail.Wrap(xerr, "failed to query Subnet '%s' Security Group with ID %s", defaultAbstractSubnet.Name, defaultAbstractSubnet.PublicIPSecurityGroupID)
+		}
+
+		pubipsgTrx, xerr := newSecurityGroupTransaction(ctx, gwsg)
+		if xerr != nil {
+			return xerr
+		}
+		defer pubipsgTrx.TerminateFromError(ctx, &ferr)
+
+		xerr = pubipsgTrx.BindToHost(ctx, hostTrx, SecurityGroupEnable, MarkSecurityGroupAsSupplemental)
+		if xerr != nil {
+			return fail.Wrap(xerr, "failed to apply Subnet's Public Security Group for gateway '%s' on Host '%s'", pubipsg.GetName(), req.ResourceName)
+		}
+
+		defer func() {
+			if ferr != nil && req.CleanOnFailure() {
+				derr := pubipsgTrx.UnbindFromHost(cleanupContextFrom(ctx), hostTrx)
+				if derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(ferr), pubipsg.GetName(), hostName))
+				}
 			}
+		}()
 
-			pubipsgTrx, xerr := newSecurityGroupTransaction(ctx, gwsg)
+		pubID, err := pubipsgTrx.GetID()
+		if err != nil {
+			return fail.Wrap(err)
+		}
+
+		xerr = alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
+			item := &propertiesv1.SecurityGroupBond{
+				ID:         pubID,
+				Name:       pubipsg.GetName(),
+				Disabled:   false,
+				FromSubnet: true,
+			}
+			hsgV1.ByID[item.ID] = item
+			hsgV1.ByName[item.Name] = item.ID
+			return nil
+		})
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	// Apply internal Security Group of each other subnets
+	defer func() {
+		if ferr != nil && req.CleanOnFailure() {
+			var (
+				sg   *SecurityGroup
+				derr error
+				errs []error
+			)
+			uncancellableContext := cleanupContextFrom(ctx)
+			for _, v := range req.Subnets {
+				if v.ID == defaultAbstractSubnet.ID {
+					continue
+				}
+
+				subnetInstance, deeperXErr := LoadSubnet(uncancellableContext, "", v.ID)
+				if deeperXErr != nil {
+					_ = ferr.AddConsequence(deeperXErr)
+					continue
+				}
+
+				subnetTrx, deeperXErr := newSubnetTransaction(ctx, subnetInstance)
+				if deeperXErr != nil {
+					_ = ferr.AddConsequence(deeperXErr)
+					continue
+				}
+				defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &ferr) }(subnetTrx)
+
+				sgName := sg.GetName()
+				deeperXErr = inspectSubnetMetadataAbstract(uncancellableContext, subnetTrx, func(abstractSubnet *abstract.Subnet) (fdeeperXErr fail.Error) {
+					if abstractSubnet.InternalSecurityGroupID != "" {
+						sg, derr = LoadSecurityGroup(uncancellableContext, abstractSubnet.InternalSecurityGroupID)
+						if derr != nil {
+							errs = append(errs, derr)
+							return nil
+						}
+
+						sgTrx, derr := newSecurityGroupTransaction(uncancellableContext, sg)
+						if derr != nil {
+							errs = append(errs, derr)
+							return nil
+						}
+						defer sgTrx.TerminateFromError(uncancellableContext, &fdeeperXErr)
+
+						derr = sgTrx.UnbindFromHost(uncancellableContext, hostTrx)
+						if derr != nil {
+							errs = append(errs, derr)
+						}
+					}
+					return nil
+				})
+				if deeperXErr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(deeperXErr, "cleaning up on failure, failed to unbind Security Group '%s' from Host", sgName))
+				}
+			}
+			if len(errs) > 0 {
+				_ = ferr.AddConsequence(fail.Wrap(fail.NewErrorList(errs), "failed to unbind Subnets Security Group from Host '%s'", sg.GetName(), req.ResourceName))
+			}
+		}
+	}()
+
+	// Bind security groups of all remaining Subnets
+	for _, v := range req.Subnets {
+		// Do not try to bind defaultSubnet on gateway, because this code is running under a lock on defaultSubnet in this case, and this will lead to deadlock
+		// (binding of gateway on defaultSubnet is done inside Subnet.Create() call)
+		if req.IsGateway && v.ID == defaultAbstractSubnet.ID {
+			continue
+		}
+
+		otherSubnetInstance, xerr := LoadSubnet(ctx, "", v.ID)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		otherSubnetTrx, xerr := newSubnetTransaction(ctx, otherSubnetInstance)
+		if xerr != nil {
+			return xerr
+		}
+		defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &ferr) }(otherSubnetTrx)
+
+		var otherAbstractSubnet *abstract.Subnet
+		xerr = inspectSubnetMetadataAbstract(ctx, otherSubnetTrx, func(as *abstract.Subnet) fail.Error {
+			otherAbstractSubnet = as
+			return nil
+		})
+		if xerr != nil {
+			return xerr
+		}
+
+		safe := false
+
+		// Fix for Stein
+		{
+			st, xerr := svc.ProviderName()
 			if xerr != nil {
 				return xerr
 			}
-			defer pubipsgTrx.TerminateFromError(ctx, &ferr)
 
-			xerr = pubipsgTrx.BindToHost(ctx, hostTrx, SecurityGroupEnable, MarkSecurityGroupAsSupplemental)
+			if st != "ovh" {
+				safe = true
+			}
+		}
+
+		if cfg, xerr := svc.ConfigurationOptions(); xerr == nil {
+			safe = cfg.Safe
+		}
+
+		if otherAbstractSubnet.InternalSecurityGroupID != "" {
+			lansg, xerr = LoadSecurityGroup(ctx, otherAbstractSubnet.InternalSecurityGroupID)
 			if xerr != nil {
-				return fail.Wrap(xerr, "failed to apply Subnet's Public Security Group for gateway '%s' on Host '%s'", pubipsg.GetName(), req.ResourceName)
+				return fail.Wrap(xerr, "failed to load Subnet '%s' internal Security Group %s", otherAbstractSubnet.Name, otherAbstractSubnet.InternalSecurityGroupID)
 			}
 
-			defer func() {
-				if ferr != nil && req.CleanOnFailure() {
-					derr := pubipsgTrx.UnbindFromHost(cleanupContextFrom(ctx), hostTrx)
-					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(ferr), pubipsg.GetName(), hostName))
-					}
+			if !safe && !useTerraformer {
+				xerr = svc.ChangeSecurityGroupSecurity(ctx, false, true, otherAbstractSubnet.Network, "")
+				if xerr != nil {
+					return fail.Wrap(xerr, "failed to change security group")
 				}
-			}()
+			}
 
-			pubID, err := pubipsgTrx.GetID()
+			lansgTrx, xerr := newSecurityGroupTransaction(ctx, lansg)
+			if xerr != nil {
+				return xerr
+			}
+			defer func(trx securityGroupTransaction) { trx.TerminateFromError(ctx, &ferr) }(lansgTrx)
+
+			xerr = lansgTrx.BindToHost(ctx, hostTrx, SecurityGroupEnable, MarkSecurityGroupAsSupplemental)
+			if xerr != nil {
+				return fail.Wrap(xerr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.Name, lansg.GetName(), req.ResourceName)
+			}
+
+			if !safe && !useTerraformer {
+				xerr = svc.ChangeSecurityGroupSecurity(ctx, true, false, otherAbstractSubnet.Network, "")
+				if xerr != nil {
+					return fail.Wrap(xerr, "failed to change security group")
+				}
+			}
+
+			langID, err := lansg.GetID()
 			if err != nil {
 				return fail.Wrap(err)
 			}
 
 			xerr = alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
+				// register security group in properties
 				item := &propertiesv1.SecurityGroupBond{
-					ID:         pubID,
-					Name:       pubipsg.GetName(),
+					ID:         langID,
+					Name:       lansg.GetName(),
 					Disabled:   false,
 					FromSubnet: true,
 				}
@@ -283,166 +412,78 @@ func (hostTrx *hostTransactionImpl) SetSecurityGroups(ctx context.Context, req a
 				return xerr
 			}
 		}
+	}
 
-		// Apply internal Security Group of each other subnets
-		defer func() {
-			if ferr != nil && req.CleanOnFailure() {
-				var (
-					sg   *SecurityGroup
-					derr error
-					errs []error
-				)
-				uncancellableContext := cleanupContextFrom(ctx)
-				for _, v := range req.Subnets {
-					if v.ID == defaultAbstractSubnet.ID {
-						continue
-					}
+	// Finally bind any supplemental security groups passed by request
+	var abstractHostCore *abstract.HostCore
+	xerr = inspectHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
+		abstractHostCore = ahc
+		return nil
+	})
+	if xerr != nil {
+		return xerr
+	}
 
-					subnetInstance, deeperXErr := LoadSubnet(uncancellableContext, "", v.ID)
-					if deeperXErr != nil {
-						_ = ferr.AddConsequence(deeperXErr)
-						continue
-					}
-
-					subnetTrx, deeperXErr := newSubnetTransaction(ctx, subnetInstance)
-					if deeperXErr != nil {
-						_ = ferr.AddConsequence(deeperXErr)
-						continue
-					}
-					defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &ferr) }(subnetTrx)
-
-					sgName := sg.GetName()
-					deeperXErr = inspectSubnetMetadataAbstract(uncancellableContext, subnetTrx, func(abstractSubnet *abstract.Subnet) (fdeeperXErr fail.Error) {
-						if abstractSubnet.InternalSecurityGroupID != "" {
-							sg, derr = LoadSecurityGroup(uncancellableContext, abstractSubnet.InternalSecurityGroupID)
-							if derr != nil {
-								errs = append(errs, derr)
-								return nil
-							}
-
-							sgTrx, derr := newSecurityGroupTransaction(uncancellableContext, sg)
-							if derr != nil {
-								errs = append(errs, derr)
-								return nil
-							}
-							defer sgTrx.TerminateFromError(uncancellableContext, &fdeeperXErr)
-
-							derr = sgTrx.UnbindFromHost(uncancellableContext, hostTrx)
-							if derr != nil {
-								errs = append(errs, derr)
-							}
-						}
-						return nil
-					})
-					if deeperXErr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(deeperXErr, "cleaning up on failure, failed to unbind Security Group '%s' from Host", sgName))
-					}
-				}
-				if len(errs) > 0 {
-					_ = ferr.AddConsequence(fail.Wrap(fail.NewErrorList(errs), "failed to unbind Subnets Security Group from Host '%s'", sg.GetName(), req.ResourceName))
-				}
-			}
-		}()
-
-		for _, v := range req.Subnets {
-			// Do not try to bind defaultSubnet on gateway, because this code is running under a lock on defaultSubnet in this case, and this will lead to deadlock
-			// (binding of gateway on defaultSubnet is done inside Subnet.Create() call)
-			if req.IsGateway && v.ID == defaultAbstractSubnet.ID {
-				continue
-			}
-
-			otherSubnetInstance, xerr := LoadSubnet(ctx, "", v.ID)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-
-			otherSubnetTrx, xerr := newSubnetTransaction(ctx, otherSubnetInstance)
-			if xerr != nil {
-				return xerr
-			}
-			defer func(trx subnetTransaction) { trx.TerminateFromError(ctx, &ferr) }(otherSubnetTrx)
-
-			var otherAbstractSubnet *abstract.Subnet
-			xerr = inspectSubnetMetadataAbstract(ctx, otherSubnetTrx, func(as *abstract.Subnet) fail.Error {
-				otherAbstractSubnet = as
-				return nil
-			})
-			if xerr != nil {
-				return xerr
-			}
-
-			safe := false
-
-			// Fix for Stein
-			{
-				st, xerr := svc.ProviderName()
-				if xerr != nil {
-					return xerr
-				}
-
-				if st != "ovh" {
-					safe = true
-				}
-			}
-
-			if cfg, xerr := svc.ConfigurationOptions(); xerr == nil {
-				safe = cfg.Safe
-			}
-
-			if otherAbstractSubnet.InternalSecurityGroupID != "" {
-				lansg, xerr = LoadSecurityGroup(ctx, otherAbstractSubnet.InternalSecurityGroupID)
-				if xerr != nil {
-					return fail.Wrap(xerr, "failed to load Subnet '%s' internal Security Group %s", otherAbstractSubnet.Name, otherAbstractSubnet.InternalSecurityGroupID)
-				}
-
-				if !safe && !useTerraformer {
-					xerr = svc.ChangeSecurityGroupSecurity(ctx, false, true, otherAbstractSubnet.Network, "")
-					if xerr != nil {
-						return fail.Wrap(xerr, "failed to change security group")
-					}
-				}
-
-				lansgTrx, xerr := newSecurityGroupTransaction(ctx, lansg)
-				if xerr != nil {
-					return xerr
-				}
-				defer func(trx securityGroupTransaction) { trx.TerminateFromError(ctx, &ferr) }(lansgTrx)
-
-				xerr = lansgTrx.BindToHost(ctx, hostTrx, SecurityGroupEnable, MarkSecurityGroupAsSupplemental)
-				if xerr != nil {
-					return fail.Wrap(xerr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.Name, lansg.GetName(), req.ResourceName)
-				}
-
-				if !safe && !useTerraformer {
-					xerr = svc.ChangeSecurityGroupSecurity(ctx, true, false, otherAbstractSubnet.Network, "")
-					if xerr != nil {
-						return fail.Wrap(xerr, "failed to change security group")
-					}
-				}
-
-				langID, err := lansg.GetID()
-				if err != nil {
-					return fail.Wrap(err)
-				}
-
-				xerr = alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
-					// register security group in properties
-					item := &propertiesv1.SecurityGroupBond{
-						ID:         langID,
-						Name:       lansg.GetName(),
-						Disabled:   false,
-						FromSubnet: true,
-					}
-					hsgV1.ByID[item.ID] = item
-					hsgV1.ByName[item.Name] = item.ID
-					return nil
-				})
-				if xerr != nil {
-					return xerr
-				}
-			}
+	for k := range req.SecurityGroupByID {
+		if k == "" {
+			continue
 		}
+
+		sgInstance, innerXErr := LoadSecurityGroup(ctx, k)
+		if innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to load Security Group with id '%s'", k)
+		}
+
+		sgTrx, innerXErr := newSecurityGroupTransaction(ctx, sgInstance)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		defer func(trx securityGroupTransaction) { trx.TerminateFromError(ctx, &ferr) }(sgTrx)
+
+		xerr := alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(hsgV1 *propertiesv1.HostSecurityGroups) fail.Error {
+			innerXErr = alterSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
+				logrus.WithContext(ctx).Infof("Binding security group with id %s to host '%s'", asg.Name, hostName)
+				return svc.BindSecurityGroupToHost(ctx, asg, abstractHostCore)
+			})
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrDuplicate:
+					// If Security Group is already bound, consider a success
+				default:
+					return innerXErr
+				}
+			}
+
+			// register security group in properties
+			item := &propertiesv1.SecurityGroupBond{
+				ID:         k,
+				Name:       sgTrx.GetName(),
+				Disabled:   false,
+				FromSubnet: true,
+			}
+			hsgV1.ByID[item.ID] = item
+			hsgV1.ByName[item.Name] = item.ID
+			return nil
+		})
+		if xerr != nil {
+			return xerr
+		}
+
+		defer func(trx *securityGroupTransactionImpl, sgID string) {
+			if ferr != nil {
+				derr := inspectSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
+					return svc.BindSecurityGroupToHost(ctx, asg, abstractHostCore)
+				})
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// Security Group not bound, consider this as a successful unbind
+					default:
+						_ = ferr.AddConsequence(derr)
+					}
+				}
+			}
+		}(sgTrx, k)
 	}
 
 	return nil

@@ -142,7 +142,12 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 	}
 
 	// --- Initializes abstract.HostFull ---
-	ahf, xerr := p.designHostFull(request.ResourceName)
+	ahf, xerr := abstract.NewHostFull(abstract.WithName(request.ResourceName))
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
+	xerr = p.ConsolidateHostSnippet(ahf.HostCore)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -176,7 +181,7 @@ func (p *provider) CreateHost(inctx context.Context, request abstract.HostReques
 		abstract.WithExtraData("AvailabilityZone", azone),
 		abstract.WithExtraData("Subnets", request.Subnets),
 		abstract.WithExtraData("PublicIP", request.PublicIP || request.IsGateway),
-		abstract.WithExtraData("SecurityGroupByID", request.SecurityGroupByID),
+		abstract.WithExtraData("SecurityGroupByID", map[string]string{} /*request.SecurityGroupByID*/),
 		abstract.WithExtraData("DiskSize", ahf.Sizing.DiskSize),
 		abstract.WithExtraData("Image", ahf.Sizing.ImageID),
 		abstract.WithExtraData("Template", template.Name),
