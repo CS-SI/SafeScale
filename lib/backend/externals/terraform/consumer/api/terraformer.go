@@ -29,6 +29,7 @@ import (
 )
 
 type (
+	// Terraformer exposes the methods to interact with terraform CLI
 	Terraformer interface {
 		Apply(ctx context.Context, def string) (map[string]tfexec.OutputMeta, fail.Error)
 		Assemble(ctx context.Context, resources ...abstract.Abstract) (string, fail.Error)
@@ -50,13 +51,14 @@ type (
 
 	RequiredProviders data.Map[string, RequiredProvider]
 
-	// This is mainly used to prevent import cycle with scopeapi
+	// ScopeLimitedToTerraformerUse is mainly used to prevent import cycle with scopeapi
 	ScopeLimitedToTerraformerUse interface {
 		AllAbstracts() (map[string]abstract.Abstract, fail.Error)
 		IsLoaded() bool
 		LoadAbstracts(ctx context.Context) fail.Error
 	}
 
+	// Configuration carries the configuration for the Terraformer
 	Configuration struct {
 		Release   string // contains the release of terraform wanted for the hcl file produced
 		WorkDir   string

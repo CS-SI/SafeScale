@@ -50,7 +50,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-// ProviderUsingTerraform ...
+// ProviderUsingTerraform is a superset of Provider interface that exposes methods to be used by the renderer
 type ProviderUsingTerraform interface {
 	iaasapi.Provider
 
@@ -239,7 +239,7 @@ func (instance *renderer) Assemble(ctx context.Context, resources ...abstract.Ab
 	return content, nil
 }
 
-// RealizeSnippet generates a file from box template with variables updated
+// RealizeSnippet generates a file from embedded template with variables updated
 func (instance *renderer) RealizeSnippet(efs embed.FS, filename string, vars map[string]any) (string, fail.Error) {
 	if filename == "" {
 		return "", fail.InvalidParameterCannotBeEmptyStringError("filename")

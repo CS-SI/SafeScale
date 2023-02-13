@@ -771,13 +771,6 @@ func (instance stack) CreateHost(ctx context.Context, request abstract.HostReque
 			}
 		}()
 
-		if fip, xerr = instance.attachFloatingIP(ctx, host); xerr != nil {
-			return nil, userData, fail.Wrap(xerr, "error attaching public IP for host '%s'", request.ResourceName)
-		}
-		if fip == nil {
-			return nil, userData, fail.NewError("error attaching public IP for host: unknown error")
-		}
-
 		if valid.IsIPv4(fip.PublicIPAddress) {
 			host.Networking.PublicIPv4 = fip.PublicIPAddress
 		} else if valid.IsIPv6(fip.PublicIPAddress) {

@@ -14,16 +14,20 @@
  * limitations under the License.
  */
 
+// Package consumer package consumer proposes a way to invoke terraform command-line for use in provider drivers
+//
+// A typical workflow is:
+//
+//	renderer, xerr := terraformer.New(p, p.TerraformerOptions())
+//	if xerr != nil {
+//	    return xerr
+//	}
+//	defer func() { _ = renderer.Close() }()
+//
+//	def, xerr := renderer.Assemble(inctx, ahf)
+//	if xerr != nil {
+//	    return xerr
+//	}
+//
+//	outputs, innerXErr = renderer.Apply(inctx, def)
 package consumer
-
-import (
-	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/internal"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
-)
-
-// New instantiates a terraform file builder that will put file in 'workDir'
-func New(provider internal.ProviderUsingTerraform, opts options.Options) (api.Terraformer, fail.Error) {
-	return internal.New(provider, opts)
-}
