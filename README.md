@@ -24,6 +24,7 @@ SafeScale is an Infrastructure and Platform as Code tool.
   - [Available features](#available-features)
   - [Contributing](#contributing)
   - [License](#license)
+  - [Ansible module](#ansible)
 
 ## Description
 SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters that span multiple Clouds. These APIs and CLIs are divided in 3 service layers:
@@ -151,3 +152,7 @@ For bugs and feature requests, [please create an issue](../../issues/new).
 ## License
 
 SafeScale is distributed by [CS Systemes d'Information](http://csgroup.eu) under the [Apache License, Version 2.0](LICENSE). Please see the [third-party notices](NOTICE) file for additional copyright notices and license terms applicable to portions of the software.
+
+## Ansible module
+
+We have created an [Ansible module to use SafeScale](https://galaxy.ansible.com/safescale_dev_team/safescale).
