@@ -2682,13 +2682,13 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 			xerr = inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
 				abstractSubnet = as
 
-				// IDs of Security Groups to attach to Host used as gateway
-				if len(sgs) == 0 {
-					sgs = map[string]string{}
-				}
-				sgs[as.GWSecurityGroupID] = as.GWSecurityGroupName
-				sgs[as.InternalSecurityGroupID] = as.InternalSecurityGroupName
-				sgs[as.PublicIPSecurityGroupID] = as.PublicIPSecurityGroupName
+				// // IDs of Security Groups to attach to Host used as gateway
+				// if len(sgs) == 0 {
+				// 	sgs = map[string]string{}
+				// }
+				// sgs[as.GWSecurityGroupID] = as.GWSecurityGroupName
+				// sgs[as.InternalSecurityGroupID] = as.InternalSecurityGroupName
+				// sgs[as.PublicIPSecurityGroupID] = as.PublicIPSecurityGroupName
 				return nil
 			})
 			if xerr != nil {

@@ -489,6 +489,7 @@ func (hostTrx *hostTransactionImpl) SetSecurityGroups(ctx context.Context, req a
 	return nil
 }
 
+// UndoSetSecurityGroups ...
 func (hostTrx *hostTransactionImpl) UndoSetSecurityGroups(ctx context.Context, errorPtr *fail.Error, keepOnFailure bool) (ferr fail.Error) {
 	if valid.IsNull(hostTrx) {
 		return fail.InvalidInstanceError()
@@ -564,32 +565,24 @@ func (hostTrx *hostTransactionImpl) UnbindDefaultSecurityGroupIfNeeded(ctx conte
 	}
 
 	if sgName != "" {
-		sgInstance, xerr := LoadSecurityGroup(ctx, sgName)
+		asg, xerr := svc.InspectSecurityGroupByName(ctx, networkID, sgName)
 		if xerr != nil {
 			return xerr
 		}
 
-		sgTrx, xerr := newSecurityGroupTransaction(ctx, sgInstance)
-		if xerr != nil {
-			return xerr
-		}
-		defer sgTrx.TerminateFromError(ctx, &ferr)
-
-		xerr = alterSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
-			return alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-				innerXErr := svc.UnbindSecurityGroupFromHost(ctx, asg, ahc)
-				if innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrNotFound:
-						// Consider a security group not found as a successful unbind
-						debug.IgnoreErrorWithContext(ctx, innerXErr)
-					default:
-						return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
-					}
+		xerr = inspectHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
+			innerXErr := svc.UnbindSecurityGroupFromHost(ctx, asg, ahc)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					// Consider a security group not found as a successful unbind
+					debug.IgnoreErrorWithContext(ctx, innerXErr)
+				default:
+					return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
 				}
+			}
 
-				return nil
-			})
+			return nil
 		})
 		if xerr != nil {
 			return xerr
