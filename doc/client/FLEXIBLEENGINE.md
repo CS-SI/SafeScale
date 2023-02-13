@@ -1,14 +1,26 @@
 ```
 [[tenants]]
-    name = "TenantName"
-    client = "flexibleengine"
+  name = "myFlexibleTenant"
+  client = "flexibleengine"
 
-    # This part defines how to authenticate with the provider
-    [tenants.identity]
-        IdentityEndpoint = "<IdentityEndpoint>"
-        Username = "<Username>"
-        Password = "<Password>"
-        DomainName = "<DomainName>"
-        TenantName = "<TenantName>"
-        AllowReauth = "<AllowReauth>"
+  [tenants.identity]
+    Username = "myUser"
+    Password = "abcdef............"
+    DomainName = "ABC0123456"
+
+  [tenants.compute]
+    ProjectID= "123456abcdef...................."
+    Region= "eu-west-0"
+    AvailabilityZone= "eu-west-0b"
+    DefaultImage = "Ubuntu 20.04"
+
+  [tenants.network]
+    VPCName = "myVPCName
+    VPCCIDR = "192.168.0.0/16"
+
+  [tenants.objectstorage]
+    Type = "s3"
+    Endpoint = "https://oss.eu-west-0.prod-cloud-ocb.orange-business.com"
+    AccessKey = "ABCDEF.............."
+    SecretKey = "HIJK1234................................"
 ```
