@@ -212,7 +212,7 @@ func (hostTrx *hostTransactionImpl) SetSecurityGroups(ctx context.Context, req a
 			return fail.Wrap(xerr, "failed to query Subnet '%s' Security Group with ID %s", defaultAbstractSubnet.Name, defaultAbstractSubnet.PublicIPSecurityGroupID)
 		}
 
-		pubipsgTrx, xerr := newSecurityGroupTransaction(ctx, gwsg)
+		pubipsgTrx, xerr := newSecurityGroupTransaction(ctx, pubipsg)
 		if xerr != nil {
 			return xerr
 		}

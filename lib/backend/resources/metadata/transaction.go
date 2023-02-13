@@ -32,6 +32,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Transaction defines the interface to use when a transaction on resource is needed
+// 'A' is a type satisfying the interface [abstract.Abstract]
+// 'T' is a type satisfying the interface [Metadata]
 type Transaction[A abstract.Abstract, T Metadata[A]] interface {
 	Commit(ctx context.Context) fail.Error                    // commits the changes
 	GetName() string                                          // returns transactioned object name
@@ -52,6 +55,7 @@ type Transaction[A abstract.Abstract, T Metadata[A]] interface {
 	inspectProperties(ctx context.Context, callback AllPropertiesCallback) fail.Error              // allows to inspect all properties safely (after Reload)
 }
 
+// transaction is the implementation of the former interface
 type transaction[A abstract.Abstract, T Metadata[A]] struct {
 	mu           *sync.Mutex // used for concurrency-safety
 	name, id     string
