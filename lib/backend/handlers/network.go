@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"context"
+	"github.com/sanity-io/litter"
 	"net"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend"
@@ -75,6 +76,11 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 	if networkReq.CIDR == "" {
 		networkReq.CIDR = defaultCIDR
 	}
+
+	logrus.Warningf("netRequest: %s", litter.Sdump(networkReq))
+	logrus.Warningf("subnetRequest: %s", litter.Sdump(subnetReq))
+	logrus.Warningf("gwName: %s", litter.Sdump(gwName))
+	logrus.Warningf("gwSizing: %s", litter.Sdump(gwSizing))
 
 	// If there is conflict with docker quit
 	thisCidr := netretry.CIDRString(networkReq.CIDR)
