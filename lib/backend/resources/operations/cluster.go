@@ -2302,31 +2302,34 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			}
 		*/
 
-		if itis, err := instance.isFeatureDisabled(ctx, "ansible-for-cluster"); !itis && err == nil {
-			xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
+		// disabling ansible also disables ansible-for-cluster
+		if aitis, err := instance.isFeatureDisabled(ctx, "ansible"); !aitis && err == nil {
+			if itis, err := instance.isFeatureDisabled(ctx, "ansible-for-cluster"); !itis && err == nil {
+				xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+						featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+						if !ok {
+							return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						}
 
-					featuresV1.Installed["ansible"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible"}
-					featuresV1.Installed["ansible-for-cluster"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible-for-cluster"}
-					return nil
+						featuresV1.Installed["ansible"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible"}
+						featuresV1.Installed["ansible-for-cluster"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible-for-cluster"}
+						return nil
+					})
 				})
-			})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-				chRes <- result{xerr}
-				return
-			}
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+					chRes <- result{xerr}
+					return
+				}
 
-			xerr = instance.regenerateClusterInventory(ctx)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				chRes <- result{xerr}
-				return
+				xerr = instance.regenerateClusterInventory(ctx)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					chRes <- result{xerr}
+					return
+				}
 			}
 		}
 
