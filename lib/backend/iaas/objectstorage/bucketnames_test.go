@@ -61,7 +61,7 @@ func TestBuildMetadataBucketName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := BuildMetadataBucketName(tt.args.driver, tt.args.region, tt.args.domain, tt.args.project)
+			got, err := BuildMetadataBucketName(tt.args.driver, tt.args.region, tt.args.domain, tt.args.project, "")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("BuildMetadataBucketName() error = %v, wantErr %v", err, tt.wantErr)
 				return
