@@ -347,7 +347,9 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 	}
 
 	if itis, xerr := myself.IsValid(); xerr == nil && !itis {
-		return fail.InconsistentError("the instance is not valid")
+		if almost, xerr := myself.isAlmostValid(); xerr == nil && !almost { // metadata from old clusters is INVALID
+			return fail.InconsistentError("the instance is not valid")
+		}
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -378,10 +380,12 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 				return fail.InconsistentError("uninitialized metadata should not be altered")
 			}
 
-			if id, err := myself.getID(); err != nil {
-				return fail.InconsistentError("uninitialized metadata should not be altered")
-			} else if id == "" {
-				return fail.InconsistentError("uninitialized metadata should not be altered")
+			if myself.kind != "cluster" { // another design mistake that must be horribly patched...
+				if id, err := myself.getID(); err != nil {
+					return fail.InconsistentError("uninitialized metadata should not be altered")
+				} else if id == "" {
+					return fail.InconsistentError("uninitialized metadata should not be altered")
+				}
 			}
 
 			// Make sure myself.properties is populated
