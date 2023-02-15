@@ -115,6 +115,8 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, ferr
 	objstorage := remap(opt["objectstorage"])
 	tc := remap(opt["timings"])
 
+	suffix := getSuffix(metadata, objstorage)
+
 	region := get(compute, "Region")
 	if region == "" {
 		return nil, fail.SyntaxError("keyword 'Region' in section 'compute' not found in tenant file", nil, nil)
@@ -127,7 +129,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, ferr
 		}
 
 		var xerr fail.Error
-		metadata["Bucket"], xerr = objectstorage.BuildMetadataBucketName(stackName, region, "", userID)
+		metadata["Bucket"], xerr = objectstorage.BuildMetadataBucketName(stackName, region, "", userID, suffix)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -227,6 +229,21 @@ next:
 	}
 
 	return wp, nil
+}
+
+func getSuffix(metadata map[string]interface{}, objstorage map[string]interface{}) string {
+	suffix := ""
+	if val, ok := objstorage["Suffix"].(string); ok {
+		suffix = val
+		if suffix != "" {
+			return suffix
+		}
+	}
+	if val, ok := metadata["Suffix"].(string); ok {
+		suffix = val
+	}
+
+	return suffix
 }
 
 // GetAuthenticationOptions returns authentication parameters

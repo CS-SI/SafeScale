@@ -37,7 +37,7 @@ const (
 )
 
 // BuildMetadataBucketName builds the name of the bucket/stowContainer that will store metadata
-func BuildMetadataBucketName(driver, region, domain, project string) (name string, ferr fail.Error) {
+func BuildMetadataBucketName(driver, region, domain, project string, suffixFromCfg string) (name string, ferr fail.Error) {
 	hash := fnv.New128a()
 	sig := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s", driver, region, domain, project))
 	_, herr := hash.Write([]byte(sig))
@@ -48,10 +48,17 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 	name = BucketNamePrefix + "-" + hashed
 
 	nameLen := len(name)
-	if suffix, ok := os.LookupEnv(suffixEnvName); ok && suffix != "" {
-		name += "." + suffix
+	if suffixFromCfg == "" {
+		if suffix, ok := os.LookupEnv(suffixEnvName); ok && suffix != "" {
+			name += "." + suffix
+			if len(name) > maxBucketNameLength {
+				return "", fail.OverflowError(nil, maxBucketNameLength, "suffix '%s' is too long, max allowed: %d characters", suffix, maxBucketNameLength-nameLen-1)
+			}
+		}
+	} else {
+		name += "." + suffixFromCfg
 		if len(name) > maxBucketNameLength {
-			return "", fail.OverflowError(nil, maxBucketNameLength, "suffix '%s' is too long, max allowed: %d characters", suffix, maxBucketNameLength-nameLen-1)
+			return "", fail.OverflowError(nil, maxBucketNameLength, "suffix '%s' is too long, max allowed: %d characters", suffixFromCfg, maxBucketNameLength-nameLen-1)
 		}
 	}
 	if len(name) > maxBucketNameLength {

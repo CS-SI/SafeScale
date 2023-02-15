@@ -705,7 +705,14 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		config.Credentials = string(d1)
 	}
 
-	config.BucketName, _ = metadata["MetadataBucketName"].(string) // nolint
+	if config.BucketName, ok = metadata["MetadataBucketName"].(string); !ok {
+		config.BucketName, _ = ostorage["MetadataBucketName"].(string) // nolint
+	}
+
+	if config.Suffix, ok = metadata["Suffix"].(string); !ok {
+		config.Suffix, _ = ostorage["Suffix"].(string) // nolint
+	}
+
 	return config, nil
 }
 

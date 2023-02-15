@@ -1044,17 +1044,6 @@ func (instance service) ListHostsWithTags(inctx context.Context, labels []string
 
 }
 
-// TenantCleanup removes everything related to SafeScale from tenant (mainly metadata)
-// if force equals false and there is metadata, returns an error
-// WARNING: !!! this will make SafeScale unable to handle the resources !!!
-func (instance service) TenantCleanup(ctx context.Context, force bool) fail.Error {
-	if valid.IsNil(instance) {
-		return fail.InvalidInstanceError()
-	}
-
-	return fail.NotImplementedError("service.TenantCleanup() not yet implemented") // FIXME: Technical debt
-}
-
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
 func (instance service) LookupRuleInSecurityGroup(
 	inctx context.Context, asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule,

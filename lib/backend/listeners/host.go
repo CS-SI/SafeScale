@@ -78,6 +78,9 @@ func (s *HostListener) Start(inctx context.Context, in *protocol.Reference) (emp
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, fail.InvalidParameterError("ref", "cannot be empty string")
@@ -136,6 +139,9 @@ func (s *HostListener) Reboot(inctx context.Context, in *protocol.Reference) (em
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	if inctx == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
@@ -162,6 +168,9 @@ func (s *HostListener) List(inctx context.Context, in *protocol.HostListRequest)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")

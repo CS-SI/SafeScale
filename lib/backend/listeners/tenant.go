@@ -41,6 +41,9 @@ func (s *TenantListener) List(inctx context.Context, in *googleprotobuf.Empty) (
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
@@ -69,6 +72,9 @@ func (s *TenantListener) Get(inctx context.Context, in *googleprotobuf.Empty) (_
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
@@ -109,9 +115,8 @@ func (s *TenantListener) Set(inctx context.Context, in *protocol.TenantName) (em
 	if in == nil {
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
-
 	defer fail.OnExitLogError(inctx, &err)
-
+	// FIXME: OPP This is a very bad practice
 	xerr := operations.SetCurrentTenant(inctx, in.GetName())
 	if xerr != nil {
 		return empty, xerr
@@ -129,7 +134,7 @@ func (s *TenantListener) Scan(inctx context.Context, in *protocol.TenantScanRequ
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
 	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	name := in.GetName()
@@ -162,7 +167,7 @@ func (s *TenantListener) Inspect(inctx context.Context, in *protocol.TenantName)
 	}
 
 	name := in.GetName()
-	job, xerr := PrepareJob(inctx, "", fmt.Sprintf("/tenant/%s/inspect", name))
+	job, xerr := PrepareInspectionJob(inctx, "", fmt.Sprintf("/tenant/%s/inspect", name))
 	if xerr != nil {
 		return nil, xerr
 	}

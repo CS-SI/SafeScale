@@ -19,9 +19,11 @@ package aws
 import (
 	"context"
 	"fmt"
+	"github.com/sanity-io/litter"
 	"reflect"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
@@ -186,6 +188,8 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 		return nil, xerr
 	}
 
+	logrus.WithContext(ctx).Warnf("Image full info: %s", litter.Sdump(resp)) // FIXME: OPP Remove this later
+
 	return toAbstractImage(*resp), nil
 }
 
@@ -296,7 +300,12 @@ func (s stack) ListImages(ctx context.Context, all bool) (_ []*abstract.Image, f
 		for _, image := range resp {
 			if image != nil {
 				if !aws.BoolValue(image.EnaSupport) {
-					logrus.Debug("ENA filtering does NOT actually work!")
+					logrus.WithContext(ctx).Debugf("ENA not enabled: %s", aws.StringValue(image.ImageId))
+					continue
+				}
+
+				if strings.Contains(aws.StringValue(image.ImageOwnerAlias), "aws-marketplace") {
+					logrus.WithContext(ctx).Debugf("We don't return marketplace images: %s", aws.StringValue(image.ImageId))
 					continue
 				}
 

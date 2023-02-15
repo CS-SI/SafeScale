@@ -236,7 +236,7 @@ feature:
                                 {{ if eq .EnableAudit "true" }}
                                 case $(sfGetFact "linux_kind") in
                                     debian|ubuntu)
-                                        sfApt update
+                                        sfApt update --allow-insecure-repositories
                                         sfRetry sfApt install -y auditd quota quotatool || sfFail 196 "Error installing auditd quota quotatool"
                                         ;;
 
@@ -320,9 +320,9 @@ feature:
                             deb https://apt.kubernetes.io/ kubernetes-xenial main
                             EOF
                                     if [ ! -x ${KUBE_VERSION} ]; then
-                                        sfApt update && sfApt install -y kubelet=${KUBE_VERSION}-00 kubeadm=${KUBE_VERSION}-00 kubectl=${KUBE_VERSION}-00 || sfFail 203 "Error installing kubelet kubadm kubectl"
+                                        sfApt update --allow-insecure-repositories && sfApt install -y kubelet=${KUBE_VERSION}-00 kubeadm=${KUBE_VERSION}-00 kubectl=${KUBE_VERSION}-00 || sfFail 203 "Error installing kubelet kubadm kubectl"
                                     else
-                                        sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 203 "Error installing kubelet kubeadm kubectl"
+                                        sfApt update --allow-insecure-repositories && sfApt install -y kubelet kubeadm kubectl || sfFail 203 "Error installing kubelet kubeadm kubectl"
                                     fi
                                     apt-mark hold kubelet kubeadm kubectl
                                     ;;
@@ -362,7 +362,7 @@ feature:
                             {{ if .ClusterControlplaneUsesVIP }}
                             case $(sfGetFact "linux_kind") in
                                 ubuntu|debian)
-                                    sfApt update && sfApt -y install keepalived haproxy || sfFail 205 "Error installing keepalived haproxy"
+                                    sfApt update --allow-insecure-repositories && sfApt -y install keepalived haproxy || sfFail 205 "Error installing keepalived haproxy"
                                     ;;
                                 redhat|rhel|centos|fedora)
                                     yum install -q -y keepalived haproxy || sfFail 205 "Error installing keepalived haproxy"

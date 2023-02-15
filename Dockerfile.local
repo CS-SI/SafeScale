@@ -114,5 +114,6 @@ COPY --from=builder /exported/safescaled /exported/safescaled
 COPY --from=builder /exported/safescale /exported/safescale
 COPY --from=builder /exported/go.mod /exported/go.mod
 COPY --from=builder /exported/go.sum /exported/go.sum
+COPY --from=builder /exported/safescale.proto /exported/safescale.proto
 COPY --from=builder /exported/safescale_pb.js /exported/safescale_pb.js
 COPY --from=builder /exported/safescale_grpc_web_pb.js /exported/safescale_grpc_web_pb.js

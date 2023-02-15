@@ -1,12 +1,32 @@
 ```
 [[tenants]]
-    name = "TenantName"
-    client = "outscale"
+  client = "outscale"
+  name = "myOutscale"
 
-    # This part defines how to authenticate with the provider
-    [tenants.identity]
-        Username = "<Username>"
-        UserID = "<UserID>"
-        Password = "<Password>"
-        TenantName = "<TenantName>"
+  [tenants.identity]
+    AccessKey="ABCDEF123..........."
+    SecretKey="1234567................................."
+    UserID="0123455432112345...."
+
+  [tenants.compute]
+    Region="eu-west-2"
+    Subregion="eu-west-2a"
+    Service="api"
+    DefaultVolumeSpeed="HDD"
+
+  [tenants.network]
+    VPCName = "my-vpc"
+    VPCCIDR = "192.168.0.0/16"
+
+  [tenants.objectstorage]
+    Type = "s3"
+    Endpoint = "https://oos.eu-west-2.outscale.com"
+    AccessKey="ABCDEF123..........."
+    SecretKey="1234567................................."
+
+  [tenants.metadata]
+    Type = "s3"
+    Endpoint = "https://oos.eu-west-2.outscale.com"
+    AccessKey="ABCDEF123..........."
+    SecretKey="1234567................................."
 ```

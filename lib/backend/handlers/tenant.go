@@ -19,6 +19,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"math"
 	"os"
 	"reflect"
@@ -144,6 +145,7 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 type TenantHandler interface {
 	Scan(string, bool, []string) (*protocol.ScanResultList, fail.Error)
 	Inspect(string) (*protocol.TenantInspectResponse, fail.Error)
+	SetCurrentTenant(context.Context, string) fail.Error
 }
 
 // tenantHandler service
@@ -156,6 +158,15 @@ type tenantHandler struct {
 // NewTenantHandler creates a scanner service
 func NewTenantHandler(job backend.Job) TenantHandler {
 	return &tenantHandler{job: job}
+}
+
+func (handler *tenantHandler) SetCurrentTenant(inctx context.Context, name string) fail.Error {
+	xerr := operations.SetCurrentTenant(inctx, name)
+	if xerr != nil {
+		return fail.ConvertError(xerr)
+	}
+
+	return nil
 }
 
 // Inspect displays tenant configuration
@@ -176,15 +187,12 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
 	}
 
-	svc := handler.job.Service()
-	currentName, err := svc.GetName()
-	if err != nil {
-		return nil, err
-	}
-	if tenantName != currentName {
-		return nil, fail.NewError("we only inspect current tenant right now")
+	xpc, aerr := operations.LoadTenant(handler.job.Context(), tenantName)
+	if aerr != nil {
+		return nil, fail.ConvertError(aerr)
 	}
 
+	svc := xpc.Service
 	ctx := handler.job.Context()
 
 	fromParams := func(in map[string]interface{}, key1 string, key2 string) string {

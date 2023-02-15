@@ -62,7 +62,7 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry "sfApt update && sfApt install -y ntp" || sfFail 192
+                                    sfRetry "sfApt update --allow-insecure-repositories && sfApt install -y ntp" || sfFail 192
                                     ;;
                                 centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then

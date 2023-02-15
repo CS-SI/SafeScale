@@ -65,7 +65,7 @@ feature:
                           case $LINUX_KIND in
                               debian|ubuntu)
                                   export DEBIAN_FRONTEND=noninteractive
-                                  sfRetry "sfApt update"
+                                  sfRetry "sfApt update --allow-insecure-repositories"
                                   sfRetry "sfApt install -y ntpdate" || sfFail 192
                                   ;;
                               centos|fedora|redhat|rhel)

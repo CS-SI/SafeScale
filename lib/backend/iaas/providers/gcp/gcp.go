@@ -179,8 +179,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	suffix := getSuffix(params)
+
 	providerName := "gcp"
-	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, "", projectID)
+	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, "", projectID, suffix)
 	if err != nil {
 		return nil, err
 	}
@@ -240,6 +242,24 @@ next:
 	}
 
 	return wp, nil
+}
+
+func getSuffix(params map[string]interface{}) string {
+	suffix := ""
+	if osto, ok := params["objectstorage"].(map[string]interface{}); ok {
+		if val, ok := osto["Suffix"].(string); ok {
+			suffix = val
+			if suffix != "" {
+				return suffix
+			}
+		}
+	}
+	if meta, ok := params["metadata"].(map[string]interface{}); ok {
+		if val, ok := meta["Suffix"].(string); ok {
+			suffix = val
+		}
+	}
+	return suffix
 }
 
 // GetAuthenticationOptions returns the auth options

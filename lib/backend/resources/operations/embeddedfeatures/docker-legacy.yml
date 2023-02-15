@@ -138,56 +138,15 @@ feature:
                             case $LINUX_KIND in
                                 debian)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update --allow-insecure-repositories" || sfFail 192 "error updating"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --allow-change-held-packages apt-transport-https ca-certificates" || sfFail 193 "error installing apt tools (exit code $?)"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "(apt-cache show gnupg2 && apt install -qqy gnupg2) || (apt-cache show gnupg && apt install -qqy gnupg)"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
-                                    echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update --allow-insecure-repositories" || sfFail 192 "error updating"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
+                                    sfFail 192 "Enjoy the silence"
                                     ;;
                                 ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update --allow-insecure-repositories" || sfFail 192 "error updating"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --allow-change-held-packages apt-transport-https ca-certificates" || sfFail 193 "error installing apt tools (exit code $?)"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
-                                    echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update --allow-insecure-repositories" || sfFail 192 "error updating"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
+                                    sfFail 192 "Enjoy the silence"
                                     ;;
-                                centos|redhat|rhel)
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 196 "error installing yum prerequisites"
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo" || sfFail 197 "error adding docker-ce repo"
-                                    op=-1
-                                    yum install -y curl --nobest &>/dev/null && op=$? || true
-                                    if [ $op -ne 0 ]; then
-                                        sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y curl &>/dev/null" && op=$? || true
-                                        if [ $op -ne 0 ]; then
-                                            sfFail 198 "error installing curl"
-                                        else
-                                            sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y docker-ce docker-ce-cli containerd.io" || sfFail 199 "error installing docker-ce (exit code $?)"
-                                        fi
-                                    else
-                                        sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y docker-ce docker-ce-cli containerd.io --nobest" || sfFail 200"error installing docker-ce --nobest (exit code $?)"
-                                    fi
-                                    cat /etc/redhat-release | grep 8. && systemctl enable --now docker || true
-                                    ;;
-                                fedora)
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 201
-                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo"
-                                    op=-1
-                                    dnf install -y curl --nobest &>/dev/null && op=$? || true
-                                    if [ $op -ne 0 ]; then
-                                        dnf install -y curl &>/dev/null && op=$? || true
-                                        if [ $op -ne 0 ]; then
-                                            sfFail 202 "error installing curl"
-                                        else
-                                            sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf install -y docker-ce docker-ce-cli containerd.io" || sfFail 203 "error installing docker-ce (exit code $?)"
-                                        fi
-                                    else
-                                        sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf install -y docker-ce docker-ce-cli containerd.io --nobest" || sfFail 204 "error installing docker-ce (exit code $?)"
-                                    fi
-                                    systemctl enable --now docker || true
+                                centos|redhat|rhel|fedora)
+                                    wget https://download.docker.com/linux/centos/7/x86_64/stable/Packages/docker-ce-17.09.0.ce-1.el7.centos.x86_64.rpm
+                                    sudo yum install -y ./docker-ce-17.09.0.ce-1.el7.centos.x86_64.rpm
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"

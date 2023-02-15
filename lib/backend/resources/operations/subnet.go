@@ -1271,15 +1271,12 @@ func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subne
 			default:
 				return xerr
 			}
-		} else {
-			xerr = sgInstance.unbindFromSubnetHosts(ctx, unbindParams)
-			if xerr != nil {
-				return xerr
-			}
+			continue
+		}
 
-			// VPL: no need to update SubnetSecurityGroups property, the Subnet is being removed
-			// delete(sgs.ByID, v)
-			// delete(sgs.ByName, k)
+		xerr = sgInstance.unbindFromSubnetHosts(ctx, unbindParams)
+		if xerr != nil {
+			return xerr
 		}
 	}
 	return nil

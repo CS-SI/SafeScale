@@ -55,7 +55,7 @@ func CurrentTenant(ctx context.Context) *Tenant {
 				continue
 			}
 
-			service, xerr := loadTenant(ctx, name)
+			service, xerr := loadService(ctx, name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				debug.IgnoreError2(ctx, xerr)
@@ -83,7 +83,7 @@ func SetCurrentTenant(ctx context.Context, tenantName string) error {
 		return nil
 	}
 
-	service, xerr := loadTenant(ctx, tenantName)
+	service, xerr := loadService(ctx, tenantName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -99,7 +99,24 @@ func SetCurrentTenant(ctx context.Context, tenantName string) error {
 	return nil
 }
 
-func loadTenant(ctx context.Context, tenantName string) (iaas.Service, fail.Error) {
+// LoadTenant sets the tenant to use for upcoming commands
+func LoadTenant(ctx context.Context, tenantName string) (*Tenant, error) {
+	service, xerr := loadService(ctx, tenantName)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	bucket, xerr := service.GetMetadataBucket(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	tenant := &Tenant{Name: tenantName, BucketName: bucket.GetName(), Service: service}
+	return tenant, nil
+}
+
+func loadService(ctx context.Context, tenantName string) (iaas.Service, fail.Error) {
 	service, xerr := iaas.UseService(ctx, tenantName, MinimumMetadataVersion)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

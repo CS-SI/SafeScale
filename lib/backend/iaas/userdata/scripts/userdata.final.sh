@@ -94,7 +94,7 @@ function install_drivers_nvidia() {
   ubuntu)
     sfFinishPreviousInstall
     add-apt-repository -y ppa:graphics-drivers &> /dev/null
-    sfApt update || fail 201 "failure running apt update"
+    sfApt update --allow-insecure-repositories || fail 201 "failure running apt update"
     sfApt -y install nvidia-410 &> /dev/null || {
       sfApt -y install nvidia-driver-410 &> /dev/null || fail 201 "failure installing nvidia"
     }

@@ -68,4 +68,5 @@ type FeatureSettings struct {
 	SkipSizingRequirements  bool // tells not to check sizing requirements
 	AddUnconditionally      bool // tells to not check before addition (no effect for check or removal)
 	IgnoreSuitability       bool // allows to not check if the feature is suitable for the target
+	IgnoreTainted           bool
 }

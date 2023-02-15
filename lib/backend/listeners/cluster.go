@@ -46,6 +46,9 @@ func (s *ClusterListener) List(inctx context.Context, in *protocol.Reference) (h
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
@@ -187,6 +190,9 @@ func (s *ClusterListener) Start(inctx context.Context, in *protocol.Reference) (
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
 	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return empty, fail.InvalidParameterCannotBeEmptyStringError("ref")
@@ -214,11 +220,11 @@ func (s *ClusterListener) Stop(inctx context.Context, in *protocol.Reference) (e
 	if s == nil {
 		return empty, fail.InvalidInstanceError()
 	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("inctx")
-	}
 	if in == nil {
 		return empty, fail.InvalidParameterCannotBeNilError("in")
+	}
+	if inctx == nil {
+		return empty, fail.InvalidParameterCannotBeNilError("inctx")
 	}
 	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
