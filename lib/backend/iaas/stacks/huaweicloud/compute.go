@@ -523,6 +523,9 @@ func (s stack) CreateHost(ctx context.Context, request abstract.HostRequest, ext
 		VolumeType:          "SSD",
 		VolumeSize:          diskSize,
 	}
+
+	// logrus.WithContext(ctx).Warningf("And the real creation parameters: %s", litter.Sdump(bootdiskOpts))
+
 	// Defines server
 	userDataPhase1, xerr := userData.Generate(userdata.PHASE1_INIT)
 	if xerr != nil {
@@ -953,6 +956,7 @@ func (s stack) InspectHost(ctx context.Context, hostParam stacks.HostParameter) 
 // ListImages lists available OS images
 func (s stack) ListImages(ctx context.Context, _ bool) (imgList []*abstract.Image, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+	// FIXME: context must NOT be ignored.
 
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()

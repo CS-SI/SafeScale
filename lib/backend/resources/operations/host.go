@@ -902,6 +902,16 @@ func (instance *Host) implCreate(
 				ar := result{nil, fail.ConvertError(err)}
 				return ar, ar.err
 			}
+
+			if hostDef.MinDiskSize > hostReq.DiskSize {
+				hostReq.DiskSize = hostDef.MinDiskSize
+			}
+
+			if hostDef.MaxDiskSize > hostReq.DiskSize {
+				hostReq.DiskSize = hostDef.MaxDiskSize
+			}
+
+			// finally the call to create host
 			ahf, userdataContent, xerr = svc.CreateHost(ctx, hostReq, extra)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
