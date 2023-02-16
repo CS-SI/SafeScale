@@ -18,7 +18,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path"
@@ -26,12 +28,15 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/oscarpicas/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
 
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
@@ -105,30 +110,28 @@ func work(c *cli.Context) {
 	if err != nil {
 		logrus.Fatalf("failed to listen: %v", err)
 	}
-	s := grpc.NewServer()
 
-	logrus.Infoln("Registering services")
-	protocol.RegisterBucketServiceServer(s, &listeners.BucketListener{})
-	protocol.RegisterClusterServiceServer(s, &listeners.ClusterListener{})
-	protocol.RegisterHostServiceServer(s, &listeners.HostListener{})
-	protocol.RegisterFeatureServiceServer(s, &listeners.FeatureListener{})
-	protocol.RegisterImageServiceServer(s, &listeners.ImageListener{})
-	protocol.RegisterJobServiceServer(s, &listeners.JobManagerListener{})
-	protocol.RegisterNetworkServiceServer(s, &listeners.NetworkListener{})
-	protocol.RegisterSubnetServiceServer(s, &listeners.SubnetListener{})
-	protocol.RegisterSecurityGroupServiceServer(s, &listeners.SecurityGroupListener{})
-	protocol.RegisterShareServiceServer(s, &listeners.ShareListener{})
-	protocol.RegisterSshServiceServer(s, &listeners.SSHListener{})
-	protocol.RegisterTemplateServiceServer(s, &listeners.TemplateListener{})
-	protocol.RegisterTenantServiceServer(s, &listeners.TenantListener{})
-	protocol.RegisterVolumeServiceServer(s, &listeners.VolumeListener{})
-	protocol.RegisterLabelServiceServer(s, &listeners.LabelListener{})
+	s := createGrpcServer()
+	ns, xerr := buildGRPCWebServer(s)
+	if xerr != nil {
+		logrus.Fatalf("failed to build grpcweb server: %v", xerr)
+	}
+
+	go func() {
+		nl, err := net.Listen("tcp", ":50052")
+		if err != nil {
+			logrus.Fatalf("failed to listen: %v", err)
+		}
+
+		err = ns.Serve(nl)
+		if err != nil {
+			logrus.Fatalf("failed to serve: %v", err)
+			return
+		}
+	}()
 
 	// enable heartbeat
 	go heartbeat.RunHeartbeatService(":10102")
-
-	// Register reflection service on gRPC server.
-	reflection.Register(s)
 
 	// Track goroutines
 	startTrack()
@@ -149,6 +152,84 @@ func work(c *cli.Context) {
 	if err := s.Serve(lis); err != nil {
 		logrus.Fatalf("Failed to serve: %v", err)
 	}
+}
+
+// buildGRPCWebServer wraps a *grpc.Server to handle grpcweb
+func buildGRPCWebServer(grpcServer *grpc.Server) (*http.Server, fail.Error) {
+	if valid.IsNil(grpcServer) {
+		return nil, fail.InvalidParameterCannotBeNilError("grpcServer")
+	}
+
+	options := []grpcweb.Option{
+		grpcweb.WithCorsForRegisteredEndpointsOnly(false),
+		grpcweb.WithOriginFunc(func(string) bool {
+			return true
+		}),
+	}
+
+	options = append(options,
+		grpcweb.WithWebsockets(true),
+	)
+	options = append(
+		options,
+		grpcweb.WithWebsocketPingInterval(5*time.Second),
+	)
+
+	wrappedGrpc := grpcweb.WrapServer(grpcServer, options...)
+
+	serveMux := http.NewServeMux()
+	ourHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.ProtoMajor == 2 {
+			wrappedGrpc.ServeHTTP(w, r)
+			return
+		}
+
+		if wrappedGrpc.IsGrpcWebRequest(r) || wrappedGrpc.IsAcceptableGrpcCorsRequest(r) {
+			origins, ok := r.Header["Origin"]
+			if ok && len(origins) > 0 {
+				w.Header().Set("Access-Control-Allow-Origin", strings.Join(origins, ","))
+				w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+				w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-User-Agent, X-Grpc-Web")
+				w.Header().Set("grpc-status", "")
+				w.Header().Set("grpc-message", "")
+				wrappedGrpc.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		// Fall back to other servers.
+		http.DefaultServeMux.ServeHTTP(w, r)
+	})
+	serveMux.Handle("/", ourHandler)
+
+	return &http.Server{
+		Handler: serveMux,
+	}, nil
+}
+
+func createGrpcServer() *grpc.Server {
+	s := grpc.NewServer()
+
+	logrus.Infoln("Registering services")
+	protocol.RegisterBucketServiceServer(s, &listeners.BucketListener{})
+	protocol.RegisterClusterServiceServer(s, &listeners.ClusterListener{})
+	protocol.RegisterHostServiceServer(s, &listeners.HostListener{})
+	protocol.RegisterFeatureServiceServer(s, &listeners.FeatureListener{})
+	protocol.RegisterImageServiceServer(s, &listeners.ImageListener{})
+	protocol.RegisterJobServiceServer(s, &listeners.JobManagerListener{})
+	protocol.RegisterNetworkServiceServer(s, &listeners.NetworkListener{})
+	protocol.RegisterSubnetServiceServer(s, &listeners.SubnetListener{})
+	protocol.RegisterSecurityGroupServiceServer(s, &listeners.SecurityGroupListener{})
+	protocol.RegisterShareServiceServer(s, &listeners.ShareListener{})
+	protocol.RegisterSshServiceServer(s, &listeners.SSHListener{})
+	protocol.RegisterTemplateServiceServer(s, &listeners.TemplateListener{})
+	protocol.RegisterTenantServiceServer(s, &listeners.TenantListener{})
+	protocol.RegisterVolumeServiceServer(s, &listeners.VolumeListener{})
+	protocol.RegisterLabelServiceServer(s, &listeners.LabelListener{})
+
+	// Register reflection service on gRPC server.
+	reflection.Register(s)
+	return s
 }
 
 // assembleListenString constructs the listen string we will use in net.Listen()

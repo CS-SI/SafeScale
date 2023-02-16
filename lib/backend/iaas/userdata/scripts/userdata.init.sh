@@ -250,6 +250,34 @@ function disable_upgrades() {
 
   esac
 }
+export -f disable_upgrades
+
+# try using dnf instead of yum if available
+function sfYum() {
+  rc=-1
+  if [[ -n $(which dnf) ]]; then
+    dnf "$@" && rc=$?
+  else
+    yum "$@" && rc=$?
+  fi
+  [ $rc -eq -1 ] && return 1
+  return $rc
+}
+export -f sfYum
+
+function remove_setuptools() {
+  case $LINUX_KIND in
+  debian | ubuntu)
+    # If it's not there, nothing to do
+    sudo dpkg -l python3-setuptools || true
+    sudo dpkg -l python3-setuptools | grep -E '^hi|^ii' && echo "python3-setuptools already there"
+    sudo dpkg -l python3-setuptools | grep -E '^hi|^ii' && sudo apt-get remove -y python3-setuptools
+    ;;
+  redhat | fedora | centos)
+    sfYum remove -y python3-setuptools || true
+  esac
+}
+export -f remove_setuptools
 
 function no_daily_update() {
   case $LINUX_KIND in
@@ -284,6 +312,7 @@ function no_daily_update() {
     ;;
   esac
 }
+export -f no_daily_update
 
 # ---- Main
 export DEBIAN_FRONTEND=noninteractive
@@ -309,6 +338,8 @@ drop_user
 {{- end }}
 
 create_user
+
+remove_setuptools
 
 no_daily_update
 

@@ -902,6 +902,16 @@ func (instance *Host) implCreate(
 				ar := result{nil, fail.ConvertError(err)}
 				return ar, ar.err
 			}
+
+			if hostDef.MinDiskSize > hostReq.DiskSize {
+				hostReq.DiskSize = hostDef.MinDiskSize
+			}
+
+			if hostDef.MaxDiskSize > hostReq.DiskSize {
+				hostReq.DiskSize = hostDef.MaxDiskSize
+			}
+
+			// finally the call to create host
 			ahf, userdataContent, xerr = svc.CreateHost(ctx, hostReq, extra)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -2176,7 +2186,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, hr abstract.Host
 		time.Sleep(timings.RebootTimeout())
 	}
 
-	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, 90*time.Second) // FIXME: It should be 1:30 min tops, 2*reboot time
+	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, 120*time.Second) // 1:30 was not enough
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

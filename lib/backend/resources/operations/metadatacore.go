@@ -171,6 +171,31 @@ func (myself *MetadataCore) getName() (string, fail.Error) {
 	return name, nil
 }
 
+func (myself *MetadataCore) isAlmostValid() (bool, fail.Error) {
+	if myself == nil {
+		return false, fail.InvalidInstanceError()
+	}
+
+	name, xerr := myself.getName()
+	if xerr != nil {
+		return false, nil
+	}
+
+	if name == "" {
+		return false, nil
+	}
+
+	if !myself.loaded && !myself.committed {
+		return false, nil
+	}
+
+	if myself.deleted {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (myself *MetadataCore) IsValid() (bool, fail.Error) {
 	if myself == nil {
 		return false, fail.InvalidInstanceError()
@@ -225,7 +250,9 @@ func (myself *MetadataCore) Inspect(inctx context.Context, callback resources.Ca
 	}
 
 	if itis, xerr := myself.IsValid(); xerr == nil && !itis {
-		return fail.InconsistentError("the instance is not valid")
+		if almost, xerr := myself.isAlmostValid(); xerr == nil && !almost { // metadata from old clusters is INVALID
+			return fail.InconsistentError("the instance is not valid")
+		}
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -320,7 +347,9 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 	}
 
 	if itis, xerr := myself.IsValid(); xerr == nil && !itis {
-		return fail.InconsistentError("the instance is not valid")
+		if almost, xerr := myself.isAlmostValid(); xerr == nil && !almost { // metadata from old clusters is INVALID
+			return fail.InconsistentError("the instance is not valid")
+		}
 	}
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -351,10 +380,12 @@ func (myself *MetadataCore) Alter(inctx context.Context, callback resources.Call
 				return fail.InconsistentError("uninitialized metadata should not be altered")
 			}
 
-			if id, err := myself.getID(); err != nil {
-				return fail.InconsistentError("uninitialized metadata should not be altered")
-			} else if id == "" {
-				return fail.InconsistentError("uninitialized metadata should not be altered")
+			if myself.kind != "cluster" { // another design mistake that must be horribly patched...
+				if id, err := myself.getID(); err != nil {
+					return fail.InconsistentError("uninitialized metadata should not be altered")
+				} else if id == "" {
+					return fail.InconsistentError("uninitialized metadata should not be altered")
+				}
 			}
 
 			// Make sure myself.properties is populated

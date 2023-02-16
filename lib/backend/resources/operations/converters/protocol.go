@@ -183,6 +183,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 		InitialMasterCount:      uint(masterCount),
 		FeatureParameters:       in.GetParameters(),
 		DefaultSshPort:          uint(in.DefaultSshPort),
+		Enabled:                 in.GetEnabled(),
 	}
 	return &out, nil
 }

@@ -1060,6 +1060,9 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
+	// HUGE design mistakes in all ToProtocol functions
+	// a ToProtocol function should just transform data, ALL the data should be ready BEFORE calling ToProtocol...
+	// but as we see here, there is a min of 3 remote queries here...
 
 	// instance.lock.RLock()
 	// defer instance.lock.RUnlock()
@@ -1077,7 +1080,7 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 		Attachments: []*protocol.VolumeAttachmentResponse{},
 	}
 
-	attachments, xerr := instance.GetAttachments(ctx)
+	attachments, xerr := instance.GetAttachments(ctx) // remote query
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1085,19 +1088,24 @@ func (instance *volume) ToProtocol(ctx context.Context) (*protocol.VolumeInspect
 
 	svc := instance.Service()
 	for k := range attachments.Hosts {
-		hostInstance, xerr := LoadHost(ctx, svc, k)
+		hostInstance, xerr := LoadHost(ctx, svc, k) // a few more remote queries for each attachment
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return nil, xerr
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+			default:
+				return nil, xerr
+			}
+			continue
 		}
 
-		vols, _ := hostInstance.(*Host).unsafeGetVolumes(ctx)
+		vols, _ := hostInstance.(*Host).unsafeGetVolumes(ctx) // remote query
 		device, ok := vols.DevicesByID[volumeID]
 		if !ok {
 			return nil, fail.InconsistentError("failed to find a device corresponding to the attached volume '%s' on host '%s'", volumeName, k)
 		}
 
-		mnts, _ := hostInstance.(*Host).unsafeGetMounts(ctx)
+		mnts, _ := hostInstance.(*Host).unsafeGetMounts(ctx) // remote query
 		if mnts != nil {
 			path, ok := mnts.LocalMountsByDevice[device]
 			if !ok {

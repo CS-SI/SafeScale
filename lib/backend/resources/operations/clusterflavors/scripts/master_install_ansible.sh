@@ -32,7 +32,7 @@ install_ansible() {
 case $LINUX_KIND in
     ubuntu)
         export DEBIAN_FRONTEND=noninteractive
-        sfApt update
+        sfApt update --allow-insecure-repositories
         apt-add-repository --yes --update ppa:ansible/ansible
         fApt update
         sfApt install -y ansible
@@ -40,10 +40,10 @@ case $LINUX_KIND in
         ;;
     debian)
         export DEBIAN_FRONTEND=noninteractive
-        sfApt update
+        sfApt update --allow-insecure-repositories
         echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main" >> /etc/apt/sources.list
         sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367 -y
-        sfApt update
+        sfApt update --allow-insecure-repositories
         sfApt install -y ansible
         sfApt install -y git
         ;;

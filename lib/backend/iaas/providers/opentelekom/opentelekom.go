@@ -141,8 +141,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, fail.NewError("Structure validation failure: %v", err)
 	}
 
+	suffix := getSuffix(params)
+
 	providerName := "huaweicloud"
-	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectID)
+	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectID, suffix)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -219,6 +221,24 @@ next:
 	}
 
 	return wp, nil
+}
+
+func getSuffix(params map[string]interface{}) string {
+	suffix := ""
+	if osto, ok := params["objectstorage"].(map[string]interface{}); ok {
+		if val, ok := osto["Suffix"].(string); ok {
+			suffix = val
+			if suffix != "" {
+				return suffix
+			}
+		}
+	}
+	if meta, ok := params["metadata"].(map[string]interface{}); ok {
+		if val, ok := meta["Suffix"].(string); ok {
+			suffix = val
+		}
+	}
+	return suffix
 }
 
 // ListTemplates ... ; overloads stack.ListTemplates() to allow to filter templates to show

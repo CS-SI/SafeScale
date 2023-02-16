@@ -96,6 +96,18 @@ func dockerFeature() *FeatureFile {
 	return newFeatureFile(filename, name, true, specs)
 }
 
+// dockerFeature ...
+func dockerLegacyFeature() *FeatureFile {
+	name := "docker-legacy"
+	filename, specs, err := loadSpecFile(name)
+	err = debug.InjectPlannedError(err)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return newFeatureFile(filename, name, true, specs)
+}
+
 // dockerSwarmFeature ...
 func dockerSwarmFeature() *FeatureFile {
 	name := "docker-swarm"
@@ -256,6 +268,7 @@ func init() {
 	allEmbeddedFeatures = []*FeatureFile{
 		dockerFeature(),
 		dockerSwarmFeature(),
+		dockerLegacyFeature(),
 		ntpServerFeature(),
 		ntpClientFeature(),
 		ansibleFeature(),
@@ -263,28 +276,13 @@ func init() {
 		certificateAuthorityFeature(),
 		// postgresql4platformFeature(),
 		nVidiaDockerFeature(),
-		// mpichOsPkgFeature(),
-		// mpichBuildFeature(),
-		// ohpcSlurmMasterFeature(),
-		// ohpcSlurmNodeFeature(),
 		remoteDesktopFeature(),
 		postgres4gatewayFeature(),
 		edgeproxy4subnetFeature(),
 		// keycloak4platformFeature(),
 		kubernetesFeature(),
-		// apacheIgniteFeature(),
-		// elasticsearchFeature(),
-		// logstashFeature(),
-		// metricbeatFeature(),
-		// filebeatFeature(),
-		// kibanaFeature(),
 		helm2Feature(),
 		helm3Feature(),
-		// sparkmaster4platformFeature(),
-		// elassandraFeature(),
-		// consul4platformFeature(),
-		// monitoring4platformFeature(),
-		// geoserverFeature(),
 	}
 
 	for _, item := range allEmbeddedFeatures {

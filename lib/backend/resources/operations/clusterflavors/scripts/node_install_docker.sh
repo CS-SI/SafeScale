@@ -33,7 +33,7 @@ install_docker() {
   case $LINUX_KIND in
       debian|ubuntu)
           export DEBIAN_FRONTEND=noninteractive
-          sfRetry "sfApt update"
+          sfRetry "sfApt update --allow-insecure-repositories"
           sfRetry "dpkg --remove --force-remove-reinstreq docker docker-engine docker.io containerd runc"
           ;;
       centos|redhat)
@@ -54,21 +54,21 @@ install_docker() {
   case $LINUX_KIND in
       debian)
           export DEBIAN_FRONTEND=noninteractive
-          sfRetryEx 14m 4 "sfApt update" || sfFail 192 "error updating"
-          sfRetryEx 14m 4 "sfApt install -qqy apt-transport-https ca-certificates curl" || sfFail 193 "error installing apt tools (exit code $?)"
-          sfRetryEx 14m 4 "(apt-cache show gnupg2 && apt install -qqy gnupg2) || (apt-cache show gnupg && apt install -qqy gnupg)"
+          sfRetryEx 14m 4 "sfApt update --allow-insecure-repositories" || sfFail 192 "error updating"
+          sfRetryEx 14m 4 "sfApt install --allow-change-held-packages -qqy apt-transport-https ca-certificates" || sfFail 193 "error installing apt tools (exit code $?)"
+          sfRetryEx 14m 4 "(apt-cache show gnupg2 && apt install -qqy --allow-change-held-packages gnupg2) || (apt-cache show gnupg && apt install -qqy --allow-change-held-packages gnupg)"
           sfRetryEx 14m 4 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
           echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-          sfRetryEx 14m 4 "sfApt update" || sfFail 192 "error updating"
+          sfRetryEx 14m 4 "sfApt update --allow-insecure-repositories" || sfFail 192 "error updating"
           sfRetryEx 14m 4 "sfApt install -qqy docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
           ;;
       ubuntu)
           export DEBIAN_FRONTEND=noninteractive
-          sfRetryEx 14m 4 "sfApt update" || sfFail 192 "error updating"
-          sfRetryEx 14m 4 "sfApt install -qqy apt-transport-https ca-certificates curl" || sfFail 193 "error installing apt tools (exit code $?)"
+          sfRetryEx 14m 4 "sfApt update --allow-insecure-repositories" || sfFail 192 "error updating"
+          sfRetryEx 14m 4 "sfApt install -qqy --allow-change-held-packages apt-transport-https ca-certificates" || sfFail 193 "error installing apt tools (exit code $?)"
           sfRetryEx 14m 4 "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
           echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-          sfRetryEx 14m 4 "sfApt update" || sfFail 192 "error updating"
+          sfRetryEx 14m 4 "sfApt update --allow-insecure-repositories" || sfFail 192 "error updating"
           sfRetryEx 14m 4 "sfApt install -qqy docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
           ;;
       centos|redhat|rhel)
