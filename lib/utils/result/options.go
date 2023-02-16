@@ -31,7 +31,7 @@ func TagCompletedFromError[T any](err error) Option[T] {
 	}
 }
 
-// TagFrozen freezes the cointent of the holder, making update impossible
+// TagFrozen freezes the content of the holder, making update impossible
 func TagFrozen[T any]() Option[T] {
 	return func(r *holder[T]) fail.Error {
 		r.frozen = true

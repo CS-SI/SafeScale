@@ -17,23 +17,22 @@ func NewStepResult(output StepOutput, err error) (StepResult, fail.Error) {
 	return result.NewHolder[StepOutput](
 		result.WithPayload[StepOutput](output),
 		result.TagCompletedFromError[StepOutput](err),
-		result.TagSuccessFromCondition[StepOutput](output.Retcode == 0),
+		result.TagSuccessFromCondition[StepOutput](err == nil && output.Retcode == 0),
+		result.TagFrozen[StepOutput](),
 	)
 }
 
 // UnitResults ...
-type UnitResults = result.Group[StepResult]
+type UnitResults = result.Group[StepOutput, StepResult]
 
 // NewUnitResults ...
 func NewUnitResults() UnitResults {
-	out := result.NewGroup[StepResult]()
-	return any(out).(UnitResults)
+	return result.NewGroup[StepOutput, StepResult]()
 }
 
 // Results ...
-type Results = result.Group[UnitResults]
+type Results = result.Group[UnitResults, result.Holder[UnitResults]]
 
 func NewResults() Results {
-	out := result.NewGroup[UnitResults]()
-	return any(out).(Results)
+	return result.NewGroup[UnitResults, result.Holder[UnitResults]]()
 }

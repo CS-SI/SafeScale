@@ -48,6 +48,38 @@ func newHostTransaction(ctx context.Context, instance *Host) (*hostTransactionIm
 	return &hostTransactionImpl{trx}, nil
 }
 
+func inspectHostMetadata(ctx context.Context, ht hostTransaction, callback func(*abstract.HostCore, *serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.Inspect[*abstract.HostCore](ctx, ht, callback)
+}
+
+func inspectHostMetadataAbstract(ctx context.Context, ht hostTransaction, callback func(ahc *abstract.HostCore) fail.Error) fail.Error {
+	return metadata.InspectAbstract[*abstract.HostCore](ctx, ht, callback)
+}
+
+func inspectHostMetadataProperty[P clonable.Clonable](ctx context.Context, ht hostTransaction, property string, callback func(P) fail.Error) fail.Error {
+	return metadata.InspectProperty[*abstract.HostCore, P](ctx, ht, property, callback)
+}
+
+func inspectHostMetadataProperties(ctx context.Context, ht hostTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.InspectProperties[*abstract.HostCore](ctx, ht, callback)
+}
+
+func alterHostMetadata(ctx context.Context, ht hostTransaction, callback func(*abstract.HostCore, *serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.Alter[*abstract.HostCore](ctx, ht, callback)
+}
+
+func alterHostMetadataAbstract(ctx context.Context, ht hostTransaction, callback func(ahc *abstract.HostCore) fail.Error) fail.Error {
+	return metadata.AlterAbstract[*abstract.HostCore](ctx, ht, callback)
+}
+
+func alterHostMetadataProperty[P clonable.Clonable](ctx context.Context, ht hostTransaction, property string, callback func(P) fail.Error) fail.Error {
+	return metadata.AlterProperty[*abstract.HostCore, P](ctx, ht, property, callback)
+}
+
+func alterHostMetadataProperties(ctx context.Context, ht hostTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
+	return metadata.AlterProperties[*abstract.HostCore](ctx, ht, callback)
+}
+
 // IsNull ...
 func (hostTrx *hostTransactionImpl) IsNull() bool {
 	return hostTrx == nil || hostTrx.Transaction.IsNull()
@@ -744,7 +776,7 @@ func (hostTrx *hostTransactionImpl) RelaxedDeleteHost(ctx context.Context, hostS
 	// Do not remove a Host having shared folders that are currently remotely mounted
 	xerr = inspectHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) fail.Error {
 		innerXErr := props.Inspect(hostproperty.SharesV1, func(p clonable.Clonable) fail.Error {
-			sharesV1, innerErr := clonable.Cast[*propertiesv1.HostShares](p)
+			sharesV1, innerErr := lang.Cast[*propertiesv1.HostShares](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -774,7 +806,7 @@ func (hostTrx *hostTransactionImpl) RelaxedDeleteHost(ctx context.Context, hostS
 
 		// Do not Delete a Host with Bucket mounted
 		innerXErr = props.Inspect(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
+			hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -792,7 +824,7 @@ func (hostTrx *hostTransactionImpl) RelaxedDeleteHost(ctx context.Context, hostS
 
 		// Do not Delete a Host with Volumes attached
 		return props.Inspect(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
-			hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
+			hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -1281,7 +1313,7 @@ func (hostTrx *hostTransactionImpl) EnableSecurityGroup(ctx context.Context, sgT
 
 	return alterHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-			hsgV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
+			hsgV1, innerErr := lang.Cast[*propertiesv1.HostSecurityGroups](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -1328,36 +1360,98 @@ func (hostTrx *hostTransactionImpl) EnableSecurityGroup(ctx context.Context, sgT
 	})
 }
 
-// --------------------------------------------------
+// GetVolumes is the not goroutine-safe version of GetVolumes, without parameter validation, that does the real work
+func (hostTrx *hostTransactionImpl) GetVolumes(ctx context.Context) (*propertiesv1.HostVolumes, fail.Error) {
+	if valid.IsNull(hostTrx) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
 
-func inspectHostMetadata(ctx context.Context, ht hostTransaction, callback func(*abstract.HostCore, *serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.Inspect[*abstract.HostCore](ctx, ht, callback)
+	var hvV1 *propertiesv1.HostVolumes
+	xerr := inspectHostMetadataProperty(ctx, hostTrx, hostproperty.VolumesV1, func(p *propertiesv1.HostVolumes) fail.Error {
+		hvV1 = p
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return hvV1, nil
 }
 
-func inspectHostMetadataAbstract(ctx context.Context, ht hostTransaction, callback func(ahc *abstract.HostCore) fail.Error) fail.Error {
-	return metadata.InspectAbstract[*abstract.HostCore](ctx, ht, callback)
+// GetMounts returns the information about the mounts of the host
+func (hostTrx *hostTransactionImpl) GetMounts(ctx context.Context) (*propertiesv1.HostMounts, fail.Error) {
+	if valid.IsNull(hostTrx) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	var mounts *propertiesv1.HostMounts
+	xerr := inspectHostMetadataProperty(ctx, hostTrx, hostproperty.MountsV1, func(hostMountsV1 *propertiesv1.HostMounts) fail.Error {
+		var innerErr error
+		mounts, innerErr = clonable.CastedClone[*propertiesv1.HostMounts](hostMountsV1)
+		return fail.Wrap(innerErr)
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return mounts, nil
 }
 
-func inspectHostMetadataProperty[P clonable.Clonable](ctx context.Context, ht hostTransaction, property string, callback func(P) fail.Error) fail.Error {
-	return metadata.InspectProperty[*abstract.HostCore, P](ctx, ht, property, callback)
-}
+// GetDefaultSubnet returns the Networking instance corresponding to host default subnet
+func (hostTrx *hostTransactionImpl) GetDefaultSubnet(ctx context.Context) (_ *Subnet, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-func inspectHostMetadataProperties(ctx context.Context, ht hostTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.InspectProperties[*abstract.HostCore](ctx, ht, callback)
-}
+	if valid.IsNull(hostTrx) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
 
-func alterHostMetadata(ctx context.Context, ht hostTransaction, callback func(*abstract.HostCore, *serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.Alter[*abstract.HostCore](ctx, ht, callback)
-}
+	var subnetInstance *Subnet
+	xerr := inspectHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) (innerXErr fail.Error) {
+		if props.Lookup(hostproperty.NetworkV2) {
+			return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
+				networkV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
 
-func alterHostMetadataAbstract(ctx context.Context, ht hostTransaction, callback func(ahc *abstract.HostCore) fail.Error) fail.Error {
-	return metadata.AlterAbstract[*abstract.HostCore](ctx, ht, callback)
-}
+				var innerXErr fail.Error
+				subnetInstance, innerXErr = LoadSubnet(ctx, "", networkV2.DefaultSubnetID)
+				if innerXErr != nil {
+					return innerXErr
+				}
+				return nil
+			})
+		}
+		return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
+			hostNetworkV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
+			}
 
-func alterHostMetadataProperty[P clonable.Clonable](ctx context.Context, ht hostTransaction, property string, callback func(P) fail.Error) fail.Error {
-	return metadata.AlterProperty[*abstract.HostCore, P](ctx, ht, property, callback)
-}
+			var inErr fail.Error
+			subnetInstance, inErr = LoadSubnet(ctx, "", hostNetworkV2.DefaultSubnetID)
+			if inErr != nil {
+				return inErr
+			}
 
-func alterHostMetadataProperties(ctx context.Context, ht hostTransaction, callback func(*serialize.JSONProperties) fail.Error) fail.Error {
-	return metadata.AlterProperties[*abstract.HostCore](ctx, ht, callback)
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return subnetInstance, nil
 }

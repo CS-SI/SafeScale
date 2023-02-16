@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/eko/gocache/v2/store"
 	"github.com/farmergreg/rfsnotify"
 	"github.com/sirupsen/logrus"
@@ -117,7 +118,7 @@ func (ff *FeatureFile) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*FeatureFile](p)
+	src, err := lang.Cast[*FeatureFile](p)
 	if err != nil {
 		return err
 	}

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/gofrs/uuid"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
@@ -222,7 +223,7 @@ func (hse *HostEffectiveSizing) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*HostEffectiveSizing](p)
+	src, err := lang.Cast[*HostEffectiveSizing](p)
 	if err != nil {
 		return err
 	}
@@ -344,7 +345,7 @@ func (hc *HostCore) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*HostCore](p)
+	src, err := lang.Cast[*HostCore](p)
 	if err != nil {
 		return err
 	}
@@ -444,7 +445,7 @@ func (hn *HostNetworking) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*HostNetworking](p)
+	src, err := lang.Cast[*HostNetworking](p)
 	if err != nil {
 		return err
 	}
@@ -494,7 +495,7 @@ func (hd *HostDescription) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*HostDescription](p)
+	src, err := lang.Cast[*HostDescription](p)
 	if err != nil {
 		return err
 	}
@@ -620,7 +621,7 @@ func (hf *HostFull) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*HostFull](p)
+	src, err := lang.Cast[*HostFull](p)
 	if err != nil {
 		return err
 	}

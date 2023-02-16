@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // NetworkSubnets contains additional information describing the subnets in a network, in V1
@@ -63,7 +64,7 @@ func (nd *NetworkSubnets) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*NetworkSubnets](p)
+	src, err := lang.Cast[*NetworkSubnets](p)
 	if err != nil {
 		return err
 	}

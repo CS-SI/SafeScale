@@ -496,7 +496,7 @@ func (instance *Label) ToProtocol(ctx context.Context, withHosts bool) (_ *proto
 
 		return props.Inspect(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
 			var innerErr error
-			labelHostsV1, innerErr = clonable.Cast[*propertiesv1.LabelHosts](p)
+			labelHostsV1, innerErr = lang.Cast[*propertiesv1.LabelHosts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

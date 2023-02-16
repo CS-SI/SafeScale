@@ -27,6 +27,7 @@ import (
 	"time"
 
 	rscapi "github.com/CS-SI/SafeScale/v22/lib/backend/resources/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
@@ -102,7 +103,7 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) (_ []string, fer
 
 	var out []string
 	xerr = inspectClusterMetadataProperty(ctx, clusterTrx, clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-		featuresV1, innerErr := clonable.Cast[*propertiesv1.ClusterFeatures](p)
+		featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}
@@ -129,13 +130,13 @@ func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v da
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	trx, xerr := newClusterTransaction(ctx, instance)
+	clusterTrx, xerr := newClusterTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
 	}
-	defer trx.TerminateFromError(ctx, &ferr)
+	defer clusterTrx.TerminateFromError(ctx, &ferr)
 
-	identity, xerr := trxGetIdentity(ctx, trx)
+	identity, xerr := clusterTrx.getIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -177,7 +178,7 @@ func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v da
 	v["CIDR"] = networkCfg.CIDR
 
 	var cpV1 *propertiesv1.ClusterControlplane
-	xerr = inspectClusterMetadataProperty(ctx, trx, clusterproperty.ControlPlaneV1, func(controlPlaneV1 *propertiesv1.ClusterControlplane) fail.Error {
+	xerr = inspectClusterMetadataProperty(ctx, clusterTrx, clusterproperty.ControlPlaneV1, func(controlPlaneV1 *propertiesv1.ClusterControlplane) fail.Error {
 		cpV1 = controlPlaneV1
 		return nil
 	})
@@ -191,7 +192,7 @@ func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v da
 		v["ClusterControlplaneEndpointIP"] = cpV1.VirtualIP.PrivateIP
 	} else {
 		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
-		master, xerr := instance.trxFindAvailableMaster(ctx, trx)
+		master, xerr := instance.trxFindAvailableMaster(ctx, clusterTrx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -205,7 +206,7 @@ func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v da
 
 		v["ClusterControlplaneUsesVIP"] = false
 	}
-	v["ClusterMasters"], xerr = trxListMasters(ctx, trx)
+	v["ClusterMasters"], xerr = trxListMasters(ctx, clusterTrx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -223,13 +224,13 @@ func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v da
 	}
 	v["ClusterMasterIDs"] = list
 
-	v["ClusterMasterIPs"], xerr = instance.trxListMasterIPs(ctx, trx)
+	v["ClusterMasterIPs"], xerr = instance.trxListMasterIPs(ctx, clusterTrx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	v["ClusterNodes"], xerr = instance.trxListNodes(ctx, trx)
+	v["ClusterNodes"], xerr = instance.trxListNodes(ctx, clusterTrx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -247,7 +248,7 @@ func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v da
 	}
 	v["ClusterNodeIDs"] = list
 
-	v["ClusterNodeIPs"], xerr = instance.trxListNodeIPs(ctx, trx)
+	v["ClusterNodeIPs"], xerr = instance.trxListNodeIPs(ctx, clusterTrx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -530,7 +531,7 @@ func (instance *Cluster) ExecuteScript(inctx context.Context, tmplName string, v
 			finalVariables[k] = v
 		}
 
-		script, path, xerr := realizeTemplate("clusterflavors/scripts/"+tmplName, finalVariables, tmplName)
+		script, path, xerr := realizeTemplate("internal/clusterflavors/scripts/"+tmplName, finalVariables, tmplName)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{invalid, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)}
@@ -755,7 +756,7 @@ func (instance *Cluster) installNodeRequirements(inctx context.Context, clusterT
 		}
 
 		dnsServers = cfg.DNSServers
-		identity, xerr := trxGetIdentity(ctx, clusterTrx)
+		identity, xerr := clusterTrx.getIdentity(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -806,8 +807,8 @@ func (instance *Cluster) installNodeRequirements(inctx context.Context, clusterT
 	}
 }
 
-// trxInstallReverseProxy installs reverseproxy
-func (instance *Cluster) trxInstallReverseProxy(inctx context.Context, clusterTrx clusterTransaction, params data.Map[string, any]) (ferr fail.Error) {
+// installReverseProxy installs reverseproxy
+func (instance *Cluster) installReverseProxy(inctx context.Context, clusterTrx clusterTransaction, params data.Map[string, any]) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -820,7 +821,7 @@ func (instance *Cluster) trxInstallReverseProxy(inctx context.Context, clusterTr
 	go func() {
 		defer close(chRes)
 
-		identity, xerr := trxGetIdentity(ctx, clusterTrx)
+		identity, xerr := clusterTrx.getIdentity(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -908,8 +909,8 @@ func (instance *Cluster) trxInstallReverseProxy(inctx context.Context, clusterTr
 	}
 }
 
-// trxInstallRemoteDesktop installs feature remotedesktop on all masters of the Cluster
-func (instance *Cluster) trxInstallRemoteDesktop(inctx context.Context, clusterTrx clusterTransaction, params data.Map[string, any]) (ferr fail.Error) {
+// installRemoteDesktop installs feature remotedesktop on all masters of the Cluster
+func (instance *Cluster) installRemoteDesktop(inctx context.Context, clusterTrx clusterTransaction, params data.Map[string, any]) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -922,7 +923,7 @@ func (instance *Cluster) trxInstallRemoteDesktop(inctx context.Context, clusterT
 	go func() {
 		defer close(chRes)
 
-		identity, xerr := trxGetIdentity(ctx, clusterTrx)
+		identity, xerr := clusterTrx.getIdentity(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -1017,8 +1018,8 @@ func (instance *Cluster) trxInstallRemoteDesktop(inctx context.Context, clusterT
 	}
 }
 
-// trxInstallAnsible installs feature ansible on all masters of the Cluster
-func (instance *Cluster) trxInstallAnsible(inctx context.Context, clusterTrx clusterTransaction, params data.Map[string, any]) (ferr fail.Error) {
+// installAnsible installs feature ansible on all masters of the Cluster
+func (instance *Cluster) installAnsible(inctx context.Context, clusterTrx *clusterTransactionImpl, params data.Map[string, any]) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -1031,7 +1032,7 @@ func (instance *Cluster) trxInstallAnsible(inctx context.Context, clusterTrx clu
 	go func() {
 		defer close(chRes)
 
-		identity, xerr := trxGetIdentity(ctx, clusterTrx)
+		identity, xerr := clusterTrx.getIdentity(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -1126,8 +1127,8 @@ func (instance *Cluster) trxInstallAnsible(inctx context.Context, clusterTrx clu
 	}
 }
 
-// trxInstallDocker installs docker and docker-compose
-func (instance *Cluster) trxInstallDocker(inctx context.Context, clusterTrx clusterTransaction, host *Host, hostLabel string, params data.Map[string, any]) (ferr fail.Error) {
+// installDocker installs docker and docker-compose
+func (instance *Cluster) installDocker(inctx context.Context, clusterTrx clusterTransaction, host *Host, hostLabel string, params data.Map[string, any]) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -1186,7 +1187,7 @@ func (instance *Cluster) trxInstallDocker(inctx context.Context, clusterTrx clus
 					return
 				}
 
-				if !rk.IsSuccessful() {
+				if rk != nil && !rk.IsSuccessful() {
 					msg := rk.ErrorMessage()
 					if len(msg) == 0 {
 						logrus.WithContext(ctx).Warnf("This is a false warning for %s !!: %s", k, msg)

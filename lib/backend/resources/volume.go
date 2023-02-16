@@ -668,7 +668,7 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 		volumeName = av.Name
 
 		return props.Inspect(volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
-			volumeAttachedV1, innerErr := clonable.Cast[*propertiesv1.VolumeAttachments](p)
+			volumeAttachedV1, innerErr := lang.Cast[*propertiesv1.VolumeAttachments](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -712,13 +712,13 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 	// -- proceed some checks on target server --
 	xerr = inspectHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
-			hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
+			hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
 
 			return props.Inspect(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-				hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
+				hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -836,7 +836,7 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 	// -- updates target properties --
 	xerr = alterHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) fail.Error {
 		innerXErr := props.Alter(hostproperty.VolumesV1, func(p clonable.Clonable) (ferr fail.Error) {
-			hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
+			hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -900,7 +900,7 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 		}()
 
 		return props.Alter(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
+			hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -931,7 +931,7 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 			// VPL: rollback() on transaction will do the same job
 			// derr := host.Alter(cleanupContextFrom(ctx), func(_ clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			// 	innerXErr := props.Alter(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
-			// 		hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
+			// 		hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
 			// 		if innerErr != nil {
 			// 			return fail.Wrap(innerErr)
 			// 		}
@@ -946,7 +946,7 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 			// 		logrus.WithContext(cleanupContextFrom(ctx)).Warnf("Failed to set host '%s' metadata about volumes", volumeName)
 			// 	}
 			// 	return props.Alter(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			// 		hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
+			// 		hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
 			// 		if innerErr != nil {
 			// 			return fail.Wrap(innerErr)
 			// 		}
@@ -1113,7 +1113,7 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 		)
 
 		innerXErr := props.Inspect(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
-			hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
+			hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -1134,7 +1134,7 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 		// Obtain mounts information
 		notMounted := false
 		innerXErr = props.Inspect(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-			hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
+			hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -1174,7 +1174,7 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 		// Check if Volume (or a subdir in Volume) is shared
 		if !notMounted {
 			innerXErr = props.Inspect(hostproperty.SharesV1, func(p clonable.Clonable) fail.Error {
-				hostSharesV1, innerErr := clonable.Cast[*propertiesv1.HostShares](p)
+				hostSharesV1, innerErr := lang.Cast[*propertiesv1.HostShares](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -1220,7 +1220,7 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 
 		// ... then update host property propertiesv1.VolumesV1...
 		innerXErr = props.Alter(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
-			hostVolumesV1, innerErr := clonable.Cast[*propertiesv1.HostVolumes](p)
+			hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -1238,7 +1238,7 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 		// ... update host property propertiesv1.MountsV1 ...
 		if !notMounted {
 			innerXErr = props.Alter(hostproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-				hostMountsV1, innerErr := clonable.Cast[*propertiesv1.HostMounts](p)
+				hostMountsV1, innerErr := lang.Cast[*propertiesv1.HostMounts](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}

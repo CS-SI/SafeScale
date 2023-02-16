@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -313,7 +314,7 @@ func (instance *SecurityGroupRule) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := clonable.Cast[*SecurityGroupRule](p)
+	src, err := lang.Cast[*SecurityGroupRule](p)
 	if err != nil {
 		return err
 	}
@@ -533,7 +534,7 @@ func (instance *SecurityGroup) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := clonable.Cast[*SecurityGroup](p)
+	src, err := lang.Cast[*SecurityGroup](p)
 	if err != nil {
 		return err
 	}

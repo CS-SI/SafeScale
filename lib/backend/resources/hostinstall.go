@@ -449,7 +449,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 
 	v["HostIsGateway"] = isGateway
 
-	subnetInstance, xerr := instance.trxGetDefaultSubnet(ctx, hostTrx)
+	subnetInstance, xerr := hostTrx.GetDefaultSubnet(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

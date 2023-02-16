@@ -34,9 +34,10 @@ type Holder[T any] interface {
 	IsCompleted() bool
 	IsFrozen() bool
 	IsSuccessful() bool
+	Payload() (T, error)
 	TagCompletedFromError(error) error
 	TagSuccessFromCondition(bool) error
-	Payload() T
+	Update(opts ...Option[T]) error
 }
 
 // holder[T any] implements Holder interface
@@ -210,14 +211,14 @@ func (r *holder[T]) ErrorMessage() string {
 }
 
 // Payload returns the data carried by the Holder, if result is completed
-func (r *holder[T]) Payload() T {
-	empty := new(T)
+func (r *holder[T]) Payload() (T, error) {
 
 	if r.IsCompleted() {
 		r.mu.Lock()
 		defer r.mu.Unlock()
-		return r.payload
+		return r.payload, nil
 	}
 
-	return *empty
+	empty := new(T)
+	return *empty, nil
 }

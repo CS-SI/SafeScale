@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostSystem contains information about the operating system
@@ -61,7 +62,7 @@ func (hs *HostSystem) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*HostSystem](p)
+	src, err := lang.Cast[*HostSystem](p)
 	if err != nil {
 		return err
 	}

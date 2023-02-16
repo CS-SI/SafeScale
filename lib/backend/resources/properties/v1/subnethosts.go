@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // SubnetHosts contains information about hosts attached to the subnet
@@ -59,7 +60,7 @@ func (sh *SubnetHosts) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*SubnetHosts](p)
+	src, err := lang.Cast[*SubnetHosts](p)
 	if err != nil {
 		return err
 	}

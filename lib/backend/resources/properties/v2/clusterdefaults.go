@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterDefaults ...
@@ -64,12 +65,12 @@ func (cd *ClusterDefaults) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	cloned, err := clonable.CastedClone[*ClusterDefaults](p)
+	casted, err := lang.Cast[*ClusterDefaults](p)
 	if err != nil {
 		return err
 	}
 
-	*cd = *cloned
+	*cd = *casted
 	return nil
 }
 

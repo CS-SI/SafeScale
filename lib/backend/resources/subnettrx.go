@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
@@ -246,7 +247,7 @@ func (subnetTrx *subnetTransactionImpl) CreateSecurityGroups(inctx context.Conte
 
 				return props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
 					var innerErr error
-					subnetHosts, innerErr = clonable.Cast[*propertiesv1.SubnetHosts](p)
+					subnetHosts, innerErr = lang.Cast[*propertiesv1.SubnetHosts](p)
 					return fail.Wrap(innerErr)
 				})
 			})

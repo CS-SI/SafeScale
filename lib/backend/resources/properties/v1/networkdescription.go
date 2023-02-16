@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // NetworkDescription contains additional information describing the network, in V1
@@ -63,7 +64,7 @@ func (nd *NetworkDescription) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	casted, err := clonable.Cast[*NetworkDescription](p)
+	casted, err := lang.Cast[*NetworkDescription](p)
 	if err != nil {
 		return err
 	}

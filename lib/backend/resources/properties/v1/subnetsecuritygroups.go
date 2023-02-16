@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // SubnetSecurityGroups contains a list of security groups bound to the network, applied to each host created in it
@@ -63,7 +64,7 @@ func (ssg *SubnetSecurityGroups) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*SubnetSecurityGroups](p)
+	src, err := lang.Cast[*SubnetSecurityGroups](p)
 	if err != nil {
 		return err
 	}

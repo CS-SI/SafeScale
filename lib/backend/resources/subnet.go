@@ -937,7 +937,7 @@ func (instance *Subnet) AttachHost(ctx context.Context, host *Host) (ferr fail.E
 		}
 
 		return props.Alter(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			subnetHostsV1, innerErr := clonable.Cast[*propertiesv1.SubnetHosts](p)
+			subnetHostsV1, innerErr := lang.Cast[*propertiesv1.SubnetHosts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -1185,7 +1185,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 				// Check if hosts are still attached to Subnet according to metadata
 				var errorMsg string
 				return props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-					shV1, innerErr := clonable.Cast[*propertiesv1.SubnetHosts](p)
+					shV1, innerErr := lang.Cast[*propertiesv1.SubnetHosts](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -1256,7 +1256,7 @@ func (instance *Subnet) Delete(inctx context.Context) fail.Error {
 
 				// Delete security groups associated to Subnet by users (do not include SG created with Subnet, they will be deleted later)
 				innerXErr = props.Inspect(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-					ssgV1, innerErr := clonable.Cast[*propertiesv1.SubnetSecurityGroups](p)
+					ssgV1, innerErr := lang.Cast[*propertiesv1.SubnetSecurityGroups](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -1748,7 +1748,7 @@ func (instance *Subnet) BindSecurityGroup(ctx context.Context, sgInstance *Secur
 		var subnetHosts *propertiesv1.SubnetHosts
 		innerXErr := props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
 			var innerErr error
-			subnetHosts, innerErr = clonable.Cast[*propertiesv1.SubnetHosts](p)
+			subnetHosts, innerErr = lang.Cast[*propertiesv1.SubnetHosts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -1760,7 +1760,7 @@ func (instance *Subnet) BindSecurityGroup(ctx context.Context, sgInstance *Secur
 		}
 
 		return props.Alter(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) (innerFErr fail.Error) {
-			nsgV1, innerErr := clonable.Cast[*propertiesv1.SubnetSecurityGroups](p)
+			nsgV1, innerErr := lang.Cast[*propertiesv1.SubnetSecurityGroups](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -1941,7 +1941,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance *Sec
 		var subnetHosts *propertiesv1.SubnetHosts
 		innerXErr := props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
 			var innerErr error
-			subnetHosts, innerErr = clonable.Cast[*propertiesv1.SubnetHosts](p)
+			subnetHosts, innerErr = lang.Cast[*propertiesv1.SubnetHosts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -1953,7 +1953,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance *Sec
 		}
 
 		return props.Inspect(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-			nsgV1, innerErr := clonable.Cast[*propertiesv1.SubnetSecurityGroups](p)
+			nsgV1, innerErr := lang.Cast[*propertiesv1.SubnetSecurityGroups](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -2041,7 +2041,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance *Se
 		var subnetHosts *propertiesv1.SubnetHosts
 		innerXErr := props.Inspect(subnetproperty.HostsV1, func(p clonable.Clonable) fail.Error {
 			var innerErr error
-			subnetHosts, innerErr = clonable.Cast[*propertiesv1.SubnetHosts](p)
+			subnetHosts, innerErr = lang.Cast[*propertiesv1.SubnetHosts](p)
 			return fail.Wrap(innerErr)
 		})
 		if innerXErr != nil {
@@ -2049,7 +2049,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sgInstance *Se
 		}
 
 		return props.Inspect(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-			nsgV1, innerErr := clonable.Cast[*propertiesv1.SubnetSecurityGroups](p)
+			nsgV1, innerErr := lang.Cast[*propertiesv1.SubnetSecurityGroups](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -2405,7 +2405,7 @@ func (instance *Subnet) buildSubnet(inctx context.Context, req abstract.SubnetRe
 
 				// Creates the bind between the Subnet default security group and the Subnet
 				return props.Alter(subnetproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-					ssgV1, innerErr := clonable.Cast[*propertiesv1.SubnetSecurityGroups](p)
+					ssgV1, innerErr := lang.Cast[*propertiesv1.SubnetSecurityGroups](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -2577,14 +2577,11 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 		return xerr
 	}
 
-	type result struct {
-		rErr fail.Error
-	}
-	chRes := make(chan result)
+	chRes := make(chan fail.Error)
 	go func() {
 		defer close(chRes)
 
-		gres, _ := func() (_ result, ferr fail.Error) {
+		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
 			svc := myjob.Service()
@@ -2596,8 +2593,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 			template, xerr := svc.FindTemplateBySizing(ctx, *gwSizing)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := result{fail.Wrap(xerr, "failed to find appropriate template")}
-				return ar, ar.rErr
+				return fail.Wrap(xerr, "failed to find appropriate template")
 			}
 
 			// define image...
@@ -2608,8 +2604,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 					cfg, xerr := svc.ConfigurationOptions()
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
-						ar := result{xerr}
-						return ar, ar.rErr
+						return xerr
 					}
 
 					imageQuery = cfg.DefaultImage
@@ -2626,9 +2621,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 						imgs, xerr := svc.ListImages(ctx, true)
 						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
-							xerr := fail.Wrap(xerr, "failure listing images")
-							ar := result{xerr}
-							return ar, ar.rErr
+							return fail.Wrap(xerr, "failure listing images")
 						}
 
 						img = nil
@@ -2640,15 +2633,11 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 							}
 						}
 						if img == nil {
-							xerr := fail.Wrap(xerr, "failed to find image with ID %s", imageQuery)
-							ar := result{xerr}
-							return ar, ar.rErr
+							return fail.Wrap(xerr, "failed to find image with ID %s", imageQuery)
 						}
 
 					default:
-						xerr := fail.Wrap(xerr, "failed to find image '%s'", imageQuery)
-						ar := result{xerr}
-						return ar, ar.rErr
+						return fail.Wrap(xerr, "failed to find image '%s'", imageQuery)
 					}
 				}
 
@@ -2673,9 +2662,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 			keepalivedPassword, err := utils.GeneratePassword(16)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				err := fail.Wrap(err)
-				ar := result{err}
-				return ar, ar.rErr
+				return fail.Wrap(err)
 			}
 
 			var abstractSubnet *abstract.Subnet
@@ -2692,8 +2679,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 				return nil
 			})
 			if xerr != nil {
-				ar := result{xerr}
-				return ar, ar.rErr
+				return xerr
 			}
 
 			gwRequest := abstract.HostRequest{
@@ -2730,6 +2716,12 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 			var castedExtra map[string]string
 			if extra == nil {
 				castedExtra = map[string]string{}
+			} else {
+				var err error
+				castedExtra, err = lang.Cast[map[string]string](extra)
+				if err != nil {
+					return fail.Wrap(err)
+				}
 			}
 			castedExtra["gateway"] = "true"
 
@@ -2796,8 +2788,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 			xerr = fail.Wrap(egGwCreation.Wait())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := result{xerr}
-				return ar, ar.rErr
+				return xerr
 			}
 
 			var (
@@ -2817,26 +2808,22 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 			{
 				primaryGateway, err = lang.Cast[*Host](primaryMap["host"])
 				if err != nil {
-					ar := result{fail.Wrap(err)}
-					return ar, ar.rErr
+					return xerr
 				}
 
 				primaryGatewaySSHConfig, xerr := primaryGateway.GetSSHConfig(ctx)
 				if xerr != nil {
-					ar := result{xerr}
-					return ar, ar.rErr
+					return xerr
 				}
 
 				primaryGatewaySSH, xerr := ssh.NewConnector(primaryGatewaySSHConfig)
 				if xerr != nil {
-					ar := result{xerr}
-					return ar, ar.rErr
+					return xerr
 				}
 
 				primaryGatewayTrx, xerr := newHostTransaction(ctx, primaryGateway)
 				if xerr != nil {
-					ar := result{xerr}
-					return ar, ar.rErr
+					return xerr
 				}
 				defer primaryGatewayTrx.TerminateFromError(ctx, &ferr)
 
@@ -2873,8 +2860,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 
 				primaryUserdata, err = lang.Cast[*userdata.Content](primaryMap["userdata"])
 				if err != nil {
-					ar := result{fail.Wrap(err)}
-					return ar, ar.rErr
+					return xerr
 				}
 				primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
 
@@ -2886,8 +2872,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 					{
 						st, xerr := svc.ProviderName()
 						if xerr != nil {
-							ar := result{xerr}
-							return ar, ar.rErr
+							return xerr
 						}
 
 						if st != "ovh" {
@@ -2902,8 +2887,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 					if !safe {
 						xerr = svc.ChangeSecurityGroupSecurity(ctx, false, true, req.NetworkID, "")
 						if xerr != nil {
-							ar := result{xerr}
-							return ar, ar.rErr
+							return xerr
 						}
 					}
 
@@ -2918,15 +2902,13 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 					xerr = subnetTrx.BindInternalSecurityGroupToGateway(ctx, primaryGatewayTrx)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
-						ar := result{xerr}
-						return ar, ar.rErr
+						return xerr
 					}
 
 					if !safe {
 						xerr = svc.ChangeSecurityGroupSecurity(ctx, true, false, req.NetworkID, "")
 						if xerr != nil {
-							ar := result{xerr}
-							return ar, ar.rErr
+							return xerr
 						}
 					}
 				}
@@ -2941,8 +2923,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 					{
 						st, xerr := svc.ProviderName()
 						if xerr != nil {
-							ar := result{xerr}
-							return ar, ar.rErr
+							return xerr
 						}
 						if st != "ovh" {
 							safe = true
@@ -2956,27 +2937,22 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 					var ok bool
 					secondaryGateway, ok = secondaryMap["host"].(*Host)
 					if !ok {
-						xerr := fail.InconsistentError("localresult[host] should be a *Host")
-						ar := result{xerr}
-						return ar, ar.rErr
+						return fail.InconsistentError("localresult[host] should be a *Host")
 					}
 
 					secondaryGatewaySSHConfig, xerr := secondaryGateway.GetSSHConfig(ctx)
 					if xerr != nil {
-						ar := result{xerr}
-						return ar, ar.rErr
+						return xerr
 					}
 
 					secondaryGatewaySSH, xerr := ssh.NewConnector(secondaryGatewaySSHConfig)
 					if xerr != nil {
-						ar := result{xerr}
-						return ar, ar.rErr
+						return xerr
 					}
 
 					secondaryGatewayTrx, xerr := newHostTransaction(ctx, secondaryGateway)
 					if xerr != nil {
-						ar := result{xerr}
-						return ar, ar.rErr
+						return xerr
 					}
 					defer secondaryGatewayTrx.TerminateFromError(ctx, &ferr)
 
@@ -3007,9 +2983,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 
 					secondaryUserdata, ok = secondaryMap["userdata"].(*userdata.Content)
 					if !ok {
-						xerr := fail.InvalidParameterError("localresult[userdata] should be a *userdate.Content")
-						ar := result{xerr}
-						return ar, ar.rErr
+						return fail.InvalidParameterError("localresult[userdata] should be a *userdate.Content")
 					}
 					secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
 
@@ -3024,23 +2998,20 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 					if !safe {
 						xerr = svc.ChangeSecurityGroupSecurity(ctx, false, true, req.NetworkID, "")
 						if xerr != nil {
-							ar := result{xerr}
-							return ar, ar.rErr
+							return xerr
 						}
 					}
 
 					xerr = subnetTrx.BindInternalSecurityGroupToGateway(ctx, secondaryGatewayTrx)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
-						ar := result{xerr}
-						return ar, ar.rErr
+						return xerr
 					}
 
 					if !safe {
 						xerr = svc.ChangeSecurityGroupSecurity(ctx, true, false, req.NetworkID, "")
 						if xerr != nil {
-							ar := result{xerr}
-							return ar, ar.rErr
+							return xerr
 						}
 					}
 				}
@@ -3097,8 +3068,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := result{xerr}
-				return ar, ar.rErr
+				return xerr
 			}
 
 			// As hosts are marked as gateways, the configuration stopped on phase 2 'netsec', the remaining 3 phases have to be run explicitly
@@ -3108,8 +3078,7 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				ar := result{xerr}
-				return ar, ar.rErr
+				return xerr
 			}
 
 			egFinalizer := new(errgroup.Group)
@@ -3128,20 +3097,17 @@ func (instance *Subnet) createGateways(inctx context.Context, subnetTrx subnetTr
 			xerr = fail.Wrap(egFinalizer.Wait())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				xerr := fail.Wrap(xerr, "error finalizing gateway configuration")
-				ar := result{xerr}
-				return ar, ar.rErr
+				return fail.Wrap(xerr, "error finalizing gateway configuration")
 			}
 
-			ar := result{nil}
-			return ar, ar.rErr
+			return nil
 		}()
-		chRes <- gres
+		chRes <- gerr
 	}() // nolint
 
 	select {
 	case res := <-chRes:
-		return res.rErr
+		return res
 	case <-ctx.Done():
 		<-chRes // wait for cleanup
 		return fail.Wrap(ctx.Err())

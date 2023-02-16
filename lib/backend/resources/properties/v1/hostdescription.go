@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostDescription contains description information for the host
@@ -67,7 +68,7 @@ func (hd *HostDescription) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	casted, err := clonable.Cast[*HostDescription](p)
+	casted, err := lang.Cast[*HostDescription](p)
 	if err != nil {
 		return err
 	}

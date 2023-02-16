@@ -1083,7 +1083,7 @@ func (instance *SecurityGroup) BindToSubnet(ctx context.Context, subnetInstance 
 		}
 
 		return props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-			sgsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
+			sgsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupSubnets](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

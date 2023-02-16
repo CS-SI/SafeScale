@@ -665,7 +665,7 @@ func (instance *Bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 
 	// -- update metadata of Bucket
 	xerr = alterBucketMetadataProperty(ctx, bucketTrx, bucketproperty.MountsV1, func(p clonable.Clonable) fail.Error {
-		mountsV1, innerErr := clonable.Cast[*propertiesv1.BucketMounts](p)
+		mountsV1, innerErr := lang.Cast[*propertiesv1.BucketMounts](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}

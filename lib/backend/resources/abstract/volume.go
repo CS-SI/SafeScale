@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // VolumeRequest represents a volume request
@@ -96,7 +97,7 @@ func (v *Volume) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*Volume](p)
+	src, err := lang.Cast[*Volume](p)
 	if err != nil {
 		return err
 	}

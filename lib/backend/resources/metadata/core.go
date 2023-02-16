@@ -1354,6 +1354,7 @@ func (instance *Core[T]) serialize(inctx context.Context) ([]byte, fail.Error) {
 	chRes := make(chan result.Holder[[]byte])
 	go func() {
 		defer close(chRes)
+
 		gtr, gerr := func() (_ []byte, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
@@ -1400,13 +1401,23 @@ func (instance *Core[T]) serialize(inctx context.Context) ([]byte, fail.Error) {
 
 			return r, nil
 		}()
-		res, _ := result.NewHolder[[]byte](result.WithPayload[[]byte](gtr), result.TagSuccessFromCondition[[]byte](gerr == nil), result.TagCompletedFromError[[]byte](gerr))
+
+		res, _ := result.NewHolder[[]byte](
+			result.WithPayload[[]byte](gtr),
+			result.TagSuccessFromCondition[[]byte](gerr == nil),
+			result.TagCompletedFromError[[]byte](gerr),
+		)
 		chRes <- res
 	}()
 
 	select {
 	case res := <-chRes:
-		return res.Payload(), fail.Wrap(res.Error())
+		p, err := res.Payload()
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
+
+		return p, fail.Wrap(res.Error())
 	case <-ctx.Done():
 		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():

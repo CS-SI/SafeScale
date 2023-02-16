@@ -23,6 +23,7 @@ import (
 	rscapi "github.com/CS-SI/SafeScale/v22/lib/backend/resources/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/result"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/installaction"
@@ -53,13 +54,20 @@ func (i *noneInstaller) Check(_ context.Context, f *Feature, t Targetable, v dat
 		return nil, xerr
 	}
 
-	unitResult := rscapi.NewUnitResults()
-	xerr = unitResult.Add("none", stepResult)
+	unitResults := rscapi.NewUnitResults()
+	xerr = unitResults.Add("none", stepResult)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = out.Add(t.GetName(), unitResult)
+	item, err := result.NewHolder[rscapi.UnitResults](result.WithPayload[rscapi.UnitResults](unitResults))
+	if err != nil {
+		return nil, fail.Wrap(err)
+	}
+
+	_ = item.TagCompletedFromError(nil)
+	_ = item.TagSuccessFromCondition(false)
+	xerr = out.Add(t.GetName(), item)
 	if xerr != nil {
 		return nil, xerr
 	}

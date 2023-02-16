@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterDefaults contains default information used by the cluster after initial creation
@@ -64,7 +65,7 @@ func (d *ClusterDefaults) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*ClusterDefaults](p)
+	src, err := lang.Cast[*ClusterDefaults](p)
 	if err != nil {
 		return err
 	}

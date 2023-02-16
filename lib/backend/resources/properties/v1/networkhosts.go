@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // NetworkHosts contains information about hosts connected to the network
@@ -66,7 +67,7 @@ func (nh *NetworkHosts) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*NetworkHosts](p)
+	src, err := lang.Cast[*NetworkHosts](p)
 	if err != nil {
 		return err
 	}

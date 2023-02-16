@@ -267,7 +267,7 @@ func TestMetadataCore_Inspect(t *testing.T) {
 		xerr = mc.Inspect(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
 
-			an, err := clonable.Cast[*abstract.Network](p)
+			an, err := lang.Cast[*abstract.Network](p)
 			require.Nil(t, err)
 			require.EqualValues(t, skip(an.GetID()), "Network_ID")
 			require.EqualValues(t, an.GetName(), "Network Name")
@@ -315,7 +315,7 @@ func TestMetadataCore_Review(t *testing.T) {
 		xerr = mc.Review(ctx, func(p clonable.Clonable, props *serialize.JSONProperties) fail.Error {
 			require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
 
-			an, err := clonable.Cast[*abstract.Network](p)
+			an, err := lang.Cast[*abstract.Network](p)
 			require.Nil(t, err)
 			require.EqualValues(t, skip(an.GetID()), "Network_ID")
 			require.EqualValues(t, an.GetName(), "Network Name")
@@ -365,7 +365,7 @@ func TestMetadataCore_Alter(t *testing.T) {
 
 			require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
 
-			n, err := clonable.Cast[*abstract.Network](p)
+			n, err := lang.Cast[*abstract.Network](p)
 			if err != nil {
 				t.Error(err.Error())
 				t.Fail()
@@ -380,7 +380,7 @@ func TestMetadataCore_Alter(t *testing.T) {
 
 			require.EqualValues(t, reflect.TypeOf(clonable).String(), "*abstract.Network")
 
-			n, err := clonable.Cast[*abstract.Network](p)
+			n, err := lang.Cast[*abstract.Network](p)
 			if err != nil {
 				t.Error(err.Error())
 				t.Fail()

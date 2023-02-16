@@ -635,7 +635,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 				abstractNetwork = an
 
 				return props.Inspect(networkproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-					subnetsV1, innerErr := clonable.Cast[*propertiesv1.NetworkSubnets](p)
+					subnetsV1, innerErr := lang.Cast[*propertiesv1.NetworkSubnets](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -871,7 +871,7 @@ func (instance *Network) ToProtocol(ctx context.Context) (out *protocol.Network,
 		}
 
 		return props.Inspect(networkproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-			nsV1, innerErr := clonable.Cast[*propertiesv1.NetworkSubnets](p)
+			nsV1, innerErr := lang.Cast[*propertiesv1.NetworkSubnets](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

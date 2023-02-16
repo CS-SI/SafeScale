@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // VolumeDescription contains additional information describing the volume, in V1
@@ -63,7 +64,7 @@ func (vd *VolumeDescription) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	cloned, err := clonable.Cast[*VolumeDescription](p)
+	cloned, err := lang.Cast[*VolumeDescription](p)
 	if err != nil {
 		return err
 	}
@@ -111,7 +112,7 @@ func (va *VolumeAttachments) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*VolumeAttachments](p)
+	src, err := lang.Cast[*VolumeAttachments](p)
 	if err != nil {
 		return err
 	}

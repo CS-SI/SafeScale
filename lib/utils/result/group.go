@@ -19,42 +19,47 @@ package result
 import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 //go:generate minimock -i github.com/CS-SI/SafeScale/v22/lib/utils/data/result.Group -o mocks/mock_group.go
 
 // Group ...
-type Group[T any] interface {
-	Holder[T]
-
-	Add(string, T) fail.Error
+type Group[T any, HT Holder[T]] interface {
+	Add(string, HT) fail.Error
+	Error() error
+	ErrorMessage() string
+	IsCompleted() bool
+	IsFrozen() bool
+	IsSuccessful() bool
 	Keys() ([]string, fail.Error)
-	PayloadOf(key string) (T, fail.Error)
+	Payload() (data.Map[string, HT], fail.Error)
+	PayloadOf(key string) (HT, fail.Error)
 	UncompletedKeys() ([]string, fail.Error)
 }
 
 // Group contains the errors of the step for each host target
-type group[T any] struct {
-	data.Map[string, Holder[T]]
+type group[T any, HT Holder[T]] struct {
+	data.Map[string, HT]
 }
 
 // NewGroup returns a new instance of group
-func NewGroup[T any]() *group[T] {
-	return &group[T]{
-		Map: data.NewMap[string, Holder[T]](),
+func NewGroup[T any, HT Holder[T]]() *group[T, HT] {
+	return &group[T, HT]{
+		Map: data.NewMap[string, HT](),
 	}
 }
 
 // Add adds a new entry with key; will fail if key is already used
-func (rg *group[T]) Add(key string, r Holder[T]) fail.Error {
+func (rg *group[T, HT]) Add(key string, r HT) fail.Error {
 	if valid.IsNull(rg) {
 		return fail.InvalidInstanceError()
 	}
 
 	_, ok := rg.Map[key]
 	if ok {
-		return fail.DuplicateError("rthere is already a value associated with key '%s'", key)
+		return fail.DuplicateError("there is already a value associated with key '%s'", key)
 	}
 
 	rg.Map[key] = r
@@ -62,7 +67,7 @@ func (rg *group[T]) Add(key string, r Holder[T]) fail.Error {
 }
 
 // Replace works as Add, except it will replace the key value if it already exists
-func (rg *group[T]) Replace(key string, r Holder[T]) fail.Error {
+func (rg *group[T, HT]) Replace(key string, r HT) fail.Error {
 	if valid.IsNull(rg) {
 		return fail.InvalidInstanceError()
 	}
@@ -72,7 +77,7 @@ func (rg *group[T]) Replace(key string, r Holder[T]) fail.Error {
 }
 
 // ErrorMessage returns a string containing all the errors registered
-func (rg *group[T]) ErrorMessage() string {
+func (rg *group[T, HT]) ErrorMessage() string {
 	if valid.IsNull(rg) {
 		return ""
 	}
@@ -90,23 +95,49 @@ func (rg *group[T]) ErrorMessage() string {
 	return output
 }
 
+// Error returns a fail.ErrorList contains all the errors of the members of the group
+func (rg *group[T, HT]) Error() error {
+	var errs []error
+	for _, v := range rg.Map {
+		val := v.Error()
+		if val != nil {
+			errs = append(errs, val)
+		}
+	}
+	if len(errs) > 0 {
+		return fail.NewErrorList(errs)
+	}
+
+	return nil
+}
+
+// Keys ...
+func (rg *group[T, HT]) Keys() ([]string, fail.Error) {
+	if valid.IsNull(rg) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	return rg.Map.Keys(), nil
+}
+
 // UncompletedKeys returns an array of all keys that are marked as uncompleted
-func (rg *group[T]) UncompletedKeys() ([]string, fail.Error) {
+func (rg *group[T, HT]) UncompletedKeys() ([]string, fail.Error) {
 	if valid.IsNull(rg) {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	var output []string
 	for k, v := range rg.Map {
-		if !v.IsCompleted() {
+		casted, _ := lang.Cast[Holder[T]](v)
+		if !casted.IsCompleted() {
 			output = append(output, k)
 		}
 	}
 	return output, nil
 }
 
-// Successful tells if all the group are successful
-func (rg *group[T]) Successful() bool {
+// IsSuccessful tells if all the group are successful
+func (rg *group[T, HT]) IsSuccessful() bool {
 	if valid.IsNull(rg) {
 		return false
 	}
@@ -122,8 +153,8 @@ func (rg *group[T]) Successful() bool {
 	return true
 }
 
-// Completed tells if all the group are completed
-func (rg *group[T]) Completed() bool {
+// IsCompleted tells if all the group are completed
+func (rg *group[T, HT]) IsCompleted() bool {
 	if valid.IsNull(rg) {
 		return false
 	}
@@ -140,13 +171,14 @@ func (rg *group[T]) Completed() bool {
 	return true
 }
 
-// PayloadOf returns the Holder[T] corresponding to the key
-func (rg *group[T]) PayloadOf(key string) (Holder[T], fail.Error) {
+// PayloadOf returns the T corresponding to the key
+func (rg *group[T, HT]) PayloadOf(key string) (HT, fail.Error) {
+	var empty HT
 	if valid.IsNull(rg) {
-		return nil, fail.InvalidInstanceError()
+		return empty, fail.InvalidInstanceError()
 	}
 	if key == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
+		return empty, fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
 	item, ok := rg.Map[key]
@@ -154,16 +186,21 @@ func (rg *group[T]) PayloadOf(key string) (Holder[T], fail.Error) {
 		return item, nil
 	}
 
-	return nil, fail.NotFoundError("failed to find a holder for key '%s'", key)
+	return empty, fail.NotFoundError("failed to find a holder for key '%s'", key)
 }
 
 // Payload can not be used with Group, but need to be implemented to satisfy Holder[T] interface
-func (rg *group[T]) Payload(_ string) (Holder[T], fail.Error) {
-	return nil, fail.InvalidRequestError("cannot use Payload() with result.Group")
+func (rg *group[T, HT]) Payload() (data.Map[string, HT], fail.Error) {
+	if valid.IsNull(rg) {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	clone := rg.Map.Clone()
+	return clone, nil
 }
 
 // ErrorMessageOfKey ...
-func (rg *group[T]) ErrorMessageOfKey(key string) string {
+func (rg *group[T, HT]) ErrorMessageOfKey(key string) string {
 	if valid.IsNull(rg) {
 		return ""
 	}
@@ -172,8 +209,29 @@ func (rg *group[T]) ErrorMessageOfKey(key string) string {
 	}
 
 	if item, ok := rg.Map[key]; ok {
-		return item.ErrorMessage()
+		casted, _ := lang.Cast[Holder[T]](item)
+		return casted.ErrorMessage()
 	}
 
 	return ""
+}
+
+// TagCompletedFromError can not be used with Group, but need to be implemented to satisfy Holder[T] interface
+func (rg *group[T, HT]) TagCompletedFromError(error) error {
+	return fail.InvalidRequestError("cannot use TagCompletedFromError() with result.Group")
+}
+
+// TagSuccessFromCondition can not be used with Group, but need to be implemented to satisfy Holder[T] interface
+func (rg *group[T, HT]) TagSuccessFromCondition(bool) error {
+	return fail.InvalidRequestError("cannot use TagSuccessFromCondition() with result.Group")
+}
+
+// IsFrozen can not be used with Group, but need to be implemented to satisfy Holder[T] interface
+func (rg *group[T, HT]) IsFrozen() bool {
+	return false
+}
+
+// Update can not be used with Group, but need to be implemented to satisfy Holder[T] interface
+func (rg *group[T, HT]) Update(opts ...Option[T]) error {
+	return fail.InvalidRequestError("cannot use TagSuccessFromCondition() with result.Group")
 }

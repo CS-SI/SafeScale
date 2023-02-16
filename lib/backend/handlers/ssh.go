@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
@@ -168,7 +169,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 			sshConfig.PrivateKey = ahc.PrivateKey
 			sshConfig.Port = int(ahc.SSHPort)
 			return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-				hnV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
+				hnV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}

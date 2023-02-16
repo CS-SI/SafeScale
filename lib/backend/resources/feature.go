@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/result"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -171,7 +172,7 @@ func (instance *Feature) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := clonable.Cast[*Feature](p)
+	src, err := lang.Cast[*Feature](p)
 	if err != nil {
 		return err
 	}
@@ -346,7 +347,7 @@ func (instance *Feature) Check(ctx context.Context, target Targetable, v data.Ma
 			return nil, xerr
 		}
 		if found {
-			stepResult, xerr := rscapi.NewStepResult(rscapi.StepOutput{}, nil)
+			stepResult, xerr := rscapi.NewStepResult(rscapi.StepOutput{Retcode: 0}, nil)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -354,7 +355,15 @@ func (instance *Feature) Check(ctx context.Context, target Targetable, v data.Ma
 			unitResults := rscapi.NewUnitResults()
 			_ = unitResults.Add(targetName, stepResult)
 			outcomes := rscapi.NewResults()
-			_ = outcomes.Add(featureName, unitResults)
+			item, err := result.NewHolder[rscapi.UnitResults](result.WithPayload(unitResults))
+			if err != nil {
+				return outcomes, fail.Wrap(err)
+			}
+
+			_ = item.TagSuccessFromCondition(true)
+			_ = item.TagCompletedFromError(nil)
+			_ = item.TagFrozen()
+			_ = outcomes.Add(featureName, item)
 			return outcomes, nil
 		}
 	}
@@ -527,7 +536,7 @@ func (instance *Feature) Add(ctx context.Context, target Targetable, v data.Map[
 		return nil, xerr
 	}
 
-	s, xerr := options.Value[rscapi.FeatureSettings](o, OptionFeatureSettings)
+	s, xerr := options.ValueOrDefault[rscapi.FeatureSettings](o, OptionFeatureSettings, rscapi.FeatureSettings{})
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -765,13 +774,18 @@ func mapSuccessfulHostsInResults(results rscapi.Results) (map[string]struct{}, f
 			return nil, xerr
 		}
 
-		subkeys, xerr := r.Keys()
+		payload, err := r.Payload()
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
+
+		subkeys, xerr := payload.Keys()
 		if xerr != nil {
 			return nil, xerr
 		}
 
 		for _, l := range subkeys {
-			s, xerr := r.PayloadOf(l)
+			s, xerr := payload.PayloadOf(l)
 			if xerr != nil {
 				return nil, xerr
 			}

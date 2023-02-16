@@ -21,7 +21,6 @@ import (
 	jobapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	rscapi "github.com/CS-SI/SafeScale/v22/lib/backend/resources/api"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/consts"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/converters"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusternodetype"
@@ -29,7 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/metadata"
 	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	propertiesv3 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
@@ -83,7 +81,7 @@ func inspectClusterMetadataProperties(ctx context.Context, trx clusterTransactio
 }
 
 func alterClusterMetadata(ctx context.Context, trx clusterTransaction, callback func(*abstract.Cluster, *serialize.JSONProperties) fail.Error) fail.Error {
-	return alterClusterMetadata(ctx, trx, callback)
+	return metadata.Alter[*abstract.Cluster](ctx, trx, callback)
 }
 
 func alterClusterMetadataAbstract(ctx context.Context, trx clusterTransaction, callback func(*abstract.Cluster) fail.Error) fail.Error {
@@ -104,7 +102,7 @@ func (clusterTrx *clusterTransactionImpl) IsNull() bool {
 }
 
 // createCluster is the TaskAction that creates a Cluster
-func (instance *Cluster) createCluster(inctx context.Context, clusterTrx clusterTransaction, params interface{}) fail.Error {
+func (instance *Cluster) createCluster(inctx context.Context, params interface{}) fail.Error {
 	req, ok := params.(abstract.ClusterRequest)
 	if !ok {
 		return fail.InvalidParameterError("params", "should be an abstract.ClusterRequest")
@@ -135,11 +133,17 @@ func (instance *Cluster) createCluster(inctx context.Context, clusterTrx cluster
 			}
 
 			// Create first metadata of Cluster after initialization
-			xerr = instance.firstLight(ctx, clusterTrx, req)
+			xerr = instance.firstLight(ctx, req)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
+
+			clusterTrx, xerr := newClusterTransaction(ctx, instance)
+			if xerr != nil {
+				return xerr
+			}
+			defer clusterTrx.TerminateFromError(ctx, &ferr)
 
 			cleanFailure := false
 			// Starting from here, Delete metadata if exiting with error
@@ -161,7 +165,7 @@ func (instance *Cluster) createCluster(inctx context.Context, clusterTrx cluster
 			}()
 
 			// Obtain number of nodes to create
-			_, privateNodeCount, _, xerr := instance.trxDetermineRequiredNodes(ctx, clusterTrx)
+			_, privateNodeCount, _, xerr := instance.determineRequiredNodes(ctx, clusterTrx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -186,7 +190,7 @@ func (instance *Cluster) createCluster(inctx context.Context, clusterTrx cluster
 				req.NodesDef.Image = req.OS
 			}
 
-			gatewaysDef, mastersDef, nodesDef, xerr := instance.trxDetermineSizingRequirements(ctx, clusterTrx, req)
+			gatewaysDef, mastersDef, nodesDef, xerr := instance.determineSizingRequirements(ctx, clusterTrx, req)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -310,7 +314,7 @@ func (instance *Cluster) createCluster(inctx context.Context, clusterTrx cluster
 			xerr = alterClusterMetadataProperties(ctx, clusterTrx, func(props *serialize.JSONProperties) fail.Error {
 				// update metadata about disabled default features
 				innerXErr := props.Alter(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-					featuresV1, err := clonable.Cast[*propertiesv1.ClusterFeatures](p)
+					featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures](p)
 					if err != nil {
 						return fail.Wrap(err)
 					}
@@ -323,7 +327,7 @@ func (instance *Cluster) createCluster(inctx context.Context, clusterTrx cluster
 				}
 
 				return props.Alter(clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
-					stateV1, err := clonable.Cast[*propertiesv1.ClusterState](p)
+					stateV1, err := lang.Cast[*propertiesv1.ClusterState](p)
 					if err != nil {
 						return fail.Wrap(err)
 					}
@@ -335,6 +339,11 @@ func (instance *Cluster) createCluster(inctx context.Context, clusterTrx cluster
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+				return xerr
+			}
+
+			xerr = instance.updateClusterInventory(ctx, clusterTrx)
+			if xerr != nil {
 				return xerr
 			}
 
@@ -357,7 +366,7 @@ func (instance *Cluster) createCluster(inctx context.Context, clusterTrx cluster
 }
 
 // firstLight contains the code leading to Cluster first metadata written
-func (instance *Cluster) firstLight(inctx context.Context, clusterTrx clusterTransaction, req abstract.ClusterRequest) fail.Error {
+func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterRequest) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -367,6 +376,7 @@ func (instance *Cluster) firstLight(inctx context.Context, clusterTrx clusterTra
 
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
+
 			if req.Name = strings.TrimSpace(req.Name); req.Name == "" {
 				xerr := fail.InvalidParameterError("req.Name", "cannot be empty string")
 				return xerr
@@ -388,9 +398,15 @@ func (instance *Cluster) firstLight(inctx context.Context, clusterTrx clusterTra
 				return xerr
 			}
 
+			clusterTrx, xerr := newClusterTransaction(ctx, instance)
+			if xerr != nil {
+				return xerr
+			}
+			defer clusterTrx.TerminateFromError(ctx, &ferr)
+
 			xerr = alterClusterMetadata(ctx, clusterTrx, func(aci *abstract.Cluster, props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-					featuresV1, err := clonable.Cast[*propertiesv1.ClusterFeatures](p)
+					featuresV1, err := lang.Cast[*propertiesv1.ClusterFeatures](p)
 					if err != nil {
 						return fail.Wrap(err)
 					}
@@ -409,7 +425,7 @@ func (instance *Cluster) firstLight(inctx context.Context, clusterTrx clusterTra
 
 				// Sets initial state of the new Cluster and create metadata
 				innerXErr = props.Alter(clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
-					stateV1, err := clonable.Cast[*propertiesv1.ClusterState](p)
+					stateV1, err := lang.Cast[*propertiesv1.ClusterState](p)
 					if err != nil {
 						return fail.Wrap(err)
 					}
@@ -423,7 +439,7 @@ func (instance *Cluster) firstLight(inctx context.Context, clusterTrx clusterTra
 
 				// sets default sizing from req
 				innerXErr = props.Alter(clusterproperty.DefaultsV3, func(p clonable.Clonable) fail.Error {
-					defaultsV3, err := clonable.Cast[*propertiesv3.ClusterDefaults](p)
+					defaultsV3, err := lang.Cast[*propertiesv3.ClusterDefaults](p)
 					if err != nil {
 						return fail.Wrap(err)
 					}
@@ -445,7 +461,7 @@ func (instance *Cluster) firstLight(inctx context.Context, clusterTrx clusterTra
 
 				// FUTURE: sets the Cluster composition (when we will be able to manage Cluster spread on several tenants...)
 				innerXErr = props.Alter(clusterproperty.CompositeV1, func(p clonable.Clonable) fail.Error {
-					compositeV1, err := clonable.Cast[*propertiesv1.ClusterComposite](p)
+					compositeV1, err := lang.Cast[*propertiesv1.ClusterComposite](p)
 					if err != nil {
 						return fail.Wrap(err)
 					}
@@ -494,189 +510,6 @@ func (instance *Cluster) firstLight(inctx context.Context, clusterTrx clusterTra
 		cancel()
 		<-chRes
 		return fail.Wrap(inctx.Err())
-	}
-}
-
-// trxDetermineSizingRequirements calculates the sizings needed for the hosts of the Cluster
-func (instance *Cluster) trxDetermineSizingRequirements(inctx context.Context, clusterTrx clusterTransaction, req abstract.ClusterRequest) (
-	_ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, xerr fail.Error,
-) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	type result struct {
-		aa   *abstract.HostSizingRequirements
-		ab   *abstract.HostSizingRequirements
-		ac   *abstract.HostSizingRequirements
-		rErr fail.Error
-	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
-		gres, _ := func() (_ result, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
-			var (
-				gatewaysDefault     *abstract.HostSizingRequirements
-				mastersDefault      *abstract.HostSizingRequirements
-				nodesDefault        *abstract.HostSizingRequirements
-				imageQuery, imageID string
-			)
-
-			// Determine default image
-			imageQuery = req.NodesDef.Image
-			if imageQuery == "" {
-				cfg, xerr := instance.Service().ConfigurationOptions()
-				if xerr != nil {
-					xerr := fail.Wrap(xerr, "failed to get configuration options")
-					return result{nil, nil, nil, xerr}, xerr
-				}
-				imageQuery = cfg.DefaultImage
-			}
-			makers := instance.localCache.makers
-			if imageQuery == "" && makers.DefaultImage != nil {
-				imageQuery = makers.DefaultImage(instance)
-			}
-			if imageQuery == "" {
-				imageQuery = consts.DEFAULTOS
-			}
-			svc := instance.Service()
-			_, imageID, xerr = determineImageID(ctx, svc, imageQuery)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return result{nil, nil, nil, xerr}, xerr
-			}
-
-			// Determine getGateway sizing
-			if makers.DefaultGatewaySizing != nil {
-				gatewaysDefault = complementSizingRequirements(nil, makers.DefaultGatewaySizing(instance))
-			} else {
-				gatewaysDefault = &abstract.HostSizingRequirements{
-					MinCores:    2,
-					MaxCores:    4,
-					MinRAMSize:  7.0,
-					MaxRAMSize:  16.0,
-					MinDiskSize: 50,
-					MinGPU:      -1,
-				}
-			}
-
-			emptySizing := abstract.HostSizingRequirements{
-				MinGPU: -1,
-			}
-
-			gatewaysDef := complementSizingRequirements(&req.GatewaysDef, *gatewaysDefault)
-			gatewaysDef.Image = imageID
-
-			if !req.GatewaysDef.Equals(emptySizing) {
-				if lower, err := req.GatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
-					if !req.Force {
-						xerr := fail.NewError("requested gateway sizing less than recommended")
-						return result{nil, nil, nil, xerr}, xerr
-					}
-				}
-			}
-
-			tmpl, xerr := svc.FindTemplateBySizing(ctx, *gatewaysDef)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return result{nil, nil, nil, xerr}, xerr
-			}
-
-			gatewaysDef.Template = tmpl.ID
-
-			// Determine master sizing
-			if makers.DefaultMasterSizing != nil {
-				mastersDefault = complementSizingRequirements(nil, makers.DefaultMasterSizing(instance))
-			} else {
-				mastersDefault = &abstract.HostSizingRequirements{
-					MinCores:    4,
-					MaxCores:    8,
-					MinRAMSize:  15.0,
-					MaxRAMSize:  32.0,
-					MinDiskSize: 100,
-					MinGPU:      -1,
-				}
-			}
-			mastersDef := complementSizingRequirements(&req.MastersDef, *mastersDefault)
-			mastersDef.Image = imageID
-
-			if !req.MastersDef.Equals(emptySizing) {
-				if lower, err := req.MastersDef.LowerThan(mastersDefault); err == nil && lower {
-					if !req.Force {
-						xerr := fail.NewError("requested master sizing less than recommended")
-						return result{nil, nil, nil, xerr}, xerr
-					}
-				}
-			}
-
-			tmpl, xerr = svc.FindTemplateBySizing(ctx, *mastersDef)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return result{nil, nil, nil, xerr}, xerr
-			}
-
-			mastersDef.Template = tmpl.ID
-
-			// Determine node sizing
-			if makers.DefaultNodeSizing != nil {
-				nodesDefault = complementSizingRequirements(nil, makers.DefaultNodeSizing(instance))
-			} else {
-				nodesDefault = &abstract.HostSizingRequirements{
-					MinCores:    4,
-					MaxCores:    8,
-					MinRAMSize:  15.0,
-					MaxRAMSize:  32.0,
-					MinDiskSize: 100,
-					MinGPU:      -1,
-				}
-			}
-			nodesDef := complementSizingRequirements(&req.NodesDef, *nodesDefault)
-			nodesDef.Image = imageID
-
-			if !req.NodesDef.Equals(emptySizing) {
-				if lower, err := req.NodesDef.LowerThan(nodesDefault); err == nil && lower {
-					if !req.Force {
-						xerr := fail.NewError("requested node sizing less than recommended")
-						return result{nil, nil, nil, xerr}, xerr
-					}
-				}
-			}
-
-			tmpl, xerr = svc.FindTemplateBySizing(ctx, *nodesDef)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return result{nil, nil, nil, xerr}, xerr
-			}
-			nodesDef.Template = tmpl.ID
-
-			// Updates property
-			xerr = alterClusterMetadataProperty(ctx, clusterTrx, clusterproperty.DefaultsV2, func(defaultsV2 *propertiesv2.ClusterDefaults) fail.Error { //nolint
-				defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*gatewaysDef)
-				defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*mastersDef)
-				defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*nodesDef)
-				defaultsV2.Image = imageQuery
-				return nil
-			})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-				return result{nil, nil, nil, xerr}, xerr
-			}
-
-			return result{gatewaysDef, mastersDef, nodesDef, nil}, nil
-		}()
-		chRes <- gres
-	}()
-
-	select {
-	case res := <-chRes:
-		return res.aa, res.ab, res.ac, res.rErr
-	case <-ctx.Done():
-		return nil, nil, nil, fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		cancel()
-		<-chRes
-		return nil, nil, nil, fail.Wrap(inctx.Err())
 	}
 }
 
@@ -1035,7 +868,7 @@ func (instance *Cluster) trxCreateHostResources(
 				return result{xerr}, xerr
 			}
 
-			masterCount, _, _, xerr := instance.trxDetermineRequiredNodes(ctx, clusterTrx)
+			masterCount, _, _, xerr := instance.determineRequiredNodes(ctx, clusterTrx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return result{xerr}, xerr
@@ -1357,7 +1190,7 @@ func (instance *Cluster) trxInstallGateway(inctx context.Context, clusterTrx clu
 			}
 
 			// Installs docker and docker-compose on gateway
-			xerr = instance.trxInstallDocker(ctx, clusterTrx, params.host, hostLabel, variables)
+			xerr = instance.installDocker(ctx, clusterTrx, params.host, hostLabel, variables)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return result{nil, xerr}, xerr
@@ -1389,7 +1222,7 @@ func (instance *Cluster) trxInstallGateway(inctx context.Context, clusterTrx clu
 }
 
 // Regenerate ansible inventory
-func (instance *Cluster) trxUpdateClusterInventory(inctx context.Context, clusterTrx clusterTransaction) fail.Error {
+func (instance *Cluster) updateClusterInventory(inctx context.Context, clusterTrx clusterTransaction) fail.Error {
 	// Check incoming parameters
 	if inctx == nil {
 		return fail.InvalidParameterCannotBeNilError("inctx")
@@ -1429,7 +1262,7 @@ func (instance *Cluster) trxUpdateClusterInventory(inctx context.Context, cluste
 		xerr := inspectClusterMetadata(ctx, clusterTrx, func(aci *abstract.Cluster, props *serialize.JSONProperties) fail.Error {
 			// Check if feature ansible is installed
 			innerXErr := props.Inspect(clusterproperty.FeaturesV1, func(p clonable.Clonable) fail.Error {
-				featuresV1, innerErr := clonable.Cast[*propertiesv1.ClusterFeatures](p)
+				featuresV1, innerErr := lang.Cast[*propertiesv1.ClusterFeatures](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -1447,7 +1280,7 @@ func (instance *Cluster) trxUpdateClusterInventory(inctx context.Context, cluste
 			// Collect get network config
 			var networkCfg *propertiesv3.ClusterNetwork
 			innerXErr = props.Inspect(clusterproperty.NetworkV3, func(p clonable.Clonable) fail.Error {
-				networkV3, innerErr := clonable.Cast[*propertiesv3.ClusterNetwork](p)
+				networkV3, innerErr := lang.Cast[*propertiesv3.ClusterNetwork](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -1474,7 +1307,7 @@ func (instance *Cluster) trxUpdateClusterInventory(inctx context.Context, cluste
 			}
 
 			return props.Inspect(clusterproperty.NodesV3, func(p clonable.Clonable) (ferr fail.Error) {
-				nodesV3, innerErr := clonable.Cast[*propertiesv3.ClusterNodes](p)
+				nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -1918,8 +1751,8 @@ func withTimeout(xerr fail.Error) bool {
 	return result
 }
 
-// trxGetIdentity returns the identity of the Cluster
-func trxGetIdentity(ctx context.Context, clusterTrx clusterTransaction) (_ abstract.Cluster, ferr fail.Error) {
+// getIdentity returns the identity of the Cluster
+func (clusterTrx *clusterTransactionImpl) getIdentity(ctx context.Context) (_ abstract.Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	var clusterIdentity abstract.Cluster
@@ -1935,7 +1768,7 @@ func trxGetIdentity(ctx context.Context, clusterTrx clusterTransaction) (_ abstr
 func trxGetFlavor(ctx context.Context, clusterTrx clusterTransaction) (flavor clusterflavor.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	aci, xerr := trxGetIdentity(ctx, clusterTrx)
+	aci, xerr := clusterTrx.getIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, xerr
@@ -1948,7 +1781,7 @@ func trxGetFlavor(ctx context.Context, clusterTrx clusterTransaction) (flavor cl
 func trxGetComplexity(ctx context.Context, clusterTrx clusterTransaction) (_ clustercomplexity.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	aci, xerr := trxGetIdentity(ctx, clusterTrx)
+	aci, xerr := clusterTrx.getIdentity(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, xerr
@@ -1998,7 +1831,7 @@ func (instance *Cluster) trxGetState(inctx context.Context, clusterTrx clusterTr
 		}
 
 		xerr := inspectClusterMetadataProperty(ctx, clusterTrx, clusterproperty.StateV1, func(p clonable.Clonable) fail.Error {
-			stateV1, innerErr := clonable.Cast[*propertiesv1.ClusterState](p)
+			stateV1, innerErr := lang.Cast[*propertiesv1.ClusterState](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -2103,7 +1936,7 @@ func (instance *Cluster) trxListMasterIDs(inctx context.Context, clusterTrx clus
 			}
 
 			xerr = inspectClusterMetadataProperty(ctx, clusterTrx, clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
-				nodesV3, innerErr := clonable.Cast[*propertiesv3.ClusterNodes](p)
+				nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -2336,7 +2169,7 @@ func (instance *Cluster) trxListNodes(inctx context.Context, clusterTrx clusterT
 			var list rscapi.IndexedListOfClusterNodes
 
 			xerr := inspectClusterMetadataProperty(ctx, clusterTrx, clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
-				nodesV3, innerErr := clonable.Cast[*propertiesv3.ClusterNodes](p)
+				nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -2499,4 +2332,26 @@ func (instance *Cluster) trxFindAvailableNode(inctx context.Context, clusterTrx 
 	case <-inctx.Done():
 		return nil, fail.Wrap(inctx.Err())
 	}
+}
+
+// getGatewayIDs ...
+func (clusterTrx *clusterTransactionImpl) getGatewayIDs(ctx context.Context) ([]string, fail.Error) {
+	var gateways []string
+
+	xerr := inspectClusterMetadataProperty(ctx, clusterTrx, clusterproperty.NetworkV3, func(networkV3 *propertiesv3.ClusterNetwork) fail.Error {
+		if networkV3.GatewayID != "" {
+			gateways = append(gateways, networkV3.GatewayID)
+		}
+
+		if networkV3.SecondaryGatewayID != "" {
+			gateways = append(gateways, networkV3.SecondaryGatewayID)
+		}
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return gateways, nil
 }

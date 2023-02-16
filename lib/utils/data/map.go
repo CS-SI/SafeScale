@@ -93,8 +93,8 @@ func (m Map[K, V]) Contains(key K) bool {
 }
 
 // Keys returns a slice with all keys of the map
-func (m Map[K, V]) Keys() Slice[K] {
-	keys := make(Slice[K], 0, m.Length())
+func (m Map[K, V]) Keys() []K {
+	keys := make([]K, 0, m.Length())
 	for k := range m {
 		keys = append(keys, k)
 	}

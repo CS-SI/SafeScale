@@ -517,7 +517,7 @@ func (instance *Cluster) taskConfigureMaster(inctx context.Context, clusterTrx c
 
 			// install docker feature (including docker-compose)
 			hostLabel := fmt.Sprintf("master (%s)", p.Host.GetName())
-			xerr = instance.trxInstallDocker(ctx, clusterTrx, p.Host, hostLabel, variables)
+			xerr = instance.installDocker(ctx, clusterTrx, p.Host, hostLabel, variables)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return result{nil, xerr}, xerr
@@ -1191,7 +1191,7 @@ func (instance *Cluster) taskConfigureNode(inctx context.Context, clusterTrx clu
 			}
 
 			// Docker and docker-compose installation is mandatory on all nodes
-			xerr = instance.trxInstallDocker(ctx, clusterTrx, hostInstance, hostLabel, variables)
+			xerr = instance.installDocker(ctx, clusterTrx, hostInstance, hostLabel, variables)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return result{nil, xerr}, xerr

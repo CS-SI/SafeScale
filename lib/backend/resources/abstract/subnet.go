@@ -19,6 +19,7 @@ package abstract
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -120,7 +121,7 @@ func (s *Subnet) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := clonable.Cast[*Subnet](p)
+	src, err := lang.Cast[*Subnet](p)
 	if err != nil {
 		return err
 	}
@@ -272,7 +273,7 @@ func (vip *VirtualIP) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*VirtualIP](p)
+	src, err := lang.Cast[*VirtualIP](p)
 	if err != nil {
 		return fail.Wrap(err)
 	}
@@ -280,12 +281,7 @@ func (vip *VirtualIP) Replace(p clonable.Clonable) error {
 	*vip = *src
 	vip.Hosts = make([]*HostCore, len(src.Hosts))
 	for k, v := range src.Hosts {
-		clone, err := clonable.CastedClone[*HostCore](v)
-		if err != nil {
-			return err
-		}
-
-		vip.Hosts[k] = clone
+		vip.Hosts[k] = v
 	}
 	return nil
 }

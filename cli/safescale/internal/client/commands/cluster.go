@@ -369,9 +369,16 @@ func clusterDeleteCommand() *cobra.Command {
 			defer fail.OnPanic(&ferr)
 			logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Name(), strings.Join(args, ", "))
 
-			yes, err := c.Flags().GetBool("assume-yes")
+			yes, err := c.Flags().GetBool("yes")
 			if err != nil {
 				return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+			}
+
+			if yes == false {
+				yes, err = c.Flags().GetBool("assume-yes")
+				if err != nil {
+					return cli.FailureResponse(cli.ExitOnInvalidOption(err.Error()))
+				}
 			}
 
 			force, err := c.Flags().GetBool("force")

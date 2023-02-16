@@ -90,7 +90,7 @@ func (sgTrx *securityGroupTransactionImpl) BindToHost(ctx context.Context, hostT
 		}
 
 		return props.Alter(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			sghV1, lvl2err := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
+			sghV1, lvl2err := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
 			if lvl2err != nil {
 				return fail.Wrap(lvl2err)
 			}
@@ -216,7 +216,7 @@ func (sgTrx *securityGroupTransactionImpl) UnbindFromHost(inctx context.Context,
 			}
 
 			return alterHostMetadataProperty(ctx, hostTrx, hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-				hsgV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
+				hsgV1, innerErr := lang.Cast[*propertiesv1.HostSecurityGroups](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -594,7 +594,7 @@ func (sgTrx *securityGroupTransactionImpl) Delete(ctx context.Context, force boo
 		if !force {
 			// check bonds to hosts
 			innerXErr := props.Inspect(securitygroupproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-				hostsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupHosts](p)
+				hostsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupHosts](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -621,7 +621,7 @@ func (sgTrx *securityGroupTransactionImpl) Delete(ctx context.Context, force boo
 
 			// check bonds to subnets
 			return props.Inspect(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-				subnetsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
+				subnetsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupSubnets](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -876,7 +876,7 @@ func (sgTrx *securityGroupTransactionImpl) BindToSubnet(inctx context.Context, a
 			}
 
 			return props.Alter(securitygroupproperty.SubnetsV1, func(p clonable.Clonable) fail.Error {
-				sgsV1, innerErr := clonable.Cast[*propertiesv1.SecurityGroupSubnets](p)
+				sgsV1, innerErr := lang.Cast[*propertiesv1.SecurityGroupSubnets](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}

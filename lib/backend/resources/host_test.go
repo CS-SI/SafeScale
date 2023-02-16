@@ -687,7 +687,7 @@ func TestHost_setSecurityGroups(t *testing.T) {
 
 		asubnet := &abstract.Subnet{}
 		xerr = subnet.Inspect(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, err := clonable.Cast[*abstract.Subnet](p)
+			as, err := lang.Cast[*abstract.Subnet](p)
 			if err != nil {
 				return fail.Wrap(err)
 			}
@@ -941,7 +941,7 @@ func TestHost_Run(t *testing.T) {
 		require.Contains(t, xerr.Error(), "cannot run anything on 'MyHostTest', 'MyHostTest' is NOT started")
 
 		xerr = host.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			ahc, err := clonable.Cast[*abstract.HostCore](p)
+			ahc, err := lang.Cast[*abstract.HostCore](p)
 			if err != nil {
 				return fail.Wrap(err)
 			}
@@ -1006,7 +1006,7 @@ func TestHost_Push(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(host).String(), "*resources.Host")
 
 		xerr = host.Alter(ctx, func(p clonable.Clonable, _ *serialize.JSONProperties) fail.Error {
-			ahc, err := clonable.Cast[*abstract.HostCore](p)
+			ahc, err := lang.Cast[*abstract.HostCore](p)
 			if err != nil {
 				return fail.Wrap(err)
 			}

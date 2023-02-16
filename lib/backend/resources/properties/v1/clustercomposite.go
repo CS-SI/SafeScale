@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterComposite ...
@@ -55,9 +56,9 @@ func (c *ClusterComposite) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, ok := p.(*ClusterComposite)
-	if !ok {
-		return fail.InconsistentError("failed to cast 'p' to '*ClusterComposite'")
+	src, err := lang.Cast[*ClusterComposite](p)
+	if err != nil {
+		return fail.Wrap(err)
 	}
 
 	c.Tenants = make([]string, len(src.Tenants))

@@ -45,6 +45,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/result"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/template"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
@@ -646,18 +647,13 @@ func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], se
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
+	type localresult struct {
 		rTr  rscapi.Results
 		rErr fail.Error
 	}
-	chRes := make(chan result)
+	chRes := make(chan localresult)
 	go func() {
 		defer close(chRes)
-
-		w.variables = params
-		w.settings = settings
-
-		var outcomes rscapi.Results
 
 		// 'pace' tells the order of execution
 		var (
@@ -666,10 +662,13 @@ func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], se
 			steps    map[string]interface{}
 			order    []string
 		)
+		outcomes := rscapi.NewResults()
+		w.variables = params
+		w.settings = settings
 		if w.method != installmethod.None {
 			pace = w.feature.Specs().GetString(w.rootKey + "." + yamlPaceKeyword)
 			if pace == "" {
-				chRes <- result{nil, fail.SyntaxError("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)}
+				chRes <- localresult{nil, fail.SyntaxError("missing or empty key %s.%s", w.rootKey, yamlPaceKeyword)}
 				return
 			}
 
@@ -677,7 +676,7 @@ func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], se
 			stepsKey = w.rootKey + "." + yamlStepsKeyword
 			steps = w.feature.Specs().GetStringMap(stepsKey)
 			if len(steps) == 0 {
-				chRes <- result{nil, fail.InvalidRequestError("nothing to do")}
+				chRes <- localresult{nil, fail.InvalidRequestError("nothing to do")}
 				return
 			}
 
@@ -691,7 +690,7 @@ func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], se
 				xerr := w.setReverseProxy(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					chRes <- result{nil, fail.Wrap(xerr, "failed to set reverse proxy rules on Subnet")}
+					chRes <- localresult{nil, fail.Wrap(xerr, "failed to set reverse proxy rules on Subnet")}
 					return
 				}
 			}
@@ -699,7 +698,7 @@ func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], se
 			xerr := w.setSecurity(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{nil, fail.Wrap(xerr, "failed to set security rules on Subnet")}
+				chRes <- localresult{nil, fail.Wrap(xerr, "failed to set security rules on Subnet")}
 				return
 			}
 		case installaction.Remove:
@@ -725,7 +724,7 @@ func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], se
 		var xerr fail.Error
 		xerr = w.target.ComplementFeatureParameters(ctx, params)
 		if xerr != nil {
-			chRes <- result{nil, xerr}
+			chRes <- localresult{nil, xerr}
 			return
 		}
 
@@ -745,7 +744,7 @@ func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], se
 			stepMap, ok := steps[strings.ToLower(k)].(map[string]interface{})
 			if !ok {
 				msg := `syntax error in Feature '%s' specification file (%s): no key '%s' found`
-				chRes <- result{outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(ctx), stepKey)}
+				chRes <- localresult{outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(ctx), stepKey)}
 				return
 			}
 
@@ -771,7 +770,7 @@ func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], se
 					}
 				} else {
 					msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
-					chRes <- result{nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(ctx), stepKey, yamlTargetsKeyword)}
+					chRes <- localresult{nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(ctx), stepKey, yamlTargetsKeyword)}
 					return
 				}
 
@@ -779,7 +778,7 @@ func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], se
 			}
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{nil, xerr}
+				chRes <- localresult{nil, xerr}
 				return
 			}
 
@@ -796,17 +795,25 @@ func (w *worker) Proceed(inctx context.Context, params data.Map[string, any], se
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{nil, xerr}
+				chRes <- localresult{nil, xerr}
 				return
 			}
 
-			xerr = fail.Wrap(outcomes.Add(k, ur))
+			item, err := result.NewHolder[rscapi.UnitResults](result.WithPayload[rscapi.UnitResults](ur))
+			if err != nil {
+				chRes <- localresult{nil, xerr}
+				return
+			}
+
+			_ = item.TagCompletedFromError(ur.Error())
+			_ = item.TagSuccessFromCondition(ur.IsSuccessful())
+			xerr = fail.Wrap(outcomes.Add(k, item))
 			if xerr != nil {
-				chRes <- result{nil, xerr}
+				chRes <- localresult{nil, xerr}
 				return
 			}
 		}
-		chRes <- result{outcomes, nil}
+		chRes <- localresult{outcomes, nil}
 	}()
 
 	select {
@@ -1838,7 +1845,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 		// 		domain := ""
 		// 		xerr = h.Inspect(w.feature.task, func(p clonable.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
 		// 			return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
-		// 				hostDescriptionV1, err := clonable.Cast[*propertiesv1.HostDescription)
+		// 				hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
 		// 				if !ok {
 		// 					return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		// 				}
@@ -1873,7 +1880,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 		// 			domain = ""
 		// 			xerr = h.Inspect(w.feature.task, func(p clonable.Clonable, props *unsafeSerialize.JSONProperties) fail.Error {
 		// 				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
-		// 					hostDescriptionV1, err := clonable.Cast[*propertiesv1.HostDescription)
+		// 					hostDescriptionV1, err := lang.Cast[*propertiesv1.HostDescription)
 		// 					if !ok {
 		// 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		// 					}

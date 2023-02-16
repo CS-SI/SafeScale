@@ -19,6 +19,7 @@ package abstract
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
@@ -114,7 +115,7 @@ func (n *Network) Replace(p clonable.Clonable) error {
 		return fail.InvalidParameterCannotBeNilError("p")
 	}
 
-	src, err := clonable.Cast[*Network](p)
+	src, err := lang.Cast[*Network](p)
 	if err != nil {
 		return err
 	}

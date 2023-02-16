@@ -10,6 +10,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -81,7 +82,7 @@ func (networkTrx *networkTransactionImpl) FreeCIDRForSingleHost(ctx context.Cont
 	}
 
 	return alterNetworkMetadataProperty(ctx, networkTrx, networkproperty.SingleHostsV1, func(p clonable.Clonable) fail.Error {
-		nshV1, innerErr := clonable.Cast[*propertiesv1.NetworkSingleHosts](p)
+		nshV1, innerErr := lang.Cast[*propertiesv1.NetworkSingleHosts](p)
 		if innerErr != nil {
 			return fail.Wrap(innerErr)
 		}

@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // SecurityGroupHosts contains information about attached hosts to a security group
@@ -63,7 +64,7 @@ func (sgh *SecurityGroupHosts) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*SecurityGroupHosts](p)
+	src, err := lang.Cast[*SecurityGroupHosts](p)
 	if err != nil {
 		return err
 	}

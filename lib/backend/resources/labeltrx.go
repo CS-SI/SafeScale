@@ -11,6 +11,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
@@ -123,7 +124,7 @@ func (labelTrx *labelTransactionImpl) BindToHost(ctx context.Context, hostTrx ho
 	xerr := alterLabelMetadata(ctx, labelTrx, func(alabel *abstract.Label, props *serialize.JSONProperties) fail.Error {
 		isTag := !alabel.HasDefault
 		return props.Alter(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			labelHostsV1, innerErr := clonable.Cast[*propertiesv1.LabelHosts](p)
+			labelHostsV1, innerErr := lang.Cast[*propertiesv1.LabelHosts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

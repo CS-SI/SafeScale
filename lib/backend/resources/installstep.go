@@ -260,8 +260,7 @@ func (is *step) loopSeriallyOnHosts(ctx context.Context, hosts []*Host, v data.M
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	var outcomes rscapi.UnitResults
-
+	outcomes := rscapi.NewUnitResults()
 	for _, h := range hosts {
 		h := h
 
@@ -351,7 +350,7 @@ func (is *step) loopConcurrentlyOnHosts(inctx context.Context, hosts []*Host, v 
 
 		xerr := fail.Wrap(tg.Wait())
 		xerr = debug.InjectPlannedFail(xerr)
-		var outcomes rscapi.UnitResults
+		outcomes := rscapi.NewUnitResults()
 		close(blue)
 		for ur := range blue {
 			_ = outcomes.Add(ur.who, ur.what)
@@ -396,7 +395,12 @@ func (is *step) collectOutcomes(subtasks map[string]concurrency.Task, results co
 				return wrongs, nil, xerr
 			}
 
-			if !oko.IsSuccessful() || !strings.Contains(oko.Payload().Output, "exit 0") {
+			p, err := oko.Payload()
+			if err != nil {
+				return wrongs, nil, fail.Wrap(err)
+			}
+
+			if !oko.IsSuccessful() || !strings.Contains(p.Output, "exit 0") {
 				wrongs++
 			}
 		}
@@ -524,153 +528,154 @@ func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ rsca
 	go func() {
 		defer close(chRes)
 
-		// Updates variables in step script
-		command, xerr := replaceVariablesInString(is.Script, p.Variables)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			problem := fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)
-			stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{}, problem)
-			if derr != nil {
-				_ = problem.AddConsequence(derr)
+		gres, gerr := func() (stepResult rscapi.StepResult, finnerXErr fail.Error) {
+			// Updates variables in step script
+			command, xerr := replaceVariablesInString(is.Script, p.Variables)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				problem := fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)
+				stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{}, problem)
+				if derr != nil {
+					_ = problem.AddConsequence(derr)
+				}
+				return stepResult, problem
 			}
-			chRes <- localresult{stepResult, problem}
-			return
-		}
 
-		hidesOutput := strings.Contains(command, "set +x\n")
-		if hidesOutput {
-			command = strings.Replace(command, "set +x\n", "\n", 1)
-			command = strings.Replace(command, "exec 2>&1\n", "exec 2>&7\n", 1)
-		}
-
-		// Uploads then executes command
-		filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.GetName(), strings.ToLower(is.Action.String()), is.Name)
-		rfcItem := Item{
-			Remote: filename,
-		}
-
-		var does bool
-		does, xerr = p.Host.Exists(ctx)
-		if xerr != nil {
-			stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{}, xerr)
-			if derr != nil {
-				_ = xerr.AddConsequence(derr)
+			hidesOutput := strings.Contains(command, "set +x\n")
+			if hidesOutput {
+				command = strings.Replace(command, "set +x\n", "\n", 1)
+				command = strings.Replace(command, "exec 2>&1\n", "exec 2>&7\n", 1)
 			}
-			chRes <- localresult{stepResult, xerr}
-			return
-		}
-		if !does {
-			logrus.WithContext(ctx).Errorf("Disaster: trying to install things on non-existing host")
-			stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{}, nil)
-			if derr != nil {
-				_ = xerr.AddConsequence(derr)
+
+			// Uploads then executes command
+			filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.GetName(), strings.ToLower(is.Action.String()), is.Name)
+			rfcItem := Item{
+				Remote: filename,
 			}
-			chRes <- localresult{stepResult, nil}
-		}
 
-		xerr = rfcItem.UploadString(ctx, command, p.Host)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			problem := fail.Wrap(xerr, "failure uploading script")
-			stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{}, problem)
-			if derr != nil {
-				_ = problem.AddConsequence(derr)
+			var does bool
+			does, xerr = p.Host.Exists(ctx)
+			if xerr != nil {
+				var derr error
+				stepResult, derr = rscapi.NewStepResult(rscapi.StepOutput{}, xerr)
+				if derr != nil {
+					_ = xerr.AddConsequence(xerr)
+				}
+				return stepResult, xerr
 			}
-			chRes <- localresult{stepResult, problem}
-			return
-		}
-
-		if !hidesOutput {
-			command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; bash -x -c %s; exit ${PIPESTATUS}'", filename, filename)
-		} else {
-			command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; captf=$(mktemp); bash -x -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS};cat $captf; rm $captf; exit ${rc}'", filename, filename)
-		}
-
-		// If retcode is 126, iterate a few times...
-		rounds := 10
-		var (
-			retcode int
-			outrun  string
-			outerr  string
-		)
-		svc := p.Host.Service()
-		timings, xerr := svc.Timings()
-		if xerr != nil {
-			stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{}, xerr)
-			if derr != nil {
-				_ = xerr.AddConsequence(derr)
+			if !does {
+				logrus.WithContext(ctx).Errorf("Disaster: trying to install things on non-existing host")
+				var derr error
+				stepResult, derr = rscapi.NewStepResult(rscapi.StepOutput{}, nil)
+				if derr != nil {
+					_ = xerr.AddConsequence(derr)
+				}
+				return stepResult, nil
 			}
-			chRes <- localresult{stepResult, xerr}
-			return
-		}
 
-		connTimeout := timings.ConnectionTimeout()
-		for {
-			select {
-			case <-ctx.Done():
-				xerr = fail.Wrap(ctx.Err())
+			xerr = rfcItem.UploadString(ctx, command, p.Host)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				problem := fail.Wrap(xerr, "failure uploading script")
+				stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{}, problem)
+				if derr != nil {
+					_ = problem.AddConsequence(derr)
+				}
+				return stepResult, problem
+			}
+
+			if !hidesOutput {
+				command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; bash -x -c %s; exit ${PIPESTATUS}'", filename, filename)
+			} else {
+				command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; captf=$(mktemp); bash -x -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS};cat $captf; rm $captf; exit ${rc}'", filename, filename)
+			}
+
+			// If retcode is 126, iterate a few times...
+			rounds := 10
+			var (
+				retcode int
+				outrun  string
+				outerr  string
+			)
+			svc := p.Host.Service()
+			timings, xerr := svc.Timings()
+			if xerr != nil {
 				stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{}, xerr)
 				if derr != nil {
 					_ = xerr.AddConsequence(derr)
 				}
-				chRes <- localresult{stepResult, xerr}
-				return
-			default:
+				return stepResult, xerr
 			}
 
-			retcode, outrun, outerr, xerr = p.Host.Run(ctx, command, outputs.COLLECT, connTimeout, is.WallTime)
-			if retcode == 126 {
-				logrus.WithContext(ctx).Debugf("Text busy happened")
-			}
-
-			// Executes the script on the remote host
-			if retcode != 126 || rounds == 0 {
-				if retcode == 126 {
-					logrus.WithContext(ctx).Warnf("Text busy killed the script")
-				}
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					xerr.Annotate("retcode", retcode).Annotate("stdout", outrun).Annotate("stderr", outerr)
-					stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{Retcode: retcode, Output: outrun}, xerr)
+			connTimeout := timings.ConnectionTimeout()
+			for {
+				select {
+				case <-ctx.Done():
+					xerr = fail.Wrap(ctx.Err())
+					stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{}, xerr)
 					if derr != nil {
 						_ = xerr.AddConsequence(derr)
 					}
-					chRes <- localresult{stepResult, xerr}
-					return
-				}
-				break
-			}
+					return stepResult, xerr
 
-			if !(strings.Contains(outrun, "bad interpreter") || strings.Contains(outerr, "bad interpreter")) {
-				if xerr != nil {
-					if !strings.Contains(xerr.Error(), "bad interpreter") {
-						xerr = debug.InjectPlannedFail(xerr)
-						if xerr != nil {
-							xerr.Annotate("retcode", retcode).Annotate("stdout", outrun).Annotate("stderr", outerr)
-							stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{Retcode: retcode, Output: outrun}, xerr)
-							if derr != nil {
-								_ = xerr.AddConsequence(derr)
-							}
-							chRes <- localresult{stepResult, xerr}
-							return
-						}
-						break
+				default:
+				}
+
+				retcode, outrun, outerr, xerr = p.Host.Run(ctx, command, outputs.COLLECT, connTimeout, is.WallTime)
+				if retcode == 126 {
+					logrus.WithContext(ctx).Debugf("Text busy happened")
+				}
+
+				// Executes the script on the remote host
+				if retcode != 126 || rounds == 0 {
+					if retcode == 126 {
+						logrus.WithContext(ctx).Warnf("Text busy killed the script")
 					}
-				} else {
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						xerr.Annotate("retcode", retcode).Annotate("stdout", outrun).Annotate("stderr", outerr)
+						var derr error
+						stepResult, derr = rscapi.NewStepResult(rscapi.StepOutput{Retcode: retcode, Output: outrun}, xerr)
+						if derr != nil {
+							_ = xerr.AddConsequence(derr)
+						}
+						return stepResult, xerr
+					}
 					break
 				}
+
+				if !(strings.Contains(outrun, "bad interpreter") || strings.Contains(outerr, "bad interpreter")) {
+					if xerr != nil {
+						if !strings.Contains(xerr.Error(), "bad interpreter") {
+							xerr = debug.InjectPlannedFail(xerr)
+							if xerr != nil {
+								xerr.Annotate("retcode", retcode).Annotate("stdout", outrun).Annotate("stderr", outerr)
+								var derr error
+								stepResult, derr = rscapi.NewStepResult(rscapi.StepOutput{Retcode: retcode, Output: outrun}, xerr)
+								if derr != nil {
+									_ = xerr.AddConsequence(derr)
+								}
+								return stepResult, xerr
+							}
+							break
+						}
+					} else {
+						break
+					}
+				}
+
+				rounds--
+				time.Sleep(timings.SmallDelay())
 			}
 
-			rounds--
-			time.Sleep(timings.SmallDelay())
-		}
+			stepResult, xerr = rscapi.NewStepResult(rscapi.StepOutput{Retcode: retcode, Output: outrun}, nil)
+			if xerr != nil {
+				return nil, xerr
+			}
 
-		xerr.Annotate("retcode", retcode).Annotate("stdout", outrun).Annotate("stderr", outerr)
-		stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{Retcode: retcode, Output: outrun}, nil)
-		if derr != nil {
-			_ = xerr.AddConsequence(derr)
-		}
-		chRes <- localresult{stepResult, nil}
+			return stepResult, nil
+		}()
+		chRes <- localresult{gres, gerr}
 	}()
 
 	select {

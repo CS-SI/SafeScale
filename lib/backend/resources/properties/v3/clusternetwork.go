@@ -17,13 +17,12 @@
 package propertiesv3
 
 import (
-	"fmt"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // ClusterNetwork contains network information relative to cluster
@@ -75,9 +74,9 @@ func (n *ClusterNetwork) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	casted, ok := p.(*ClusterNetwork)
-	if !ok {
-		return fmt.Errorf("p is not a *ClusterNetwork")
+	casted, err := lang.Cast[*ClusterNetwork](p)
+	if err != nil {
+		return fail.Wrap(err)
 	}
 
 	*n = *casted

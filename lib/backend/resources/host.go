@@ -214,26 +214,35 @@ func LoadHost(inctx context.Context, ref string) (*Host, fail.Error) {
 				}
 			}
 
-			trx, innerErr := newHostTransaction(ctx, hostInstance)
+			hostTrx, innerErr := newHostTransaction(ctx, hostInstance)
 			if innerErr != nil {
 				return nil, innerErr
 			}
-			defer trx.TerminateFromError(ctx, &ferr)
+			defer hostTrx.TerminateFromError(ctx, &ferr)
 
-			xerr = hostInstance.updateCachedInformation(ctx, trx)
+			xerr = hostInstance.updateCachedInformation(ctx, hostTrx)
 			if xerr != nil {
 				return nil, xerr
 			}
 
 			return hostInstance, nil
 		}()
-		res, _ := result.NewHolder[*Host](result.WithPayload(ga), result.TagSuccessFromCondition[*Host](ga != nil), result.TagCompletedFromError[*Host](gerr))
+		res, _ := result.NewHolder[*Host](
+			result.WithPayload(ga),
+			result.TagSuccessFromCondition[*Host](ga != nil),
+			result.TagCompletedFromError[*Host](gerr),
+		)
 		chRes <- res
 	}()
 
 	select {
 	case res := <-chRes:
-		return res.Payload(), fail.Wrap(res.Error())
+		p, err := res.Payload()
+		if err != nil {
+			return nil, fail.Wrap(err)
+		}
+
+		return p, fail.Wrap(res.Error())
 	case <-ctx.Done():
 		return nil, fail.Wrap(ctx.Err())
 	case <-inctx.Done():
@@ -309,7 +318,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context, hostTrx hostT
 	return inspectHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
 		var primaryGatewayConfig, secondaryGatewayConfig sshapi.Config
 		innerXErr := props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) (ferr fail.Error) {
-			hnV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
+			hnV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -466,7 +475,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context, hostTrx hostT
 		// -- updates available install methods
 		var index uint8
 		innerXErr = props.Inspect(hostproperty.SystemV1, func(p clonable.Clonable) fail.Error {
-			systemV1, innerErr := clonable.Cast[*propertiesv1.HostSystem](p)
+			systemV1, innerErr := lang.Cast[*propertiesv1.HostSystem](p)
 			if innerErr != nil {
 				logrus.WithContext(ctx).Error(fail.Wrap(innerErr))
 			}
@@ -516,7 +525,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context, hostTrx hostT
 
 			var sgs map[string]string
 			innerXErr = props.Inspect(hostproperty.SecurityGroupsV1, func(p clonable.Clonable) fail.Error {
-				sgsV1, innerErr := clonable.Cast[*propertiesv1.HostSecurityGroups](p)
+				sgsV1, innerErr := lang.Cast[*propertiesv1.HostSecurityGroups](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -535,7 +544,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context, hostTrx hostT
 				template, diskSize string
 			)
 			innerXErr = props.Inspect(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
-				hsV2, innerErr := clonable.Cast[*propertiesv2.HostSizing](p)
+				hsV2, innerErr := lang.Cast[*propertiesv2.HostSizing](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -550,7 +559,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context, hostTrx hostT
 
 			var image string
 			innerXErr = props.Inspect(hostproperty.SystemV1, func(p clonable.Clonable) fail.Error {
-				systemV1, innerErr := clonable.Cast[*propertiesv1.HostSystem](p)
+				systemV1, innerErr := lang.Cast[*propertiesv1.HostSystem](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -564,7 +573,7 @@ func (instance *Host) updateCachedInformation(ctx context.Context, hostTrx hostT
 
 			var az string
 			innerXErr = props.Inspect(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
-				descV1, innerErr := clonable.Cast[*propertiesv1.HostDescription](p)
+				descV1, innerErr := lang.Cast[*propertiesv1.HostDescription](p)
 				if innerErr != nil {
 					return fail.Wrap(innerErr)
 				}
@@ -1144,7 +1153,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 
 			xerr = alterHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
-					hostSizingV2, innerErr := clonable.Cast[*propertiesv2.HostSizing](p)
+					hostSizingV2, innerErr := lang.Cast[*propertiesv2.HostSizing](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -1160,7 +1169,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 
 				// Sets Host extension DescriptionV1
 				innerXErr = props.Alter(hostproperty.DescriptionV1, func(p clonable.Clonable) fail.Error {
-					hostDescriptionV1, innerErr := clonable.Cast[*propertiesv1.HostDescription](p)
+					hostDescriptionV1, innerErr := lang.Cast[*propertiesv1.HostDescription](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -1196,7 +1205,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 
 				// Updates Host property propertiesv2.HostNetworking
 				return props.Alter(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-					hnV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
+					hnV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
 					}
@@ -2276,7 +2285,7 @@ func (instance *Host) GetVolumes(ctx context.Context) (_ *propertiesv1.HostVolum
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxGetVolumes(ctx, hostTrx)
+	return hostTrx.GetVolumes(ctx)
 }
 
 // Start starts the Host
@@ -2737,7 +2746,7 @@ func (instance *Host) GetMounts(ctx context.Context) (mounts *propertiesv1.HostM
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxGetMounts(ctx, hostTrx)
+	return hostTrx.GetMounts(ctx)
 }
 
 // IsClusterMember returns true if the Host is member of a cluster
@@ -2855,7 +2864,7 @@ func (instance *Host) GetDefaultSubnet(ctx context.Context) (_ *Subnet, ferr fai
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	return instance.trxGetDefaultSubnet(ctx, hostTrx)
+	return hostTrx.GetDefaultSubnet(ctx)
 }
 
 // ToProtocol convert a resources.Host to protocol.Host
@@ -2886,7 +2895,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 		abstractHostCore = ahc
 		innerXErr := props.Inspect(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
 			var innerErr error
-			hostSizingV2, innerErr = clonable.Cast[*propertiesv2.HostSizing](p)
+			hostSizingV2, innerErr = lang.Cast[*propertiesv2.HostSizing](p)
 			return fail.Wrap(innerErr)
 		})
 		if innerXErr != nil {
@@ -2895,7 +2904,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 
 		innerXErr = props.Inspect(hostproperty.LabelsV1, func(p clonable.Clonable) fail.Error {
 			var innerErr error
-			hostLabelsV1, innerErr = clonable.Cast[*propertiesv1.HostLabels](p)
+			hostLabelsV1, innerErr = lang.Cast[*propertiesv1.HostLabels](p)
 			return fail.Wrap(innerErr)
 		})
 		if innerXErr != nil {
@@ -2904,7 +2913,7 @@ func (instance *Host) ToProtocol(ctx context.Context) (ph *protocol.Host, ferr f
 
 		return props.Inspect(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
 			var innerErr error
-			hostVolumesV1, innerErr = clonable.Cast[*propertiesv1.HostVolumes](p)
+			hostVolumesV1, innerErr = lang.Cast[*propertiesv1.HostVolumes](p)
 			return fail.Wrap(innerErr)
 		})
 	})
@@ -3498,7 +3507,7 @@ func (instance *Host) UpdateLabel(ctx context.Context, labelInstance *Label, val
 	xerr = alterLabelMetadata(ctx, labelTrx, func(al *abstract.Label, props *serialize.JSONProperties) fail.Error {
 		alabel = al
 		return props.Alter(labelproperty.HostsV1, func(p clonable.Clonable) fail.Error {
-			labelHostsV1, innerErr := clonable.Cast[*propertiesv1.LabelHosts](p)
+			labelHostsV1, innerErr := lang.Cast[*propertiesv1.LabelHosts](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -3800,7 +3809,7 @@ func (instance *Host) reload(ctx context.Context, hostTrx hostTransaction) (ferr
 		}
 
 		innerXErr := props.Alter(hostproperty.SizingV2, func(p clonable.Clonable) fail.Error {
-			hostSizingV2, innerErr := clonable.Cast[*propertiesv2.HostSizing](p)
+			hostSizingV2, innerErr := lang.Cast[*propertiesv2.HostSizing](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}
@@ -3818,7 +3827,7 @@ func (instance *Host) reload(ctx context.Context, hostTrx hostTransaction) (ferr
 
 		// Updates Host property propertiesv1.HostNetworking from "ground" (Cloud Provider side)
 		innerXErr = props.Alter(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-			hnV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
+			hnV2, innerErr := lang.Cast[*propertiesv2.HostNetworking](p)
 			if innerErr != nil {
 				return fail.Wrap(innerErr)
 			}

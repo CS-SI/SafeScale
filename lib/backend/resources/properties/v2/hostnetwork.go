@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 )
 
 // HostNetworking contains network information related to Host
@@ -53,7 +54,7 @@ func NewHostNetworking() *HostNetworking {
 func NewHostNetworkingFromProperty(props *serialize.JSONProperties) (*HostNetworking, fail.Error) {
 	var netInfo *HostNetworking
 	xerr := props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-		clod, err := clonable.Cast[*HostNetworking](p)
+		clod, err := lang.Cast[*HostNetworking](p)
 		if err != nil {
 			return fail.Wrap(err)
 		}
@@ -101,7 +102,7 @@ func (hn *HostNetworking) Replace(p clonable.Clonable) error {
 		return fail.InvalidInstanceError()
 	}
 
-	src, err := clonable.Cast[*HostNetworking](p)
+	src, err := lang.Cast[*HostNetworking](p)
 	if err != nil {
 		return err
 	}

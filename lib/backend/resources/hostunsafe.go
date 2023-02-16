@@ -28,15 +28,10 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hostproperty"
 	sshfactory "github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
-	propertiesv1 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v1"
-	propertiesv2 "github.com/CS-SI/SafeScale/v22/lib/backend/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/v22/lib/system/ssh/api"
 	"github.com/CS-SI/SafeScale/v22/lib/utils"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/clonable"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/retry"
@@ -400,39 +395,6 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	return retcode, stdout, stderr, xerr
 }
 
-// trxGetVolumes is the not goroutine-safe version of GetVolumes, without parameter validation, that does the real work
-// Note: must be used with wisdom
-func (instance *Host) trxGetVolumes(ctx context.Context, hostTrx hostTransaction) (*propertiesv1.HostVolumes, fail.Error) {
-	var hvV1 *propertiesv1.HostVolumes
-	xerr := inspectHostMetadataProperty(ctx, hostTrx, hostproperty.VolumesV1, func(p *propertiesv1.HostVolumes) fail.Error {
-		hvV1 = p
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return hvV1, nil
-}
-
-// trxGetMounts returns the information about the mounts of the host
-// Intended to be used when instance is notoriously not nil (because previously checked)
-func (instance *Host) trxGetMounts(ctx context.Context, hostTrx hostTransaction) (_ *propertiesv1.HostMounts, ferr fail.Error) {
-	var mounts *propertiesv1.HostMounts
-	xerr := inspectHostMetadataProperty(ctx, hostTrx, hostproperty.MountsV1, func(hostMountsV1 *propertiesv1.HostMounts) fail.Error {
-		var innerErr error
-		mounts, innerErr = clonable.CastedClone[*propertiesv1.HostMounts](hostMountsV1)
-		return fail.Wrap(innerErr)
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return mounts, nil
-}
-
 // unsafePushStringToFileWithOwnership is the non goroutine-safe version of PushStringToFIleWithOwnership, that does the real work
 func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -519,47 +481,4 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	}
 
 	return nil
-}
-
-// trxGetDefaultSubnet returns the Networking instance corresponding to host default subnet
-func (instance *Host) trxGetDefaultSubnet(ctx context.Context, hostTrx hostTransaction) (subnetInstance *Subnet, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	xerr := inspectHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) (innerXErr fail.Error) {
-		if props.Lookup(hostproperty.NetworkV2) {
-			return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-				networkV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
-				if innerErr != nil {
-					return fail.Wrap(innerErr)
-				}
-
-				var inErr fail.Error
-				subnetInstance, inErr = LoadSubnet(ctx, "", networkV2.DefaultSubnetID)
-				if inErr != nil {
-					return inErr
-				}
-				return nil
-			})
-		}
-		return props.Inspect(hostproperty.NetworkV2, func(p clonable.Clonable) fail.Error {
-			hostNetworkV2, innerErr := clonable.Cast[*propertiesv2.HostNetworking](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			var inErr fail.Error
-			subnetInstance, inErr = LoadSubnet(ctx, "", hostNetworkV2.DefaultSubnetID)
-			if inErr != nil {
-				return inErr
-			}
-
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return subnetInstance, nil
 }
