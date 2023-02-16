@@ -86,8 +86,6 @@ func New() providers.Provider {
 
 // Build builds a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
-	// tenantName, _ := params["name"].(string)
-
 	identityCfg, ok := params["identity"].(map[string]interface{})
 	if !ok {
 		return &provider{}, fail.SyntaxError("section 'identity' not found in tenants.toml")
@@ -117,7 +115,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	var owners []string
-	if _, ok = computeCfg["Owners"]; ok {
+	if _, ok = computeCfg["Owners"]; ok { // FIXME: OPP, undocumented....
 		ownerList, ok := computeCfg["Owners"].(string)
 		if !ok {
 			logrus.WithContext(context.Background()).Debugf("error reading owners: %v", computeCfg["Owners"])
@@ -204,7 +202,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	providerName := "aws"
 
-	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, "", projectID)
+	suffix := getSuffix(params)
+	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, "", projectID, suffix)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -284,6 +283,24 @@ next:
 	}
 
 	return wp, nil
+}
+
+func getSuffix(params map[string]interface{}) string {
+	suffix := ""
+	if osto, ok := params["objectstorage"].(map[string]interface{}); ok {
+		if val, ok := osto["Suffix"].(string); ok {
+			suffix = val
+			if suffix != "" {
+				return suffix
+			}
+		}
+	}
+	if meta, ok := params["metadata"].(map[string]interface{}); ok {
+		if val, ok := meta["Suffix"].(string); ok {
+			suffix = val
+		}
+	}
+	return suffix
 }
 
 // GetAuthenticationOptions returns the auth options

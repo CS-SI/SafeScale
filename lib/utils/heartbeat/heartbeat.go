@@ -18,6 +18,7 @@ package heartbeat
 
 import (
 	"encoding/json"
+	"github.com/CS-SI/SafeScale/v22/lib"
 	"net/http"
 	"time"
 
@@ -40,10 +41,7 @@ func init() {
 }
 
 func handler(rw http.ResponseWriter, _ *http.Request) {
-	hash := commitHash
-	if hash == "" {
-		hash = notAvailableMessage
-	}
+	hash := lib.Revision
 	uptime := time.Since(startTime).String()
 	err := json.NewEncoder(rw).Encode(heartbeatMessage{"running", hash, uptime})
 	if err != nil {

@@ -36,6 +36,8 @@ feature:
         - name: TomcatPort
           value: 9009
           description: Port tomcat must use
+        - name: tainted
+          value: 1
 
     install:
         bash:
@@ -98,7 +100,7 @@ feature:
                                     dnf install -y --skip-broken xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
                                     ;;
                                 debian|ubuntu)
-                                    sfApt update && apt-mark hold xscreensaver
+                                    sfApt update --allow-insecure-repositories && apt-mark hold xscreensaver
                                     sfApt install -y perl xfce4 firefox
                                     ;;
                                 *)

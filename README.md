@@ -105,11 +105,7 @@ Supplemental software and/or configurations can be installed in 3 ways on SafeSc
 
 A "SafeScale `Feature`" is a file in YAML format that describes the operations to check/add/remove software and/or configuration on a target (Host or Cluster).
 
-A `Feature` can describe operations using different methods:
-- `package`: just define the package(s) concerned
-- `bash`: uses bash snippets
-- `helm`: uses helm chart, the "package" engine for Kubernetes
-- `ansible`: defines playbook to run, SafeScale providing inventory
+A `Feature` can describe operations using bash snippets.
 
 Additionally, a `Feature` is able to apply:
 - reverse proxy rules

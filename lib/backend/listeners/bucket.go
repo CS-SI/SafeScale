@@ -50,6 +50,9 @@ func (s *BucketListener) List(inctx context.Context, in *protocol.BucketListRequ
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
@@ -238,7 +241,7 @@ func (s *BucketListener) Inspect(inctx context.Context, in *protocol.BucketReque
 		return nil, xerr
 	}
 
-	// DEFENSIVE CODING: this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
+	// returning nil, nil IS a mistake
 	if resp == nil {
 		return nil, fail.NotFoundError("bucket '%s' not found", bucketName)
 	}

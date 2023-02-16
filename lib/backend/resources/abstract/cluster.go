@@ -51,6 +51,7 @@ type ClusterRequest struct {
 	Force                   bool                // set to True in order to ignore sizing recommendations
 	FeatureParameters       []string            // contains parameter values of automatically installed Features
 	DefaultSshPort          uint                // default ssh port for gateways // nolint
+	Enabled                 []string            // enabled features
 }
 
 // ClusterIdentity contains the bare minimum information about a cluster

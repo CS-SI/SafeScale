@@ -551,6 +551,12 @@ func (instance *Feature) Add(ctx context.Context, target resources.Targetable, v
 		return nil, xerr
 	}
 
+	if !s.IgnoreTainted {
+		if _, ok := myV["tainted"]; ok {
+			return nil, fail.NewError("sorry, this feature cannot be installed")
+		}
+	}
+
 	if !s.AddUnconditionally {
 		results, xerr := instance.Check(ctx, target, v, s)
 		xerr = debug.InjectPlannedFail(xerr)

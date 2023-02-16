@@ -22,6 +22,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations/consts"
 	"math"
 	mrand "math/rand"
 	"reflect"
@@ -318,6 +319,29 @@ func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (d
 			xerr = clusterInstance.bootstrap(flavor)
 			if xerr != nil {
 				return nil, xerr
+			}
+
+			if val, ok := aclupro[clusterproperty.NetworkV3]; !ok {
+				return nil, fail.NewError("corrupted metadata")
+			} else {
+				if val == nil {
+					return nil, fail.NewError("corrupted metadata")
+				}
+			}
+
+			nev, err := aclupro[clusterproperty.NetworkV3].UnWrap()
+			if err != nil {
+				return nil, fail.ConvertError(err)
+			}
+
+			gottanev, ok := nev.(*propertiesv3.ClusterNetwork)
+			if !ok {
+				return nil, fail.NewError("bad cast")
+			}
+
+			clusterInstance.gateways = append(clusterInstance.gateways, gottanev.GatewayID)
+			if gottanev.SecondaryGatewayID != "" {
+				clusterInstance.gateways = append(clusterInstance.gateways, gottanev.SecondaryGatewayID)
 			}
 
 			if val, ok := aclupro[clusterproperty.NodesV3]; !ok {
@@ -824,7 +848,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 				)
 			}
 
-			gatewayID = networkV3.GatewayID
+			gatewayID = networkV3.GatewayID // FIXME: OPP I came here for
 			secondaryGatewayID = networkV3.SecondaryGatewayID
 			return nil
 		})
@@ -1198,6 +1222,10 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 	nodeDef := complementHostDefinition(def, *nodeDefaultDefinition)
 	if def.Image != "" {
 		hostImage = def.Image
+	}
+
+	if hostImage == "" {
+		hostImage = consts.DEFAULTOS
 	}
 
 	svc := instance.Service()
@@ -1795,6 +1823,10 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Erro
 
 	xerr := instance.delete(cleanupContextFrom(ctx), clusterName)
 	if xerr != nil {
+		logrus.WithContext(cleanupContextFrom(ctx)).Error(xerr)
+		if strings.Contains(xerr.Error(), "Alter") {
+			return fail.NewError("severe metadata corruption")
+		}
 		return xerr
 	}
 
@@ -2093,8 +2125,6 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 				logrus.WithContext(ctx).Infof("Network '%s' successfully deleted.", networkName)
 			}
 
-			theID, _ := instance.GetID()
-
 			// --- Delete metadata ---
 			xerr = instance.MetadataCore.Delete(cleanupContextFrom(ctx))
 			if xerr != nil {
@@ -2102,6 +2132,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 			}
 
 			if ka, err := instance.Service().GetCache(ctx); err == nil {
+				theID, _ := instance.GetID()
 				if ka != nil {
 					if theID != "" {
 						_ = ka.Delete(ctx, fmt.Sprintf("%T/%s", instance, theID))
@@ -2247,17 +2278,19 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 
 		// FIXME: Enable this ONLY after remotedesktop feature is UPDATED AND TESTED
 		// Also, EOL, unsafe, undocumented, 4 releases have passed since 1.0.0 was published
-		/*
-			xerr := instance.installRemoteDesktop(ctx, parameters, req)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
-				if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
-					chRes <- result{xerr}
-					return
+		for _, v := range req.Enabled { // if some explicitly asks for it
+			if v == "remotedesktop" {
+				xerr := instance.installRemoteDesktop(ctx, parameters, req)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
+					if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
+						chRes <- result{xerr}
+						return
+					}
 				}
 			}
-		*/
+		}
 
 		// Install ansible feature on Cluster (all masters) // aaaand it's gone...
 		/*
@@ -2269,31 +2302,34 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			}
 		*/
 
-		if itis, err := instance.isFeatureDisabled(ctx, "ansible-for-cluster"); !itis && err == nil {
-			xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
+		// disabling ansible also disables ansible-for-cluster
+		if aitis, err := instance.isFeatureDisabled(ctx, "ansible"); !aitis && err == nil {
+			if itis, err := instance.isFeatureDisabled(ctx, "ansible-for-cluster"); !itis && err == nil {
+				xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+						featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+						if !ok {
+							return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						}
 
-					featuresV1.Installed["ansible"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible"}
-					featuresV1.Installed["ansible-for-cluster"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible-for-cluster"}
-					return nil
+						featuresV1.Installed["ansible"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible"}
+						featuresV1.Installed["ansible-for-cluster"] = &propertiesv1.ClusterInstalledFeature{Name: "ansible-for-cluster"}
+						return nil
+					})
 				})
-			})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				xerr = fail.Wrap(xerr, callstack.WhereIsThis())
-				chRes <- result{xerr}
-				return
-			}
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					xerr = fail.Wrap(xerr, callstack.WhereIsThis())
+					chRes <- result{xerr}
+					return
+				}
 
-			xerr = instance.regenerateClusterInventory(ctx)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				chRes <- result{xerr}
-				return
+				xerr = instance.regenerateClusterInventory(ctx)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					chRes <- result{xerr}
+					return
+				}
 			}
 		}
 

@@ -47,6 +47,9 @@ func (s *TemplateListener) List(inctx context.Context, in *protocol.TemplateList
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")
 	}
@@ -82,6 +85,9 @@ func (s *TemplateListener) Match(inctx context.Context, in *protocol.TemplateMat
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
 	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterError("inctx", "cannot be nil")

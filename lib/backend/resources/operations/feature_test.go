@@ -101,9 +101,9 @@ func TestNewEmbeddedFeature(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, efe)
 
-	shit, err := efe.PrepareParameters(context.Background(), map[string]interface{}{}, nil)
+	thing, err := efe.PrepareParameters(context.Background(), map[string]interface{}{}, nil)
 	require.Nil(t, err)
-	require.NotNil(t, shit)
+	require.NotNil(t, thing)
 
 	boo := efe.Specs().GetString("feature.install.bash.add.pace")
 	require.NotEmpty(t, boo)

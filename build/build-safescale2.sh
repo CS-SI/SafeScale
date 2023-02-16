@@ -88,10 +88,13 @@ echo "Export"
 export CIBIN=/exported-$GOOS-$GOARCH
 mkdir -p /exported-$GOOS-$GOARCH
 
-CIBIN=/exported-$GOOS-$GOARCH make installci
+CIBIN=/exported-$GOOS-$GOARCH make installci force_sdk_js force_sdk_python
 [ $? -ne 0 ] && echo "Export failure" && exit 1
 
 cp ${WRKDIR}/SafeScale/go.mod /exported-$GOOS-$GOARCH
 cp ${WRKDIR}/SafeScale/go.sum /exported-$GOOS-$GOARCH
+cp ${WRKDIR}/SafeScale/lib/protocol/safescale.proto /exported-$GOOS-$GOARCH
+cp ${WRKDIR}/SafeScale/lib/protocol/javascript/* /exported-$GOOS-$GOARCH
+cp ${WRKDIR}/SafeScale/lib/protocol/python3/* /exported-$GOOS-$GOARCH
 
 exit 0

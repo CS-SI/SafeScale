@@ -41,7 +41,6 @@ type SecurityGroupHandler interface {
 	Inspect(sgRef string) (resources.SecurityGroup, fail.Error)
 	List(all bool) ([]*abstract.SecurityGroup, fail.Error)
 	Reset(sgRef string) fail.Error
-	// Sanitize(sgRef string) (ferr fail.Error)
 }
 
 type securityGroupHandler struct {

@@ -102,7 +102,7 @@ function sfApt() {
   [ $? -ne 0 ] && return $?
   echo "running apt " "$@"
   rc=-1
-  DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt -o Dpkg::Options::=--force-confnew "$@" && rc=$?
+  DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt --ignore-missing --allow-unauthenticated -o Dpkg::Options::=--force-confnew "$@" && rc=$?
   [ $rc -eq -1 ] && return 1
   return $rc
 }
@@ -434,7 +434,7 @@ function sfInstall() {
   debian | ubuntu)
     export DEBIAN_FRONTEND=noninteractive
     export UCF_FORCE_CONFFNEW=1
-    sfRetry4 "sfApt update"
+    sfApt update --allow-insecure-repositories
     sfApt install $1 -y || return 194
     command -v $1 || return 194
     ;;
@@ -1025,16 +1025,6 @@ function sfDetectFacts() {
     [ -z "$id" ] && id=$(docker ps --filter "name=kong4gateway_proxy_1" {{ "--format '{{.ID}}'" }} 2> /dev/null || true)
     [ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }} 2> /dev/null || true)
     FACTS["edgeproxy4subnet_docker_id"]=$id
-
-    # VPL: not used anymore
-    #		id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
-    #		FACTS["ingress4platform_docker_id"]=$id
-    #
-    #		id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_db | cut -d: -f2 || true)
-    #		FACTS["postgresql4platform_docker_id"]=$id
-    #
-    #		id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep keycloak4platform_server | cut -d: -f2 || true)
-    #		FACTS["keycloak4platform_docker_id"]=$id
   fi
 
   # "Serialize" facts to file

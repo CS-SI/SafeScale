@@ -47,6 +47,9 @@ func (s *SecurityGroupListener) List(inctx context.Context, in *protocol.Securit
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	if in == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("in")
+	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
@@ -354,36 +357,6 @@ func (s *SecurityGroupListener) DeleteRule(inctx context.Context, in *protocol.S
 
 	logrus.WithContext(ctx).Infof("Rule successfully added to security group %s", refLabel)
 	return sgInstance.ToProtocol(ctx)
-}
-
-// Sanitize checks if provider-side rules are coherent with registered ones in metadata
-func (s *SecurityGroupListener) Sanitize(inctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) { // FIXME: Remove this
-	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot sanitize security group")
-
-	empty = &googleprotobuf.Empty{}
-	if s == nil {
-		return empty, fail.InvalidInstanceError()
-	}
-	if in == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("in")
-	}
-	if inctx == nil {
-		return empty, fail.InvalidParameterCannotBeNilError("inctx")
-	}
-
-	ref, _ := srvutils.GetReference(in)
-	if ref == "" {
-		return nil, fail.InvalidRequestError("neither name nor id given as reference")
-	}
-
-	job, err := PrepareJob(inctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/sanitize", ref))
-	if err != nil {
-		return nil, err
-	}
-	defer job.Close()
-
-	return empty, fail.NotImplementedError("not yet implemented") // FIXME: Technical debt
 }
 
 // Bonds lists the resources bound to the Security Group

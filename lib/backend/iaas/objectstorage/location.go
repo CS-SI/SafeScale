@@ -65,6 +65,7 @@ type Config struct {
 	BucketName       string
 	DNS              string
 	Direct           bool // if true, no stow cache is used
+	Suffix           string
 }
 
 // Location ...

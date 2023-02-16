@@ -1,14 +1,23 @@
 ```
 [[tenants]]
-    name = "TenantName"
+    name = "TestOVHGra"
     client = "ovh"
 
-    # This part defines how to authenticate with the provider
     [tenants.identity]
-        Username = "<Username>"
-        Password = "<Password>"
-        DomainName = "<DomainName>"
-        TenantID = "<TenantID>"
-        TenantName = "<TenantName>"
-        AllowReauth = "<AllowReauth>"
+        ApplicationKey = "123456.........................."
+        OpenstackID = "ABCDE......."
+        OpenstackPassword = "abcdefgh123....................."
+        
+    [tenants.compute]
+        Region = "SBG5"
+        ProjectName = "987654.........."
+        DefaultImage = "Ubuntu 18.04"
+
+    [tenants.network]
+        ProviderNetwork = "Ext-Net"
+
+    [tenants.objectstorage]
+        Type = "swift"
+        Region = "SBG"
+        AuthURL = "https://auth.cloud.ovh.net/v3"
 ```

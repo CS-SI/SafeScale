@@ -33,6 +33,9 @@ RUN wget --no-check-certificate https://github.com/google/protobuf/releases/down
 && ln -s /usr/local/protoc/bin/protoc /usr/local/bin \
 && rm /tmp/protoc-$PROTOVERSION-linux-x86_64.zip
 
+RUN wget --no-check-certificate https://github.com/grpc/grpc-web/releases/download/1.3.1/protoc-gen-grpc-web-1.3.1-linux-x86_64 -O /usr/bin/protoc-gen-grpc-web \
+&& chmod ugo+x /usr/bin/protoc-gen-grpc-web
+
 FROM base AS builder
 
 WORKDIR /tmp
@@ -43,11 +46,18 @@ WORKDIR /tmp
 RUN apt-get install -y --allow-unauthenticated --no-install-recommends \
 locales \
 sudo \
+locate \
 build-essential \
 make \
+wget \
 curl \
+unzip \
+vim \
 git \
 jq \
+iproute2 \
+iputils-ping \
+openssh-server \
 python3 \
 python3-pip \
 && apt-get autoclean -y \
@@ -60,6 +70,9 @@ ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
 RUN python3 -c "print('testing UTF8: 👌')"
+
+RUN wget --no-check-certificate https://github.com/grpc/grpc-web/releases/download/1.3.1/protoc-gen-grpc-web-1.3.1-linux-x86_64 -O /usr/bin/protoc-gen-grpc-web \
+&& chmod ugo+x /usr/bin/protoc-gen-grpc-web
 
 ENV SHELL /bin/bash
 ENV GOPATH /go
@@ -100,3 +113,6 @@ COPY --from=builder /exported/safescaled /exported/safescaled
 COPY --from=builder /exported/safescale /exported/safescale
 COPY --from=builder /exported/go.mod /exported/go.mod
 COPY --from=builder /exported/go.sum /exported/go.sum
+COPY --from=builder /exported/safescale.proto /exported/safescale.proto
+COPY --from=builder /exported/safescale_pb.js /exported/safescale_pb.js
+COPY --from=builder /exported/safescale_grpc_web_pb.js /exported/safescale_grpc_web_pb.js

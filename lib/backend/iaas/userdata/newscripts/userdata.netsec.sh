@@ -105,10 +105,9 @@ function reset_fw() {
   case $LINUX_KIND in
   debian)
     echo "Reset firewall"
-    sfRetry4 "sfApt update" || failure 207 "reset_fw(): failure running apt update"
-    sfRetry4 "sfApt -y autoclean autoremove" || failure 210 "reset_fw(): failure running cleanup"
+    sfApt update --allow-insecure-repositories
     sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 210 "reset_fw(): failure installing iptables"
-    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3 python3-pip" || failure 211 "reset_fw(): failure installing firewalld"
+    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3" || failure 211 "reset_fw(): failure installing firewalld"
 
     systemctl is-active ufw &> /dev/null && {
       echo "Stopping ufw"
@@ -122,10 +121,9 @@ function reset_fw() {
 
   ubuntu)
     echo "Reset firewall"
-    sfRetry4 "sfApt update" || failure 213 "reset_fw(): failure running apt update"
-    sfRetry4 "sfApt -y autoclean autoremove" || failure 213 "reset_fw(): failure running cleanup"
+    sfApt update --allow-insecure-repositories
     sfRetry4 "sfApt install -q -y --no-install-recommends iptables" || failure 214 "reset_fw(): failure installing iptables"
-    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3 python3-pip" || failure 215 "reset_fw(): failure installing firewalld"
+    sfRetry4 "sfApt install -q -y --no-install-recommends firewalld python3" || failure 215 "reset_fw(): failure installing firewalld"
 
     systemctl is-active ufw &> /dev/null && {
       echo "Stopping ufw"
@@ -146,7 +144,7 @@ function reset_fw() {
           sudo dnf config-manager -y --disable epel-modular
           sudo dnf config-manager -y --disable epel
         fi
-        sfRetry4 "sfYum install -q -y firewalld python3 python3-pip" || failure 220 "reset_fw(): failure installing firewalld"
+        sfRetry4 "sfYum install -q -y firewalld python3" || failure 220 "reset_fw(): failure installing firewalld"
       fi
     fi
     ;;
@@ -1310,7 +1308,7 @@ function install_drivers_nvidia() {
   ubuntu)
     sfFinishPreviousInstall
     add-apt-repository -y ppa:graphics-drivers &> /dev/null
-    sfRetry4 "sfApt update" || failure 201 "apt update failed"
+    sfApt update --allow-insecure-repositories || failure 201 "apt update failed"
     sfRetry4 "sfApt -y install nvidia-410 &>/dev/null" || {
       sfRetry4 "sfApt -y install nvidia-driver-410 &>/dev/null" || failure 201 "failed nvidia driver install"
     }
@@ -1321,10 +1319,10 @@ function install_drivers_nvidia() {
       echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >> /etc/modprobe.d/blacklist-nouveau.conf
       rmmod nouveau
     fi
-    sfRetry4 "sfApt update"
+    sfApt update --allow-insecure-repositories
     sfRetry4 "sfApt install -y --no-install-recommends dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null" || failure 202 "failure installing nvdiia requirements"
     dpkg --add-architecture i386 &> /dev/null
-    sfRetry4 "sfApt update"
+    sfApt update --allow-insecure-repositories
     sfRetry4 "sfApt install -y --no-install-recommends lib32z1 lib32ncurses5 &>/dev/null" || failure 203 "failure installing nvidia requirements"
     wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &> /dev/null || failure 204 "failure downloading nvidia installer"
     bash NVIDIA-Linux-x86_64-410.78.run -s || failure 205 "failure running nvidia installer"
@@ -1367,7 +1365,7 @@ EOF
     # # Force use of IPv4 addresses when installing packages
     # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
 
-    sfApt update || {
+    sfApt update --allow-insecure-repositories || {
       echo "problem updating package repos"
       return 209
     }
@@ -1387,7 +1385,7 @@ EOF
     # # Force use of IPv4 addresses when installing packages
     # echo 'Acquire::ForceIPv4 "true";' >/etc/apt/apt.conf.d/99force-ipv4
 
-    sfApt update || {
+    sfApt update --allow-insecure-repositories || {
       echo "problem updating package repos"
       return 210
     }
@@ -1413,14 +1411,20 @@ EOF
       fi
       # netplan.io may break networking... So ensure networking is working as expected
       ensure_network_connectivity
-      sfApt install -y --no-install-recommends sudo || {
+      sfApt install -y --no-install-recommends --allow-change-held-packages sudo || {
         echo "problem installing sudo"
         return 210
       }
     else
-      sfApt install -y --no-install-recommends systemd pciutils sudo || {
+      sfApt install -y --no-install-recommends pciutils sudo || {
         echo "problem installing pciutils and sudo"
         return 211
+      }
+      dpkg -l systemd | tail -n 1 | grep -E '^hi|^ii' || {
+        sfApt install -y --no-install-recommends systemd || {
+          echo "problem installing systemd"
+          return 210
+        }
       }
     fi
 
@@ -1428,22 +1432,26 @@ EOF
       if [ "{{.ProviderName}}" == "aws" ]; then
         : # do nothing
       else
+        dpkg -l systemd | tail -n 1 | grep -E '^hi|^ii' || {
+          sfApt install -y --no-install-recommends systemd || {
+            echo "problem installing systemd"
+            return 210
+          }
+        }
+      fi
+    else
+      dpkg -l systemd | tail -n 1 | grep -E '^hi|^ii' || {
         sfApt install -y --no-install-recommends systemd || {
           echo "problem installing systemd"
           return 210
         }
-      fi
-    else
-      sfApt install -y --no-install-recommends systemd || {
-        echo "problem installing systemd"
-        return 210
       }
       # systemd, if updated, is restarted, so we may need to ensure again network connectivity
       ensure_network_connectivity
     fi
 
     # # Security updates ...
-    # sfApt update &>/dev/null && sfApt install -qy unattended-upgrades && unattended-upgrades -v
+    # sfApt update --allow-insecure-repositories &>/dev/null && sfApt install -qy unattended-upgrades && unattended-upgrades -v
     ;;
 
   redhat | centos)
@@ -1468,13 +1476,13 @@ EOF
 function install_packages() {
   case $LINUX_KIND in
   ubuntu | debian)
-    sfApt install -y -qq --no-install-recommends wget curl jq zip unzip time at sshpass &> /dev/null || failure 213 "failure installing utility packages: jq zip time at"
+    sfApt install -y -qq --no-install-recommends wget jq zip unzip time at sshpass &> /dev/null || failure 213 "failure installing utility packages: jq zip time at"
     ;;
   redhat | centos)
     if [ $(versionchk ${VERSION_ID}) -ge $(versionchk "8.0") ]; then
-      sfYum install -y -q wget curl jq zip unzip time at sshpass &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
+      sfYum install -y -q wget jq zip unzip time at sshpass &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
     else
-      sfYum install --enablerepo=epel -y -q wget curl jq zip unzip time at sshpass &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
+      sfYum install --enablerepo=epel -y -q wget jq zip unzip time at sshpass &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
     fi
     ;;
   *)
