@@ -4,9 +4,13 @@ on:
   push:
     branches:
       - 'check/**'
+      - 'experimental/**'
+      - 'feature/**'
       - 'pr/**'
   pull_request:
     branches:
+      - 'experimental/**'
+      - 'feature/**'
       - 'check/**'
       - 'pr/**'
 
