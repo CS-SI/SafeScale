@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -89,6 +90,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 	var (
 		tenantInCfg    bool
 		found          bool
+		ok             bool
 		name, provider string
 		svc            Service
 		svcProvider    = "__not_found__"
@@ -108,22 +110,35 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		}
 
 		tenantInCfg = true
-		provider, found = tenant["provider"].(string)
-		if !found {
-			provider, found = tenant["Provider"].(string)
-			if !found {
-				provider, found = tenant["client"].(string)
-				if !found {
-					provider, found = tenant["Client"].(string)
-					if !found {
-						logrus.WithContext(ctx).Error("Missing field 'provider' or 'client' in tenant")
-						continue
-					}
-				}
+
+		xerr := validateTenant(tenant)
+
+		if xerr != nil {
+			return nullService(), xerr
+		}
+
+		providerKeysToCheck := []string{
+			"provider",
+			"Provider",
+			"client",
+			"Client",
+		}
+
+		ok = false
+
+		for _, key := range providerKeysToCheck {
+			if provider, found = tenant[key].(string); found {
+				svcProvider = provider
+				ok = true
+				break
 			}
 		}
 
-		svcProvider = provider
+		if !ok {
+			logrus.WithContext(ctx).Error("Missing field 'provider' or 'client' in tenant")
+			continue
+		}
+
 		svc, found = allProviders[provider]
 		if !found {
 			logrus.WithContext(ctx).Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
@@ -387,41 +402,68 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	var (
 		config objectstorage.Config
 		ok     bool
+		found  bool
 	)
 
 	identity, _ := tenant["identity"].(map[string]interface{})      // nolint
 	compute, _ := tenant["compute"].(map[string]interface{})        // nolint
 	ostorage, _ := tenant["objectstorage"].(map[string]interface{}) // nolint
+	client, _ := tenant["client"].(string)
 
 	if config.Type, ok = ostorage["Type"].(string); !ok {
 		return config, fail.SyntaxError("missing setting 'Type' in 'objectstorage' section")
 	}
 
-	if config.Domain, ok = ostorage["Domain"].(string); !ok {
-		if config.Domain, ok = ostorage["DomainName"].(string); !ok {
-			if config.Domain, ok = compute["Domain"].(string); !ok {
-				if config.Domain, ok = compute["DomainName"].(string); !ok {
-					if config.Domain, ok = identity["Domain"].(string); !ok {
-						if config.Domain, ok = identity["DomainName"].(string); !ok {
-							config.Domain = authOpts.GetString("DomainName")
-						}
-					}
-				}
-			}
+	domainKeysToCheck := []string{
+		"Domain",
+		"DomainName",
+	}
+
+	found = false
+
+	for _, key := range domainKeysToCheck {
+		if val, ok := ostorage[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
+		} else if val, ok := compute[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
+		} else if val, ok := identity[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
 		}
 	}
+	if !found {
+		config.Domain = authOpts.GetString("DomainName")
+	}
+
 	config.TenantDomain = config.Domain
 
-	if config.Tenant, ok = ostorage["Tenant"].(string); !ok {
-		if config.Tenant, ok = ostorage["ProjectName"].(string); !ok {
-			if config.Tenant, ok = ostorage["ProjectID"].(string); !ok {
-				if config.Tenant, ok = compute["ProjectName"].(string); !ok {
-					if config.Tenant, ok = compute["ProjectID"].(string); !ok {
-						config.Tenant = authOpts.GetString("ProjectName")
-					}
-				}
-			}
+	tenantKeysToCheck := []string{
+		"Tenant",
+		"ProjectName",
+		"ProjectID",
+	}
+
+	found = false
+
+	for _, key := range tenantKeysToCheck {
+		if val, ok := ostorage[key].(string); ok {
+			config.Tenant = val
+			found = true
+			break
+		} else if val, ok := compute[key].(string); ok {
+			config.Tenant = val
+			found = true
+			break
 		}
+	}
+
+	if !found {
+		config.Tenant = authOpts.GetString("ProjectName")
 	}
 
 	config.AuthURL, _ = ostorage["AuthURL"].(string)   // nolint
@@ -430,41 +472,82 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		config.Direct, _ = ostorage["Direct"].(bool) // nolint
 	}
 
-	if config.User, ok = ostorage["AccessKey"].(string); !ok {
-		if config.User, ok = ostorage["OpenStackID"].(string); !ok {
-			if config.User, ok = ostorage["Username"].(string); !ok {
-				if config.User, ok = identity["OpenstackID"].(string); !ok {
-					config.User, _ = identity["Username"].(string) // nolint
-				}
+	if client != "gcp" {
+		userKeysToCheck := []string{
+			"AccessKey",
+			"OpenstackID",
+			"Username",
+		}
+
+		found = false
+
+		for _, key := range userKeysToCheck {
+			if val, ok := ostorage[key].(string); ok {
+				config.User = val
+				found = true
+				break
+			} else if val, ok := identity[key].(string); ok {
+				config.User = val
+				found = true
+				break
 			}
+		}
+
+		if !found {
+			return config, fail.SyntaxError("missing setting 'AccessKey', 'OpenstackID' or 'Username' field in 'identity' section")
 		}
 	}
 
-	if config.Key, ok = ostorage["ApplicationKey"].(string); !ok {
-		config.Key, _ = identity["ApplicationKey"].(string) // nolint
+	if client == "ovh" || client == "openstack" || client == "cloudferro" {
+		key := "ApplicationKey"
+
+		if val, ok := ostorage[key].(string); ok {
+			config.Key = val
+		} else if val, ok := identity[key].(string); ok {
+			config.Key = val
+		} else if tenant["client"].(string) != "aws" {
+			return config, fail.SyntaxError("missing setting 'ApplicationKey' in 'identity' section")
+		}
 	}
 
-	if config.SecretKey, ok = ostorage["SecretKey"].(string); !ok {
-		if config.SecretKey, ok = ostorage["OpenstackPassword"].(string); !ok {
-			if config.SecretKey, ok = ostorage["Password"].(string); !ok {
-				if config.SecretKey, ok = identity["SecretKey"].(string); !ok {
-					if config.SecretKey, ok = identity["OpenstackPassword"].(string); !ok {
-						config.SecretKey, _ = identity["Password"].(string) // nolint
-					}
-				}
-			}
+	secretKeyToCheck := []string{
+		"SecretKey",
+		"OpenstackPassword",
+		"Password",
+	}
+
+	found = false
+
+	for _, key := range secretKeyToCheck {
+		if val, ok := ostorage[key].(string); ok {
+			config.SecretKey = val
+			found = true
+			break
+		} else if val, ok := identity[key].(string); ok {
+			config.SecretKey = val
+			found = true
+			break
 		}
+	}
+
+	if !found {
+		return config, fail.SyntaxError("missing settings 'SecretKey' or 'OpenstackPassword' or 'Password' in 'identity' section")
 	}
 
 	if config.Region, ok = ostorage["Region"].(string); !ok {
 		config.Region, _ = compute["Region"].(string) // nolint
+		// TODO : Use validateRegionName function
 		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
 		// 	return config, err
 		// }
 	}
 
-	if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
-		config.AvailabilityZone, _ = compute["AvailabilityZone"].(string) // nolint
+	key := "AvailabilityZone"
+
+	if val, ok := ostorage[key].(string); ok {
+		config.AvailabilityZone = val
+	} else if val, ok := compute[key].(string); ok {
+		config.AvailabilityZone = val
 	}
 
 	for k, v := range identity {
@@ -546,6 +629,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 	var (
 		config objectstorage.Config
 		ok     bool
+		found  bool
 	)
 
 	// FIXME: This code is ancient and doesn't provide nor hints nor protection against formatting
@@ -554,6 +638,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 	compute, _ := tenant["compute"].(map[string]interface{})        // nolint
 	ostorage, _ := tenant["objectstorage"].(map[string]interface{}) // nolint
 	metadata, _ := tenant["metadata"].(map[string]interface{})      // nolint
+	client, _ := tenant["client"].(string)
 
 	if config.Type, ok = metadata["Type"].(string); !ok {
 		if config.Type, ok = ostorage["Type"].(string); !ok {
@@ -561,40 +646,55 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		}
 	}
 
-	if config.Domain, ok = metadata["Domain"].(string); !ok {
-		if config.Domain, ok = metadata["DomainName"].(string); !ok {
-			if config.Domain, ok = ostorage["Domain"].(string); !ok {
-				if config.Domain, ok = ostorage["DomainName"].(string); !ok {
-					if config.Domain, ok = compute["Domain"].(string); !ok {
-						if config.Domain, ok = compute["DomainName"].(string); !ok {
-							if config.Domain, ok = identity["Domain"].(string); !ok {
-								if config.Domain, ok = identity["DomainName"].(string); !ok {
-									config.Domain = authOpts.GetString("DomainName") // nolint
-								}
-							}
-						}
-					}
-				}
-			}
+	var domainKeyToCheck = []string{
+		"Domain",
+		"DomainName",
+	}
+
+	found = false
+
+	for _, key := range domainKeyToCheck {
+		if val, ok := metadata[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
+		} else if val, ok := ostorage[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
+		} else if val, ok := compute[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
+		} else if val, ok := compute[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
 		}
 	}
+
+	if !found {
+		config.Domain = authOpts.GetString("DomainName")
+	}
+
 	config.TenantDomain = config.Domain
 
-	if config.Tenant, ok = metadata["Tenant"].(string); !ok {
-		if config.Tenant, ok = metadata["ProjectName"].(string); !ok {
-			if config.Tenant, ok = metadata["ProjectID"].(string); !ok {
-				if config.Tenant, ok = ostorage["Tenant"].(string); !ok {
-					if config.Tenant, ok = ostorage["ProjectName"].(string); !ok {
-						if config.Tenant, ok = ostorage["ProjectID"].(string); !ok {
-							if config.Tenant, ok = compute["Tenant"].(string); !ok {
-								if config.Tenant, ok = compute["ProjectName"].(string); !ok {
-									config.Tenant, _ = compute["ProjectID"].(string) // nolint
-								}
-							}
-						}
-					}
-				}
-			}
+	var tenantKeysToCheck = []string{
+		"Tenant",
+		"ProjectName",
+		"ProjectID",
+	}
+
+	for _, key := range tenantKeysToCheck {
+		if val, ok := metadata[key].(string); ok {
+			config.Tenant = val
+			break
+		} else if val, ok := ostorage[key].(string); ok {
+			config.Tenant = val
+			break
+		} else if val, ok := compute[key].(string); ok {
+			config.Tenant = val
+			break
 		}
 	}
 
@@ -606,67 +706,127 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		config.Endpoint, _ = ostorage["Endpoint"].(string) // nolint
 	}
 
-	if config.User, ok = metadata["AccessKey"].(string); !ok {
-		if config.User, ok = metadata["OpenstackID"].(string); !ok {
-			if config.User, ok = metadata["Username"].(string); !ok {
-				if config.User, ok = ostorage["AccessKey"].(string); !ok {
-					if config.User, ok = ostorage["OpenStackID"].(string); !ok {
-						if config.User, ok = ostorage["Username"].(string); !ok {
-							if config.User, ok = identity["Username"].(string); !ok {
-								config.User, _ = identity["OpenstackID"].(string) // nolint
-							}
-						}
-					}
-				}
+	if client != "gcp" {
+		var userKeysToCheck = []string{
+			"AccessKey",
+			"OpenstackID",
+			"Username",
+		}
+
+		found = false
+
+		for _, key := range userKeysToCheck {
+			if val, ok := metadata[key].(string); ok {
+				config.User = val
+				found = true
+				break
+			} else if val, ok := ostorage[key].(string); ok {
+				config.User = val
+				found = true
+				break
+			} else if val, ok := identity[key].(string); ok {
+				config.User = val
+				found = true
+				break
 			}
+		}
+		if !found {
+			return config, fail.SyntaxError("missing setting 'AccessKey', 'OpenstackID' or 'Username' field in 'identity' section")
 		}
 	}
 
 	config.DNS, _ = compute["DNS"].(string) // nolint
 
-	if config.Key, ok = metadata["ApplicationKey"].(string); !ok {
-		if config.Key, ok = ostorage["ApplicationKey"].(string); !ok {
-			config.Key, _ = identity["ApplicationKey"].(string) // nolint
+	if client == "ovh" || client == "openstack" || client == "cloudferro" {
+		key := "ApplicationKey"
+		found = false
+
+		if val, ok := metadata[key].(string); ok {
+			config.Key = val
+			found = true
+		} else if val, ok := ostorage[key].(string); ok {
+			config.Key = val
+			found = true
+		} else if val, ok := identity[key].(string); ok {
+			config.Key = val
+			found = true
+		}
+		if !found {
+			return config, fail.SyntaxError("missing setting 'ApplicationKey' field in 'identity' section")
 		}
 	}
 
-	if config.SecretKey, ok = metadata["SecretKey"].(string); !ok {
-		if config.SecretKey, ok = metadata["AccessPassword"].(string); !ok {
-			if config.SecretKey, ok = metadata["OpenstackPassword"].(string); !ok {
-				if config.SecretKey, ok = metadata["Password"].(string); !ok {
-					if config.SecretKey, ok = ostorage["SecretKey"].(string); !ok {
-						if config.SecretKey, ok = ostorage["AccessPassword"].(string); !ok {
-							if config.SecretKey, ok = ostorage["OpenstackPassword"].(string); !ok {
-								if config.SecretKey, ok = ostorage["Password"].(string); !ok {
-									if config.SecretKey, ok = identity["SecretKey"].(string); !ok {
-										if config.SecretKey, ok = identity["AccessPassword"].(string); !ok {
-											if config.SecretKey, ok = identity["Password"].(string); !ok {
-												config.SecretKey, _ = identity["OpenstackPassword"].(string) // nolint
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+	var secretKeysToCheck = []string{
+		"SecretKey",
+		"AccessPassword",
+		"OpenstackPassword",
+		"Password",
 	}
 
-	if config.Region, ok = metadata["Region"].(string); !ok {
-		if config.Region, ok = ostorage["Region"].(string); !ok {
-			config.Region, _ = compute["Region"].(string) // nolint
+	found = false
+
+	for _, key := range secretKeysToCheck {
+		if val, ok := metadata[key].(string); ok {
+			config.SecretKey = val
+			found = true
+			break
+		} else if val, ok := ostorage[key].(string); ok {
+			config.SecretKey = val
+			found = true
+			break
+		} else if val, ok := identity[key].(string); ok {
+			config.SecretKey = val
+			found = true
+			break
 		}
-		// FIXME: Wrong, this needs validation, but not ALL providers
-		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-		// 	return config, err
-		// }
+	}
+	if !found {
+		return config, fail.SyntaxError("missing setting 'SecretKey' or 'AccessPassword' or 'OpenstackPasswork' or 'Password' field in 'identity' section")
 	}
 
-	if config.AvailabilityZone, ok = metadata["AvailabilityZone"].(string); !ok {
-		if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
-			config.AvailabilityZone, _ = compute["AvailabilityZone"].(string) // nolint
+	//if config.Region, ok = metadata["Region"].(string); !ok {
+	//	if config.Region, ok = ostorage["Region"].(string); !ok {
+	//		config.Region, _ = compute["Region"].(string) // nolint
+	//	}
+	//	// FIXME: Wrong, this needs validation, but not ALL providers
+	//	// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+	//	// 	return config, err
+	//	// }
+	//}
+
+	key := "Region"
+	found = false
+
+	if val, ok := metadata[key].(string); ok {
+		config.Region = val
+		found = true
+	} else if val, ok := ostorage[key].(string); ok {
+		config.Region = val
+		found = true
+	} else if val, ok := compute[key].(string); ok {
+		config.Region = val
+		found = true
+	}
+	if !found {
+		return config, fail.SyntaxError("missing setting 'Region' field in 'compute' section")
+	}
+
+	if client == "cloudferro" || client == "flexibleengine" {
+		key = "AvailabilityZone"
+		found = false
+
+		if val, ok := metadata[key].(string); ok {
+			config.AvailabilityZone = val
+			found = true
+		} else if val, ok := ostorage[key].(string); ok {
+			config.AvailabilityZone = val
+			found = true
+		} else if val, ok := compute[key].(string); ok {
+			config.AvailabilityZone = val
+			found = true
+		}
+		if !found {
+			return config, fail.SyntaxError("missing setting 'AvailabilityZone' field in 'compute' section")
 		}
 	}
 
@@ -784,4 +944,224 @@ func getTenantsFromViperCfg(v *viper.Viper) ([]map[string]interface{}, *viper.Vi
 		return nil, v, fail.ConvertError(err)
 	}
 	return out, v, nil
+}
+
+func validateTenant(tenant map[string]interface{}) fail.Error {
+	var (
+		name     string
+		client   string
+		identity map[string]interface{}
+		compute  map[string]interface{}
+		//network  map[string]interface{}
+		ostorage map[string]interface{}
+		metadata map[string]interface{}
+		val      string
+		ok       bool
+		found    bool
+	)
+
+	if val, ok = tenant["name"].(string); !ok {
+		return fail.SyntaxError("Missing field 'name' for tenant")
+	} else {
+		name = val
+	}
+
+	providerKeysToCheck := []string{
+		"provider",
+		"Provider",
+		"client",
+		"Client",
+	}
+
+	found = false
+
+	for _, key := range providerKeysToCheck {
+		if val, ok = tenant[key].(string); ok {
+			if !chekcClientName(val) {
+				return fail.SyntaxError("Client value be 'aws, cloudferro, ebrc, flexibleengine, gcp, local, openstack, outscale, ovh'")
+			}
+			client = val
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fail.SyntaxError("Missing field 'client' for tenant")
+	}
+
+	if identity, ok = tenant["identity"].(map[string]interface{}); !ok {
+		return fail.SyntaxError("No section 'identity' found for tenant %s", name)
+	}
+
+	if compute, ok = tenant["compute"].(map[string]interface{}); !ok {
+		return fail.SyntaxError("No section 'compute' found for tenant %s", name)
+	}
+
+	ostorage, _ = tenant["objectstorage"].(map[string]interface{})
+
+	metadata, _ = tenant["metadata"].(map[string]interface{})
+
+	if client != "gcp" {
+		userKeysToCheck := []string{
+			"AccessKey",
+			"OpenstackID",
+			"Username",
+		}
+
+		found = false
+
+		for _, key := range userKeysToCheck {
+			if _, ok := ostorage[key].(string); ok {
+				found = true
+				break
+			} else if _, ok := identity[key].(string); ok {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return fail.SyntaxError("missing setting 'AccessKey', 'OpenstackID' or 'Username' field in 'identity' section")
+		}
+	} else {
+		if _, ok := identity["User"].(string); !ok {
+			return fail.SyntaxError("missing setting 'User' field in 'identity section")
+		}
+	}
+
+	if client == "ovh" || client == "openstack" || client == "cloudferro" {
+		key := "ApplicationKey"
+		found = false
+
+		if _, ok := ostorage[key].(string); ok {
+			found = true
+		} else if _, ok := identity[key].(string); ok {
+			found = true
+		}
+
+		if !found {
+			return fail.SyntaxError("missing setting 'ApplicationKey' in 'identity' section")
+		}
+	}
+
+	secretKeyToCheck := []string{
+		"SecretKey",
+		"AccessPassword",
+		"OpenstackPassword",
+		"Password",
+	}
+
+	found = false
+
+	for _, key := range secretKeyToCheck {
+		if _, ok := metadata[key].(string); ok {
+			found = true
+			break
+		}
+		if _, ok := ostorage[key].(string); ok {
+			found = true
+			break
+		} else if _, ok := identity[key].(string); ok {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fail.SyntaxError("missing settings 'SecretKey' or 'AccessPassword' or 'OpenstackPassword' or 'Password' in 'identity' section")
+	}
+
+	if client == "cloudferro" || client == "flexibleengine" {
+		key := "AvailabilityZone"
+		found = false
+
+		if _, ok := ostorage[key].(string); ok {
+			found = true
+		} else if _, ok := compute[key].(string); ok {
+			found = true
+		}
+
+		if !found {
+			return fail.SyntaxError("missing settings 'AvailabilityZone' in 'compute' section")
+		}
+	}
+
+	if metadata != nil || ostorage != nil {
+		var typeName string
+		key := "Type"
+		found = false
+
+		if val, ok := metadata[key].(string); ok {
+			typeName = val
+			found = true
+		} else if val, ok := ostorage[key].(string); ok {
+			typeName = val
+			found = true
+		}
+
+		if !found {
+			return fail.SyntaxError("missing setting 'Type' in 'metadata' or 'objectstorage' section")
+		} else {
+			if !checkType(typeName) {
+				return fail.SyntaxError("Type value must be 's3, swift, azure, gce'")
+			}
+		}
+	}
+
+	key := "Region"
+	found = false
+
+	if _, ok := metadata[key].(string); ok {
+		found = true
+	} else if _, ok := ostorage[key].(string); ok {
+		found = true
+	} else if _, ok := compute[key].(string); ok {
+		found = true
+	}
+	if !found {
+		return fail.SyntaxError("missing setting 'Region' field in 'compute' section")
+	}
+
+	return nil
+}
+
+func chekcClientName(client string) bool {
+	clientList := []string{
+		"aws",
+		"cloudferro",
+		"ebrc",
+		"flexibleengine",
+		"gcp",
+		"local",
+		"openstack",
+		"outscale",
+		"ovh",
+	}
+
+	for _, key := range clientList {
+		if key == strings.ToLower(client) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func checkType(typeName string) bool {
+	typeList := []string{
+		"s3",
+		"swift",
+		"azure",
+		"gce",
+		"google",
+	}
+
+	for _, key := range typeList {
+		if key == strings.ToLower(typeName) {
+			return true
+		}
+	}
+
+	return false
 }
