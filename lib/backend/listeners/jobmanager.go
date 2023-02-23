@@ -63,7 +63,12 @@ func prepareJob(ctx context.Context, in scopeFromProtocol, description string) (
 		return nil, xerr
 	}
 
-	if j.Service().Capabilities().UseTerraformer {
+	svc, xerr := j.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if svc.Capabilities().UseTerraformer {
 		if !scopeHolder.IsLoaded() {
 			xerr = scopeHolder.LoadAbstracts(j.Context())
 			if xerr != nil {

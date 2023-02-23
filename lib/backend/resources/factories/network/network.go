@@ -37,12 +37,17 @@ func List(ctx context.Context) ([]*abstract.Network, fail.Error) {
 		return nil, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	networkInstance, xerr := New(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	withDefaultNetwork, xerr := myjob.Service().HasDefaultNetwork()
+	withDefaultNetwork, xerr := svc.HasDefaultNetwork()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -51,10 +56,11 @@ func List(ctx context.Context) ([]*abstract.Network, fail.Error) {
 	var list []*abstract.Network
 	if withDefaultNetwork {
 		var an *abstract.Network
-		an, xerr = myjob.Service().DefaultNetwork(ctx)
+		an, xerr = svc.DefaultNetwork(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		list = append(list, an)
 	}
 

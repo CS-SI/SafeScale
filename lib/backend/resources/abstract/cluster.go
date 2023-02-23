@@ -62,6 +62,8 @@ type Cluster struct {
 	Complexity    clustercomplexity.Enum `json:"complexity"`     // Complexity is the mode of cluster
 	Keypair       *KeyPair               `json:"keypair"`        // Keypair contains the key-pair used inside the Cluster
 	AdminPassword string                 `json:"admin_password"` // contains the password of the cladm account
+
+	Local clonable.Clonable `json:"-"` // contains complementary data that won't be store in metadata, but needed
 }
 
 // NewCluster ...
@@ -117,26 +119,40 @@ func (instance *Cluster) Replace(p clonable.Clonable) error {
 		return err
 	}
 
-	*instance = *src
-	instance.Keypair = nil
+	instance.Flavor = src.Flavor
+	instance.Complexity = src.Complexity
+	instance.AdminPassword = src.AdminPassword
 	if src.Keypair != nil {
 		instance.Keypair = &KeyPair{}
 		*instance.Keypair = *src.Keypair
 	}
-	instance.Flavor = src.Flavor
-	instance.Complexity = src.Complexity
-	instance.AdminPassword = src.AdminPassword
+
+	if src.Local != nil {
+		instance.Local, err = src.Local.Clone()
+		if err != nil {
+			return err
+		}
+	}
+
 	return instance.core.Replace(src.core)
 }
 
 // GetID returns the ID of the cluster (== GetName)
 // Satisfies interface data.Identifiable
-func (instance Cluster) GetID() (string, error) {
+func (instance *Cluster) GetID() (string, error) {
+	if valid.IsNull(instance) {
+		return "", fail.InvalidInstanceError()
+	}
+
 	return instance.GetName(), nil
 }
 
 // OK ...
-func (instance Cluster) OK() bool {
+func (instance *Cluster) OK() bool {
+	if valid.IsNull(instance) {
+		return false
+	}
+
 	result := true
 	result = result && instance.Name != ""
 	result = result && instance.Flavor != 0

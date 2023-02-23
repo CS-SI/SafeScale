@@ -48,13 +48,6 @@ func NewTagHandler(job jobapi.Job) LabelHandler {
 
 // List returns the network list
 func (handler *labelHandler) List(listTag bool) (list []*resources.Label, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -62,8 +55,15 @@ func (handler *labelHandler) List(listTag bool) (list []*resources.Label, ferr f
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "").WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(ctx)
+		}
+	}()
+	defer fail.OnPanic(&ferr)
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.tag"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
 
@@ -72,13 +72,13 @@ func (handler *labelHandler) List(listTag bool) (list []*resources.Label, ferr f
 		return nil, xerr
 	}
 
-	xerr = browseInstance.Browse(task.Context(), func(label *abstract.Label) fail.Error {
+	xerr = browseInstance.Browse(ctx, func(label *abstract.Label) fail.Error {
 		labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), label.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
 
-		isTag, innerXErr := labelInstance.IsTag(task.Context())
+		isTag, innerXErr := labelInstance.IsTag(ctx)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -97,13 +97,6 @@ func (handler *labelHandler) List(listTag bool) (list []*resources.Label, ferr f
 
 // Delete deletes Label referenced by ref
 func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -114,10 +107,17 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "(%s)", ref).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(ctx)
+		}
+	}()
+	defer fail.OnPanic(&ferr)
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.tag"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	instance, xerr := labelfactory.Load(handler.job.Context(), ref)
 	if xerr != nil {
@@ -125,23 +125,16 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 		case *fail.ErrNotFound:
 			return abstract.ResourceNotFoundError("tag", ref)
 		default:
-			logrus.WithContext(task.Context()).Debugf("failed to delete tag: %+v", xerr)
+			logrus.WithContext(ctx).Debugf("failed to delete tag: %+v", xerr)
 			return xerr
 		}
 	}
 
-	return instance.Delete(task.Context())
+	return instance.Delete(ctx)
 }
 
 // Inspect returns the tag identified by ref and its attachment (if any)
 func (handler *labelHandler) Inspect(ref string) (_ *resources.Label, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -152,12 +145,19 @@ func (handler *labelHandler) Inspect(ref string) (_ *resources.Label, ferr fail.
 		return nil, fail.InvalidParameterError("ref", "cannot be empty!")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.tag"), "('"+ref+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	ctx := handler.job.Context()
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(ctx)
+		}
+	}()
+	defer fail.OnPanic(&ferr)
 
-	instance, xerr := labelfactory.Load(handler.job.Context(), ref)
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.tag"), "('"+ref+"')").WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
+
+	instance, xerr := labelfactory.Load(ctx, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -172,13 +172,6 @@ func (handler *labelHandler) Inspect(ref string) (_ *resources.Label, ferr fail.
 
 // Create a tag
 func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue string) (_ *resources.Label, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -189,16 +182,24 @@ func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue s
 		return nil, fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tag"), "('%s', %d, %s)", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	ctx := handler.job.Context()
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(ctx)
+		}
+	}()
+	defer fail.OnPanic(&ferr)
 
-	instance, xerr := labelfactory.New(handler.job.Context())
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.tag"), "('%s', %d, %s)", name).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
+
+	instance, xerr := labelfactory.New(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = instance.Create(handler.job.Context(), name, hasDefault, defaultValue)
+	xerr = instance.Create(ctx, name, hasDefault, defaultValue)
 	if xerr != nil {
 		return nil, xerr
 	}

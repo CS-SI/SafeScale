@@ -69,11 +69,6 @@ func (handler *shareHandler) Create(
 	shareName, hostName, apath string, options string, /*securityModes []string,
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,*/
 ) (share *resources.Share, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -92,31 +87,32 @@ func (handler *shareHandler) Create(
 		return nil, fail.InvalidParameterError("path", "cannot be empty")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", shareName).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
-
-	shareInstance, xerr := sharefactory.New(handler.job.Context())
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), hostName)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return shareInstance, shareInstance.Create(task.Context(), shareName, hostInstance, apath, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
-}
-
-// Delete a share from host
-func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
+	ctx := handler.job.Context()
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
 		}
 	}()
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.share"), "(%s)", shareName).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
+
+	shareInstance, xerr := sharefactory.New(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	hostInstance, xerr := hostfactory.Load(ctx, hostName)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return shareInstance, shareInstance.Create(ctx, shareName, hostInstance, apath, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
+}
+
+// Delete a share from host
+func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -129,8 +125,14 @@ func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", name).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.share"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
@@ -139,16 +141,11 @@ func (handler *shareHandler) Delete(name string) (ferr fail.Error) {
 		return xerr
 	}
 
-	return shareInstance.Delete(task.Context())
+	return shareInstance.Delete(ctx)
 }
 
 // List return the list of all shares from all servers
 func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.HostShare, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -159,6 +156,12 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	}
 
 	ctx := handler.job.Context()
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(handler.job.Context())
+		}
+	}()
+
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.share"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
@@ -167,6 +170,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	var servers []string
 	xerr = objs.Browse(ctx, func(hostName string, shareID string) fail.Error {
 		servers = append(servers, hostName)
@@ -209,11 +213,6 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 
 // Mount a share on a local directory of a host
 func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bool) (mount *propertiesv1.HostRemoteMount, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
 	defer fail.OnPanic(&ferr)
 
 	if handler == nil {
@@ -232,13 +231,18 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 		return nil, fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareName, hostRef).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(ctx)
+		}
+	}()
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareName, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
 	// Retrieve info about the share
-	ctx := handler.job.Context()
 	shareInstance, xerr := sharefactory.Load(ctx, shareName)
 	if xerr != nil {
 		return nil, xerr
@@ -254,13 +258,6 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 
 // Unmount a share from local directory of a host
 func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -274,12 +271,18 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 		return fail.InvalidParameterError("hostRef", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareRef, hostRef).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(ctx)
+		}
+	}()
+	defer fail.OnPanic(&ferr)
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareRef, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
 
-	ctx := handler.job.Context()
 	objs, xerr := sharefactory.Load(ctx, shareRef)
 	if xerr != nil {
 		return xerr
@@ -296,13 +299,6 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 // Inspect returns the host and share corresponding to 'shareName'
 // If share isn't found, return (nil, nil, nil, utils.ErrNotFound)
 func (handler *shareHandler) Inspect(shareRef string) (_ *resources.Share, ferr fail.Error) {
-	defer func() {
-		if ferr != nil {
-			ferr.WithContext(handler.job.Context())
-		}
-	}()
-	defer fail.OnPanic(&ferr)
-
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -313,10 +309,17 @@ func (handler *shareHandler) Inspect(shareRef string) (_ *resources.Share, ferr 
 		return nil, fail.InvalidParameterError("shareName", "cannot be empty string")
 	}
 
-	task := handler.job.Task()
-	tracer := debug.NewTracer(task.Context(), tracing.ShouldTrace("handlers.share"), "(%s)", shareRef).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
+	ctx := handler.job.Context()
+	defer func() {
+		if ferr != nil {
+			ferr.WithContext(ctx)
+		}
+	}()
+	defer fail.OnPanic(&ferr)
 
-	return sharefactory.Load(handler.job.Context(), shareRef)
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.share"), "(%s)", shareRef).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
+
+	return sharefactory.Load(ctx, shareRef)
 }

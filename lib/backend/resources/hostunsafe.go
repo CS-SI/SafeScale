@@ -38,8 +38,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
-// unsafeRun is the non goroutine-safe version of Run, with less parameter validation, that does the real work
-func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+// run is the non goroutine-safe version of Run, with less parameter validation, that does the real work
+func (instance *Host) run(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
@@ -56,7 +56,12 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.NewError("the machine is not started: %s", state.String())
 	}
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -80,7 +85,7 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return retCode, stdOut, stdErr, xerr
 	}
 
-	retCode, stdOut, stdErr, xerr = run(ctx, sshProfile, cmd, outs, connTimeout+execTimeout)
+	retCode, stdOut, stdErr, xerr = remoteRun(ctx, sshProfile, cmd, outs, connTimeout+execTimeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // == *fail.ErrAborted
@@ -100,14 +105,14 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 	return retCode, stdOut, stdErr, xerr
 }
 
-// run executes command on the host
-// If run fails to connect to remote host, returns *fail.ErrNotAvailable
+// remoteRun executes command on the host
+// If remoteRun fails to connect to remote host, returns *fail.ErrNotAvailable
 // In case of error, can return:
 // - *fail.ErrExecution: problem detected running the script
 // - *fail.ErrNotAvailable: execution with 409 or 404 errors
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
-func run(ctx context.Context, sshProfile2 sshapi.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func remoteRun(ctx context.Context, sshProfile2 sshapi.Connector, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
 		timeout = temporal.HostLongOperationTimeout()
@@ -199,9 +204,9 @@ func getMD5Hash(text string) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-// unsafePush is the non goroutine-safe version of Push, with less parameter validation, that do the real work
+// push is the non goroutine-safe version of Push, with less parameter validation, that do the real work
 // Note: must be used with wisdom
-func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
+func (instance *Host) push(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
@@ -219,7 +224,12 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		return invalid, "", "", fail.InvalidParameterError("target", "cannot be empty string")
 	}
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -296,7 +306,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 				crcCtx, cancelCrc := context.WithTimeout(ctx, uploadTime)
 				defer cancelCrc()
 
-				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, uploadTime)
+				fretcode, fstdout, fstderr, finnerXerr := remoteRun(crcCtx, sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, uploadTime)
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
 					finnerXerr.Annotate("retcode", fretcode)
@@ -365,7 +375,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		iretcode, istdout, istderr, innerXerr := run(ctx, finalProfile, cmd, outputs.COLLECT, timeout)
+		iretcode, istdout, istderr, innerXerr := remoteRun(ctx, finalProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {
 			innerXerr.Annotate("retcode", iretcode)
@@ -395,8 +405,8 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 	return retcode, stdout, stderr, xerr
 }
 
-// unsafePushStringToFileWithOwnership is the non goroutine-safe version of PushStringToFIleWithOwnership, that does the real work
-func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (ferr fail.Error) {
+// pushStringToFileWithOwnership is the non goroutine-safe version of PushStringToFIleWithOwnership, that does the real work
+func (instance *Host) pushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	instance.localCache.RLock()
@@ -412,7 +422,12 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		return fail.InvalidParameterError("filename", "cannot be empty string")
 	}
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -449,7 +464,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 			default:
 			}
 
-			retcode, stdout, stderr, innerXErr := instance.unsafePush(ctx, f.Name(), filename, owner, mode, timings.ExecutionTimeout())
+			retcode, stdout, stderr, innerXErr := instance.push(ctx, f.Name(), filename, owner, mode, timings.ExecutionTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}

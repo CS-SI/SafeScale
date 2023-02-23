@@ -93,6 +93,11 @@ func LoadShare(inctx context.Context, ref string) (*Share, fail.Error) {
 		return nil, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -110,7 +115,7 @@ func LoadShare(inctx context.Context, ref string) (*Share, fail.Error) {
 			var kt *Share
 			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().Cache(ctx)
+			cache, xerr := svc.Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -431,7 +436,12 @@ func (instance *Share) Create(
 		return xerr
 	}
 
-	nfsServer, xerr := nfs.NewServer(instance.Service(), sshProfile)
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	nfsServer, xerr := nfs.NewServer(svc, sshProfile)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -669,6 +679,11 @@ func (instance *Share) Mount(ctx context.Context, target *Host, spath string, wi
 		shareName, shareID string
 	)
 
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	targetName = castedTarget.GetName()
 	targetID, err := target.GetID()
 	if err != nil {
@@ -796,13 +811,18 @@ func (instance *Share) Mount(ctx context.Context, target *Host, spath string, wi
 			return xerr
 		}
 
-		xerr = nfsClient.Install(ctx, instance.Service())
+		svc, xerr := instance.Service()
+		if xerr != nil {
+			return xerr
+		}
+
+		xerr = nfsClient.Install(ctx, svc)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 
-		xerr = nfsClient.Mount(ctx, instance.Service(), export, mountPath, withCache)
+		xerr = nfsClient.Mount(ctx, svc, export, mountPath, withCache)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -845,7 +865,7 @@ func (instance *Share) Mount(ctx context.Context, target *Host, spath string, wi
 				return
 			}
 
-			derr = nfsClient.Unmount(cleanupContextFrom(ctx), instance.Service(), export)
+			derr = nfsClient.Unmount(cleanupContextFrom(ctx), svc, export)
 			if derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount trying to Delete Share"))
 				return
@@ -1019,7 +1039,12 @@ func (instance *Share) trxUnmount(ctx context.Context, shareTrx shareTransaction
 			return inErr
 		}
 
-		inErr = nfsClient.Unmount(ctx, instance.Service(), serverPrivateIP+":"+hostShare.Path)
+		svc, inErr := instance.Service()
+		if inErr != nil {
+			return inErr
+		}
+
+		inErr = nfsClient.Unmount(ctx, svc, serverPrivateIP+":"+hostShare.Path)
 		if inErr != nil {
 			return inErr
 		}
@@ -1130,7 +1155,12 @@ func (instance *Share) Delete(ctx context.Context) (ferr fail.Error) {
 			return xerr
 		}
 
-		nfsServer, xerr := nfs.NewServer(instance.Service(), sshProfile)
+		svc, xerr := instance.Service()
+		if xerr != nil {
+			return xerr
+		}
+
+		nfsServer, xerr := nfs.NewServer(svc, sshProfile)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr

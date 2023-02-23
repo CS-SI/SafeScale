@@ -219,7 +219,14 @@ func (instance *Core[T]) Replace(in clonable.Clonable) error {
 }
 
 // Service returns the iaasapi.Service used to create/load the persistent object
-func (instance *Core[T]) Service() iaasapi.Service {
+func (instance *Core[T]) Service() (iaasapi.Service, fail.Error) {
+	if instance == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if instance.folder == nil {
+		return nil, fail.InvalidInstanceContentError("instance.folder", "cannot be nil")
+	}
+
 	return instance.folder.Service()
 }
 
@@ -561,7 +568,12 @@ func (instance *Core[T]) ReadByID(inctx context.Context, id string) (_ fail.Erro
 		gerr := func() (ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			timings, xerr := instance.Service().Timings()
+			svc, xerr := instance.Service()
+			if xerr != nil {
+				return xerr
+			}
+
+			timings, xerr := svc.Timings()
 			if xerr != nil {
 				return xerr
 			}
@@ -693,7 +705,12 @@ func (instance *Core[T]) readByID(inctx context.Context, id string) fail.Error {
 			}
 
 			// check in Scope failed, read the metadata storage
-			timings, xerr := instance.Service().Timings()
+			svc, xerr := instance.Service()
+			if xerr != nil {
+				return xerr
+			}
+
+			timings, xerr := svc.Timings()
 			if xerr != nil {
 				return xerr
 			}
@@ -815,7 +832,12 @@ func (instance *Core[T]) readByName(inctx context.Context, name string) fail.Err
 			}
 
 			// check in Scope failed, read the metadata storage
-			timings, xerr := instance.Service().Timings()
+			svc, xerr := instance.Service()
+			if xerr != nil {
+				return xerr
+			}
+
+			timings, xerr := svc.Timings()
 			if xerr != nil {
 				return xerr
 			}
@@ -952,7 +974,12 @@ func (instance *Core[T]) Reload(inctx context.Context) (ferr fail.Error) {
 func (instance *Core[T]) reload(inctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}

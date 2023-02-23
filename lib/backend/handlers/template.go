@@ -56,11 +56,17 @@ func (handler *templateHandler) List(all bool) (_ []*abstract.HostTemplate, ferr
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), true, "(all=%v)", all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	ctx := handler.job.Context()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
 
-	return handler.job.Service().ListTemplates(handler.job.Context(), all)
+	tracer := debug.NewTracer(ctx, true, "(all=%v)", all).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
+
+	return svc.ListTemplates(ctx, all)
 }
 
 // Match lists templates that match the sizing
@@ -76,11 +82,17 @@ func (handler *templateHandler) Match(sizing abstract.HostSizingRequirements) (_
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), true, "%s", sizing).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	ctx := handler.job.Context()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
 
-	return handler.job.Service().ListTemplatesBySizing(handler.job.Context(), sizing, false)
+	tracer := debug.NewTracer(ctx, true, "%s", sizing).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
+
+	return svc.ListTemplatesBySizing(ctx, sizing, false)
 }
 
 // Inspect returns information about a tenant
@@ -95,10 +107,15 @@ func (handler *templateHandler) Inspect(ref string) (_ *abstract.HostTemplate, f
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	ctx := handler.job.Context()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.template"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.template"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
-	return handler.job.Service().FindTemplateByName(handler.job.Context(), ref)
+	return svc.FindTemplateByName(ctx, ref)
 }

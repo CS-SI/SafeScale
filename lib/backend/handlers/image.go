@@ -61,11 +61,17 @@ func (handler *imageHandler) List(all bool) (images []*abstract.Image, ferr fail
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
+	ctx := handler.job.Context()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
 
-	return handler.job.Service().ListImages(handler.job.Context(), all)
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
+
+	return svc.ListImages(ctx, all)
 }
 
 // Select selects the image that best fits osname

@@ -23,11 +23,8 @@ import (
 	"reflect"
 	"time"
 
-	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
-	uuidpkg "github.com/gofrs/uuid"
-	"github.com/puzpuzpuz/xsync"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/common/job/api"
+	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/consul/consumer"
 	terraformerapi "github.com/CS-SI/SafeScale/v22/lib/backend/externals/terraform/consumer/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/externals/versions"
@@ -40,6 +37,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/options"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	uuidpkg "github.com/gofrs/uuid"
+	"github.com/puzpuzpuz/xsync"
 )
 
 // job contains the information needed by safescaled to execute a request
@@ -52,6 +51,7 @@ type job struct {
 	service   iaasapi.Service
 	kv        *consumer.KV
 	startTime time.Time
+	closed    bool
 }
 
 var JobList *xsync.MapOf[string, jobapi.Job]
@@ -220,23 +220,17 @@ func (instance *job) Context() context.Context {
 	return instance.ctx
 }
 
-// Task returns the task instance
-func (instance *job) Task() concurrency.Task {
-	if instance == nil {
-		t, _ := concurrency.NewTask()
-		return t
-	}
-
-	return instance.task
-}
-
 // Service returns the service instance
-func (instance *job) Service() iaasapi.Service {
+func (instance *job) Service() (iaasapi.Service, fail.Error) {
 	if instance == nil {
-		return nil
+		return nil, fail.InvalidInstanceError()
 	}
 
-	return instance.service
+	if instance.service == nil {
+		return nil, fail.InvalidInstanceContentError("instance.service", "cannot be nil")
+	}
+
+	return instance.service, nil
 }
 
 // Duration returns the duration of the job
@@ -278,12 +272,13 @@ func (instance *job) Aborted() (bool, fail.Error) {
 
 // Close tells the job to wait for end of operation; this ensures everything is cleaned up correctly
 func (instance *job) Close() {
-	if instance != nil {
+	if instance != nil && !instance.closed {
 		_ = deregister(instance.ID())
 		if instance.cancel != nil {
 			instance.cancel()
 		}
-		*instance = job{}
+		// *instance = job{}
+		instance.closed = true
 	}
 }
 

@@ -280,7 +280,7 @@ func clusterCreateCommand() *cobra.Command {
 				Parameters:     parameters,
 				DefaultSshPort: gatewaySSHPort,
 			}
-			res, err := ClientSession.Cluster.Create(&req, temporal.HostLongOperationTimeout())
+			res, err := ClientSession.Cluster.Create(&req, 0)
 			if err != nil {
 				err = fail.FromGRPCStatus(err)
 				return cli.FailureResponse(cli.ExitOnErrorWithMessage(exitcode.Run, err.Error()))

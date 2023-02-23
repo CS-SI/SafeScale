@@ -1,5 +1,4 @@
 //go:build debug
-// +build debug
 
 /*
  * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
@@ -33,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/data"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 var (
@@ -51,12 +51,15 @@ var (
 	}
 )
 
-func minimumRequiredServers(clusterIdentity abstract.Cluster) (uint, uint, uint, fail.Error) {
+func minimumRequiredServers(clusterAbstract *abstract.Cluster) (uint, uint, uint, fail.Error) {
+	if valid.IsNull(clusterAbstract) {
+		return 0, 0, 0, fail.InvalidParameterCannotBeNilError("clusterAbstract")
+	}
 	var masterCount uint
 	var privateNodeCount uint
 	var publicNodeCount uint
 
-	switch clusterIdentity.Complexity {
+	switch clusterAbstract.Complexity {
 	case clustercomplexity.Small:
 		masterCount = 1
 		privateNodeCount = 1
@@ -127,9 +130,9 @@ func configureCluster(ctx context.Context, c clusterflavors.ClusterTarget, param
 }
 
 // This function is called to remove a node from a Cluster
-func leaveNodeFromCluster(ctx context.Context, clusterInstance clusterflavors.ClusterTarget, node clusterflavors.HostTarget, selectedMaster clusterflavors.HostTarget) (ferr fail.Error) {
-	if clusterInstance == nil {
-		return fail.InvalidParameterCannotBeNilError("clusterInstance")
+func leaveNodeFromCluster(ctx context.Context, target clusterflavors.ClusterTarget, node clusterflavors.HostTarget, selectedMaster clusterflavors.HostTarget) (ferr fail.Error) {
+	if target == nil {
+		return fail.InvalidParameterCannotBeNilError("target")
 	}
 	if node == nil {
 		return fail.InvalidParameterCannotBeNilError("node")
@@ -138,13 +141,19 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance clusterflavors.Cl
 		return fail.InvalidParameterCannotBeNilError("selectedMaster")
 	}
 
-	// Drain pods from node
-	// cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
-	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets", node.GetName())
-	timings, xerr := clusterInstance.Service().Timings()
+	svc, xerr := target.Service()
 	if xerr != nil {
 		return xerr
 	}
+
+	// Drain pods from node
+	// cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
+	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets", node.GetName())
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	retcode, stdout, stderr, xerr := selectedMaster.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to execute pod drain from node '%s'", node.GetName())
@@ -169,7 +178,7 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance clusterflavors.Cl
 	cmd = fmt.Sprintf("sudo -u cladm -i kubectl delete node %s", node.GetName())
 	retcode, stdout, stderr, xerr = selectedMaster.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to execute node deletion '%s' from cluster '%s'", node.GetName(), clusterInstance.GetName())
+		return fail.Wrap(xerr, "failed to execute node deletion '%s' from cluster '%s'", node.GetName(), target.GetName())
 	}
 	switch retcode {
 	case 0:
@@ -180,7 +189,7 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance clusterflavors.Cl
 		}
 		fallthrough
 	default:
-		xerr := fail.ExecutionError(nil, "failed to delete node '%s' from cluster '%s'", node.GetName(), clusterInstance.GetName())
+		xerr := fail.ExecutionError(nil, "failed to delete node '%s' from cluster '%s'", node.GetName(), target.GetName())
 		xerr.Annotate("retcode", retcode)
 		xerr.Annotate("stdout", stdout)
 		xerr.Annotate("stderr", stderr)

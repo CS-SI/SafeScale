@@ -106,6 +106,11 @@ func LoadBucket(inctx context.Context, name string) (*Bucket, fail.Error) {
 		return nil, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -123,7 +128,7 @@ func LoadBucket(inctx context.Context, name string) (*Bucket, fail.Error) {
 			var kt *Bucket
 			refcache := fmt.Sprintf("%T/%s", kt, name)
 
-			cache, xerr := myjob.Service().Cache(ctx)
+			cache, xerr := svc.Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -196,7 +201,7 @@ func LoadBucket(inctx context.Context, name string) (*Bucket, fail.Error) {
 				}
 			}
 
-			if myjob.Service().Capabilities().UseTerraformer {
+			if svc.Capabilities().UseTerraformer {
 				bucketTrx, xerr := newBucketTransaction(ctx, bucketInstance)
 				if xerr != nil {
 					return nil, xerr
@@ -288,7 +293,12 @@ func (instance *Bucket) Exists(ctx context.Context) (bool, fail.Error) {
 		return false, fail.Wrap(err)
 	}
 
-	_, xerr := instance.Service().InspectBucket(ctx, theID)
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return false, xerr
+	}
+
+	_, xerr = svc.InspectBucket(ctx, theID)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -455,7 +465,12 @@ func (instance *Bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- check if Bucket already exist on provider side
-	ab, xerr := instance.Service().InspectBucket(ctx, name)
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	ab, xerr := svc.InspectBucket(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -474,7 +489,7 @@ func (instance *Bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 	}
 
 	// -- create Bucket
-	ab, xerr = instance.Service().CreateBucket(ctx, name)
+	ab, xerr = svc.CreateBucket(ctx, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -524,7 +539,12 @@ func (instance *Bucket) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// -- Delete Bucket
-	xerr = instance.Service().DeleteBucket(ctx, bun)
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = svc.DeleteBucket(ctx, bun)
 	if xerr != nil {
 		if strings.Contains(xerr.Error(), objectstorage.NotFound) {
 			return fail.NotFoundError("failed to find Bucket '%s'", bun)
@@ -564,7 +584,11 @@ func (instance *Bucket) Mount(ctx context.Context, hostName, path string) (ferr 
 	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	bun := instance.GetName()
-	svc := instance.Service()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	hostInstance, xerr := LoadHost(ctx, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

@@ -39,7 +39,12 @@ func List(ctx context.Context, all bool) (abstract.HostList, fail.Error) {
 			return nil, xerr
 		}
 
-		return myjob.Service().ListHosts(ctx, all)
+		svc, xerr := myjob.Service()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		return svc.ListHosts(ctx, all)
 	}
 
 	hostSvc, xerr := New(ctx)

@@ -84,7 +84,7 @@ func (s *FeatureListener) List(inctx context.Context, in *protocol.FeatureListRe
 		return empty, xerr
 	}
 
-	return resources.FeatureSliceFromResourceToProtocol(ctx, list), nil
+	return resources.FeatureSliceFromResourceToProtocol(ctx, list)
 }
 
 func convertTargetType(in protocol.FeatureTargetType) (featuretargettype.Enum, fail.Error) {

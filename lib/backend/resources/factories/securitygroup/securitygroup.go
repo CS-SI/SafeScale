@@ -38,7 +38,12 @@ func List(ctx context.Context, networkRef string, all bool) ([]*abstract.Securit
 			return nil, xerr
 		}
 
-		return myjob.Service().ListSecurityGroups(ctx, "")
+		svc, xerr := myjob.Service()
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		return svc.ListSecurityGroups(ctx, "")
 	}
 
 	var networkID string

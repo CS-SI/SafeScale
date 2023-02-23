@@ -1,5 +1,4 @@
 //go:build !debug
-// +build !debug
 
 /*
  * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu
@@ -51,7 +50,7 @@ var (
 	}
 )
 
-func minimumRequiredServers(clusterIdentity abstract.Cluster) (uint, uint, uint, fail.Error) {
+func minimumRequiredServers(clusterIdentity *abstract.Cluster) (uint, uint, uint, fail.Error) {
 	var masterCount uint
 	var privateNodeCount uint
 	var publicNodeCount uint
@@ -139,13 +138,19 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance clusterflavors.Cl
 		return fail.InvalidParameterCannotBeNilError("selectedMaster")
 	}
 
-	// Drain pods from node
-	// cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
-	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets", node.GetName())
-	timings, xerr := clusterInstance.Service().Timings()
+	svc, xerr := clusterInstance.Service()
 	if xerr != nil {
 		return xerr
 	}
+
+	// Drain pods from node
+	// cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
+	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets", node.GetName())
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
+	}
+
 	retcode, stdout, stderr, xerr := selectedMaster.Run(ctx, cmd, outputs.COLLECT, timings.ConnectionTimeout(), timings.ExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to execute pod drain from node '%s'", node.GetName())

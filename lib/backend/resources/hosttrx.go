@@ -104,6 +104,11 @@ func (hostTrx *hostTransactionImpl) DisableSecurityGroup(ctx context.Context, sg
 		return xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	sgName := sgTrx.GetName()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "('%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -128,16 +133,16 @@ func (hostTrx *hostTransactionImpl) DisableSecurityGroup(ctx context.Context, sg
 					return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, hostTrx.GetName())
 				}
 
-				caps := myjob.Service().Capabilities()
+				caps := svc.Capabilities()
 				if caps.CanDisableSecurityGroup {
-					innerXErr := myjob.Service().DisableSecurityGroup(ctx, asg)
+					innerXErr := svc.DisableSecurityGroup(ctx, asg)
 					innerXErr = debug.InjectPlannedFail(innerXErr)
 					if innerXErr != nil {
 						return innerXErr
 					}
 				} else {
 					// Bind the security group on provider side; if security group not binded, considered as a success
-					innerXErr := myjob.Service().UnbindSecurityGroupFromHost(ctx, asg, ahc)
+					innerXErr := svc.UnbindSecurityGroupFromHost(ctx, asg, ahc)
 					innerXErr = debug.InjectPlannedFail(innerXErr)
 					if innerXErr != nil {
 						switch innerXErr.(type) {
@@ -175,7 +180,11 @@ func (hostTrx *hostTransactionImpl) SetSecurityGroups(ctx context.Context, req a
 		return xerr
 	}
 
-	svc := myjob.Service()
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	hostName := hostTrx.GetName()
 
 	// In case of use of terraform, the security groups have already been set
@@ -586,7 +595,11 @@ func (hostTrx *hostTransactionImpl) UnbindDefaultSecurityGroupIfNeeded(ctx conte
 		return xerr
 	}
 
-	svc := myjob.Service()
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	if svc.Capabilities().UseTerraformer {
 		return nil
 	}
@@ -743,7 +756,11 @@ func (hostTrx *hostTransactionImpl) RelaxedDeleteHost(ctx context.Context, hostS
 		return xerr
 	}
 
-	svc := myjob.Service()
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
@@ -1216,8 +1233,13 @@ func (hostTrx *hostTransactionImpl) ForceGetState(ctx context.Context) (state ho
 		return state, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return state, xerr
+	}
+
 	xerr = alterHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
-		abstractHostFull, innerXErr := myjob.Service().InspectHost(ctx, ahc)
+		abstractHostFull, innerXErr := svc.InspectHost(ctx, ahc)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -1306,6 +1328,11 @@ func (hostTrx *hostTransactionImpl) EnableSecurityGroup(ctx context.Context, sgT
 		return xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	hostName := hostTrx.GetName()
 	sgName := sgTrx.GetName()
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.host"), "(%s)", sgName).WithStopwatch().Entering()
@@ -1331,16 +1358,16 @@ func (hostTrx *hostTransactionImpl) EnableSecurityGroup(ctx context.Context, sgT
 					return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, hostName)
 				}
 
-				caps := myjob.Service().Capabilities()
+				caps := svc.Capabilities()
 				if caps.CanDisableSecurityGroup {
-					innerXErr := myjob.Service().EnableSecurityGroup(ctx, asg)
+					innerXErr := svc.EnableSecurityGroup(ctx, asg)
 					innerXErr = debug.InjectPlannedFail(innerXErr)
 					if innerXErr != nil {
 						return innerXErr
 					}
 				} else {
 					// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), considered as a success
-					innerXErr := myjob.Service().BindSecurityGroupToHost(ctx, asg, ahc)
+					innerXErr := svc.BindSecurityGroupToHost(ctx, asg, ahc)
 					innerXErr = debug.InjectPlannedFail(innerXErr)
 					if innerXErr != nil {
 						switch innerXErr.(type) {

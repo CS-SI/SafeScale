@@ -88,6 +88,11 @@ func LoadNetwork(inctx context.Context, ref string) (*Network, fail.Error) {
 		return nil, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -105,7 +110,7 @@ func LoadNetwork(inctx context.Context, ref string) (*Network, fail.Error) {
 			var kt *Network
 			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().Cache(ctx)
+			cache, xerr := svc.Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -179,7 +184,7 @@ func LoadNetwork(inctx context.Context, ref string) (*Network, fail.Error) {
 				}
 			}
 
-			if myjob.Service().Capabilities().UseTerraformer {
+			if svc.Capabilities().UseTerraformer {
 				networkTrx, xerr := newNetworkTransaction(ctx, networkInstance)
 				if xerr != nil {
 					return nil, xerr
@@ -187,7 +192,7 @@ func LoadNetwork(inctx context.Context, ref string) (*Network, fail.Error) {
 				defer networkTrx.TerminateFromError(ctx, &ferr)
 
 				xerr = inspectNetworkMetadataAbstract(ctx, networkTrx, func(an *abstract.Network) fail.Error {
-					prov, xerr := myjob.Service().ProviderDriver()
+					prov, xerr := svc.ProviderDriver()
 					if xerr != nil {
 						return xerr
 					}
@@ -304,7 +309,13 @@ func (instance *Network) Exists(ctx context.Context) (bool, fail.Error) {
 	if err != nil {
 		return false, fail.Wrap(err)
 	}
-	_, xerr := instance.Service().InspectNetwork(ctx, theID)
+
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return false, xerr
+	}
+
+	_, xerr = svc.InspectNetwork(ctx, theID)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -338,7 +349,10 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 	tracer := debug.NewTracer(inctx, true, "('%s', '%s')", req.Name, req.CIDR).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	svc := instance.Service()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -503,9 +517,18 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	tracer := debug.NewTracer(ctx, true, "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	myjob, xerr := jobapi.FromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	// Check if Network already exists and is managed by SafeScale
-	svc := instance.Service()
-	_, xerr := LoadNetwork(ctx, ref)
+	_, xerr = LoadNetwork(ctx, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -536,13 +559,8 @@ func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Erro
 	// logrus.WithContext(ctx).Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
 	abstractNetwork.Imported = true
 
-	myjob, xerr := jobapi.FromContext(ctx)
-	if xerr != nil {
-		return xerr
-	}
-
-	if myjob.Service().Capabilities().UseTerraformer {
-		prov, xerr := myjob.Service().ProviderDriver()
+	if svc.Capabilities().UseTerraformer {
+		prov, xerr := svc.ProviderDriver()
 		if xerr != nil {
 			return xerr
 		}
@@ -621,7 +639,12 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 			tracer := debug.NewTracer(ctx, true, "").WithStopwatch().Entering()
 			defer tracer.Exiting()
 
-			timings, xerr := instance.Service().Timings()
+			svc, xerr := instance.Service()
+			if xerr != nil {
+				return xerr
+			}
+
+			timings, xerr := svc.Timings()
 			if xerr != nil {
 				return xerr
 			}
@@ -630,7 +653,7 @@ func (instance *Network) Delete(inctx context.Context) (ferr fail.Error) {
 				abstractNetwork *abstract.Network
 				subnets         map[string]string
 			)
-			svc := instance.Service()
+
 			xerr = inspectNetworkMetadata(ctx, networkTrx, func(an *abstract.Network, props *serialize.JSONProperties) fail.Error {
 				abstractNetwork = an
 

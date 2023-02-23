@@ -84,6 +84,11 @@ func LoadLabel(inctx context.Context, ref string) (*Label, fail.Error) {
 		return nil, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -101,7 +106,7 @@ func LoadLabel(inctx context.Context, ref string) (*Label, fail.Error) {
 			var kt *Label
 			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().Cache(ctx)
+			cache, xerr := svc.Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -175,7 +180,7 @@ func LoadLabel(inctx context.Context, ref string) (*Label, fail.Error) {
 				}
 			}
 
-			if myjob.Service().Capabilities().UseTerraformer {
+			if svc.Capabilities().UseTerraformer {
 				labelTrx, xerr := newLabelTransaction(ctx, labelInstance)
 				if xerr != nil {
 					return nil, xerr

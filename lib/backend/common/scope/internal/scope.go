@@ -390,7 +390,12 @@ func (s *scope) extractProvider(ctx context.Context) (providerUsingTerraform, fa
 		return nil, xerr
 	}
 
-	provider, xerr := myjob.Service().ProviderDriver()
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	provider, xerr := svc.ProviderDriver()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -661,6 +666,10 @@ func (s *scope) RegisterAbstract(rsc abstract.Abstract) fail.Error {
 }
 
 // RegisterAbstractIfNeeded ...
+// return true, nil if abstract wasn't register before the call and is now registered
+//
+//	false, nil if abstract was already registered
+//	false, error if an error occured
 func (s *scope) RegisterAbstractIfNeeded(rsc abstract.Abstract) (bool, fail.Error) {
 	if valid.IsNull(s) {
 		return false, fail.InvalidInstanceError()

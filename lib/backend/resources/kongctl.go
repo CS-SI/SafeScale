@@ -138,10 +138,15 @@ func NewKongController(ctx context.Context, subnet *Subnet, addressPrimaryGatewa
 		}
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	ctrl := &KongController{
 		subnet:  subnet,
 		gateway: addressedGateway,
-		service: myjob.Service(),
+		service: svc,
 	}
 	ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP(ctx)
 	xerr = debug.InjectPlannedFail(xerr)

@@ -31,8 +31,7 @@ import (
 )
 
 type ClusterTarget interface {
-	Service() iaasapi.Service
-	// FindAvailableMaster(context.Context) (HostTarget, fail.Error)
+	Service() (iaasapi.Service, fail.Error)
 	GetName() string
 	AddFeature(context.Context, string, data.Map[string, any], ...options.Option) (rscapi.Results, fail.Error)
 }
@@ -40,16 +39,16 @@ type ClusterTarget interface {
 type HostTarget interface {
 	GetName() string
 	Run(context.Context, string, outputs.Enum, time.Duration, time.Duration) (int, string, string, fail.Error)
-	Service() iaasapi.Service
+	Service() (iaasapi.Service, fail.Error)
 }
 
 // Makers ...
 type Makers struct {
-	MinimumRequiredServers func(clusterIdentity abstract.Cluster) (uint, uint, uint, fail.Error) // returns masterCount, privateNodeCount, publicNodeCount
-	DefaultGatewaySizing   func(c ClusterTarget) abstract.HostSizingRequirements                 // sizing of gateway(s)
-	DefaultMasterSizing    func(c ClusterTarget) abstract.HostSizingRequirements                 // default sizing of master(s)
-	DefaultNodeSizing      func(c ClusterTarget) abstract.HostSizingRequirements                 // default sizing of node(s)
-	DefaultImage           func(c ClusterTarget) string                                          // default image of server(s)
+	MinimumRequiredServers func(clusterIdentity *abstract.Cluster) (uint, uint, uint, fail.Error) // returns masterCount, privateNodeCount, publicNodeCount
+	DefaultGatewaySizing   func(c ClusterTarget) abstract.HostSizingRequirements                  // sizing of gateway(s)
+	DefaultMasterSizing    func(c ClusterTarget) abstract.HostSizingRequirements                  // default sizing of master(s)
+	DefaultNodeSizing      func(c ClusterTarget) abstract.HostSizingRequirements                  // default sizing of node(s)
+	DefaultImage           func(c ClusterTarget) string                                           // default image of server(s)
 	// GetNodeInstallationScript func(c resources.Cluster, nodeType clusternodetype.Enum) (string, map[string]interface{})
 	// GetGlobalSystemRequirements func(c resources.Cluster) (string, fail.Error)
 	ConfigureGateway       func(c ClusterTarget) fail.Error

@@ -88,9 +88,13 @@ func (instance *folder) IsNull() bool {
 }
 
 // Service returns the service used by the folder
-func (instance folder) Service() iaasapi.Service {
+func (instance folder) Service() (iaasapi.Service, fail.Error) {
 	if valid.IsNull(instance) {
-		return nil
+		return nil, fail.InvalidInstanceError()
+	}
+
+	if instance.job == nil {
+		return nil, fail.InvalidInstanceContentError("instance.job", "cannot be nil")
 	}
 
 	return instance.job.Service()
@@ -192,7 +196,12 @@ func (instance folder) Read(ctx context.Context, path string, name string, callb
 	}
 	_ = o
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -283,7 +292,12 @@ func (instance folder) Write(ctx context.Context, path string, name string, cont
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}

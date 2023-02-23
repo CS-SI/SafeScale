@@ -25,8 +25,8 @@ import (
 )
 
 // List returns a list of available hosts
-func List(ctx context.Context) (list []abstract.Cluster, ferr fail.Error) {
-	var emptyList []abstract.Cluster
+func List(ctx context.Context) (list []*abstract.Cluster, ferr fail.Error) {
+	var emptyList []*abstract.Cluster
 
 	if ctx == nil {
 		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
@@ -37,9 +37,9 @@ func List(ctx context.Context) (list []abstract.Cluster, ferr fail.Error) {
 		return nil, xerr
 	}
 
-	list = []abstract.Cluster{}
+	list = []*abstract.Cluster{}
 	xerr = instance.Browse(ctx, func(hc *abstract.Cluster) fail.Error {
-		list = append(list, *hc)
+		list = append(list, hc)
 		return nil
 	})
 	return list, xerr

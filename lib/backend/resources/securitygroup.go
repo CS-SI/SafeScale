@@ -113,6 +113,11 @@ func LoadSecurityGroup(inctx context.Context, ref string) (*SecurityGroup, fail.
 		return nil, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	type result struct {
 		rTr  *SecurityGroup
 		rErr fail.Error
@@ -127,7 +132,7 @@ func LoadSecurityGroup(inctx context.Context, ref string) (*SecurityGroup, fail.
 			var kt *SecurityGroup
 			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().Cache(ctx)
+			cache, xerr := svc.Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -199,7 +204,7 @@ func LoadSecurityGroup(inctx context.Context, ref string) (*SecurityGroup, fail.
 				}
 			}
 
-			if myjob.Service().Capabilities().UseTerraformer {
+			if svc.Capabilities().UseTerraformer {
 				sgTrx, xerr := newSecurityGroupTransaction(ctx, sgInstance)
 				if xerr != nil {
 					return nil, xerr
@@ -207,7 +212,7 @@ func LoadSecurityGroup(inctx context.Context, ref string) (*SecurityGroup, fail.
 				defer sgTrx.TerminateFromError(ctx, &ferr)
 
 				xerr = inspectSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
-					prov, xerr := myjob.Service().ProviderDriver()
+					prov, xerr := svc.ProviderDriver()
 					if xerr != nil {
 						return xerr
 					}
@@ -322,7 +327,12 @@ func (instance *SecurityGroup) Exists(ctx context.Context) (bool, fail.Error) {
 		return false, fail.Wrap(err)
 	}
 
-	_, xerr := instance.Service().InspectSecurityGroup(ctx, theID)
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return false, xerr
+	}
+
+	_, xerr = svc.InspectSecurityGroup(ctx, theID)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -433,8 +443,13 @@ func (instance *SecurityGroup) Create(inctx context.Context, networkID, name, de
 			defer fail.OnPanic(&ferr)
 
 			// Check if SecurityGroup exists and is managed by SafeScale
-			svc := instance.Service()
-			_, xerr := LoadSecurityGroup(ctx, name)
+			svc, xerr := instance.Service()
+			if xerr != nil {
+				ar := result{xerr}
+				return ar, ar.rErr
+			}
+
+			_, xerr = LoadSecurityGroup(ctx, name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -764,6 +779,11 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules ...*abstract.
 		trx.TerminateFromError(ctx, &ferr)
 	}()
 
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	return alterSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
 		for k, v := range rules {
 			if valid.IsNull(v) {
@@ -776,7 +796,7 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules ...*abstract.
 			}
 		}
 
-		innerXErr := instance.Service().AddRulesToSecurityGroup(ctx, asg, rules...)
+		innerXErr := svc.AddRulesToSecurityGroup(ctx, asg, rules...)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -802,6 +822,11 @@ func (instance *SecurityGroup) DeleteRules(ctx context.Context, rules ...*abstra
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.securitygroup")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	for k, v := range rules {
 		xerr := v.Validate()
 		if xerr != nil {
@@ -816,7 +841,7 @@ func (instance *SecurityGroup) DeleteRules(ctx context.Context, rules ...*abstra
 	defer trx.TerminateFromError(ctx, &ferr)
 
 	return alterSecurityGroupMetadataAbstract(ctx, trx, func(asg *abstract.SecurityGroup) fail.Error {
-		innerXErr := instance.Service().DeleteRulesFromSecurityGroup(ctx, asg, rules...)
+		innerXErr := svc.DeleteRulesFromSecurityGroup(ctx, asg, rules...)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:

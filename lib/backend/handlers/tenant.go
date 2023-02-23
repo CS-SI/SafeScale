@@ -181,11 +181,16 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	ctx := handler.job.Context()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
 
-	svc := handler.job.Service()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
+
 	// currentName, err := svc.GetName()
 	// if err != nil {
 	// 	return nil, err
@@ -193,8 +198,6 @@ func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInsp
 	// if tenantName != currentName {
 	// 	return nil, fail.NewError("we only inspect current tenant right now")
 	// }
-
-	ctx := handler.job.Context()
 
 	fromParams := func(in map[string]interface{}, key1 string, key2 string) string {
 		if val, ok := in[key1]; ok {
@@ -355,12 +358,15 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
-
-	svc := handler.job.Service()
 	ctx := handler.job.Context()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	isScannable, xerr := handler.checkScannable()
 	if xerr != nil {
@@ -422,7 +428,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}
 
 	defer func() {
-		derr := network.Delete(context.Background())
+		derr := network.Delete(ctx)
 		if derr != nil {
 			logrus.Warnf("Error deleting network '%s'", nid)
 			_ = ferr.AddConsequence(derr)
@@ -441,7 +447,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}
 
 	defer func() {
-		derr := subnet.Delete(context.Background())
+		derr := subnet.Delete(ctx)
 		if derr != nil {
 			logrus.Warnf("Error deleting subnet '%s'", snid)
 			_ = ferr.AddConsequence(derr)
@@ -516,19 +522,24 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	if err := handler.collect(ctx); err != nil {
 		return nil, fail.Wrap(err, "failed to save scanned info for tenant '%s'", svcName)
 	}
+
 	return &protocol.ScanResultList{Results: scanResultList}, nil
 }
 
 func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (ferr fail.Error) {
-	svc := handler.job.Service()
-	task := handler.job.Task()
+	ctx := handler.job.Context()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	tenantName, xerr := svc.GetName()
 	if xerr != nil {
 		return xerr
 	}
 
 	hostName := scannedHostPrefix + template.Name
-	host, xerr := hostfactory.New(handler.job.Context())
+	host, xerr := hostfactory.New(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -548,7 +559,8 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		Image: defaultScanImage,
 	}
 
-	if _, xerr = host.Create(handler.job.Context(), req, def, nil); xerr != nil {
+	_, xerr = host.Create(ctx, req, def, nil)
+	if xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': error creation", template.Name, hostName)
 	}
 
@@ -559,7 +571,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 
 	defer func() {
 		logrus.Infof("Deleting host '%s' with ID '%s'", hostName, hid)
-		ctx := jobapi.NewContextPropagatingJob(handler.job.Context())
+		ctx := jobapi.NewContextPropagatingJob(ctx)
 		derr := host.Delete(ctx)
 		if derr != nil {
 			switch derr.(type) {
@@ -571,7 +583,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		}
 	}()
 
-	_, cout, _, xerr := host.Run(task.Context(), cmd, outputs.COLLECT, temporal.ConnectionTimeout(), 5*temporal.ContextTimeout())
+	_, cout, _, xerr := host.Run(ctx, cmd, outputs.COLLECT, temporal.ConnectionTimeout(), 5*temporal.ContextTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
 	}
@@ -605,7 +617,10 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 }
 
 func (handler *tenantHandler) dryRun(ctx context.Context, templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
-	svc := handler.job.Service()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	var resultList []*protocol.ScanResult
 
@@ -635,7 +650,10 @@ func (handler *tenantHandler) dryRun(ctx context.Context, templateNamesToScan []
 }
 
 func (handler *tenantHandler) checkScannable() (isScannable bool, ferr fail.Error) {
-	svc := handler.job.Service()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return false, xerr
+	}
 
 	params, xerr := svc.TenantParameters()
 	if xerr != nil {
@@ -662,7 +680,11 @@ func (handler *tenantHandler) dumpTemplates(ctx context.Context) (ferr fail.Erro
 		Templates []*abstract.HostTemplate `json:"templates,omitempty"`
 	}
 
-	svc := handler.job.Service()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	templates, xerr := svc.ListTemplates(ctx, false)
 	if xerr != nil {
 		return xerr
@@ -698,7 +720,11 @@ func (handler *tenantHandler) dumpImages(ctx context.Context) (ferr fail.Error) 
 		Images []*abstract.Image `json:"images,omitempty"`
 	}
 
-	svc := handler.job.Service()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	images, xerr := svc.ListImages(ctx, false)
 	if xerr != nil {
 		return xerr
@@ -861,7 +887,10 @@ func createCPUInfo(output string) (_ *CPUInfo, ferr fail.Error) {
 }
 
 func (handler *tenantHandler) collect(ctx context.Context) (ferr fail.Error) {
-	svc := handler.job.Service()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return xerr
+	}
 
 	authOpts, xerr := svc.AuthenticationOptions()
 	if xerr != nil {

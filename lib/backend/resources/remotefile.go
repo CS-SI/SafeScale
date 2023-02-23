@@ -63,7 +63,12 @@ func (rfc Item) Upload(ctx context.Context, host *Host) (ferr fail.Error) { // F
 		return fail.InvalidParameterError("host", "must exist")
 	}
 
-	timings, xerr := host.Service().Timings()
+	svc, xerr := host.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -170,7 +175,12 @@ func (rfc Item) RemoveRemote(ctx context.Context, host *Host) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	timings, xerr := host.Service().Timings()
+	svc, xerr := host.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}

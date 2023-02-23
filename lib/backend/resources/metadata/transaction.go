@@ -36,12 +36,13 @@ import (
 // 'A' is a type satisfying the interface [abstract.Abstract]
 // 'T' is a type satisfying the interface [Metadata]
 type Transaction[A abstract.Abstract, T Metadata[A]] interface {
-	Commit(ctx context.Context) fail.Error                    // commits the changes
-	GetName() string                                          // returns transactioned object name
-	GetID() (string, error)                                   // returns transactioned object id
-	IsNull() bool                                             // Tells if instance is a zero-value
-	Rollback(ctx context.Context) fail.Error                  // ignores the uncommitted changes
-	SilentTerminate(ctx context.Context)                      // closes the connection without returning error, only log if error occurs
+	Commit(ctx context.Context) fail.Error   // commits the changes
+	GetName() string                         // returns transactioned object name
+	GetID() (string, error)                  // returns transactioned object id
+	IsNull() bool                            // Tells if instance is a zero-value
+	Rollback(ctx context.Context) fail.Error // ignores the uncommitted changes
+	SilentTerminate(ctx context.Context)     // closes the connection without returning error, only log if error occurs
+	Service() (iaasapi.Service, fail.Error)
 	Terminate(ctx context.Context) fail.Error                 // closes the transaction; will fail if dirty and neither Commit() nor Rollback() has been called
 	TerminateFromError(ctx context.Context, ferr *fail.Error) // closes the transaction, committing if ferr contains no error, rolling back otherwise
 
@@ -311,9 +312,9 @@ func (trx *transaction[A, T]) TerminateFromError(ctx context.Context, ferr *fail
 }
 
 // Service returns the iaasapi.Service used to create/load the persistent object
-func (trx *transaction[A, T]) Service() iaasapi.Service {
+func (trx *transaction[A, T]) Service() (iaasapi.Service, fail.Error) {
 	if trx == nil {
-		return nil
+		return nil, fail.InvalidInstanceError()
 	}
 
 	trx.mu.Lock()
@@ -399,7 +400,12 @@ func (trx *transaction[A, T]) inspect(ctx context.Context, callback ResourceCall
 		return fail.InvalidInstanceContentError("trx.coreChanges.properties", "cannot be nil")
 	}
 
-	timings, xerr := trx.coreChanges.Service().Timings()
+	svc, xerr := trx.coreChanges.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}

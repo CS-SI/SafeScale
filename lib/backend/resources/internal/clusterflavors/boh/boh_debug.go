@@ -29,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/internal/clusterflavors"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
 var (
@@ -44,14 +45,18 @@ var (
 	}
 )
 
-func minimumRequiredServers(clusterIdentity abstract.Cluster) (uint, uint, uint, fail.Error) {
+func minimumRequiredServers(clusterAbstract *abstract.Cluster) (uint, uint, uint, fail.Error) {
+	if valid.IsNull(clusterAbstract) {
+		return 0, 0, 0, fail.InvalidParameterCannotBeNilError("clusterAbstract")
+	}
+
 	var (
 		privateNodeCount uint
 		masterNodeCount  uint
 	)
 
 	// custom
-	switch clusterIdentity.Complexity {
+	switch clusterAbstract.Complexity {
 	case clustercomplexity.Small:
 		privateNodeCount = 3
 		masterNodeCount = 2

@@ -66,6 +66,11 @@ func (sgTrx *securityGroupTransactionImpl) BindToHost(ctx context.Context, hostT
 		return xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	select {
 	case <-ctx.Done():
 		return fail.Wrap(ctx.Err())
@@ -99,7 +104,7 @@ func (sgTrx *securityGroupTransactionImpl) BindToHost(ctx context.Context, hostT
 				switch enable {
 				case SecurityGroupEnable:
 					// In case the security group is already bound, we must consider a "duplicate" error has a success
-					lvl3xerr := myjob.Service().BindSecurityGroupToHost(ctx, asg, ahc)
+					lvl3xerr := svc.BindSecurityGroupToHost(ctx, asg, ahc)
 					lvl3xerr = debug.InjectPlannedFail(lvl3xerr)
 					if lvl3xerr != nil {
 						switch lvl3xerr.(type) {
@@ -112,7 +117,7 @@ func (sgTrx *securityGroupTransactionImpl) BindToHost(ctx context.Context, hostT
 					}
 				case SecurityGroupDisable:
 					// In case the security group has to be disabled, we must consider a "not found" error has a success
-					lvl3xerr := myjob.Service().UnbindSecurityGroupFromHost(ctx, asg, ahc)
+					lvl3xerr := svc.UnbindSecurityGroupFromHost(ctx, asg, ahc)
 					lvl3xerr = debug.InjectPlannedFail(lvl3xerr)
 					if lvl3xerr != nil {
 						switch lvl3xerr.(type) {
@@ -163,6 +168,11 @@ func (sgTrx *securityGroupTransactionImpl) UnbindFromHost(inctx context.Context,
 		return xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	sgID, err := sgTrx.GetID()
 	if err != nil {
 		return fail.Wrap(err)
@@ -187,7 +197,7 @@ func (sgTrx *securityGroupTransactionImpl) UnbindFromHost(inctx context.Context,
 
 			xerr = alterSecurityGroupMetadata(ctx, sgTrx, func(asg *abstract.SecurityGroup, sgProps *serialize.JSONProperties) fail.Error {
 				// Unbind Security Group from Host on provider side
-				innerXErr := myjob.Service().UnbindSecurityGroupFromHost(ctx, asg, abstractHost)
+				innerXErr := svc.UnbindSecurityGroupFromHost(ctx, asg, abstractHost)
 				innerXErr = debug.InjectPlannedFail(innerXErr)
 				if innerXErr != nil {
 					switch innerXErr.(type) {
@@ -560,6 +570,11 @@ func (sgTrx *securityGroupTransactionImpl) Delete(ctx context.Context, force boo
 		return xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	select {
 	case <-ctx.Done():
 		return fail.Wrap(ctx.Err())
@@ -681,7 +696,7 @@ func (sgTrx *securityGroupTransactionImpl) Delete(ctx context.Context, force boo
 	}
 
 	// Delete SecurityGroup resource
-	xerr = deleteProviderSecurityGroup(ctx, myjob.Service(), abstractSG)
+	xerr = deleteProviderSecurityGroup(ctx, svc, abstractSG)
 	if xerr != nil {
 		return xerr
 	}
@@ -721,8 +736,13 @@ func (sgTrx *securityGroupTransactionImpl) Clear(ctx context.Context) fail.Error
 		return xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	return alterSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
-		return myjob.Service().ClearSecurityGroup(ctx, asg)
+		return svc.ClearSecurityGroup(ctx, asg)
 	})
 
 }
@@ -744,6 +764,11 @@ func (sgTrx *securityGroupTransactionImpl) AddRules(inctx context.Context, rules
 		return xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	type result struct {
 		rErr fail.Error
 	}
@@ -760,7 +785,7 @@ func (sgTrx *securityGroupTransactionImpl) AddRules(inctx context.Context, rules
 		}
 
 		xerr := alterSecurityGroupMetadataAbstract(ctx, sgTrx, func(asg *abstract.SecurityGroup) fail.Error {
-			return myjob.Service().AddRulesToSecurityGroup(ctx, asg, rules...)
+			return svc.AddRulesToSecurityGroup(ctx, asg, rules...)
 		})
 		chRes <- result{xerr}
 	}()

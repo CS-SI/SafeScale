@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/internal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/eko/gocache/v2/store"
 	"github.com/farmergreg/rfsnotify"
@@ -202,6 +203,12 @@ func LoadFeatureFile(inctx context.Context, name string, embeddedOnly bool) (*Fe
 	if xerr != nil {
 		return nil, xerr
 	}
+
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -219,7 +226,7 @@ func LoadFeatureFile(inctx context.Context, name string, embeddedOnly bool) (*Fe
 			var kt *FeatureFile
 			cachename := fmt.Sprintf("%T/%s", kt, name)
 
-			cache, xerr := myjob.Service().Cache(ctx)
+			cache, xerr := svc.Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -228,7 +235,7 @@ func LoadFeatureFile(inctx context.Context, name string, embeddedOnly bool) (*Fe
 				if val, xerr := cache.Get(ctx, cachename); xerr == nil {
 					casted, ok := val.(*FeatureFile)
 					if ok {
-						incrementExpVar("ost.cache.hit")
+						internal.IncrementExpVar("ost.cache.hit")
 						return casted, nil
 					}
 				}

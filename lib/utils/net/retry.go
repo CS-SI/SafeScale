@@ -27,7 +27,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -129,7 +128,7 @@ func isRaw(in error) bool {
 // If the error is not a communication error, we return a *retry.ErrAborted error
 // containing the causing error in it
 func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // nolint
-	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
+	// FIXME: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
 	defer func() {
 		if err != nil {
 			switch err.(type) {
@@ -197,20 +196,20 @@ func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // n
 		default:
 			// doing something based on error's Error() method is always dangerous, so a little log here might help to find problems later
 			logrus.Tracef("trying to normalize based on Error() string of: (%s): %v", reflect.TypeOf(in).String(), in)
-			str := in.Error()
-			switch str {
-			case objectstorage.NotFound: // stow may return that error message if it does not find something
-				return fail.NotFoundError(objectstorage.NotFound)
-			default: // stow may return an error containing "dial tcp:" for some HTTP errors
-				if strings.Contains(str, "dial tcp:") { // FIXME: This should be a constant
-					return fail.NotAvailableError(str)
-				}
-				if strings.Contains(str, "EOF") { // stow may return that error message if comm fails // FIXME: Also a constant
-					return fail.NotAvailableError("encountered end-of-file")
-				}
-				// In any other case, the error should explain the retry has to stop
-				return retry.StopRetryError(in)
-			}
+			// str := in.Error()
+			// switch str {
+			// case objectstorage.NotFound: // stow may return that error message if it does not find something
+			// 	return fail.NotFoundError(objectstorage.NotFound)
+			// default: // stow may return an error containing "dial tcp:" for some HTTP errors
+			// 	if strings.Contains(str, "dial tcp:") { // FIXME: This should be a constant
+			// 		return fail.NotAvailableError(str)
+			// 	}
+			// 	if strings.Contains(str, "EOF") { // stow may return that error message if comm fails // FIXME: Also a constant
+			// 		return fail.NotAvailableError("encountered end-of-file")
+			// 	}
+			// In any other case, the error should explain the retry has to stop
+			return retry.StopRetryError(in)
+			// }
 		}
 	}
 	return nil
@@ -269,23 +268,25 @@ func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) {
 		default:
 			// doing something based on error's Error() method is always dangerous, so a little log here might help to find problems later
 			logrus.Tracef("trying to normalize based on Error() string of: (%s): %v", reflect.TypeOf(in).String(), in)
-			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
-			str := in.Error()
-			switch str {
-			case objectstorage.NotFound: // stow may return that error message if it does not find something
-				return fail.NotFoundError(objectstorage.NotFound)
-			default: // stow may return an error containing "dial tcp:" for some HTTP errors
-				if strings.Contains(str, "dial tcp:") {
-					logrus.Tracef("encountered 'dial tcp' error")
-					return fail.NotAvailableError(str)
-				}
-				if strings.Contains(str, "EOF") { // stow may return that error message if comm fails
-					logrus.Tracef("encountered end-of-file")
-					return fail.NotAvailableError("encountered end-of-file")
-				}
-				// In any other case, the error should explain the retry has to stop
-				return retry.StopRetryError(in)
-			}
+			// // VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
+			// str := in.Error()
+			// switch str {
+			// case objectstorage.NotFound: // stow may return that error message if it does not find something
+			// 	return fail.NotFoundError(objectstorage.NotFound)
+			// default: // stow may return an error containing "dial tcp:" for some HTTP errors
+			// 	if strings.Contains(str, "dial tcp:") {
+			// 		logrus.Tracef("encountered 'dial tcp' error")
+			// 		return fail.NotAvailableError(str)
+			// 	}
+			//
+			// 	if strings.Contains(str, "EOF") { // stow may return that error message if comm fails
+			// 		logrus.Tracef("encountered end-of-file")
+			// 		return fail.NotAvailableError("encountered end-of-file")
+			// 	}
+
+			// In any other case, the error should explain the retry has to stop
+			return retry.StopRetryError(in)
+			// }
 		}
 	}
 	return nil

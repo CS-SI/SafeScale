@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/factories/ssh"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/lang"
 	"github.com/sirupsen/logrus"
 
@@ -742,7 +743,11 @@ func (subnetTrx *subnetTransactionImpl) deleteSubnetThenWaitCompletion(ctx conte
 	if xerr != nil {
 		return xerr
 	}
-	svc := myjob.Service()
+
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return xerr
+	}
 
 	timings, xerr := svc.Timings()
 	if xerr != nil {
@@ -876,6 +881,11 @@ func (subnetTrx *subnetTransactionImpl) CreateGateway(inctx context.Context, req
 		return nil, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	type localresult struct {
 		rTr  data.Map[string, any]
 		rErr fail.Error
@@ -888,7 +898,6 @@ func (subnetTrx *subnetTransactionImpl) CreateGateway(inctx context.Context, req
 			defer fail.OnPanic(&ferr)
 
 			logrus.WithContext(ctx).Infof("Requesting the creation of gateway '%s' using template ID '%s', template name '%s', with image ID '%s'", request.ResourceName, request.TemplateID, request.TemplateRef, request.ImageID)
-			svc := myjob.Service()
 			request.PublicIP = true
 			request.IsGateway = true
 
@@ -1065,4 +1074,135 @@ func (subnetTrx *subnetTransactionImpl) UnbindSecurityGroups(ctx context.Context
 		}
 	}
 	return nil
+}
+
+// deleteGateways deletes all the gateways of the Subnet
+// A gateway host that is not found must be considered as a success
+func (subnetTrx *subnetTransactionImpl) deleteGateways(ctx context.Context) (ids []string, ferr fail.Error) {
+	var empty []string
+	return ids, inspectSubnetMetadataAbstract(ctx, subnetTrx, func(as *abstract.Subnet) fail.Error {
+		if as.GatewayIDs == nil { // unlikely, either is an input error or we are dealing with metadata corruption
+			as.GatewayIDs = empty
+		}
+
+		if len(as.GatewayIDs) == 0 { // unlikely, either is an input error or we are dealing with metadata corruption
+			gwInstance, xerr := LoadHost(ctx, fmt.Sprintf("gw-%s", as.Name))
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					debug.IgnoreErrorWithContext(ctx, xerr)
+				default:
+					ids = as.GatewayIDs
+					return xerr
+				}
+			}
+
+			if gwInstance != nil {
+				if gid, err := gwInstance.GetID(); err == nil {
+					if gid != "" {
+						as.GatewayIDs = append(as.GatewayIDs, gid)
+					}
+				}
+			}
+
+			gw2Instance, xerr := LoadHost(ctx, fmt.Sprintf("gw2-%s", as.Name))
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					debug.IgnoreError(xerr)
+				default:
+					ids = as.GatewayIDs
+					return xerr
+				}
+			}
+
+			if gw2Instance != nil {
+				if g2id, err := gw2Instance.GetID(); err == nil { // valid id
+					if g2id != "" {
+						as.GatewayIDs = append(as.GatewayIDs, g2id)
+					}
+				}
+			}
+		}
+
+		if len(as.GatewayIDs) > 0 {
+			deleteHostFn := func(v string) (ferr fail.Error) {
+				var (
+					hostInstance *Host
+					innerXErr    fail.Error
+				)
+
+				defer func() {
+					if ferr == nil && hostInstance != nil {
+						ferr = hostInstance.Core.Delete(ctx)
+					}
+				}()
+
+				hostInstance, innerXErr = LoadHost(ctx, v)
+				innerXErr = debug.InjectPlannedFail(innerXErr)
+				if innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						// missing gateway is considered as a successful deletion, continue
+						logrus.WithContext(ctx).Tracef("host instance not found, gateway deletion considered as a success")
+
+					default:
+						ids = as.GatewayIDs
+						return innerXErr
+					}
+				} else {
+					name := hostInstance.GetName()
+					logrus.WithContext(ctx).Debugf("Deleting gateway '%s'...", name)
+
+					hostSSHConfig, innerXErr := hostInstance.GetSSHConfig(ctx)
+					if innerXErr != nil {
+						return innerXErr
+					}
+
+					hostSSH, innerXErr := ssh.NewConnector(hostSSHConfig)
+					if innerXErr != nil {
+						return innerXErr
+					}
+
+					// Delete Host
+					hostTrx, innerXErr := newHostTransaction(ctx, hostInstance)
+					if innerXErr != nil {
+						return innerXErr
+					}
+					defer func(trx hostTransaction) { trx.TerminateFromError(ctx, &ferr) }(hostTrx)
+
+					innerXErr = hostTrx.RelaxedDeleteHost(ctx, hostSSH)
+					innerXErr = debug.InjectPlannedFail(innerXErr)
+					if innerXErr != nil {
+						switch innerXErr.(type) {
+						case *fail.ErrNotFound:
+							// missing gateway is considered as a successful deletion, continue
+							logrus.WithContext(ctx).Tracef("host instance not found, relaxed gateway deletion considered as a success")
+							debug.IgnoreErrorWithContext(ctx, innerXErr)
+						default:
+							ids = as.GatewayIDs
+							return innerXErr
+						}
+					}
+
+					logrus.WithContext(ctx).Debugf("Gateway '%s' successfully deleted.", name)
+				}
+
+				// Remove current entry from gateways to Delete
+				as.GatewayIDs = as.GatewayIDs[1:]
+				return nil
+			}
+
+			for _, v := range as.GatewayIDs {
+				xerr := deleteHostFn(v)
+				if xerr != nil {
+					return xerr
+				}
+			}
+		} else {
+			logrus.WithContext(ctx).Warnf("no gateways were detected")
+		}
+
+		return nil
+	})
 }

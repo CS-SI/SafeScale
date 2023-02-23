@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/internal"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/eko/gocache/v2/store"
 	"github.com/sirupsen/logrus"
@@ -137,7 +138,12 @@ func LoadHost(inctx context.Context, ref string) (*Host, fail.Error) {
 			var kt *Host
 			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().Cache(ctx)
+			svc, xerr := myjob.Service()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			cache, xerr := svc.Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -156,7 +162,7 @@ func LoadHost(inctx context.Context, ref string) (*Host, fail.Error) {
 					}
 
 					inCache = true
-					incrementExpVar("newhost.cache.hit")
+					internal.IncrementExpVar("newhost.cache.hit")
 
 					// -- reload from metadata storage
 					xerr = hostInstance.Core.Reload(ctx)
@@ -204,7 +210,7 @@ func LoadHost(inctx context.Context, ref string) (*Host, fail.Error) {
 					val, xerr := cache.Get(ctx, refcache)
 					if xerr == nil {
 						if _, ok := val.(*Host); ok {
-							incrementExpVar("newhost.cache.hit")
+							internal.IncrementExpVar("newhost.cache.hit")
 						} else {
 							logrus.WithContext(ctx).Warnf("wrong type of *Host")
 						}
@@ -272,8 +278,8 @@ func onHostCacheMiss(inctx context.Context, ref string) (_ data.Identifiable, fe
 		return nil, xerr
 	}
 
-	incrementExpVar("host.load.hits")
-	incrementExpVar("newhost.cache.read")
+	internal.IncrementExpVar("host.load.hits")
+	internal.IncrementExpVar("newhost.cache.read")
 
 	if strings.Compare(fail.IgnoreError(hostInstance.String()).(string), fail.IgnoreError(blank.String()).(string)) == 0 {
 		return nil, fail.NotFoundError("fail to find Host with ref '%s'", ref)
@@ -289,7 +295,12 @@ func (instance *Host) Exists(ctx context.Context) (bool, fail.Error) {
 		return false, fail.Wrap(err)
 	}
 
-	_, xerr := instance.Service().InspectHost(ctx, theID)
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return false, xerr
+	}
+
+	_, xerr = svc.InspectHost(ctx, theID)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -304,9 +315,12 @@ func (instance *Host) Exists(ctx context.Context) (bool, fail.Error) {
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
 func (instance *Host) updateCachedInformation(ctx context.Context, hostTrx hostTransaction) fail.Error {
-	svc := instance.Service()
-	scope := instance.Job().Scope()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
 
+	scope := instance.Job().Scope()
 	opUser, opUserErr := getOperatorUsernameFromCfg(ctx, svc)
 	if opUserErr != nil {
 		return opUserErr
@@ -881,10 +895,14 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 
 		ud, gerr := func() (_ *userdata.Content, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
-			svc := instance.Service()
+
+			svc, xerr := instance.Service()
+			if xerr != nil {
+				return nil, xerr
+			}
 
 			// Check if Host exists and is managed bySafeScale
-			_, xerr := LoadHost(ctx, hostReq.ResourceName)
+			_, xerr = LoadHost(ctx, hostReq.ResourceName)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -1051,7 +1069,8 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && hostReq.CleanOnFailure() && ahc != nil && ahc.IsConsistent() {
-					derr := svc.DeleteHost(cleanupContextFrom(ctx), ahc)
+					ctx := cleanupContextFrom(ctx)
+					derr := svc.DeleteHost(ctx, ahc)
 					if derr != nil {
 						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to Delete Host '%s'", ActionFromError(ferr), ahc.Name))
 					}
@@ -1084,6 +1103,7 @@ func (instance *Host) Create(inctx context.Context, hostReq abstract.HostRequest
 
 			defer func() {
 				if ferr != nil && hostReq.CleanOnFailure() {
+					ctx := cleanupContextFrom(ctx)
 					derr := svc.DeleteHost(ctx, ahf)
 					if derr != nil {
 						logrus.WithContext(ctx).Errorf("cleaning up on %s, failed to Delete Host '%s': %v", ActionFromError(ferr), ahf.Name, derr)
@@ -1571,7 +1591,8 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 	if notok {
 		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
 	}
-	incrementExpVar("host.cache.hit")
+
+	internal.IncrementExpVar("host.cache.hit")
 
 	content, xerr := userdataContent.Generate(phase)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1580,7 +1601,7 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 	}
 
 	file := fmt.Sprintf("%s/user_data.%s.sh", utils.TempFolder, phase)
-	xerr = instance.unsafePushStringToFileWithOwnership(ctx, string(content), file, userdataContent.Username, "755")
+	xerr = instance.pushStringToFileWithOwnership(ctx, string(content), file, userdataContent.Username, "755")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1594,7 +1615,7 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 		default:
 		}
 
-		rc, _, _, xerr := instance.unsafeRun(ctx, "sudo sync", outputs.COLLECT, 0, 10*time.Second)
+		rc, _, _, xerr := instance.run(ctx, "sudo sync", outputs.COLLECT, 0, 10*time.Second)
 		if xerr != nil {
 			rounds--
 			continue
@@ -1620,7 +1641,7 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 	command := getCommand(ctx, file)
 
 	// Executes the script on the remote Host
-	retcode, stdout, stderr, xerr := instance.unsafeRun(ctx, command, outputs.COLLECT, 0, timeout)
+	retcode, stdout, stderr, xerr := instance.run(ctx, command, outputs.COLLECT, 0, timeout)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to apply configuration phase '%s'", phase)
@@ -1804,8 +1825,13 @@ func createSingleHostNetworking(ctx context.Context, singleHostRequest abstract.
 		return nil, nil, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
 	// Build network name
-	cfg, xerr := myjob.Service().ConfigurationOptions()
+	cfg, xerr := svc.ConfigurationOptions()
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -2049,7 +2075,8 @@ func (instance *Host) GetSSHConfig(ctx context.Context) (_ sshapi.Config, ferr f
 	if valid.IsNil(sshProfile) {
 		return nil, fail.NotFoundError("failed to find SSH Config of Host '%s'", instance.GetName())
 	}
-	incrementExpVar("host.cache.hit")
+
+	internal.IncrementExpVar("host.cache.hit")
 
 	return sshProfile.Config()
 }
@@ -2068,7 +2095,8 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 	if notok {
 		return invalid, "", "", fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
 	}
-	incrementExpVar("host.cache.hit")
+
+	internal.IncrementExpVar("host.cache.hit")
 
 	if ctx == nil {
 		return invalid, "", "", fail.InvalidParameterCannotBeNilError("ctx")
@@ -2091,7 +2119,7 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot run anything on '%s', '%s' is NOT started", targetName, targetName))
 	}
 
-	return instance.unsafeRun(ctx, cmd, outs, connectionTimeout, executionTimeout)
+	return instance.run(ctx, cmd, outs, connectionTimeout, executionTimeout)
 }
 
 // Pull downloads a file from Host
@@ -2112,7 +2140,12 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("source")
 	}
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -2218,7 +2251,7 @@ func (instance *Host) Push(ctx context.Context, source, target, owner, mode stri
 		return invalid, "", "", fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started: %s", targetName, targetName, state.String()))
 	}
 
-	return instance.unsafePush(ctx, source, target, owner, mode, timeout)
+	return instance.push(ctx, source, target, owner, mode, timeout)
 }
 
 // GetShare returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
@@ -2308,7 +2341,11 @@ func (instance *Host) Start(ctx context.Context) (ferr fail.Error) {
 		return fail.Wrap(err)
 	}
 
-	svc := instance.Service()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
@@ -2384,9 +2421,12 @@ func (instance *Host) Stop(ctx context.Context) (ferr fail.Error) {
 		return fail.Wrap(err)
 	}
 
-	svc := instance.Service()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
 
-	timings, xerr := instance.Service().Timings()
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -2481,7 +2521,12 @@ func (instance *Host) Reboot(ctx context.Context, soft bool) (ferr fail.Error) {
 func (instance *Host) Sync(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -2498,7 +2543,7 @@ func (instance *Host) Sync(ctx context.Context) (ferr fail.Error) {
 	// Sync Host
 	logrus.WithContext(ctx).Infof("Host '%s': sync", instance.GetName())
 	command := `sync`
-	_, _, _, xerr = instance.unsafeRun(ctx, command, outputs.COLLECT, timings.NormalDelay(), 30*time.Second) // nolint
+	_, _, _, xerr = instance.run(ctx, command, outputs.COLLECT, timings.NormalDelay(), 30*time.Second) // nolint
 	if xerr != nil {
 		logrus.WithContext(ctx).Debugf("there was an error sending the reboot command: %v", xerr)
 	}
@@ -2513,7 +2558,12 @@ func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
 		return nil
 	}
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -2529,7 +2579,7 @@ func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
 	command := `echo "sleep 4 ; sync ; sudo systemctl reboot" | at now`
 	rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 	defer cancelReboot()
-	_, _, _, xerr = instance.unsafeRun(rebootCtx, command, outputs.COLLECT, timings.NormalDelay(), waitingTime) // nolint
+	_, _, _, xerr = instance.run(rebootCtx, command, outputs.COLLECT, timings.NormalDelay(), waitingTime) // nolint
 	if xerr != nil {
 		logrus.WithContext(ctx).Debugf("there was an error sending the reboot command: %v", xerr)
 	}
@@ -2610,7 +2660,7 @@ func (instance *Host) GetPublicIP(ctx context.Context) (_ string, ferr fail.Erro
 	if ip == "" {
 		return "", fail.NotFoundError("failed to find Public IP of Host '%s'", instance.GetName())
 	}
-	incrementExpVar("host.cache.hit")
+	internal.IncrementExpVar("host.cache.hit")
 
 	return ip, nil
 }
@@ -2640,7 +2690,7 @@ func (instance *Host) GetPrivateIP(ctx context.Context) (_ string, ferr fail.Err
 	if ip == "" {
 		return "", fail.NotFoundError("failed to find Private IP of Host '%s'", instance.GetName())
 	}
-	incrementExpVar("host.cache.hit")
+	internal.IncrementExpVar("host.cache.hit")
 
 	return ip, nil
 }
@@ -2705,7 +2755,7 @@ func (instance *Host) GetAccessIP(ctx context.Context) (_ string, ferr fail.Erro
 	if ip == "" {
 		return "", fail.NotFoundError("failed to find Access IP of Host '%s'", instance.GetName())
 	}
-	incrementExpVar("host.cache.hit")
+	internal.IncrementExpVar("host.cache.hit")
 
 	return ip, nil
 }
@@ -2847,7 +2897,7 @@ func (instance *Host) PushStringToFileWithOwnership(ctx context.Context, content
 		return fail.InvalidRequestError(fmt.Sprintf("cannot push anything on '%s', '%s' is NOT started: %s", targetName, targetName, state.String()))
 	}
 
-	return instance.unsafePushStringToFileWithOwnership(ctx, content, filename, owner, mode)
+	return instance.pushStringToFileWithOwnership(ctx, content, filename, owner, mode)
 }
 
 // GetDefaultSubnet returns the Networking instance corresponding to Host default subnet
@@ -3350,7 +3400,11 @@ func (instance *Host) BindLabel(ctx context.Context, labelInstance *Label, value
 		return fail.Wrap(err)
 	}
 
-	svc := instance.Service()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	xerr = svc.UpdateTags(ctx, abstract.HostResource, hostID, lmap)
 	if xerr != nil {
 		return xerr
@@ -3437,7 +3491,12 @@ func (instance *Host) UnbindLabel(ctx context.Context, labelInstance *Label) (fe
 		return xerr
 	}
 
-	xerr = instance.Service().DeleteTags(ctx, abstract.HostResource, hostID, []string{labelInstance.GetName()})
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = svc.DeleteTags(ctx, abstract.HostResource, hostID, []string{labelInstance.GetName()})
 	if xerr != nil {
 		return xerr
 	}
@@ -3582,7 +3641,7 @@ func (instance *Host) refreshLocalCacheIfNeeded(ctx context.Context, hostTrx hos
 			return xerr
 		}
 	} else {
-		incrementExpVar("host.cache.hit")
+		internal.IncrementExpVar("host.cache.hit")
 	}
 	return nil
 }
@@ -3601,14 +3660,18 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, hostTrx hostTran
 	defer fail.OnExitLogError(ctx, &ferr)
 
 	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
-	svc := instance.Service()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	hostName := hostTrx.GetName()
 	hostID, err := hostTrx.GetID()
 	if err != nil {
 		return fail.Wrap(err)
 	}
 
-	xerr := svc.ClearHostStartupScript(ctx, hostID)
+	xerr = svc.ClearHostStartupScript(ctx, hostID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -3770,13 +3833,18 @@ func (instance *Host) reload(ctx context.Context, hostTrx hostTransaction) (ferr
 	}
 
 	// Request Host inspection from provider
-	ahf, xerr := instance.Service().InspectHost(ctx, hid)
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	ahf, xerr := svc.InspectHost(ctx, hid)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	cache, xerr := instance.Service().Cache(ctx)
+	cache, xerr := svc.Cache(ctx)
 	if xerr != nil {
 		return xerr
 	}

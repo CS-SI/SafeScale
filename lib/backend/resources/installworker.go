@@ -111,7 +111,7 @@ type worker struct {
 	startTime time.Time
 
 	host    *Host
-	cluster *Cluster
+	cluster clusterTransaction
 
 	machines map[string]*Host
 
@@ -128,12 +128,12 @@ type worker struct {
 	concernedGateways []*Host
 
 	rootKey string
-	// function to alter the content of 'run' key of specification file
+	// function to alter the content of 'remoteRun' key of specification file
 	commandCB alterCommandCB
 }
 
 // newWorker ...
-// alterCmdCB is used to change the content of keys 'run' or 'package' before executing
+// alterCmdCB is used to change the content of keys 'remoteRun' or 'package' before executing
 // the requested action. If not used, must be nil
 func newWorker(ctx context.Context, f *Feature, target Targetable, method installmethod.Enum, action installaction.Enum, cb alterCommandCB) (*worker, fail.Error) {
 	w := worker{
@@ -148,7 +148,7 @@ func newWorker(ctx context.Context, f *Feature, target Targetable, method instal
 	switch target.TargetType() {
 	case featuretargettype.Cluster:
 		var ok bool
-		w.cluster, ok = target.(*Cluster)
+		w.cluster, ok = target.(clusterTransaction)
 		if !ok {
 			return nil, fail.InconsistentError("target should be a *Cluster")
 		}
@@ -198,10 +198,10 @@ func (w *worker) CanProceed(inctx context.Context, s rscapi.FeatureSettings) fai
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
+	type localresult struct {
 		rErr fail.Error
 	}
-	chRes := make(chan result)
+	chRes := make(chan localresult)
 	go func() {
 		defer close(chRes)
 
@@ -210,31 +210,26 @@ func (w *worker) CanProceed(inctx context.Context, s rscapi.FeatureSettings) fai
 			xerr := w.validateContextForCluster(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr == nil && !s.SkipSizingRequirements {
-				castedTarget, err := lang.Cast[*Cluster](w.target)
+				clusterTrx, err := lang.Cast[clusterTransaction](w.target)
 				if err != nil {
-					chRes <- result{fail.Wrap(err)}
+					chRes <- localresult{fail.Wrap(err)}
 					return
 				}
 
-				clusterTrx, xerr := newClusterTransaction(ctx, castedTarget)
-				if xerr != nil {
-					chRes <- result{fail.Wrap(err)}
-					return
-				}
-				xerr = w.trxValidateClusterSizing(ctx, clusterTrx)
+				xerr = w.validateClusterSizing(ctx, clusterTrx)
 			}
-			chRes <- result{xerr}
+			chRes <- localresult{xerr}
 			return
 		case featuretargettype.Host:
 			// If the target is a host inside a worker for a cluster, validate unconditionally
 			if w.cluster != nil {
-				chRes <- result{nil}
+				chRes <- localresult{nil}
 				return
 			}
-			chRes <- result{w.validateContextForHost(s)}
+			chRes <- localresult{w.validateContextForHost(s)}
 			return
 		}
-		chRes <- result{nil}
+		chRes <- localresult{nil}
 
 	}()
 	select {
@@ -247,16 +242,16 @@ func (w *worker) CanProceed(inctx context.Context, s rscapi.FeatureSettings) fai
 	}
 }
 
-// trxIdentifyAvailableMaster finds a master available, and keep track of it
+// identifyAvailableMaster finds a master available, and keep track of it
 // for all the life of the action (prevent to request too often)
-func (w *worker) trxIdentifyAvailableMaster(ctx context.Context, clusterTrx clusterTransaction) (_ *Host, ferr fail.Error) {
+func (w *worker) identifyAvailableMaster(ctx context.Context, clusterTrx clusterTransaction) (_ *Host, ferr fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 
 	if w.availableMaster == nil {
 		var xerr fail.Error
-		w.availableMaster, xerr = w.cluster.trxFindAvailableMaster(ctx, clusterTrx)
+		w.availableMaster, xerr = clusterTrx.FindAvailableMaster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -265,14 +260,14 @@ func (w *worker) trxIdentifyAvailableMaster(ctx context.Context, clusterTrx clus
 	return w.availableMaster, nil
 }
 
-// trxIdentifyAvailableNode finds a node available and will use this one during all the installation session
-func (w *worker) trxIdentifyAvailableNode(ctx context.Context, clusterTrx clusterTransaction) (_ *Host, ferr fail.Error) {
+// identifyAvailableNode finds a node available and will use this one during all the installation session
+func (w *worker) identifyAvailableNode(ctx context.Context, clusterTrx clusterTransaction) (_ *Host, ferr fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
 		var xerr fail.Error
-		w.availableNode, xerr = w.cluster.trxFindAvailableNode(ctx, clusterTrx)
+		w.availableNode, xerr = clusterTrx.FindAvailableNode(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -359,7 +354,7 @@ func (w *worker) identifyAllMasters(ctx context.Context, clusterTrx clusterTrans
 
 	if w.allMasters == nil || len(w.allMasters) == 0 {
 		w.allMasters = []*Host{}
-		masters, xerr := w.cluster.trxListMasterIDs(ctx, clusterTrx)
+		masters, xerr := clusterTrx.ListMasterIDs(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -411,7 +406,7 @@ func (w *worker) trxIdentifyAllNodes(ctx context.Context, clusterTrx clusterTran
 
 	if w.allNodes == nil {
 		var allHosts []*Host
-		list, xerr := w.cluster.trxListNodeIDs(ctx, clusterTrx)
+		list, xerr := clusterTrx.ListNodeIDs(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -442,7 +437,12 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (*Host, fail.Erro
 		return nil, xerr
 	}
 
-	timings, xerr := myjob.Service().Timings()
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -549,6 +549,11 @@ func (w *worker) identifyAllGateways(inctx context.Context) (_ []*Host, ferr fai
 		return nil, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -570,7 +575,7 @@ func (w *worker) identifyAllGateways(inctx context.Context) (_ []*Host, ferr fai
 			rs   *Subnet
 		)
 
-		timings, xerr := myjob.Service().Timings()
+		timings, xerr := svc.Timings()
 		if xerr != nil {
 			chRes <- localresult{nil, xerr}
 			return
@@ -845,6 +850,11 @@ func (w *worker) taskLaunchStep(inctx context.Context, p taskLaunchStepParameter
 		return nil, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -891,7 +901,7 @@ func (w *worker) taskLaunchStep(inctx context.Context, p taskLaunchStepParameter
 			return
 		}
 
-		timings, xerr := myjob.Service().Timings()
+		timings, xerr := svc.Timings()
 		if xerr != nil {
 			chRes <- localresult{nil, xerr}
 			return
@@ -913,7 +923,7 @@ func (w *worker) taskLaunchStep(inctx context.Context, p taskLaunchStepParameter
 		}
 		runContent, ok = p.stepMap[keyword].(string)
 		if ok {
-			// If 'run' content has to be altered, do it
+			// If 'remoteRun' content has to be altered, do it
 			if w.commandCB != nil {
 				runContent = w.commandCB(runContent)
 			}
@@ -1112,92 +1122,92 @@ func (w *worker) validateContextForHost(settings rscapi.FeatureSettings) fail.Er
 	return fail.NotAvailableError("Feature '%s' not suitable for host", w.feature.GetName())
 }
 
-func (w *worker) trxValidateClusterSizing(inctx context.Context, clusterTrx clusterTransaction) (ferr fail.Error) {
+func (w *worker) validateClusterSizing(inctx context.Context, clusterTrx clusterTransaction) (ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
+	type localresult struct {
 		rErr fail.Error
 	}
-	chRes := make(chan result)
+	chRes := make(chan localresult)
 	go func() {
 		defer close(chRes)
 
 		clusterFlavor, xerr := w.cluster.GetFlavor(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			chRes <- result{xerr}
+			chRes <- localresult{xerr}
 			return
 		}
 
 		sizing, xerr := w.feature.ClusterSizingRequirementsForFlavor(strings.ToLower(clusterFlavor.String()))
 		if xerr != nil {
-			chRes <- result{xerr}
+			chRes <- localresult{xerr}
 			return
 		}
 
 		if sizing == nil {
 			// No sizing requirement for the cluster flavor, so everything is ok
-			chRes <- result{nil}
+			chRes <- localresult{nil}
 			return
 		}
 
 		if anon, ok := sizing["masters"]; ok {
 			request, ok := anon.(string)
 			if !ok {
-				chRes <- result{fail.SyntaxError("invalid masters key")}
+				chRes <- localresult{fail.SyntaxError("invalid masters key")}
 				return
 			}
 
 			count, _, _, xerr := w.parseClusterSizingRequest(request)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{xerr}
+				chRes <- localresult{xerr}
 				return
 			}
 
-			masters, xerr := w.cluster.trxListMasterIDs(ctx, clusterTrx)
+			masters, xerr := clusterTrx.ListMasterIDs(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{xerr}
+				chRes <- localresult{xerr}
 				return
 			}
 
 			curMasters := len(masters)
 			if curMasters < count {
-				chRes <- result{fail.NotAvailableError("cluster does not meet the minimum number of masters (%d < %d)", curMasters, count)}
+				chRes <- localresult{fail.NotAvailableError("cluster does not meet the minimum number of masters (%d < %d)", curMasters, count)}
 				return
 			}
 		}
 		if anon, ok := sizing["nodes"]; ok {
 			request, ok := anon.(string)
 			if !ok {
-				chRes <- result{fail.SyntaxError("invalid nodes key")}
+				chRes <- localresult{fail.SyntaxError("invalid nodes key")}
 				return
 			}
 
 			count, _, _, xerr := w.parseClusterSizingRequest(request)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{xerr}
+				chRes <- localresult{xerr}
 				return
 			}
 
-			list, xerr := w.cluster.trxListNodeIDs(ctx, clusterTrx)
+			list, xerr := clusterTrx.ListNodeIDs(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{xerr}
+				chRes <- localresult{xerr}
 				return
 			}
 
 			curNodes := len(list)
 			if curNodes < count {
-				chRes <- result{fail.NotAvailableError("cluster does not meet the minimum number of nodes (%d < %d)", curNodes, count)}
+				chRes <- localresult{fail.NotAvailableError("cluster does not meet the minimum number of nodes (%d < %d)", curNodes, count)}
 				return
 			}
 		}
 
-		chRes <- result{nil}
+		chRes <- localresult{nil}
 	}()
 
 	select {
@@ -1221,62 +1231,62 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
+	type localresult struct {
 		rErr fail.Error
 	}
-	chRes := make(chan result)
+	chRes := make(chan localresult)
 	go func() {
 		defer close(chRes)
 
 		const yamlKey = "feature.proxy.rules"
 		rules, ok := w.feature.Specs().Get(yamlKey).([]interface{})
 		if !ok || len(rules) == 0 {
-			chRes <- result{nil}
+			chRes <- localresult{nil}
 			return
 		}
 
 		// TODO: there are valid scenarios for reverse proxy settings when Feature applied to Host...
 		if w.cluster == nil {
-			chRes <- result{fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")}
+			chRes <- localresult{fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")}
 			return
 		}
 
 		rgw, xerr := w.identifyAvailableGateway(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			chRes <- result{xerr}
+			chRes <- localresult{xerr}
 			return
 		}
 
 		found, xerr := rgw.IsFeatureInstalled(ctx, "edgeproxy4subnet")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			chRes <- result{xerr}
+			chRes <- localresult{xerr}
 			return
 		}
 		if !found {
-			chRes <- result{nil}
+			chRes <- localresult{nil}
 			return
 		}
 
 		netprops, xerr := w.cluster.GetNetworkConfig(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			chRes <- result{xerr}
+			chRes <- localresult{xerr}
 			return
 		}
 
 		subnetInstance, xerr := LoadSubnet(ctx, "", netprops.SubnetID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			chRes <- result{xerr}
+			chRes <- localresult{xerr}
 			return
 		}
 
 		primaryKongController, xerr := NewKongController(ctx, subnetInstance, true)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			chRes <- result{fail.Wrap(xerr, "failed to apply reverse proxy rules")}
+			chRes <- localresult{fail.Wrap(xerr, "failed to apply reverse proxy rules")}
 			return
 		}
 
@@ -1285,7 +1295,7 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 			secondaryKongController, xerr = NewKongController(ctx, subnetInstance, false)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{fail.Wrap(xerr, "failed to apply reverse proxy rules")}
+				chRes <- localresult{fail.Wrap(xerr, "failed to apply reverse proxy rules")}
 				return
 			}
 		}
@@ -1303,7 +1313,7 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 			}
 			rule, ok := r.(map[interface{}]interface{})
 			if !ok {
-				chRes <- result{fail.InconsistentError("wrong r type %T, it should be a map[interface{}]interface{}", r)}
+				chRes <- localresult{fail.InconsistentError("wrong r type %T, it should be a map[interface{}]interface{}", r)}
 				return
 			}
 
@@ -1311,16 +1321,16 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 			hosts, xerr := w.identifyHosts(ctx, targets)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{fail.Wrap(xerr, "failed to apply proxy rules: %s")}
+				chRes <- localresult{fail.Wrap(xerr, "failed to apply proxy rules: %s")}
 				return
 			}
 
-			for _, h := range hosts { // FIXME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
+			for _, h := range hosts { // FIXME: make no mistake, this does NOT remoteRun in parallel, it's a HUGE bottleneck
 				h := h
 				primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					chRes <- result{xerr}
+					chRes <- localresult{xerr}
 					return
 				}
 
@@ -1328,7 +1338,7 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 				domain, xerr := h.GetDomain(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					chRes <- result{xerr}
+					chRes <- localresult{xerr}
 					return
 				}
 
@@ -1376,12 +1386,12 @@ func (w *worker) setReverseProxy(inctx context.Context) (ferr fail.Error) {
 
 				xerr = fail.Wrap(tg.Wait())
 				if xerr != nil {
-					chRes <- result{xerr}
+					chRes <- localresult{xerr}
 					return
 				}
 			}
 		}
-		chRes <- result{nil}
+		chRes <- localresult{nil}
 	}()
 
 	select {
@@ -1406,22 +1416,22 @@ func taskApplyProxyRule(inctx context.Context, params interface{}) (_ interface{
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
+	type localresult struct {
 		rTr  interface{}
 		rErr fail.Error
 	}
-	chRes := make(chan result)
+	chRes := make(chan localresult)
 	go func() {
 		defer close(chRes)
 
 		p, ok := params.(taskApplyProxyRuleParameters)
 		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("params", "is not a taskApplyProxyRuleParameters")}
+			chRes <- localresult{nil, fail.InvalidParameterError("params", "is not a taskApplyProxyRuleParameters")}
 			return
 		}
 		hostName, ok := (*p.variables)["Hostname"].(string)
 		if !ok {
-			chRes <- result{nil, fail.InvalidParameterError("variables['Hostname']", "is not a string")}
+			chRes <- localresult{nil, fail.InvalidParameterError("variables['Hostname']", "is not a string")}
 			return
 		}
 
@@ -1433,10 +1443,10 @@ func taskApplyProxyRule(inctx context.Context, params interface{}) (_ interface{
 				msg += " '" + ruleName + "'"
 			}
 			msg += " for host '" + hostName
-			chRes <- result{nil, fail.Wrap(xerr, msg)}
+			chRes <- localresult{nil, fail.Wrap(xerr, msg)}
 			return
 		}
-		chRes <- result{nil, nil}
+		chRes <- localresult{nil, nil}
 	}()
 
 	select {
@@ -1478,15 +1488,15 @@ func (w *worker) identifyHosts(inctx context.Context, targets stepTargets) ([]*H
 				return list, nil
 			}
 
-			clusterTrx, xerr := newClusterTransaction(ctx, w.cluster)
-			if xerr != nil {
-				return list, xerr
-			}
-			defer clusterTrx.TerminateFromError(ctx, &ferr)
+			// clusterTrx, xerr := newClusterTransaction(ctx, w.cluster)
+			// if xerr != nil {
+			// 	return list, xerr
+			// }
+			// defer clusterTrx.TerminateFromError(ctx, &ferr)
 
 			switch masterT {
 			case "1":
-				hostInstance, xerr := w.trxIdentifyAvailableMaster(ctx, clusterTrx)
+				hostInstance, xerr := w.identifyAvailableMaster(ctx, w.cluster)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return nil, xerr
@@ -1494,9 +1504,9 @@ func (w *worker) identifyHosts(inctx context.Context, targets stepTargets) ([]*H
 				list = append(list, hostInstance)
 			case "*":
 				if w.action == installaction.Add {
-					all, xerr = w.trxIdentifyConcernedMasters(ctx, clusterTrx)
+					all, xerr = w.trxIdentifyConcernedMasters(ctx, w.cluster)
 				} else {
-					all, xerr = w.identifyAllMasters(ctx, clusterTrx)
+					all, xerr = w.identifyAllMasters(ctx, w.cluster)
 				}
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -1507,7 +1517,7 @@ func (w *worker) identifyHosts(inctx context.Context, targets stepTargets) ([]*H
 
 			switch nodeT {
 			case "1":
-				hostInstance, xerr := w.trxIdentifyAvailableNode(ctx, clusterTrx)
+				hostInstance, xerr := w.identifyAvailableNode(ctx, w.cluster)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return nil, xerr
@@ -1515,9 +1525,9 @@ func (w *worker) identifyHosts(inctx context.Context, targets stepTargets) ([]*H
 				list = append(list, hostInstance)
 			case "*":
 				if w.action == installaction.Add {
-					all, xerr = w.trxIdentifyConcernedNodes(ctx, clusterTrx)
+					all, xerr = w.trxIdentifyConcernedNodes(ctx, w.cluster)
 				} else {
-					all, xerr = w.trxIdentifyAllNodes(ctx, clusterTrx)
+					all, xerr = w.trxIdentifyAllNodes(ctx, w.cluster)
 				}
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -1654,22 +1664,22 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	type result struct {
+	type localresult struct {
 		rErr fail.Error
 	}
-	chRes := make(chan result)
+	chRes := make(chan localresult)
 	go func() {
 		defer close(chRes)
 
 		const yamlKey = "feature.security.networking"
 		if ok := w.feature.Specs().IsSet(yamlKey); !ok {
-			chRes <- result{nil}
+			chRes <- localresult{nil}
 			return
 		}
 
 		rules, ok := w.feature.Specs().Get(yamlKey).([]interface{})
 		if !ok || len(rules) == 0 {
-			chRes <- result{nil}
+			chRes <- localresult{nil}
 			return
 		}
 
@@ -1681,14 +1691,14 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 			if netprops, xerr := w.cluster.GetNetworkConfig(ctx); xerr != nil {
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					chRes <- result{xerr}
+					chRes <- localresult{xerr}
 					return
 				}
 			} else {
 				rs, xerr = LoadSubnet(ctx, netprops.NetworkID, netprops.SubnetID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					chRes <- result{xerr}
+					chRes <- localresult{xerr}
 					return
 				}
 			}
@@ -1696,7 +1706,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 			rs, xerr = w.host.GetDefaultSubnet(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				chRes <- result{xerr}
+				chRes <- localresult{xerr}
 				return
 			}
 		}
@@ -1706,7 +1716,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 		for k, rule := range rules {
 			r, ok := rule.(map[interface{}]interface{})
 			if !ok {
-				chRes <- result{fail.InvalidParameterError("rule", "should be a map[interface{}][interface{}]")}
+				chRes <- localresult{fail.InvalidParameterError("rule", "should be a map[interface{}][interface{}]")}
 				return
 			}
 			targets := w.interpretRuleTargets(r)
@@ -1715,20 +1725,20 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 			if _, ok := targets["gateways"]; ok {
 				description, ok := r["name"].(string)
 				if !ok {
-					chRes <- result{fail.SyntaxError("missing field 'name' from rule '%s' in '%s'", k, yamlKey)}
+					chRes <- localresult{fail.SyntaxError("missing field 'name' from rule '%s' in '%s'", k, yamlKey)}
 					return
 				}
 
 				gwSG, xerr := rs.InspectGatewaySecurityGroup(ctx)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					chRes <- result{xerr}
+					chRes <- localresult{xerr}
 					return
 				}
 
 				gwID, err := gwSG.GetID()
 				if err != nil {
-					chRes <- result{fail.Wrap(err)}
+					chRes <- localresult{fail.Wrap(err)}
 					return
 				}
 
@@ -1737,7 +1747,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 				sgRule.EtherType = ipversion.IPv4
 				sgRule.Protocol, ok = r["protocol"].(string) // nolint
 				if !ok {
-					chRes <- result{fail.InconsistentError("failed to cast 'r[\"protocol\"]' to 'string'")}
+					chRes <- localresult{fail.InconsistentError("failed to cast 'r[\"protocol\"]' to 'string'")}
 				}
 
 				sgRule.Sources = []string{"0.0.0.0/0"}
@@ -1747,7 +1757,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 				if ports, ok := r["ports"].(int); ok {
 					sgRule.Description = description + fmt.Sprintf(" (port %d)", ports) + forFeature
 					if ports > 65535 {
-						chRes <- result{fail.SyntaxError("invalid value '%s' for field 'ports'", ports)}
+						chRes <- localresult{fail.SyntaxError("invalid value '%s' for field 'ports'", ports)}
 						return
 					}
 					sgRule.PortFrom = int32(ports)
@@ -1760,7 +1770,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 							// This rule already exists, considered as a success and continue
 							debug.IgnoreErrorWithContext(ctx, xerr)
 						default:
-							chRes <- result{xerr}
+							chRes <- localresult{xerr}
 							return
 						}
 					}
@@ -1778,25 +1788,25 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 								portFrom, err = strconv.Atoi(dashSplitted[0])
 								err = debug.InjectPlannedError(err)
 								if err != nil {
-									chRes <- result{fail.SyntaxError("invalid value '%s' for field 'ports'", ports)}
+									chRes <- localresult{fail.SyntaxError("invalid value '%s' for field 'ports'", ports)}
 									return
 								}
 								if len(dashSplitted) == 2 {
 									portTo, err = strconv.Atoi(dashSplitted[0])
 									err = debug.InjectPlannedError(err)
 									if err != nil {
-										chRes <- result{fail.SyntaxError("invalid value '%s' for field 'ports'", ports)}
+										chRes <- localresult{fail.SyntaxError("invalid value '%s' for field 'ports'", ports)}
 										return
 									}
 								}
 								sgRule.Description += fmt.Sprintf(" (port%s %s)", strprocess.Plural(uint(dashCount)), dashSplitted)
 
 								if portFrom > 65535 {
-									chRes <- result{fail.SyntaxError("invalid value '%d' for field 'portFrom'", portFrom)}
+									chRes <- localresult{fail.SyntaxError("invalid value '%d' for field 'portFrom'", portFrom)}
 									return
 								}
 								if portTo > 65535 {
-									chRes <- result{fail.SyntaxError("invalid value '%d' for field 'portTo'", portTo)}
+									chRes <- localresult{fail.SyntaxError("invalid value '%d' for field 'portTo'", portTo)}
 									return
 								}
 								sgRule.PortFrom = int32(portFrom)
@@ -1812,14 +1822,14 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 									// These rules already exists, considered as a success and continue
 									debug.IgnoreErrorWithContext(ctx, xerr)
 								default:
-									chRes <- result{xerr}
+									chRes <- localresult{xerr}
 									return
 								}
 							}
 						}
 					}
 				} else {
-					chRes <- result{fail.SyntaxError("invalid value for ports in rule '%s'")}
+					chRes <- localresult{fail.SyntaxError("invalid value for ports in rule '%s'")}
 					return
 				}
 			}
@@ -1916,7 +1926,7 @@ func (w *worker) setNetworkingSecurity(inctx context.Context) (ferr fail.Error) 
 		// 		}
 		// 	}
 		// }
-		chRes <- result{nil}
+		chRes <- localresult{nil}
 
 	}()
 

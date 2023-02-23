@@ -106,6 +106,11 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 
 	//task := handler.job.Task()
 	ctx := handler.job.Context()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	_, hostRef, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return nil, xerr
@@ -120,7 +125,7 @@ func (handler *sshHandler) GetConfig(hostParam iaasapi.HostIdentifier) (_ sshapi
 		return nil, xerr
 	}
 
-	cfg, xerr := handler.job.Service().ConfigurationOptions()
+	cfg, xerr := svc.ConfigurationOptions()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -340,9 +345,14 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 	stdErr := ""
 
 	ctx := handler.job.Context()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
@@ -362,7 +372,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 		return invalid, "", "", xerr
 	}
 
-	timings, xerr := handler.job.Service().Timings()
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -417,7 +427,7 @@ func (handler *sshHandler) runWithTimeout(ssh sshapi.Connector, cmd string, dura
 	}()
 
 	// Create the command
-	sshCmd, xerr = ssh.NewCommand(handler.job.Task().Context(), cmd)
+	sshCmd, xerr = ssh.NewCommand(handler.job.Context(), cmd)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -440,7 +450,7 @@ func (handler *sshHandler) runWithTimeout(ssh sshapi.Connector, cmd string, dura
 			_ = sshCmd.Close()
 		}
 	}()
-	rc, stdout, stderr, xerr := sshCmd.RunWithTimeout(handler.job.Task().Context(), outputs.DISPLAY, duration) // FIXME: What if this never returns ?
+	rc, stdout, stderr, xerr := sshCmd.RunWithTimeout(handler.job.Context(), outputs.DISPLAY, duration) // FIXME: What if this never returns ?
 	return rc, stdout, stderr, xerr
 }
 
@@ -513,9 +523,14 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	}
 
 	ctx := handler.job.Context()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage(""))
 
 	hostName := ""
 	var upload bool
@@ -579,7 +594,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		stdout, stderr string
 	)
 	retcode := -1
-	timings, xerr := handler.job.Service().Timings()
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
@@ -621,7 +636,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 					md5hash = getMD5Hash(string(content))
 				}
 
-				crcCtx := handler.job.Task().Context()
+				crcCtx := ctx
 
 				var crcCmd sshapi.Command
 				var finnerXerr fail.Error

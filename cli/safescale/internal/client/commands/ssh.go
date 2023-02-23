@@ -40,7 +40,7 @@ import (
 
 var sshCmdLabel = "ssh"
 
-// SSHCommand ssh command
+// SSHCommands ssh command
 func SSHCommands() *cobra.Command {
 	out := &cobra.Command{
 		Use:   sshCmdLabel,

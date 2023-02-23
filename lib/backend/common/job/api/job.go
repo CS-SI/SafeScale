@@ -22,7 +22,6 @@ import (
 
 	scopeapi "github.com/CS-SI/SafeScale/v22/lib/backend/common/scope/api"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -34,8 +33,7 @@ type Job interface {
 	Name() string
 	Scope() scopeapi.Scope
 	Context() context.Context
-	Task() concurrency.Task
-	Service() iaasapi.Service
+	Service() (iaasapi.Service, fail.Error)
 	Duration() time.Duration
 	String() string
 

@@ -256,14 +256,16 @@ func (instance *Feature) Applicable(ctx context.Context, tg Targetable) (bool, f
 	// 1st check Feature is suitable for target
 	switch tg.TargetType() {
 	case featuretargettype.Cluster:
-		casted, ok := tg.(*Cluster)
+		clusterTrx, ok := tg.(clusterTransaction)
 		if !ok {
 			return false, fail.InconsistentError("failed to cast target as '*Cluster'")
 		}
-		flavor, xerr := casted.GetFlavor(ctx)
+
+		flavor, xerr := clusterTrx.GetFlavor(ctx)
 		if xerr != nil {
 			return false, fail.Wrap(xerr, "failed to get Cluster Flavor")
 		}
+
 		if _, ok := instance.file.suitableFor[flavor.String()]; !ok {
 			return false, nil
 		}
@@ -322,24 +324,18 @@ func (instance *Feature) Check(ctx context.Context, target Targetable, v data.Ma
 	switch target.(type) { // nolint
 	case *Host:
 		var found bool
-		castedTarget, err := lang.Cast[*Host](target)
+		hostInstance, err := lang.Cast[*Host](target)
 		if err != nil {
 			return nil, fail.Wrap(err)
 		}
 
-		targetTrx, xerr := newHostTransaction(ctx, castedTarget)
+		hostTrx, xerr := newHostTransaction(ctx, hostInstance)
 		if xerr != nil {
 			return nil, xerr
 		}
-		defer targetTrx.TerminateFromError(ctx, &ferr)
+		defer hostTrx.TerminateFromError(ctx, &ferr)
 
-		// xerr := inspectHostMetadataProperty(ctx, targetTrx, ...)
-		// where:
-		//  hostMetadataTransaction = metadata.Transaction[*äbstract.HostCore, *Host]
-		// func inspectHostMetadataProperty[P clonable.Clonable](xtx context.Context, trx *hostMetadataTransaction, property string,callback func(p P) fail.Error {
-		//    return metadata.InspectProperty[*abstract.HostCore](ctx, trx, property, callback)
-		// }
-		xerr = inspectHostMetadataProperty(ctx, targetTrx, hostproperty.FeaturesV1, func(hostFeaturesV1 *propertiesv1.HostFeatures) fail.Error {
+		xerr = inspectHostMetadataProperty(ctx, hostTrx, hostproperty.FeaturesV1, func(hostFeaturesV1 *propertiesv1.HostFeatures) fail.Error {
 			_, found = hostFeaturesV1.Installed[instance.GetName()]
 			return nil
 		})
@@ -396,13 +392,6 @@ func (instance *Feature) Check(ctx context.Context, target Targetable, v data.Ma
 		return nil, xerr
 	}
 
-	// // Checks required parameters have their values
-	// xerr = checkRequiredParameters(*instance, myV)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
 	r, xerr := installer.Check(ctx, instance, target, myV, opts...)
 	if xerr != nil {
 		return nil, xerr
@@ -413,11 +402,11 @@ func (instance *Feature) Check(ctx context.Context, target Targetable, v data.Ma
 	return r, xerr
 }
 
-// prepareConditionedParameters builds a map of strings with final value set, picking it from externals if provided (otherwise, default value is set)
+// prepareParameters builds a map of strings with final value set, picking it from externals if provided (otherwise, default value is set)
 // Returned error may be:
 //   - nil: everything went well
 //   - fail.InvalidRequestError: a required parameter is missing (value not provided in externals and no default value defined)
-func (instance Feature) prepareParameters(ctx context.Context, externals data.Map[string, any], target Targetable) (data.Map[string, any], fail.Error) {
+func (instance *Feature) prepareParameters(ctx context.Context, externals data.Map[string, any], target Targetable) (data.Map[string, any], fail.Error) {
 	xerr := instance.conditionParameters(ctx, externals, target)
 	if xerr != nil {
 		return nil, xerr
@@ -574,7 +563,7 @@ func (instance *Feature) Add(ctx context.Context, target Targetable, v data.Map[
 		return nil, xerr
 	}
 
-	xerr = registerOnSuccessfulHostsInCluster(ctx, instance.Scope(), target, instance, nil, results)
+	xerr = registerOnSuccessfulHostsInCluster(ctx, target, instance, nil, results)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -638,6 +627,10 @@ func (instance *Feature) Remove(ctx context.Context, target Targetable, v data.M
 
 // Dependencies returns a list of features needed as dependencies
 func (instance *Feature) Dependencies(_ context.Context) (map[string]struct{}, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	emptyMap := map[string]struct{}{}
 	if valid.IsNil(instance) {
 		return emptyMap, fail.InvalidInstanceError()
@@ -649,6 +642,10 @@ func (instance *Feature) Dependencies(_ context.Context) (map[string]struct{}, f
 // ClusterSizingRequirements returns the cluster sizing requirements for all flavors
 // FIXME: define a type to return instead of a map[string]interface{}
 func (instance *Feature) ClusterSizingRequirements() (map[string]interface{}, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	emptyMap := map[string]interface{}{}
 	if instance.IsNull() {
 		return emptyMap, fail.InvalidInstanceError()
@@ -668,6 +665,10 @@ func (instance *Feature) ClusterSizingRequirements() (map[string]interface{}, fa
 //
 // FIXME: define a type to return instead of a map[string]interface{}
 func (instance *Feature) ClusterSizingRequirementsForFlavor(flavor string) (map[string]interface{}, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	emptyMap := map[string]interface{}{}
 	if instance.IsNull() {
 		return emptyMap, fail.InvalidInstanceError()
@@ -734,7 +735,8 @@ func (instance *Feature) installRequirements(ctx context.Context, t Targetable, 
 	return nil
 }
 
-func registerOnSuccessfulHostsInCluster(ctx context.Context, scope scopeapi.Scope, target Targetable, installed *Feature, requiredBy *Feature, results rscapi.Results) fail.Error {
+// registerOnSuccessfulHostsInCluster ...
+func registerOnSuccessfulHostsInCluster(ctx context.Context, target Targetable, installed *Feature, requiredBy *Feature, results rscapi.Results) fail.Error {
 	if target.TargetType() == featuretargettype.Cluster {
 		// Walk through results and register Feature in successful hosts
 		successfulHosts, xerr := mapSuccessfulHostsInResults(results)
@@ -798,6 +800,8 @@ func mapSuccessfulHostsInResults(results rscapi.Results) (map[string]struct{}, f
 
 	return successfulHosts, nil
 }
+
+// unregisterOnSuccessfulHostsInCluster ...
 func unregisterOnSuccessfulHostsInCluster(ctx context.Context, target Targetable, installed *Feature, results rscapi.Results) fail.Error {
 	if target.TargetType() == featuretargettype.Cluster {
 		// Walk through results and register Feature in successful hosts
@@ -824,35 +828,36 @@ func unregisterOnSuccessfulHostsInCluster(ctx context.Context, target Targetable
 }
 
 // ToProtocol converts a Feature to *protocol.FeatureResponse
-func (instance Feature) ToProtocol(ctx context.Context) *protocol.FeatureResponse {
+func (instance *Feature) ToProtocol(ctx context.Context) (*protocol.FeatureResponse, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
 	out := &protocol.FeatureResponse{
 		Name:     instance.GetName(),
 		FileName: instance.GetDisplayFilename(ctx),
 	}
-	return out
+	return out, nil
 }
 
 // ListParametersWithControl returns a slice of parameter names that have control script
-func (instance Feature) ListParametersWithControl(_ context.Context) []string {
+func (instance *Feature) ListParametersWithControl(_ context.Context) ([]string, fail.Error) {
+	if valid.IsNil(instance) {
+		return nil, fail.InvalidInstanceError()
+	}
+
 	out := make([]string, 0, len(instance.file.versionControl))
 	for k := range instance.file.versionControl {
 		out = append(out, k)
 	}
-	return out
+	return out, nil
 }
 
 // controlledParameter ...
-func (instance Feature) controlledParameter(ctx context.Context, p string, target Targetable) (string, fail.Error) {
-	if ctx == nil {
-		return "", fail.InvalidParameterCannotBeNilError("ctx")
-	}
-	if p == "" {
-		return "", fail.InvalidParameterCannotBeEmptyStringError("p")
-	}
-	if target == nil {
-		return "", fail.InvalidParameterCannotBeNilError("target")
-	}
-
+func (instance *Feature) controlledParameter(ctx context.Context, p string, target Targetable) (string, fail.Error) {
 	if cc, ok := instance.file.versionControl[p]; ok {
 		var host *Host
 		switch target.TargetType() {
@@ -863,12 +868,12 @@ func (instance Feature) controlledParameter(ctx context.Context, p string, targe
 			}
 		case featuretargettype.Cluster:
 			var xerr fail.Error
-			cluster, ok := target.(*Cluster)
+			casted, ok := target.(clusterTransaction)
 			if !ok {
 				return "", fail.InconsistentError("failed to cast target to '*Host'")
 			}
 
-			host, xerr = cluster.FindAvailableMaster(ctx)
+			host, xerr = casted.FindAvailableMaster(ctx)
 			if xerr != nil {
 				return "", xerr
 			}
@@ -965,11 +970,17 @@ func filterEligibleFeatures(ctx context.Context, target Targetable, filter featu
 	return out, nil
 }
 
-func FeatureSliceFromResourceToProtocol(ctx context.Context, in []*Feature) *protocol.FeatureListResponse {
+// FeatureSliceFromResourceToProtocol ...
+func FeatureSliceFromResourceToProtocol(ctx context.Context, in []*Feature) (*protocol.FeatureListResponse, fail.Error) {
 	out := &protocol.FeatureListResponse{}
 	out.Features = make([]*protocol.FeatureResponse, 0, len(in))
 	for _, v := range in {
-		out.Features = append(out.Features, v.ToProtocol(ctx))
+		exported, xerr := v.ToProtocol(ctx)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		out.Features = append(out.Features, exported)
 	}
-	return out
+	return out, nil
 }

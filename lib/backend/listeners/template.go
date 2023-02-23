@@ -76,7 +76,12 @@ func (s *TemplateListener) List(inctx context.Context, in *protocol.TemplateList
 		return nil, xerr
 	}
 
-	finalList, xerr := complementWithScan(ctx, job.Service(), scannedOnly, originalList...)
+	svc, xerr := job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	finalList, xerr := complementWithScan(ctx, svc, scannedOnly, originalList...)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -163,7 +168,12 @@ func (s *TemplateListener) Inspect(inctx context.Context, in *protocol.TemplateI
 		return nil, xerr
 	}
 
-	out, xerr := complementWithScan(ctx, job.Service(), false, at)
+	svc, xerr := job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	out, xerr := complementWithScan(ctx, svc, false, at)
 	if xerr != nil {
 		return nil, xerr
 	}

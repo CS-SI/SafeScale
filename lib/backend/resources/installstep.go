@@ -597,7 +597,16 @@ func (is *step) taskRunOnHost(inctx context.Context, params interface{}) (_ rsca
 				outrun  string
 				outerr  string
 			)
-			svc := p.Host.Service()
+
+			svc, xerr := p.Host.Service()
+			if xerr != nil {
+				stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{}, xerr)
+				if derr != nil {
+					_ = xerr.AddConsequence(derr)
+				}
+				return stepResult, xerr
+			}
+
 			timings, xerr := svc.Timings()
 			if xerr != nil {
 				stepResult, derr := rscapi.NewStepResult(rscapi.StepOutput{}, xerr)

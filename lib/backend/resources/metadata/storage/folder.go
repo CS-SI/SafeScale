@@ -40,7 +40,7 @@ type (
 		Lookup(ctx context.Context, path string, name string) fail.Error                                                // tells if the object named 'name' is inside the metadata Folder
 		Prefix() string                                                                                                 // returns the path of the Folder
 		Read(ctx context.Context, path string, name string, callback FolderCallback, opts ...options.Option) fail.Error // loads the content of the object stored in metadata folder
-		Service() iaasapi.Service                                                                                       // returns the current provider driver to use
+		Service() (iaasapi.Service, fail.Error)                                                                         // returns the current provider driver to use
 		Write(ctx context.Context, path string, name string, content []byte, opts ...options.Option) fail.Error         // writes the content in storage, and check the write operation is committed
 	}
 )

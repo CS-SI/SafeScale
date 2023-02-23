@@ -94,6 +94,11 @@ func LoadVolume(inctx context.Context, ref string) (*Volume, fail.Error) {
 		return nil, xerr
 	}
 
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -111,7 +116,7 @@ func LoadVolume(inctx context.Context, ref string) (*Volume, fail.Error) {
 			var kt *Volume
 			refcache := fmt.Sprintf("%T/%s", kt, ref)
 
-			cache, xerr := myjob.Service().Cache(ctx)
+			cache, xerr := svc.Cache(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -183,7 +188,7 @@ func LoadVolume(inctx context.Context, ref string) (*Volume, fail.Error) {
 				}
 			}
 
-			if myjob.Service().Capabilities().UseTerraformer {
+			if svc.Capabilities().UseTerraformer {
 				volumeTrx, xerr := newVolumeTransaction(ctx, volumeInstance)
 				if xerr != nil {
 					return nil, xerr
@@ -191,7 +196,7 @@ func LoadVolume(inctx context.Context, ref string) (*Volume, fail.Error) {
 				defer volumeTrx.TerminateFromError(ctx, &ferr)
 
 				xerr = inspectVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
-					prov, xerr := myjob.Service().ProviderDriver()
+					prov, xerr := svc.ProviderDriver()
 					if xerr != nil {
 						return xerr
 					}
@@ -306,7 +311,13 @@ func (instance *Volume) Exists(ctx context.Context) (bool, fail.Error) {
 	if err != nil {
 		return false, fail.Wrap(err)
 	}
-	_, xerr := instance.Service().InspectVolume(ctx, theID)
+
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return false, xerr
+	}
+
+	_, xerr = svc.InspectVolume(ctx, theID)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -474,7 +485,12 @@ func (instance *Volume) Delete(ctx context.Context) (ferr fail.Error) {
 	}
 
 	// Delete Volume
-	xerr = instance.Service().DeleteVolume(ctx, volid)
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = svc.DeleteVolume(ctx, volid)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -549,7 +565,11 @@ func (instance *Volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	}
 
 	// Check if host exists but is not managed by SafeScale
-	svc := instance.Service()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	_, xerr = svc.InspectVolume(ctx, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -630,7 +650,12 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 		return fail.InvalidParameterError("format", "cannot be empty string")
 	}
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -643,7 +668,6 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 		nfsServer                                                      *nfs.Server
 	)
 
-	svc := instance.Service()
 	targetID, err := host.GetID()
 	if err != nil {
 		return fail.Wrap(err)
@@ -982,7 +1006,10 @@ func listAttachedDevices(ctx context.Context, host *Host) (_ mapset.Set, ferr fa
 		stdout, stderr string
 	)
 
-	svc := host.Service()
+	svc, xerr := host.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	timings, xerr := svc.Timings()
 	if xerr != nil {
@@ -1103,7 +1130,10 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 	}
 
 	// -- retrieve host data --
-	svc := instance.Service()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
 
 	// -- Update target attachments --
 	return alterHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) fail.Error {

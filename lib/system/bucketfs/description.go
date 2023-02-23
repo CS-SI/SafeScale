@@ -57,7 +57,11 @@ func (desc *Description) upload(ctx context.Context, host hostTarget) fail.Error
 		}
 	}()
 
-	svc := host.Service()
+	svc, xerr := host.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr

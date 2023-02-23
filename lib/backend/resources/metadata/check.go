@@ -76,7 +76,12 @@ func CheckVersion(ctx context.Context, method string) (string, fail.Error) {
 		currentMetadataVersion = FirstMetadataVersion
 	}
 
-	svcName, xerr := myjob.Service().GetName()
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return "", xerr
+	}
+
+	svcName, xerr := svc.GetName()
 	if xerr != nil {
 		return currentMetadataVersion, xerr
 	}

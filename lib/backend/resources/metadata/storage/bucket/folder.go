@@ -65,7 +65,12 @@ func NewFolder(ctx context.Context, path string) (*folder, fail.Error) {
 		job:  myjob,
 	}
 
-	cryptKey, xerr := f.job.Service().MetadataKey()
+	svc, xerr := myjob.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	cryptKey, xerr := svc.MetadataKey()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
@@ -86,7 +91,7 @@ func (instance *folder) IsNull() bool {
 }
 
 // Service returns the service used by the folder
-func (instance folder) Service() iaasapi.Service {
+func (instance folder) Service() (iaasapi.Service, fail.Error) {
 	return instance.job.Service()
 }
 
@@ -110,7 +115,12 @@ func (instance folder) GetBucket(ctx context.Context) (*abstract.Bucket, fail.Er
 
 // getBucket is the same as GetBucket without instance validation (for internal use)
 func (instance folder) getBucket(ctx context.Context) (*abstract.Bucket, fail.Error) {
-	bucket, xerr := instance.job.Service().MetadataBucket(ctx)
+	svc, xerr := instance.job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	bucket, xerr := svc.MetadataBucket(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -145,7 +155,12 @@ func (instance folder) Lookup(ctx context.Context, path, name string) fail.Error
 	}
 	fullPath := absPath + name
 
-	found, xerr := instance.Service().HasObject(ctx, bu.GetName(), instance.AbsolutePath(path, name))
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	found, xerr := svc.HasObject(ctx, bu.GetName(), instance.AbsolutePath(path, name))
 	if xerr != nil {
 		return xerr
 	}
@@ -168,7 +183,12 @@ func (instance *folder) Delete(ctx context.Context, path string, name string) fa
 		return xerr
 	}
 
-	has, xerr := instance.job.Service().HasObject(ctx, bucket.Name, instance.AbsolutePath(path, name))
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	has, xerr := svc.HasObject(ctx, bucket.Name, instance.AbsolutePath(path, name))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
@@ -177,11 +197,12 @@ func (instance *folder) Delete(ctx context.Context, path string, name string) fa
 		return nil
 	}
 
-	xerr = instance.job.Service().DeleteObject(ctx, bucket.Name, instance.AbsolutePath(path, name))
+	xerr = svc.DeleteObject(ctx, bucket.Name, instance.AbsolutePath(path, name))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
 	}
+
 	return nil
 }
 
@@ -200,7 +221,12 @@ func (instance *folder) Read(ctx context.Context, path string, name string, call
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -219,13 +245,14 @@ func (instance *folder) Read(ctx context.Context, path string, name string, call
 			if iErr != nil {
 				return iErr
 			}
-			_, iErr = instance.job.Service().ReadObject(ctx, bucket.Name, instance.AbsolutePath(path, name), &buffer, 0, 0)
+
+			_, iErr = svc.ReadObject(ctx, bucket.Name, instance.AbsolutePath(path, name), &buffer, 0, 0)
 			if iErr != nil {
 				switch iErr.(type) {
 				case *fail.ErrNotFound:
 					return retry.StopRetryError(iErr, "does NOT exist")
 				default:
-					_ = instance.job.Service().InvalidateObject(ctx, bucket.Name, instance.AbsolutePath(path, name))
+					_ = svc.InvalidateObject(ctx, bucket.Name, instance.AbsolutePath(path, name))
 					return iErr
 				}
 			}
@@ -300,7 +327,12 @@ func (instance folder) Write(ctx context.Context, path string, name string, cont
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	timings, xerr := instance.Service().Timings()
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -353,7 +385,7 @@ func (instance folder) Write(ctx context.Context, path string, name string, cont
 
 			var innerXErr fail.Error
 			source := bytes.NewBuffer(data)
-			if _, innerXErr = instance.job.Service().WriteObject(ctx, bucketName, absolutePath, source, int64(source.Len()), nil); innerXErr != nil {
+			if _, innerXErr = svc.WriteObject(ctx, bucketName, absolutePath, source, int64(source.Len()), nil); innerXErr != nil {
 				return innerXErr
 			}
 
@@ -370,15 +402,15 @@ func (instance folder) Write(ctx context.Context, path string, name string, cont
 
 					var target bytes.Buffer
 					// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
-					_, innerErr := instance.job.Service().ReadObject(ctx, bucketName, absolutePath, &target, 0, int64(source.Len()))
+					_, innerErr := svc.ReadObject(ctx, bucketName, absolutePath, &target, 0, int64(source.Len()))
 					if innerErr != nil {
-						_ = instance.job.Service().InvalidateObject(ctx, bucketName, absolutePath)
+						_ = svc.InvalidateObject(ctx, bucketName, absolutePath)
 						logrus.WithContext(ctx).Warnf(innerErr.Error())
 						return innerErr
 					}
 
 					if !bytes.Equal(data, target.Bytes()) {
-						_ = instance.job.Service().InvalidateObject(ctx, bucketName, absolutePath)
+						_ = svc.InvalidateObject(ctx, bucketName, absolutePath)
 						innerErr := fail.NewError("remote content is different from local reference")
 						logrus.WithContext(ctx).Warnf(innerErr.Error())
 						return innerErr
@@ -453,7 +485,12 @@ func (instance folder) Browse(ctx context.Context, path string, callback storage
 		return xerr
 	}
 
-	list, xerr := instance.job.Service().ListObjects(ctx, metadataBucket.Name, absPath, objectstorage.NoPrefix)
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	list, xerr := svc.ListObjects(ctx, metadataBucket.Name, absPath, objectstorage.NoPrefix)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "Error browsing metadata: listing objects")
@@ -471,10 +508,10 @@ func (instance folder) Browse(ctx context.Context, path string, callback storage
 			continue
 		}
 		var buffer bytes.Buffer
-		_, xerr = instance.job.Service().ReadObject(ctx, metadataBucket.Name, i, &buffer, 0, 0)
+		_, xerr = svc.ReadObject(ctx, metadataBucket.Name, i, &buffer, 0, 0)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			_ = instance.job.Service().InvalidateObject(ctx, metadataBucket.Name, i)
+			_ = svc.InvalidateObject(ctx, metadataBucket.Name, i)
 			return fail.Wrap(xerr, "Error browsing metadata: reading from buffer")
 		}
 

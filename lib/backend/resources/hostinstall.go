@@ -434,9 +434,14 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 		return xerr
 	}
 
+	svc, xerr := instance.Service()
+	if xerr != nil {
+		return xerr
+	}
+
 	v["Hostname"] = hostTrx.GetName() + domain
 	if _, ok := v["Username"]; !ok {
-		config, xerr := instance.Service().ConfigurationOptions()
+		config, xerr := svc.ConfigurationOptions()
 		if xerr != nil {
 			return xerr
 		}

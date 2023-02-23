@@ -42,7 +42,7 @@ import (
 // hostTarget is a subnet of *resources.Host to use in the package, to prevent import cycle
 type hostTarget interface {
 	Run(context.Context, string, outputs.Enum, time.Duration, time.Duration) (int, string, string, fail.Error)
-	Service() iaasapi.Service
+	Service() (iaasapi.Service, fail.Error)
 	Push(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, ferr fail.Error)
 }
 
@@ -54,7 +54,12 @@ var bucketfsScripts embed.FS
 // If error == nil && retcode != 0, the script ran but failed.
 // func executeScript(ctx context.Context, sshconfig ssh.Profile, name string, data map[string]interface{}) (int, string, string, fail.Error) {
 func executeScript(ctx context.Context, host hostTarget, name string, data map[string]interface{}) fail.Error {
-	timings, xerr := host.Service().Timings()
+	svc, xerr := host.Service()
+	if xerr != nil {
+		return xerr
+	}
+
+	timings, xerr := svc.Timings()
 	if xerr != nil {
 		return xerr
 	}
@@ -186,7 +191,10 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 	}()
 
 	// TODO: This is not Windows friendly
-	svc := host.Service()
+	svc, xerr := host.Service()
+	if xerr != nil {
+		return "", xerr
+	}
 
 	timings, xerr := svc.Timings()
 	if xerr != nil {

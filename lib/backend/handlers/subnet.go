@@ -131,19 +131,25 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.Context(), tracing.ShouldTrace("handlers.subnet"), "(%v, %v)", networkRef, all).WithStopwatch().Entering()
+	ctx := handler.job.Context()
+	svc, xerr := handler.job.Service()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("handlers.subnet"), "(%v, %v)", networkRef, all).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(handler.job.Context(), &ferr, tracer.TraceMessage())
+	defer fail.OnExitLogError(ctx, &ferr, tracer.TraceMessage())
 
 	var networkID string
 	if networkRef == "" {
-		withDefaultNetwork, xerr := handler.job.Service().HasDefaultNetwork()
+		withDefaultNetwork, xerr := svc.HasDefaultNetwork()
 		if xerr != nil {
 			return nil, xerr
 		}
 
 		if withDefaultNetwork {
-			an, xerr := handler.job.Service().DefaultNetwork(handler.job.Context())
+			an, xerr := svc.DefaultNetwork(ctx)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -151,7 +157,7 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 			networkID = an.ID
 		}
 	} else {
-		networkInstance, xerr := networkfactory.Load(handler.job.Context(), networkRef)
+		networkInstance, xerr := networkfactory.Load(ctx, networkRef)
 		if xerr != nil {
 			return nil, xerr
 		}

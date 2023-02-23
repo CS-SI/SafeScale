@@ -589,9 +589,9 @@ func Test_ClusterIdentityFromAbstractToProtocol(t *testing.T) {
 	aci.Keypair = kp
 	aci.AdminPassword = "Password"
 
-	pclr := ClusterListFromAbstractToProtocol([]abstract.Cluster{*aci})
+	pclr := ClusterListFromAbstractToProtocol([]*abstract.Cluster{aci})
 
-	require.EqualValues(t, pclr.Clusters[0].Identity, ClusterFromAbstractToProtocol(*aci))
+	require.EqualValues(t, pclr.Clusters[0].Identity, ClusterFromAbstractToProtocol(aci))
 }
 
 func Test_SecurityGroupRulesFromAbstractToProtocol(t *testing.T) {
