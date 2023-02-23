@@ -456,11 +456,6 @@ func (instance *Volume) Delete(ctx context.Context) (ferr fail.Error) {
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.Volume")).Entering()
 	defer tracer.Exiting()
 
-	volid, err := instance.GetID()
-	if err != nil {
-		return fail.Wrap(err)
-	}
-
 	volumeTrx, xerr := newVolumeTransaction(ctx, instance)
 	if xerr != nil {
 		return xerr
@@ -484,13 +479,15 @@ func (instance *Volume) Delete(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	// Delete Volume
 	svc, xerr := instance.Service()
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = svc.DeleteVolume(ctx, volid)
+	// Delete Volume
+	xerr = inspectVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
+		return svc.DeleteVolume(ctx, av)
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -509,12 +506,8 @@ func (instance *Volume) Delete(ctx context.Context) (ferr fail.Error) {
 		}
 	}
 
-	volumeTrx.SilentTerminate(ctx)
-	if xerr != nil {
-		return xerr
-	}
-
 	// remove metadata
+	volumeTrx.SilentTerminate(ctx)
 	return instance.Core.Delete(ctx)
 }
 

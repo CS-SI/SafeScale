@@ -158,7 +158,7 @@ func volumeCreateCommand() *cobra.Command {
 				return cli.FailureResponse(cli.ExitOnInvalidOption(fmt.Sprintf("Invalid speed '%s'", speed)))
 			}
 
-			volSize, err := c.Flags().GetInt("size")
+			volSize, err := c.Flags().GetUint("size")
 			if err != nil {
 				return err
 			}
