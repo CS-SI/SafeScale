@@ -1,0 +1,24 @@
+[[tenants]]
+    name = "myFlexibleTenant"
+    client = "flexibleengine"
+
+    [tenants.identity]
+        Username = "myUser"
+        Password = "abcdef............"
+        DomainName = "ABC0123456"
+
+    [tenants.compute]
+        ProjectID= "123456abcdef...................."
+        Region= "eu-west-0"
+        AvailabilityZone= "eu-west-0b"
+        DefaultImage = "Ubuntu 20.04"
+
+    [tenants.network]
+        VPCName = "myVPCName"
+        VPCCIDR = "192.168.0.0/16"
+
+    [tenants.objectstorage]
+        Type = "s3"
+        Endpoint = "https://oss.eu-west-0.prod-cloud-ocb.orange-business.com"
+        AccessKey = "ABCDEF.............."
+        SecretKey = "HIJK1234................................"

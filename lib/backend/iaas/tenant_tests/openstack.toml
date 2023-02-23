@@ -1,0 +1,19 @@
+[[tenants]]
+    name = "TenantName"
+    client = "openstack"
+
+    # This part defines how to authenticate with the provider
+    [tenants.identity]
+        IdentityEndpoint = "<IdentityEndpoint>"
+        Username = "<Username>"
+        Password = "<Password>"
+        DomainID = "<DomainID>"
+        DomainName = "<DomainName>"
+        TenantName = "<TenantName>"
+        TokenID = "<TokenID>"
+        ApplicationKey = "1234567890..............."
+
+    [tenants.compute]
+        Region = "RegionOne"
+        ProjectName = "admin"
+        DefaultImage = "Ubuntu 18.04"
