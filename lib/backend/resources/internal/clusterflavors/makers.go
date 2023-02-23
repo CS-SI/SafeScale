@@ -44,11 +44,11 @@ type HostTarget interface {
 
 // Makers ...
 type Makers struct {
-	MinimumRequiredServers func(clusterIdentity *abstract.Cluster) (uint, uint, uint, fail.Error) // returns masterCount, privateNodeCount, publicNodeCount
-	DefaultGatewaySizing   func(c ClusterTarget) abstract.HostSizingRequirements                  // sizing of gateway(s)
-	DefaultMasterSizing    func(c ClusterTarget) abstract.HostSizingRequirements                  // default sizing of master(s)
-	DefaultNodeSizing      func(c ClusterTarget) abstract.HostSizingRequirements                  // default sizing of node(s)
-	DefaultImage           func(c ClusterTarget) string                                           // default image of server(s)
+	MinimumRequiredServers func(clusterIdentity *abstract.Cluster) (mas uint, pri uint, pub uint, ferr fail.Error) // returns masterCount, privateNodeCount, publicNodeCount
+	DefaultGatewaySizing   func(c ClusterTarget) abstract.HostSizingRequirements                                   // sizing of gateway(s)
+	DefaultMasterSizing    func(c ClusterTarget) abstract.HostSizingRequirements                                   // default sizing of master(s)
+	DefaultNodeSizing      func(c ClusterTarget) abstract.HostSizingRequirements                                   // default sizing of node(s)
+	DefaultImage           func(c ClusterTarget) string                                                            // default image of server(s)
 	// GetNodeInstallationScript func(c resources.Cluster, nodeType clusternodetype.Enum) (string, map[string]interface{})
 	// GetGlobalSystemRequirements func(c resources.Cluster) (string, fail.Error)
 	ConfigureGateway       func(c ClusterTarget) fail.Error

@@ -1,5 +1,4 @@
-//go:build debug
-// +build debug
+//go:build debugx
 
 /*
  * Copyright 2018-2023, CS Systemes d'Information, http://csgroup.eu

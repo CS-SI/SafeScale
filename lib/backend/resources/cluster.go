@@ -170,7 +170,7 @@ func (instance *Cluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 	defer clusterTrx.TerminateFromError(ctx, &ferr)
 
 	// begin by inspecting all hosts...
-	ci, xerr := clusterTrx.getIdentity(ctx)
+	ci, xerr := clusterTrx.getAbstract(ctx)
 	if xerr != nil {
 		return false, xerr
 	}
@@ -603,7 +603,7 @@ func (instance *Cluster) GetIdentity(ctx context.Context) (clusterIdentity *abst
 	}
 	defer clusterTrx.TerminateFromError(ctx, &ferr)
 
-	return clusterTrx.getIdentity(ctx)
+	return clusterTrx.getAbstract(ctx)
 }
 
 // GetFlavor returns the flavor of the Cluster
@@ -700,7 +700,7 @@ func (instance *Cluster) GetNetworkConfig(ctx context.Context) (config *properti
 	}
 	defer clusterTrx.TerminateFromError(ctx, &ferr)
 
-	return clusterTrx.GetNetworkConfig(ctx)
+	return clusterTrx.NetworkConfig(ctx)
 }
 
 // Start starts the Cluster

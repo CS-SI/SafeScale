@@ -164,7 +164,7 @@ func (clusterTrx *clusterTransactionImpl) ComplementFeatureParameters(inctx cont
 		return xerr
 	}
 
-	identity, xerr := clusterTrx.getIdentity(ctx)
+	identity, xerr := clusterTrx.getAbstract(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -185,7 +185,7 @@ func (clusterTrx *clusterTransactionImpl) ComplementFeatureParameters(inctx cont
 			v["Username"] = abstract.DefaultUser
 		}
 	}
-	networkCfg, xerr := clusterTrx.GetNetworkConfig(ctx)
+	networkCfg, xerr := clusterTrx.NetworkConfig(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -612,7 +612,7 @@ func (instance *Cluster) createCluster(inctx context.Context, params interface{}
 			}()
 
 			// Creates and configures hosts
-			xerr = instance.createHostResources(ctx, clusterTrx, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, ExtractFeatureParameters(req.FeatureParameters), req.KeepOnFailure)
+			xerr = clusterTrx.createHostResources(ctx, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, ExtractFeatureParameters(req.FeatureParameters), req.KeepOnFailure)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -956,9 +956,8 @@ func (clusterTrx *clusterTransactionImpl) createNetworkingResources(
 }
 
 // createHostResources creates and configures hosts for the Cluster
-func (instance *Cluster) createHostResources(
+func (clusterTrx *clusterTransactionImpl) createHostResources(
 	ctx context.Context,
-	clusterTrx clusterTransaction,
 	subnet *Subnet,
 	mastersDef abstract.HostSizingRequirements,
 	nodesDef abstract.HostSizingRequirements,
@@ -998,6 +997,8 @@ func (instance *Cluster) createHostResources(
 				}
 			}
 
+			clusterName := clusterTrx.GetName()
+
 			// if this happens, then no, we don't have a secondary gateway, and we have also another problem...
 			if haveSecondaryGateway {
 				pgi, err := primaryGateway.GetID()
@@ -1020,13 +1021,13 @@ func (instance *Cluster) createHostResources(
 
 			eg := new(errgroup.Group)
 			eg.Go(func() error {
-				_, xerr := clusterTrx.InstallGateway(ctx, trxInstallGatewayParameters{host: primaryGateway, variables: parameters})
-				return xerr
+				_, innerXErr := clusterTrx.installGateway(ctx, primaryGateway, parameters)
+				return innerXErr
 			})
 			if haveSecondaryGateway {
 				eg.Go(func() error {
-					_, xerr := clusterTrx.InstallGateway(ctx, trxInstallGatewayParameters{host: secondaryGateway, variables: parameters})
-					return xerr
+					_, innerXErr := clusterTrx.installGateway(ctx, secondaryGateway, parameters)
+					return innerXErr
 				})
 			}
 
@@ -1038,6 +1039,11 @@ func (instance *Cluster) createHostResources(
 
 			masterCount, _, _, xerr := clusterTrx.determineRequiredNodes(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return result{xerr}, xerr
+			}
+
+			svc, xerr := clusterTrx.Service()
 			if xerr != nil {
 				return result{xerr}, xerr
 			}
@@ -1059,26 +1065,18 @@ func (instance *Cluster) createHostResources(
 					}
 
 					// FIXME:
-					svc, merr := instance.Service()
+					hosts, merr := svc.ListHosts(cleanupContextFrom(ctx), false)
 					if merr != nil {
 						_ = ferr.AddConsequence(merr)
 						return
 					}
 
-					hosts, merr := svc.ListHosts(cleanupContextFrom(ctx) /*jobapi.NewContextPropagatingJob(ctx)*/, false)
-					if merr != nil {
-						_ = ferr.AddConsequence(merr)
-						return
-					}
-
-					clusterName := instance.GetName()
+					clusterName := clusterTrx.GetName()
 					for _, invol := range hosts {
 						theName := invol.GetName()
 						theID, _ := invol.GetID()
-						if strings.Contains(theName, "master") {
-							if strings.Contains(theName, clusterName) {
-								list = append(list, machineID{ID: theID, Name: invol.GetName()})
-							}
+						if strings.Contains(theName, "master") && strings.Contains(theName, clusterName) {
+							list = append(list, machineID{ID: theID, Name: invol.GetName()})
 						}
 					}
 
@@ -1088,9 +1086,8 @@ func (instance *Cluster) createHostResources(
 							captured := v
 							if captured.ID != "" {
 								clean.Go(func() error {
-									// FIXME:
-									_, err := clusterTrx.deleteNodeOnFailure(cleanupContextFrom(ctx) /*jobapi.NewContextPropagatingJob(ctx)*/, taskDeleteNodeOnFailureParameters{ID: captured.ID, Name: captured.Name, KeepOnFailure: keepOnFailure, Timeout: 2 * time.Minute})
-									return err
+									_, innerXErr := clusterTrx.deleteNodeOnFailure(cleanupContextFrom(ctx), taskDeleteNodeOnFailureParameters{ID: captured.ID, Name: captured.Name, KeepOnFailure: keepOnFailure, Timeout: 2 * time.Minute})
+									return innerXErr
 								})
 							}
 						}
@@ -1119,15 +1116,12 @@ func (instance *Cluster) createHostResources(
 				defer func() {
 					close(waitForMasters)
 				}()
-				_, xerr := clusterTrx.createMasters(ctx, taskCreateMastersParameters{
+
+				return clusterTrx.createMasters(ctx, taskCreateMastersParameters{
 					count:         masterCount,
 					mastersDef:    mastersDef,
 					keepOnFailure: keepOnFailure,
 				})
-				if xerr != nil {
-					return xerr
-				}
-				return nil
 			})
 			egMas.Go(func() error {
 				<-waitForMasters
@@ -1136,11 +1130,8 @@ func (instance *Cluster) createHostResources(
 						close(waitForBoth)
 					}
 				}()
-				xerr := clusterTrx.configureGateway(ctx, primaryGateway)
-				if xerr != nil {
-					return xerr
-				}
-				return nil
+
+				return clusterTrx.configureGateway(ctx, primaryGateway)
 			})
 			if haveSecondaryGateway {
 				egMas.Go(func() error {
@@ -1148,18 +1139,14 @@ func (instance *Cluster) createHostResources(
 					defer func() {
 						close(waitForBoth)
 					}()
-					xerr := clusterTrx.configureGateway(ctx, secondaryGateway)
-					if xerr != nil {
-						return xerr
-					}
-					return nil
+
+					return clusterTrx.configureGateway(ctx, secondaryGateway)
 				})
 			}
 			egMas.Go(func() error {
 				<-waitForMasters
 				<-waitForBoth
-				xerr := clusterTrx.configureMasters(ctx, parameters)
-				return xerr
+				return clusterTrx.configureMasters(ctx, parameters)
 			})
 
 			xerr = fail.Wrap(egMas.Wait())
@@ -1188,18 +1175,11 @@ func (instance *Cluster) createHostResources(
 						list = append(list, machineID{ID: mach.ID, Name: mach.Name})
 					}
 
-					svc, merr := instance.Service()
-					if merr != nil {
-						_ = ferr.AddConsequence(merr)
-						return
-					}
-
 					hosts, derr := svc.ListHosts(cleanupContextFrom(ctx), false)
 					if derr != nil {
 						return
 					}
 
-					clusterName := instance.GetName()
 					for _, invol := range hosts {
 						theName := invol.GetName()
 						theID, _ := invol.GetID()
@@ -1227,7 +1207,7 @@ func (instance *Cluster) createHostResources(
 
 			egNod := new(errgroup.Group)
 			egNod.Go(func() error {
-				_, xerr := clusterTrx.createNodes(ctx, taskCreateNodesParameters{
+				_, xerr := clusterTrx.createNodes(ctx, createNodesParameters{
 					count:         initialNodeCount,
 					public:        false,
 					nodesDef:      nodesDef,
@@ -1322,21 +1302,18 @@ type trxInstallGatewayParameters struct {
 }
 
 // installGateway installs necessary components on one gateway
-func (clusterTrx *clusterTransactionImpl) InstallGateway(inctx context.Context, params trxInstallGatewayParameters) (_ interface{}, _ fail.Error) {
+func (clusterTrx *clusterTransactionImpl) installGateway(inctx context.Context, host *Host, variables data.Map[string, any]) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(clusterTrx) {
 		return nil, fail.InvalidInstanceError()
 	}
 	if inctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("inctx")
 	}
-
-	if params.host == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
+	if valid.IsNull(host) {
+		return nil, fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	// variables, _ := data.FromMap(p.variables)
-	variables := params.variables
-	hostLabel := params.host.GetName()
+	hostLabel := host.GetName()
 
 	inctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -1346,7 +1323,7 @@ func (clusterTrx *clusterTransactionImpl) InstallGateway(inctx context.Context, 
 		inctx = context.WithValue(inctx, "ID", fmt.Sprintf("%s/install/gateway/%s", oldKey, hostLabel)) // nolint
 	}
 
-	tracer := debug.NewTracer(inctx, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
+	tracer := debug.NewTracer(inctx, tracing.ShouldTrace("resources.cluster"), "('%s')", hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	type result struct {
@@ -1371,21 +1348,21 @@ func (clusterTrx *clusterTransactionImpl) InstallGateway(inctx context.Context, 
 
 			logrus.WithContext(inctx).Debugf("starting installation.")
 
-			_, xerr = params.host.WaitSSHReady(inctx, timings.HostOperationTimeout())
+			_, xerr = host.WaitSSHReady(inctx, timings.HostOperationTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return result{nil, xerr}, xerr
 			}
 
 			// Installs docker and docker-compose on gateway
-			xerr = clusterTrx.installDocker(inctx, params.host, hostLabel, variables)
+			xerr = clusterTrx.installDocker(inctx, host, hostLabel, variables)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return result{nil, xerr}, xerr
 			}
 
 			// Installs dependencies as defined by Cluster Flavor (if it exists)
-			xerr = clusterTrx.installNodeRequirements(inctx, clusternodetype.Gateway, params.host, hostLabel)
+			xerr = clusterTrx.installNodeRequirements(inctx, clusternodetype.Gateway, host, hostLabel)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return result{nil, xerr}, xerr
@@ -1693,7 +1670,7 @@ func (clusterTrx *clusterTransactionImpl) createMaster(inctx context.Context, pa
 
 	hostReq := abstract.HostRequest{}
 	var xerr fail.Error
-	hostReq.ResourceName, xerr = clusterTrx.BuildHostname(ctx, "master", clusternodetype.Master)
+	hostReq.ResourceName, xerr = clusterTrx.buildHostname(ctx, "master", clusternodetype.Master)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1760,7 +1737,7 @@ func (clusterTrx *clusterTransactionImpl) createMaster(inctx context.Context, pa
 			// 	}
 			// }()
 
-			netCfg, xerr := clusterTrx.GetNetworkConfig(ctx)
+			netCfg, xerr := clusterTrx.NetworkConfig(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return result{nil, xerr}, xerr
@@ -1919,8 +1896,8 @@ func withTimeout(xerr fail.Error) bool {
 	return result
 }
 
-// getIdentity returns the identity of the Cluster
-func (clusterTrx *clusterTransactionImpl) getIdentity(ctx context.Context) (_ *abstract.Cluster, ferr fail.Error) {
+// getAbstract returns the identity of the Cluster
+func (clusterTrx *clusterTransactionImpl) getAbstract(ctx context.Context) (_ *abstract.Cluster, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	var clusterIdentity *abstract.Cluster
@@ -1940,7 +1917,7 @@ func (clusterTrx *clusterTransactionImpl) getIdentity(ctx context.Context) (_ *a
 func (clusterTrx *clusterTransactionImpl) GetFlavor(ctx context.Context) (flavor clusterflavor.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	aci, xerr := clusterTrx.getIdentity(ctx)
+	aci, xerr := clusterTrx.getAbstract(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, xerr
@@ -1953,7 +1930,7 @@ func (clusterTrx *clusterTransactionImpl) GetFlavor(ctx context.Context) (flavor
 func trxGetComplexity(ctx context.Context, clusterTrx clusterTransaction) (_ clustercomplexity.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	aci, xerr := clusterTrx.getIdentity(ctx)
+	aci, xerr := clusterTrx.getAbstract(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, xerr
@@ -2539,8 +2516,8 @@ func (clusterTrx *clusterTransactionImpl) leaveNodesFromList(ctx context.Context
 	return nil
 }
 
-// BuildHostname builds a unique hostname in the Cluster
-func (clusterTrx *clusterTransactionImpl) BuildHostname(ctx context.Context, core string, nodeType clusternodetype.Enum) (_ string, _ fail.Error) {
+// buildHostname builds a unique hostname in the Cluster
+func (clusterTrx *clusterTransactionImpl) buildHostname(ctx context.Context, core string, nodeType clusternodetype.Enum) (_ string, _ fail.Error) {
 	var index int
 	xerr := alterClusterMetadataProperty(ctx, clusterTrx, clusterproperty.NodesV3, func(p clonable.Clonable) fail.Error {
 		nodesV3, innerErr := lang.Cast[*propertiesv3.ClusterNodes](p)
@@ -2565,8 +2542,8 @@ func (clusterTrx *clusterTransactionImpl) BuildHostname(ctx context.Context, cor
 	return clusterTrx.GetName() + "-" + core + "-" + strconv.Itoa(index), nil
 }
 
-// GetNetworkConfig returns subnet configuration of the Cluster
-func (clusterTrx *clusterTransactionImpl) GetNetworkConfig(ctx context.Context) (config *propertiesv3.ClusterNetwork, ferr fail.Error) {
+// NetworkConfig returns subnet configuration of the Cluster
+func (clusterTrx *clusterTransactionImpl) NetworkConfig(ctx context.Context) (config *propertiesv3.ClusterNetwork, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(clusterTrx) {
@@ -2899,7 +2876,7 @@ func (clusterTrx *clusterTransactionImpl) installNodeRequirements(inctx context.
 	go func() {
 		defer close(chRes)
 
-		netCfg, xerr := clusterTrx.GetNetworkConfig(ctx)
+		netCfg, xerr := clusterTrx.NetworkConfig(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -3039,7 +3016,7 @@ func (clusterTrx *clusterTransactionImpl) installNodeRequirements(inctx context.
 		}
 
 		dnsServers = cfg.DNSServers
-		identity, xerr := clusterTrx.getIdentity(ctx)
+		identity, xerr := clusterTrx.getAbstract(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -3142,7 +3119,7 @@ func (clusterTrx *clusterTransactionImpl) createNode(inctx context.Context, para
 	defer cancel()
 
 	hostReq := abstract.HostRequest{}
-	hostReq.ResourceName, xerr = clusterTrx.BuildHostname(ctx, "node", clusternodetype.Node)
+	hostReq.ResourceName, xerr = clusterTrx.buildHostname(ctx, "node", clusternodetype.Node)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -3208,7 +3185,7 @@ func (clusterTrx *clusterTransactionImpl) createNode(inctx context.Context, para
 				}
 			}()
 
-			netCfg, xerr := clusterTrx.GetNetworkConfig(ctx)
+			netCfg, xerr := clusterTrx.NetworkConfig(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				ar := result{nil, xerr}
@@ -3592,191 +3569,157 @@ type taskCreateMastersParameters struct {
 	keepOnFailure bool
 }
 
-// taskCreateMasters creates masters
-func (clusterTrx *clusterTransactionImpl) createMasters(inctx context.Context, params taskCreateMastersParameters) (_ interface{}, _ fail.Error) {
+// createMasters creates masters
+func (clusterTrx *clusterTransactionImpl) createMasters(ctx context.Context, params taskCreateMastersParameters) (ferr fail.Error) {
 	if valid.IsNil(clusterTrx) {
-		return nil, fail.InvalidInstanceError()
+		return fail.InvalidInstanceError()
 	}
-	if inctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("inctx")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if params.count < 1 {
-		return nil, fail.InvalidParameterError("params.count", "cannot be an integer less than 1")
+		return fail.InvalidParameterError("params.count", "cannot be an integer less than 1")
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
+	select {
+	case <-ctx.Done():
+		return fail.Wrap(ctx.Err())
+	default:
+	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if params.count == 0 {
 		logrus.WithContext(ctx).Debugf("[Cluster %s] no masters to create.", clusterTrx.GetName())
-		return nil, nil
+		return nil
 	}
 
-	type localresult struct {
-		rTr  interface{}
-		rErr fail.Error
+	defer fail.OnPanic(&ferr)
+
+	svc, xerr := clusterTrx.Service()
+	if xerr != nil {
+		return xerr
 	}
-	chRes := make(chan localresult)
-	go func() {
-		defer close(chRes)
-		gres, _ := func() (_ localresult, ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
 
-			svc, xerr := clusterTrx.Service()
-			if xerr != nil {
-				return localresult{nil, xerr}, xerr
-			}
-
-			timings, xerr := svc.Timings()
-			if xerr != nil {
-				return localresult{nil, xerr}, xerr
-			}
-
-			logrus.WithContext(ctx).Debugf("Creating %d master%s...", params.count, strprocess.Plural(params.count))
-
-			timeout := time.Duration(params.count) * timings.HostCreationTimeout() // FIXME: OPP This became the timeout for the whole cluster creation....
-			winSize := 8
-			cfg, xerr := svc.ConfigurationOptions()
-			if xerr == nil {
-				winSize = cfg.ConcurrentMachineCreationLimit
-			}
-
-			var listMasters []StdResult
-			masterChan := make(chan StdResult, params.count)
-			err := runWindow(ctx, params.count, uint(math.Min(float64(params.count), float64(winSize))), timeout, masterChan, clusterTrx.createMaster, trxCreateMasterParameters{
-				masterDef:     params.mastersDef,
-				timeout:       timings.HostCreationTimeout(),
-				keepOnFailure: params.keepOnFailure,
-			})
-			if err != nil {
-				close(masterChan)
-				return localresult{nil, fail.Wrap(err)}, fail.Wrap(err)
-			}
-
-			close(masterChan)
-			for v := range masterChan {
-				if v.Err != nil {
-					continue
-				}
-				if v.ToBeDeleted {
-					if aho, ok := v.Content.(*Host); ok {
-						xerr = aho.Delete(cleanupContextFrom(ctx))
-						debug.IgnoreErrorWithContext(ctx, xerr)
-						continue
-					}
-				}
-				listMasters = append(listMasters, v)
-			}
-
-			logrus.WithContext(ctx).Debugf("Masters creation successful: %v", listMasters)
-			return localresult{listMasters, nil}, nil
-		}()
-		chRes <- gres
-	}()
-
-	select {
-	case res := <-chRes:
-		return res.rTr, res.rErr
-	case <-ctx.Done():
-		return nil, fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		cancel()
-		<-chRes
-		return nil, fail.Wrap(inctx.Err())
+	timings, xerr := svc.Timings()
+	if xerr != nil {
+		return xerr
 	}
+
+	logrus.WithContext(ctx).Debugf("Creating %d master%s...", params.count, strprocess.Plural(params.count))
+
+	timeout := time.Duration(params.count) * timings.HostCreationTimeout() // FIXME: OPP This became the timeout for the whole cluster creation....
+	winSize := 8
+	cfg, xerr := svc.ConfigurationOptions()
+	if xerr == nil {
+		winSize = cfg.ConcurrentMachineCreationLimit
+	}
+
+	var listMasters []StdResult
+	masterChan := make(chan StdResult, params.count)
+	err := runWindow(ctx, params.count, uint(math.Min(float64(params.count), float64(winSize))), timeout, masterChan, clusterTrx.createMaster, trxCreateMasterParameters{
+		masterDef:     params.mastersDef,
+		timeout:       timings.HostCreationTimeout(),
+		keepOnFailure: params.keepOnFailure,
+	})
+	if err != nil {
+		close(masterChan)
+		return fail.Wrap(err)
+	}
+
+	close(masterChan)
+	for v := range masterChan {
+		if v.Err != nil {
+			continue
+		}
+		if v.ToBeDeleted {
+			if aho, ok := v.Content.(*Host); ok {
+				xerr = aho.Delete(cleanupContextFrom(ctx))
+				debug.IgnoreErrorWithContext(ctx, xerr)
+				continue
+			}
+		}
+		listMasters = append(listMasters, v)
+	}
+
+	logrus.WithContext(ctx).Debugf("Masters creation successful: %v", listMasters)
+	return nil
 }
 
-// taskConfigureMasters configure masters
-func (clusterTrx *clusterTransactionImpl) configureMasters(inctx context.Context, variables data.Map[string, any]) fail.Error {
+// configureMasters configures masters
+func (clusterTrx *clusterTransactionImpl) configureMasters(ctx context.Context, variables data.Map[string, any]) (ferr fail.Error) {
 	if valid.IsNil(clusterTrx) {
 		return fail.InvalidInstanceError()
 	}
-	if inctx == nil {
-		return fail.InvalidParameterCannotBeNilError("inctx")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
+	select {
+	case <-ctx.Done():
+		return fail.Wrap(ctx.Err())
+	default:
+	}
 
 	tracer := debug.NewTracerFromCtx(ctx, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	chRes := make(chan fail.Error)
-	go func() {
-		defer close(chRes)
-		gerr := func() (ferr fail.Error) {
-			defer fail.OnPanic(&ferr)
+	defer fail.OnPanic(&ferr)
 
-			clusterName := clusterTrx.GetName()
-			logrus.WithContext(ctx).Debugf("[Cluster %s] Configuring masters...", clusterName)
+	clusterName := clusterTrx.GetName()
+	logrus.WithContext(ctx).Debugf("[Cluster %s] Configuring masters...", clusterName)
 
-			masters, xerr := clusterTrx.ListMasters(ctx)
+	masters, xerr := clusterTrx.ListMasters(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+	if len(masters) == 0 {
+		return fail.NewError("[Cluster %s] master list cannot be empty.", clusterName)
+	}
+
+	for _, master := range masters {
+		if master.ID == "" {
+			return fail.InvalidParameterError("masters", "cannot contain items with empty ID")
+		}
+	}
+
+	tgm := new(errgroup.Group)
+	for _, master := range masters {
+		capturedMaster := master
+		tgm.Go(func() error {
+			host, xerr := LoadHost(ctx, capturedMaster.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				return xerr
-			}
-			if len(masters) == 0 {
-				return fail.NewError("[Cluster %s] master list cannot be empty.", clusterName)
-			}
-
-			for _, master := range masters {
-				if master.ID == "" {
-					return fail.InvalidParameterError("masters", "cannot contain items with empty ID")
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					return nil
+				default:
+					return xerr
 				}
 			}
 
-			tgm := new(errgroup.Group)
-			for _, master := range masters {
-				capturedMaster := master
-				tgm.Go(func() error {
-					host, xerr := LoadHost(ctx, capturedMaster.ID)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						switch xerr.(type) {
-						case *fail.ErrNotFound:
-							return nil
-						default:
-							return xerr
-						}
-					}
-
-					xerr = clusterTrx.configureMaster(ctx, host, variables)
-					if xerr != nil {
-						switch xerr.(type) {
-						case *fail.ErrNotFound:
-							return nil
-						default:
-							return xerr
-						}
-					}
-					return nil
-				})
-			}
-
-			xerr = fail.Wrap(tgm.Wait())
+			xerr = clusterTrx.configureMaster(ctx, host, variables)
 			if xerr != nil {
-				return xerr
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					return nil
+				default:
+					return xerr
+				}
 			}
-
-			logrus.WithContext(ctx).Debugf("[Cluster %s] masters configuration successful", clusterName)
 			return nil
-		}()
-		chRes <- gerr
-	}()
-
-	select {
-	case res := <-chRes:
-		return res
-	case <-ctx.Done():
-		return fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		cancel()
-		<-chRes
-		return fail.Wrap(inctx.Err())
+		})
 	}
+
+	xerr = fail.Wrap(tgm.Wait())
+	if xerr != nil {
+		return xerr
+	}
+
+	logrus.WithContext(ctx).Debugf("[Cluster %s] masters configuration successful", clusterName)
+	return nil
 }
 
 // configureMaster configures one master
@@ -3851,7 +3794,7 @@ func (clusterTrx *clusterTransactionImpl) configureMaster(ctx context.Context, h
 	return nil
 }
 
-type taskCreateNodesParameters struct {
+type createNodesParameters struct {
 	count         uint
 	public        bool
 	nodesDef      abstract.HostSizingRequirements
@@ -3859,7 +3802,7 @@ type taskCreateNodesParameters struct {
 }
 
 // createNodes creates nodes
-func (clusterTrx *clusterTransactionImpl) createNodes(inctx context.Context, params taskCreateNodesParameters) (_ any, _ fail.Error) {
+func (clusterTrx *clusterTransactionImpl) createNodes(inctx context.Context, params createNodesParameters) (_ any, _ fail.Error) {
 	if valid.IsNil(clusterTrx) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -3951,83 +3894,70 @@ func (clusterTrx *clusterTransactionImpl) createNodes(inctx context.Context, par
 
 // configureCluster ...
 // params contains a data.Map with primary and secondary getGateway hosts
-func (clusterTrx *clusterTransactionImpl) configureCluster(inctx context.Context, req abstract.ClusterRequest) (ferr fail.Error) {
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
+func (clusterTrx *clusterTransactionImpl) configureCluster(ctx context.Context, req abstract.ClusterRequest) (ferr fail.Error) {
+	if valid.IsNull(clusterTrx) {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	select {
+	case <-ctx.Done():
+		return fail.Wrap(ctx.Err())
+	default:
+	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
-	logrus.WithContext(ctx).Infof("[Cluster %s] configuring Cluster...", clusterTrx.GetName())
+	clusterName := clusterTrx.GetName()
+	logrus.WithContext(ctx).Infof("[Cluster %s] configuring Cluster...", clusterName)
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			logrus.WithContext(ctx).Errorf("[Cluster %s] configuration failed: %s", clusterTrx.GetName(), ferr.Error())
+			logrus.WithContext(ctx).Errorf("[Cluster %s] configuration failed: %s", clusterName, ferr.Error())
 		} else {
-			logrus.WithContext(ctx).Infof("[Cluster %s] configuration successful.", clusterTrx.GetName())
+			logrus.WithContext(ctx).Infof("[Cluster %s] configuration successful.", clusterName)
 		}
 	}()
 
-	type result struct {
-		rErr fail.Error
+	// Install reverse-proxy feature on Cluster (gateways)
+	parameters := ExtractFeatureParameters(req.FeatureParameters)
+	xerr := clusterTrx.installReverseProxy(ctx, parameters)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
 	}
-	chRes := make(chan result)
-	go func() {
-		defer close(chRes)
 
-		// FIXME: OPP This should use instance.AddFeature instead
-
-		// Install reverse-proxy feature on Cluster (gateways)
-		parameters := ExtractFeatureParameters(req.FeatureParameters)
-		xerr := clusterTrx.installReverseProxy(ctx, parameters)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
+	// Install remote-desktop feature on Cluster (all masters)
+	xerr = clusterTrx.installRemoteDesktop(ctx, parameters)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
+		if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
+			return xerr
 		}
-
-		// Install remote-desktop feature on Cluster (all masters)
-		xerr = clusterTrx.installRemoteDesktop(ctx, parameters)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			// Break execution flow only if the Feature cannot be run (file transfer, Host unreachable, ...), not if it ran but has failed
-			if annotation, found := xerr.Annotation("ran_but_failed"); !found || !annotation.(bool) {
-				chRes <- result{xerr}
-				return
-			}
-		}
-
-		// Install ansible feature on Cluster (all masters)
-		xerr = clusterTrx.installAnsible(ctx, parameters)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-
-		// configure what has to be done Cluster-wide
-		makers, xerr := clusterTrx.extractMakers(ctx)
-		if xerr != nil {
-			chRes <- result{xerr}
-			return
-		}
-		internal.IncrementExpVar("cluster.cache.hit")
-		if makers.ConfigureCluster != nil {
-			chRes <- result{makers.ConfigureCluster(ctx, clusterTrx, parameters)}
-			return
-		}
-
-		chRes <- result{nil}
-	}()
-
-	select {
-	case res := <-chRes:
-		return res.rErr
-	case <-ctx.Done():
-		return fail.Wrap(ctx.Err())
-	case <-inctx.Done():
-		return fail.Wrap(inctx.Err())
 	}
+
+	// Install ansible feature on Cluster (all masters)
+	xerr = clusterTrx.installAnsible(ctx, parameters)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	// configure what has to be done Cluster-wide
+	makers, xerr := clusterTrx.extractMakers(ctx)
+	if xerr != nil {
+		return xerr
+	}
+	internal.IncrementExpVar("cluster.cache.hit")
+	if makers.ConfigureCluster != nil {
+		return makers.ConfigureCluster(ctx, clusterTrx, parameters)
+	}
+
+	return nil
 }
 
 // determineRequiredNodes ...
@@ -4038,13 +3968,13 @@ func (clusterTrx *clusterTransactionImpl) determineRequiredNodes(ctx context.Con
 	}
 
 	if makers.MinimumRequiredServers != nil {
-		g, m, n, xerr := makers.MinimumRequiredServers(func() *abstract.Cluster { out, _ := clusterTrx.getIdentity(ctx); return out }())
+		mas, pri, pub, xerr := makers.MinimumRequiredServers(func() *abstract.Cluster { out, _ := clusterTrx.getAbstract(ctx); return out }())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return 0, 0, 0, xerr
 		}
 
-		return g, m, n, nil
+		return mas, pri, pub, nil
 	}
 
 	return 0, 0, 0, nil
@@ -4802,7 +4732,7 @@ func (clusterTrx *clusterTransactionImpl) installReverseProxy(inctx context.Cont
 	default:
 	}
 
-	identity, xerr := clusterTrx.getIdentity(ctx)
+	identity, xerr := clusterTrx.getAbstract(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -4884,7 +4814,7 @@ func (clusterTrx *clusterTransactionImpl) installRemoteDesktop(inctx context.Con
 	go func() {
 		defer close(chRes)
 
-		identity, xerr := clusterTrx.getIdentity(ctx)
+		identity, xerr := clusterTrx.getAbstract(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -4993,7 +4923,7 @@ func (clusterTrx *clusterTransactionImpl) installAnsible(inctx context.Context, 
 	go func() {
 		defer close(chRes)
 
-		identity, xerr := clusterTrx.getIdentity(ctx)
+		identity, xerr := clusterTrx.getAbstract(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			chRes <- result{xerr}

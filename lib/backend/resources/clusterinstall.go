@@ -100,7 +100,7 @@ package resources
 // 	}
 // 	defer clusterTrx.TerminateFromError(ctx, &ferr)
 //
-// 	identity, xerr := clusterTrx.getIdentity(ctx)
+// 	identity, xerr := clusterTrx.getAbstract(ctx)
 // 	xerr = debug.InjectPlannedFail(xerr)
 // 	if xerr != nil {
 // 		return xerr
@@ -121,7 +121,7 @@ package resources
 // 			v["Username"] = abstract.DefaultUser
 // 		}
 // 	}
-// 	networkCfg, xerr := instance.GetNetworkConfig(ctx)
+// 	networkCfg, xerr := instance.NetworkConfig(ctx)
 // 	xerr = debug.InjectPlannedFail(xerr)
 // 	if xerr != nil {
 // 		return xerr

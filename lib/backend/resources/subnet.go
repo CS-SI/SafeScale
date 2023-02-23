@@ -464,11 +464,7 @@ func (instance *Subnet) updateCachedInformation(ctx context.Context, trx subnetT
 				return xerr
 			}
 		} else {
-			var ok bool
 			instance.localCache.gateways[1] = hostInstance
-			if !ok {
-				return fail.InconsistentError("hostInstance should be a *Host")
-			}
 		}
 	}
 
