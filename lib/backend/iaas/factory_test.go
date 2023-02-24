@@ -135,6 +135,24 @@ func Test_validateOutscale(t *testing.T) {
 	}
 }
 
+// Test_validateBadOutscale has to fail, and fail badly at that because there are several mistakes in the tenants.toml file (see the file)
+func Test_validateBadOutscale(t *testing.T) {
+	v := viper.New()
+	v.AddConfigPath("./tenant_tests")
+	v.SetConfigName("wrongoutscale")
+
+	tenants, _, xerr := getTenantsFromViperCfg(v)
+
+	if xerr != nil {
+		t.Error(xerr.Error())
+	}
+
+	err := validateTenant(tenants[0])
+	if err == nil {
+		t.Error("Ouch!, we didn't saw the errors")
+	}
+}
+
 func Test_validateOvh(t *testing.T) {
 	v := viper.New()
 	v.AddConfigPath("./tenant_tests")
