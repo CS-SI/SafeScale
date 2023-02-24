@@ -962,7 +962,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		found    bool
 	)
 
-	if val, ok = tenant["name"].(string); !ok {
+	if val, ok = tenant["name"].(string); !ok { // FIXME: this is wrong, take a look at Test_inputValidation (there is an explanation below), but the UT proves the point
 		return fail.SyntaxError("Missing field 'name' for tenant")
 	} else {
 		name = val
@@ -1004,16 +1004,34 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	}
 
 	if identity, ok = tenant["identity"].(map[string]interface{}); !ok {
-		return fail.SyntaxError("No section 'identity' found for tenant %s", name)
+		return fail.SyntaxError("No section 'identity' found for tenant %s", name) // No, this is not true
+		// FIXME:
+		// _, ok = tenant["whatever"], !ok -> the map does not have the key whatever
+		// BUT this is not what you are doing in line 1006, what you are actually checking is the validity of the CAST !!
+		// line 1006 checks that the CONTENT of tenant["identity"] if any, CAN BE CASTED to a map[string]interface{}
+		// you should 1st check if the map tenant has a "whatever", if doesn't then you can say no section found
+		// THEN, check if the tenant["whatever"] is of the type we expect, if not, return another error with wrong format
 	}
+
+	// that's how to do it
+	/*
+		maybe, ok := tenant["identity"]
+		if !ok {
+			return fail.SyntaxError("No section 'identity'")
+		}
+
+		if identity, ok = maybe.(map[string]interface{}); !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[identity] is not a map[string]any")
+		}
+	*/
 
 	if compute, ok = tenant["compute"].(map[string]interface{}); !ok {
-		return fail.SyntaxError("No section 'compute' found for tenant %s", name)
+		return fail.SyntaxError("No section 'compute' found for tenant %s", name) // Same problem as before
 	}
 
-	ostorage, _ = tenant["objectstorage"].(map[string]interface{})
+	ostorage, _ = tenant["objectstorage"].(map[string]interface{}) // FIXME: you can never be sure, better safe than sorry, there is a missing ok here, and also the same problem as before
 
-	metadata, _ = tenant["metadata"].(map[string]interface{})
+	metadata, _ = tenant["metadata"].(map[string]interface{}) // FIXME: you can never be sure, better safe than sorry, there is a missing ok here, and also the same problem as before
 
 	if client != "gcp" {
 		userKeysToCheck := []string{
@@ -1045,7 +1063,9 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		)
 
 		if err != nil {
-			return fail.ConvertError(err)
+			return fail.ConvertError(err) // FIXME: the problem with that is that the only thing the user SEE is: "must be in a valid format".  So the user has no idea what happened and why his tenants file is wrong.
+			// you should wrap the error, with explanations, like
+			// return fail.Wrap(err, "dear user, when looking at the field "XXXX", we expected an alphanumeric text and you provided instead 'yyy', please correct you input, check the documentation, yada yada yada")
 		}
 	} else {
 		if val, ok = identity["User"].(string); !ok {
@@ -1059,11 +1079,11 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		)
 
 		if err != nil {
-			return fail.ConvertError(err)
+			return fail.ConvertError(err) // FIXME: same as before, the user should know how to fix the problem
 		}
 	}
 
-	if client == "ovh" || client == "openstack" || client == "cloudferro" {
+	if client == "ovh" || client == "openstack" || client == "cloudferro" { // hardcoding strings usually is NOT a good idea, better using constants or enumerations
 		key := "ApplicationKey"
 		found = false
 
@@ -1084,7 +1104,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		)
 
 		if err != nil {
-			return fail.ConvertError(err)
+			return fail.ConvertError(err) // FIXME: same as before, the user should know how to fix the problem
 		}
 	}
 
@@ -1112,7 +1132,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	}
 
 	if !found {
-		return fail.SyntaxError("missing settings 'SecretKey' or 'AccessPassword' or 'OpenstackPassword' or 'Password' in 'identity' section")
+		return fail.SyntaxError("missing settings 'SecretKey' or 'AccessPassword' or 'OpenstackPassword' or 'Password' in 'identity' section") // FIXME: sure, which one ?
 	}
 
 	err := validation.Validate(val,
@@ -1122,14 +1142,14 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	)
 
 	if err != nil {
-		return fail.ConvertError(err)
+		return fail.ConvertError(err) // FIXME: same as before, the user should know how to fix the problem
 	}
 
 	if client == "cloudferro" || client == "flexibleengine" {
 		key := "AvailabilityZone"
 		found = false
 
-		if val, ok = ostorage[key].(string); ok {
+		if val, ok = ostorage[key].(string); ok { // FIXME: again, this not tests what you think it tests, not having a key, and having the key with a wrong type are different problems
 			found = true
 		} else if val, ok = compute[key].(string); ok {
 			found = true
@@ -1146,7 +1166,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		)
 
 		if err != nil {
-			return fail.ConvertError(err)
+			return fail.ConvertError(err) // FIXME: same as before, the user should know how to fix the problem
 		}
 	}
 
@@ -1155,10 +1175,10 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		key := "Type"
 		found = false
 
-		if val, ok := metadata[key].(string); ok {
+		if val, ok := metadata[key].(string); ok { // FIXME: same as before
 			typeName = val
 			found = true
-		} else if val, ok := ostorage[key].(string); ok {
+		} else if val, ok := ostorage[key].(string); ok { // FIXME: same as before
 			typeName = val
 			found = true
 		}
