@@ -21,6 +21,8 @@ import (
 	"context"
 	"expvar"
 	"fmt"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"os"
 	"regexp"
 	"strings"
@@ -982,6 +984,17 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 			}
 			client = val
 			found = true
+
+			err := validation.Validate(val,
+				validation.Required,
+				validation.Length(1, 64),
+				is.Alphanumeric,
+			)
+
+			if err != nil {
+				return fail.ConvertError(err)
+			}
+
 			break
 		}
 	}
@@ -1012,10 +1025,10 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		found = false
 
 		for _, key := range userKeysToCheck {
-			if _, ok := ostorage[key].(string); ok {
+			if val, ok = ostorage[key].(string); ok {
 				found = true
 				break
-			} else if _, ok := identity[key].(string); ok {
+			} else if val, ok = identity[key].(string); ok {
 				found = true
 				break
 			}
@@ -1024,9 +1037,29 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		if !found {
 			return fail.SyntaxError("missing setting 'AccessKey', 'OpenstackID' or 'Username' field in 'identity' section")
 		}
+
+		err := validation.Validate(val,
+			validation.Required,
+			validation.Length(1, 64),
+			validation.Match(regexp.MustCompile("^[a-zA-Z0-9-]+$")),
+		)
+
+		if err != nil {
+			return fail.ConvertError(err)
+		}
 	} else {
-		if _, ok := identity["User"].(string); !ok {
+		if val, ok = identity["User"].(string); !ok {
 			return fail.SyntaxError("missing setting 'User' field in 'identity' section")
+		}
+
+		err := validation.Validate(val,
+			validation.Required,
+			validation.Length(1, 64),
+			validation.Match(regexp.MustCompile("^[a-zA-Z0-9-]+$")),
+		)
+
+		if err != nil {
+			return fail.ConvertError(err)
 		}
 	}
 
@@ -1034,14 +1067,24 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		key := "ApplicationKey"
 		found = false
 
-		if _, ok := ostorage[key].(string); ok {
+		if val, ok = ostorage[key].(string); ok {
 			found = true
-		} else if _, ok := identity[key].(string); ok {
+		} else if val, ok = identity[key].(string); ok {
 			found = true
 		}
 
 		if !found {
 			return fail.SyntaxError("missing setting 'ApplicationKey' field in 'identity' section")
+		}
+
+		err := validation.Validate(val,
+			validation.Required,
+			validation.Length(1, 64),
+			is.Alphanumeric,
+		)
+
+		if err != nil {
+			return fail.ConvertError(err)
 		}
 	}
 
@@ -1055,14 +1098,14 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	found = false
 
 	for _, key := range secretKeyToCheck {
-		if _, ok := metadata[key].(string); ok {
+		if val, ok = metadata[key].(string); ok {
 			found = true
 			break
 		}
-		if _, ok := ostorage[key].(string); ok {
+		if val, ok = ostorage[key].(string); ok {
 			found = true
 			break
-		} else if _, ok := identity[key].(string); ok {
+		} else if val, ok = identity[key].(string); ok {
 			found = true
 			break
 		}
@@ -1072,18 +1115,38 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		return fail.SyntaxError("missing settings 'SecretKey' or 'AccessPassword' or 'OpenstackPassword' or 'Password' in 'identity' section")
 	}
 
+	err := validation.Validate(val,
+		validation.Required,
+		validation.Length(1, 64),
+		is.Alphanumeric,
+	)
+
+	if err != nil {
+		return fail.ConvertError(err)
+	}
+
 	if client == "cloudferro" || client == "flexibleengine" {
 		key := "AvailabilityZone"
 		found = false
 
-		if _, ok := ostorage[key].(string); ok {
+		if val, ok = ostorage[key].(string); ok {
 			found = true
-		} else if _, ok := compute[key].(string); ok {
+		} else if val, ok = compute[key].(string); ok {
 			found = true
 		}
 
 		if !found {
 			return fail.SyntaxError("missing settings 'AvailabilityZone' in 'compute' section")
+		}
+
+		err = validation.Validate(val,
+			validation.Required,
+			validation.Length(1, 64),
+			validation.Match(regexp.MustCompile("\"^[a-zA-Z0-9-]+$\"")),
+		)
+
+		if err != nil {
+			return fail.ConvertError(err)
 		}
 	}
 
@@ -1112,15 +1175,25 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	key := "Region"
 	found = false
 
-	if _, ok := metadata[key].(string); ok {
+	if val, ok = metadata[key].(string); ok {
 		found = true
-	} else if _, ok := ostorage[key].(string); ok {
+	} else if val, ok = ostorage[key].(string); ok {
 		found = true
-	} else if _, ok := compute[key].(string); ok {
+	} else if val, ok = compute[key].(string); ok {
 		found = true
 	}
 	if !found {
 		return fail.SyntaxError("missing setting 'Region' field in 'compute' section")
+	}
+
+	err = validation.Validate(val,
+		validation.Required,
+		validation.Length(1, 64),
+		validation.Match(regexp.MustCompile("\"^[a-zA-Z0-9-]+$\"")),
+	)
+
+	if err != nil {
+		return fail.ConvertError(err)
 	}
 
 	return nil
