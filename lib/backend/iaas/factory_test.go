@@ -135,6 +135,68 @@ func Test_validateOutscale(t *testing.T) {
 	}
 }
 
+// Test_validateBadOutscale has to fail, and fail badly at that because there are several mistakes in the tenants.toml file (see the file)
+func Test_validateBadOutscale(t *testing.T) {
+	v := viper.New()
+	v.AddConfigPath("./tenant_tests")
+	v.SetConfigName("wrongoutscale")
+
+	tenants, _, xerr := getTenantsFromViperCfg(v)
+
+	if xerr != nil {
+		t.Error(xerr.Error())
+	}
+
+	err := validateTenant(tenants[0])
+	if err == nil {
+		t.Error("Ouch!, we didn't saw the errors")
+	} else {
+		t.Log(err)
+	}
+}
+
+// Test_validateBadOutscale has to fail, and fail badly at that because there are several mistakes in the tenants.toml file (see the file)
+func Test_validateBadOutscale2(t *testing.T) {
+	v := viper.New()
+	v.AddConfigPath("./tenant_tests")
+	v.SetConfigName("wrongoutscale2")
+
+	tenants, _, xerr := getTenantsFromViperCfg(v)
+
+	if xerr != nil {
+		t.Error(xerr.Error())
+	}
+
+	err := validateTenant(tenants[0])
+	if err == nil {
+		t.Error("Ouch!, we didn't saw the errors")
+	} else {
+		t.Log(err)
+	}
+}
+
+func Test_validateBadOutscale3(t *testing.T) {
+	v := viper.New()
+	v.AddConfigPath("./tenant_tests")
+	v.SetConfigName("wrongoutscale3")
+
+	tenants, _, xerr := getTenantsFromViperCfg(v)
+	if xerr != nil {
+		t.Error(xerr.Error())
+		// this is missing: (and by the way, is missing in all other tests)
+		// t.FailNow()
+	}
+
+	// do we handle errors properly ?
+	// under ANY circumstance our code has to PANIC -> how to fix this ? look at lines 185
+	err := validateTenant(tenants[0]) // <- this PANICS
+	if err == nil {
+		t.Error("Ouch!, we didn't saw the errors")
+	} else {
+		t.Log(err)
+	}
+}
+
 func Test_validateOvh(t *testing.T) {
 	v := viper.New()
 	v.AddConfigPath("./tenant_tests")
