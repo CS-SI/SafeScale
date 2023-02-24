@@ -1,6 +1,7 @@
 package iaas
 
 import (
+	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 	"time"
@@ -90,9 +91,11 @@ func Test_validateGcp(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		// FIXME: you should add a t.FailNow() here, and also in almost all the other tests after a t.Error, WHY ?
 	}
 
-	err := validateTenant(tenants[0])
+	err := validateTenant(tenants[0]) // FIXME: Because usually when you recover something like a, b, err := whatever(), if you have a err != nil, a and b by convention are null or zero values, so what actually happens is that t.Error (line 94) logs the error, but when we reach line 97, tenants is empty (length 0), so when you try to recover the first element (tenants[0]), it PANICS
+	// There is also the possibility of doing 1st a "if len(tenants) > 0" and keep going; it's a choice
 
 	if err != nil {
 		t.Error(err.Error())
@@ -114,6 +117,20 @@ func Test_validateOpenstack(t *testing.T) {
 
 	if err != nil {
 		t.Error(err.Error())
+	}
+}
+
+func Test_inputValidation(t *testing.T) {
+	// Having a missing field and a field with the wrong type are aaaaalmost the same, but not quite
+
+	pefo := make(map[string]interface{})
+	pefo["name"] = 3 // name is CLEARLY NOT missing, it cannot be more hardcoded than this
+	err := validateTenant(pefo)
+
+	if err != nil { // yes, it MUST fail but....
+		assert.NotContains(t, err.Error(), "Missing field") // but not like that, the problem is that name is the wrong TYPE, not that is missing
+	} else { // no error ??, we have a serious problem then...
+		t.FailNow()
 	}
 }
 
@@ -145,6 +162,7 @@ func Test_validateBadOutscale(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
@@ -165,6 +183,7 @@ func Test_validateBadOutscale2(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
@@ -183,11 +202,11 @@ func Test_validateBadOutscale3(t *testing.T) {
 	tenants, _, xerr := getTenantsFromViperCfg(v)
 	if xerr != nil {
 		t.Error(xerr.Error())
-		// this is missing: (and by the way, is missing in all other tests)
+		// FIXME: this is missing: (and by the way, is missing in all other tests)
 		// t.FailNow()
 	}
 
-	// do we handle errors properly ?
+	// FIXME: do we handle errors properly ?
 	// under ANY circumstance our code has to PANIC -> how to fix this ? look at lines 185
 	err := validateTenant(tenants[0]) // <- this PANICS
 	if err == nil {
