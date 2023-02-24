@@ -18,13 +18,13 @@
         VPCCIDR = "14000.168.0.0/16" #this has to be a valid cidr
 
     [tenants.objectstorage]
-        Type = "fjdsoaf" #we only accept s3 and swift
+        Type = "s3" #we only accept s3 and swift
         Endpoint = "toto" #this has to be a valid url
         AccessKey="hello there" #only alphanumeric with CAPS is valid
         SecretKey="()//" #only alphanumeric is valid
 
     [tenants.metadata]
-        Type = "fjdsoaf" #we only accept s3 and swift
+        Type = "s3" #we only accept s3 and swift
         Endpoint = "toto" #this has to be a valid url
         AccessKey="hello there" #only alphanumeric with CAPS is valid
         SecretKey="()//" #only alphanumeric is valid

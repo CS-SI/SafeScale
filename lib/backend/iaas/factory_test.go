@@ -150,6 +150,8 @@ func Test_validateBadOutscale(t *testing.T) {
 	err := validateTenant(tenants[0])
 	if err == nil {
 		t.Error("Ouch!, we didn't saw the errors")
+	} else {
+		t.Log(err)
 	}
 }
 
