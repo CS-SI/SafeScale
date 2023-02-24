@@ -1,6 +1,6 @@
 [[tenants]]
     client = "cloudferro"
-    name = "TestCloudferro"
+    name = "Test with valid cloudferro tenant"
 
     [tenants.identity]
         ApplicationKey = "1234567890................."

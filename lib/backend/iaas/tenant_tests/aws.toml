@@ -1,6 +1,6 @@
 [[tenants]]
     client = "aws"
-    name = "myAws"
+    name = "Test with valid AWS tenant"
 
     [tenants.identity]
         AccessKeyID = "ABCDEFGHIJK........."

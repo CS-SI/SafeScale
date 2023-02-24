@@ -1,6 +1,6 @@
 [[tenants]]
     client = "outscale"
-    name = "myOutscale"
+    name = "Test with valid outscale tenant"
 
     [tenants.identity]
         AccessKey="ABCDEF123..........."

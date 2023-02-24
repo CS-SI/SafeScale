@@ -1,5 +1,5 @@
 [[tenants]]
-    name = "TenantName"
+    name = "Test with valid openstack tenant"
     client = "openstack"
 
     # This part defines how to authenticate with the provider

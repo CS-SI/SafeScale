@@ -1026,7 +1026,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	} else {
 		if _, ok := identity["User"].(string); !ok {
-			return fail.SyntaxError("missing setting 'User' field in 'identity section")
+			return fail.SyntaxError("missing setting 'User' field in 'identity' section")
 		}
 	}
 
@@ -1041,7 +1041,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 
 		if !found {
-			return fail.SyntaxError("missing setting 'ApplicationKey' in 'identity' section")
+			return fail.SyntaxError("missing setting 'ApplicationKey' field in 'identity' section")
 		}
 	}
 

@@ -1,5 +1,5 @@
 [[tenants]]
-    name = "TestOVHGra"
+    name = "Test with valid ovh tenant"
     client = "ovh"
 
     [tenants.identity]

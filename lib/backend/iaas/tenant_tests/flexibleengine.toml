@@ -1,5 +1,5 @@
 [[tenants]]
-    name = "myFlexibleTenant"
+    name = "Test with valid flexibleengine tenant"
     client = "flexibleengine"
 
     [tenants.identity]

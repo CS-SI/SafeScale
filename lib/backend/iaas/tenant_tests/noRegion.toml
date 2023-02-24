@@ -1,0 +1,16 @@
+[[tenants]]
+name = "Test with tenant without Region"
+client = "ovh"
+
+
+[tenants.identity]
+ApplicationKey = "1234567890..........."
+Username = "test"
+Password = "password"
+
+[tenants.compute]
+AvailabilityZone = "eu-west-0b"
+
+[tenants.objectstorage]
+Type = "s3"
+

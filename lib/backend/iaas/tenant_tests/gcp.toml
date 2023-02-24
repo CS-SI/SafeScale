@@ -1,6 +1,6 @@
 [[tenants]]
     client = "gcp"
-    name = "myGoogleTenant"
+    name = "Test with valid gcp tenant"
 
     [tenants.identity]
         User = "user@somewhere"

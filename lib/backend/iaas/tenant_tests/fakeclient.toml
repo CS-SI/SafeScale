@@ -1,0 +1,3 @@
+[[tenants]]
+    name = "Test with tenant with fake client"
+    client = "fakeclient"

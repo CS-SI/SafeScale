@@ -1,0 +1,7 @@
+[[tenants]]
+name = "Test with tenant without user (gcp)"
+client = "gcp"
+
+[tenants.identity]
+
+[tenants.compute]

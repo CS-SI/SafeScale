@@ -1,0 +1,7 @@
+[[tenants]]
+    name = "Test with Tenant without user"
+    client = "local"
+
+    [tenants.identity]
+
+    [tenants.compute]
