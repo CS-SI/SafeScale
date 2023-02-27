@@ -248,6 +248,60 @@ func Test_validateBadOutscale5(t *testing.T) {
 	require.EqualValues(t, msg, err.Error())
 }
 
+func Test_validateBadOutscale4(t *testing.T) {
+	v := viper.New()
+	v.AddConfigPath("./tenant_tests")
+	v.SetConfigName("wrongoutscale4")
+
+	tenants, _, xerr := getTenantsFromViperCfg(v)
+	if xerr != nil {
+		t.Error(xerr.Error())
+		t.FailNow()
+	}
+
+	// FIXME: do we handle errors properly ?
+	// under ANY circumstance our code has to PANIC -> how to fix this ? look at lines 185
+	err := validateTenant(tenants[0]) // <- this PANICS
+	if err == nil {
+		t.Error("Ouch!, we didn't saw the errors")
+	} else {
+		errorText := err.Error()
+		if !(strings.Contains(errorText, "letters and digits") && strings.Contains(errorText, "SecretKey")) {
+			t.Log(err)
+			t.Error("The user doesn't know which field was wrong") // FIXME: errors should have more information
+			t.FailNow()
+		}
+		t.Log(err)
+	}
+}
+
+func Test_validateBadOutscale5(t *testing.T) {
+	v := viper.New()
+	v.AddConfigPath("./tenant_tests")
+	v.SetConfigName("wrongoutscale5")
+
+	tenants, _, xerr := getTenantsFromViperCfg(v)
+	if xerr != nil {
+		t.Error(xerr.Error())
+		t.FailNow()
+	}
+
+	// FIXME: do we handle errors properly ?
+	// under ANY circumstance our code has to PANIC -> how to fix this ? look at lines 185
+	err := validateTenant(tenants[0]) // <- this PANICS
+	if err == nil {
+		t.Error("Ouch!, we didn't saw the errors")
+	} else {
+		errorText := err.Error()
+		if !(strings.Contains(errorText, "letters and digits") && strings.Contains(errorText, "SecretKey") && strings.Contains(errorText, "UserID")) {
+			t.Log(err)
+			t.Error("What if we have more than one error in the file ?") // FIXME: we should handle lists of errors
+			t.FailNow()
+		}
+		t.Log(err)
+	}
+}
+
 func Test_validateOvh(t *testing.T) {
 	v := viper.New()
 	v.AddConfigPath("./tenant_tests")
