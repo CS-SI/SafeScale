@@ -6,11 +6,13 @@ on:
       - 'check/**'
       - 'experimental/**'
       - 'feature/**'
+      - 'tasks/**'
       - 'pr/**'
   pull_request:
     branches:
       - 'experimental/**'
       - 'feature/**'
+      - 'tasks/**'
       - 'check/**'
       - 'pr/**'
 
