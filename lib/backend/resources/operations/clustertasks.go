@@ -151,16 +151,16 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 				req.InitialNodeCount = privateNodeCount
 			}
 			if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
-				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
-				req.InitialNodeCount = privateNodeCount
+				logrus.WithContext(ctx).Warnf("[Cluster %s] creating less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
+				// req.InitialNodeCount = privateNodeCount
 			}
 
 			if req.InitialMasterCount == 0 {
 				req.InitialMasterCount = privateMasterCount
 			}
 			if req.InitialMasterCount > 0 && req.InitialMasterCount < privateMasterCount {
-				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialMasterCount, privateMasterCount, req.Flavor.String())
-				req.InitialMasterCount = privateMasterCount
+				logrus.WithContext(ctx).Warnf("[Cluster %s] creating less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialMasterCount, privateMasterCount, req.Flavor.String())
+				// req.InitialMasterCount = privateMasterCount
 			}
 
 			// Define the sizing dependencies for Cluster hosts
@@ -1122,8 +1122,8 @@ func (instance *Cluster) createHostResources(
 				cluReq.InitialMasterCount = masterCount
 			}
 			if cluReq.InitialMasterCount > 0 && cluReq.InitialMasterCount < masterCount {
-				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", cluReq.Name, cluReq.InitialMasterCount, masterCount, cluReq.Flavor.String())
-				cluReq.InitialMasterCount = masterCount
+				logrus.WithContext(ctx).Warnf("[Cluster %s] creating less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", cluReq.Name, cluReq.InitialMasterCount, masterCount, cluReq.Flavor.String())
+				// cluReq.InitialMasterCount = masterCount
 			}
 
 			// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
