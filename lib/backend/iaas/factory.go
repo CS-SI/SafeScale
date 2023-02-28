@@ -21,7 +21,10 @@ import (
 	"context"
 	"expvar"
 	"fmt"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/enums"
+	"net"
 	"net/mail"
+	"net/url"
 	"os"
 	"regexp"
 	"sync"
@@ -947,12 +950,12 @@ func getTenantsFromViperCfg(v *viper.Viper) ([]map[string]interface{}, *viper.Vi
 
 func validateTenant(tenant map[string]interface{}) fail.Error {
 	var (
-		name     string
-		client   Client
-		err      error
-		identity map[string]interface{}
-		compute  map[string]interface{}
-		//network  map[string]interface{}
+		name      string
+		client    enums.Client
+		err       error
+		identity  map[string]interface{}
+		compute   map[string]interface{}
+		network   map[string]interface{}
 		ostorage  map[string]interface{}
 		metadata  map[string]interface{}
 		val       string
@@ -986,7 +989,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 				return fail.SyntaxError("Wrong type, the content of tenant[%s] is not a string", key)
 			}
 
-			client, err = ParseClient(val)
+			client, err = enums.ParseClient(val)
 
 			if err != nil {
 				return fail.ConvertError(err)
@@ -1012,6 +1015,15 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 
 	if compute, ok = maybe.(map[string]interface{}); !ok {
 		return fail.SyntaxError("Wrong type, the content of tenant[compute] is not a map[string]any")
+	}
+
+	maybe, ok = tenant["network"]
+	if ok {
+		network, ok = maybe.(map[string]interface{})
+
+		if !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[network] is not a map[string]any")
+		}
 	}
 
 	maybe, ok = tenant["objectstorage"]
@@ -1085,6 +1097,29 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 
 		if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
 			return fail.SyntaxError("User in identity section must be alphanumeric (with -) and between 1 and 64 characters long")
+		}
+	}
+
+	if client == 8 {
+		key := "UserID"
+		found = false
+
+		if maybe, ok = identity[key]; ok {
+			searchKey = key
+			section = "identity"
+			found = true
+		}
+
+		if !found {
+			return fail.SyntaxError("missing setting 'UserID' field in 'identity' section")
+		}
+
+		if val, ok = maybe.(string); !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey)
+		}
+
+		if match, _ := regexp.Match("^[0-9]{1,64}$", []byte(val)); !match {
+			return fail.SyntaxError("%s in %s section must be alphanumeric and between 1 and 64 characters long", searchKey, section)
 		}
 	}
 
@@ -1202,7 +1237,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 			if typeName, ok = maybe.(string); !ok {
 				return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
 			}
-			_, err := ParseStorage(typeName)
+			_, err := enums.ParseStorage(typeName)
 
 			if err != nil {
 				return fail.ConvertError(err)
@@ -1233,6 +1268,76 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 
 	if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
 		return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section)
+	}
+
+	if client == 8 {
+		key := "Subregion"
+		found = false
+
+		if maybe, ok = compute[key]; ok {
+			section = "compute"
+			found = true
+		}
+
+		if !found {
+			return fail.SyntaxError("missing setting 'Subregion' field in 'compute' section")
+		}
+
+		if val, ok = maybe.(string); !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
+		}
+
+		if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+			return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", key, section)
+		}
+	}
+
+	if client == 4 || client == 8 {
+		key = "VPCName"
+
+		if maybe, ok = network[key]; ok {
+			section = "network"
+		}
+
+		if val, ok = maybe.(string); !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
+		}
+
+		if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,255}$", []byte(val)); !match {
+			return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 255 characters long", key, section)
+		}
+
+		key = "VPCCIDR"
+
+		if maybe, ok = network[key]; ok {
+			section = "network"
+		}
+
+		if val, ok = maybe.(string); !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
+		}
+
+		_, _, err = net.ParseCIDR(val)
+		if err != nil {
+			return fail.SyntaxError("%s in %s section must be a valid CIDR", key, section)
+		}
+	}
+
+	key = "Endpoint"
+
+	if maybe, ok = metadata[key]; ok {
+		section = "metadata"
+	} else if maybe, ok = ostorage[key]; ok {
+		section = "objectstorage"
+	}
+
+	if val, ok = maybe.(string); !ok {
+		return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
+	}
+
+	_, err = url.ParseRequestURI(val)
+	if err != nil {
+		return fail.SyntaxError("%s in %s section must be a valid URL", key, section)
 	}
 
 	return nil
