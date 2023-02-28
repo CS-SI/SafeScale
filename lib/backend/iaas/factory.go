@@ -962,10 +962,13 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		found    bool
 	)
 
-	if val, ok = tenant["name"].(string); !ok { // FIXME: this is wrong, take a look at Test_inputValidation (there is an explanation below), but the UT proves the point
+	maybe, ok := tenant["name"]
+	if !ok {
 		return fail.SyntaxError("Missing field 'name' for tenant")
-	} else {
-		name = val
+	}
+	name, ok = maybe.(string)
+	if !ok {
+		return fail.SyntaxError("Field 'name' for tenant MUST be a string")
 	}
 
 	providerKeysToCheck := []string{
@@ -984,27 +987,12 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 			if err != nil {
 				return fail.ConvertError(err)
 			}
-			found = true
-
-			err = validation.Validate(val,
-				validation.Required,
-				validation.Length(1, 64),
-				is.Alphanumeric,
-			)
-
-			if err != nil {
-				return fail.ConvertError(err)
-			}
 
 			break
 		}
 	}
 
-	if !found {
-		return fail.SyntaxError("Missing field 'client' for tenant")
-	}
-
-	maybe, ok := tenant["identity"]
+	maybe, ok = tenant["identity"]
 	if !ok {
 		return fail.SyntaxError("No section 'identity' found for tenant %s", name)
 	}
@@ -1050,10 +1038,16 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		found = false
 
 		for _, key := range userKeysToCheck {
-			if val, ok = ostorage[key].(string); ok {
+			if maybe, ok = ostorage[key]; ok {
+				if val, ok = maybe.(string); !ok {
+					return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
+				}
 				found = true
 				break
-			} else if val, ok = identity[key].(string); ok {
+			} else if maybe, ok = identity[key].(string); ok {
+				if val, ok = maybe.(string); !ok {
+					return fail.SyntaxError("Wrong type, the content of tenant[identity][%s] is not a string", key)
+				}
 				found = true
 				break
 			}
@@ -1075,8 +1069,12 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 			// return fail.Wrap(err, "dear user, when looking at the field "XXXX", we expected an alphanumeric text and you provided instead 'yyy', please correct you input, check the documentation, yada yada yada")
 		}
 	} else {
-		if val, ok = identity["User"].(string); !ok {
-			return fail.SyntaxError("missing setting 'User' field in 'identity' section")
+		if maybe, ok = identity["User"]; !ok {
+			if val, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[identity][User] is not a string")
+			} else {
+				return fail.SyntaxError("missing setting 'User' field in 'identity' section")
+			}
 		}
 
 		err := validation.Validate(val,
@@ -1094,9 +1092,15 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		key := "ApplicationKey"
 		found = false
 
-		if val, ok = ostorage[key].(string); ok {
+		if maybe, ok = ostorage[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
+			}
 			found = true
-		} else if val, ok = identity[key].(string); ok {
+		} else if maybe, ok = identity[key].(string); ok {
+			if val, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[identity][%s] is not a string", key)
+			}
 			found = true
 		}
 
@@ -1125,14 +1129,23 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	found = false
 
 	for _, key := range secretKeyToCheck {
-		if val, ok = metadata[key].(string); ok {
+		if maybe, ok = metadata[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[metadata][%s] is not a string", key)
+			}
 			found = true
 			break
 		}
-		if val, ok = ostorage[key].(string); ok {
+		if maybe, ok = ostorage[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
+			}
 			found = true
 			break
-		} else if val, ok = identity[key].(string); ok {
+		} else if maybe, ok = identity[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[identity][%s] is not a string", key)
+			}
 			found = true
 			break
 		}
@@ -1156,9 +1169,15 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		key := "AvailabilityZone"
 		found = false
 
-		if val, ok = ostorage[key].(string); ok { // FIXME: again, this not tests what you think it tests, not having a key, and having the key with a wrong type are different problems
+		if maybe, ok = ostorage[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
+			}
 			found = true
-		} else if val, ok = compute[key].(string); ok {
+		} else if maybe, ok = compute[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[compute][%s] is not a string", key)
+			}
 			found = true
 		}
 
@@ -1182,10 +1201,16 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		key := "Type"
 		found = false
 
-		if val, ok := metadata[key].(string); ok { // FIXME: same as before
+		if maybe, ok = metadata[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[metadata][%s] is not a string", key)
+			}
 			typeName = val
 			found = true
-		} else if val, ok := ostorage[key].(string); ok { // FIXME: same as before
+		} else if maybe, ok = ostorage[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
+			}
 			typeName = val
 			found = true
 		}
@@ -1204,11 +1229,20 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	key := "Region"
 	found = false
 
-	if val, ok = metadata[key].(string); ok {
+	if maybe, ok = metadata[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[metadata][%s] is not a string", key)
+		}
 		found = true
-	} else if val, ok = ostorage[key].(string); ok {
+	} else if maybe, ok = ostorage[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
+		}
 		found = true
-	} else if val, ok = compute[key].(string); ok {
+	} else if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[compute][%s] is not a string", key)
+		}
 		found = true
 	}
 	if !found {
