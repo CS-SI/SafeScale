@@ -21,8 +21,7 @@ import (
 	"context"
 	"expvar"
 	"fmt"
-	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/go-ozzo/ozzo-validation/v4/is"
+	"net/mail"
 	"os"
 	"regexp"
 	"sync"
@@ -759,7 +758,6 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 
 	var secretKeysToCheck = []string{
 		"SecretKey",
-		"AccessPassword",
 		"OpenstackPassword",
 		"Password",
 	}
@@ -782,7 +780,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		}
 	}
 	if !found {
-		return config, fail.SyntaxError("missing setting 'SecretKey' or 'AccessPassword' or 'OpenstackPasswork' or 'Password' field in 'identity' section")
+		return config, fail.SyntaxError("missing setting 'SecretKey' or 'OpenstackPasswork' or 'Password' field in 'identity' section")
 	}
 
 	//if config.Region, ok = metadata["Region"].(string); !ok {
@@ -955,11 +953,13 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		identity map[string]interface{}
 		compute  map[string]interface{}
 		//network  map[string]interface{}
-		ostorage map[string]interface{}
-		metadata map[string]interface{}
-		val      string
-		ok       bool
-		found    bool
+		ostorage  map[string]interface{}
+		metadata  map[string]interface{}
+		val       string
+		ok        bool
+		found     bool
+		searchKey string
+		section   string
 	)
 
 	maybe, ok := tenant["name"]
@@ -981,7 +981,11 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	found = false
 
 	for _, key := range providerKeysToCheck {
-		if val, ok = tenant[key].(string); ok {
+		if maybe, ok = tenant[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[%s] is not a string", key)
+			}
+
 			client, err = ParseClient(val)
 
 			if err != nil {
@@ -1039,34 +1043,36 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 
 		for _, key := range userKeysToCheck {
 			if maybe, ok = ostorage[key]; ok {
-				if val, ok = maybe.(string); !ok {
-					return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
-				}
+				section = "objectstorage"
+				searchKey = key
 				found = true
 				break
-			} else if maybe, ok = identity[key].(string); ok {
-				if val, ok = maybe.(string); !ok {
-					return fail.SyntaxError("Wrong type, the content of tenant[identity][%s] is not a string", key)
-				}
+			} else if maybe, ok = identity[key]; ok {
+				section = "identity"
+				searchKey = key
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			return fail.SyntaxError("missing setting 'AccessKey', 'OpenstackID' or 'Username' field in 'identity' section")
+			return fail.SyntaxError("missing setting 'AccessKey' field in 'identity' section")
 		}
 
-		err := validation.Validate(val,
-			validation.Required,
-			validation.Length(1, 64),
-			validation.Match(regexp.MustCompile("^[a-zA-Z0-9-]+$")),
-		)
+		if val, ok = maybe.(string); !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey)
+		}
 
-		if err != nil {
-			return fail.ConvertError(err) // FIXME: the problem with that is that the only thing the user SEE is: "must be in a valid format".  So the user has no idea what happened and why his tenants file is wrong.
-			// you should wrap the error, with explanations, like
-			// return fail.Wrap(err, "dear user, when looking at the field "XXXX", we expected an alphanumeric text and you provided instead 'yyy', please correct you input, check the documentation, yada yada yada")
+		if client == 2 && searchKey == "Username" {
+			_, err = mail.ParseAddress(val)
+
+			if err != nil {
+				return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a valid email address", section, searchKey)
+			}
+		} else {
+			if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+				return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section)
+			}
 		}
 	} else {
 		if maybe, ok = identity["User"]; !ok {
@@ -1077,14 +1083,8 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 			}
 		}
 
-		err := validation.Validate(val,
-			validation.Required,
-			validation.Length(1, 64),
-			validation.Match(regexp.MustCompile("^[a-zA-Z0-9-]+$")),
-		)
-
-		if err != nil {
-			return fail.ConvertError(err) // FIXME: same as before, the user should know how to fix the problem
+		if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+			return fail.SyntaxError("User in identity section must be alphanumeric (with -) and between 1 and 64 characters long")
 		}
 	}
 
@@ -1093,14 +1093,12 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		found = false
 
 		if maybe, ok = ostorage[key]; ok {
-			if val, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
-			}
+			searchKey = key
+			section = "objectstorage"
 			found = true
-		} else if maybe, ok = identity[key].(string); ok {
-			if val, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[identity][%s] is not a string", key)
-			}
+		} else if maybe, ok = identity[key]; ok {
+			searchKey = key
+			section = "identity"
 			found = true
 		}
 
@@ -1108,20 +1106,18 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 			return fail.SyntaxError("missing setting 'ApplicationKey' field in 'identity' section")
 		}
 
-		err := validation.Validate(val,
-			validation.Required,
-			validation.Length(1, 64),
-			is.Alphanumeric,
-		)
+		if val, ok = maybe.(string); !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey)
+		}
 
-		if err != nil {
-			return fail.ConvertError(err) // FIXME: same as before, the user should know how to fix the problem
+		if match, _ := regexp.Match("^[a-zA-Z0-9]{1,64}$", []byte(val)); !match {
+			return fail.SyntaxError("%s in %s section must be alphanumeric and between 1 and 64 characters long", searchKey, section)
 		}
 	}
 
 	secretKeyToCheck := []string{
 		"SecretKey",
-		"AccessPassword",
+		"SecretAccessKey",
 		"OpenstackPassword",
 		"Password",
 	}
@@ -1130,39 +1126,36 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 
 	for _, key := range secretKeyToCheck {
 		if maybe, ok = metadata[key]; ok {
-			if val, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[metadata][%s] is not a string", key)
-			}
+			searchKey = key
+			section = "metadata"
 			found = true
 			break
 		}
 		if maybe, ok = ostorage[key]; ok {
-			if val, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
-			}
+			searchKey = key
+			section = "objectstorage"
 			found = true
 			break
 		} else if maybe, ok = identity[key]; ok {
-			if val, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[identity][%s] is not a string", key)
-			}
+			searchKey = key
+			section = "identity"
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		return fail.SyntaxError("missing settings 'SecretKey' or 'AccessPassword' or 'OpenstackPassword' or 'Password' in 'identity' section") // FIXME: sure, which one ?
+		return fail.SyntaxError("missing settings 'SecretKey' in 'identity' section")
 	}
 
-	err = validation.Validate(val,
-		validation.Required,
-		validation.Length(1, 64),
-		is.Alphanumeric,
-	)
+	if val, ok = maybe.(string); !ok {
+		return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey)
+	}
 
-	if err != nil {
-		return fail.ConvertError(err) // FIXME: same as before, the user should know how to fix the problem
+	if searchKey == "SecretKey" || searchKey == "SecretAccessKey" {
+		if match, _ := regexp.Match("^[a-zA-Z0-9+/]{1,64}$", []byte(val)); !match {
+			return fail.SyntaxError("%s in %s section must be alphanumeric and between 1 and 64 characters long", searchKey, section)
+		}
 	}
 
 	if client == 2 || client == 4 {
@@ -1170,14 +1163,10 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		found = false
 
 		if maybe, ok = ostorage[key]; ok {
-			if val, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
-			}
+			section = "objectstorage"
 			found = true
 		} else if maybe, ok = compute[key]; ok {
-			if val, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[compute][%s] is not a string", key)
-			}
+			section = "compute"
 			found = true
 		}
 
@@ -1185,14 +1174,12 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 			return fail.SyntaxError("missing settings 'AvailabilityZone' in 'compute' section")
 		}
 
-		err = validation.Validate(val,
-			validation.Required,
-			validation.Length(1, 64),
-			validation.Match(regexp.MustCompile("\"^[a-zA-Z0-9-]+$\"")),
-		)
+		if val, ok = maybe.(string); !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
+		}
 
-		if err != nil {
-			return fail.ConvertError(err) // FIXME: same as before, the user should know how to fix the problem
+		if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+			return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section)
 		}
 	}
 
@@ -1202,22 +1189,19 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		found = false
 
 		if maybe, ok = metadata[key]; ok {
-			if val, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[metadata][%s] is not a string", key)
-			}
-			typeName = val
+			section = "metadata"
 			found = true
 		} else if maybe, ok = ostorage[key]; ok {
-			if val, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
-			}
-			typeName = val
+			section = "objectstorage"
 			found = true
 		}
 
 		if !found {
 			return fail.SyntaxError("missing setting 'Type' in 'metadata' or 'objectstorage' section")
 		} else {
+			if typeName, ok = maybe.(string); !ok {
+				return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
+			}
 			_, err := ParseStorage(typeName)
 
 			if err != nil {
@@ -1230,33 +1214,25 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	found = false
 
 	if maybe, ok = metadata[key]; ok {
-		if val, ok = maybe.(string); !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[metadata][%s] is not a string", key)
-		}
+		section = "metadata"
 		found = true
 	} else if maybe, ok = ostorage[key]; ok {
-		if val, ok = maybe.(string); !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[objectstorage][%s] is not a string", key)
-		}
+		section = "objectstorage"
 		found = true
 	} else if maybe, ok = compute[key]; ok {
-		if val, ok = maybe.(string); !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[compute][%s] is not a string", key)
-		}
+		section = "compute"
 		found = true
 	}
 	if !found {
 		return fail.SyntaxError("missing setting 'Region' field in 'compute' section")
 	}
 
-	err = validation.Validate(val,
-		validation.Required,
-		validation.Length(1, 64),
-		validation.Match(regexp.MustCompile("\"^[a-zA-Z0-9-]+$\"")),
-	)
+	if val, ok = maybe.(string); !ok {
+		return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
+	}
 
-	if err != nil {
-		return fail.ConvertError(err)
+	if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+		return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section)
 	}
 
 	return nil
