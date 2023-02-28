@@ -25,7 +25,6 @@ import (
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"os"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 
@@ -951,7 +950,8 @@ func getTenantsFromViperCfg(v *viper.Viper) ([]map[string]interface{}, *viper.Vi
 func validateTenant(tenant map[string]interface{}) fail.Error {
 	var (
 		name     string
-		client   string
+		client   Client
+		err      error
 		identity map[string]interface{}
 		compute  map[string]interface{}
 		//network  map[string]interface{}
@@ -979,13 +979,14 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 
 	for _, key := range providerKeysToCheck {
 		if val, ok = tenant[key].(string); ok {
-			if !chekcClientName(val) {
-				return fail.SyntaxError("Client value be 'aws, cloudferro, ebrc, flexibleengine, gcp, local, openstack, outscale, ovh'")
+			client, err = ParseClient(val)
+
+			if err != nil {
+				return fail.ConvertError(err)
 			}
-			client = val
 			found = true
 
-			err := validation.Validate(val,
+			err = validation.Validate(val,
 				validation.Required,
 				validation.Length(1, 64),
 				is.Alphanumeric,
@@ -1003,37 +1004,43 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		return fail.SyntaxError("Missing field 'client' for tenant")
 	}
 
-	if identity, ok = tenant["identity"].(map[string]interface{}); !ok {
-		return fail.SyntaxError("No section 'identity' found for tenant %s", name) // No, this is not true
-		// FIXME:
-		// _, ok = tenant["whatever"], !ok -> the map does not have the key whatever
-		// BUT this is not what you are doing in line 1006, what you are actually checking is the validity of the CAST !!
-		// line 1006 checks that the CONTENT of tenant["identity"] if any, CAN BE CASTED to a map[string]interface{}
-		// you should 1st check if the map tenant has a "whatever", if doesn't then you can say no section found
-		// THEN, check if the tenant["whatever"] is of the type we expect, if not, return another error with wrong format
+	maybe, ok := tenant["identity"]
+	if !ok {
+		return fail.SyntaxError("No section 'identity' found for tenant %s", name)
 	}
 
-	// that's how to do it
-	/*
-		maybe, ok := tenant["identity"]
+	if identity, ok = maybe.(map[string]interface{}); !ok {
+		return fail.SyntaxError("Wrong type, the content of tenant[identity] is not a map[string]any")
+	}
+
+	maybe, ok = tenant["compute"]
+	if !ok {
+		return fail.SyntaxError("Missing field 'compute' for tenant")
+	}
+
+	if compute, ok = maybe.(map[string]interface{}); !ok {
+		return fail.SyntaxError("Wrong type, the content of tenant[compute] is not a map[string]any")
+	}
+
+	maybe, ok = tenant["objectstorage"]
+	if ok {
+		ostorage, ok = maybe.(map[string]interface{})
+
 		if !ok {
-			return fail.SyntaxError("No section 'identity'")
+			return fail.SyntaxError("Wrong type, the content of tenant[objectstorage] is not a map[string]any")
 		}
-
-		if identity, ok = maybe.(map[string]interface{}); !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[identity] is not a map[string]any")
-		}
-	*/
-
-	if compute, ok = tenant["compute"].(map[string]interface{}); !ok {
-		return fail.SyntaxError("No section 'compute' found for tenant %s", name) // Same problem as before
 	}
 
-	ostorage, _ = tenant["objectstorage"].(map[string]interface{}) // FIXME: you can never be sure, better safe than sorry, there is a missing ok here, and also the same problem as before
+	maybe, ok = tenant["metadata"]
+	if ok {
+		metadata, ok = maybe.(map[string]interface{})
 
-	metadata, _ = tenant["metadata"].(map[string]interface{}) // FIXME: you can never be sure, better safe than sorry, there is a missing ok here, and also the same problem as before
+		if !ok {
+			return fail.SyntaxError("Wrong type, the content of tenant[metadata] is not a map[string]any")
+		}
+	}
 
-	if client != "gcp" {
+	if client != 5 {
 		userKeysToCheck := []string{
 			"AccessKey",
 			"OpenstackID",
@@ -1083,7 +1090,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
-	if client == "ovh" || client == "openstack" || client == "cloudferro" { // hardcoding strings usually is NOT a good idea, better using constants or enumerations
+	if client == 0 || client == 2 || client == 7 {
 		key := "ApplicationKey"
 		found = false
 
@@ -1135,7 +1142,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		return fail.SyntaxError("missing settings 'SecretKey' or 'AccessPassword' or 'OpenstackPassword' or 'Password' in 'identity' section") // FIXME: sure, which one ?
 	}
 
-	err := validation.Validate(val,
+	err = validation.Validate(val,
 		validation.Required,
 		validation.Length(1, 64),
 		is.Alphanumeric,
@@ -1145,7 +1152,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		return fail.ConvertError(err) // FIXME: same as before, the user should know how to fix the problem
 	}
 
-	if client == "cloudferro" || client == "flexibleengine" {
+	if client == 2 || client == 4 {
 		key := "AvailabilityZone"
 		found = false
 
@@ -1186,8 +1193,10 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		if !found {
 			return fail.SyntaxError("missing setting 'Type' in 'metadata' or 'objectstorage' section")
 		} else {
-			if !checkType(typeName) {
-				return fail.SyntaxError("Type value must be 's3, swift, azure, gce'")
+			_, err := ParseStorage(typeName)
+
+			if err != nil {
+				return fail.ConvertError(err)
 			}
 		}
 	}
@@ -1217,44 +1226,4 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	}
 
 	return nil
-}
-
-func chekcClientName(client string) bool {
-	clientList := []string{
-		"aws",
-		"cloudferro",
-		"ebrc",
-		"flexibleengine",
-		"gcp",
-		"local",
-		"openstack",
-		"outscale",
-		"ovh",
-	}
-
-	for _, key := range clientList {
-		if key == strings.ToLower(client) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func checkType(typeName string) bool {
-	typeList := []string{
-		"s3",
-		"swift",
-		"azure",
-		"gce",
-		"google",
-	}
-
-	for _, key := range typeList {
-		if key == strings.ToLower(typeName) {
-			return true
-		}
-	}
-
-	return false
 }
