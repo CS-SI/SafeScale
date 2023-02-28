@@ -1044,6 +1044,12 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
+	xerr := checkTenantSections(tenant)
+
+	if xerr != nil {
+		return xerr
+	}
+
 	if client != 5 {
 		userKeysToCheck := []string{
 			"AccessKey",
@@ -1294,50 +1300,79 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 
 	if client == 4 || client == 8 {
 		key = "VPCName"
+		found = false
 
 		if maybe, ok = network[key]; ok {
 			section = "network"
+			found = true
 		}
 
-		if val, ok = maybe.(string); !ok {
+		if val, ok = maybe.(string); !ok && found {
 			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
-		}
-
-		if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,255}$", []byte(val)); !match {
-			return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 255 characters long", key, section)
+		} else if found {
+			if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,255}$", []byte(val)); !match {
+				return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 255 characters long", key, section)
+			}
 		}
 
 		key = "VPCCIDR"
+		found = false
 
 		if maybe, ok = network[key]; ok {
 			section = "network"
+			found = true
 		}
 
-		if val, ok = maybe.(string); !ok {
+		if val, ok = maybe.(string); !ok && found {
 			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
-		}
-
-		_, _, err = net.ParseCIDR(val)
-		if err != nil {
-			return fail.SyntaxError("%s in %s section must be a valid CIDR", key, section)
+		} else if found {
+			_, _, err = net.ParseCIDR(val)
+			if err != nil {
+				return fail.SyntaxError("%s in %s section must be a valid CIDR", key, section)
+			}
 		}
 	}
 
 	key = "Endpoint"
+	found = false
 
 	if maybe, ok = metadata[key]; ok {
 		section = "metadata"
+		found = true
 	} else if maybe, ok = ostorage[key]; ok {
 		section = "objectstorage"
+		found = true
 	}
 
-	if val, ok = maybe.(string); !ok {
+	if val, ok = maybe.(string); !ok && found {
 		return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
+	} else if found {
+		_, err = url.ParseRequestURI(val)
+		if err != nil {
+			return fail.SyntaxError("%s in %s section must be a valid URL", key, section)
+		}
 	}
 
-	_, err = url.ParseRequestURI(val)
-	if err != nil {
-		return fail.SyntaxError("%s in %s section must be a valid URL", key, section)
+	return nil
+}
+
+func checkTenantSections(tenant map[string]interface{}) fail.Error {
+	tenantSections := []string{
+		"metadata",
+		"objectstorage",
+		"compute",
+		"network",
+		"identity",
+		"name",
+		"client",
+	}
+
+	for _, section := range tenantSections {
+		delete(tenant, section)
+	}
+
+	if len(tenant) > 0 {
+		return fail.SyntaxError("unknown sections in tenant: %v", tenant)
 	}
 
 	return nil
