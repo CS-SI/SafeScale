@@ -39,7 +39,7 @@ require (
 	github.com/sirupsen/logrus v1.9.0
 	github.com/sony/gobreaker v0.5.0
 	github.com/spf13/viper v1.11.0
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/urfave/cli v1.22.10
 	github.com/zserge/metric v0.1.0
 	golang.org/x/crypto v0.6.0
