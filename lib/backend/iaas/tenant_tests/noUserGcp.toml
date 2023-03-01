@@ -3,5 +3,7 @@ name = "Test with tenant without user (gcp)"
 client = "gcp"
 
 [tenants.identity]
+SecretKey = "1234567890"
 
 [tenants.compute]
+Region = "eu-west"

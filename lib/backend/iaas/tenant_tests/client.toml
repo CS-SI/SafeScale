@@ -1,2 +1,10 @@
 [[tenants]]
     name = "Tenant without client"
+
+    [tenants.identity]
+    AccessKey = "1234567890"
+    SecretKey = "1234567890"
+    ApplicationKey = "azertyuiop"
+
+    [tenants.compute]
+    Region = "eu-west"

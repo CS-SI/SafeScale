@@ -1,2 +1,9 @@
 [[tenants]]
     client = "local"
+
+    [tenants.identity]
+    AccessKey = "1234567890"
+    SecretKey = "1234567890"
+
+    [tenants.compute]
+    Region = "eu-west"

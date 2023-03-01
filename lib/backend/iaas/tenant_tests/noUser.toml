@@ -2,6 +2,8 @@
     name = "Test with Tenant without user"
     client = "local"
 
-    [tenants.identity]
+[tenants.identity]
+SecretKey = "1234567890"
 
-    [tenants.compute]
+[tenants.compute]
+Region = "eu-west"
