@@ -118,6 +118,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 
 		if xerr != nil {
 			return nullService(), xerr
+
 		}
 
 		providerKeysToCheck := []string{
@@ -965,13 +966,16 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		section   string
 	)
 
+	var errors []fail.Error
+
 	maybe, ok := tenant["name"]
 	if !ok {
-		return fail.SyntaxError("Missing field 'name' for tenant")
-	}
-	name, ok = maybe.(string)
-	if !ok {
-		return fail.SyntaxError("Field 'name' for tenant MUST be a string")
+		errors = append(errors, fail.SyntaxError("Missing field 'name' for tenant"))
+	} else {
+		name, ok = maybe.(string)
+		if !ok {
+			errors = append(errors, fail.SyntaxError("Field 'name' for tenant MUST be a string"))
+		}
 	}
 
 	providerKeysToCheck := []string{
@@ -986,40 +990,39 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	for _, key := range providerKeysToCheck {
 		if maybe, ok = tenant[key]; ok {
 			if val, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[%s] is not a string", key)
-			}
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s] is not a string", key))
+			} else {
+				client, err = enums.ParseClient(val)
 
-			client, err = enums.ParseClient(val)
-
-			if err != nil {
-				return fail.ConvertError(err)
+				if err != nil {
+					errors = append(errors, fail.ConvertError(err))
+				}
 			}
 			found = true
-
 			break
 		}
 	}
 
 	if !found {
-		return fail.SyntaxError("Missing field 'client' for tenant")
+		errors = append(errors, fail.SyntaxError("Missing field 'client' for tenant"))
 	}
 
 	maybe, ok = tenant["identity"]
 	if !ok {
-		return fail.SyntaxError("No section 'identity' found for tenant %s", name)
-	}
-
-	if identity, ok = maybe.(map[string]interface{}); !ok {
-		return fail.SyntaxError("Wrong type, the content of tenant[identity] is not a map[string]any")
+		errors = append(errors, fail.SyntaxError("No section 'identity' found for tenant %s", name))
+	} else {
+		if identity, ok = maybe.(map[string]interface{}); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity] is not a map[string]any"))
+		}
 	}
 
 	maybe, ok = tenant["compute"]
 	if !ok {
-		return fail.SyntaxError("Missing field 'compute' for tenant")
-	}
-
-	if compute, ok = maybe.(map[string]interface{}); !ok {
-		return fail.SyntaxError("Wrong type, the content of tenant[compute] is not a map[string]any")
+		errors = append(errors, fail.SyntaxError("Missing field 'compute' for tenant"))
+	} else {
+		if compute, ok = maybe.(map[string]interface{}); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[compute] is not a map[string]any"))
+		}
 	}
 
 	maybe, ok = tenant["network"]
@@ -1027,7 +1030,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		network, ok = maybe.(map[string]interface{})
 
 		if !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[network] is not a map[string]any")
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[network] is not a map[string]any"))
 		}
 	}
 
@@ -1036,7 +1039,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		ostorage, ok = maybe.(map[string]interface{})
 
 		if !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[objectstorage] is not a map[string]any")
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[objectstorage] is not a map[string]any"))
 		}
 	}
 
@@ -1045,14 +1048,14 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		metadata, ok = maybe.(map[string]interface{})
 
 		if !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[metadata] is not a map[string]any")
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[metadata] is not a map[string]any"))
 		}
 	}
 
 	xerr := checkSection(tenant, Sections)
 
 	if xerr != nil {
-		return xerr
+		errors = append(errors, xerr)
 	}
 
 	if client != 5 {
@@ -1079,37 +1082,37 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 
 		if !found {
-			return fail.SyntaxError("missing setting 'AccessKey' field in 'identity' section")
-		}
-
-		if val, ok = maybe.(string); !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey)
-		}
-
-		if client == 2 && searchKey == "Username" {
-			_, err = mail.ParseAddress(val)
-
-			if err != nil {
-				return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a valid email address", section, searchKey)
-			}
+			errors = append(errors, fail.SyntaxError("missing setting 'AccessKey' field in 'identity' section"))
 		} else {
-			if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
-				return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section)
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey))
+			}
+
+			if client == 2 && searchKey == "Username" {
+				_, err = mail.ParseAddress(val)
+
+				if err != nil {
+					errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a valid email address", section, searchKey))
+				}
+			} else {
+				if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section))
+				}
 			}
 		}
 	} else {
 		if maybe, ok = identity["User"]; ok {
 			if val, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[identity][User] is not a string")
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity][User] is not a string"))
+			} else {
+				_, err := mail.ParseAddress(val)
+
+				if err != nil {
+					errors = append(errors, fail.SyntaxError("User in identity section must be a valid email"))
+				}
 			}
 		} else {
-			return fail.SyntaxError("missing setting 'User' field in 'identity' section")
-		}
-
-		_, err := mail.ParseAddress(val)
-
-		if err != nil {
-			return fail.SyntaxError("User in identity section must be a valid email")
+			errors = append(errors, fail.SyntaxError("missing setting 'User' field in 'identity' section"))
 		}
 	}
 
@@ -1124,15 +1127,15 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 
 		if !found {
-			return fail.SyntaxError("missing setting 'UserID' field in 'identity' section")
-		}
-
-		if val, ok = maybe.(string); !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey)
-		}
-
-		if match, _ := regexp.Match("^[0-9]{1,64}$", []byte(val)); !match {
-			return fail.SyntaxError("%s in %s section must be numeric and between 1 and 64 characters long", searchKey, section)
+			errors = append(errors, fail.SyntaxError("missing setting 'UserID' field in 'identity' section"))
+		} else {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey))
+			} else {
+				if match, _ := regexp.Match("^[0-9]{1,64}$", []byte(val)); !match {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be numeric and between 1 and 64 characters long", searchKey, section))
+				}
+			}
 		}
 	}
 
@@ -1151,15 +1154,15 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 
 		if !found {
-			return fail.SyntaxError("missing setting 'ApplicationKey' field in 'identity' section")
-		}
-
-		if val, ok = maybe.(string); !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey)
-		}
-
-		if match, _ := regexp.Match("^[a-zA-Z0-9]{1,64}$", []byte(val)); !match {
-			return fail.SyntaxError("%s in %s section must be alphanumeric and between 1 and 64 characters long", searchKey, section)
+			errors = append(errors, fail.SyntaxError("missing setting 'ApplicationKey' field in 'identity' section"))
+		} else {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey))
+			} else {
+				if match, _ := regexp.Match("^[a-zA-Z0-9]{1,64}$", []byte(val)); !match {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric and between 1 and 64 characters long", searchKey, section))
+				}
+			}
 		}
 	}
 
@@ -1193,16 +1196,16 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	}
 
 	if !found {
-		return fail.SyntaxError("missing settings 'SecretKey' in 'identity' section")
-	}
+		errors = append(errors, fail.SyntaxError("missing settings 'SecretKey' in 'identity' section"))
+	} else {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey))
+		}
 
-	if val, ok = maybe.(string); !ok {
-		return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey)
-	}
-
-	if searchKey == "SecretKey" || searchKey == "SecretAccessKey" {
-		if match, _ := regexp.Match("^[a-zA-Z0-9+/]{1,64}$", []byte(val)); !match {
-			return fail.SyntaxError("%s in %s section must be alphanumeric and between 1 and 64 characters long", searchKey, section)
+		if searchKey == "SecretKey" || searchKey == "SecretAccessKey" {
+			if match, _ := regexp.Match("^[a-zA-Z0-9+/]{1,64}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric and between 1 and 64 characters long", searchKey, section))
+			}
 		}
 	}
 
@@ -1219,15 +1222,15 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 
 		if !found {
-			return fail.SyntaxError("missing settings 'AvailabilityZone' in 'compute' section")
-		}
-
-		if val, ok = maybe.(string); !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
-		}
-
-		if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
-			return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section)
+			errors = append(errors, fail.SyntaxError("missing settings 'AvailabilityZone' in 'compute' section"))
+		} else {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
+			} else {
+				if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section))
+				}
+			}
 		}
 	}
 
@@ -1245,15 +1248,16 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 
 		if !found {
-			return fail.SyntaxError("missing setting 'Type' in 'metadata' or 'objectstorage' section")
+			errors = append(errors, fail.SyntaxError("missing setting 'Type' in 'metadata' or 'objectstorage' section"))
 		} else {
 			if typeName, ok = maybe.(string); !ok {
-				return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
-			}
-			_, err := enums.ParseStorage(typeName)
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
+			} else {
+				_, err := enums.ParseStorage(typeName)
 
-			if err != nil {
-				return fail.ConvertError(err)
+				if err != nil {
+					errors = append(errors, fail.ConvertError(err))
+				}
 			}
 		}
 	}
@@ -1272,15 +1276,15 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		found = true
 	}
 	if !found {
-		return fail.SyntaxError("missing setting 'Region' field in 'compute' section")
-	}
-
-	if val, ok = maybe.(string); !ok {
-		return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
-	}
-
-	if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
-		return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section)
+		errors = append(errors, fail.SyntaxError("missing setting 'Region' field in 'compute' section"))
+	} else {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
+		} else {
+			if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section))
+			}
+		}
 	}
 
 	if client == 8 {
@@ -1293,16 +1297,17 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 
 		if !found {
-			return fail.SyntaxError("missing setting 'Subregion' field in 'compute' section")
+			errors = append(errors, fail.SyntaxError("missing setting 'Subregion' field in 'compute' section"))
+		} else {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
+			} else {
+				if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", key, section))
+				}
+			}
 		}
 
-		if val, ok = maybe.(string); !ok {
-			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
-		}
-
-		if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
-			return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", key, section)
-		}
 	}
 
 	if client == 4 || client == 8 {
@@ -1315,10 +1320,10 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 
 		if val, ok = maybe.(string); !ok && found {
-			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
 		} else if found {
 			if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,255}$", []byte(val)); !match {
-				return fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 255 characters long", key, section)
+				errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 255 characters long", key, section))
 			}
 		}
 
@@ -1331,11 +1336,11 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 
 		if val, ok = maybe.(string); !ok && found {
-			return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
 		} else if found {
 			_, _, err = net.ParseCIDR(val)
 			if err != nil {
-				return fail.SyntaxError("%s in %s section must be a valid CIDR", key, section)
+				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid CIDR", key, section))
 			}
 		}
 	}
@@ -1352,48 +1357,67 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	}
 
 	if val, ok = maybe.(string); !ok && found {
-		return fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key)
+		errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
 	} else if found {
 		_, err = url.ParseRequestURI(val)
 		if err != nil {
-			return fail.SyntaxError("%s in %s section must be a valid URL", key, section)
+			errors = append(errors, fail.SyntaxError("%s in %s section must be a valid URL", key, section))
 		}
 	}
 
 	xerr = checkSection(identity, IdentityField)
 
 	if xerr != nil {
-		return xerr
+		errors = append(errors, xerr)
 	}
 
 	xerr = checkSection(compute, computeField)
 
 	if xerr != nil {
-		return xerr
+		errors = append(errors, xerr)
 	}
 
 	xerr = checkSection(network, Networkfield)
 
 	if xerr != nil {
-		return xerr
+		errors = append(errors, xerr)
 	}
 
 	xerr = checkSection(ostorage, OStorageField)
 
 	if xerr != nil {
-		return xerr
+		errors = append(errors, xerr)
 	}
 
 	xerr = checkSection(metadata, MetadataField)
 
 	if xerr != nil {
-		return xerr
+		errors = append(errors, xerr)
+	}
+
+	if len(errors) > 0 {
+		var msg string
+
+		for i, err := range errors {
+			if i != len(errors)-1 {
+				msg = msg + err.Error() + " | "
+			} else {
+				msg = msg + err.Error()
+			}
+		}
+
+		return fail.NewError(msg)
 	}
 
 	return nil
 }
 
-func checkSection(section map[string]interface{}, fields []string) fail.Error {
+func checkSection(sections map[string]interface{}, fields []string) fail.Error {
+	section := make(map[string]interface{})
+	for k, v := range sections {
+		section[k] = v
+	}
+
 	for _, field := range fields {
 		delete(section, field)
 	}
