@@ -3,13 +3,13 @@
     client = "ovh"
 
     [tenants.identity]
-        ApplicationKey = "123456.........................."
-        OpenstackID = "ABCDE......."
-        OpenstackPassword = "abcdefgh123....................."
+        ApplicationKey = "123456"
+        OpenstackID = "ABCDE"
+        OpenstackPassword = "abcdefgh123"
 
     [tenants.compute]
         Region = "SBG5"
-        ProjectName = "987654.........."
+        ProjectName = "987654"
         DefaultImage = "Ubuntu 18.04"
 
     [tenants.network]

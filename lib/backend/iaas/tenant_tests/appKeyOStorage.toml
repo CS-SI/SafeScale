@@ -11,4 +11,4 @@
 
     [tenants.objectstorage]
         Type = "s3"
-        ApplicationKey = "1234567890.................."
+        ApplicationKey = "1234567890"

@@ -994,9 +994,14 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 			if err != nil {
 				return fail.ConvertError(err)
 			}
+			found = true
 
 			break
 		}
+	}
+
+	if !found {
+		return fail.SyntaxError("Missing field 'client' for tenant")
 	}
 
 	maybe, ok = tenant["identity"]
@@ -1093,16 +1098,18 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 			}
 		}
 	} else {
-		if maybe, ok = identity["User"]; !ok {
+		if maybe, ok = identity["User"]; ok {
 			if val, ok = maybe.(string); !ok {
 				return fail.SyntaxError("Wrong type, the content of tenant[identity][User] is not a string")
-			} else {
-				return fail.SyntaxError("missing setting 'User' field in 'identity' section")
 			}
+		} else {
+			return fail.SyntaxError("missing setting 'User' field in 'identity' section")
 		}
 
-		if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
-			return fail.SyntaxError("User in identity section must be alphanumeric (with -) and between 1 and 64 characters long")
+		_, err := mail.ParseAddress(val)
+
+		if err != nil {
+			return fail.SyntaxError("User in identity section must be a valid email")
 		}
 	}
 
@@ -1125,7 +1132,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 
 		if match, _ := regexp.Match("^[0-9]{1,64}$", []byte(val)); !match {
-			return fail.SyntaxError("%s in %s section must be alphanumeric and between 1 and 64 characters long", searchKey, section)
+			return fail.SyntaxError("%s in %s section must be numeric and between 1 and 64 characters long", searchKey, section)
 		}
 	}
 

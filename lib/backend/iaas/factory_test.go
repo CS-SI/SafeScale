@@ -1,7 +1,6 @@
 package iaas
 
 import (
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 	"time"
@@ -47,6 +46,7 @@ func Test_validateAws(t *testing.T) {
 
 	if err != nil {
 		t.Error(err.Error())
+		t.FailNow()
 	}
 }
 
@@ -61,6 +61,7 @@ func Test_validateCloudferro(t *testing.T) {
 
 	if err != nil {
 		t.Error(err.Error())
+		t.FailNow()
 	}
 }
 
@@ -73,12 +74,14 @@ func Test_validateFlexibleengine(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
 	if err != nil {
 		t.Error(err.Error())
+		t.FailNow()
 	}
 }
 
@@ -91,14 +94,14 @@ func Test_validateGcp(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
-		// FIXME: you should add a t.FailNow() here, and also in almost all the other tests after a t.Error, WHY ?
+		t.FailNow()
 	}
 
-	err := validateTenant(tenants[0]) // FIXME: Because usually when you recover something like a, b, err := whatever(), if you have a err != nil, a and b by convention are null or zero values, so what actually happens is that t.Error (line 94) logs the error, but when we reach line 97, tenants is empty (length 0), so when you try to recover the first element (tenants[0]), it PANICS
-	// There is also the possibility of doing 1st a "if len(tenants) > 0" and keep going; it's a choice
+	err := validateTenant(tenants[0])
 
 	if err != nil {
 		t.Error(err.Error())
+		t.FailNow()
 	}
 }
 
@@ -111,12 +114,14 @@ func Test_validateOpenstack(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
 	if err != nil {
 		t.Error(err.Error())
+		t.FailNow()
 	}
 }
 
@@ -128,7 +133,7 @@ func Test_inputValidation(t *testing.T) {
 	err := validateTenant(pefo)
 
 	if err != nil { // yes, it MUST fail but....
-		assert.NotContains(t, err.Error(), "Missing field") // but not like that, the problem is that name is the wrong TYPE, not that is missing
+		require.EqualValues(t, "Field 'name' for tenant MUST be a string", err.Error())
 	} else { // no error ??, we have a serious problem then...
 		t.FailNow()
 	}
@@ -143,12 +148,14 @@ func Test_validateOutscale(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
 	if err != nil {
 		t.Error(err.Error())
+		t.FailNow()
 	}
 }
 
@@ -168,6 +175,7 @@ func Test_validateBadOutscale(t *testing.T) {
 	err := validateTenant(tenants[0])
 	if err == nil {
 		t.Error("Ouch!, we didn't saw the errors")
+		t.FailNow()
 	} else {
 		t.Log(err)
 	}
@@ -189,6 +197,7 @@ func Test_validateBadOutscale2(t *testing.T) {
 	err := validateTenant(tenants[0])
 	if err == nil {
 		t.Error("Ouch!, we didn't saw the errors")
+		t.FailNow()
 	} else {
 		t.Log(err)
 	}
@@ -199,21 +208,9 @@ func Test_validateBadOutscale3(t *testing.T) {
 	v.AddConfigPath("./tenant_tests")
 	v.SetConfigName("wrongoutscale3")
 
-	tenants, _, xerr := getTenantsFromViperCfg(v)
-	if xerr != nil {
-		t.Error(xerr.Error())
-		// FIXME: this is missing: (and by the way, is missing in all other tests)
-		// t.FailNow()
-	}
+	_, _, xerr := getTenantsFromViperCfg(v)
 
-	// FIXME: do we handle errors properly ?
-	// under ANY circumstance our code has to PANIC -> how to fix this ? look at lines 185
-	err := validateTenant(tenants[0]) // <- this PANICS
-	if err == nil {
-		t.Error("Ouch!, we didn't saw the errors")
-	} else {
-		t.Log(err)
-	}
+	require.EqualValues(t, "error reading configuration file: While parsing config: (17, 6): duplicated tables", xerr.Error())
 }
 
 func Test_validateBadOutscale4(t *testing.T) {
@@ -227,20 +224,9 @@ func Test_validateBadOutscale4(t *testing.T) {
 		t.FailNow()
 	}
 
-	// FIXME: do we handle errors properly ?
-	// under ANY circumstance our code has to PANIC -> how to fix this ? look at lines 185
-	err := validateTenant(tenants[0]) // <- this PANICS
-	if err == nil {
-		t.Error("Ouch!, we didn't saw the errors")
-	} else {
-		errorText := err.Error()
-		if !(strings.Contains(errorText, "letters and digits") && strings.Contains(errorText, "SecretKey")) {
-			t.Log(err)
-			t.Error("The user doesn't know which field was wrong") // FIXME: errors should have more information
-			t.FailNow()
-		}
-		t.Log(err)
-	}
+	err := validateTenant(tenants[0])
+
+	require.EqualValues(t, "SecretKey in identity section must be alphanumeric and between 1 and 64 characters long", err.Error())
 }
 
 func Test_validateBadOutscale5(t *testing.T) {
@@ -254,20 +240,9 @@ func Test_validateBadOutscale5(t *testing.T) {
 		t.FailNow()
 	}
 
-	// FIXME: do we handle errors properly ?
-	// under ANY circumstance our code has to PANIC -> how to fix this ? look at lines 185
-	err := validateTenant(tenants[0]) // <- this PANICS
-	if err == nil {
-		t.Error("Ouch!, we didn't saw the errors")
-	} else {
-		errorText := err.Error()
-		if !(strings.Contains(errorText, "letters and digits") && strings.Contains(errorText, "SecretKey") && strings.Contains(errorText, "UserID")) {
-			t.Log(err)
-			t.Error("What if we have more than one error in the file ?") // FIXME: we should handle lists of errors
-			t.FailNow()
-		}
-		t.Log(err)
-	}
+	err := validateTenant(tenants[0])
+
+	require.EqualValues(t, "UserID in identity section must be numeric and between 1 and 64 characters long", err.Error())
 }
 
 func Test_validateOvh(t *testing.T) {
@@ -279,12 +254,14 @@ func Test_validateOvh(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
 	if err != nil {
 		t.Error(err.Error())
+		t.FailNow()
 	}
 }
 
@@ -297,6 +274,7 @@ func Test_validateWithoutName(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
@@ -313,6 +291,7 @@ func Test_validateWithoutClient(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
@@ -329,11 +308,12 @@ func Test_validateWithFakeClient(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
-	require.EqualValues(t, "Client value be 'aws, cloudferro, ebrc, flexibleengine, gcp, local, openstack, outscale, ovh'", err.Error())
+	require.EqualValues(t, "failed to find a Provider matching with 'fakeclient'", err.Error())
 }
 
 func Test_validateWithoutIdentity(t *testing.T) {
@@ -345,6 +325,7 @@ func Test_validateWithoutIdentity(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
@@ -361,11 +342,12 @@ func Test_validateWithoutCompute(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
-	require.EqualValues(t, "No section 'compute' found for tenant Test with tenant without compute section", err.Error())
+	require.EqualValues(t, "Missing field 'compute' for tenant", err.Error())
 }
 
 func Test_validateWithoutUser(t *testing.T) {
@@ -377,11 +359,12 @@ func Test_validateWithoutUser(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
-	require.EqualValues(t, "missing setting 'AccessKey', 'OpenstackID' or 'Username' field in 'identity' section", err.Error())
+	require.EqualValues(t, "missing setting 'AccessKey' field in 'identity' section", err.Error())
 }
 
 func Test_validateGcpWithoutUser(t *testing.T) {
@@ -393,6 +376,7 @@ func Test_validateGcpWithoutUser(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
@@ -409,12 +393,14 @@ func Test_validateAppKeyInOStorage(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
 	if err != nil {
 		t.Error(err.Error())
+		t.FailNow()
 	}
 }
 
@@ -427,6 +413,7 @@ func Test_validateNoAppKey(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
@@ -443,11 +430,12 @@ func Test_validateNoSecretKey(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
-	require.EqualValues(t, "missing settings 'SecretKey' or 'AccessPassword' or 'OpenstackPassword' or 'Password' in 'identity' section", err.Error())
+	require.EqualValues(t, "missing settings 'SecretKey' in 'identity' section", err.Error())
 }
 
 func Test_validateAvailabilityZoneInOStorage(t *testing.T) {
@@ -459,12 +447,14 @@ func Test_validateAvailabilityZoneInOStorage(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
 	if err != nil {
 		t.Error(err.Error())
+		t.FailNow()
 	}
 }
 
@@ -477,6 +467,7 @@ func Test_validateNoAvailabilityZone(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
@@ -493,6 +484,7 @@ func Test_validateNoType(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
@@ -509,11 +501,12 @@ func Test_validateInvalidType(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
-	require.EqualValues(t, "Type value must be 's3, swift, azure, gce'", err.Error())
+	require.EqualValues(t, "failed to find a Storage type matching with 'faketype'", err.Error())
 }
 
 func Test_validateRegionInMetadata(t *testing.T) {
@@ -525,12 +518,14 @@ func Test_validateRegionInMetadata(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])
 
 	if err != nil {
 		t.Error(err.Error())
+		t.FailNow()
 	}
 }
 
@@ -543,6 +538,7 @@ func Test_validateNoRegion(t *testing.T) {
 
 	if xerr != nil {
 		t.Error(xerr.Error())
+		t.FailNow()
 	}
 
 	err := validateTenant(tenants[0])

@@ -26,6 +26,23 @@ var IdentityField = []string{
 	"AlternateApiApplicationSecret",
 	"AlternateApiConsumerKey",
 	"AccessKeyID",
+	"ProjectID",
+	"DomainName",
+	"DomainID",
+	"IdentityEndpoint",
+	"TokenID",
+
+	// Google specific
+	"ProjectNumber",
+	"project_id",
+	"private_key_id",
+	"private_key",
+	"client_email",
+	"client_id",
+	"auth_uri",
+	"token_uri",
+	"auth_provider_x509_cert_url",
+	"client_x509_cert_url",
 }
 
 var computeField = []string{
@@ -42,6 +59,9 @@ var computeField = []string{
 	"OperatorUsername",
 	"Owners",
 	"Zone",
+	"OperatorUsername",
+	"DefaultVolumeSpeed",
+	"Service",
 }
 
 var Networkfield = []string{

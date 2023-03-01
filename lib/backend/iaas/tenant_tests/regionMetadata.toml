@@ -4,7 +4,7 @@ client = "ovh"
 
 
 [tenants.identity]
-ApplicationKey = "1234567890..........."
+ApplicationKey = "1234567890"
 Username = "test"
 Password = "password"
 
