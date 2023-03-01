@@ -19,6 +19,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -108,6 +109,11 @@ func (instance *Network) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 	if err != nil {
 		return false, fail.ConvertError(err)
 	}
+
+	if beta := os.Getenv("SAFESCALE_DETECT_CORRUPTION"); beta != "yes" {
+		return true, nil
+	}
+
 	_, xerr := instance.Service().InspectNetwork(ctx, theID)
 	if xerr != nil {
 		switch xerr.(type) {

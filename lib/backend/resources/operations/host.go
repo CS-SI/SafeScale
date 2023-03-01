@@ -179,6 +179,10 @@ func (instance *Host) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 		return false, fail.ConvertError(err)
 	}
 
+	if beta := os.Getenv("SAFESCALE_DETECT_CORRUPTION"); beta != "yes" {
+		return true, nil
+	}
+
 	_, xerr := instance.Service().InspectHost(ctx, theID)
 	if xerr != nil {
 		switch xerr.(type) {

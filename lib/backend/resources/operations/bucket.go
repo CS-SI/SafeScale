@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -107,6 +108,10 @@ func (instance *bucket) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 	theID, err := instance.GetID()
 	if err != nil {
 		return false, fail.ConvertError(err)
+	}
+
+	if beta := os.Getenv("SAFESCALE_DETECT_CORRUPTION"); beta != "yes" {
+		return true, nil
 	}
 
 	_, xerr := instance.Service().InspectBucket(ctx, theID)
