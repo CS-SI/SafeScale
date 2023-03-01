@@ -1044,7 +1044,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
-	xerr := checkTenantSections(tenant)
+	xerr := checkSection(tenant, Sections)
 
 	if xerr != nil {
 		return xerr
@@ -1353,26 +1353,46 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
+	xerr = checkSection(identity, IdentityField)
+
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = checkSection(compute, computeField)
+
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = checkSection(network, Networkfield)
+
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = checkSection(ostorage, OStorageField)
+
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = checkSection(metadata, MetadataField)
+
+	if xerr != nil {
+		return xerr
+	}
+
 	return nil
 }
 
-func checkTenantSections(tenant map[string]interface{}) fail.Error {
-	tenantSections := []string{
-		"metadata",
-		"objectstorage",
-		"compute",
-		"network",
-		"identity",
-		"name",
-		"client",
+func checkSection(section map[string]interface{}, fields []string) fail.Error {
+	for _, field := range fields {
+		delete(section, field)
 	}
 
-	for _, section := range tenantSections {
-		delete(tenant, section)
-	}
-
-	if len(tenant) > 0 {
-		return fail.SyntaxError("unknown sections in tenant: %v", tenant)
+	if len(section) > 0 {
+		return fail.SyntaxError("unknown fields in tenant: %v", section)
 	}
 
 	return nil
