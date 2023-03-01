@@ -1,0 +1,14 @@
+[[tenants]]
+    client = "outscale" # what happens if we put here a client we don't have ?
+    name = "Test with valid outscale tenant"
+
+    [tenants.identity]
+        AccessKey="ABCD1234" #only alphanumeric with CAPS is valid
+        SecretKey="()//" #only alphanumeric is valid
+        UserID="3455343" #only numeric is valid
+
+    [tenants.compute]
+        Region="eu-west-2" #only alphanumeric (with -) is valid
+        Subregion="eu-west-2a" #only alphanumeric (with -) is valid
+        Service="api"
+        DefaultVolumeSpeed="HDD"
