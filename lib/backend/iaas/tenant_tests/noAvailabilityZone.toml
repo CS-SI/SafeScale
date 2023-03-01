@@ -11,3 +11,4 @@ Password = "password"
 Region = "SBG5"
 
 [tenants.objectstorage]
+Type = "s3"

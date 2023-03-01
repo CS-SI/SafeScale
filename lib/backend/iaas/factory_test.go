@@ -133,7 +133,8 @@ func Test_inputValidation(t *testing.T) {
 	err := validateTenant(pefo)
 
 	if err != nil { // yes, it MUST fail but....
-		require.EqualValues(t, "Field 'name' for tenant MUST be a string", err.Error())
+		msg := "Field 'name' for tenant MUST be a string | Missing field 'client' for tenant | No section 'identity' found for tenant | Missing field 'compute' for tenant | missing setting 'AccessKey' field in 'identity' section | missing setting 'ApplicationKey' field in 'identity' section | missing settings 'SecretKey' in 'identity' section | missing setting 'Region' field in 'compute' section"
+		require.EqualValues(t, msg, err.Error())
 	} else { // no error ??, we have a serious problem then...
 		t.FailNow()
 	}
@@ -242,7 +243,8 @@ func Test_validateBadOutscale5(t *testing.T) {
 
 	err := validateTenant(tenants[0])
 
-	require.EqualValues(t, "UserID in identity section must be numeric and between 1 and 64 characters long", err.Error())
+	msg := "UserID in identity section must be numeric and between 1 and 64 characters long | SecretKey in identity section must be alphanumeric and between 1 and 64 characters long"
+	require.EqualValues(t, msg, err.Error())
 }
 
 func Test_validateOvh(t *testing.T) {
@@ -330,7 +332,8 @@ func Test_validateWithoutIdentity(t *testing.T) {
 
 	err := validateTenant(tenants[0])
 
-	require.EqualValues(t, "No section 'identity' found for tenant Test with tenant without identity section", err.Error())
+	msg := "No section 'identity' found for tenant Test with tenant without identity section | missing setting 'AccessKey' field in 'identity' section | missing settings 'SecretKey' in 'identity' section"
+	require.EqualValues(t, msg, err.Error())
 }
 
 func Test_validateWithoutCompute(t *testing.T) {
@@ -347,7 +350,8 @@ func Test_validateWithoutCompute(t *testing.T) {
 
 	err := validateTenant(tenants[0])
 
-	require.EqualValues(t, "Missing field 'compute' for tenant", err.Error())
+	msg := "Missing field 'compute' for tenant | missing setting 'Region' field in 'compute' section"
+	require.EqualValues(t, msg, err.Error())
 }
 
 func Test_validateWithoutUser(t *testing.T) {
