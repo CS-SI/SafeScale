@@ -3,9 +3,9 @@
     name = "Test with valid outscale tenant"
 
     [tenants.identity]
-        AccessKey="ABCDEF123..........."
-        SecretKey="1234567................................."
-        UserID="0123455432112345...."
+        AccessKey="ABCDEF123"
+        SecretKey="1234567"
+        UserID="0123455432112345"
 
     [tenants.compute]
         Region="eu-west-2"
@@ -20,11 +20,11 @@
     [tenants.objectstorage]
         Type = "s3"
         Endpoint = "https://oos.eu-west-2.outscale.com"
-        AccessKey="ABCDEF123..........."
-        SecretKey="1234567................................."
+        AccessKey="ABCDEF123"
+        SecretKey="1234567"
 
     [tenants.metadata]
         Type = "s3"
         Endpoint = "https://oos.eu-west-2.outscale.com"
-        AccessKey="ABCDEF123..........."
-        SecretKey="1234567................................."
+        AccessKey="ABCDEF123"
+        SecretKey="1234567"

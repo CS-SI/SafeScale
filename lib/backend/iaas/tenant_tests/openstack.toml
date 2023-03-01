@@ -5,13 +5,12 @@
     # This part defines how to authenticate with the provider
     [tenants.identity]
         IdentityEndpoint = "<IdentityEndpoint>"
-        Username = "<Username>"
-        Password = "<Password>"
-        DomainID = "<DomainID>"
-        DomainName = "<DomainName>"
-        TenantName = "<TenantName>"
-        TokenID = "<TokenID>"
-        ApplicationKey = "1234567890..............."
+        Username = "Username"
+        Password = "Password"
+        DomainID = "DomainID"
+        DomainName = "DomainName"
+        TokenID = "TokenID"
+        ApplicationKey = "1234567890"
 
     [tenants.compute]
         Region = "RegionOne"

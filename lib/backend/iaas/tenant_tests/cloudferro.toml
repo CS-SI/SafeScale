@@ -3,10 +3,10 @@
     name = "Test with valid cloudferro tenant"
 
     [tenants.identity]
-        ApplicationKey = "1234567890................."
-        ProjectID = "abcdefgh........................"
+        ApplicationKey = "1234567890"
+        ProjectID = "abcdefgh"
         Username = "user@somewhere"
-        Password = "ABCDEF.............."
+        Password = "ABCDEF"
         DomainName = "dom_12345"
 
     [tenants.compute]
