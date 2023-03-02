@@ -7,7 +7,9 @@ var Sections = []string{
 	"network",
 	"identity",
 	"name",
+	"Name",
 	"client",
+	"Client",
 	"provider",
 }
 
@@ -62,6 +64,8 @@ var computeField = []string{
 	"OperatorUsername",
 	"DefaultVolumeSpeed",
 	"Service",
+	"WhitelistTemplateRegexp",
+	"DNSList",
 }
 
 var Networkfield = []string{
@@ -108,4 +112,6 @@ var MetadataField = []string{
 	"Tenant",
 	"Type",
 	"Username",
+	"CryptKey",
+	"MetadataBucketName",
 }
