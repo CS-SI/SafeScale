@@ -476,6 +476,9 @@ func (instance *Host) updateCachedInformation(ctx context.Context, hostTrx hostT
 			}
 			return nil
 		})
+		if innerXErr != nil {
+			return innerXErr
+		}
 
 		cfg := ssh.NewConfig(instance.GetName(), instance.localCache.accessIP, int(ahc.SSHPort), opUser, ahc.PrivateKey, 0, "", primaryGatewayConfig, secondaryGatewayConfig)
 		conn, innerXErr := sshfactory.NewConnector(cfg)

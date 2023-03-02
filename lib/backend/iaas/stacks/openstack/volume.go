@@ -324,18 +324,24 @@ func (instance *stack) CreateVolumeAttachment(ctx context.Context, request abstr
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
-	if request.Name = strings.TrimSpace(request.Name); request.Name == "" {
-		return "", fail.InvalidParameterCannotBeEmptyStringError("request.Name")
+	if ctx == nil {
+		return "", fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if valid.IsNull(request.Volume) {
+		return "", fail.InvalidParameterCannotBeNilError("request.Volume")
+	}
+	if valid.IsNull(request.Host) {
+		return "", fail.InvalidParameterCannotBeNilError("request.Host")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.volume"), "("+request.Name+")").WithStopwatch().Entering().Exiting()
 
 	// Creates the attachment
 	var va *volumeattach.VolumeAttachment
 	xerr := stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			va, innerErr = volumeattach.Create(instance.ComputeClient, request.HostID, volumeattach.CreateOpts{
-				VolumeID: request.VolumeID,
+			va, innerErr = volumeattach.Create(instance.ComputeClient, request.Host.ID, volumeattach.CreateOpts{
+				VolumeID: request.Volume.ID,
 			}).Extract()
 			return innerErr
 		},
@@ -344,28 +350,37 @@ func (instance *stack) CreateVolumeAttachment(ctx context.Context, request abstr
 	if xerr != nil {
 		return "", xerr
 	}
+
 	return va.ID, nil
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by id
-func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (*abstract.VolumeAttachment, fail.Error) {
-	nilA := abstract.NewVolumeAttachment()
-	if valid.IsNil(instance) {
+func (instance *stack) InspectVolumeAttachment(ctx context.Context, hostParam iaasapi.HostIdentifier, volumeParam iaasapi.VolumeIdentifier, attachmentID string) (*abstract.VolumeAttachment, fail.Error) {
+	var nilA *abstract.VolumeAttachment
+	if valid.IsNull(instance) {
 		return nilA, fail.InvalidInstanceError()
 	}
-	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return nilA, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+	if ctx == nil {
+		return nilA, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if id = strings.TrimSpace(id); id == "" {
-		return nilA, fail.InvalidParameterCannotBeEmptyStringError("id")
+	abstractHost, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nilA, xerr
+	}
+	_, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(volumeParam)
+	if xerr != nil {
+		return nilA, xerr
+	}
+	if attachmentID = strings.TrimSpace(attachmentID); attachmentID == "" {
+		return nilA, fail.InvalidParameterCannotBeEmptyStringError("attachmentID")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+id+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.volume"), "(%s, %s, %s)", volumeLabel, hostLabel, attachmentID).WithStopwatch().Entering().Exiting()
 
 	var va *volumeattach.VolumeAttachment
-	xerr := stacks.RetryableRemoteCall(ctx,
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (innerErr error) {
-			va, innerErr = volumeattach.Get(instance.ComputeClient, serverID, id).Extract()
+			va, innerErr = volumeattach.Get(instance.ComputeClient, abstractHost.ID, attachmentID).Extract()
 			return innerErr
 		},
 		NormalizeError,
@@ -373,6 +388,7 @@ func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, id
 	if xerr != nil {
 		return nilA, xerr
 	}
+
 	return &abstract.VolumeAttachment{
 		ID:       va.ID,
 		ServerID: va.ServerID,
@@ -382,25 +398,30 @@ func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, id
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID string) ([]*abstract.VolumeAttachment, fail.Error) {
+func (instance *stack) ListVolumeAttachments(ctx context.Context, hostParam iaasapi.HostIdentifier) ([]*abstract.VolumeAttachment, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	abstractHost, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.volume"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
 	var vs []*abstract.VolumeAttachment
-	xerr := stacks.RetryableRemoteCall(ctx,
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() error {
 			vs = []*abstract.VolumeAttachment{} // If call fails, need to reset volume list to prevent duplicates
-			return volumeattach.List(instance.ComputeClient, serverID).EachPage(func(page pagination.Page) (bool, error) {
+			return volumeattach.List(instance.ComputeClient, abstractHost.ID).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumeattach.ExtractVolumeAttachments(page)
 				if err != nil {
 					return false, err
 				}
+
 				for _, va := range list {
 					ava := &abstract.VolumeAttachment{
 						ID:       va.ID,
@@ -421,27 +442,37 @@ func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID strin
 	return vs, nil
 }
 
-func (instance *stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
-	return nil
-}
-
 // DeleteVolumeAttachment deletes the volume attachment identified by id
-func (instance *stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string) fail.Error {
-	if valid.IsNil(instance) {
+func (instance *stack) DeleteVolumeAttachment(ctx context.Context, hostParam iaasapi.HostIdentifier, volumeParam iaasapi.VolumeIdentifier, attachmentID string) fail.Error {
+	if valid.IsNull(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if serverID = strings.TrimSpace(serverID); serverID == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("serverID")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if vaID = strings.TrimSpace(vaID); vaID == "" {
+	abstractHost, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+	switch volumeParam.(type) {
+	case string:
+		return fail.InvalidParameterError("volumeParam", "must be an '*abstract.Volume'")
+	default:
+	}
+	_, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(volumeParam)
+	if xerr != nil {
+		return xerr
+	}
+	attachmentID = strings.TrimSpace(attachmentID)
+	if attachmentID == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "('"+serverID+"', '"+vaID+"')").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.volume"), "(%s, %s)", hostLabel, volumeLabel).WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {
-			return volumeattach.Delete(instance.ComputeClient, serverID, vaID).ExtractErr()
+			return volumeattach.Delete(instance.ComputeClient, abstractHost.ID, attachmentID).ExtractErr()
 		},
 		NormalizeError,
 	)

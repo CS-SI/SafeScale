@@ -3125,7 +3125,7 @@ func (e *ServiceTest) ListVolumeAttachments(ctx context.Context, serverID string
 	e._survey("ServiceTest::ListVolumeAttachments (not implemented)")
 	return make([]*abstract.VolumeAttachment, 0), nil
 }
-func (e *ServiceTest) DeleteVolumeAttachment(ctx context.Context, serverID, id string) fail.Error {
+func (e *ServiceTest) DeleteVolumeAttachment(ctx context.Context, hostParam iaasapi.HostIdentifier, volumeParam iaasapi.VolumeIdentifier, attachmentID string) fail.Error {
 	e._survey("ServiceTest::DeleteVolumeAttachment (not implemented)")
 	return nil
 }

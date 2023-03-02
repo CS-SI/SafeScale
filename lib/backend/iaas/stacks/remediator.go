@@ -588,45 +588,35 @@ func (s Remediator) CreateVolumeAttachment(ctx context.Context, request abstract
 	return volume, xerr
 }
 
-func (s Remediator) InspectVolumeAttachment(ctx context.Context, serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
+func (s Remediator) InspectVolumeAttachment(ctx context.Context, hostParam iaasapi.HostIdentifier, volumeParam iaasapi.VolumeIdentifier, attachmentID string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	volume, xerr := s.Stack.InspectVolumeAttachment(ctx, serverID, id)
+	volume, xerr := s.Stack.InspectVolumeAttachment(ctx, hostParam, volumeParam, attachmentID)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
 	return volume, xerr
 }
 
-func (s Remediator) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
+func (s Remediator) ListVolumeAttachments(ctx context.Context, hostParam iaasapi.HostIdentifier) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	volume, xerr := s.Stack.ListVolumeAttachments(ctx, serverID)
+	volume, xerr := s.Stack.ListVolumeAttachments(ctx, hostParam)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
 	return volume, xerr
 }
 
-func (s Remediator) DeleteVolumeAttachment(ctx context.Context, serverID, id string) (ferr fail.Error) {
+func (s Remediator) DeleteVolumeAttachment(ctx context.Context, hostParam iaasapi.HostIdentifier, volumeParam iaasapi.VolumeIdentifier, attachmentID string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	xerr := s.Stack.DeleteVolumeAttachment(ctx, serverID, id)
+	xerr := s.Stack.DeleteVolumeAttachment(ctx, hostParam, volumeParam, attachmentID)
 	if xerr != nil {
 		xerr.WithContext(ctx)
 	}
 	return xerr
 }
-
-// func (s Remediator) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
-// 	defer fail.OnPanic(&ferr)
-//
-// 	xerr := s.StackDriver.Migrate(ctx, operation, params)
-// 	if xerr != nil {
-// 		xerr.WithContext(ctx)
-// 	}
-// 	return xerr
-// }
 
 func (s Remediator) Timings() (_ temporal.Timings, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)

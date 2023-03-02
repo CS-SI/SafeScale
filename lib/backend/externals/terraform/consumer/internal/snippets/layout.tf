@@ -1,14 +1,14 @@
 terraform {
-    required_version = "{{ .Terraformer.Config.Release }}"
+	required_version = "{{ .Terraformer.Config.Release }}"
 {{- if .Terraformer.Config.RequiredProviders }}
-    required_providers {
+	required_providers {
 {{-   range $k, $i := .Terraformer.Config.RequiredProviders }}
-        {{ $k }} = {
-            source  = "{{ $i.Source }}"
-            version = "{{ $i.Version }}"
-        }
+		{{ $k }} = {
+			source  = "{{ $i.Source }}"
+			version = "{{ $i.Version }}"
+		}
 {{-   end }}
-    }
+	}
 {{- end }}
 
 {{ if .ConsulBackendConfig }}

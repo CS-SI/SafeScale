@@ -25,18 +25,18 @@ output "volume_{{ .Resource.Name }}_id" {
 	value = "${openstack_blockstorage_volume_v2.{{ .Resource.Name }}.id}"
 }
 
-{{   if .Extra.Attachment }}
-resource "openstack_compute_volume_attach_v2" "{{ .Extra.Attachment.Name }}" {
+{{    range $k, $v := $extra.Attachments }}
+resource "openstack_compute_volume_attach_v2" "volume_{{ .Resource.Name }}_host_{{ $v }}" {
 	provider    = openstack.ovh
-	instance_id = "{{ .Extra.Attachment.ServerID }}"
+	instance_id = "{{ $k }}"
 	volume_id   = ${openstack_blockstorage_volume_v2.{{ .Resource.Name }}.id}
 	region      = "{{ .Provider.Authentication.Region }}"
 	tenant_id   = "{{ .Provider.Authentication.TenantID }}"
 }
 
-output "volumeattachment_{{ .Extra.Attachment.Name }}_id" {
-	value = "${openstack_compute_volume_attach_v2.{{ .Resource.Name }}.id}"
+output "volume_{{ .Resource.Name }}_host_{{ $v }}_id" {
+	value = "${openstack_compute_volume_attach_v2.volume_{{ .ResourceName }}_host_{{ $v }}.id}"
 }
-{{   end }}
+{{    end }}
 
 {{ end }}

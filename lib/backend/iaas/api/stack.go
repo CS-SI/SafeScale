@@ -159,14 +159,11 @@ type Stack interface {
 	// CreateVolumeAttachment attaches a volume to a host
 	CreateVolumeAttachment(ctx context.Context, request abstract.VolumeAttachmentRequest) (string, fail.Error)
 	// InspectVolumeAttachment returns the volume attachment identified by id
-	InspectVolumeAttachment(ctx context.Context, serverID, id string) (*abstract.VolumeAttachment, fail.Error)
+	InspectVolumeAttachment(ctx context.Context, hostParam HostIdentifier, volumeParam VolumeIdentifier, attachmentID string) (*abstract.VolumeAttachment, fail.Error)
 	// ListVolumeAttachments lists available volume attachment
-	ListVolumeAttachments(ctx context.Context, serverID string) ([]*abstract.VolumeAttachment, fail.Error)
+	ListVolumeAttachments(ctx context.Context, hostParam HostIdentifier) ([]*abstract.VolumeAttachment, fail.Error)
 	// DeleteVolumeAttachment deletes the volume attachment identified by id
-	DeleteVolumeAttachment(ctx context.Context, serverID, id string) fail.Error
-
-	// // Migrate runs custom code without breaking Interfaces
-	// Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error
+	DeleteVolumeAttachment(ctx context.Context, hostParam HostIdentifier, volumeParam VolumeIdentifier, attachmentID string) fail.Error
 
 	// Timings ...
 	Timings() (temporal.Timings, fail.Error)
@@ -177,10 +174,3 @@ type Stack interface {
 	// DeleteTags removes provider's tags
 	DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error
 }
-
-//
-// // StackDriver is the interface that MUST actually implement all the providers; don't do it, and we can encounter runtime panics
-// type StackDriver interface {
-// 	StackDriver
-// 	ReservedForProviderUse
-// }

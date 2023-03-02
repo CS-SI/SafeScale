@@ -195,11 +195,12 @@ func LoadVolume(inctx context.Context, ref string) (*Volume, fail.Error) {
 				}
 				defer volumeTrx.TerminateFromError(ctx, &ferr)
 
-				xerr = inspectVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
+				xerr = alterVolumeMetadata(ctx, volumeTrx, func(av *abstract.Volume, props *serialize.JSONProperties) fail.Error {
 					prov, xerr := svc.ProviderDriver()
 					if xerr != nil {
 						return xerr
 					}
+
 					castedProv, innerErr := lang.Cast[providers.ReservedForTerraformerUse](prov)
 					if innerErr != nil {
 						return fail.Wrap(innerErr)
@@ -210,9 +211,15 @@ func LoadVolume(inctx context.Context, ref string) (*Volume, fail.Error) {
 						return innerXErr
 					}
 
-					// _, innerXErr = myjob.Scope().RegisterAbstractIfNeeded(av)
-					// return innerXErr
-					return nil
+					// Adds attachments as extra data to abstract volume
+					return props.Inspect(volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
+						va, innerErr := lang.Cast[*propertiesv1.VolumeAttachments](p)
+						if innerErr != nil {
+							return fail.Wrap(innerErr)
+						}
+
+						return av.AddOptions(abstract.WithExtraData("Attachments", va.Hosts))
+					})
 				})
 				if xerr != nil {
 					return nil, xerr
@@ -657,15 +664,9 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 	defer tracer.Exiting()
 
 	var (
-		volumeID, volumeName, deviceName, volumeUUID, mountPoint, vaID string
-		nfsServer                                                      *nfs.Server
+		deviceName, volumeUUID, mountPoint, vaID string
+		nfsServer                                *nfs.Server
 	)
-
-	targetID, err := host.GetID()
-	if err != nil {
-		return fail.Wrap(err)
-	}
-	targetName := host.GetName()
 
 	volumeTrx, xerr := newVolumeTransaction(ctx, instance)
 	if xerr != nil {
@@ -679,55 +680,19 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
-	// -- proceed some checks on Volume --
-	xerr = inspectVolumeMetadata(ctx, volumeTrx, func(av *abstract.Volume, props *serialize.JSONProperties) fail.Error {
-		volumeID = av.ID
-		volumeName = av.Name
-
-		return props.Inspect(volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
-			volumeAttachedV1, innerErr := lang.Cast[*propertiesv1.VolumeAttachments](p)
-			if innerErr != nil {
-				return fail.Wrap(innerErr)
-			}
-
-			if doNotMount {
-				mountPoint = ""
-			} else {
-				mountPoint = path
-				if path == abstract.DefaultVolumeMountPoint {
-					mountPoint = abstract.DefaultVolumeMountPoint + volumeName
-				}
-			}
-
-			// For now, allows only one attachment...
-			if len(volumeAttachedV1.Hosts) > 0 {
-				for id := range volumeAttachedV1.Hosts {
-					if id != targetID {
-						return fail.NotAvailableError("Volume '%s' is already attached", volumeName)
-					}
-					break
-				}
-			}
-			return nil
-		})
+	var abstractVolume *abstract.Volume
+	xerr = inspectVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
+		abstractVolume = av
+		return nil
 	})
-	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	var state hoststate.Enum
-	state, xerr = host.GetState(ctx)
-	if xerr != nil {
-		return xerr
-	}
-
-	if state != hoststate.Started {
-		return fail.InvalidRequestError(fmt.Sprintf("cannot attach Volume '%s' to '%s:%s': host '%s' is NOT started", volumeName, targetName, mountPoint, targetName))
-	}
-
-	// -- proceed some checks on target server --
-	xerr = inspectHostMetadataProperties(ctx, hostTrx, func(props *serialize.JSONProperties) fail.Error {
+	// -- proceed some checks on target Host --
+	var abstractHostCore *abstract.HostCore
+	xerr = inspectHostMetadata(ctx, hostTrx, func(ahc *abstract.HostCore, props *serialize.JSONProperties) fail.Error {
+		abstractHostCore = ahc
 		return props.Inspect(hostproperty.VolumesV1, func(p clonable.Clonable) fail.Error {
 			hostVolumesV1, innerErr := lang.Cast[*propertiesv1.HostVolumes](p)
 			if innerErr != nil {
@@ -741,16 +706,16 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 				}
 
 				// Check if the Volume is already mounted elsewhere
-				if device, found := hostVolumesV1.DevicesByID[volumeID]; found {
+				if device, found := hostVolumesV1.DevicesByID[abstractVolume.ID]; found {
 					mount, ok := hostMountsV1.LocalMountsByPath[hostMountsV1.LocalMountsByDevice[device]]
 					if !ok {
-						return fail.InconsistentError("metadata inconsistency for Volume '%s' attached to host '%s'", volumeName, targetName)
+						return fail.InconsistentError("metadata inconsistency for Volume '%s' attached to host '%s'", abstractVolume.Name, ahc.Name)
 					}
 
 					path := mount.Path
 					if mountPoint != "" {
 						if path != mountPoint {
-							return fail.InvalidRequestError("Volume '%s' is already attached in '%s:%s'", volumeName, targetName, path)
+							return fail.InvalidRequestError("Volume '%s' is already attached in '%s:%s'", abstractVolume.Name, ahc.Name, path)
 						}
 					}
 					return nil
@@ -761,14 +726,14 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 					for _, i := range hostMountsV1.LocalMountsByPath {
 						if mountPoint != "" {
 							if strings.Index(i.Path, mountPoint) == 0 {
-								return fail.InvalidRequestError(fmt.Sprintf("cannot attach Volume '%s' to '%s:%s': there is already a Volume mounted in '%s:%s'", volumeName, targetName, mountPoint, targetName, i.Path))
+								return fail.InvalidRequestError("cannot attach Volume '%s' to '%s:%s': there is already a Volume mounted in '%s:%s'", abstractVolume.Name, ahc.Name, mountPoint, ahc.Name, i.Path)
 							}
 						}
 					}
 					for _, i := range hostMountsV1.RemoteMountsByPath {
 						if mountPoint != "" {
 							if strings.Index(i.Path, mountPoint) == 0 {
-								return fail.InvalidRequestError(fmt.Sprintf("can't attach Volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", volumeName, targetName, mountPoint, targetName, i.Path))
+								return fail.InvalidRequestError("cannot attach Volume '%s' to '%s:%s': there is a share mounted in path '%s:%s[/...]'", abstractVolume.Name, ahc.Name, mountPoint, ahc.Name, i.Path)
 							}
 						}
 					}
@@ -782,6 +747,43 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 		return xerr
 	}
 
+	// -- proceed some checks on Volume --
+	xerr = inspectVolumeMetadataProperty(ctx, volumeTrx, volumeproperty.AttachedV1, func(volumeAttachedV1 *propertiesv1.VolumeAttachments) fail.Error {
+		if doNotMount {
+			mountPoint = ""
+		} else {
+			mountPoint = path
+			if path == abstract.DefaultVolumeMountPoint {
+				mountPoint = abstract.DefaultVolumeMountPoint + abstractVolume.Name
+			}
+		}
+
+		// For now, allows only one attachment...
+		if len(volumeAttachedV1.Hosts) > 0 {
+			for id := range volumeAttachedV1.Hosts {
+				if id != abstractHostCore.ID {
+					return fail.NotAvailableError("Volume '%s' is already attached", abstractVolume.Name)
+				}
+				break
+			}
+		}
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	var state hoststate.Enum
+	state, xerr = host.GetState(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.InvalidRequestError("cannot attach Volume '%s' to '%s:%s': host '%s' is NOT started", abstractVolume.Name, abstractHostCore.Name, mountPoint, abstractHostCore.Name)
+	}
+
 	// -- Get list of disks before attachment --
 	// Note: some providers are not able to tell the real device name the Volume
 	//       will have on the host, so we have to use a way that can work everywhere
@@ -793,9 +795,9 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 
 	// -- creates Volume attachment --
 	vaID, xerr = svc.CreateVolumeAttachment(ctx, abstract.VolumeAttachmentRequest{
-		Name:     fmt.Sprintf("%s-%s", volumeName, targetName),
-		HostID:   targetID,
-		VolumeID: volumeID,
+		Name:   abstractVolume.Name + "-" + abstractHostCore.Name,
+		Host:   abstractHostCore,
+		Volume: abstractVolume,
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -806,9 +808,9 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			derr := svc.DeleteVolumeAttachment(cleanupContextFrom(ctx), targetID, vaID)
+			derr := svc.DeleteVolumeAttachment(cleanupContextFrom(ctx), abstractHostCore, abstractVolume, vaID)
 			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", ActionFromError(ferr), abstractVolume.Name, abstractHostCore.Name))
 			}
 		}
 	}()
@@ -887,20 +889,20 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 					ferr = debug.InjectPlannedFail(ferr)
 					if ferr != nil {
 						if derr := nfsServer.UnmountBlockDevice(cleanupContextFrom(ctx), volumeUUID); derr != nil {
-							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from host '%s'", ActionFromError(ferr), abstractVolume.Name, abstractHostCore.Name))
 						}
 					}
 				}()
 			}
 
 			// Saves Volume information in property
-			hostVolumesV1.VolumesByID[volumeID] = &propertiesv1.HostVolume{
+			hostVolumesV1.VolumesByID[abstractVolume.ID] = &propertiesv1.HostVolume{
 				AttachID: vaID,
 				Device:   volumeUUID,
 			}
-			hostVolumesV1.VolumesByName[volumeName] = volumeID
-			hostVolumesV1.VolumesByDevice[volumeUUID] = volumeID
-			hostVolumesV1.DevicesByID[volumeID] = volumeUUID
+			hostVolumesV1.VolumesByName[abstractVolume.Name] = abstractVolume.ID
+			hostVolumesV1.VolumesByDevice[volumeUUID] = abstractVolume.ID
+			hostVolumesV1.DevicesByID[abstractVolume.ID] = volumeUUID
 			return nil
 		})
 		if innerXErr != nil {
@@ -911,7 +913,7 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 			if innerXErr != nil && !doNotMount {
 				derr := nfsServer.UnmountBlockDevice(cleanupContextFrom(ctx), volumeUUID)
 				if derr != nil {
-					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from host '%s'", ActionFromError(innerXErr), volumeName, targetName))
+					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from host '%s'", ActionFromError(innerXErr), abstractVolume.Name, abstractHostCore.Name))
 				}
 			}
 		}()
@@ -942,7 +944,7 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 		if ferr != nil {
 			if !doNotMount {
 				if derr := nfsServer.UnmountBlockDevice(cleanupContextFrom(ctx), volumeUUID); derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(ferr), abstractVolume.Name, abstractHostCore.Name))
 				}
 			}
 			// VPL: rollback() on transaction will do the same job
@@ -980,16 +982,25 @@ func (instance *Volume) Attach(ctx context.Context, host *Host, path, format str
 	}()
 
 	// Updates Volume properties
-	xerr = alterVolumeMetadataProperty(ctx, volumeTrx, volumeproperty.AttachedV1, func(volumeAttachedV1 *propertiesv1.VolumeAttachments) fail.Error {
-		volumeAttachedV1.Hosts[targetID] = targetName
-		return nil
+	xerr = alterVolumeMetadata(ctx, volumeTrx, func(av *abstract.Volume, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
+			volumeAttachedV1, innerErr := lang.Cast[*propertiesv1.VolumeAttachments](p)
+			if innerErr != nil {
+				return fail.Wrap(innerErr)
+			}
+
+			volumeAttachedV1.Hosts[abstractHostCore.ID] = abstractHostCore.Name
+
+			// Updates abstract volume extra data
+			return av.AddOptions(abstract.WithExtraData("Attachments", volumeAttachedV1))
+		})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	logrus.WithContext(ctx).Infof("Volume '%s' successfully attached to host '%s' as device '%s'", volumeName, targetName, volumeUUID)
+	logrus.WithContext(ctx).Infof("Volume '%s' successfully attached to host '%s' as device '%s'", abstractVolume.Name, abstractHostCore.Name, volumeUUID)
 	return nil
 }
 
@@ -1068,35 +1079,23 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if host == nil {
+	if valid.IsNull(host) {
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
-	castedHost, err := lang.Cast[*Host](host)
-	if err != nil {
-		return fail.Wrap(err)
-	}
 
+	targetName := host.GetName()
 	targetID, err := host.GetID()
 	if err != nil {
 		return fail.Wrap(err)
 	}
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.Volume"), "('%s')", targetID).Entering()
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("resources.volume"), "('%s')", targetName).Entering()
 	defer tracer.Exiting()
 
-	var (
-		volumeID, volumeName string
-		mountPath            string
-	)
-
-	targetName := host.GetName()
-
+	var mountPath string
 	state, xerr := host.GetState(ctx)
 	if xerr != nil {
 		return xerr
-	}
-
-	if state != hoststate.Started {
-		return fail.InvalidRequestError(fmt.Sprintf("cannot detach Volume '%s' from '%s', '%s' is NOT started", volumeName, targetName, targetName))
 	}
 
 	volumeTrx, xerr := newVolumeTransaction(ctx, instance)
@@ -1105,21 +1104,35 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 	}
 	defer volumeTrx.TerminateFromError(ctx, &ferr)
 
-	hostTrx, xerr := newHostTransaction(ctx, castedHost)
+	hostTrx, xerr := newHostTransaction(ctx, host)
 	if xerr != nil {
 		return xerr
 	}
 	defer hostTrx.TerminateFromError(ctx, &ferr)
 
 	// -- retrieves Volume data --
+	var abstractVolume *abstract.Volume
 	xerr = inspectVolumeMetadataAbstract(ctx, volumeTrx, func(av *abstract.Volume) fail.Error {
-		volumeID = av.ID
-		volumeName = av.Name
+		abstractVolume = av
 		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
+	}
+
+	var abstractHostCore *abstract.HostCore
+	xerr = inspectHostMetadataAbstract(ctx, hostTrx, func(ahc *abstract.HostCore) fail.Error {
+		abstractHostCore = ahc
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	if state != hoststate.Started {
+		return fail.InvalidRequestError(fmt.Sprintf("cannot detach Volume '%s' from '%s', '%s' is NOT started", abstractVolume.Name, targetName, targetName))
 	}
 
 	// -- retrieve host data --
@@ -1143,9 +1156,9 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 
 			// Check the Volume is effectively attached
 			var found bool
-			attachment, found = hostVolumesV1.VolumesByID[volumeID]
+			attachment, found = hostVolumesV1.VolumesByID[abstractVolume.ID]
 			if !found {
-				return fail.NotFoundError("cannot detach Volume '%s': not attached to host '%s'", volumeName, targetName)
+				return fail.NotFoundError("cannot detach Volume '%s': not attached to host '%s'", abstractVolume.Name, targetName)
 			}
 
 			return nil
@@ -1179,12 +1192,12 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 						continue
 					}
 					if strings.Index(p+"/", mount.Path+"/") == 0 {
-						return fail.InvalidRequestError("cannot detach Volume '%s' from '%s:%s', there is a Volume mounted in '%s:%s'", volumeName, targetName, mount.Path, targetName, p)
+						return fail.InvalidRequestError("cannot detach Volume '%s' from '%s:%s', there is a Volume mounted in '%s:%s'", abstractVolume.Name, targetName, mount.Path, targetName, p)
 					}
 				}
 				for p := range hostMountsV1.RemoteMountsByPath {
 					if strings.Index(p+"/", mount.Path+"/") == 0 {
-						return fail.InvalidRequestError("cannot detach Volume '%s' from '%s:%s', there is a share mounted in '%s:%s'", volumeName, targetName, mount.Path, targetName, p)
+						return fail.InvalidRequestError("cannot detach Volume '%s' from '%s:%s', there is a share mounted in '%s:%s'", abstractVolume.Name, targetName, mount.Path, targetName, p)
 					}
 				}
 			}
@@ -1204,7 +1217,7 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 
 				for _, v := range hostSharesV1.ByID {
 					if strings.Index(v.Path, mount.Path) == 0 {
-						return fail.InvalidRequestError("cannot detach Volume '%s' from '%s': mounted in '%s' and shared", volumeName, targetName, mount.Path)
+						return fail.InvalidRequestError("cannot detach Volume '%s' from '%s': mounted in '%s' and shared", abstractVolume.Name, targetName, mount.Path)
 					}
 				}
 				return nil
@@ -1231,13 +1244,15 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 			}
 
 			// Unmount block device ...
-			if innerXErr = nfsServer.UnmountBlockDevice(jobapi.NewContextPropagatingJob(ctx), attachment.Device); innerXErr != nil {
+			innerXErr = nfsServer.UnmountBlockDevice(jobapi.NewContextPropagatingJob(ctx), attachment.Device)
+			if innerXErr != nil {
 				return innerXErr
 			}
 		}
 
 		// ... then detach Volume ...
-		if innerXErr = svc.DeleteVolumeAttachment(ctx, targetID, attachment.AttachID); innerXErr != nil {
+		innerXErr = svc.DeleteVolumeAttachment(ctx, abstractHostCore, abstractVolume, attachment.AttachID)
+		if innerXErr != nil {
 			return innerXErr
 		}
 
@@ -1248,10 +1263,10 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 				return fail.Wrap(innerErr)
 			}
 
-			delete(hostVolumesV1.VolumesByID, volumeID)
-			delete(hostVolumesV1.VolumesByName, volumeName)
+			delete(hostVolumesV1.VolumesByID, abstractVolume.ID)
+			delete(hostVolumesV1.VolumesByName, abstractVolume.Name)
 			delete(hostVolumesV1.VolumesByDevice, attachment.Device)
-			delete(hostVolumesV1.DevicesByID, volumeID)
+			delete(hostVolumesV1.DevicesByID, abstractVolume.ID)
 			return nil
 		})
 		if innerXErr != nil {
@@ -1276,9 +1291,18 @@ func (instance *Volume) Detach(ctx context.Context, host *Host) (ferr fail.Error
 		}
 
 		// ... and finish with update of Volume property propertiesv1.VolumeAttachments
-		return alterVolumeMetadataProperty(ctx, volumeTrx, volumeproperty.AttachedV1, func(vaV1 *propertiesv1.VolumeAttachments) fail.Error {
-			delete(vaV1.Hosts, targetID)
-			return nil
+		return alterVolumeMetadata(ctx, volumeTrx, func(av *abstract.Volume, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(volumeproperty.AttachedV1, func(p clonable.Clonable) fail.Error {
+				volumeAttachedV1, innerErr := lang.Cast[*propertiesv1.VolumeAttachments](p)
+				if innerErr != nil {
+					return fail.Wrap(innerErr)
+				}
+
+				delete(volumeAttachedV1.Hosts, targetID)
+
+				// Updates abstract volume extra data
+				return av.AddOptions(abstract.WithExtraData("Attachments", volumeAttachedV1))
+			})
 		})
 	})
 }

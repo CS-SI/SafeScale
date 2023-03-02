@@ -2572,3 +2572,29 @@ func (s stack) rpcDeleteDiskAttachment(ctx context.Context, vaID string) fail.Er
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, timings.SmallDelay(), timings.HostOperationTimeout())
 }
+
+func (s *stack) rpcListDisks(ctx context.Context) ([]*compute.Disk, fail.Error) {
+	var (
+		out  []*compute.Disk
+		resp *compute.DiskList
+	)
+	for token := ""; ; {
+		xerr := stacks.RetryableRemoteCall(ctx,
+			func() (err error) {
+				resp, err = s.ComputeService.Disks.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
+				return err
+			},
+			normalizeError,
+		)
+		if xerr != nil {
+			return nil, xerr
+		}
+		if resp != nil && len(resp.Items) > 0 {
+			out = append(out, resp.Items...)
+		}
+		if token = resp.NextPageToken; token == "" {
+			break
+		}
+	}
+	return out, nil
+}

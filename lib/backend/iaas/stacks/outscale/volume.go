@@ -299,75 +299,89 @@ func (instance *stack) CreateVolumeAttachment(ctx context.Context, request abstr
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
-	if request.HostID == "" {
-		return "", fail.InvalidParameterCannotBeEmptyStringError("HostID")
+	if ctx == nil {
+		return "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if request.VolumeID == "" {
-		return "", fail.InvalidParameterCannotBeEmptyStringError("VolumeID")
+	if valid.IsNull(request.Host) {
+		return "", fail.InvalidParameterCannotBeNilError("request.Host")
+	}
+	if valid.IsNull(request.Volume) {
+		return "", fail.InvalidParameterCannotBeNilError("request.Volume")
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	firstDeviceName, xerr := instance.getFirstFreeDeviceName(ctx, request.HostID)
+	firstDeviceName, xerr := instance.getFirstFreeDeviceName(ctx, request.Host.ID)
 	if xerr != nil {
 		return "", xerr
 	}
 
-	if xerr := instance.rpcLinkVolume(ctx, request.VolumeID, request.HostID, firstDeviceName); xerr != nil {
+	if xerr := instance.rpcLinkVolume(ctx, request.Volume.ID, request.Host.ID, firstDeviceName); xerr != nil {
 		return "", xerr
 	}
+
 	// No ID of attachment in outscale, volume can be attached to only one server; Volume Attachment ID is equal to VolumeID
-	return request.VolumeID, nil
+	return request.Volume.ID, nil
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by volumeID
-func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, volumeID string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
-	if valid.IsNil(instance) {
+// Note: attachmentID is not used in this stack
+func (instance *stack) InspectVolumeAttachment(ctx context.Context, hostParam iaasapi.HostIdentifier, volumeParam iaasapi.VolumeIdentifier, _ string) (*abstract.VolumeAttachment, fail.Error) {
+	if valid.IsNull(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if serverID == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if volumeID == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("volumeID")
+	abstractHost, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+	abstractVolume, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(volumeParam)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s, %s)", volumeLabel, hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := instance.rpcReadVolumeByID(ctx, volumeID)
+	resp, xerr := instance.rpcReadVolumeByID(ctx, abstractVolume.ID)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	for _, lv := range resp.LinkedVolumes {
-		if lv.VmId == serverID {
+		if lv.VmId == abstractHost.ID {
 			return &abstract.VolumeAttachment{
-				VolumeID:   volumeID,
-				ServerID:   serverID,
+				VolumeID:   abstractVolume.ID,
+				ServerID:   abstractHost.ID,
 				Device:     lv.DeviceName,
 				Name:       "",
 				MountPoint: "",
 				Format:     "",
-				ID:         volumeID,
+				ID:         abstractVolume.ID,
 			}, nil
 		}
 	}
 
-	return nil, fail.NotFoundError("failed to find an attachment of Volume '%s' on Host '%s'", volumeID, serverID)
+	return nil, fail.NotFoundError("failed to find an attachment of Volume '%s' on Host '%s'", volumeLabel, hostLabel)
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
+func (instance *stack) ListVolumeAttachments(ctx context.Context, hostParam iaasapi.HostIdentifier) ([]*abstract.VolumeAttachment, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if serverID == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverID")
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	abstractHost, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s)", serverID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s)", hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	volumes, err := instance.ListVolumes(ctx)
@@ -376,7 +390,11 @@ func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID strin
 	}
 	atts := make([]*abstract.VolumeAttachment, 0, len(volumes))
 	for _, v := range volumes {
-		att, _ := instance.InspectVolumeAttachment(ctx, serverID, v.ID)
+		att, xerr := instance.InspectVolumeAttachment(ctx, v, abstractHost.ID, "")
+		if xerr != nil {
+			return nil, xerr
+		}
+
 		if att != nil {
 			atts = append(atts, att)
 		}
@@ -384,28 +402,29 @@ func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID strin
 	return atts, nil
 }
 
-func (instance *stack) Migrate(_ context.Context, _ string, _ map[string]interface{}) (ferr fail.Error) {
-	return nil
-}
-
 // DeleteVolumeAttachment deletes the volume attachment identified by id
-func (instance *stack) DeleteVolumeAttachment(ctx context.Context, serverID, volumeID string) (ferr fail.Error) {
+func (instance *stack) DeleteVolumeAttachment(ctx context.Context, hostParam iaasapi.HostIdentifier, volumeParam iaasapi.VolumeIdentifier, attachmentID string) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if serverID == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("serverID")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if volumeID == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("volumeID")
-	}
-
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
-	xerr := instance.rpcUnlinkVolume(ctx, volumeID)
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
 	if xerr != nil {
 		return xerr
 	}
-	return instance.WaitForVolumeState(ctx, volumeID, volumestate.Available)
+	abstractVolume, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(volumeParam)
+	if xerr != nil {
+		return xerr
+	}
+
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stack.outscale") || tracing.ShouldTrace("stacks.volume"), "(%s, %s)", hostLabel, volumeLabel).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	xerr = instance.rpcUnlinkVolume(ctx, abstractVolume.ID)
+	if xerr != nil {
+		return xerr
+	}
+	return instance.WaitForVolumeState(ctx, abstractVolume.ID, volumestate.Available)
 }

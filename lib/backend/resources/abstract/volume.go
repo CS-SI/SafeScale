@@ -140,12 +140,6 @@ func (v *Volume) Deserialize(buf []byte) (ferr fail.Error) {
 	return fail.Wrap(json.Unmarshal(buf, v))
 }
 
-// // GetName returns the name of the volume
-// // Satisfies interface data.Identifiable
-// func (v *Volume) GetName() string {
-// 	return v.Name
-// }
-
 // GetID returns the ID of the volume
 // Satisfies interface data.Identifiable
 func (v *Volume) GetID() (string, error) {
@@ -158,9 +152,9 @@ func (v *Volume) GetID() (string, error) {
 
 // VolumeAttachmentRequest represents a volume attachment request
 type VolumeAttachmentRequest struct {
-	Name     string `json:"name,omitempty"`
-	VolumeID string `json:"volume_id,omitempty"`
-	HostID   string `json:"host_id,omitempty"`
+	Name   string
+	Volume *Volume
+	Host   *HostCore
 }
 
 // VolumeAttachment represents a volume attachment

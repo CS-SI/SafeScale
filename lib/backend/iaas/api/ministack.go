@@ -27,7 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 )
 
-//go:generate minimock -o mocks/mock_stack.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api.Stack
+//go:generate minimock -o mocks/mock_ministack.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api.MiniStack
 
 // MiniStack is the interface to missing abilities from terraform that are needed by higher level code
 type MiniStack interface {
@@ -83,19 +83,11 @@ type MiniStack interface {
 	InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error)
 	// ListVolumes list available volumes
 	ListVolumes(context.Context) ([]*abstract.Volume, fail.Error)
-
 	// InspectVolumeAttachment returns the volume attachment identified by id
-	InspectVolumeAttachment(ctx context.Context, serverID, id string) (*abstract.VolumeAttachment, fail.Error)
+	InspectVolumeAttachment(ctx context.Context, hostParam HostIdentifier, volumeParam VolumeIdentifier, attachmentID string) (*abstract.VolumeAttachment, fail.Error)
 	// ListVolumeAttachments lists available volume attachment
-	ListVolumeAttachments(ctx context.Context, serverID string) ([]*abstract.VolumeAttachment, fail.Error)
+	ListVolumeAttachments(ctx context.Context, hostParam HostIdentifier) ([]*abstract.VolumeAttachment, fail.Error)
 
 	// Timings ...
 	Timings() (temporal.Timings, fail.Error)
 }
-
-//
-// // Stack is the interface that MUST actually implement all the providers; don't do it, and we can encounter runtime panics
-// type Stack interface {
-// 	Stack
-// 	ReservedForProviderUse
-// }

@@ -88,7 +88,7 @@ func (instance *stack) InspectVolume(ctx context.Context, ref string) (_ *abstra
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", ref).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%s)", ref).WithStopwatch().Entering().Exiting()
 	// VPL: caller must log; sometimes InspectVolume() returned error is to be considered as an information, not a real error
 	// defer fail.OnExitLogError(&xerr)
 
@@ -194,7 +194,7 @@ func (instance *stack) ListVolumes(ctx context.Context) (_ []*abstract.Volume, f
 		return nil, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network")).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(ctx, &ferr)
 
 	var resp *ec2.DescribeVolumesOutput
@@ -244,7 +244,7 @@ func (instance *stack) DeleteVolume(ctx context.Context, parameter iaasapi.Volum
 		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", volumeLabel).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%s)", volumeLabel).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(ctx, &ferr)
 
 	query := ec2.DeleteVolumeInput{
@@ -264,8 +264,20 @@ func (instance *stack) CreateVolumeAttachment(ctx context.Context, request abstr
 	if valid.IsNil(instance) {
 		return "", fail.InvalidInstanceError()
 	}
+	if ctx == nil {
+		return "", fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if valid.IsNull(request.Volume) {
+		return "", fail.InvalidParameterCannotBeNilError("request.Volume")
+	}
+	if valid.IsNull(request.Host) {
+		return "", fail.InvalidParameterCannotBeNilError("request.Host")
+	}
+	if request.Name == "" {
+		return "", fail.InvalidParameterCannotBeEmptyStringError("request.Name")
+	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", request).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(ctx, &ferr)
 
 	availableDevices := initAvailableDevices()
@@ -276,15 +288,15 @@ func (instance *stack) CreateVolumeAttachment(ctx context.Context, request abstr
 				deviceName string
 				innerXErr  fail.Error
 			)
-			deviceName, availableDevices, innerXErr = instance.findNextAvailableDevice(ctx, request.HostID, availableDevices)
+			deviceName, availableDevices, innerXErr = instance.findNextAvailableDevice(ctx, request.Host.ID, availableDevices)
 			if innerXErr != nil {
 				return innerXErr
 			}
 
 			resp, innerErr = instance.EC2Service.AttachVolume(&ec2.AttachVolumeInput{
 				Device:     aws.String(deviceName), // aws.String(request.Name),
-				InstanceId: aws.String(request.HostID),
-				VolumeId:   aws.String(request.VolumeID),
+				InstanceId: aws.String(request.Host.ID),
+				VolumeId:   aws.String(request.Volume.ID),
 			})
 			return innerErr
 		},
@@ -357,27 +369,30 @@ func (instance *stack) findNextAvailableDevice(ctx context.Context, hostID strin
 }
 
 // InspectVolumeAttachment returns information about a volume attachment
-func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, id string) (_ *abstract.VolumeAttachment, ferr fail.Error) {
-	nilA := abstract.NewVolumeAttachment()
-	if valid.IsNil(instance) {
-		return nilA, fail.InvalidInstanceError()
+// Note: attachmentID is not used in this stack
+func (instance *stack) InspectVolumeAttachment(ctx context.Context, hostParam iaasapi.HostIdentifier, volumeParam iaasapi.VolumeIdentifier, _ string) (*abstract.VolumeAttachment, fail.Error) {
+	if valid.IsNull(instance) {
+		return nil, fail.InvalidInstanceError()
 	}
-	if serverID == "" {
-		return nilA, fail.InvalidParameterError("serverID", "cannot be empty string")
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if id == "" {
-		return nilA, fail.InvalidParameterError("id", "cannot be empty string")
+	abstractHost, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+	abstractVolume, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(volumeParam)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	// VPL: caller MUST log; sometimes, InspectVolumeAttachment returned error may be considered as an information of non-existence, not a real error
-	// defer fail.OnExitLogError(&xerr)
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%s, %s)", volumeLabel, hostLabel).WithStopwatch().Entering().Exiting()
 
 	query := ec2.DescribeVolumesInput{
-		VolumeIds: []*string{aws.String(id)},
+		VolumeIds: []*string{aws.String(abstractVolume.ID)},
 	}
 	var resp *ec2.DescribeVolumesOutput
-	xerr := stacks.RetryableRemoteCall(ctx,
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = instance.EC2Service.DescribeVolumes(&query)
 			return normalizeError(err)
@@ -390,7 +405,7 @@ func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, id
 
 	v := resp.Volumes[0]
 	for _, va := range v.Attachments {
-		if *va.InstanceId == serverID {
+		if *va.InstanceId == abstractHost.ID {
 			return &abstract.VolumeAttachment{
 				Device:   aws.StringValue(va.Device),
 				ServerID: aws.StringValue(va.InstanceId),
@@ -398,30 +413,34 @@ func (instance *stack) InspectVolumeAttachment(ctx context.Context, serverID, id
 			}, nil
 		}
 	}
-	return nil, fail.NotFoundError("volume attachment of volume %s on server %s does not exist", serverID, id)
+	return nil, fail.NotFoundError("volume attachment of volume %s on host %s does not exist", volumeLabel, hostLabel)
 }
 
 // ListVolumeAttachments ...
-func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
-	if valid.IsNil(instance) {
+func (instance *stack) ListVolumeAttachments(ctx context.Context, hostParam iaasapi.HostIdentifier) (_ []*abstract.VolumeAttachment, ferr fail.Error) {
+	if valid.IsNull(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if serverID == "" {
-		return nil, fail.InvalidParameterError("serverID", "cannot be empty string")
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	abstractHost, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", serverID).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
 	query := ec2.DescribeVolumesInput{
 		Filters: []*ec2.Filter{
 			{
 				Name:   aws.String("attachment.instance-id"),
-				Values: []*string{aws.String(serverID)},
+				Values: []*string{aws.String(abstractHost.ID)},
 			},
 		},
 	}
 	var resp *ec2.DescribeVolumesOutput
-	xerr := stacks.RetryableRemoteCall(ctx,
+	xerr = stacks.RetryableRemoteCall(ctx,
 		func() (err error) {
 			resp, err = instance.EC2Service.DescribeVolumes(&query)
 			return normalizeError(err)
@@ -446,27 +465,37 @@ func (instance *stack) ListVolumeAttachments(ctx context.Context, serverID strin
 	return vas, nil
 }
 
-func (instance *stack) Migrate(_ context.Context, _ string, _ map[string]interface{}) (ferr fail.Error) {
-	return nil
-}
+// func (instance *stack) Migrate(_ context.Context, _ string, _ map[string]interface{}) (ferr fail.Error) {
+// 	return nil
+// }
 
 // DeleteVolumeAttachment detach from server 'serverID' the volume 'id'
-func (instance *stack) DeleteVolumeAttachment(ctx context.Context, serverID, id string) (ferr fail.Error) {
+func (instance *stack) DeleteVolumeAttachment(ctx context.Context, hostParam iaasapi.HostIdentifier, volumeParam iaasapi.VolumeIdentifier, _ string) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
-	if serverID == "" {
-		return fail.InvalidParameterError("serverID", "cannot be empty string")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty string")
+	switch volumeParam.(type) {
+	case string:
+		return fail.InvalidParameterError("volumeParam", "must be a '*abstract.Volume'")
+	default:
+	}
+	abstractVolume, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(volumeParam)
+	if xerr != nil {
+		return xerr
+	}
+	abstractHost, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return xerr
 	}
 
-	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s, %s)", serverID, id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(ctx, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%s, %s)", volumeLabel, hostLabel).WithStopwatch().Entering().Exiting()
 
 	query := ec2.DetachVolumeInput{
-		InstanceId: aws.String(serverID),
-		VolumeId:   aws.String(id),
+		InstanceId: aws.String(abstractHost.ID),
+		VolumeId:   aws.String(abstractVolume.ID),
 	}
 	return stacks.RetryableRemoteCall(ctx,
 		func() error {

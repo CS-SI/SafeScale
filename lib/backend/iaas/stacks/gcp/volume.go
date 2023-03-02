@@ -25,8 +25,6 @@ import (
 	iaasapi "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/api"
 	"google.golang.org/api/compute/v1"
 
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
@@ -159,32 +157,6 @@ func (s *stack) ListVolumes(ctx context.Context) ([]*abstract.Volume, fail.Error
 	return out, nil
 }
 
-func (s *stack) rpcListDisks(ctx context.Context) ([]*compute.Disk, fail.Error) {
-	var (
-		out  []*compute.Disk
-		resp *compute.DiskList
-	)
-	for token := ""; ; {
-		xerr := stacks.RetryableRemoteCall(ctx,
-			func() (err error) {
-				resp, err = s.ComputeService.Disks.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
-				return err
-			},
-			normalizeError,
-		)
-		if xerr != nil {
-			return nil, xerr
-		}
-		if resp != nil && len(resp.Items) > 0 {
-			out = append(out, resp.Items...)
-		}
-		if token = resp.NextPageToken; token == "" {
-			break
-		}
-	}
-	return out, nil
-}
-
 // DeleteVolume deletes the volume identified by id
 func (s *stack) DeleteVolume(ctx context.Context, parameter iaasapi.VolumeIdentifier) fail.Error {
 	if valid.IsNil(s) {
@@ -210,17 +182,20 @@ func (s *stack) CreateVolumeAttachment(ctx context.Context, request abstract.Vol
 	if valid.IsNil(s) {
 		return "", fail.InvalidInstanceError()
 	}
-	if request.VolumeID == "" {
-		return "", fail.InvalidParameterCannotBeEmptyStringError("request.VolumeID")
+	if ctx == nil {
+		return "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if request.HostID == "" {
-		return "", fail.InvalidParameterCannotBeEmptyStringError("request.HostID")
+	if valid.IsNull(request.Volume) {
+		return "", fail.InvalidParameterCannotBeNilError("request.Volume")
+	}
+	if valid.IsNull(request.Host) {
+		return "", fail.InvalidParameterCannotBeNilError("request.Host")
 	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	resp, xerr := s.rpcCreateDiskAttachment(ctx, request.VolumeID, request.HostID)
+	resp, xerr := s.rpcCreateDiskAttachment(ctx, request.Volume.ID, request.Host.ID)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -228,21 +203,29 @@ func (s *stack) CreateVolumeAttachment(ctx context.Context, request abstract.Vol
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by id
-func (s *stack) InspectVolumeAttachment(ctx context.Context, hostRef, vaID string) (*abstract.VolumeAttachment, fail.Error) {
-	if valid.IsNil(s) {
+func (s *stack) InspectVolumeAttachment(ctx context.Context, hostParam iaasapi.HostIdentifier, volumeParam iaasapi.VolumeIdentifier, attachmentID string) (*abstract.VolumeAttachment, fail.Error) {
+	if valid.IsNull(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if hostRef == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("hostRef")
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if vaID == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("vaID")
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+	_, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(volumeParam)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if attachmentID = strings.TrimSpace(attachmentID); attachmentID == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("attachmentID")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", hostRef, vaID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s, *s)", volumeLabel, hostLabel, attachmentID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	serverID, diskID := extractFromAttachmentID(vaID)
+	serverID, diskID := extractFromAttachmentID(attachmentID)
 	instance, xerr := s.rpcGetInstance(ctx, serverID)
 	if xerr != nil {
 		return nil, xerr
@@ -262,107 +245,60 @@ func (s *stack) InspectVolumeAttachment(ctx context.Context, hostRef, vaID strin
 		}
 	}
 
-	return nil, abstract.ResourceNotFoundError("attachment", vaID)
-}
-
-func (s *stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if operation == "tags" {
-		// delete current nat route (is it really necessary ?)
-		routeName := params["subnetName"].(string) + "-nat-allowed"
-		xerr := s.rpcDeleteRoute(ctx, routeName)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				break
-			default:
-				return xerr
-			}
-		}
-
-		// create new nat route
-		_, xerr = s.rpcCreateRoute(ctx, params["networkName"].(string), params["subnetID"].(string), params["subnetName"].(string))
-		if xerr != nil {
-			return xerr
-		}
-
-		return nil
-	}
-
-	if operation == "removetag" {
-		subnetInstance, ok := params["subnetInstance"].(*resources.Subnet)
-		if !ok {
-			return fail.InvalidParameterError("subnetInstance", "should be resources.Subnet")
-		}
-		instance, ok := params["instance"].(*resources.Host)
-		if !ok {
-			return fail.InvalidParameterError("instance", "should be *resources.Host")
-		}
-
-		hid, err := instance.GetID()
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		networkInstance, xerr := subnetInstance.InspectNetwork(context.Background())
-		if xerr != nil {
-			return xerr
-		}
-
-		nid, err := networkInstance.GetID()
-		if err != nil {
-			return fail.Wrap(err)
-		}
-
-		// remove old nat route tag
-		xerr = s.rpcRemoveTagsFromInstance(ctx, hid, []string{"no-ip-" + subnetInstance.GetName()})
-		if xerr != nil {
-			return xerr
-		}
-
-		// add new nat route tag
-		xerr = s.rpcAddTagsToInstance(ctx, hid, []string{fmt.Sprintf(NATRouteTagFormat, nid)})
-		if xerr != nil {
-			return xerr
-		}
-
-		return nil
-	}
-
-	return nil
+	return nil, abstract.ResourceNotFoundError("attachment", attachmentID)
 }
 
 // DeleteVolumeAttachment ...
-func (s *stack) DeleteVolumeAttachment(ctx context.Context, serverRef, vaID string) fail.Error {
-	if valid.IsNil(s) {
+func (s *stack) DeleteVolumeAttachment(ctx context.Context, hostParam iaasapi.HostIdentifier, volumeParam iaasapi.VolumeIdentifier, attachmentID string) fail.Error {
+	if valid.IsNull(s) {
 		return fail.InvalidInstanceError()
 	}
-	if vaID == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	_, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return xerr
+	}
+	switch volumeParam.(type) {
+	case string:
+		return fail.InvalidParameterError("volumeParam", "must be an '*abstract.Volume'")
+	default:
+	}
+	_, volumeLabel, xerr := iaasapi.ValidateVolumeIdentifier(volumeParam)
+	if xerr != nil {
+		return xerr
+	}
+	attachmentID = strings.TrimSpace(attachmentID)
+	if attachmentID == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("attachmentID")
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverRef, vaID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", hostLabel, volumeLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return s.rpcDeleteDiskAttachment(ctx, vaID)
+	return s.rpcDeleteDiskAttachment(ctx, attachmentID)
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s *stack) ListVolumeAttachments(ctx context.Context, serverRef string) ([]*abstract.VolumeAttachment, fail.Error) {
+func (s *stack) ListVolumeAttachments(ctx context.Context, hostParam iaasapi.HostIdentifier) ([]*abstract.VolumeAttachment, fail.Error) {
 	if valid.IsNil(s) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if serverRef == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("serverRef")
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	abstractHost, hostLabel, xerr := iaasapi.ValidateHostIdentifier(hostParam)
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", serverRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", hostLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var vats []*abstract.VolumeAttachment
 
-	instance, xerr := s.rpcGetInstance(ctx, serverRef)
+	instance, xerr := s.rpcGetInstance(ctx, abstractHost.ID)
 	if xerr != nil {
 		return nil, xerr
 	}
