@@ -77,7 +77,7 @@ func DefaultTCPRules(sshPort int32) []abstract.SecurityGroupRule {
 			// PortTo:      sshPort,
 			EtherType: ipversion.IPv6,
 			Protocol:  "tcp",
-			Targets:   []string{"::/0"},
+			Targets:   []string{"::0/0"},
 		},
 
 		// Egress: allow everything
@@ -97,7 +97,7 @@ func DefaultTCPRules(sshPort int32) []abstract.SecurityGroupRule {
 			PortTo:      65535,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "tcp",
-			Targets:     []string{"::/0"},
+			Targets:     []string{"::0/0"},
 		},
 	}
 }
@@ -123,7 +123,7 @@ func DefaultUDPRules() []abstract.SecurityGroupRule {
 			PortTo:      65535,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "udp",
-			Targets:     []string{"::/0"},
+			Targets:     []string{"::0/0"},
 		},
 	}
 }
@@ -145,7 +145,7 @@ func DefaultICMPRules() []abstract.SecurityGroupRule {
 			Direction:   securitygroupruledirection.Ingress,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
-			Targets:     []string{"::/0"},
+			Targets:     []string{"::0/0"},
 		},
 		// Outbound = egress == going to Outside
 		{
@@ -160,7 +160,7 @@ func DefaultICMPRules() []abstract.SecurityGroupRule {
 			Direction:   securitygroupruledirection.Egress,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
-			Targets:     []string{"::/0"},
+			Targets:     []string{"::0/0"},
 		},
 	}
 }

@@ -11,15 +11,12 @@ resource "openstack_networking_secgroup_v2" "{{ .Resource.Name }}" {
 
 	lifecycle {
 		ignore_changes = [delete_default_rules]
-    }
+	}
 }
 
 output "sg_{{ .Resource.Name }}" {
 	value = "${openstack_networking_secgroup_v2.{{ .Resource.Name }}}"
 	sensitive = true
-}
-output "sg_{{ .Resource.Name }}_id" {
-	value = "${openstack_networking_secgroup_v2.{{ .Resource.Name }}.id}"
 }
 
 {{    $rsc := .Resource }}
@@ -57,6 +54,6 @@ output "sg_{{ $rsc.Name }}_rule_{{ $k }}_{{ $i }}_id" {
 	value = "${openstack_networking_secgroup_rule_v2.{{ $rsc.Name }}_rule_{{ $k }}_{{ $i }}.id}"
 }
 
-{{      end }}
+{{-     end }}
 {{-   end }}
 {{- end }}
