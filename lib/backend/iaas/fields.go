@@ -66,6 +66,10 @@ var computeField = []string{
 	"Service",
 	"WhitelistTemplateRegexp",
 	"DNSList",
+	"S3",
+	"EC2",
+	"SSM",
+	"MaxLifetimeInHours",
 }
 
 var Networkfield = []string{

@@ -1399,6 +1399,56 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
+	key = "S3"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); ok {
+			_, err = url.ParseRequestURI(val)
+
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid url", key, "compute"))
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "compute", key))
+		}
+	}
+
+	key = "EC2"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); ok {
+			_, err = url.ParseRequestURI(val)
+
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid url", key, "compute"))
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "compute", key))
+		}
+	}
+
+	key = "SSM"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); ok {
+			_, err = url.ParseRequestURI(val)
+
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid url", key, "compute"))
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "compute", key))
+		}
+	}
+
+	key = "MaxLifetimeInHours"
+
+	if maybe, ok = compute[key]; ok {
+		if _, ok := maybe.(uint); !ok {
+			errors = append(errors, fail.SyntaxError("%s in %s section must be an unsigned int", key, "compute"))
+		}
+	}
+
 	xerr = checkSection(identity, IdentityField)
 
 	if xerr != nil {
