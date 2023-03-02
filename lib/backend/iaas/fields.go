@@ -33,6 +33,8 @@ var IdentityField = []string{
 	"DomainID",
 	"IdentityEndpoint",
 	"TokenID",
+	"Endpoint",
+	"provider",
 
 	// Google specific
 	"ProjectNumber",
@@ -70,12 +72,23 @@ var computeField = []string{
 	"EC2",
 	"SSM",
 	"MaxLifetimeInHours",
+	"Safe",
+	"ConcurrentMachineCreationLimit",
+	"TenantName",
+	"TenantID",
+	"URL",
+	"Service",
+	"DefaultTenancy",
 }
 
 var Networkfield = []string{
 	"ProviderNetwork",
 	"VPCCIDR",
 	"VPCName",
+	"FloatingIPPool",
+	"DefaultNetworkName",
+	"DefaultNetworkCIDR",
+	"ExternalNetwork",
 }
 
 var OStorageField = []string{
@@ -97,6 +110,7 @@ var OStorageField = []string{
 	"Type",
 	"Username",
 	"ApplicationKey",
+	"Suffix",
 }
 
 var MetadataField = []string{
@@ -118,4 +132,6 @@ var MetadataField = []string{
 	"Username",
 	"CryptKey",
 	"MetadataBucketName",
+	"Suffix",
+	"Bucket",
 }
