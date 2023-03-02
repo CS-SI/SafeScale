@@ -9,6 +9,6 @@
 
     [tenants.compute]
         Region="eu-west-2" #only alphanumeric (with -) is valid
-        Subregion="eu-west-2a" #only alphanumeric (with -) is valid
+        Subregion= 3 #only alphanumeric (with -) is valid
         Service="api"
         DefaultVolumeSpeed="HDD"

@@ -1,0 +1,22 @@
+[[tenants]]
+name = "Tenant with wrong fields type"
+client = "cloudferro"
+
+[tenants.identity]
+Username = "test"
+ApplicationKey = "1.2.3.4"
+SecretKey = "AZERTYUIOP"
+
+[tenants.compute]
+AvailabilityZone = "1.2.3.4"
+Region = "azert/yuiop"
+WhitelistTemplateRegexp = "["
+
+[tenants.network]
+
+[tenants.objectstorage]
+Type = "s3"
+Endpoint = "test@example.com"
+
+[tenants.metadata]
+MetadataBucketName = "1234567890......."

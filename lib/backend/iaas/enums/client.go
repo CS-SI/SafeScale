@@ -14,6 +14,7 @@ const (
 	Local
 	OpenStack
 	Outscale
+	OpenTelekom
 )
 
 var (
@@ -27,6 +28,7 @@ var (
 		"local":          Local,
 		"openstack":      OpenStack,
 		"outscale":       Outscale,
+		"opentelekom":    OpenTelekom,
 	}
 
 	clientEnumMap = map[Client]string{
@@ -39,6 +41,7 @@ var (
 		Local:          "Local",
 		OpenStack:      "OpenStack",
 		Outscale:       "Outscale",
+		OpenTelekom:    "Opentelekom",
 	}
 )
 
