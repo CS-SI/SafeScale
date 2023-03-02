@@ -42,6 +42,9 @@ func (p *provider) CreateVolume(ctx context.Context, request abstract.VolumeRequ
 	if valid.IsNil(p) {
 		return nil, fail.InvalidInstanceError()
 	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
 
 	tracer := debug.NewTracer(ctx, tracing.ShouldTrace("provider.ovhtf") || tracing.ShouldTrace("providers.volume"), "(%s)", request.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -59,8 +62,17 @@ func (p *provider) CreateVolume(ctx context.Context, request abstract.VolumeRequ
 		return nil, xerr
 	}
 
+	cfg, xerr := p.ConfigurationOptions()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// Pass information to terraformer that we are in creation process
-	xerr = abstractVolume.AddOptions(abstract.MarkForCreation())
+	xerr = abstractVolume.AddOptions(
+		abstract.MarkForCreation(),
+		abstract.WithExtraData("Attachments", map[string]string{}),
+		abstract.WithExtraData("VolumeTypes", cfg.VolumeTypes),
+	)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -300,7 +312,7 @@ func (p *provider) CreateVolumeAttachment(ctx context.Context, request abstract.
 		return "", fail.Wrap(xerr, "failed to recover volume attachment id")
 	}
 
-	logrus.Infoln("Created Volume attachment '%s' successfully", request.Name)
+	logrus.Infof("Created Volume attachment '%s' successfully", request.Name)
 	return volAttachID, nil
 }
 

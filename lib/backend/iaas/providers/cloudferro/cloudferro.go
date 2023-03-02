@@ -193,6 +193,11 @@ next:
 			"Hdd": volumespeed.Hdd,
 			"Ssd": volumespeed.Ssd,
 		},
+		VolumeTypes: map[volumespeed.Enum]string{
+			volumespeed.Cold: "Hdd",
+			volumespeed.Hdd:  "Hdd",
+			volumespeed.Ssd:  "Ssd",
+		},
 		MetadataBucketName:             metadataBucketName,
 		DNSServers:                     cloudferroDNSServers,
 		DefaultImage:                   defaultImage,

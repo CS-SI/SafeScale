@@ -217,8 +217,13 @@ next:
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,
 		VolumeSpeeds: map[string]volumespeed.Enum{
-			"SATA": volumespeed.Cold,
+			"SATA": volumespeed.Hdd,
 			"Ssd":  volumespeed.Ssd,
+		},
+		VolumeTypes: map[volumespeed.Enum]string{
+			volumespeed.Cold: "SATA",
+			volumespeed.Hdd:  "SATA",
+			volumespeed.Ssd:  "Ssd",
 		},
 		MetadataBucketName:       metadataBucketName,
 		OperatorUsername:         operatorUsername,

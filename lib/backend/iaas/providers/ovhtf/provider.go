@@ -292,6 +292,11 @@ next:
 			"classic":    volumespeed.Cold,
 			"high-speed": volumespeed.Hdd,
 		},
+		VolumeTypes: map[volumespeed.Enum]string{
+			volumespeed.Cold: "classic",
+			volumespeed.Hdd:  "high-speed",
+			volumespeed.Ssd:  "high-speed",
+		},
 		MetadataBucketName:       metadataBucketName,
 		OperatorUsername:         operatorUsername,
 		ProviderName:             providerName,

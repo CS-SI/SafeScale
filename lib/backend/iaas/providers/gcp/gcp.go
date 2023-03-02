@@ -217,6 +217,11 @@ next:
 			"standard":   volumespeed.Cold,
 			"performant": volumespeed.Hdd,
 		},
+		VolumeTypes: map[volumespeed.Enum]string{
+			volumespeed.Cold: "standard",
+			volumespeed.Hdd:  "performant",
+			volumespeed.Ssd:  "performant",
+		},
 		MetadataBucketName:             metadataBucketName,
 		DefaultImage:                   defaultImage,
 		OperatorUsername:               operatorUsername,

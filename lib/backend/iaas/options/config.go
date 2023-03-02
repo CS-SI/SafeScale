@@ -53,6 +53,9 @@ type Configuration struct {
 	// VolumeSpeeds map volume types with volume speeds
 	VolumeSpeeds map[string]volumespeed.Enum
 
+	// VolumeTypes map volume speeds to provider volume types
+	VolumeTypes map[volumespeed.Enum]string
+
 	// DefaultImage names the image to use when not specified by the user
 	DefaultImage string
 

@@ -427,7 +427,7 @@ func (subnetTrx *subnetTransactionImpl) createGWSecurityGroup(ctx context.Contex
 			PortFrom:    defaultSSHPort,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "tcp",
-			Sources:     []string{"::/0"},
+			Sources:     []string{"::0/0"},
 			Targets:     []string{sgid},
 		},
 		{
@@ -443,7 +443,7 @@ func (subnetTrx *subnetTransactionImpl) createGWSecurityGroup(ctx context.Contex
 			Direction:   securitygroupruledirection.Ingress,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
-			Sources:     []string{"::/0"},
+			Sources:     []string{"::0/0"},
 			Targets:     []string{sgid},
 		},
 	}
@@ -464,7 +464,7 @@ func (subnetTrx *subnetTransactionImpl) createGWSecurityGroup(ctx context.Contex
 				PortFrom:    22,
 				EtherType:   ipversion.IPv6,
 				Protocol:    "tcp",
-				Sources:     []string{"::/0"},
+				Sources:     []string{"::0/0"},
 				Targets:     []string{sgid},
 			},
 		}

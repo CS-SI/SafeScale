@@ -7,18 +7,20 @@
 resource "openstack_blockstorage_volume_v2" "{{ .Resource.Name }}" {
 	provider          = openstack.ovh
 	name              = "{{ .Resource.Name }}"
-	description       = "{{ .Resource.Description }}"
 	size              = {{ .Resource.Size }}
 	region            = "{{ .Provider.Authentication.Region }}"
 	availability_zone = "{{ $az }}"
-	tenant_id         = "{{ .Provider.Authentication.TenantID }}"
-	volume_type       = "{{ .Resource.Speed }}"
+	volume_type       = "{{ index $extra.VolumeTypes .Resource.Speed }}"
 
 	metadata = {
 {{-   range $t, $v := .Resource.Tags }}
 		{{ $t }} = "{{ $v }}"
 {{-   end }}
-    }
+	}
+
+	lifecycle {
+		ignore_changes = [ volume_type ]
+	}
 }
 
 output "volume_{{ .Resource.Name }}_id" {
@@ -31,7 +33,6 @@ resource "openstack_compute_volume_attach_v2" "volume_{{ .Resource.Name }}_host_
 	instance_id = "{{ $k }}"
 	volume_id   = ${openstack_blockstorage_volume_v2.{{ .Resource.Name }}.id}
 	region      = "{{ .Provider.Authentication.Region }}"
-	tenant_id   = "{{ .Provider.Authentication.TenantID }}"
 }
 
 output "volume_{{ .Resource.Name }}_host_{{ $v }}_id" {

@@ -193,6 +193,11 @@ next:
 			"SAS":  volumespeed.Hdd,
 			"Ssd":  volumespeed.Ssd,
 		},
+		VolumeTypes: map[volumespeed.Enum]string{
+			volumespeed.Cold: "SATA",
+			volumespeed.Hdd:  "SAS",
+			volumespeed.Ssd:  "Ssd",
+		},
 		MetadataBucketName:             metadataBucketName,
 		OperatorUsername:               operatorUsername,
 		ProviderName:                   providerName,
