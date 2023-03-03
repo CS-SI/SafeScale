@@ -132,11 +132,11 @@ Each entry defines a tenant, using the field `name` to identify it, and the fiel
 
 Inside a `[[tenants]]` item, you can have these sections :
 
-- `[tenants.identity]`
-- `[tenants.compute]`
-- `[tenants.network]`
-- `[tenants.objectstorage]`
-- `[tenants.metadata]`
+- `[tenants.identity]` : MANDATORY
+- `[tenants.compute]` : MANDATORY
+- `[tenants.network]` : OPTIONAL
+- `[tenants.objectstorage]` : OPTIONAL
+- `[tenants.metadata]` : OPTIONAL
 
 In the description of sections hereafter, each keyword is annotated with these tags:
 
@@ -157,90 +157,106 @@ Combinations are possible :
 
 The valid keywords in this section are :
 
-> | keyword     | presence    |
-> | --- | --- |
-> | `AccessKey` | MANDATORY, CLIENT |
-> | `ApplicationKey` | MANDATORY, CLIENT |
-> | `OpenstackID` | MANDATORY, CLIENT |
-> | `OpenstackPassword` | MANDATORY, CLIENT |
-> | `Password` | MANDATORY, CLIENT |
-> | `SecretKey` | MANDATORY, CLIENT |
-> | `Username` | MANDATORY, CLIENT |
-> | `AlternateApiApplicationKey` | OPTIONAL, CLIENT |
-> | `AlternateApiApplicationSecret` | OPTIONAL, CLIENT |
-> | `AlternateApiConsumerKey` | OPTIONAL, CLIENT |
+> | keyword                         | presence          | client                                |
+> |---------------------------------|-------------------|---------------------------------------|
+> | `AccessKey`                     | MANDATORY, CLIENT | outscale                              |
+> | `ApplicationKey`                | MANDATORY, CLIENT | ovh                                   |
+> | `OpenstackID`                   | MANDATORY, CLIENT | ovh                                   |
+> | `OpenstackPassword`             | MANDATORY, CLIENT | ovh                                   |
+> | `Password`                      | MANDATORY, CLIENT | all providers except ooutscal and ovh |
+> | `SecretKey`                     | MANDATORY, CLIENT | outscale                              |
+> | `Username`                      | MANDATORY, CLIENT | all providers except ooutscal and ovh |
+> | `AlternateApiApplicationKey`    | OPTIONAL, CLIENT  | ovh                                   |
+> | `AlternateApiApplicationSecret` | OPTIONAL, CLIENT  | ovh                                   |
+> | `AlternateApiConsumerKey`       | OPTIONAL, CLIENT  | ovh                                   |
+> | `UserID`                        | MANDATORY, CLIENT | outscale                              | 
+> | `AccessKeyID`                   | MANDATORY, CLIENT | aws                                   |
+> | `SecretAccessKey`               | MANDATORY, CLIENT | aws                                   |
+> | `IdentityEndpoint`              | MANDATORY, CLIENT | openstack                             |
+> | `auth_uri`                      | MANDATORY, CLIENT | gcp                                   |
+> | `DomainNAme`                    | MANDATORY, CLIENT | cloudferro, flexibleengine            |
+> | `Endpoint`                      | MANDATORY, CLIENT | flexibleengine                        | 
+> | `project_id`                    | MANDATORY, CLIENT | gcp                                   |
+> | `private_key_id`                | MANDATORY, CLIENT | gcp                                   |
+> | `private_key`                   | MANDATORY, CLIENT | gcp                                   |
+> | `client_email`                  | MANDATORY, CLIENT | gcp                                   |
+> | `toekn_uri`                     | MANDATORY, CLIENT | gcp                                   |
+> | `auth_provider_x509_cert_url`   | MANDATORY, CLIENT | gcp                                   |
+> | `client_x509_cert_url`          | MANDATORY, CLIENT | gcp                                   |
 
 ### Section ``[tenants.compute]``
 
 The valid keywords in this section are :
 
-> | keyword     | presence    |
-> | --- | --- |
-> | `DefaultImage` | OPTIONAL |
-> | `Domain` | OPTIONAL, CLIENT |
-> | `DomainName` | OPTIONAL, CLIENT |
-> | `ProjectName` | OPTIONAL, CLIENT |
-> | `ProjectID` | OPTIONAL, CLIENT |
-> | `Region` | MANDATORY |
-> | `AvailabilityZone` | MANDATORY |
-> | `DNS` | OPTIONAL |
-> | `Scannable` | OPTIONAL |
-> | `OperatorUsername` | OPTIONAL |
-> | `Owners` | OPTIONAL |
+> | keyword                          | presence          | client                         |
+> |----------------------------------|-------------------|--------------------------------|
+> | `DefaultImage`                   | OPTIONAL, CLIENT  | all except ovh                 |
+> | `ProjectName`                    | OPTIONAL, CLIENT  | aws, cloudferro, gcp, ovh      |
+> | `ProjectID`                      | OPTIONAL, CLIENT  | aws, flexibleengine, gcp       |
+> | `Region`                         | MANDATORY         | all                            |
+> | `AvailabilityZone`               | MANDATORY, CLIENT | flexibleengine, openstack, ovh |
+> | `DNS`                            | OPTIONAL          | all                            |
+> | `Scannable`                      | OPTIONAL, CLIENT  | ovh                            |
+> | `OperatorUsername`               | OPTIONAL          | all                            |
+> | `Owners`                         | OPTIONAL, CLIENT  | aws                            |
+> | `MaxLiftimeInHours`              | OPTIONAL          | all                            |
+> | `ConcurrentMachineCreationLimit` | OPTIONAL          | all                            |
+> | `Safe`                           | OPTIONAL          | all                            |
+> | `Zone`                           | MANDATORY, CLIENT | gcp, aws                       |
+> | `TenantName`                     | OPTIONAL, CLIENT  | openstack                      |
+> | `TenantID`                       | OPTIONAL, CLIENT  | openstack                      |
+> | `URL`                            | OPTIONAL, CLIENT  | outscale                       |
+> | `Service`                        | MANDATORY, CLIENT | outscale                       |
+> | `Subregion`                      | MANDATORY, CLIENT | outscale                       |
+> | `DefaultTenancy`                 | OPTIONAL, CLIENT  | outscale                       |
+> | `DefaultVolumeSpeed`             | OPTIONAL, CLIENT  | outscale                       |
+> | `S3`                             | OPTIONAL, CLIENT  | aws                            |
+> | `EC2`                            | OPTIONAL, CLIENT  | aws                            |
+> | `SSM`                            | OPTIONAL, CLIENT  | aws                            |
 
 ### Section ``[tenants.network]``
 
 The valid keywords in this section are :
 
-> | keyword     | presence    |
-> | --- | --- |
-> | `ProviderNetwork` | OPTIONAL, CLIENT |
-> | `VPCCIDR` | OPTIONAL, CLIENT |
-> | `VPCName` | OPTIONAL, CLIENT |
+> | keyword              | presence         | client                        |
+> |----------------------|------------------|-------------------------------|
+> | `ProviderNetwork`    | OPTIONAL, CLIENT | cloudferro, gcp, ovh          |
+> | `VPCCIDR`            | OPTIONAL, CLIENT | flexibleengine, gcp, outscale |  
+> | `VPCName`            | OPTIONAL, CLIENT | flexibleengine, gcp, outscale | 
+> | `FloatingIPPool`     | OPTIONAL, CLIENT | cloudferro, openstack         |
+> | `DefaultNetworkName` | OPTIONAL, CLIENT | flexibleengine, outscale      |
+> | `DefaultNetworkCIDR` | OPTIONAL, CLIENT | flexibleengine, outscale      |
+> | `ExternalNetwork`    | OPTIONAL, CLIENT | openstack                     |
 
 ### Section ``[tenants.objectstorage]``
 
 The valid keywords in this section are :
 
-> | keyword     | presence    |
-> | --- | --- |
-> | `AccessKey` | MANDATORY, INHERIT |
-> | `AuthURL` | OPTIONAL, CLIENT |
-> | `Domain` | OPTIONAL, CLIENT |
-> | `DomainName` | OPTIONAL, CLIENT |
-> | `Endpoint` | OPTIONAL, CLIENT |
-> | `OpenstackPassword` | MANDATORY, INHERIT |
-> | `ProjectID` | OPTIONAL, CLIENT |
-> | `ProjectName` | OPTIONAL, CLIENT |
-> | `Password` | MANDATORY, INHERIT |
-> | `Region` | OPTIONAL, INHERIT |
-> | `AvailabilityZone` | OPTIONAL, INHERIT |
-> | `SecretKey` | MANDATORY, INHERIT |
-> | `Tenant` | OPTIONAL, CLIENT |
-> | `Type` | MANDATORY |
-> | `Username` | MANDATORY, INHERIT |
+> | keyword       | presence                   | client                        |
+> |---------------|----------------------------|-------------------------------|
+> | `AccessKey`   | MANDATORY, CLIENT, INHERIT | aws, flexibleengine, outscale |
+> | `AuthURL`     | OPTIONAL, CLIENT           | openstack, ovh                |
+> | `Endpoint`    | OPTIONAL, CLIENT           | flexibleengine                |
+> | `Region`      | OPTIONAL, CLIENT, INHERIT  | gcp, ovh                      |
+> | `SecretKey`   | MANDATORY, CLIENT, INHERIT | aws, flexibleengine, outscale |
+> | `Type`        | MANDATORY                  | all                           |
+> | `Endpoint`    | MANDATORY, CLIENT          | flexibleengine, outscale      |
+> | `ProjectName` | OPTIONAL, CLIENT           | openstack, ovh                |
+> | `Suffix`      | OPTIONAL                   | all                           |
 
 ### Section [tenants.metadata]
 
 The valid keywords in this section are :
 
-> | keyword     | presence    |
-> | --- | --- |
-> | `AccessKey` | MANDATORY, INHERIT |
-> | `AuthURL` | OPTIONAL, CLIENT, INHERIT |
-> | `DomainName` | OPTIONAL, CLIENT, INHERIT |
-> | `Endpoint` | OPTIONAL, CLIENT, INHERIT |
-> | `Domain` | OPTIONAL, CLIENT, INHERIT |
-> | `OpenstackPassword` | MANDATORY, INHERIT |
-> | `ProjectID` | OPTIONAL, CLIENT, INHERIT |
-> | `ProjectName` | OPTIONAL, CLIENT, INHERIT |
-> | `Password` | MANDATORY, INHERIT |
-> | `Region` | OPTIONAL, INHERIT |
-> | `AvailabilityZone` | OPTIONAL, INHERIT |
-> | `SecretKey` | MANDATORY, INHERIT |
-> | `Tenant` | OPTIONAL, CLIENT, INHERIT |
-> | `Type`| MANDATORY, INHERIT |
-> | `Username` | MANDATORY, INHERIT |
+> | keyword     | presence                          | client        |
+> |-------------|-----------------------------------|---------------|
+> | `AccessKey` | MANDATORY, CLIENT, INHERIT        | aws, outscale |
+> | `Endpoint`  | OPTIONAL, CLIENT, CLIENT, INHERIT | outscale      |
+> | `SecretKey` | MANDATORY, CLIENT, INHERIT        | aws, outscale |
+> | `Type`      | MANDATORY, INHERIT                | all           |
+> | `CryptKey`  | OPTIONAL , CLIENT                 | outscale, ovh |
+> | `Bucket`    | OPTIONAL, CLIENT                  | outscale      |
+> | `Suffix`    | OPTIONAL                          | all           |
 
 <br>
 
@@ -258,15 +274,15 @@ It defines the "driver" to communicate with the provider. Valid values are:
 > | --- |
 > | `"aws"` |
 > | `"cloudferro"` |
-> | `"ebrc"` |
 > | `"flexibleengine"` |
 > | `"gcp"` |
-> | `"local"` |
 > | `"openstack"` |
 > | `"outscale"` |
 > | `"ovh"` |
 
 ### AccessKey: alias, see [`Username`](#Username)
+
+### AccessKeyID: alias, see [`Username`](#Username)
 
 ### `AlternateApiApplicationKey`
 
@@ -285,6 +301,9 @@ Contains OVH api consumer key, who have to be previously validated (see [First S
 
 ### `ApplicationKey`
 
+Only available on `OVH`.<br>
+Contains OVH API application key (see [First Steps with OVH API](https://docs.ovh.com/gb/en/customer/first-steps-with-ovh-api/))
+
 ### `AuthURL`
 
 Contains the URL used to authenticate.<br>
@@ -297,6 +316,37 @@ Is mandatory in `tenants.compute`
 May be used in `tenants.objectstorage` and `tenants.metadata`.
 If the AvailabilityZone is empty in `tenants.metadata`, safescale searches for valid values in `tenants.objectstorage`, then in `tenants.compute` (where is mandatory)
 
+### `Bucket`
+
+Contain the name of the bucket to use to store metadata.
+
+### `ConcurrentMachineCreationLimit`
+
+Contains the maximum number of machines that can be created concurrently.
+
+### `CryptKey`
+
+Contains the key used to encrypt the metadata.
+
+### `DefaultImage`
+
+Contains the name of the image to use by default.
+
+### `DefaultNetworkCIDR`
+
+Contains the CIDR of the default network.
+
+### `DefaultNetworkName`
+
+Contains the name of the default network.
+
+### `DefaultVolumeSpeed`
+
+Contains the type of volume to use by default.
+Value :
+    - "HDD" : for HDD volume
+    - "SSD" : for SSD volume
+
 ### `DNS`
 
 Contains a list of IP addresses of DNS servers separated by commas.
@@ -308,10 +358,30 @@ May be used in every section.
 
 ### `DomainName`: alias, see [`Domain`](#Domain)
 
+### `EC2`
+
+Contains the EC2 endpoint to use.
+
 ### `Endpoint`
 
 Contains the URL of the Object Storage backend to use.<br>
 May be used in sections `tenants.objectstorage` and `tenants.metadata`, especially when `Type` == `"s3"`.
+
+### `ExternalNetwork`
+
+Contains the name of the external network connected host resources to public network.
+
+### `FloatingIPPool`
+
+Contains the name of the floating IP pool to use.
+
+### `IdentityEndpoint`
+
+Contains the URL of the Identity backend to use.
+
+### `MaxLifeTimeInHours`
+
+Contains the maximum lifetime of a machine in hours.
 
 ### `OpenstackID`: alias, see [`Username`](#Username)
 
@@ -328,17 +398,16 @@ May be used in sections `tenants.identity`, `tenants.objectstorage` and `tenants
 
 ### `ProjectID`
 
+Contains the project ID to connect to.
+
 ### `ProjectName`
+
+Contains the project name to connect to.
 
 ### `ProviderNetwork`
 
 Contains the name of the provider network connected host resources to public network.<br>
-Is meaningful for some providers:
 
-> | |
-> | --- |
-> | `ovh` |
->
 ### `Region`
 
 Contains the region to connect to. Values depend on provider.<br>
@@ -346,11 +415,53 @@ Is mandatory in `tenants.compute`
 May be used in `tenants.objectstorage` and `tenants.metadata`.
 If the Region is empty in `tenants.metadata`, safescale searches for valid values in `tenants.objectstorage`, then in `tenants.compute` (where is mandatory)
 
+### `S3`
+
+Contains the S3 endpoint to use.
+
+### `Safe`
+
+If set to true, the tenant will be protected from deletion.
+
 ### `Scannable`
 
 If set to true, allow the scanner to scan the tenant ([cf. SCANNER](SCANNER.md))
 
+### `SecretAccessKey` : alias, see [`Password`](#Password)
+
 ### `SecretKey`: alias, see [Password](#Password)
+
+### `Service`
+
+Contains the name of the service to use.
+
+### `SSM`
+
+Contains the SSM endpoint to use.
+
+### `Subregion`
+
+Contains the subregion to connect to.
+
+### `Suffix`
+
+Contains the suffix to use for the tenant.
+
+### `TenantID`
+
+Contains the tenant ID to connect to.
+
+### `TenantName`
+
+Contains the tenant name to connect to.
+
+### `URL`
+
+Contains the URL of the provider to connect to.
+
+### `UserID`
+
+Contains the user ID to connect to.
 
 ### `Username`
 
@@ -363,38 +474,29 @@ It (or one of its aliases) must be present in section `tenants.identity`, and ma
 Only for AWS, optional.
 Contains the comma-separated list of AMI Owners that will be used for AMI image search/selection.
 
-### `Tenant`
-
 ### `Type`
 
 Allows to specify the type of Object Storage protocol.<br>
 Valid values are:
 
-> | | |
-> | --- | --- |
-> | `"s3"` | S3 protocol as proposed by AWS or tools like minio |
+> | value     | description                                                  |
+> |-----------|--------------------------------------------------------------|
+> | `"s3"`    | S3 protocol as proposed by AWS or tools like minio           |
 > | `"swift"` | SwiftKS protocol proposed by OpenStack Cloud implementations |
-> | `"azure"` | Azure protocol (not tested) |
-> | `"gce"` | Google GCE protocol |
+> | `"azure"` | Azure protocol (not tested)                                  |
+> | `"gce"`   | Google GCE protocol                                          |
 
 ### `VPCCIDR`
 
-Contains the name of the VPC where networks will be created. If the VPC doesn't exist, will be created.<br>
-Is meaningful for some drivers only:
-
-> | |
-> | --- |
-> | `flexibleengine` |
+Contains the name of the VPC where networks will be created. If the VPC doesn't exist, will be created.
 
 ### `VPCName`
 
-Contains the CIDR of the VPC where networks will be created.<br>
-Is meaningful for some drivers only:
+Contains the CIDR of the VPC where networks will be created.
 
-> | |
-> | --- |
-> | `flexibleengine` |
+### `Zone`
 
+Contains the zone to connect to.
 
 ### GCP-specific
 
