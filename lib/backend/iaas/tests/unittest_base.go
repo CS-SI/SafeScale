@@ -29,7 +29,6 @@ import (
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/gcp"            // Imported to initialize tenant gcp
-	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekom
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/outscale"       // Imported to initialize tenant outscale
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/ovh"            // Imported to initialize tenant ovh
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"

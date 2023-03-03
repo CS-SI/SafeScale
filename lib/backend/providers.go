@@ -25,7 +25,6 @@ import (
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/flexibleengine" // Imported to initialize tenants
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/gcp"            // Imported to initialize tenants
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/openstack"      // Imported to initialize tenants
-	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/opentelekom"    // Imported to initialize tenants
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/outscale"       // Imported to initialize tenants
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/ovh"            // Imported to initialize tenants
 )
