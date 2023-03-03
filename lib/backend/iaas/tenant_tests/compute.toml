@@ -1,6 +1,6 @@
 [[tenants]]
     name = "Test with tenant without compute section"
-    client = "local"
+    client = "aws"
 
 [tenants.identity]
 AccessKey = "1234567890"

@@ -1,5 +1,5 @@
 [[tenants]]
-    client = "local"
+    client = "aws"
 
     [tenants.identity]
     AccessKey = "1234567890"
