@@ -1,6 +1,6 @@
 [[tenants]]
     name = "Test with Tenant without user"
-    client = "local"
+    client = "aws"
 
 [tenants.identity]
 SecretKey = "1234567890"
