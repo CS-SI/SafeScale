@@ -8,13 +8,13 @@ const (
 	OVH Client = iota
 	AWS
 	Cloudferro
-	Ebrc
+	_
 	FlexibleEngine
 	GCP
-	Local
+	_
 	OpenStack
 	Outscale
-	OpenTelekom
+	_
 )
 
 var (
@@ -22,26 +22,20 @@ var (
 		"ovh":            OVH,
 		"aws":            AWS,
 		"cloudferro":     Cloudferro,
-		"ebrc":           Ebrc,
 		"flexibleengine": FlexibleEngine,
 		"gcp":            GCP,
-		"local":          Local,
 		"openstack":      OpenStack,
 		"outscale":       Outscale,
-		"opentelekom":    OpenTelekom,
 	}
 
 	clientEnumMap = map[Client]string{
 		OVH:            "OVH",
 		AWS:            "AWS",
 		Cloudferro:     "Cloudferro",
-		Ebrc:           "Ebrc",
 		FlexibleEngine: "FlexibleEngine",
 		GCP:            "GCP",
-		Local:          "Local",
 		OpenStack:      "OpenStack",
 		Outscale:       "Outscale",
-		OpenTelekom:    "Opentelekom",
 	}
 )
 
