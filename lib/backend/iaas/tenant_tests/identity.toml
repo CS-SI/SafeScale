@@ -1,0 +1,6 @@
+[[tenants]]
+    name = "Test with tenant without identity section"
+    client = "aws"
+
+[tenants.compute]
+Region = "eu-west"

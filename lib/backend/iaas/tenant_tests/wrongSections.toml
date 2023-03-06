@@ -1,0 +1,9 @@
+[[tenants]]
+name = "Tenant with wrong sections"
+client = 3
+
+identity = "identity"
+compute = "compute"
+metadata = "metadata"
+objectstorage = "ostorage"
+network = 3

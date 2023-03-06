@@ -1,0 +1,8 @@
+[[tenants]]
+    name = "Test with tenant without compute section"
+    client = "aws"
+
+[tenants.identity]
+AccessKey = "1234567890"
+SecretKey = "1234567890"
+
