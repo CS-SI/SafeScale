@@ -565,7 +565,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 			if _, ok = v.(bool); ok {
 				continue
 			}
-			if k == "DNSList" {
+			if k == "DNSList" || k == "MaxLifetimeInHours" {
 				continue
 			}
 			return config, fail.InconsistentError("'compute' it's a map[string]string, and the key %s is not a string: %v", k, v)
@@ -937,17 +937,7 @@ func getTenantsFromViperCfg(v *viper.Viper) ([]map[string]interface{}, *viper.Vi
 		return nil, v, fail.SyntaxError("failed to convert tenants file to map[string]interface{}")
 	}
 
-	jsoned, err := json.Marshal(tenantsCfg)
-	if err != nil {
-		return nil, v, fail.ConvertError(err)
-	}
-
-	var out []map[string]interface{}
-	err = json.Unmarshal(jsoned, &out)
-	if err != nil {
-		return nil, v, fail.ConvertError(err)
-	}
-	return out, v, nil
+	return tenantsCfg, v, nil
 }
 
 func validateTenant(tenant map[string]interface{}) fail.Error {
@@ -1445,8 +1435,10 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	key = "MaxLifetimeInHours"
 
 	if maybe, ok = compute[key]; ok {
-		if _, ok := maybe.(uint); !ok {
-			errors = append(errors, fail.SyntaxError("%s in %s section must be an unsigned int", key, "compute"))
+		if _, ok := maybe.(int64); !ok {
+			errors = append(errors, fail.SyntaxError("%s in %s section must be an integer", key, "compute"))
+		} else if maybe.(int64) < 1 {
+			errors = append(errors, fail.SyntaxError("%s in %s section must be greater than 0", key, "compute"))
 		}
 	}
 

@@ -3164,10 +3164,10 @@ func (e *ServiceTest) GetRawConfigurationOptions(ctx context.Context) (stacks.Co
 	if ok {
 		OperatorUsername = buffer.(string)
 	}
-	var MaxLifeTimeInHours int = 0
+	var MaxLifeTimeInHours int64 = 0
 	buffer, ok = cfg.Get("MaxLifeTimeInHours")
 	if ok {
-		MaxLifeTimeInHours = buffer.(int)
+		MaxLifeTimeInHours = buffer.(int64)
 	}
 	rawcfg := stacks.ConfigurationOptions{
 		ProviderNetwork:           "",

@@ -175,9 +175,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		defaultImage = ovhDefaultImage
 	}
 
-	maxLifeTime := 0
-	if _, ok = compute["MaxLifetimeInHours"].(string); ok {
-		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	var maxLifeTime int64 = 0
+	if val, ok := compute["MaxLifetimeInHours"].(int64); ok {
+		maxLifeTime = val
 	}
 
 	machineCreationLimit := 8

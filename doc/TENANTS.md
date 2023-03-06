@@ -379,7 +379,7 @@ Contains the name of the floating IP pool to use.
 
 Contains the URL of the Identity backend to use.
 
-### `MaxLifeTimeInHours`
+### `MaxLifeTimeInHours` (integer)
 
 Contains the maximum lifetime of a machine in hours.
 
