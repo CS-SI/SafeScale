@@ -1378,6 +1378,19 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
+	key = "BlacklistTemplateRegexp"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); ok {
+			_, err = regexp.Compile(val)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid regex", key, "compute"))
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenent[%s][%s] is not a string", "compute", key))
+		}
+	}
+
 	key = "MetadataBucketName"
 
 	if maybe, ok = metadata[key]; ok {
