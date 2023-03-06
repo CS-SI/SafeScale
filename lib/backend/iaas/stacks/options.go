@@ -134,7 +134,7 @@ type ConfigurationOptions struct {
 	DefaultNetworkName string // contains the name of the Networking/VPC that is used by default (corresponds to keywords 'DefaultNetworkName' or 'NetworkName' in tenant section 'compute')
 	DefaultNetworkCIDR string // contains the CIDR of the default Networking/VPC
 
-	MaxLifeTime int
+	MaxLifeTime int64
 
 	Safe bool
 

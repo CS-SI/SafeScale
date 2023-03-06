@@ -676,3 +676,23 @@ func Test_unknownFields(t *testing.T) {
 	msg := "unknown fields in tenant: map[False:this is wrong] | unknown fields in tenant: map[Unknown:error] | unknown fields in tenant: map[SQLInjection:1 && 1] | unknown fields in tenant: map[Virus:this is a virus]"
 	require.EqualValues(t, msg, err.Error())
 }
+
+func Test_MaxLifetimeInHours(t *testing.T) {
+	v := viper.New()
+	v.AddConfigPath("./tenant_tests")
+	v.SetConfigName("maxLifetimeInHours")
+
+	tenants, _, xerr := getTenantsFromViperCfg(v)
+
+	if xerr != nil {
+		t.Error(xerr.Error())
+		t.FailNow()
+	}
+
+	err := validateTenant(tenants[0])
+
+	if err != nil {
+		t.Error(err.Error())
+		t.FailNow()
+	}
+}
