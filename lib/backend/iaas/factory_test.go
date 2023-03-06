@@ -696,3 +696,23 @@ func Test_MaxLifetimeInHours(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+func Test_BlacklistTemplateRegexp(t *testing.T) {
+	v := viper.New()
+	v.AddConfigPath("./tenant_tests")
+	v.SetConfigName("blacklistTemplateRegexp")
+
+	tenants, _, xerr := getTenantsFromViperCfg(v)
+
+	if xerr != nil {
+		t.Error(xerr.Error())
+		t.FailNow()
+	}
+
+	err := validateTenant(tenants[0])
+
+	if err != nil {
+		t.Error(err.Error())
+		t.FailNow()
+	}
+}

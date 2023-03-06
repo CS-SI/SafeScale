@@ -1,0 +1,22 @@
+[[tenants]]
+    name = "Test with valid ovh tenant"
+    client = "ovh"
+
+    [tenants.identity]
+        ApplicationKey = "123456"
+        OpenstackID = "ABCDE"
+        OpenstackPassword = "abcdefgh123"
+
+    [tenants.compute]
+        Region = "SBG5"
+        ProjectName = "987654"
+        DefaultImage = "Ubuntu 18.04"
+        BlacklistTemplateRegexp = "c2-120"
+
+    [tenants.network]
+        ProviderNetwork = "Ext-Net"
+
+    [tenants.objectstorage]
+        Type = "swift"
+        Region = "SBG"
+        AuthURL = "https://auth.cloud.ovh.net/v3"
