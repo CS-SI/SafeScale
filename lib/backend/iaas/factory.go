@@ -21,7 +21,6 @@ import (
 	"context"
 	"expvar"
 	"fmt"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/enums"
 	"net"
 	"net/mail"
 	"net/url"
@@ -29,6 +28,8 @@ import (
 	"regexp"
 	"sync"
 	"time"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/enums"
 
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
@@ -412,7 +413,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	identity, _ := tenant["identity"].(map[string]interface{})      // nolint
 	compute, _ := tenant["compute"].(map[string]interface{})        // nolint
 	ostorage, _ := tenant["objectstorage"].(map[string]interface{}) // nolint
-	client, _ := tenant["client"].(string)
+	client, _ := tenant["client"].(string)                          // nolint
 
 	if config.Type, ok = ostorage["Type"].(string); !ok {
 		return config, fail.SyntaxError("missing setting 'Type' in 'objectstorage' section")
@@ -642,7 +643,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 	compute, _ := tenant["compute"].(map[string]interface{})        // nolint
 	ostorage, _ := tenant["objectstorage"].(map[string]interface{}) // nolint
 	metadata, _ := tenant["metadata"].(map[string]interface{})      // nolint
-	client, _ := tenant["client"].(string)
+	client, _ := tenant["client"].(string)                          // nolint
 
 	if config.Type, ok = metadata["Type"].(string); !ok {
 		if config.Type, ok = ostorage["Type"].(string); !ok {
