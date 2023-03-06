@@ -67,6 +67,7 @@ var computeField = []string{
 	"DefaultVolumeSpeed",
 	"Service",
 	"WhitelistTemplateRegexp",
+	"BlacklistTemplateRegexp",
 	"DNSList",
 	"S3",
 	"EC2",

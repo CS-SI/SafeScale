@@ -165,9 +165,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	projectID, _ := computeCfg["ProjectID"].(string)       // nolint
 	defaultImage, _ := computeCfg["DefaultImage"].(string) // nolint
 
-	maxLifeTime := 0
-	if _, ok := computeCfg["MaxLifetimeInHours"].(string); ok {
-		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
+	var maxLifeTime int64 = 0
+	if val, ok := computeCfg["MaxLifetimeInHours"].(int64); ok {
+		maxLifeTime = val
 	}
 
 	machineCreationLimit := 8
