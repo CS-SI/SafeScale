@@ -48,7 +48,7 @@ require (
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.5.0
 	golang.org/x/term v0.5.0
-	golang.org/x/text v0.7.0
+	golang.org/x/text v0.8.0
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.110.0
 	google.golang.org/grpc v1.53.0
