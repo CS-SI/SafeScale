@@ -157,76 +157,81 @@ Combinations are possible :
 
 The valid keywords in this section are :
 
-> | keyword                         | presence          | client                                |
-> |---------------------------------|-------------------|---------------------------------------|
-> | `AccessKey`                     | MANDATORY, CLIENT | outscale                              |
-> | `ApplicationKey`                | MANDATORY, CLIENT | ovh                                   |
-> | `OpenstackID`                   | MANDATORY, CLIENT | ovh                                   |
-> | `OpenstackPassword`             | MANDATORY, CLIENT | ovh                                   |
-> | `Password`                      | MANDATORY, CLIENT | all providers except ooutscal and ovh |
-> | `SecretKey`                     | MANDATORY, CLIENT | outscale                              |
-> | `Username`                      | MANDATORY, CLIENT | all providers except ooutscal and ovh |
-> | `AlternateApiApplicationKey`    | OPTIONAL, CLIENT  | ovh                                   |
-> | `AlternateApiApplicationSecret` | OPTIONAL, CLIENT  | ovh                                   |
-> | `AlternateApiConsumerKey`       | OPTIONAL, CLIENT  | ovh                                   |
-> | `UserID`                        | MANDATORY, CLIENT | outscale                              | 
-> | `AccessKeyID`                   | MANDATORY, CLIENT | aws                                   |
-> | `SecretAccessKey`               | MANDATORY, CLIENT | aws                                   |
-> | `IdentityEndpoint`              | MANDATORY, CLIENT | openstack                             |
-> | `auth_uri`                      | MANDATORY, CLIENT | gcp                                   |
-> | `DomainNAme`                    | MANDATORY, CLIENT | cloudferro, flexibleengine            |
-> | `Endpoint`                      | MANDATORY, CLIENT | flexibleengine                        | 
-> | `project_id`                    | MANDATORY, CLIENT | gcp                                   |
-> | `private_key_id`                | MANDATORY, CLIENT | gcp                                   |
-> | `private_key`                   | MANDATORY, CLIENT | gcp                                   |
-> | `client_email`                  | MANDATORY, CLIENT | gcp                                   |
-> | `toekn_uri`                     | MANDATORY, CLIENT | gcp                                   |
-> | `auth_provider_x509_cert_url`   | MANDATORY, CLIENT | gcp                                   |
-> | `client_x509_cert_url`          | MANDATORY, CLIENT | gcp                                   |
+> | keyword                         | presence          | client                                    |
+> |---------------------------------|-------------------|-------------------------------------------|
+> | `AccessKey`                     | MANDATORY, CLIENT | outscale                                  |
+> | `ApplicationKey`                | MANDATORY, CLIENT | ovh                                       |
+> | `OpenstackID`                   | MANDATORY, CLIENT | ovh                                       |
+> | `OpenstackPassword`             | MANDATORY, CLIENT | ovh                                       |
+> | `Password`                      | MANDATORY, CLIENT | all providers except ooutscal and ovh     |
+> | `SecretKey`                     | MANDATORY, CLIENT | outscale                                  |
+> | `Username`                      | MANDATORY, CLIENT | all providers except ooutscal and ovh     |
+> | `AlternateApiApplicationKey`    | OPTIONAL, CLIENT  | ovh                                       |
+> | `AlternateApiApplicationSecret` | OPTIONAL, CLIENT  | ovh                                       |
+> | `AlternateApiConsumerKey`       | OPTIONAL, CLIENT  | ovh                                       |
+> | `UserID`                        | MANDATORY, CLIENT | outscale                                  | 
+> | `AccessKeyID`                   | MANDATORY, CLIENT | aws                                       |
+> | `SecretAccessKey`               | MANDATORY, CLIENT | aws                                       |
+> | `IdentityEndpoint`              | MANDATORY, CLIENT | openstack                                 |
+> | `auth_uri`                      | MANDATORY, CLIENT | gcp                                       |
+> | `DomainNAme`                    | MANDATORY, CLIENT | cloudferro, flexibleengine                |
+> | `Endpoint`                      | MANDATORY, CLIENT | flexibleengine                            | 
+> | `project_id`                    | MANDATORY, CLIENT | gcp                                       |
+> | `private_key_id`                | MANDATORY, CLIENT | gcp                                       |
+> | `private_key`                   | MANDATORY, CLIENT | gcp                                       |
+> | `client_email`                  | MANDATORY, CLIENT | gcp                                       |
+> | `toekn_uri`                     | MANDATORY, CLIENT | gcp                                       |
+> | `auth_provider_x509_cert_url`   | MANDATORY, CLIENT | gcp                                       |
+> | `client_x509_cert_url`          | MANDATORY, CLIENT | gcp                                       |
+> | `IdentityEndpointVersion`       | OPTIONAL, CLIENT  | ovh, flexibleengine, outscale, cloudferro |
 
 ### Section ``[tenants.compute]``
 
 The valid keywords in this section are :
 
-> | keyword                          | presence          | client                         |
-> |----------------------------------|-------------------|--------------------------------|
-> | `DefaultImage`                   | OPTIONAL, CLIENT  | all except ovh                 |
-> | `ProjectName`                    | OPTIONAL, CLIENT  | aws, cloudferro, gcp, ovh      |
-> | `ProjectID`                      | OPTIONAL, CLIENT  | aws, flexibleengine, gcp       |
-> | `Region`                         | MANDATORY         | all                            |
-> | `AvailabilityZone`               | MANDATORY, CLIENT | flexibleengine, openstack, ovh |
-> | `DNS`                            | OPTIONAL          | all                            |
-> | `Scannable`                      | OPTIONAL, CLIENT  | ovh                            |
-> | `OperatorUsername`               | OPTIONAL          | all                            |
-> | `Owners`                         | OPTIONAL, CLIENT  | aws                            |
-> | `MaxLiftimeInHours`              | OPTIONAL          | all                            |
-> | `ConcurrentMachineCreationLimit` | OPTIONAL          | all                            |
-> | `Safe`                           | OPTIONAL          | all                            |
-> | `Zone`                           | MANDATORY, CLIENT | gcp, aws                       |
-> | `TenantName`                     | OPTIONAL, CLIENT  | openstack                      |
-> | `TenantID`                       | OPTIONAL, CLIENT  | openstack                      |
-> | `URL`                            | OPTIONAL, CLIENT  | outscale                       |
-> | `Service`                        | MANDATORY, CLIENT | outscale                       |
-> | `Subregion`                      | MANDATORY, CLIENT | outscale                       |
-> | `DefaultTenancy`                 | OPTIONAL, CLIENT  | outscale                       |
-> | `DefaultVolumeSpeed`             | OPTIONAL, CLIENT  | outscale                       |
-> | `S3`                             | OPTIONAL, CLIENT  | aws                            |
-> | `EC2`                            | OPTIONAL, CLIENT  | aws                            |
-> | `SSM`                            | OPTIONAL, CLIENT  | aws                            |
+> | keyword                          | presence          | client                               |
+> |----------------------------------|-------------------|--------------------------------------|
+> | `DefaultImage`                   | OPTIONAL, CLIENT  | all except ovh                       |
+> | `ProjectName`                    | OPTIONAL, CLIENT  | aws, cloudferro, gcp, ovh            |
+> | `ProjectID`                      | OPTIONAL, CLIENT  | aws, flexibleengine, gcp             |
+> | `Region`                         | MANDATORY         | all                                  |
+> | `AvailabilityZone`               | MANDATORY, CLIENT | flexibleengine, openstack, ovh       |
+> | `DNS`                            | OPTIONAL          | all                                  |
+> | `Scannable`                      | OPTIONAL, CLIENT  | ovh                                  |
+> | `OperatorUsername`               | OPTIONAL          | all                                  |
+> | `Owners`                         | OPTIONAL, CLIENT  | aws                                  |
+> | `MaxLiftimeInHours`              | OPTIONAL          | all                                  |
+> | `ConcurrentMachineCreationLimit` | OPTIONAL          | all                                  |
+> | `Safe`                           | OPTIONAL          | all                                  |
+> | `Zone`                           | MANDATORY, CLIENT | gcp, aws                             |
+> | `TenantName`                     | OPTIONAL, CLIENT  | openstack                            |
+> | `TenantID`                       | OPTIONAL, CLIENT  | openstack                            |
+> | `URL`                            | OPTIONAL, CLIENT  | outscale                             |
+> | `Service`                        | MANDATORY, CLIENT | outscale                             |
+> | `Subregion`                      | MANDATORY, CLIENT | outscale                             |
+> | `DefaultTenancy`                 | OPTIONAL, CLIENT  | outscale                             |
+> | `DefaultVolumeSpeed`             | OPTIONAL, CLIENT  | outscale                             |
+> | `S3`                             | OPTIONAL, CLIENT  | aws                                  |
+> | `EC2`                            | OPTIONAL, CLIENT  | aws                                  |
+> | `SSM`                            | OPTIONAL, CLIENT  | aws                                  |
+> | `ComputeEndpointVersion`         | OPTIONAL, CLIENT  | ovh, flexibleengine, gcp, cloudferro |
+> | `VolumeEndpointVersion`          |  OPTIONAL, CLIENT | ovh, flexibleengine, cloudferro      |
 
 ### Section ``[tenants.network]``
 
 The valid keywords in this section are :
 
-> | keyword              | presence         | client                        |
-> |----------------------|------------------|-------------------------------|
-> | `ProviderNetwork`    | OPTIONAL, CLIENT | cloudferro, gcp, ovh          |
-> | `VPCCIDR`            | OPTIONAL, CLIENT | flexibleengine, gcp, outscale |  
-> | `VPCName`            | OPTIONAL, CLIENT | flexibleengine, gcp, outscale | 
-> | `FloatingIPPool`     | OPTIONAL, CLIENT | cloudferro, openstack         |
-> | `DefaultNetworkName` | OPTIONAL, CLIENT | flexibleengine, outscale      |
-> | `DefaultNetworkCIDR` | OPTIONAL, CLIENT | flexibleengine, outscale      |
-> | `ExternalNetwork`    | OPTIONAL, CLIENT | openstack                     |
+> | keyword                   | presence         | client                          |
+> |---------------------------|------------------|---------------------------------|
+> | `ProviderNetwork`         | OPTIONAL, CLIENT | cloudferro, gcp, ovh            |
+> | `VPCCIDR`                 | OPTIONAL, CLIENT | flexibleengine, gcp, outscale   |  
+> | `VPCName`                 | OPTIONAL, CLIENT | flexibleengine, gcp, outscale   | 
+> | `FloatingIPPool`          | OPTIONAL, CLIENT | cloudferro, openstack           |
+> | `DefaultNetworkName`      | OPTIONAL, CLIENT | flexibleengine, outscale        |
+> | `DefaultNetworkCIDR`      | OPTIONAL, CLIENT | flexibleengine, outscale        |
+> | `ExternalNetwork`         | OPTIONAL, CLIENT | openstack                       |
+> |  `NetworkEndpointVersion` | OPTIONAL, CLIENT | ovh, flexibleengine, cloudferro |
+> | `NetworkClientEndpoint`   | OPTIONAL, CLIENT |  flexibleengine                 |
 
 ### Section ``[tenants.objectstorage]``
 
@@ -324,6 +329,10 @@ Contain the name of the bucket to use to store metadata.
 
 Contains the maximum number of machines that can be created concurrently.
 
+### `ComputeEndpointVersion`
+
+Constains the version of the provider compute endpoint (ex : v1; v3.1)
+
 ### `CryptKey`
 
 Contains the key used to encrypt the metadata.
@@ -379,9 +388,21 @@ Contains the name of the floating IP pool to use.
 
 Contains the URL of the Identity backend to use.
 
+### `IdentityEndpointVersion`
+
+Constains the version of the provider identity endpoint (ex : v1; v3.1)
+
 ### `MaxLifeTimeInHours` (integer)
 
 Contains the maximum lifetime of a machine in hours.
+
+### `NetworkClientEndpointVersion`
+
+Constains the version of the provider network client endpoint (ex : v1; v3.1)
+
+### `NetworkEndpointVersion`
+
+Constains the version of the provider network endpoint (ex : v1; v3.1)
 
 ### `OpenstackID`: alias, see [`Username`](#Username)
 
@@ -485,6 +506,10 @@ Valid values are:
 > | `"swift"` | SwiftKS protocol proposed by OpenStack Cloud implementations |
 > | `"azure"` | Azure protocol (not tested)                                  |
 > | `"gce"`   | Google GCE protocol                                          |
+
+### `VolumeEndpointVersion`
+
+Constains the version of the provider volume endpoint (ex : v1; v3.1)
 
 ### `VPCCIDR`
 
