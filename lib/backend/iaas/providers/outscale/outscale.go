@@ -160,6 +160,14 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, ferr
 
 	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
+	identityEndpointVersion := "v1"
+
+	if maybe, ok := identity["IdentityEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			identityEndpointVersion = val
+		}
+	}
+
 	var timings *temporal.MutableTimings
 	s := &temporal.MutableTimings{}
 	err := mapstructure.Decode(tc, &s)
@@ -175,7 +183,7 @@ next:
 			SecretKey: get(identity, "SecretKey"),
 		},
 		Compute: outscale.ComputeConfiguration{
-			URL:                get(compute, "URL", fmt.Sprintf("https://api.%s.outscale.com/api/v1", region)),
+			URL:                get(compute, "URL", fmt.Sprintf("https://api.%s.outscale.com/api/%s", region, identityEndpointVersion)), // FIXME: hardcoded endpoint
 			Service:            get(compute, "Service", "api"),
 			Region:             region,
 			Subregion:          get(compute, "Subregion"),

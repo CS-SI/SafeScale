@@ -35,7 +35,7 @@ var IdentityField = []string{
 	"TokenID",
 	"Endpoint",
 	"provider",
-	"IdentiyEndpointVersion",
+	"IdentityEndpointVersion",
 
 	// Google specific
 	"ProjectNumber",
