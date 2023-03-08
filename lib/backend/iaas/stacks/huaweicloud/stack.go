@@ -18,9 +18,10 @@ package huaweicloud
 
 import (
 	"context"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -37,6 +38,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
+
 	// Gophercloud OpenStack API
 	"github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
@@ -84,7 +86,7 @@ func NullStack() api.Stack { // nolint
 // New authenticates and return interface stack
 //
 //goland:noinspection GoExportedFuncWithUnexportedType
-func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
+func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions, serviceVerions map[string]string) (*stack, fail.Error) { // nolint
 	ctx := context.Background()
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
@@ -127,9 +129,13 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 
 	// TODO: detect versions instead of statically declare them
 	s.versions = map[string]string{
-		"compute": "v2",
-		"volume":  "v2",
-		"network": "v2",
+		"compute":       "v2",
+		"volume":        "v2",
+		"network":       "v2",
+		"networkclient": "v1",
+	}
+	for k, v := range serviceVerions {
+		s.versions[k] = v
 	}
 
 	// Openstack client
@@ -176,7 +182,8 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", s.versions["compute"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged Openstack service 'compute' version '%s'", s.versions["compute"])
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -194,7 +201,8 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -221,7 +229,8 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", s.versions["volumes"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged service 'volumes' version '%s'", s.versions["volumes"])
 	}
 	if xerr != nil {
 		return nil, xerr

@@ -126,7 +126,7 @@ func (s stack) CreateNetwork(ctx context.Context, req abstract.NetworkRequest) (
 		return nil, normalizeError(err)
 	}
 
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs" // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + s.versions["networkclient"] + "/" + s.authOpts.ProjectID + "/vpcs"
 	resp := vpcCreateResult{}
 	opts := gophercloud.RequestOpts{
 		JSONBody:     b,
@@ -235,7 +235,7 @@ func (s stack) InspectNetwork(ctx context.Context, id string) (*abstract.Network
 	}
 
 	r := vpcGetResult{}
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + s.versions["networkclient"] + "/" + s.authOpts.ProjectID + "/vpcs/" + id
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -309,7 +309,7 @@ func (s stack) ListNetworks(ctx context.Context) ([]*abstract.Network, fail.Erro
 	}
 
 	r := vpcCommonResult{}
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs" // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + s.versions["networkclient"] + "/" + s.authOpts.ProjectID + "/vpcs"
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -368,7 +368,7 @@ func (s stack) DeleteNetwork(ctx context.Context, id string) fail.Error {
 	}
 
 	r := vpcCommonResult{}
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + s.versions["networkclient"] + "/" + s.authOpts.ProjectID + "/vpcs/" + id
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201, 204},
@@ -530,7 +530,7 @@ func (s stack) InspectSubnet(ctx context.Context, id string) (*abstract.Subnet, 
 	}
 
 	r := subnetGetResult{}
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets/" + id // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + s.versions["networkclient"] + "/" + s.authOpts.ProjectID + "/subnets/" + id
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -597,7 +597,7 @@ func (s stack) ListSubnets(ctx context.Context, networkRef string) ([]*abstract.
 		return nil, fail.InvalidInstanceError()
 	}
 
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets" // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + s.versions["networkclient"] + "/" + s.authOpts.ProjectID + "/subnets"
 	if networkRef != "" {
 		url += "?vpc_id=" + networkRef
 	}
@@ -657,7 +657,7 @@ func (s stack) DeleteSubnet(ctx context.Context, id string) fail.Error {
 		}
 	}
 
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + as.Network + "/subnets/" + id // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + s.versions["networkclient"] + "/" + s.authOpts.ProjectID + "/vpcs/" + as.Network + "/subnets/" + id
 	opts := gophercloud.RequestOpts{
 		OkCodes: []int{204},
 	}
@@ -778,7 +778,7 @@ func (s stack) createSubnet(ctx context.Context, req abstract.SubnetRequest) (*s
 	}
 
 	respCreate := subnetCreateResult{}
-	url := fmt.Sprintf("%sv1/%s/subnets", s.NetworkClient.Endpoint, s.authOpts.ProjectID) // FIXME: Hardcoded endpoint
+	url := fmt.Sprintf("%s%s/%s/subnets", s.NetworkClient.Endpoint, s.versions["networkclient"], s.authOpts.ProjectID)
 	opts := gophercloud.RequestOpts{
 		JSONBody:     b,
 		JSONResponse: &respCreate.Body,
