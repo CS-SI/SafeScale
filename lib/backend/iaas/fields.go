@@ -35,6 +35,7 @@ var IdentityField = []string{
 	"TokenID",
 	"Endpoint",
 	"provider",
+	"IdentiyEndpointVersion",
 
 	// Google specific
 	"ProjectNumber",
@@ -80,6 +81,8 @@ var computeField = []string{
 	"URL",
 	"Service",
 	"DefaultTenancy",
+	"ComputeEndpointVersion",
+	"VolumeEndpointVersion",
 }
 
 var Networkfield = []string{
@@ -90,6 +93,8 @@ var Networkfield = []string{
 	"DefaultNetworkName",
 	"DefaultNetworkCIDR",
 	"ExternalNetwork",
+	"NetworkEndpointVersion",
+	"NetworkClientEndpointVersion",
 }
 
 var OStorageField = []string{

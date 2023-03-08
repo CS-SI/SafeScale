@@ -169,7 +169,8 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		// Initializes Provider
 		providerInstance, xerr := svc.Build(tenant)
 		if xerr != nil {
-			return nullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
+			//return nullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
+			return nullService(), xerr
 		}
 
 		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
@@ -1209,6 +1210,66 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
+	key := "IdentityEndpointVersion"
+
+	if maybe, ok = identity[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "identity"))
+			}
+		}
+	}
+
+	key = "ComputeEndpointVersion"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[compute][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "compute"))
+			}
+		}
+	}
+
+	key = "VolumeEndpointVersion"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[compute][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "compute"))
+			}
+		}
+	}
+
+	key = "NetworkEndpointVersion"
+
+	if maybe, ok = network[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[network][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "network"))
+			}
+		}
+	}
+
+	key = "NetworkClientEndpointVersion"
+
+	if maybe, ok = network[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[network][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "network"))
+			}
+		}
+	}
+
 	if client == 2 || client == 4 || client == 9 {
 		key := "AvailabilityZone"
 		found = false
@@ -1262,7 +1323,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
-	key := "Region"
+	key = "Region"
 	found = false
 
 	if maybe, ok = metadata[key]; ok {

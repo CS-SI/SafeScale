@@ -18,8 +18,9 @@ package openstack // Package openstack contains the implemenation of a stack for
 
 import (
 	context2 "context"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -151,7 +152,8 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -169,7 +171,8 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -196,7 +199,8 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"])
 	}
 	if xerr != nil {
 		return nil, xerr
