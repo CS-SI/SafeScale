@@ -92,12 +92,11 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 	}
 
 	var (
-		tenantInCfg    bool
-		found          bool
-		ok             bool
-		name, provider string
-		svc            Service
-		svcProvider    = "__not_found__"
+		tenantInCfg bool
+		found       bool
+		name        string
+		svc         Service
+		svcProvider = "__not_found__"
 	)
 
 	for _, tenant := range tenants {
@@ -116,51 +115,8 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		tenantInCfg = true
 
 		xerr := validateTenant(tenant)
-
 		if xerr != nil {
 			return nullService(), xerr
-
-		}
-
-		providerKeysToCheck := []string{
-			"provider",
-			"Provider",
-			"client",
-			"Client",
-		}
-
-		ok = false
-
-		for _, key := range providerKeysToCheck {
-			if provider, found = tenant[key].(string); found {
-				svcProvider = provider
-				ok = true
-				break
-			}
-		}
-
-		if !ok {
-			logrus.WithContext(ctx).Error("Missing field 'provider' or 'client' in tenant")
-			continue
-		}
-
-		svc, found = allProviders[provider]
-		if !found {
-			logrus.WithContext(ctx).Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
-			continue
-		}
-
-		_, found = tenant["identity"].(map[string]interface{})
-		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'identity' found in tenant '%s', continuing.", name)
-		}
-		_, found = tenant["compute"].(map[string]interface{})
-		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'compute' found in tenant '%s', continuing.", name)
-		}
-		_, found = tenant["network"].(map[string]interface{})
-		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'network' found in tenant '%s', continuing.", name)
 		}
 
 		_, tenantObjectStorageFound := tenant["objectstorage"]
@@ -768,7 +724,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		}
 	}
 	if !found {
-		return config, fail.SyntaxError("missing setting 'SecretKey' or 'OpenstackPasswork' or 'Password' field in 'identity' section")
+		return config, fail.SyntaxError("missing setting 'SecretKey' or 'OpenstackPassword' or 'Password' field in 'identity' section")
 	}
 
 	//if config.Region, ok = metadata["Region"].(string); !ok {
