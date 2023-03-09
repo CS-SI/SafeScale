@@ -941,6 +941,7 @@ func getTenantsFromViperCfg(v *viper.Viper) ([]map[string]interface{}, *viper.Vi
 	return tenantsCfg, v, nil
 }
 
+// validateTenant makes sure the contents of tenants.toml or tenants.yaml are correct
 func validateTenant(tenant map[string]interface{}) fail.Error {
 	var (
 		name      string

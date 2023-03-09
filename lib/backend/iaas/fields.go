@@ -11,6 +11,7 @@ var Sections = []string{
 	"client",
 	"Client",
 	"provider",
+	"clientType",
 }
 
 var IdentityField = []string{
