@@ -182,7 +182,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions, ser
 			NormalizeError,
 		)
 	default:
-		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
 		return nil, fail.NewError("unmanaged Openstack service 'compute' version '%s'", s.versions["compute"])
 	}
 	if xerr != nil {
@@ -201,7 +201,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions, ser
 			NormalizeError,
 		)
 	default:
-		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
 		return nil, fail.NewError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
 	}
 	if xerr != nil {
@@ -229,8 +229,8 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions, ser
 			NormalizeError,
 		)
 	default:
-		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
-		return nil, fail.NewError("unmanaged service 'volumes' version '%s'", s.versions["volumes"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged service 'volumes' version '%s'", s.versions["volume"])
 	}
 	if xerr != nil {
 		return nil, xerr

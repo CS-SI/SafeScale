@@ -3414,7 +3414,6 @@ func (e *ServiceTest) ReadObject(ctx context.Context, bucketname string, path st
 		}
 		length = int64(len(version)) // nolint
 	default:
-
 		val, err := e._getRawInternalData(path)
 		if err == nil {
 			dataValue := "[Serial]"

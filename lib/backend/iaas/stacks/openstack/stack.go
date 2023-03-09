@@ -152,7 +152,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 			NormalizeError,
 		)
 	default:
-		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
 		return nil, fail.NewError("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
 	}
 	if xerr != nil {
@@ -171,7 +171,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 			NormalizeError,
 		)
 	default:
-		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
 		return nil, fail.NewError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
 	}
 	if xerr != nil {
@@ -199,8 +199,8 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 			NormalizeError,
 		)
 	default:
-		// TODO : this should be a NotImplemented error but we use a generic one instead beacause NotImplemented is too verbose
-		return nil, fail.NewError("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged service 'volumes' version '%s'", serviceVersions["volume"])
 	}
 	if xerr != nil {
 		return nil, xerr
