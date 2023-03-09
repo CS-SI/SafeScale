@@ -324,24 +324,6 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 	return nullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
 }
 
-// validateRegionName validates the availability of the region passed as parameter
-func validateRegionName(name string, allRegions []string) fail.Error { // nolint
-	// FIXME: Use this function
-	if len(allRegions) > 0 {
-		regionIsValidInput := false
-		for _, vr := range allRegions {
-			if name == vr {
-				regionIsValidInput = true
-			}
-		}
-		if !regionIsValidInput {
-			return fail.NotFoundError("region '%s' not found", name)
-		}
-	}
-
-	return nil
-}
-
 // validateRegexps validates regexp values from tenants file
 func validateRegexps(svc *service, tenant map[string]interface{}) fail.Error {
 	compute, ok := tenant["compute"].(map[string]interface{})
@@ -1011,6 +993,27 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 
 	if !found {
 		errors = append(errors, fail.SyntaxError("Missing field 'client' for tenant"))
+	}
+
+	providerKindKeysToCheck := []string{
+		"clientType",
+		"ClientType",
+	}
+
+	found = false
+
+	for _, key := range providerKindKeysToCheck {
+		if maybe, ok := tenant[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s] is not a string", key))
+			} else {
+				if val != "classic" && val != "terraform" {
+					errors = append(errors, fail.SyntaxError("only 'classic' and 'terraform' are allowed for '%s'", key))
+				}
+			}
+			found = true
+			break
+		}
 	}
 
 	maybe, ok := tenant["identity"]
