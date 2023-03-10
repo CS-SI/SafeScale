@@ -80,6 +80,13 @@ func (s StackProxy) GetStackName() (_ string, ferr fail.Error) {
 	return cfg, xerr
 }
 
+func (s StackProxy) GetType() (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	theType, xerr := s.FullStack.GetType()
+	return theType, xerr
+}
+
 func (s StackProxy) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

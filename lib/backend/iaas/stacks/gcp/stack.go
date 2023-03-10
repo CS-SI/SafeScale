@@ -61,6 +61,10 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "gcp", nil
 }
 
+func (s stack) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
+}
+
 // GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
 	if valid.IsNil(s) || s.Config == nil {

@@ -111,6 +111,10 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "outscale", nil
 }
 
+func (s stack) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
+}
+
 // New creates a new stack
 func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 	if options == nil {

@@ -1051,6 +1051,12 @@ func (e *ServiceTest) GetStackName() (string, fail.Error) {
 	}
 	return stackname, nil
 }
+
+func (e *ServiceTest) GetType() (string, fail.Error) {
+	e._survey("ServiceTest::ListAvailabilityZones (not implemented)")
+	return "", nil
+}
+
 func (e *ServiceTest) ListAvailabilityZones(ctx context.Context) (map[string]bool, fail.Error) {
 	e._survey("ServiceTest::ListAvailabilityZones (not implemented)")
 	return map[string]bool{}, nil

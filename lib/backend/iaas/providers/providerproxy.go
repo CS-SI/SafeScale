@@ -152,6 +152,13 @@ func (s ProviderProxy) GetStackName() (_ string, ferr fail.Error) {
 	return cfg, xerr
 }
 
+func (s ProviderProxy) GetType() (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	theType, xerr := s.Provider.GetType()
+	return theType, xerr
+}
+
 func (s ProviderProxy) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

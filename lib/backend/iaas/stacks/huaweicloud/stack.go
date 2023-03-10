@@ -1087,6 +1087,10 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "huaweicloud", nil
 }
 
+func (s stack) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
+}
+
 // initVPC initializes the instance of the Networking/VPC if one is defined in tenant
 func (s *stack) initVPC(ctx context.Context) fail.Error {
 	if s.cfgOpts.DefaultNetworkName != "" {

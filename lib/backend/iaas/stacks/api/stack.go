@@ -34,6 +34,8 @@ import (
 type Stack interface {
 	GetStackName() (string, fail.Error)
 
+	GetType() (string, fail.Error)
+
 	// ListAvailabilityZones lists the usable Availability Zones
 	ListAvailabilityZones(ctx context.Context) (map[string]bool, fail.Error)
 
@@ -163,7 +165,7 @@ type Stack interface {
 	UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error
 
 	// ListTags list provider's tags
-	ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error)
+	ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) // CRITICAL: OPP Remove this
 
 	// DeleteTags removes provider's tags
 	DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error

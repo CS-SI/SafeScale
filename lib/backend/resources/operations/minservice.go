@@ -101,6 +101,10 @@ func (m minService) GetStackName() (string, fail.Error) {
 	panic("implement me")
 }
 
+func (s minService) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
+}
+
 func (m minService) ListAvailabilityZones(ctx context.Context) (map[string]bool, fail.Error) {
 	//TODO implement me
 	panic("implement me")

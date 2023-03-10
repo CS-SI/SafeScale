@@ -268,6 +268,10 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "openstack", nil
 }
 
+func (s stack) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
+}
+
 // Timings returns the instance containing current timeout settings
 func (s *stack) Timings() (temporal.Timings, fail.Error) {
 	if s == nil {
