@@ -101,6 +101,10 @@ func (m minService) GetStackName() (string, fail.Error) {
 	panic("implement me")
 }
 
+func (s minService) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
+}
+
 func (m minService) ListAvailabilityZones(ctx context.Context) (map[string]bool, fail.Error) {
 	//TODO implement me
 	panic("implement me")
@@ -414,10 +418,6 @@ var MINTIMINGS = &temporal.MutableTimings{
 
 func (m minService) Timings() (temporal.Timings, fail.Error) {
 	return MINTIMINGS, nil
-}
-
-func (m minService) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
-	panic("implement me")
 }
 
 func (m minService) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {

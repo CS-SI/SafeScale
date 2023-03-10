@@ -92,12 +92,11 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 	}
 
 	var (
-		tenantInCfg    bool
-		found          bool
-		ok             bool
-		name, provider string
-		svc            Service
-		svcProvider    = "__not_found__"
+		tenantInCfg bool
+		found       bool
+		name        string
+		svc         Service
+		svcProvider = "__not_found__"
 	)
 
 	for _, tenant := range tenants {
@@ -116,51 +115,8 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		tenantInCfg = true
 
 		xerr := validateTenant(tenant)
-
 		if xerr != nil {
 			return nullService(), xerr
-
-		}
-
-		providerKeysToCheck := []string{
-			"provider",
-			"Provider",
-			"client",
-			"Client",
-		}
-
-		ok = false
-
-		for _, key := range providerKeysToCheck {
-			if provider, found = tenant[key].(string); found {
-				svcProvider = provider
-				ok = true
-				break
-			}
-		}
-
-		if !ok {
-			logrus.WithContext(ctx).Error("Missing field 'provider' or 'client' in tenant")
-			continue
-		}
-
-		svc, found = allProviders[provider]
-		if !found {
-			logrus.WithContext(ctx).Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
-			continue
-		}
-
-		_, found = tenant["identity"].(map[string]interface{})
-		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'identity' found in tenant '%s', continuing.", name)
-		}
-		_, found = tenant["compute"].(map[string]interface{})
-		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'compute' found in tenant '%s', continuing.", name)
-		}
-		_, found = tenant["network"].(map[string]interface{})
-		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'network' found in tenant '%s', continuing.", name)
 		}
 
 		_, tenantObjectStorageFound := tenant["objectstorage"]
@@ -169,7 +125,8 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		// Initializes Provider
 		providerInstance, xerr := svc.Build(tenant)
 		if xerr != nil {
-			return nullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
+			//return nullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
+			return nullService(), xerr
 		}
 
 		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
@@ -321,24 +278,6 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		return nullService(), fail.NotFoundError("tenant '%s' not found in configuration", tenantName)
 	}
 	return nullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
-}
-
-// validateRegionName validates the availability of the region passed as parameter
-func validateRegionName(name string, allRegions []string) fail.Error { // nolint
-	// FIXME: Use this function
-	if len(allRegions) > 0 {
-		regionIsValidInput := false
-		for _, vr := range allRegions {
-			if name == vr {
-				regionIsValidInput = true
-			}
-		}
-		if !regionIsValidInput {
-			return fail.NotFoundError("region '%s' not found", name)
-		}
-	}
-
-	return nil
 }
 
 // validateRegexps validates regexp values from tenants file
@@ -785,7 +724,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		}
 	}
 	if !found {
-		return config, fail.SyntaxError("missing setting 'SecretKey' or 'OpenstackPasswork' or 'Password' field in 'identity' section")
+		return config, fail.SyntaxError("missing setting 'SecretKey' or 'OpenstackPassword' or 'Password' field in 'identity' section")
 	}
 
 	//if config.Region, ok = metadata["Region"].(string); !ok {
@@ -940,6 +879,7 @@ func getTenantsFromViperCfg(v *viper.Viper) ([]map[string]interface{}, *viper.Vi
 	return tenantsCfg, v, nil
 }
 
+// validateTenant makes sure the contents of tenants.toml or tenants.yaml are correct
 func validateTenant(tenant map[string]interface{}) fail.Error {
 	var (
 		name      string
@@ -1009,6 +949,27 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 
 	if !found {
 		errors = append(errors, fail.SyntaxError("Missing field 'client' for tenant"))
+	}
+
+	providerKindKeysToCheck := []string{
+		"clientType",
+		"ClientType",
+	}
+
+	found = false
+
+	for _, key := range providerKindKeysToCheck {
+		if maybe, ok := tenant[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s] is not a string", key))
+			} else {
+				if val != "classic" && val != "terraform" {
+					errors = append(errors, fail.SyntaxError("only 'classic' and 'terraform' are allowed for '%s'", key))
+				}
+			}
+			found = true
+			break
+		}
 	}
 
 	maybe, ok := tenant["identity"]
@@ -1209,6 +1170,66 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
+	key := "IdentityEndpointVersion"
+
+	if maybe, ok = identity[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "identity"))
+			}
+		}
+	}
+
+	key = "ComputeEndpointVersion"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[compute][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "compute"))
+			}
+		}
+	}
+
+	key = "VolumeEndpointVersion"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[compute][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "compute"))
+			}
+		}
+	}
+
+	key = "NetworkEndpointVersion"
+
+	if maybe, ok = network[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[network][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "network"))
+			}
+		}
+	}
+
+	key = "NetworkClientEndpointVersion"
+
+	if maybe, ok = network[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[network][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "network"))
+			}
+		}
+	}
+
 	if client == 2 || client == 4 || client == 9 {
 		key := "AvailabilityZone"
 		found = false
@@ -1262,7 +1283,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
-	key := "Region"
+	key = "Region"
 	found = false
 
 	if maybe, ok = metadata[key]; ok {

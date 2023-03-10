@@ -95,7 +95,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	identityParams, _ := params["identity"].(map[string]interface{}) // nolint
 	compute, _ := params["compute"].(map[string]interface{})         // nolint
-	// networkParams, _ := params["network"].(map[string]interface{}) // nolint
+	network, _ := params["network"].(map[string]interface{})         // nolint
 
 	applicationKey, _ := identityParams["ApplicationKey"].(string)       // nolint
 	openstackID, _ := identityParams["OpenstackID"].(string)             // nolint
@@ -185,6 +185,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		machineCreationLimit, _ = strconv.Atoi(compute["ConcurrentMachineCreationLimit"].(string))
 	}
 
+	if maybe, ok := network["ProviderNetwork"]; ok {
+		if val, ok := maybe.(string); ok {
+			externalNetwork = val
+		}
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         openstackID,
@@ -250,6 +256,30 @@ next:
 	}
 
 	serviceVersions := map[string]string{"volume": "v2"}
+
+	if maybe, ok := compute["IdentityEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["identity"] = val
+		}
+	}
+
+	if maybe, ok := compute["ComputeEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["compute"] = val
+		}
+	}
+
+	if maybe, ok := compute["VolumeEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["volume"] = val
+		}
+	}
+
+	if maybe, ok := network["NetworkEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["network"] = val
+		}
+	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
 	if xerr != nil {

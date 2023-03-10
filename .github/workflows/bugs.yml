@@ -4,9 +4,15 @@ on:
   push:
     branches:
       - 'bug/**'
+      - 'bugs/**'
+      - 'task/**'
+      - 'tasks/**'
   pull_request:
     branches:
       - 'bug/**'
+      - 'bugs/**'
+      - 'task/**'
+      - 'tasks/**'
 
 env:
   PROTOCVERSION: 3.17.3

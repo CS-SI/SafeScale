@@ -221,7 +221,15 @@ next:
 		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
-	gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)
+	serviceVersions := map[string]string{}
+
+	if maybe, ok := computeCfg["ComputeEndpointVersion"]; ok {
+		if version, ok := maybe.(string); ok {
+			serviceVersions["compute"] = version
+		}
+	}
+
+	gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions, serviceVersions)
 	if xerr != nil {
 		return nil, xerr
 	}

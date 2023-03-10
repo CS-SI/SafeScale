@@ -1051,6 +1051,12 @@ func (e *ServiceTest) GetStackName() (string, fail.Error) {
 	}
 	return stackname, nil
 }
+
+func (e *ServiceTest) GetType() (string, fail.Error) {
+	e._survey("ServiceTest::ListAvailabilityZones (not implemented)")
+	return "", nil
+}
+
 func (e *ServiceTest) ListAvailabilityZones(ctx context.Context) (map[string]bool, fail.Error) {
 	e._survey("ServiceTest::ListAvailabilityZones (not implemented)")
 	return map[string]bool{}, nil
@@ -3021,11 +3027,6 @@ func (e *ServiceTest) Timings() (temporal.Timings, fail.Error) {
 	return timings, nil
 }
 
-func (e *ServiceTest) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
-	e._survey("ServiceTest::ListTags (not implemented)")
-	return nil, nil
-}
-
 func (e *ServiceTest) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
 	e._survey("ServiceTest::UpdateTags (not implemented)")
 	return nil
@@ -3414,7 +3415,6 @@ func (e *ServiceTest) ReadObject(ctx context.Context, bucketname string, path st
 		}
 		length = int64(len(version)) // nolint
 	default:
-
 		val, err := e._getRawInternalData(path)
 		if err == nil {
 			dataValue := "[Serial]"

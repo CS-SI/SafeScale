@@ -225,7 +225,39 @@ next:
 		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
-	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
+	serviceVersions := map[string]string{}
+
+	if maybe, ok := compute["IdentityEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["identity"] = val
+		}
+	}
+
+	if maybe, ok := compute["ComputeEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["compute"] = val
+		}
+	}
+
+	if maybe, ok := compute["VolumeEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["volume"] = val
+		}
+	}
+
+	if maybe, ok := network["NetworkEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["network"] = val
+		}
+	}
+
+	if maybe, ok := network["NetworkClientEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["networkclient"] = val
+		}
+	}
+
+	stack, xerr := huaweicloud.New(authOptions, cfgOptions, serviceVersions)
 	if xerr != nil {
 		return nil, xerr
 	}
