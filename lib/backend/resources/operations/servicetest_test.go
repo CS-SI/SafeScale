@@ -3027,11 +3027,6 @@ func (e *ServiceTest) Timings() (temporal.Timings, fail.Error) {
 	return timings, nil
 }
 
-func (e *ServiceTest) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
-	e._survey("ServiceTest::ListTags (not implemented)")
-	return nil, nil
-}
-
 func (e *ServiceTest) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
 	e._survey("ServiceTest::UpdateTags (not implemented)")
 	return nil

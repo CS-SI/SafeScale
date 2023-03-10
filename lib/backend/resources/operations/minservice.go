@@ -420,10 +420,6 @@ func (m minService) Timings() (temporal.Timings, fail.Error) {
 	return MINTIMINGS, nil
 }
 
-func (m minService) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
-	panic("implement me")
-}
-
 func (m minService) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {
 	//TODO implement me
 	panic("implement me")

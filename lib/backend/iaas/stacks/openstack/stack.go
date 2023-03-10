@@ -291,10 +291,6 @@ func (s *stack) UpdateTags(ctx context2.Context, kind abstract.Enum, id string, 
 	xerr := s.rpcSetMetadataOfInstance(ctx, id, lmap)
 	return xerr
 }
-
-func (s *stack) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
-	panic("implement me")
-}
 func (s *stack) DeleteTags(ctx context2.Context, kind abstract.Enum, id string, keys []string) fail.Error {
 	if kind != abstract.HostResource {
 		return fail.NotImplementedError("Tagging resources other than hosts not implemented yet")
