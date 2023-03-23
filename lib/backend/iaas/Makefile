@@ -8,7 +8,7 @@ minimock: generate
 
 generate: clean
 	@mkdir -p mocks || true
-	@$(GO) generate ./... || true
+	@$(GO) generate ./... > /dev/null 2>&1 || true
 	@(cd objectstorage && $(MAKE) $(@))
 	@(cd providers && $(MAKE) $(@))
 	@(cd userdata && $(MAKE) $(@))
