@@ -92,11 +92,11 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 	}
 
 	var (
-		tenantInCfg bool
-		found       bool
-		name        string
-		svc         Service
-		svcProvider = "__not_found__"
+		tenantInCfg    bool
+		found          bool
+		name, provider string
+		svc            Service
+		svcProvider    = "__not_found__"
 	)
 
 	for _, tenant := range tenants {
@@ -117,6 +117,28 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		xerr := validateTenant(tenant)
 		if xerr != nil {
 			return nullService(), xerr
+		}
+
+		provider, found = tenant["provider"].(string)
+		if !found {
+			provider, found = tenant["Provider"].(string)
+			if !found {
+				provider, found = tenant["client"].(string)
+				if !found {
+					provider, found = tenant["Client"].(string)
+					if !found {
+						logrus.WithContext(ctx).Error("Missing field 'provider' or 'client' in tenant")
+						continue
+					}
+				}
+			}
+		}
+
+		svcProvider = provider
+		svc, found = allProviders[provider]
+		if !found {
+			logrus.WithContext(ctx).Errorf("failed to find client '%s' for tenant '%s'", svcProvider, name)
+			continue
 		}
 
 		_, tenantObjectStorageFound := tenant["objectstorage"]
