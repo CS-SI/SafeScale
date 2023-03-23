@@ -1417,7 +1417,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid regex", key, "compute"))
 			}
 		} else {
-			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenent[%s][%s] is not a string", "compute", key))
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "compute", key))
 		}
 	}
 
@@ -1430,7 +1430,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid regex", key, "compute"))
 			}
 		} else {
-			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenent[%s][%s] is not a string", "compute", key))
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "compute", key))
 		}
 	}
 
@@ -1442,7 +1442,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 				errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 255 characters long", key, section))
 			}
 		} else {
-			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenent[%s][%s] is not a string", "metadata", key))
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "metadata", key))
 		}
 	}
 
