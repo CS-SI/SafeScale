@@ -583,7 +583,7 @@ func Test_wrongFieldsType(t *testing.T) {
 
 	err := validateTenant(tenants[0])
 
-	msg := "Wrong type, the content of tenant[identity][AccessKey] is not a string | Wrong type, the content of tenant[identity][ApplicationKey] is not a string | Wrong type, the content of tenant[identity][SecretKey] is not a string | Wrong type, the content of tenant[compute][AvailabilityZone] is not a string | Wrong type, the content of tenant[objectstorage][Type] is not a string | Wrong type, the content of tenant[compute][Region] is not a string | Wrong type, the content of tenant[objectstorage][Endpoint] is not a string | Wrong type, the content of tenent[compute][WhitelistTemplateRegexp] is not a string | Wrong type, the content of tenent[metadata][MetadataBucketName] is not a string"
+	msg := "Wrong type, the content of tenant[identity][AccessKey] is not a string | Wrong type, the content of tenant[identity][ApplicationKey] is not a string | Wrong type, the content of tenant[identity][SecretKey] is not a string | Wrong type, the content of tenant[compute][AvailabilityZone] is not a string | Wrong type, the content of tenant[objectstorage][Type] is not a string | Wrong type, the content of tenant[compute][Region] is not a string | Wrong type, the content of tenant[objectstorage][Endpoint] is not a string | Wrong type, the content of tenant[compute][WhitelistTemplateRegexp] is not a string | Wrong type, the content of tenant[metadata][MetadataBucketName] is not a string"
 	require.EqualValues(t, msg, err.Error())
 }
 
