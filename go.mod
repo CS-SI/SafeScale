@@ -13,6 +13,7 @@ require (
 	github.com/eko/gocache/v2 v2.3.1
 	github.com/felixge/fgprof v0.9.3
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
+	github.com/go-rod/rod v0.112.6
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/gojuno/minimock/v3 v3.1.1
 	github.com/golang/protobuf v1.5.2
@@ -113,6 +114,9 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
+	github.com/ysmood/goob v0.4.0 // indirect
+	github.com/ysmood/gson v0.7.3 // indirect
+	github.com/ysmood/leakless v0.8.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230209215440-0dfe4f8abfcc // indirect

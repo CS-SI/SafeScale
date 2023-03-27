@@ -36,8 +36,6 @@ feature:
         - name: TomcatPort
           value: 9009
           description: Port tomcat must use
-        - name: tainted
-          value: 1
 
     install:
         bash:
@@ -61,12 +59,16 @@ feature:
                     user:
                         targets:
                             hosts: all
+                            masters: all
                         run: |
-                            {{ if not .ClusterFlavor }}
-                            id {{ .Username }} &>/dev/null && sfExit
-
+                            {{ if .Username }}
+                            {{ if eq .Username "cladm" }}
+                            sfExit
+                            {{ end }}
+                            id {{ .Username }} &>/dev/null && sfFail 191 "User {{ .Username }} already exists"
+                            echo "Creating user {{ .Username }}" >> ${SF_LOGDIR}/useradd.log
                             useradd {{ .Username }} --home-dir /home/{{ .Username }} --shell /bin/bash --comment "" --create-home || sfFail 192
-                            echo "{{ .Username }}:{{ .Password }}" | chpasswd || sfFail 193
+                            echo "{{ .Username }}:{{ .Password }}" | chpasswd || sfFail 193 "Failed to set password for user {{ .Username }}"
                             {{ end }}
                             sfExit
 
@@ -388,7 +390,7 @@ feature:
                             cat >${SF_ETCDIR}/remotedesktop/build/user-mapping.xml <<'EOF'
                             <user-mapping>
                                 <authorize
-                            {{ if not .ClusterFlavor }}
+                            {{ if ne .Username "cladm" }}
                                     username="{{ .Username }}"
                                     password="{{ .Password }}">
                             {{ else }}
@@ -400,12 +402,6 @@ feature:
                                         <protocol>vnc</protocol>
                                         <param name="hostname">{{ .HostIP }}</param>
                                         <param name="port">5900</param>
-                                        <param name="enable-sftp">true</param>
-                                        <param name="sftp-username">{{ .Username }}</param>
-                                        <param name="sftp-password">{{ .Password }}</param>
-                                        <param name="sftp-directory">/home/{{ .Username }}/Desktop</param>
-                                        <param name="sftp-root-directory">/home/{{ .Username }}</param>
-                                        <param name="sftp-server-alive-interval">60</param>
                                         <param name="color-depth">16</param>
                                     </connection>
                                 </authorize>
@@ -521,14 +517,6 @@ feature:
                             hosts: all
                             masters: all
                         run: |
-                            # Guacd need sshd to authorize password authentication...
-                            cat >>/etc/ssh/sshd_config <<-EOF
-                            # Allow Password Authentication from user {{.Username}} for guacd to work
-                            Match User {{.Username}} Address $(sfSubnetOfDockerBridge)
-                                PasswordAuthentication yes
-                            EOF
-                            systemctl reload sshd
-
                             cat >${SF_ETCDIR}/remotedesktop/docker-compose.yml <<-'EOF'
                             version: '2.1'
 
@@ -588,8 +576,8 @@ feature:
                             hosts: all
                             masters: all
                         run: |
-                            echo "docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 192
+                            echo "docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 192
                             docker image rm -f safescale/remotedesktop:latest || sfFail 193
                             rm -rf ${SF_ETCDIR}/remotedesktop
                             sfExit
