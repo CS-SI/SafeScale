@@ -381,7 +381,7 @@ var clusterCreateCommand = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "flavor, F",
-			Value: "K8S",
+			Value: "BOH",
 			Usage: `Defines the type of the cluster; can be BOH, K8S
 	Default sizing for each cluster type is:
 		BOH: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
