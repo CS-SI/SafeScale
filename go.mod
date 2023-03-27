@@ -16,7 +16,7 @@ require (
 	github.com/go-rod/rod v0.112.6
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/gojuno/minimock/v3 v3.1.1
-	github.com/golang/protobuf v1.5.2
+	github.com/golang/protobuf v1.5.3
 	github.com/google/gofuzz v1.2.0
 	github.com/gophercloud/gophercloud v1.2.0
 	github.com/improbable-eng/grpc-web v0.15.0
