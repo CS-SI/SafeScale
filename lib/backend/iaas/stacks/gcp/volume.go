@@ -25,11 +25,9 @@ import (
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/volumestate"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
@@ -237,74 +235,6 @@ func (s stack) InspectVolumeAttachment(ctx context.Context, hostRef, vaID string
 	}
 
 	return nil, abstract.ResourceNotFoundError("attachment", vaID)
-}
-
-func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if operation == "tags" {
-		// delete current nat route (is it really necessary ?)
-		routeName := params["subnetName"].(string) + "-nat-allowed"
-		xerr := s.rpcDeleteRoute(ctx, routeName)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				break
-			default:
-				return xerr
-			}
-		}
-
-		// create new nat route
-		_, xerr = s.rpcCreateRoute(ctx, params["networkName"].(string), params["subnetID"].(string), params["subnetName"].(string))
-		if xerr != nil {
-			return xerr
-		}
-
-		return nil
-	}
-
-	if operation == "removetag" {
-		subnetInstance, ok := params["subnetInstance"].(resources.Subnet)
-		if !ok {
-			return fail.InvalidParameterError("subnetInstance", "should be resources.Subnet")
-		}
-		instance, ok := params["instance"].(*operations.Host)
-		if !ok {
-			return fail.InvalidParameterError("instance", "should be *operations.Host")
-		}
-
-		hid, err := instance.GetID()
-		if err != nil {
-			return fail.ConvertError(err)
-		}
-
-		networkInstance, xerr := subnetInstance.InspectNetwork(context.Background())
-		if xerr != nil {
-			return xerr
-		}
-
-		nid, err := networkInstance.GetID()
-		if err != nil {
-			return fail.ConvertError(err)
-		}
-
-		// remove old nat route tag
-		xerr = s.rpcRemoveTagsFromInstance(ctx, hid, []string{"no-ip-" + subnetInstance.GetName()})
-		if xerr != nil {
-			return xerr
-		}
-
-		// add new nat route tag
-		xerr = s.rpcAddTagsToInstance(ctx, hid, []string{fmt.Sprintf(NATRouteTagFormat, nid)})
-		if xerr != nil {
-			return xerr
-		}
-
-		return nil
-	}
-
-	return nil
 }
 
 // DeleteVolumeAttachment ...
