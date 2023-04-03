@@ -92,6 +92,12 @@ func (s *ClusterListener) Create(inctx context.Context, in *protocol.ClusterCrea
 
 	ctx := job.Context()
 
+	cfg, xerr := job.Service().GetConfigurationOptions(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	in.OperatorUsername = cfg.GetString("OperatorUsername")
 	req, xerr := converters.ClusterRequestFromProtocolToAbstract(in)
 	if xerr != nil {
 		return nil, xerr
