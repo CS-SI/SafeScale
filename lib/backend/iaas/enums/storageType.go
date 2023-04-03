@@ -7,7 +7,7 @@ type StorageType int
 const (
 	S3 StorageType = iota
 	Swift
-	Azure
+	AzureStorage
 	GCE
 	Google
 )
@@ -16,17 +16,17 @@ var (
 	storageStringMap = map[string]StorageType{
 		"s3":     S3,
 		"swift":  Swift,
-		"azure":  Azure,
+		"azure":  AzureStorage,
 		"gce":    GCE,
 		"google": Google,
 	}
 
 	storageEnumMap = map[StorageType]string{
-		S3:     "S3",
-		Swift:  "Swift",
-		Azure:  "Azure",
-		GCE:    "GCE",
-		Google: "Google",
+		S3:           "S3",
+		Swift:        "Swift",
+		AzureStorage: "Azure",
+		GCE:          "GCE",
+		Google:       "Google",
 	}
 )
 
