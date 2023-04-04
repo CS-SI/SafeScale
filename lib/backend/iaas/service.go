@@ -524,6 +524,11 @@ func (instance service) ListTemplatesBySizing(
 			return
 		}
 
+		if len(allTpls) == 0 {
+			chRes <- result{nil, fail.NewError("no template found")}
+			return
+		}
+
 		scannerTpls := map[string]bool{}
 		askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinCPUFreq != 0
 		if askedForSpecificScannerInfo {
@@ -715,6 +720,11 @@ func (instance service) ListTemplatesBySizing(
 				newT := t
 				selectedTpls = append(selectedTpls, newT)
 			}
+		}
+
+		if len(selectedTpls) == 0 {
+			chRes <- result{nil, fail.NewError("no template found")}
+			return
 		}
 
 		sort.Sort(ByRankDRF(selectedTpls))
