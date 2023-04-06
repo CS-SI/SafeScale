@@ -51,7 +51,7 @@ require (
 	golang.org/x/term v0.6.0
 	golang.org/x/text v0.8.0
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.115.0
+	google.golang.org/api v0.116.0
 	google.golang.org/grpc v1.54.0
 	google.golang.org/protobuf v1.30.0
 )
