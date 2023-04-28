@@ -52,7 +52,7 @@ import (
 // TargetType returns the type of the target
 //
 // satisfies resources.Targetable interface
-func (instance *Cluster) TargetType() featuretargettype.Enum {
+func (instance *ClassicCluster) TargetType() featuretargettype.Enum {
 	return featuretargettype.Cluster
 }
 
@@ -71,7 +71,7 @@ func incrementExpVar(name string) {
 
 // InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 // satisfies resources.Targetable interface
-func (instance *Cluster) InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error) {
+func (instance *ClassicCluster) InstallMethods(ctx context.Context) (map[uint8]installmethod.Enum, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -94,7 +94,7 @@ func (instance *Cluster) InstallMethods(ctx context.Context) (map[uint8]installm
 }
 
 // InstalledFeatures returns a list of installed features
-func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.Error) {
+func (instance *ClassicCluster) InstalledFeatures(ctx context.Context) ([]string, fail.Error) {
 	if valid.IsNull(instance) {
 		return []string{}, fail.InvalidInstanceError()
 	}
@@ -122,7 +122,7 @@ func (instance *Cluster) InstalledFeatures(ctx context.Context) ([]string, fail.
 }
 
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
-func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v data.Map) (ferr fail.Error) {
+func (instance *ClassicCluster) ComplementFeatureParameters(inctx context.Context, v data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	defer elapsed(inctx, "ComplementFeatureParameters")()
 
@@ -245,9 +245,9 @@ func (instance *Cluster) ComplementFeatureParameters(inctx context.Context, v da
 	return nil
 }
 
-// RegisterFeature registers an installed Feature in metadata of a Cluster
+// RegisterFeature registers an installed Feature in metadata of a ClassicCluster
 // satisfies interface resources.Targetable
-func (instance *Cluster) RegisterFeature(
+func (instance *ClassicCluster) RegisterFeature(
 	ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool,
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -291,9 +291,9 @@ func (instance *Cluster) RegisterFeature(
 	return xerr
 }
 
-// UnregisterFeature unregisters a Feature from Cluster metadata
+// UnregisterFeature unregisters a Feature from ClassicCluster metadata
 // satisfies interface resources.Targetable
-func (instance *Cluster) UnregisterFeature(inctx context.Context, feat string) (ferr fail.Error) {
+func (instance *ClassicCluster) UnregisterFeature(inctx context.Context, feat string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -326,8 +326,8 @@ func (instance *Cluster) UnregisterFeature(inctx context.Context, feat string) (
 	return xerr
 }
 
-// ListEligibleFeatures returns a slice of features eligible to Cluster
-func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
+// ListEligibleFeatures returns a slice of features eligible to ClassicCluster
+func (instance *ClassicCluster) ListEligibleFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -369,7 +369,7 @@ func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resource
 }
 
 // ListInstalledFeatures returns a slice of installed features
-func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
+func (instance *ClassicCluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -394,8 +394,8 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 	return out, nil
 }
 
-// AddFeature installs a feature on the Cluster
-func (instance *Cluster) AddFeature(
+// AddFeature installs a feature on the ClassicCluster
+func (instance *ClassicCluster) AddFeature(
 	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
 ) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
@@ -417,8 +417,8 @@ func (instance *Cluster) AddFeature(
 	return feat.Add(ctx, instance, vars, settings)
 }
 
-// CheckFeature tells if a feature is installed on the Cluster
-func (instance *Cluster) CheckFeature(
+// CheckFeature tells if a feature is installed on the ClassicCluster
+func (instance *ClassicCluster) CheckFeature(
 	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
 ) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
@@ -440,8 +440,8 @@ func (instance *Cluster) CheckFeature(
 	return feat.Check(ctx, instance, vars, settings)
 }
 
-// RemoveFeature uninstalls a feature from the Cluster
-func (instance *Cluster) RemoveFeature(
+// RemoveFeature uninstalls a feature from the ClassicCluster
+func (instance *ClassicCluster) RemoveFeature(
 	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
 ) (resources.Results, fail.Error) {
 	if valid.IsNil(instance) {
@@ -467,7 +467,7 @@ func (instance *Cluster) RemoveFeature(
 var clusterFlavorScripts embed.FS
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *Cluster) ExecuteScript(
+func (instance *ClassicCluster) ExecuteScript(
 	inctx context.Context, tmplName string, variables data.Map, host resources.Host,
 ) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -614,7 +614,7 @@ func (instance *Cluster) ExecuteScript(
 }
 
 // installNodeRequirements ...
-func (instance *Cluster) installNodeRequirements(
+func (instance *ClassicCluster) installNodeRequirements(
 	inctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string, pars abstract.ClusterRequest,
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -864,7 +864,7 @@ func (instance *Cluster) installNodeRequirements(
 }
 
 // installReverseProxy installs reverseproxy
-func (instance *Cluster) installReverseProxy(inctx context.Context, params data.Map, req abstract.ClusterRequest) (ferr fail.Error) {
+func (instance *ClassicCluster) installReverseProxy(inctx context.Context, params data.Map, req abstract.ClusterRequest) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -900,7 +900,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 		clusterName := identity.Name
 
 		if !disabled {
-			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] adding feature 'edgeproxy4subnet'", clusterName)
 			feat, xerr := NewFeature(ctx, instance.Service(), "edgeproxy4subnet")
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -918,7 +918,7 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 
 			if !results.Successful() {
 				msg := results.AllErrorMessages()
-				chRes <- result{fail.NewError("[Cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)}
+				chRes <- result{fail.NewError("[ClassicCluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)}
 				return
 			}
 
@@ -942,12 +942,12 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 				return
 			}
 
-			logrus.WithContext(ctx).Debugf("[Cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] feature '%s' added successfully", clusterName, feat.GetName())
 			chRes <- result{nil}
 			return
 		}
 
-		logrus.WithContext(ctx).Infof("[Cluster %s] reverseproxy (feature 'edgeproxy4subnet' not installed because disabled", clusterName)
+		logrus.WithContext(ctx).Infof("[ClassicCluster %s] reverseproxy (feature 'edgeproxy4subnet' not installed because disabled", clusterName)
 		chRes <- result{nil}
 	}()
 	select {
@@ -960,8 +960,8 @@ func (instance *Cluster) installReverseProxy(inctx context.Context, params data.
 	}
 }
 
-// installRemoteDesktop installs feature remotedesktop on all masters of the Cluster
-func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data.Map, req abstract.ClusterRequest) (ferr fail.Error) {
+// installRemoteDesktop installs feature remotedesktop on all masters of the ClassicCluster
+func (instance *ClassicCluster) installRemoteDesktop(inctx context.Context, params data.Map, req abstract.ClusterRequest) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -995,7 +995,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 		}
 
 		if !disabled {
-			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'remotedesktop'", identity.Name)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] adding feature 'remotedesktop'", identity.Name)
 
 			feat, xerr := NewFeature(ctx, instance.Service(), "remotedesktop")
 			xerr = debug.InjectPlannedFail(xerr)
@@ -1004,7 +1004,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 				return
 			}
 
-			// Adds remotedesktop feature on Cluster (ie masters)
+			// Adds remotedesktop feature on ClassicCluster (ie masters)
 			params, _ := data.FromMap(params)
 			params["Username"] = "cladm"
 			params["Password"] = identity.AdminPassword
@@ -1024,7 +1024,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 
 			if !r.Successful() {
 				msg := r.AllErrorMessages()
-				xerr := fail.NewError("[Cluster %s] failed to add 'remotedesktop' failed: %s", identity.Name, msg)
+				xerr := fail.NewError("[ClassicCluster %s] failed to add 'remotedesktop' failed: %s", identity.Name, msg)
 				_ = xerr.Annotate("ran_but_failed", true)
 				chRes <- result{xerr}
 				return
@@ -1050,7 +1050,7 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 				return
 			}
 
-			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'remotedesktop' added successfully", identity.Name)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] feature 'remotedesktop' added successfully", identity.Name)
 		}
 
 		chRes <- result{nil}
@@ -1066,8 +1066,8 @@ func (instance *Cluster) installRemoteDesktop(inctx context.Context, params data
 	}
 }
 
-// installAnsible installs feature ansible on all masters of the Cluster
-func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) (ferr fail.Error) {
+// installAnsible installs feature ansible on all masters of the ClassicCluster
+func (instance *ClassicCluster) installAnsible(inctx context.Context, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	ctx, cancel := context.WithCancel(inctx)
@@ -1111,7 +1111,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 		}
 
 		if !disabled {
-			logrus.WithContext(ctx).Debugf("[Cluster %s] adding feature 'ansible'", identity.Name)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] adding feature 'ansible'", identity.Name)
 
 			// 1st, Feature 'ansible'
 			feat, xerr := NewFeature(ctx, instance.Service(), "ansible")
@@ -1121,7 +1121,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 				return
 			}
 
-			// Adds ansible feature on Cluster (ie masters)
+			// Adds ansible feature on ClassicCluster (ie masters)
 			params, _ := data.FromMap(params)
 			params["Username"] = "cladm"
 			params["Password"] = identity.AdminPassword
@@ -1134,10 +1134,10 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 
 			if !r.Successful() {
 				msg := r.AllErrorMessages()
-				chRes <- result{fail.NewError("[Cluster %s] failed to add 'ansible': %s", identity.Name, msg)}
+				chRes <- result{fail.NewError("[ClassicCluster %s] failed to add 'ansible': %s", identity.Name, msg)}
 				return
 			}
-			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'ansible' added successfully", identity.Name)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] feature 'ansible' added successfully", identity.Name)
 
 			// 2nd, Feature 'ansible-for-cluster' (which does the necessary for a dynamic inventory)
 			feat, xerr = NewFeature(ctx, instance.Service(), "ansible-for-cluster")
@@ -1156,7 +1156,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 
 			if !r.Successful() {
 				msg := r.AllErrorMessages()
-				chRes <- result{fail.NewError("[Cluster %s] failed to add 'ansible-for-cluster': %s", identity.Name, msg)}
+				chRes <- result{fail.NewError("[ClassicCluster %s] failed to add 'ansible-for-cluster': %s", identity.Name, msg)}
 				return
 			}
 
@@ -1180,7 +1180,7 @@ func (instance *Cluster) installAnsible(inctx context.Context, params data.Map) 
 				return
 			}
 
-			logrus.WithContext(ctx).Debugf("[Cluster %s] feature 'ansible-for-cluster' added successfully", identity.Name)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] feature 'ansible-for-cluster' added successfully", identity.Name)
 		}
 		chRes <- result{nil}
 

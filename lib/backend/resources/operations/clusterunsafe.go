@@ -31,35 +31,35 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// unsafeGetIdentity returns the identity of the Cluster
-func (instance *Cluster) unsafeGetIdentity(inctx context.Context) (_ abstract.ClusterIdentity, ferr fail.Error) {
+// unsafeGetIdentity returns the identity of the ClassicCluster
+func (instance *ClassicCluster) unsafeGetIdentity(inctx context.Context) (_ abstract.ClusterIdentity, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	return *instance.cluID, nil
 }
 
-// unsafeGetFlavor returns the flavor of the Cluster
-func (instance *Cluster) unsafeGetFlavor(ctx context.Context) (flavor clusterflavor.Enum, ferr fail.Error) {
+// unsafeGetFlavor returns the flavor of the ClassicCluster
+func (instance *ClassicCluster) unsafeGetFlavor(ctx context.Context) (flavor clusterflavor.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	return instance.cluID.Flavor, nil
 }
 
-// unsafeGetComplexity returns the complexity of the Cluster
-func (instance *Cluster) unsafeGetComplexity(ctx context.Context) (_ clustercomplexity.Enum, ferr fail.Error) {
+// unsafeGetComplexity returns the complexity of the ClassicCluster
+func (instance *ClassicCluster) unsafeGetComplexity(ctx context.Context) (_ clustercomplexity.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	return instance.cluID.Complexity, nil
 }
 
-// unsafeGetState returns the current state of the Cluster
+// unsafeGetState returns the current state of the ClassicCluster
 // Uses the "maker" ForceGetState
-func (instance *Cluster) unsafeGetState(inctx context.Context) (_ clusterstate.Enum, _ fail.Error) {
+func (instance *ClassicCluster) unsafeGetState(inctx context.Context) (_ clusterstate.Enum, _ fail.Error) {
 	return instance.state, nil
 }
 
 // unsafeListMasters is the not goroutine-safe equivalent of ListMasters, that does the real work
-func (instance *Cluster) unsafeListMasters(inctx context.Context) (_ resources.IndexedListOfClusterNodes, _ fail.Error) {
+func (instance *ClassicCluster) unsafeListMasters(inctx context.Context) (_ resources.IndexedListOfClusterNodes, _ fail.Error) {
 	defer elapsed(inctx, "unsafeListMasters")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -107,7 +107,7 @@ func (instance *Cluster) unsafeListMasters(inctx context.Context) (_ resources.I
 }
 
 // unsafeListMasterIDs is the not goroutine-safe version of ListNodeIDs and no parameter validation, that does the real work
-func (instance *Cluster) unsafeListMasterIDs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
+func (instance *ClassicCluster) unsafeListMasterIDs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -144,12 +144,12 @@ func (instance *Cluster) unsafeListMasterIDs(inctx context.Context) (_ data.Inde
 }
 
 // unsafeListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
-func (instance *Cluster) unsafeListMasterIPs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
+func (instance *ClassicCluster) unsafeListMasterIPs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
 	return instance.newunsafeListMasterIPs(inctx)
 }
 
 // unsafeListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
-func (instance *Cluster) newunsafeListMasterIPs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
+func (instance *ClassicCluster) newunsafeListMasterIPs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
 	defer elapsed(inctx, "newunsafeListMasterIPs")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -228,8 +228,8 @@ func (instance *Cluster) newunsafeListMasterIPs(inctx context.Context) (_ data.I
 
 }
 
-// unsafeListNodeIPs lists the IPs of the nodes in the Cluster
-func (instance *Cluster) newunsafeListNodeIPs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
+// unsafeListNodeIPs lists the IPs of the nodes in the ClassicCluster
+func (instance *ClassicCluster) newunsafeListNodeIPs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
 	defer elapsed(inctx, "newunsafeListNodeIPs")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -315,7 +315,7 @@ func (instance *Cluster) newunsafeListNodeIPs(inctx context.Context) (_ data.Ind
 
 // unsafeFindAvailableMaster is the not go-routine-safe version of FindAvailableMaster, that does the real work
 // Must be used with wisdom
-func (instance *Cluster) unsafeFindAvailableMaster(inctx context.Context) (_ resources.Host, _ fail.Error) {
+func (instance *ClassicCluster) unsafeFindAvailableMaster(inctx context.Context) (_ resources.Host, _ fail.Error) {
 	defer elapsed(inctx, "unsafeFindAvailableMaster")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -371,7 +371,7 @@ func (instance *Cluster) unsafeFindAvailableMaster(inctx context.Context) (_ res
 
 }
 
-func (instance *Cluster) trueListNodes(inctx context.Context) (_ []*abstract.HostFull, _ fail.Error) {
+func (instance *ClassicCluster) trueListNodes(inctx context.Context) (_ []*abstract.HostFull, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -414,7 +414,7 @@ func (instance *Cluster) trueListNodes(inctx context.Context) (_ []*abstract.Hos
 	}
 }
 
-func (instance *Cluster) trueListMasters(inctx context.Context) (_ []*abstract.HostFull, _ fail.Error) {
+func (instance *ClassicCluster) trueListMasters(inctx context.Context) (_ []*abstract.HostFull, _ fail.Error) {
 	defer elapsed(inctx, "trueListMasters")()
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -458,7 +458,7 @@ func (instance *Cluster) trueListMasters(inctx context.Context) (_ []*abstract.H
 	}
 }
 
-func (instance *Cluster) trueListGateways(inctx context.Context) (_ []*abstract.HostFull, _ fail.Error) {
+func (instance *ClassicCluster) trueListGateways(inctx context.Context) (_ []*abstract.HostFull, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -502,7 +502,7 @@ func (instance *Cluster) trueListGateways(inctx context.Context) (_ []*abstract.
 }
 
 // unsafeListNodes is the not goroutine-safe version of ListNodes and no parameter validation, that does the real work
-func (instance *Cluster) unsafeListNodes(inctx context.Context) (_ resources.IndexedListOfClusterNodes, _ fail.Error) {
+func (instance *ClassicCluster) unsafeListNodes(inctx context.Context) (_ resources.IndexedListOfClusterNodes, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -548,7 +548,7 @@ func (instance *Cluster) unsafeListNodes(inctx context.Context) (_ resources.Ind
 }
 
 // unsafeListNodeIDs is the not goroutine-safe version of ListNodeIDs and no parameter validation, that does the real work
-func (instance *Cluster) unsafeListNodeIDs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
+func (instance *ClassicCluster) unsafeListNodeIDs(inctx context.Context) (_ data.IndexedListOfStrings, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -589,7 +589,7 @@ func (instance *Cluster) unsafeListNodeIDs(inctx context.Context) (_ data.Indexe
 }
 
 // unsafeFindAvailableNode is the package restricted, not goroutine-safe, no parameter validation version of FindAvailableNode, that does the real work
-func (instance *Cluster) unsafeFindAvailableNode(inctx context.Context) (node resources.Host, _ fail.Error) {
+func (instance *ClassicCluster) unsafeFindAvailableNode(inctx context.Context) (node resources.Host, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 

@@ -2410,7 +2410,7 @@ func (e *ServiceTest) WaitHostReady(ctx context.Context, hostParam stacks.HostPa
 	return nil, nil
 }
 
-/* Cluster */
+/* ClassicCluster */
 func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.ClusterRequest, shorten bool) (*abstract.ClusterIdentity, fail.Error) { // nolint
 
 	var (
@@ -2450,7 +2450,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 		},
 	}
 
-	// Cluster network
+	// ClassicCluster network
 	if !e._hasInternalData(fmt.Sprintf("networks/ByID/%s", request.NetworkID)) {
 		_, xerr = e.CreateNetwork(ctx, abstract.NetworkRequest{
 			Name:          request.NetworkID,
@@ -2467,7 +2467,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 		return aci, xerr
 	}
 
-	// Cluster subnet
+	// ClassicCluster subnet
 	if !e._hasInternalData(fmt.Sprintf("subnets/ByID/%s", name)) {
 		_, xerr := e.CreateSubnet(ctx, abstract.SubnetRequest{
 			NetworkID:      network.ID,
@@ -2490,7 +2490,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 		return aci, xerr
 	}
 
-	// Cluster securityGroups
+	// ClassicCluster securityGroups
 	sgNames := []string{"PublicIPSecurityGroupID", "GWSecurityGroupID", "InternalSecurityGroupID"}
 	for _, sgName := range sgNames {
 		if !e._hasInternalData(fmt.Sprintf("security-groups/byID/%s.%s", network.ID, sgName)) {
@@ -2535,7 +2535,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 		}
 	}
 
-	// Cluster gateway
+	// ClassicCluster gateway
 	if !e._hasInternalData(fmt.Sprintf("hosts/ByID/gw-%s", name)) {
 		_, _, xerr = e.CreateHost(ctx, abstract.HostRequest{
 			ResourceName:   fmt.Sprintf("gw-%s", name),
@@ -2655,7 +2655,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 
 	if shorten { // To make cluster.Create result without have to folow procedure
 
-		// Cluster master subnet
+		// ClassicCluster master subnet
 		if !e._hasInternalData(fmt.Sprintf("subnets/ByID/%s-master-1", name)) {
 			_, xerr := e.CreateSubnet(ctx, abstract.SubnetRequest{
 				NetworkID:      network.ID,
@@ -2693,7 +2693,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			return aci, xerr
 		}
 
-		// Cluster master
+		// ClassicCluster master
 		if !e._hasInternalData(fmt.Sprintf("hosts/ByID/%s-master-1", name)) {
 			_, _, xerr = e.CreateHost(ctx, abstract.HostRequest{
 				ResourceName:   fmt.Sprintf("%s-master-1", name),
@@ -2723,7 +2723,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			}
 		}
 
-		// Cluster node subnet
+		// ClassicCluster node subnet
 		if !e._hasInternalData(fmt.Sprintf("subnets/ByID/%s-node-1", name)) {
 			_, xerr := e.CreateSubnet(ctx, abstract.SubnetRequest{
 				NetworkID:      network.ID,
@@ -2761,7 +2761,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			return aci, xerr
 		}
 
-		// Cluster node
+		// ClassicCluster node
 		if !e._hasInternalData(fmt.Sprintf("hosts/ByID/%s-node-1", name)) {
 			_, _, xerr = e.CreateHost(ctx, abstract.HostRequest{
 				ResourceName:   fmt.Sprintf("%s-node-1", name),
@@ -2791,7 +2791,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 			}
 		}
 
-		// Cluster
+		// ClassicCluster
 		if !e._hasInternalData(fmt.Sprintf("clusters/%s", name)) {
 			e._setInternalData(fmt.Sprintf("clusters/%s", name), aci)
 		}
@@ -2801,9 +2801,9 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 		if xerr != nil {
 			return aci, xerr
 		}
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			return aci, fail.ConvertError(errors.New("resource.Cluster not castable to operation.Cluster"))
+			return aci, fail.ConvertError(errors.New("resource.ClassicCluster not castable to operation.ClassicCluster"))
 		}
 		xerr = ocluster.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			xerr = props.Alter(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
@@ -2927,7 +2927,7 @@ func (e *ServiceTest) _CreateCluster(ctx context.Context, request abstract.Clust
 
 	} else {
 
-		// Create Cluster
+		// Create ClassicCluster
 		cluster, xerr := NewCluster(ctx, e)
 		if xerr != nil {
 			return aci, xerr

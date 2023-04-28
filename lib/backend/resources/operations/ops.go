@@ -430,7 +430,7 @@ func loadCluster(inctx context.Context, svc iaas.Service, name string) (_ resour
 		defer close(chRes)
 
 		// trick to avoid collisions
-		var kt *Cluster
+		var kt *ClassicCluster
 		cachename := fmt.Sprintf("%T/%s", kt, name)
 
 		cache, xerr := svc.GetCache(ctx)
@@ -457,15 +457,15 @@ func loadCluster(inctx context.Context, svc iaas.Service, name string) (_ resour
 		}
 
 		var (
-			clusterInstance *Cluster
+			clusterInstance *ClassicCluster
 			ok              bool
 		)
-		if clusterInstance, ok = anon.(*Cluster); !ok {
-			chRes <- result{nil, fail.InconsistentError("value found in Cluster cache for key '%s' is not a Cluster", name)}
+		if clusterInstance, ok = anon.(*ClassicCluster); !ok {
+			chRes <- result{nil, fail.InconsistentError("value found in ClassicCluster cache for key '%s' is not a ClassicCluster", name)}
 			return
 		}
 		if clusterInstance == nil {
-			chRes <- result{nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)}
+			chRes <- result{nil, fail.InconsistentError("nil value found in ClassicCluster cache for key '%s'", name)}
 			return
 		}
 

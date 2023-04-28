@@ -250,7 +250,7 @@ func (s *ClusterListener) Stop(inctx context.Context, in *protocol.Reference) (e
 // Delete a cluster
 func (s *ClusterListener) Delete(inctx context.Context, in *protocol.ClusterDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot delete Cluster")
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete ClassicCluster")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -482,7 +482,7 @@ func (s *ClusterListener) InspectNode(inctx context.Context, in *protocol.Cluste
 // DeleteNode removes node(s) from a cluster
 func (s *ClusterListener) DeleteNode(inctx context.Context, in *protocol.ClusterDeleteNodeRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot delete Cluster Node")
+	defer fail.OnExitWrapError(inctx, &err, "cannot delete ClassicCluster Node")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -561,7 +561,7 @@ func (s *ClusterListener) StopNode(inctx context.Context, in *protocol.ClusterNo
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return empty, fail.NotFoundError("failed to find node %s in Cluster '%s'", nodeRefLabel, clusterName)
+			return empty, fail.NotFoundError("failed to find node %s in ClassicCluster '%s'", nodeRefLabel, clusterName)
 		default:
 			return empty, xerr
 		}
@@ -608,7 +608,7 @@ func (s *ClusterListener) StartNode(inctx context.Context, in *protocol.ClusterN
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return empty, fail.NotFoundError("failed to find a node %s in Cluster '%s'", nodeRefLabel, clusterName)
+			return empty, fail.NotFoundError("failed to find a node %s in ClassicCluster '%s'", nodeRefLabel, clusterName)
 		default:
 			return empty, xerr
 		}
@@ -655,7 +655,7 @@ func (s *ClusterListener) StateNode(inctx context.Context, in *protocol.ClusterN
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return out, fail.NotFoundError("failed to find a node %s in Cluster '%s'", nodeRefLabel, clusterName)
+			return out, fail.NotFoundError("failed to find a node %s in ClassicCluster '%s'", nodeRefLabel, clusterName)
 		default:
 			return out, xerr
 		}
@@ -785,7 +785,7 @@ func (s *ClusterListener) InspectMaster(inctx context.Context, in *protocol.Clus
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return nil, fail.NotFoundError("failed to find a master %s in Cluster '%s'", masterRefLabel, clusterName)
+			return nil, fail.NotFoundError("failed to find a master %s in ClassicCluster '%s'", masterRefLabel, clusterName)
 		default:
 			return nil, xerr
 		}
@@ -799,10 +799,10 @@ func (s *ClusterListener) InspectMaster(inctx context.Context, in *protocol.Clus
 	return out, nil
 }
 
-// StopMaster stops a master of the Cluster
+// StopMaster stops a master of the ClassicCluster
 func (s *ClusterListener) StopMaster(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot stop Cluster master")
+	defer fail.OnExitWrapError(inctx, &err, "cannot stop ClassicCluster master")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -835,7 +835,7 @@ func (s *ClusterListener) StopMaster(inctx context.Context, in *protocol.Cluster
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return empty, fail.NotFoundError("failed to find a master %s in Cluster '%s'", masterRefLabel, clusterName)
+			return empty, fail.NotFoundError("failed to find a master %s in ClassicCluster '%s'", masterRefLabel, clusterName)
 		default:
 			return empty, xerr
 		}
@@ -844,10 +844,10 @@ func (s *ClusterListener) StopMaster(inctx context.Context, in *protocol.Cluster
 	return empty, nil
 }
 
-// StartMaster starts a stopped master of the Cluster
+// StartMaster starts a stopped master of the ClassicCluster
 func (s *ClusterListener) StartMaster(inctx context.Context, in *protocol.ClusterNodeRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot start Cluster master")
+	defer fail.OnExitWrapError(inctx, &err, "cannot start ClassicCluster master")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -882,7 +882,7 @@ func (s *ClusterListener) StartMaster(inctx context.Context, in *protocol.Cluste
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return empty, fail.NotFoundError("failed to find a master %s in Cluster '%s'", masterRefLabel, clusterName)
+			return empty, fail.NotFoundError("failed to find a master %s in ClassicCluster '%s'", masterRefLabel, clusterName)
 		default:
 			return empty, xerr
 		}
@@ -891,10 +891,10 @@ func (s *ClusterListener) StartMaster(inctx context.Context, in *protocol.Cluste
 	return empty, nil
 }
 
-// StateMaster returns the state of a master of the Cluster
+// StateMaster returns the state of a master of the ClassicCluster
 func (s *ClusterListener) StateMaster(inctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.HostStatus, err error) {
 	defer fail.OnExitConvertToGRPCStatus(inctx, &err)
-	defer fail.OnExitWrapError(inctx, &err, "cannot get Cluster master state")
+	defer fail.OnExitWrapError(inctx, &err, "cannot get ClassicCluster master state")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -929,7 +929,7 @@ func (s *ClusterListener) StateMaster(inctx context.Context, in *protocol.Cluste
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return out, fail.NotFoundError("failed to find a master %s in Cluster '%s'", masterRefLabel, clusterName)
+			return out, fail.NotFoundError("failed to find a master %s in ClassicCluster '%s'", masterRefLabel, clusterName)
 		default:
 			return out, xerr
 		}

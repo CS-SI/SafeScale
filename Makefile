@@ -17,7 +17,7 @@ COVEREXECS=cli/safescale/safescale-cover$(EXT) cli/safescaled/safescaled-cover$(
 STRINGER := golang.org/x/tools/cmd/stringer
 PROTOC := google.golang.org/protobuf
 PROTOBUF := google.golang.org/protobuf/protoc-gen-go
-PROTOVER := v1.28.1
+PROTOVER := v1.30.0
 
 # Build tools
 CONVEY := github.com/smartystreets/goconvey
