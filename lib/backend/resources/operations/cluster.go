@@ -1624,7 +1624,7 @@ func (instance *ClassicCluster) deleteMaster(ctx context.Context, host string) (
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	// FIXME: OPP Bad idea, the first thing to go must be the resource, then the metadata; if not we can have zombie instances without metadata (it happened)
+	// FIXME: Bad idea, the first thing to go must be the resource, then the metadata; if not we can have zombie instances without metadata (it happened)
 	// which means that the code doing the "restore" never worked
 
 	xerr := instance.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2251,7 +2251,7 @@ func (instance *ClassicCluster) configureCluster(inctx context.Context, req abst
 
 		parameters := efe
 
-		// FIXME: OPP This should use instance.AddFeature instead
+		// FIXME: This should use instance.AddFeature instead
 
 		// Install reverse-proxy feature on ClassicCluster (gateways)
 		fla, xerr := instance.unsafeGetFlavor(inctx)
@@ -2756,7 +2756,7 @@ func (instance *ClassicCluster) configureNodesFromList(ctx context.Context, name
 					node:        nodes[captured],
 					variables:   parameters,
 					clusterName: name,
-					request: abstract.ClusterRequest{ // FIXME: OPP This requires another hack
+					request: abstract.ClusterRequest{ // FIXME: This requires another hack
 						DisabledDefaultFeatures: disabled,
 					},
 				})

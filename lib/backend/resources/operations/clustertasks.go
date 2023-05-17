@@ -100,7 +100,7 @@ func (instance *ClassicCluster) taskCreateCluster(inctx context.Context, params 
 			}
 
 			// this is the real constructor of the cluster, the one that populates the cluster with meaningful data
-			// FIXME: OPP Having this function here is a severe problem, this function should be IN LoadCluster
+			// FIXME: Having this function here is a severe problem, this function should be IN LoadCluster
 			// Create first metadata of ClassicCluster after initialization
 			xerr = instance.firstLight(ctx, req)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -394,7 +394,7 @@ func (instance *ClassicCluster) firstLight(inctx context.Context, req abstract.C
 				return xerr
 			}
 
-			// FIXME: OPP This is the true cluster constructor
+			// FIXME: This is the true cluster constructor
 			// Initializes instance
 			ci := abstract.NewClusterIdentity()
 			ci.Name = req.Name
@@ -1207,7 +1207,7 @@ func (instance *ClassicCluster) createHostResources(
 			}
 
 			// Starting from here, if exiting with error, delete nodes
-			// FIXME: OPP, another mistake
+			// FIXME: another lifecycle mistake
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !keepOnFailure {
@@ -1631,7 +1631,7 @@ func (instance *ClassicCluster) taskCreateMasters(inctx context.Context, params 
 			logrus.WithContext(ctx).Debugf("Creating %d master%s...", p.count, strprocess.Plural(p.count))
 
 			tcount := uint(math.Max(4, float64(p.count)))
-			timeout := time.Duration(tcount) * timings.HostCreationTimeout() // FIXME: OPP This became the timeout for the whole cluster creation....
+			timeout := time.Duration(tcount) * timings.HostCreationTimeout() // FIXME: This became the timeout for the whole cluster creation....
 
 			winSize := 8
 			st, xerr := instance.Service().GetProviderName()

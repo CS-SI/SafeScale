@@ -130,13 +130,6 @@ func (instance *ClassicCluster) ComplementFeatureParameters(inctx context.Contex
 		return fail.InvalidInstanceError()
 	}
 
-	defer func() {
-		if ferr != nil {
-			// FIXME: OPP Remove this later
-			logrus.WithContext(inctx).Errorf("Unexpected error: %s", ferr)
-		}
-	}()
-
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 

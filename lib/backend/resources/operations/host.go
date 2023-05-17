@@ -699,7 +699,7 @@ func (instance *Host) implCreate(
 			}
 
 			// Check if Host exists but is not managed by SafeScale
-			// FIXME: OPP Another mistake, we are not looking for the managed tag
+			// FIXME: Another mistake, we are not looking for the managed tag
 			_, xerr = svc.InspectHost(ctx, abstract.NewHostCore().SetName(hostReq.ResourceName))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {

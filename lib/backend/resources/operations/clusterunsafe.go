@@ -18,6 +18,9 @@ package operations
 
 import (
 	"context"
+	"fmt"
+	"github.com/sirupsen/logrus"
+	"strings"
 	"sync"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -387,12 +390,14 @@ func (instance *ClassicCluster) trueListNodes(inctx context.Context) (_ []*abstr
 
 			svc := instance.Service()
 
+			var answer []*abstract.HostFull
+
 			cluID, xerr := instance.GetID()
 			if xerr != nil {
 				return result{}, fail.ConvertError(xerr)
 			}
 
-			listed, err := svc.ListHostsWithTags(ctx, nil, map[string]string{
+			tagged, err := svc.ListHostsWithTags(ctx, nil, map[string]string{
 				"type":      "node",
 				"clusterID": cluID,
 			})
@@ -400,7 +405,33 @@ func (instance *ClassicCluster) trueListNodes(inctx context.Context) (_ []*abstr
 				return result{}, err
 			}
 
-			return result{listed, nil}, nil
+			legacy, err := svc.ListHosts(ctx, true)
+			if err != nil {
+				return result{}, err
+			}
+
+			added := make(map[string]bool)
+			for _, v := range legacy {
+				if strings.HasPrefix(v.Core.Name, fmt.Sprintf("%s-node-", instance.GetName())) {
+					added[v.Core.ID] = true
+					answer = append(answer, v)
+				}
+			}
+
+			for _, v := range tagged {
+				if !added[v.Core.ID] {
+					answer = append(answer, v)
+					added[v.Core.ID] = true
+				}
+			}
+
+			for _, v := range instance.nodes {
+				if !added[v] {
+					logrus.Warningf("node %s in cluster %s is in metadata but does not exist", v, instance.GetName())
+				}
+			}
+
+			return result{answer, nil}, nil
 		}()
 		chRes <- gres
 	}()
@@ -436,7 +467,9 @@ func (instance *ClassicCluster) trueListMasters(inctx context.Context) (_ []*abs
 				return result{}, fail.ConvertError(xerr)
 			}
 
-			listed, err := svc.ListHostsWithTags(ctx, nil, map[string]string{
+			var answer []*abstract.HostFull
+
+			tagged, err := svc.ListHostsWithTags(ctx, nil, map[string]string{
 				"type":      "master",
 				"clusterID": cluID,
 			})
@@ -444,7 +477,33 @@ func (instance *ClassicCluster) trueListMasters(inctx context.Context) (_ []*abs
 				return result{}, err
 			}
 
-			return result{listed, nil}, nil
+			legacy, err := svc.ListHosts(ctx, true)
+			if err != nil {
+				return result{}, err
+			}
+
+			added := make(map[string]bool)
+			for _, v := range legacy {
+				if strings.HasPrefix(v.Core.Name, fmt.Sprintf("%s-master-", instance.GetName())) {
+					added[v.Core.ID] = true
+					answer = append(answer, v)
+				}
+			}
+
+			for _, v := range tagged {
+				if !added[v.Core.ID] {
+					answer = append(answer, v)
+					added[v.Core.ID] = true
+				}
+			}
+
+			for _, v := range instance.masters {
+				if !added[v] {
+					logrus.Warningf("master %s in cluster %s is in metadata but does not exist", v, instance.GetName())
+				}
+			}
+
+			return result{answer, nil}, nil
 		}()
 		chRes <- gres
 	}()
@@ -479,7 +538,9 @@ func (instance *ClassicCluster) trueListGateways(inctx context.Context) (_ []*ab
 				return result{}, fail.ConvertError(xerr)
 			}
 
-			listed, err := svc.ListHostsWithTags(ctx, nil, map[string]string{
+			var answer []*abstract.HostFull
+
+			tagged, err := svc.ListHostsWithTags(ctx, nil, map[string]string{
 				"type":      "gateway",
 				"clusterID": cluID,
 			})
@@ -487,7 +548,31 @@ func (instance *ClassicCluster) trueListGateways(inctx context.Context) (_ []*ab
 				return result{}, err
 			}
 
-			return result{listed, nil}, nil
+			legacy, err := svc.ListHosts(ctx, true)
+			if err != nil {
+				return result{}, err
+			}
+
+			added := make(map[string]bool)
+			for _, v := range legacy {
+				if strings.HasPrefix(v.Core.Name, fmt.Sprintf("gw-%s", instance.GetName())) {
+					added[v.Core.ID] = true
+					answer = append(answer, v)
+				}
+				if strings.HasPrefix(v.Core.Name, fmt.Sprintf("gw2-%s", instance.GetName())) {
+					added[v.Core.ID] = true
+					answer = append(answer, v)
+				}
+			}
+
+			for _, v := range tagged {
+				if !added[v.Core.ID] {
+					answer = append(answer, v)
+					added[v.Core.ID] = true
+				}
+			}
+
+			return result{answer, nil}, nil
 		}()
 		chRes <- gres
 	}()
