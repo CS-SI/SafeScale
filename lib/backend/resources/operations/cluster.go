@@ -848,7 +848,7 @@ func (instance *ClassicCluster) Start(ctx context.Context) (ferr fail.Error) {
 				)
 			}
 
-			gatewayID = networkV3.GatewayID // FIXME: OPP I came here for
+			gatewayID = networkV3.GatewayID
 			secondaryGatewayID = networkV3.SecondaryGatewayID
 			return nil
 		})

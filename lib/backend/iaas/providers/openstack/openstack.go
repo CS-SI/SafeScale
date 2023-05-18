@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -69,11 +70,47 @@ func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }
 
+func recast(in any) (map[string]any, error) {
+	out := make(map[string]any)
+	if in == nil {
+		return out, nil
+	}
+
+	if input, ok := in.(map[string]any); ok {
+		return input, nil
+	}
+
+	input, ok := in.(map[any]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid input type: %T", in)
+	}
+
+	for k, v := range input {
+		nk, ok := k.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid key type: %T", k)
+		}
+		out[nk] = v
+	}
+	return out, nil
+}
+
 // Build builds a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
-	identity, _ := params["identity"].(map[string]interface{}) // nolint
-	compute, _ := params["compute"].(map[string]interface{})   // nolint
-	network, _ := params["network"].(map[string]interface{})   // nolint
+	identity, err := recast(params["identity"])
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	compute, err := recast(params["compute"])
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	network, err := recast(params["network"])
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
 
 	identityEndpoint, _ := identity["IdentityEndpoint"].(string) // nolint
 	username, _ := identity["Username"].(string)                 // nolint
@@ -223,7 +260,7 @@ next:
 
 func getSuffix(params map[string]interface{}) string {
 	suffix := ""
-	if osto, ok := params["objectstorage"].(map[string]interface{}); ok {
+	if osto, err := recast(params["objectstorage"]); err == nil {
 		if val, ok := osto["Suffix"].(string); ok {
 			suffix = val
 			if suffix != "" {
@@ -231,7 +268,7 @@ func getSuffix(params map[string]interface{}) string {
 			}
 		}
 	}
-	if meta, ok := params["metadata"].(map[string]interface{}); ok {
+	if meta, err := recast(params["metadata"]); err == nil {
 		if val, ok := meta["Suffix"].(string); ok {
 			suffix = val
 		}

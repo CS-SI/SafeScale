@@ -1080,7 +1080,7 @@ func (s stack) identifyOpenstackSubnetsAndPorts(ctx context.Context, request abs
 			)
 		}
 
-		// FIXME: OPP workaround for Stein disaster, so we have to make sure it is OVH
+		// FIXME: workaround for Stein disaster, so we have to make sure it is OVH
 		if !s.cfgOpts.Safe && s.cfgOpts.ProviderName == "ovh" {
 			port, xerr = s.rpcChangePortSecurity(ctx, port.ID, false)
 			if xerr != nil {

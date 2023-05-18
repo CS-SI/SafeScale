@@ -262,7 +262,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 			return nil, fail.NewError("error loading template for phase '%s'", phase)
 		}
 	} else {
-		// FIXME: OPP If /tmp/+ userdataScripts[phase] exists, use the local file
+		// FIXME: If /tmp/+ userdataScripts[phase] exists, use the local file
 		var tmplString []byte
 		tmplString, err = scripts.ReadFile(fmt.Sprintf(userdataScripts[phase], userdataScriptProvider))
 		if err != nil {

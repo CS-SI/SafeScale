@@ -35,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
-	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 )
@@ -89,11 +88,45 @@ func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }
 
+func recast(in any) (map[string]any, error) {
+	out := make(map[string]any)
+	if in == nil {
+		return out, nil
+	}
+
+	if input, ok := in.(map[string]any); ok {
+		return input, nil
+	}
+
+	input, ok := in.(map[any]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid input type: %T", in)
+	}
+
+	for k, v := range input {
+		nk, ok := k.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid key type: %T", k)
+		}
+		out[nk] = v
+	}
+	return out, nil
+}
+
 // Build initializes a new FlexibleEngine instance from parameters
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
-	identity, _ := params["identity"].(map[string]interface{}) // nolint
-	compute, _ := params["compute"].(map[string]interface{})   // nolint
-	network, _ := params["network"].(map[string]interface{})   // nolint
+	identity, err := recast(params["identity"])
+	if err != nil {
+		return &provider{}, fail.ConvertError(err)
+	}
+	compute, err := recast(params["compute"])
+	if err != nil {
+		return &provider{}, fail.ConvertError(err)
+	}
+	network, err := recast(params["network"])
+	if err != nil {
+		return &provider{}, fail.ConvertError(err)
+	}
 
 	identityEndpoint, _ := identity["EndPoint"].(string) // nolint
 	if identityEndpoint == "" {
@@ -156,14 +189,6 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:           region,
 		AvailabilityZone: zone,
 		AllowReauth:      true,
-	}
-
-	err := validation.ValidateStruct(&authOptions,
-		validation.Field(&authOptions.Region, validation.Required, validation.Match(regexp.MustCompile("^[-a-zA-Z0-9-_]+$"))),
-		validation.Field(&authOptions.AvailabilityZone, validation.Required, validation.Match(regexp.MustCompile("^[-a-zA-Z0-9-_]+$"))),
-	)
-	if err != nil {
-		return nil, fail.NewError("Structure validation failure: %v", err)
 	}
 
 	suffix := getSuffix(params)
@@ -282,7 +307,7 @@ next:
 
 func getSuffix(params map[string]interface{}) string {
 	suffix := ""
-	if osto, ok := params["objectstorage"].(map[string]interface{}); ok {
+	if osto, err := recast(params["objectstorage"]); err == nil {
 		if val, ok := osto["Suffix"].(string); ok {
 			suffix = val
 			if suffix != "" {
@@ -290,7 +315,7 @@ func getSuffix(params map[string]interface{}) string {
 			}
 		}
 	}
-	if meta, ok := params["metadata"].(map[string]interface{}); ok {
+	if meta, err := recast(params["metadata"]); err == nil {
 		if val, ok := meta["Suffix"].(string); ok {
 			suffix = val
 		}

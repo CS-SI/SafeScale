@@ -17,6 +17,8 @@
 package tests
 
 // TODO: NOTICE Side-effects imports here
+// NOTICE: NOTICE Side-effects imports here
+
 import (
 	"context"
 	"fmt"

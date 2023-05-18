@@ -188,7 +188,7 @@ func (s stack) InspectImage(ctx context.Context, id string) (_ *abstract.Image, 
 		return nil, xerr
 	}
 
-	logrus.WithContext(ctx).Warnf("Image full info: %s", litter.Sdump(resp)) // FIXME: OPP Remove this later
+	logrus.WithContext(ctx).Warnf("Image full info: %s", litter.Sdump(resp)) // FIXME: Remove this later
 
 	return toAbstractImage(*resp), nil
 }

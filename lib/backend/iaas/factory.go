@@ -260,7 +260,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 					}
 				}
 			}
-			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {
+			if metadataConfig, err := recast(tenant["metadata"]); err == nil {
 				if key, ok := metadataConfig["CryptKey"].(string); ok {
 					ek, err := crypt.NewEncryptionKey([]byte(key))
 					if err != nil {
@@ -279,7 +279,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		newS.metadataBucket = metadataBucket
 		newS.metadataKey = metadataCryptKey
 
-		// FIXME: OPP, Wrong, this is input validation, and should be into Build.
+		// FIXME: Wrong, this is input validation, and should be into Build.
 		if xerr := validateRegexps(newS, tenant); xerr != nil {
 			return nullService(), xerr
 		}
@@ -304,9 +304,9 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 
 // validateRegexps validates regexp values from tenants file
 func validateRegexps(svc *service, tenant map[string]interface{}) fail.Error {
-	compute, ok := tenant["compute"].(map[string]interface{})
-	if !ok {
-		return fail.InvalidParameterError("tenant['compute']", "is not a map")
+	compute, err := recast(tenant["compute"])
+	if err != nil {
+		return fail.ConvertError(err)
 	}
 
 	res, xerr := validateRegexpsOfKeyword("WhitelistTemplateRegexp", compute["WhitelistTemplateRegexp"])
@@ -371,10 +371,10 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		found  bool
 	)
 
-	identity, _ := tenant["identity"].(map[string]interface{})      // nolint
-	compute, _ := tenant["compute"].(map[string]interface{})        // nolint
-	ostorage, _ := tenant["objectstorage"].(map[string]interface{}) // nolint
-	client, _ := tenant["client"].(string)                          // nolint
+	identity, _ := recast(tenant["identity"])      // nolint
+	compute, _ := recast(tenant["compute"])        // nolint
+	ostorage, _ := recast(tenant["objectstorage"]) // nolint
+	client, _ := tenant["client"].(string)         // nolint
 
 	if config.Type, ok = ostorage["Type"].(string); !ok {
 		return config, fail.SyntaxError("missing setting 'Type' in 'objectstorage' section")
@@ -598,13 +598,11 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		found  bool
 	)
 
-	// FIXME: This code is ancient and doesn't provide nor hints nor protection against formatting
-
-	identity, _ := tenant["identity"].(map[string]interface{})      // nolint
-	compute, _ := tenant["compute"].(map[string]interface{})        // nolint
-	ostorage, _ := tenant["objectstorage"].(map[string]interface{}) // nolint
-	metadata, _ := tenant["metadata"].(map[string]interface{})      // nolint
-	client, _ := tenant["client"].(string)                          // nolint
+	identity, _ := recast(tenant["identity"])      // nolint
+	compute, _ := recast(tenant["compute"])        // nolint
+	ostorage, _ := recast(tenant["objectstorage"]) // nolint
+	metadata, _ := recast(tenant["metadata"])      // nolint
+	client, _ := tenant["client"].(string)         // nolint
 
 	if config.Type, ok = metadata["Type"].(string); !ok {
 		if config.Type, ok = ostorage["Type"].(string); !ok {
@@ -901,12 +899,38 @@ func getTenantsFromViperCfg(v *viper.Viper) ([]map[string]interface{}, *viper.Vi
 	return tenantsCfg, v, nil
 }
 
+func recast(in any) (map[string]any, error) {
+	out := make(map[string]any)
+	if in == nil {
+		return out, nil
+	}
+
+	if input, ok := in.(map[string]any); ok {
+		return input, nil
+	}
+
+	input, ok := in.(map[any]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid input type: %T", in)
+	}
+
+	for k, v := range input {
+		nk, ok := k.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid key type: %T", k)
+		}
+		out[nk] = v
+	}
+	return out, nil
+}
+
 // validateTenant makes sure the contents of tenants.toml or tenants.yaml are correct
 func validateTenant(tenant map[string]interface{}) fail.Error {
 	var (
 		name      string
 		client    enums.Client
 		err       error
+		team      map[string]interface{}
 		identity  map[string]interface{}
 		compute   map[string]interface{}
 		network   map[string]interface{}
@@ -999,7 +1023,10 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		errors = append(errors, fail.SyntaxError("No section 'identity' found for tenant %s", name))
 	} else {
 		if identity, ok = maybe.(map[string]interface{}); !ok {
-			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity] is not a map[string]any"))
+			identity, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity] is not a map[string]any"))
+			}
 		}
 	}
 
@@ -1008,44 +1035,103 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		errors = append(errors, fail.SyntaxError("Missing field 'compute' for tenant"))
 	} else {
 		if compute, ok = maybe.(map[string]interface{}); !ok {
-			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[compute] is not a map[string]any"))
+			compute, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[compute] is not a map[string]any"))
+			}
+		}
+	}
+
+	maybe, ok = tenant["team"]
+	if ok {
+		if team, ok = maybe.(map[string]interface{}); !ok {
+			team, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[team] is not a map[string]any"))
+			}
 		}
 	}
 
 	maybe, ok = tenant["network"]
 	if ok {
 		network, ok = maybe.(map[string]interface{})
-
 		if !ok {
-			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[network] is not a map[string]any"))
+			network, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[network] is not a map[string]any"))
+			}
 		}
 	}
 
 	maybe, ok = tenant["objectstorage"]
 	if ok {
 		ostorage, ok = maybe.(map[string]interface{})
-
 		if !ok {
-			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[objectstorage] is not a map[string]any"))
+			ostorage, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[objectstorage] is not a map[string]any"))
+			}
 		}
 	}
 
 	maybe, ok = tenant["metadata"]
 	if ok {
 		metadata, ok = maybe.(map[string]interface{})
-
 		if !ok {
-			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[metadata] is not a map[string]any"))
+			metadata, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[metadata] is not a map[string]any"))
+			}
 		}
 	}
 
 	xerr := checkSection(tenant, Sections)
-
 	if xerr != nil {
 		errors = append(errors, xerr)
 	}
 
-	if client != 5 {
+	// validate the new "team" section
+	if team != nil {
+		if maybe, ok := team["TerraformVersion"]; ok {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of TerraformVersion is not a string"))
+			}
+		}
+
+		if maybe, ok := team["WithConsul"]; ok {
+			if _, ok := maybe.(bool); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of WithConsul is not a boolean"))
+			}
+		}
+
+		if maybe, ok := team["ConsulURL"]; ok {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of ConsulURL is not a string"))
+			} else {
+				_, err = url.ParseRequestURI(val)
+				if err != nil {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be a valid URL", "ConsulURL", "team"))
+				}
+			}
+		}
+	}
+
+	switch client {
+	case enums.GCP:
+		if maybe, ok = identity["User"]; ok {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity][User] is not a string"))
+			} else {
+				_, err := mail.ParseAddress(val)
+
+				if err != nil {
+					errors = append(errors, fail.SyntaxError("User in identity section must be a valid email"))
+				}
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("missing setting 'User' field in 'identity' section"))
+		}
+	default:
 		userKeysToCheck := []string{
 			"AccessKey",
 			"OpenstackID",
@@ -1073,7 +1159,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		} else {
 			if val, ok = maybe.(string); !ok {
 				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey))
-			} else if client == 2 && searchKey == "Username" {
+			} else if client == enums.Cloudferro && searchKey == "Username" {
 				_, err = mail.ParseAddress(val)
 
 				if err != nil {
@@ -1085,23 +1171,9 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 				}
 			}
 		}
-	} else {
-		if maybe, ok = identity["User"]; ok {
-			if val, ok = maybe.(string); !ok {
-				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity][User] is not a string"))
-			} else {
-				_, err := mail.ParseAddress(val)
-
-				if err != nil {
-					errors = append(errors, fail.SyntaxError("User in identity section must be a valid email"))
-				}
-			}
-		} else {
-			errors = append(errors, fail.SyntaxError("missing setting 'User' field in 'identity' section"))
-		}
 	}
 
-	if client == 8 {
+	if client == enums.Outscale {
 		key := "UserID"
 		found = false
 
@@ -1124,7 +1196,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
-	if client == 0 || client == 2 || client == 7 {
+	if client == enums.OVH || client == enums.Cloudferro || client == enums.OpenStack {
 		key := "ApplicationKey"
 		found = false
 
@@ -1252,7 +1324,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
-	if client == 2 || client == 4 || client == 9 {
+	if client == enums.Cloudferro || client == enums.FlexibleEngine {
 		key := "AvailabilityZone"
 		found = false
 
@@ -1330,7 +1402,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		}
 	}
 
-	if client == 8 {
+	if client == enums.Outscale {
 		key := "Subregion"
 		found = false
 
@@ -1353,7 +1425,7 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 
 	}
 
-	if client == 4 || client == 8 {
+	if client == enums.FlexibleEngine || client == enums.Outscale {
 		key = "VPCName"
 		found = false
 
@@ -1465,7 +1537,6 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	if maybe, ok = compute[key]; ok {
 		if val, ok = maybe.(string); ok {
 			_, err = url.ParseRequestURI(val)
-
 			if err != nil {
 				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid url", key, "compute"))
 			}
@@ -1479,7 +1550,6 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	if maybe, ok = compute[key]; ok {
 		if val, ok = maybe.(string); ok {
 			_, err = url.ParseRequestURI(val)
-
 			if err != nil {
 				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid url", key, "compute"))
 			}
@@ -1499,31 +1569,26 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 	}
 
 	xerr = checkSection(identity, IdentityField)
-
 	if xerr != nil {
 		errors = append(errors, xerr)
 	}
 
 	xerr = checkSection(compute, computeField)
-
 	if xerr != nil {
 		errors = append(errors, xerr)
 	}
 
 	xerr = checkSection(network, Networkfield)
-
 	if xerr != nil {
 		errors = append(errors, xerr)
 	}
 
 	xerr = checkSection(ostorage, OStorageField)
-
 	if xerr != nil {
 		errors = append(errors, xerr)
 	}
 
 	xerr = checkSection(metadata, MetadataField)
-
 	if xerr != nil {
 		errors = append(errors, xerr)
 	}

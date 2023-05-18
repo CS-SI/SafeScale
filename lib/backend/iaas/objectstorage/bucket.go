@@ -197,7 +197,7 @@ func (instance bucket) ListObjects(ctx context.Context, path string, prefix stri
 func (instance bucket) Browse(
 	ctx context.Context, path string, prefix string, callback func(Object) fail.Error,
 ) (ferr fail.Error) {
-	// FIXME: OPP Make this ctx sensitive
+	// FIXME: Make this ctx sensitive
 	defer fail.OnPanic(&ferr)
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
