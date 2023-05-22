@@ -420,8 +420,10 @@ func (instance *ClassicCluster) trueListNodes(inctx context.Context) (_ []*abstr
 
 			for _, v := range tagged {
 				if !added[v.Core.ID] {
-					answer = append(answer, v)
-					added[v.Core.ID] = true
+					if strings.HasPrefix(v.Core.Name, fmt.Sprintf("%s-node-", instance.GetName())) {
+						answer = append(answer, v)
+						added[v.Core.ID] = true
+					}
 				}
 			}
 
@@ -492,8 +494,10 @@ func (instance *ClassicCluster) trueListMasters(inctx context.Context) (_ []*abs
 
 			for _, v := range tagged {
 				if !added[v.Core.ID] {
-					answer = append(answer, v)
-					added[v.Core.ID] = true
+					if strings.HasPrefix(v.Core.Name, fmt.Sprintf("%s-master-", instance.GetName())) {
+						answer = append(answer, v)
+						added[v.Core.ID] = true
+					}
 				}
 			}
 
@@ -567,8 +571,10 @@ func (instance *ClassicCluster) trueListGateways(inctx context.Context) (_ []*ab
 
 			for _, v := range tagged {
 				if !added[v.Core.ID] {
-					answer = append(answer, v)
-					added[v.Core.ID] = true
+					if strings.Contains(v.Core.Name, fmt.Sprintf("-%s", instance.GetName())) {
+						answer = append(answer, v)
+						added[v.Core.ID] = true
+					}
 				}
 			}
 
