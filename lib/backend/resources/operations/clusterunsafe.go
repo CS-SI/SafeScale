@@ -427,7 +427,7 @@ func (instance *ClassicCluster) trueListNodes(inctx context.Context) (_ []*abstr
 
 			for _, v := range instance.nodes {
 				if !added[v] {
-					logrus.Warningf("node %s in cluster %s is in metadata but does not exist", v, instance.GetName())
+					logrus.WithContext(inctx).Debugf("node %s in cluster %s is in metadata but does not exist", v, instance.GetName())
 				}
 			}
 
@@ -499,7 +499,7 @@ func (instance *ClassicCluster) trueListMasters(inctx context.Context) (_ []*abs
 
 			for _, v := range instance.masters {
 				if !added[v] {
-					logrus.Warningf("master %s in cluster %s is in metadata but does not exist", v, instance.GetName())
+					logrus.WithContext(inctx).Debugf("master %s in cluster %s is in metadata but does not exist", v, instance.GetName())
 				}
 			}
 
