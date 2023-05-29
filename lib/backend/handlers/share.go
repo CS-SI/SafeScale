@@ -91,12 +91,19 @@ func (handler *shareHandler) Create(
 		return nil, fail.InvalidParameterError("path", "cannot be empty")
 	}
 
-	shareInstance, xerr := sharefactory.New(handler.job.Service())
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	shareInstance, xerr := sharefactory.New(handler.job.Service(), isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostName)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostName, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -147,8 +154,15 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
 	svc := handler.job.Service()
-	objs, xerr := sharefactory.New(svc)
+	objs, xerr := sharefactory.New(svc, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -168,7 +182,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	}
 
 	for _, serverID := range servers {
-		host, xerr := hostfactory.Load(handler.job.Context(), svc, serverID)
+		host, xerr := hostfactory.Load(handler.job.Context(), svc, serverID, isTerraform)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -215,6 +229,13 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 		return nil, fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
 	// Retrieve info about the share
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
@@ -223,7 +244,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 		return nil, xerr
 	}
 
-	target, xerr := hostfactory.Load(ctx, svc, hostRef)
+	target, xerr := hostfactory.Load(ctx, svc, hostRef, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -253,6 +274,13 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 		return fail.InvalidParameterError("hostRef", "cannot be empty string")
 	}
 
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
 	objs, xerr := sharefactory.Load(ctx, svc, shareRef)
@@ -260,7 +288,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (ferr fail.Error)
 		return xerr
 	}
 
-	target, xerr := hostfactory.Load(ctx, svc, hostRef)
+	target, xerr := hostfactory.Load(ctx, svc, hostRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}

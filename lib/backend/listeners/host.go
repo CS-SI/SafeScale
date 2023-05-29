@@ -237,6 +237,40 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 		sizing = &abstract.HostSizingRequirements{MinGPU: -1}
 	}
 
+	isTerraform := false
+	pn, xerr := job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	if isTerraform {
+		domain := in.Domain
+		domain = strings.Trim(domain, ".")
+		if domain != "" {
+			domain = "." + domain
+		}
+
+		hostReq := abstract.HostRequest{
+			ResourceName:  name,
+			HostName:      name + domain,
+			Single:        in.GetSingle(),
+			KeepOnFailure: in.GetKeepOnFailure(),
+			Subnets:       nil, // FIXME: Populate this
+			SubnetNames:   []string{in.GetNetwork()},
+			ImageRef:      in.GetImageId(),
+			DiskSize:      int(in.GetDisk()),
+		}
+
+		handler := handlers.NewHostHandler(job)
+		hostInstance, xerr := handler.Create(hostReq, *sizing)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		return hostInstance.ToProtocol(ctx)
+	}
+
 	// Determine if the Subnet(s) to use exist
 	// Because of legacy, the subnet can be fully identified by network+subnet, or can be identified by network+network,
 	// because previous release of SafeScale created network AND subnet with the same name
@@ -250,7 +284,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 	}
 	if len(in.GetSubnets()) > 0 {
 		for _, v := range in.GetSubnets() {
-			subnetInstance, xerr = subnetfactory.Load(ctx, job.Service(), networkRef, v)
+			subnetInstance, xerr = subnetfactory.Load(ctx, job.Service(), networkRef, v, false)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -274,7 +308,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 		}
 	}
 	if len(subnets) == 0 && networkRef != "" {
-		subnetInstance, xerr = subnetfactory.Load(ctx, job.Service(), networkRef, networkRef)
+		subnetInstance, xerr = subnetfactory.Load(ctx, job.Service(), networkRef, networkRef, false)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -308,6 +342,7 @@ func (s *HostListener) Create(inctx context.Context, in *protocol.HostDefinition
 		Single:        in.GetSingle(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 		Subnets:       subnets,
+		SubnetNames:   []string{in.GetNetwork()},
 		ImageRef:      in.GetImageId(),
 		DiskSize:      int(in.GetDisk()),
 	}

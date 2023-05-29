@@ -134,7 +134,7 @@ func (instance *Network) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 //   - *fail.ErrNotAvailable: a Network with the same name is currently created
 //   - *fail.ErrDuplicate: a Network with the same name already exist on Provider Side (managed or not by SafeScale)
 //   - *fail.ErrAborted: abort signal has been received
-func (instance *Network) Create(inctx context.Context, req abstract.NetworkRequest) (_ fail.Error) {
+func (instance *Network) Create(inctx context.Context, req *abstract.NetworkRequest, snreq *abstract.SubnetRequest) (_ fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -229,7 +229,7 @@ func (instance *Network) Create(inctx context.Context, req abstract.NetworkReque
 
 			// Create the Network
 			logrus.WithContext(ctx).Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
-			abstractNetwork, xerr = svc.CreateNetwork(ctx, req)
+			abstractNetwork, xerr = svc.CreateNetwork(ctx, *req)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				rv := fail.Wrap(xerr, "failure creating provider network")
@@ -279,58 +279,6 @@ func (instance *Network) carry(ctx context.Context, clonable data.Clonable) (fer
 	}
 
 	return nil
-}
-
-// Import imports an existing Network in SafeScale metadata
-func (instance *Network) Import(ctx context.Context, ref string) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	if instance == nil {
-		return fail.InvalidInstanceError()
-	}
-	if !valid.IsNil(instance) && instance.MetadataCore.IsTaken() {
-		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
-	}
-	if ctx == nil {
-		return fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	// instance.lock.Lock()
-	// defer instance.lock.Unlock()
-
-	// Check if Network already exists and is managed by SafeScale
-	svc := instance.Service()
-	_, xerr := LoadNetwork(ctx, svc, ref)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError2(ctx, xerr)
-		default:
-			return xerr
-		}
-	} else {
-		return fail.DuplicateError("cannot import Network '%s': there is already such a Network in metadata", ref)
-	}
-
-	// Verify if the subnet already exist and in this case is not managed by SafeScale
-	abstractNetwork, xerr := svc.InspectNetworkByName(ctx, ref)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			abstractNetwork, xerr = svc.InspectNetwork(ctx, ref)
-			if xerr != nil {
-				return xerr
-			}
-		default:
-			return xerr
-		}
-	}
-
-	// Write subnet object metadata
-	// logrus.WithContext(ctx).Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
-	abstractNetwork.Imported = true
-	return instance.carry(ctx, abstractNetwork)
 }
 
 // Browse walks through all the metadata objects in subnet

@@ -60,32 +60,43 @@ func (handler *labelHandler) List(listTag bool) (list []resources.Label, ferr fa
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	browseInstance, xerr := labelfactory.New(handler.job.Service())
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	browseInstance, xerr := labelfactory.New(handler.job.Service(), isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = browseInstance.Browse(handler.job.Context(), func(label *abstract.Label) fail.Error {
-		labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Service(), label.ID)
-		if innerXErr != nil {
-			return innerXErr
-		}
+	if !isTerraform {
+		xerr = browseInstance.Browse(handler.job.Context(), func(label *abstract.Label) fail.Error {
+			labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Service(), label.ID, isTerraform)
+			if innerXErr != nil {
+				return innerXErr
+			}
 
-		isTag, innerXErr := labelInstance.IsTag(handler.job.Context())
-		if innerXErr != nil {
-			return innerXErr
-		}
+			isTag, innerXErr := labelInstance.IsTag(handler.job.Context())
+			if innerXErr != nil {
+				return innerXErr
+			}
 
-		if listTag == isTag {
-			list = append(list, labelInstance)
-		}
+			if listTag == isTag {
+				list = append(list, labelInstance)
+			}
 
-		return nil
-	})
-	if xerr != nil {
-		return nil, xerr
+			return nil
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+		return list, nil
 	}
-	return list, nil
+
+	return labelfactory.LoadAll(handler.job.Context(), handler.job.Service(), isTerraform)
 }
 
 // Delete deletes Label referenced by ref
@@ -107,7 +118,14 @@ func (handler *labelHandler) Delete(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref, isTerraform)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -140,7 +158,14 @@ func (handler *labelHandler) Inspect(ref string) (_ resources.Label, ferr fail.E
 		return nil, fail.InvalidParameterError("ref", "cannot be empty!")
 	}
 
-	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), ref, isTerraform)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -172,8 +197,14 @@ func (handler *labelHandler) Create(name string, hasDefault bool, defaultValue s
 		return nil, fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	var xerr fail.Error
-	instance, xerr = labelfactory.New(handler.job.Service())
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr = labelfactory.New(handler.job.Service(), isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -15,6 +15,7 @@ const (
 	OpenStack
 	Outscale
 	_
+	Azure
 )
 
 var (
@@ -26,6 +27,7 @@ var (
 		"gcp":            GCP,
 		"openstack":      OpenStack,
 		"outscale":       Outscale,
+		"azuretf":        Azure,
 	}
 
 	clientEnumMap = map[Client]string{
@@ -36,6 +38,7 @@ var (
 		GCP:            "GCP",
 		OpenStack:      "OpenStack",
 		Outscale:       "Outscale",
+		Azure:          "Azure",
 	}
 )
 

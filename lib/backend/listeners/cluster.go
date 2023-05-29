@@ -690,7 +690,7 @@ func (s *ClusterListener) ListMasters(inctx context.Context, in *protocol.Refere
 	}
 	defer job.Close()
 
-	handler := handlers.NewClusterHandler(job) // FIXME: Another mistake
+	handler := handlers.NewClusterHandler(job)
 	list, xerr := handler.ListMasters(clusterName)
 	if xerr != nil {
 		return nil, xerr

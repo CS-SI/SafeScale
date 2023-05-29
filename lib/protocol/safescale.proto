@@ -1060,6 +1060,7 @@ message SecurityGroupRule {
 message SecurityGroupRuleRequest {
 	Reference group = 1;
 	SecurityGroupRule rule = 2;
+	Reference resource_group = 3;
 }
 
 message SecurityGroupRuleDeleteRequest {

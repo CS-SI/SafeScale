@@ -27,8 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/ipversion"
-	serializer "github.com/CS-SI/SafeScale/v22/lib/utils/data/serialize"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/stretchr/testify/require"
 )
@@ -126,12 +124,12 @@ func TestNetwork_Create(t *testing.T) {
 		require.EqualValues(t, reflect.TypeOf(err).String(), "*fail.ErrNotFound")
 		require.Contains(t, err.Error(), "neither networks/byName/mynetwork nor networks/byID/mynetwork were found in the bucket")
 
-		xerr := onetwork.Create(ctx, abstract.NetworkRequest{
+		xerr := onetwork.Create(ctx, &abstract.NetworkRequest{
 			Name:          "mynetwork",
 			CIDR:          "192.168.16.4/32",
 			DNSServers:    []string{"8.8.8.8", "8.8.4.4"},
 			KeepOnFailure: false,
-		})
+		}, nil)
 		require.Contains(t, xerr.Error(), "calling method from a nil pointer")
 
 		anetwork := &abstract.Network{
@@ -156,12 +154,12 @@ func TestNetwork_Create(t *testing.T) {
 		require.Nil(t, xerr)
 
 		onetwork = &Network{MetadataCore: mc}
-		xerr = onetwork.Create(nil, abstract.NetworkRequest{ // nolint
+		xerr = onetwork.Create(nil, &abstract.NetworkRequest{ // nolint
 			Name:          "mynetwork",
 			CIDR:          "192.168.16.4/32",
 			DNSServers:    []string{"8.8.8.8", "8.8.4.4"},
 			KeepOnFailure: false,
-		})
+		}, nil)
 
 	})
 	require.Nil(t, xerr)
@@ -213,47 +211,6 @@ func TestNetwork_Carry(t *testing.T) {
 
 		xerr = onetwork.carry(ctx, anetwork)
 		require.Nil(t, xerr)
-
-	})
-	require.Nil(t, xerr)
-
-}
-
-func TestNetwork_Import(t *testing.T) {
-
-	network := abstract.NewNetwork()
-	network.ID = "Network_ID"
-	network.Name = "Network_Name"
-
-	ctx := context.Background()
-
-	xerr := NewServiceTest(t, func(svc *ServiceTest) {
-
-		fld, xerr := NewMetadataFolder(svc, "networks")
-		xerr = debug.InjectPlannedFail(xerr)
-		require.Nil(t, xerr)
-
-		props, xerr := serializer.NewJSONProperties("resources.network")
-		xerr = debug.InjectPlannedFail(xerr)
-		require.Nil(t, xerr)
-
-		onetwork := &Network{
-			MetadataCore: &MetadataCore{
-				kind:       "network",
-				folder:     fld,
-				properties: props,
-			},
-		}
-
-		err := svc._setInternalData("networks/byID/Network_ID", network)
-		require.Nil(t, err)
-		err = svc._setInternalData("networks/byName/Network_Name", network)
-		require.Nil(t, err)
-
-		// @TODO: check about this behaviour, not sure that is correct
-		xerr = onetwork.Import(ctx, "Network_ID")
-		require.Contains(t, xerr.Error(), "cannot import Network")
-		require.Contains(t, xerr.Error(), "is already such a Network in metadata")
 
 	})
 	require.Nil(t, xerr)

@@ -26,7 +26,7 @@ import (
 )
 
 // New creates an instance of resources.Share
-func New(svc iaas.Service) (resources.Share, fail.Error) {
+func New(svc iaas.Service, terraform bool) (resources.Share, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}

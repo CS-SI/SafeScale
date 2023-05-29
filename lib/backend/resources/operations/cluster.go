@@ -88,39 +88,6 @@ type ClassicCluster struct {
 	randomDelayCh   <-chan int
 }
 
-// NewCluster is the constructor of resources.Cluster struct
-func NewCluster(inctx context.Context, svc iaas.Service) (_ *ClassicCluster, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
-	initial := &abstract.ClusterIdentity{}
-	coreInstance, xerr := NewCore(svc, clusterKind, clustersFolderName, initial)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	instance := &ClassicCluster{
-		MetadataCore: coreInstance,
-		cluID:        initial,
-	}
-	xerr = instance.startRandomDelayGenerator(ctx, 0, 2000)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	instance.nodeIPs = make(data.IndexedListOfStrings)
-	instance.masterIPs = make(data.IndexedListOfStrings)
-
-	return instance, nil
-}
-
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
 func (instance *ClassicCluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -286,9 +253,14 @@ func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (d
 		ga, gerr := func() (_ resources.Cluster, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			clusterInstance, xerr := NewCluster(ctx, svc)
+			clusterInstanceRaw, xerr := NewCluster(ctx, svc)
 			if xerr != nil {
 				return nil, xerr
+			}
+
+			clusterInstance, ok := clusterInstanceRaw.(*ClassicCluster)
+			if !ok {
+				return nil, fail.InvalidParameterError("clusterInstanceRaw", "should have been a *ClassicCluster")
 			}
 
 			if xerr = clusterInstance.Read(ctx, name); xerr != nil {

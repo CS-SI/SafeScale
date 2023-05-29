@@ -420,16 +420,14 @@ func (instance *ClassicCluster) trueListNodes(inctx context.Context) (_ []*abstr
 
 			for _, v := range tagged {
 				if !added[v.Core.ID] {
-					if strings.HasPrefix(v.Core.Name, fmt.Sprintf("%s-node-", instance.GetName())) {
-						answer = append(answer, v)
-						added[v.Core.ID] = true
-					}
+					answer = append(answer, v)
+					added[v.Core.ID] = true
 				}
 			}
 
 			for _, v := range instance.nodes {
 				if !added[v] {
-					logrus.WithContext(inctx).Debugf("node %s in cluster %s is in metadata but does not exist", v, instance.GetName())
+					logrus.Warningf("node %s in cluster %s is in metadata but does not exist", v, instance.GetName())
 				}
 			}
 
@@ -494,16 +492,14 @@ func (instance *ClassicCluster) trueListMasters(inctx context.Context) (_ []*abs
 
 			for _, v := range tagged {
 				if !added[v.Core.ID] {
-					if strings.HasPrefix(v.Core.Name, fmt.Sprintf("%s-master-", instance.GetName())) {
-						answer = append(answer, v)
-						added[v.Core.ID] = true
-					}
+					answer = append(answer, v)
+					added[v.Core.ID] = true
 				}
 			}
 
 			for _, v := range instance.masters {
 				if !added[v] {
-					logrus.WithContext(inctx).Debugf("master %s in cluster %s is in metadata but does not exist", v, instance.GetName())
+					logrus.Warningf("master %s in cluster %s is in metadata but does not exist", v, instance.GetName())
 				}
 			}
 
@@ -571,10 +567,8 @@ func (instance *ClassicCluster) trueListGateways(inctx context.Context) (_ []*ab
 
 			for _, v := range tagged {
 				if !added[v.Core.ID] {
-					if strings.Contains(v.Core.Name, fmt.Sprintf("-%s", instance.GetName())) {
-						answer = append(answer, v)
-						added[v.Core.ID] = true
-					}
+					answer = append(answer, v)
+					added[v.Core.ID] = true
 				}
 			}
 

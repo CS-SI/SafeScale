@@ -12,6 +12,13 @@ var Sections = []string{
 	"Client",
 	"provider",
 	"clientType",
+	"team",
+}
+
+var TeamField = []string{
+	"WithConsul",
+	"ConsulURL",
+	"TerraformVersion",
 }
 
 var IdentityField = []string{
@@ -49,6 +56,12 @@ var IdentityField = []string{
 	"token_uri",
 	"auth_provider_x509_cert_url",
 	"client_x509_cert_url",
+
+	// Azure specific
+	"ClientID",
+	"ClientSecret",
+	"SubscriptionID",
+	"TenantID",
 }
 
 var computeField = []string{

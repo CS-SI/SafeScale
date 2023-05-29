@@ -1131,6 +1131,25 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		} else {
 			errors = append(errors, fail.SyntaxError("missing setting 'User' field in 'identity' section"))
 		}
+	case enums.Azure:
+		// ALL the following keys are mandatory and cannot be empty
+		userKeysToCheck := []string{
+			"ClientID",
+			"ClientSecret",
+			"TenantID",
+			"SubscriptionID",
+		}
+		for _, key := range userKeysToCheck {
+			var val string
+			if maybe, ok = identity[key]; !ok {
+				errors = append(errors, fail.SyntaxError("missing setting '%s' field in 'identity' section", key))
+			} else if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity][%s] is not a string", key))
+			}
+			if val == "" {
+				errors = append(errors, fail.SyntaxError("setting '%s' field in 'identity' section cannot be empty", key))
+			}
+		}
 	default:
 		userKeysToCheck := []string{
 			"AccessKey",
@@ -1566,6 +1585,11 @@ func validateTenant(tenant map[string]interface{}) fail.Error {
 		} else if maybe.(int64) < 1 {
 			errors = append(errors, fail.SyntaxError("%s in %s section must be greater than 0", key, "compute"))
 		}
+	}
+
+	xerr = checkSection(team, TeamField)
+	if xerr != nil {
+		errors = append(errors, xerr)
 	}
 
 	xerr = checkSection(identity, IdentityField)

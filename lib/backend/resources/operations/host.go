@@ -2305,7 +2305,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 				CIDR:          abstract.SingleHostNetworkCIDR,
 				KeepOnFailure: true,
 			}
-			xerr = networkInstance.Create(ctx, request)
+			xerr = networkInstance.Create(ctx, &request, nil)
 			if xerr != nil {
 				// handle a particular case of *fail.ErrDuplicate...
 				switch cerr := xerr.(type) {

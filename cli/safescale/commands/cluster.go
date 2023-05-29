@@ -291,12 +291,10 @@ func outputClusterConfig(cluster *protocol.ClusterResponse) (map[string]interfac
 // convertToMap converts clusterInstance to its equivalent in map[string]interface{},
 // with fields converted to string and used as keys
 func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Error) {
-	// identity := c.Identity(concurrency.RootTask()
-
 	result := map[string]interface{}{
-		"name":             c.GetIdentity().GetName(),
-		"flavor":           c.GetIdentity().GetFlavor(),
-		"flavor_label":     clusterflavor.Enum(c.GetIdentity().GetFlavor()).String(),
+		"name":   c.GetIdentity().GetName(),
+		"flavor": c.GetIdentity().GetFlavor(),
+		// "flavor_label":     clusterflavor.Enum(c.GetIdentity().GetFlavor()).String(),
 		"complexity":       c.GetIdentity().GetComplexity(),
 		"complexity_label": clustercomplexity.Enum(c.GetIdentity().GetComplexity()).String(),
 		"admin_login":      "cladm",
@@ -321,7 +319,7 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 		result["subnet_id"] = c.Network.SubnetId
 		result["cidr"] = c.Network.Cidr
 		result["default_route_ip"] = c.Network.DefaultRouteIp
-		result["primary_gateway_ip"] = c.Network.GatewayIp
+		result["primary_gateway_ip"] = c.Network.GatewayIp // FIXME: Maybe this should be DefaultRouteIp
 		result["endpoint_ip"] = c.Network.EndpointIp
 		result["primary_public_ip"] = c.Network.EndpointIp
 		if sgwpubip = c.Network.SecondaryPublicIp; sgwpubip != "" {

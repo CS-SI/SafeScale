@@ -814,7 +814,7 @@ func (instance *ClassicCluster) createNetworkingResources(inctx context.Context,
 					return ar, ar.rErr
 				}
 
-				xerr = networkInstance.Create(ctx, networkReq)
+				xerr = networkInstance.Create(ctx, &networkReq, nil)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					ar := result{nil, nil, fail.Wrap(xerr, "failed to create Network '%s'", req.Name)}

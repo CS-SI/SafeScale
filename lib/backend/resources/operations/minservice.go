@@ -14,6 +14,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/eko/gocache/v2/cache"
+	tfjson "github.com/hashicorp/terraform-json"
 	"io"
 	"regexp"
 	"sync"
@@ -23,6 +24,21 @@ import (
 type minService struct {
 	loc objectstorage.Location
 	aob abstract.ObjectStorageBucket
+}
+
+func (m minService) Render(ctx context.Context, kind abstract.Enum, workDir string, options map[string]any) ([]abstract.RenderedContent, fail.Error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m minService) GetTerraformState(ctx context.Context) (_ *tfjson.State, ferr fail.Error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m minService) ExportFromState(ctx context.Context, kind abstract.Enum, state *tfjson.State, input any, id string) (any, fail.Error) {
+	// TODO implement me
+	panic("implement me")
 }
 
 func (m minService) FilterImages(ctx context.Context, s string) ([]*abstract.Image, fail.Error) {

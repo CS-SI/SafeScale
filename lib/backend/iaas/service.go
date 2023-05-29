@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/sanity-io/litter"
 	"os"
 	"regexp"
 	"sort"
@@ -885,13 +886,16 @@ func (instance service) ListImages(inctx context.Context, all bool) ([]*abstract
 }
 
 // SearchImage search an image corresponding to OS Name
-func (instance service) SearchImage(inctx context.Context, osname string) (*abstract.Image, fail.Error) {
+func (instance service) SearchImage(inctx context.Context, inosname string) (*abstract.Image, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if osname == "" {
+	if inosname == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("osname")
 	}
+
+	// work in caps
+	osname := strings.ToUpper(inosname)
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -940,6 +944,14 @@ func (instance service) SearchImage(inctx context.Context, osname string) (*abst
 					minWFScore = wfScore
 					wfSelect = i
 				}
+			} else {
+				wfScore := 2 * smetrics.WagnerFischer(paddedNormalizedOSName, normalizedImageName, 1, 1, 2)
+				logrus.WithContext(ctx).Tracef("%*s (%s): Alternate, WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
+
+				if minWFScore == -1 || wfScore < minWFScore {
+					minWFScore = wfScore
+					wfSelect = i
+				}
 			}
 		}
 
@@ -948,7 +960,7 @@ func (instance service) SearchImage(inctx context.Context, osname string) (*abst
 			return
 		}
 
-		logrus.WithContext(ctx).Infof("Selected image: '%s' (ID='%s')", imgs[wfSelect].Name, imgs[wfSelect].ID)
+		logrus.WithContext(ctx).Infof("Selected image: '%s' (ID='%s'), '%s'", imgs[wfSelect].Name, imgs[wfSelect].ID, litter.Sdump(imgs[wfSelect]))
 		chRes <- result{imgs[wfSelect], nil}
 
 	}()

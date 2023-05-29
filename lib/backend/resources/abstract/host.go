@@ -153,6 +153,9 @@ type Image struct {
 	Description string `json:"description,omitempty"`
 	StorageType string `json:"storage_type,omitempty"`
 	DiskSize    int64  `json:"disk_size_Gb,omitempty"`
+	Publisher   string `json:"publisher,omitempty"`
+	Offer       string `json:"offer,omitempty"`
+	Sku         string `json:"sku,omitempty"`
 }
 
 // OK ...
@@ -169,6 +172,7 @@ type HostRequest struct {
 	ResourceName     string              // ResourceName contains the name of the compute resource
 	HostName         string              // HostName contains the hostname on the system (if empty, will use ResourceName)
 	Subnets          []*Subnet           // lists the Subnets the host must be connected to
+	SubnetNames      []string            // SubnetNames lists the names of the Subnets the host must be connected to
 	DefaultRouteIP   string              // DefaultRouteIP is the IP used as default route
 	TemplateID       string              // TemplateID is ID of the template used to size the host (see SelectTemplates)
 	TemplateRef      string              // TemplateRef is the name or ID of the template used to size the host (see SelectTemplates)
@@ -213,6 +217,7 @@ type HostTemplate struct {
 	GPUNumber int     `json:"gpu_number,omitempty"`
 	GPUType   string  `json:"gpu_type,omitempty"`
 	CPUFreq   float32 `json:"cpu_freq,omitempty"`
+	CPUPerf   float32 `json:"cpu_perf,omitempty"`
 	ID        string  `json:"id,omitempty"`
 	Name      string  `json:"name,omitempty"`
 }

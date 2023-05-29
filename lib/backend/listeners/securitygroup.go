@@ -298,6 +298,8 @@ func (s *SecurityGroupListener) AddRule(inctx context.Context, in *protocol.Secu
 		return nil, xerr
 	}
 
+	rule.Network = in.ResourceGroup.String()
+
 	job, xerr := PrepareJob(inctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/rule/add", sgRef))
 	if xerr != nil {
 		return nil, xerr
@@ -397,7 +399,7 @@ func (s *SecurityGroupListener) Bonds(inctx context.Context, in *protocol.Securi
 
 	ctx := job.Context()
 
-	sgInstance, xerr := securitygroupfactory.Load(ctx, job.Service(), ref)
+	sgInstance, xerr := securitygroupfactory.Load(ctx, job.Service(), ref, false)
 	if xerr != nil {
 		return nil, xerr
 	}

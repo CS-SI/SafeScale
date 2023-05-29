@@ -18,6 +18,7 @@ package api
 
 import (
 	"context"
+	tfjson "github.com/hashicorp/terraform-json"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
@@ -32,6 +33,8 @@ import (
 
 // Stack is the interface to cloud stack
 type Stack interface {
+	TerraformStack
+
 	GetStackName() (string, fail.Error)
 
 	GetType() (string, fail.Error)
@@ -166,6 +169,18 @@ type Stack interface {
 
 	// DeleteTags removes provider's tags
 	DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error
+}
+
+// TerraformStack is the interface that all terraform drivers should implement
+type TerraformStack interface {
+	// Render renders the Terraform template of the type kind into the workDir directory
+	Render(ctx context.Context, kind abstract.Enum, workDir string, options map[string]any) ([]abstract.RenderedContent, fail.Error)
+
+	// GetTerraformState returns the Terraform state of the stack
+	GetTerraformState(ctx context.Context) (*tfjson.State, fail.Error)
+
+	// ExportFromState extracts from the terraform state the information about the resource identified by id
+	ExportFromState(ctx context.Context, kind abstract.Enum, state *tfjson.State, input any, id string) (any, fail.Error)
 }
 
 // ReservedForProviderUse is an interface about the methods only available to providers internally

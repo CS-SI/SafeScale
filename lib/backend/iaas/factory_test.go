@@ -65,6 +65,25 @@ func Test_validateCloudferro(t *testing.T) {
 	}
 }
 
+func Test_validateFlexibleengine2(t *testing.T) {
+	v := viper.New()
+	v.AddConfigPath("./tenant_tests")
+	v.SetConfigName("lied")
+
+	tenants, _, xerr := getTenantsFromViperCfg(v)
+
+	if xerr != nil {
+		t.Error(xerr.Error())
+		t.FailNow()
+	}
+
+	err := validateTenant(tenants[0])
+
+	if err != nil {
+		t.Error(err.Error())
+		t.FailNow()
+	}
+}
 func Test_validateFlexibleengine(t *testing.T) {
 	v := viper.New()
 	v.AddConfigPath("./tenant_tests")

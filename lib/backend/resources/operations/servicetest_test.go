@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	tfjson "github.com/hashicorp/terraform-json"
 	"io"
 	"io/ioutil"
 	"os"
@@ -2985,6 +2986,22 @@ func (e *ServiceTest) CreateVolume(ctx context.Context, request abstract.VolumeR
 	return avolume, nil
 
 }
+
+func (e *ServiceTest) Render(ctx context.Context, kind abstract.Enum, workDir string, options map[string]any) (_ []abstract.RenderedContent, ferr fail.Error) {
+	e._survey("ServiceTest::Render (not implemented)")
+	return nil, nil
+}
+
+func (e *ServiceTest) GetTerraformState(ctx context.Context) (_ *tfjson.State, ferr fail.Error) {
+	e._survey("ServiceTest::GetTerraformOutputsFromState (not implemented)")
+	return nil, nil
+}
+
+func (e *ServiceTest) ExportFromState(ctx context.Context, kind abstract.Enum, state *tfjson.State, input any, id string) (any, fail.Error) {
+	e._survey("ServiceTest::ExportFromState (not implemented)")
+	return nil, nil
+}
+
 func (e *ServiceTest) InspectVolume(ctx context.Context, id string) (*abstract.Volume, fail.Error) {
 	e._survey("ServiceTest::InspectVolume (not implemented)")
 	return nil, nil

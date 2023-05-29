@@ -28,6 +28,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/aws"            // Imported to initialize tenant aws
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/azuretf"        // Imported to initialize tenant aws
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/gcp"            // Imported to initialize tenant gcp
