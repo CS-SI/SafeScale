@@ -14,7 +14,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/eko/gocache/v2/cache"
-	tfjson "github.com/hashicorp/terraform-json"
+	"github.com/hashicorp/terraform-json"
 	"io"
 	"regexp"
 	"sync"

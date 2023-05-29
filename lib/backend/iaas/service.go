@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	tfjson "github.com/hashicorp/terraform-json"
 	"github.com/sanity-io/litter"
 	"os"
 	"regexp"
@@ -76,16 +77,8 @@ type Service interface {
 	objectstorage.Location
 }
 
-type Loader interface {
-	LoadHost(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadCluster(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadLabel(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadNetwork(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadShare(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadVolume(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadBucket(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadSubnet(inctx context.Context, svc Service, netref string, ref string) (interface{}, fail.Error)
-	LoadSecurityGroup(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+type unused struct {
+	unused tfjson.Config // this is hack in order to import terraform-json
 }
 
 // service is the implementation struct of interface Service

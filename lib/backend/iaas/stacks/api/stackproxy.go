@@ -18,7 +18,7 @@ package api
 
 import (
 	"context"
-	tfjson "github.com/hashicorp/terraform-json"
+	"github.com/hashicorp/terraform-json"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"

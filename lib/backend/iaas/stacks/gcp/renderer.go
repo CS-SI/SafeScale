@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
-	tfjson "github.com/hashicorp/terraform-json"
+	"github.com/hashicorp/terraform-json"
 )
 
 func (s stack) Render(ctx context.Context, kind abstract.Enum, workDir string, options map[string]any) ([]abstract.RenderedContent, fail.Error) {

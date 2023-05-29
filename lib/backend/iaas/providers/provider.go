@@ -18,6 +18,7 @@ package providers
 
 import (
 	"context"
+	tfjson "github.com/hashicorp/terraform-json"
 	"regexp"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
@@ -26,6 +27,10 @@ import (
 )
 
 //go:generate minimock -o mocks/mock_provider.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers.Provider
+
+type unused struct {
+	unused tfjson.Config // this is hack in order to import terraform-json
+}
 
 // Provider is the interface to cloud stack
 // It has to recall Stack api, to serve as Provider AND as Stack

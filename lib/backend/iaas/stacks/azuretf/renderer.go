@@ -12,7 +12,7 @@ import (
 	_ "github.com/hashicorp/hcl/v2"
 	_ "github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/hashicorp/terraform-exec/tfexec"
-	tfjson "github.com/hashicorp/terraform-json"
+	"github.com/hashicorp/terraform-json"
 	_ "github.com/zclconf/go-cty/cty"
 	"strings"
 	"text/template"

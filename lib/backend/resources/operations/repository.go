@@ -3,7 +3,7 @@ package operations
 import (
 	"context"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
-	tfjson "github.com/hashicorp/terraform-json"
+	"github.com/hashicorp/terraform-json"
 )
 
 type ResourcesRepository[T any] interface {
