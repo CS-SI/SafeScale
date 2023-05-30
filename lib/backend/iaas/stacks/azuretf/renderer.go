@@ -41,11 +41,11 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 		if hint != "" {
 			for _, resource := range stateResources {
 				if resource.Type == "azurerm_storage_container" {
-					name := resource.AttributeValues["name"].(string)
+					name := resource.AttributeValues["name"].(string) // nolint
 					if strings.Contains(name, hint) {
-						tfn.Name = resource.AttributeValues["name"].(string)
-						tfn.Identity = resource.AttributeValues["id"].(string)
-						tfn.StorageAccount = resource.AttributeValues["storage_account_name"].(string)
+						tfn.Name = resource.AttributeValues["name"].(string)                           // nolint
+						tfn.Identity = resource.AttributeValues["id"].(string)                         // nolint
+						tfn.StorageAccount = resource.AttributeValues["storage_account_name"].(string) // nolint
 
 						return tfn, nil
 					}
@@ -56,9 +56,9 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 			for _, resource := range stateResources {
 				if resource.Type == "azurerm_storage_container" {
 					tfn := &operations.TfBucket{}
-					tfn.Name = resource.AttributeValues["name"].(string)
-					tfn.Identity = resource.AttributeValues["id"].(string)
-					tfn.StorageAccount = resource.AttributeValues["storage_account_name"].(string)
+					tfn.Name = resource.AttributeValues["name"].(string)                           // nolint
+					tfn.Identity = resource.AttributeValues["id"].(string)                         // nolint
+					tfn.StorageAccount = resource.AttributeValues["storage_account_name"].(string) // nolint
 					answer = append(answer, tfn)
 				}
 			}
@@ -83,10 +83,10 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 
 		for _, resource := range stateResources {
 			if resource.Type == "azurerm_network_interface" {
-				name := resource.AttributeValues["name"].(string)
+				name := resource.AttributeValues["name"].(string) // nolint
 				if strings.Contains(name, hint) {
-					tfn.Name = resource.AttributeValues["name"].(string)
-					tfn.Identity = resource.AttributeValues["id"].(string)
+					tfn.Name = resource.AttributeValues["name"].(string)   // nolint
+					tfn.Identity = resource.AttributeValues["id"].(string) // nolint
 
 					return tfn, nil
 				}
@@ -115,9 +115,9 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 					name := resource.Name
 					if hint == name || strings.HasSuffix(name, hint) {
 						tfn.Name = resource.Name
-						tfn.Identity = resource.AttributeValues["id"].(string)
-						tfn.AttachedHostId = resource.AttributeValues["virtual_machine_id"].(string)
-						tfn.AttachedDiskId = resource.AttributeValues["managed_disk_id"].(string)
+						tfn.Identity = resource.AttributeValues["id"].(string)                       // nolint
+						tfn.AttachedHostId = resource.AttributeValues["virtual_machine_id"].(string) // nolint
+						tfn.AttachedDiskId = resource.AttributeValues["managed_disk_id"].(string)    // nolint
 
 						return tfn, nil
 					}
@@ -130,9 +130,9 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 					inst := &operations.TfVolumeAttachment{}
 
 					inst.Name = resource.Name
-					inst.Identity = resource.AttributeValues["id"].(string)
-					inst.AttachedHostId = resource.AttributeValues["virtual_machine_id"].(string)
-					inst.AttachedDiskId = resource.AttributeValues["managed_disk_id"].(string)
+					inst.Identity = resource.AttributeValues["id"].(string)                       // nolint
+					inst.AttachedHostId = resource.AttributeValues["virtual_machine_id"].(string) // nolint
+					inst.AttachedDiskId = resource.AttributeValues["managed_disk_id"].(string)    // nolint
 
 					instances = append(instances, inst)
 				}
@@ -159,12 +159,12 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 		if hint != "" {
 			for _, resource := range stateResources {
 				if resource.Type == "azurerm_managed_disk" {
-					name := resource.AttributeValues["name"].(string)
+					name := resource.AttributeValues["name"].(string) // nolint
 					if hint == name || name == fmt.Sprintf("disk-%s", hint) {
 						tfn.Name = name
-						tfn.Location = resource.AttributeValues["location"].(string)
-						tfn.Identity = resource.AttributeValues["id"].(string)
-						jn := resource.AttributeValues["disk_size_gb"].(json.Number)
+						tfn.Location = resource.AttributeValues["location"].(string) // nolint
+						tfn.Identity = resource.AttributeValues["id"].(string)       // nolint
+						jn := resource.AttributeValues["disk_size_gb"].(json.Number) // nolint
 						val, _ := jn.Int64()
 						tfn.Size = int32(val)
 
@@ -177,7 +177,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 									tfn.Tags = make(map[string]string)
 								}
 								for k, v := range phase {
-									tfn.Tags[k] = v.(string)
+									tfn.Tags[k] = v.(string) // nolint
 								}
 							}
 						}
@@ -191,12 +191,12 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 			for _, resource := range stateResources {
 				if resource.Type == "azurerm_managed_disk" {
 					tfn := &operations.TfVolume{}
-					name := resource.AttributeValues["name"].(string)
+					name := resource.AttributeValues["name"].(string) // nolint
 					{
 						tfn.Name = name
-						tfn.Location = resource.AttributeValues["location"].(string)
-						tfn.Identity = resource.AttributeValues["id"].(string)
-						jn := resource.AttributeValues["disk_size_gb"].(json.Number)
+						tfn.Location = resource.AttributeValues["location"].(string) // nolint
+						tfn.Identity = resource.AttributeValues["id"].(string)       // nolint
+						jn := resource.AttributeValues["disk_size_gb"].(json.Number) // nolint
 						val, _ := jn.Int64()
 						tfn.Size = int32(val)
 
@@ -209,7 +209,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 									tfn.Tags = make(map[string]string)
 								}
 								for k, v := range phase {
-									tfn.Tags[k] = v.(string)
+									tfn.Tags[k] = v.(string) // nolint
 								}
 							}
 						}
@@ -239,10 +239,10 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 		if hint != "" {
 			for _, resource := range stateResources {
 				if resource.Type == "azurerm_network_security_group" {
-					name := resource.AttributeValues["name"].(string)
+					name := resource.AttributeValues["name"].(string) // nolint
 					if hint == name || strings.Contains(name, fmt.Sprintf("%s-%s", "NetworkSecurityGroup", hint)) {
-						tfn.Location = resource.AttributeValues["location"].(string)
-						tfn.Identity = resource.AttributeValues["id"].(string)
+						tfn.Location = resource.AttributeValues["location"].(string) // nolint
+						tfn.Identity = resource.AttributeValues["id"].(string)       // nolint
 						tfn.Name = name
 
 						var ok bool
@@ -254,7 +254,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 									tfn.Tags = make(map[string]string)
 								}
 								for k, v := range phase {
-									tfn.Tags[k] = v.(string)
+									tfn.Tags[k] = v.(string) // nolint
 								}
 							}
 						}
@@ -278,10 +278,10 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 			for _, resource := range stateResources {
 				if resource.Type == "azurerm_network_security_group" {
 					tfn := &operations.TfSecurityGroup{}
-					name := resource.AttributeValues["name"].(string)
+					name := resource.AttributeValues["name"].(string) // nolint
 					{
-						tfn.Location = resource.AttributeValues["location"].(string)
-						tfn.Identity = resource.AttributeValues["id"].(string)
+						tfn.Location = resource.AttributeValues["location"].(string) // nolint
+						tfn.Identity = resource.AttributeValues["id"].(string)       // nolint
 						tfn.Name = name
 
 						var ok bool
@@ -293,7 +293,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 									tfn.Tags = make(map[string]string)
 								}
 								for k, v := range phase {
-									tfn.Tags[k] = v.(string)
+									tfn.Tags[k] = v.(string) // nolint
 								}
 							}
 						}
@@ -337,10 +337,10 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 				if resource.Type == "azurerm_subnet" {
 					tfn := &operations.TfSubnet{}
 					// recover the subnet information
-					name := resource.AttributeValues["name"].(string)
-					netName := resource.AttributeValues["virtual_network_name"].(string)
-					cidr := resource.AttributeValues["address_prefix"].(string)
-					identity := resource.AttributeValues["id"].(string)
+					name := resource.AttributeValues["name"].(string)                    // nolint
+					netName := resource.AttributeValues["virtual_network_name"].(string) // nolint
+					cidr := resource.AttributeValues["address_prefix"].(string)          // nolint
+					identity := resource.AttributeValues["id"].(string)                  // nolint
 
 					maybeTags, ok := resource.AttributeValues["tags"].(map[string]any)
 					if ok {
@@ -348,7 +348,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 							tfn.Tags = make(map[string]string)
 						}
 						for k, v := range maybeTags {
-							tfn.Tags[k] = v.(string)
+							tfn.Tags[k] = v.(string) // nolint
 						}
 					}
 
@@ -365,12 +365,12 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 				for _, resource := range stateResources {
 					if resource.Type == "azurerm_virtual_network" {
 						// recover the subnet information
-						name := resource.AttributeValues["name"].(string)
+						name := resource.AttributeValues["name"].(string) // nolint
 						if name != atfn.NetworkName {
 							continue
 						}
 
-						vnetid := resource.AttributeValues["id"].(string)
+						vnetid := resource.AttributeValues["id"].(string) // nolint
 						atfn.NetworkID = vnetid
 					}
 				}
@@ -381,12 +381,12 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 				for _, resource := range stateResources {
 					if resource.Type == "azurerm_linux_virtual_machine" {
 						// recover the subnet information
-						name := resource.AttributeValues["name"].(string)
+						name := resource.AttributeValues["name"].(string) // nolint
 						if !(name == fmt.Sprintf("gw-%s", atfn.NetworkName) || name == fmt.Sprintf("gw2-%s", atfn.NetworkName)) {
 							continue
 						}
 
-						atfn.GatewayIDS = append(atfn.GatewayIDS, resource.AttributeValues["id"].(string))
+						atfn.GatewayIDS = append(atfn.GatewayIDS, resource.AttributeValues["id"].(string)) // nolint
 					}
 				}
 			}
@@ -406,9 +406,9 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 					continue
 				}
 
-				netName := resource.AttributeValues["virtual_network_name"].(string)
-				cidr := resource.AttributeValues["address_prefix"].(string)
-				identity := resource.AttributeValues["id"].(string)
+				netName := resource.AttributeValues["virtual_network_name"].(string) // nolint
+				cidr := resource.AttributeValues["address_prefix"].(string)          // nolint
+				identity := resource.AttributeValues["id"].(string)                  // nolint
 
 				maybeTags, ok := resource.AttributeValues["tags"].(map[string]any)
 				if ok {
@@ -416,7 +416,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 						tfn.Tags = make(map[string]string)
 					}
 					for k, v := range maybeTags {
-						tfn.Tags[k] = v.(string)
+						tfn.Tags[k] = v.(string) // nolint
 					}
 				}
 
@@ -436,12 +436,12 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 		for _, resource := range stateResources {
 			if resource.Type == "azurerm_virtual_network" {
 				// recover the subnet information
-				name := resource.AttributeValues["name"].(string)
+				name := resource.AttributeValues["name"].(string) // nolint
 				if name != tfn.NetworkName {
 					continue
 				}
 
-				vnetid := resource.AttributeValues["id"].(string)
+				vnetid := resource.AttributeValues["id"].(string) // nolint
 				tfn.NetworkID = vnetid
 			}
 		}
@@ -450,12 +450,12 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 		for _, resource := range stateResources {
 			if resource.Type == "azurerm_linux_virtual_machine" {
 				// recover the subnet information
-				name := resource.AttributeValues["name"].(string)
+				name := resource.AttributeValues["name"].(string) // nolint
 				if !(name == fmt.Sprintf("gw-%s", tfn.NetworkName) || name == fmt.Sprintf("gw2-%s", tfn.NetworkName)) {
 					continue
 				}
 
-				tfn.GatewayIDS = append(tfn.GatewayIDS, resource.AttributeValues["id"].(string))
+				tfn.GatewayIDS = append(tfn.GatewayIDS, resource.AttributeValues["id"].(string)) // nolint
 			}
 		}
 
@@ -479,15 +479,15 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 			for _, resource := range stateResources {
 				if resource.Type == "azurerm_virtual_network" {
 					// recover the subnet information
-					name := resource.AttributeValues["name"].(string)
+					name := resource.AttributeValues["name"].(string) // nolint
 					var cidr string
 					maycidr, ok := resource.AttributeValues["address_space"].([]any)
 					if ok {
 						if len(maycidr) > 0 {
-							cidr = maycidr[0].(string)
+							cidr = maycidr[0].(string) // nolint
 						}
 					}
-					identity := resource.AttributeValues["id"].(string)
+					identity := resource.AttributeValues["id"].(string) // nolint
 
 					if !(name == hint || identity == hint || name == fmt.Sprintf("network-%s", hint)) {
 						continue
@@ -504,17 +504,17 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 							tfn.Tags = make(map[string]string)
 						}
 						for k, v := range maybeTags {
-							tfn.Tags[k] = v.(string)
+							tfn.Tags[k] = v.(string) // nolint
 						}
 					}
 
 					maybeSubnetStruct, ok := resource.AttributeValues["subnet"].([]any)
 					if ok {
 						if len(maybeSubnetStruct) > 0 {
-							subnetStruct := maybeSubnetStruct[0].(map[string]any)
-							tfn.SubnetCidr = subnetStruct["address_prefix"].(string)
-							tfn.SubnetId = subnetStruct["id"].(string)
-							tfn.SubnetName = subnetStruct["name"].(string)
+							subnetStruct := maybeSubnetStruct[0].(map[string]any)    // nolint
+							tfn.SubnetCidr = subnetStruct["address_prefix"].(string) // nolint
+							tfn.SubnetId = subnetStruct["id"].(string)               // nolint
+							tfn.SubnetName = subnetStruct["name"].(string)           // nolint
 						}
 					}
 
@@ -528,7 +528,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 					tfn := &operations.TfNetwork{}
 
 					// recover the subnet information
-					name := resource.AttributeValues["name"].(string)
+					name := resource.AttributeValues["name"].(string) // nolint
 					var cidr string
 					maycidr, ok := resource.AttributeValues["address_space"].([]any)
 					if ok {
@@ -536,7 +536,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 							cidr = maycidr[0].(string)
 						}
 					}
-					identity := resource.AttributeValues["id"].(string)
+					identity := resource.AttributeValues["id"].(string) // nolint
 
 					// and now we populate the subnet
 					tfn.Name = name
@@ -549,17 +549,17 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 							tfn.Tags = make(map[string]string)
 						}
 						for k, v := range maybeTags {
-							tfn.Tags[k] = v.(string)
+							tfn.Tags[k] = v.(string) // nolint
 						}
 					}
 
 					maybeSubnetStruct, ok := resource.AttributeValues["subnet"].([]any)
 					if ok {
 						if len(maybeSubnetStruct) > 0 {
-							subnetStruct := maybeSubnetStruct[0].(map[string]any)
-							tfn.SubnetCidr = subnetStruct["address_prefix"].(string)
-							tfn.SubnetId = subnetStruct["id"].(string)
-							tfn.SubnetName = subnetStruct["name"].(string)
+							subnetStruct := maybeSubnetStruct[0].(map[string]any)    // nolint
+							tfn.SubnetCidr = subnetStruct["address_prefix"].(string) // nolint
+							tfn.SubnetId = subnetStruct["id"].(string)               // nolint
+							tfn.SubnetName = subnetStruct["name"].(string)           // nolint
 						}
 					}
 
@@ -596,32 +596,32 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 					}
 
 					{
-						t.ID = resource.AttributeValues["id"].(string)
+						t.ID = resource.AttributeValues["id"].(string) // nolint
 						t.Name = computerName
-						t.Password = resource.AttributeValues["admin_password"].(string)
-						t.Tags, ok = resource.AttributeValues["tags"].(map[string]string)
+						t.Password = resource.AttributeValues["admin_password"].(string)  // nolint
+						t.Tags, ok = resource.AttributeValues["tags"].(map[string]string) // nolint
 						if !ok {
 							phase, ok := resource.AttributeValues["tags"].(map[string]any)
 							if ok {
 								t.Tags = make(map[string]string)
 								for k, v := range phase {
-									t.Tags[k] = v.(string)
+									t.Tags[k] = v.(string) // nolint
 								}
 							}
 						}
 
 						t.SSHPort = 22 // FIXME: fix this later
 						t.InternalTerraformID = resource.Address
-						t.TemplateSize = resource.AttributeValues["size"].(string)
-						t.VmIdentity = resource.AttributeValues["virtual_machine_id"].(string)
+						t.TemplateSize = resource.AttributeValues["size"].(string)             // nolint
+						t.VmIdentity = resource.AttributeValues["virtual_machine_id"].(string) // nolint
 
-						t.PublicIP = resource.AttributeValues["public_ip_address"].(string)
-						t.PrivateIP = resource.AttributeValues["private_ip_address"].(string)
+						t.PublicIP = resource.AttributeValues["public_ip_address"].(string)   // nolint
+						t.PrivateIP = resource.AttributeValues["private_ip_address"].(string) // nolint
 
 						maybeIDs, ok := resource.AttributeValues["network_interface_ids"].([]any)
 						if ok {
 							for _, v := range maybeIDs {
-								t.Nics = append(t.Nics, v.(string))
+								t.Nics = append(t.Nics, v.(string)) // nolint
 							}
 						}
 
@@ -637,17 +637,17 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 						maybe, ok := resource.AttributeValues["admin_ssh_key"].([]any)
 						if ok {
 							if len(maybe) > 0 {
-								keyStruct := maybe[0].(map[string]interface{})
-								t.PrivateKey = keyStruct["public_key"].(string)
-								t.Operator = keyStruct["username"].(string)
+								keyStruct := maybe[0].(map[string]interface{})  // nolint
+								t.PrivateKey = keyStruct["public_key"].(string) // nolint
+								t.Operator = keyStruct["username"].(string)     // nolint
 							}
 						}
 
 						maybe, ok = resource.AttributeValues["os_disk"].([]any)
 						if ok {
 							if len(maybe) > 0 {
-								osDiskStruct := maybe[0].(map[string]interface{})
-								jn := osDiskStruct["disk_size_gb"].(json.Number)
+								osDiskStruct := maybe[0].(map[string]interface{}) // nolint
+								jn := osDiskStruct["disk_size_gb"].(json.Number)  // nolint
 								val, _ := jn.Int64()
 								t.DiskSizeInGb = int32(val)
 							}
@@ -682,7 +682,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 					}
 					if resource.Type == "tls_private_key" {
 						if resource.Name == fmt.Sprintf("ssh-%s", t.Name) {
-							t.PrivateKey = resource.AttributeValues["private_key_pem"].(string)
+							t.PrivateKey = resource.AttributeValues["private_key_pem"].(string) // nolint
 							break
 						}
 
@@ -691,19 +691,19 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 								switch resource.Name {
 								case "ssh":
 									if strings.HasPrefix(t.Name, "gw") {
-										t.PrivateKey = resource.AttributeValues["private_key_pem"].(string)
+										t.PrivateKey = resource.AttributeValues["private_key_pem"].(string) // nolint
 										foundKey = true
 										break
 									}
 								case "ssh_node":
 									if strings.Contains(t.Name, "-node") {
-										t.PrivateKey = resource.AttributeValues["private_key_pem"].(string)
+										t.PrivateKey = resource.AttributeValues["private_key_pem"].(string) // nolint
 										foundKey = true
 										break
 									}
 								case "ssh_master":
 									if strings.Contains(t.Name, "-master") {
-										t.PrivateKey = resource.AttributeValues["private_key_pem"].(string)
+										t.PrivateKey = resource.AttributeValues["private_key_pem"].(string) // nolint
 										foundKey = true
 										break
 									}
@@ -737,32 +737,32 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 				}
 
 				if computerName == hint || vmID == hint {
-					t.ID = resource.AttributeValues["id"].(string)
+					t.ID = resource.AttributeValues["id"].(string) // nolint
 					t.Name = computerName
-					t.Password = resource.AttributeValues["admin_password"].(string)
+					t.Password = resource.AttributeValues["admin_password"].(string) // nolint
 					t.Tags, ok = resource.AttributeValues["tags"].(map[string]string)
 					if !ok {
 						phase, ok := resource.AttributeValues["tags"].(map[string]any)
 						if ok {
 							t.Tags = make(map[string]string)
 							for k, v := range phase {
-								t.Tags[k] = v.(string)
+								t.Tags[k] = v.(string) // nolint
 							}
 						}
 					}
 
 					t.SSHPort = 22 // FIXME: fix this later
 					t.InternalTerraformID = resource.Address
-					t.TemplateSize = resource.AttributeValues["size"].(string)
-					t.VmIdentity = resource.AttributeValues["virtual_machine_id"].(string)
+					t.TemplateSize = resource.AttributeValues["size"].(string)             // nolint
+					t.VmIdentity = resource.AttributeValues["virtual_machine_id"].(string) // nolint
 
-					t.PublicIP = resource.AttributeValues["public_ip_address"].(string)
-					t.PrivateIP = resource.AttributeValues["private_ip_address"].(string)
+					t.PublicIP = resource.AttributeValues["public_ip_address"].(string)   // nolint
+					t.PrivateIP = resource.AttributeValues["private_ip_address"].(string) // nolint
 
 					maybeIDs, ok := resource.AttributeValues["network_interface_ids"].([]any)
 					if ok {
 						for _, v := range maybeIDs {
-							t.Nics = append(t.Nics, v.(string))
+							t.Nics = append(t.Nics, v.(string)) // nolint
 						}
 					}
 
@@ -778,17 +778,17 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 					maybe, ok := resource.AttributeValues["admin_ssh_key"].([]any)
 					if ok {
 						if len(maybe) > 0 {
-							keyStruct := maybe[0].(map[string]interface{})
-							t.PrivateKey = keyStruct["public_key"].(string)
-							t.Operator = keyStruct["username"].(string)
+							keyStruct := maybe[0].(map[string]interface{})  // nolint
+							t.PrivateKey = keyStruct["public_key"].(string) // nolint
+							t.Operator = keyStruct["username"].(string)     // nolint
 						}
 					}
 
 					maybe, ok = resource.AttributeValues["os_disk"].([]any)
 					if ok {
 						if len(maybe) > 0 {
-							osDiskStruct := maybe[0].(map[string]interface{})
-							jn := osDiskStruct["disk_size_gb"].(json.Number)
+							osDiskStruct := maybe[0].(map[string]interface{}) // nolint
+							jn := osDiskStruct["disk_size_gb"].(json.Number)  // nolint
 							val, _ := jn.Int64()
 							t.DiskSizeInGb = int32(val)
 						}
@@ -826,7 +826,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 			}
 			if resource.Type == "tls_private_key" {
 				if resource.Name == fmt.Sprintf("ssh-%s", t.Name) {
-					t.PrivateKey = resource.AttributeValues["private_key_pem"].(string)
+					t.PrivateKey = resource.AttributeValues["private_key_pem"].(string) // nolint
 					break
 				}
 
@@ -835,19 +835,19 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 						switch resource.Name {
 						case "ssh":
 							if strings.HasPrefix(t.Name, "gw") {
-								t.PrivateKey = resource.AttributeValues["private_key_pem"].(string)
+								t.PrivateKey = resource.AttributeValues["private_key_pem"].(string) // nolint
 								foundKey = true
 								break
 							}
 						case "ssh_node":
 							if strings.Contains(t.Name, "-node") {
-								t.PrivateKey = resource.AttributeValues["private_key_pem"].(string)
+								t.PrivateKey = resource.AttributeValues["private_key_pem"].(string) // nolint
 								foundKey = true
 								break
 							}
 						case "ssh_master":
 							if strings.Contains(t.Name, "-master") {
-								t.PrivateKey = resource.AttributeValues["private_key_pem"].(string)
+								t.PrivateKey = resource.AttributeValues["private_key_pem"].(string) // nolint
 								foundKey = true
 								break
 							}
@@ -994,8 +994,8 @@ func (s stack) Render(ctx context.Context, kind abstract.Enum, source string, op
 			return nil, fail.Wrap(err, "error parsing provider template")
 		}
 		err = pt.Execute(&buf, Creds{
-			AzureTenantID:       options["AzureTenantID"].(string),
-			AzureSubscriptionID: options["AzureSubscriptionID"].(string),
+			AzureTenantID:       options["AzureTenantID"].(string),       // nolint
+			AzureSubscriptionID: options["AzureSubscriptionID"].(string), // nolint
 		})
 		if err != nil {
 			return nil, fail.Wrap(err, "error executing provider template")
@@ -1118,7 +1118,7 @@ func (s stack) Render(ctx context.Context, kind abstract.Enum, source string, op
 			return nil, fail.NewError("template not found")
 		}
 
-		return []abstract.RenderedContent{{Name: options["custom"].(string), Content: string(tmplString)}}, nil
+		return []abstract.RenderedContent{{Name: options["custom"].(string), Content: string(tmplString)}}, nil // nolint
 	default:
 		return nil, fail.NotImplementedError("rendering of kind '%s' is not implemented", kind.String())
 	}
