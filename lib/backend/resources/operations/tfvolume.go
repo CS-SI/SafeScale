@@ -199,7 +199,12 @@ func (t TfVolume) Delete(ctx context.Context) fail.Error {
 	if err != nil {
 		return fail.ConvertError(err)
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			logrus.WithContext(ctx).Debugf("error closing file: %v", err)
+		}
+	}(file)
 	names, err := file.Readdirnames(0)
 	if err != nil {
 		return fail.ConvertError(err)
