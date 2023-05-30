@@ -70,8 +70,8 @@ type TfHost struct {
 
 	InternalTerraformID string
 
-	gw2SSHConfig *ssh.CommonConfig `json:"gw_2_ssh_config,omitempty"`
-	gwSSHConfig  *ssh.CommonConfig `json:"gw_ssh_config,omitempty"`
+	Gw2SSHConfig *ssh.CommonConfig `json:"gw_2_ssh_config,omitempty"`
+	GwSSHConfig  *ssh.CommonConfig `json:"gw_ssh_config,omitempty"`
 
 	svc iaas.Service
 
@@ -429,13 +429,13 @@ func (t TfHost) GetSSHConfig(ctx context.Context) (sshapi.Config, fail.Error) {
 		if xerr != nil {
 			return nil, xerr
 		}
-		t.gwSSHConfig, xerr = ssh.NewConfigFrom(theCfg)
+		t.GwSSHConfig, xerr = ssh.NewConfigFrom(theCfg)
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
 
-	return ssh.NewConfig(t.Name, aip, 22, t.Operator, t.PrivateKey, 22, "", t.gwSSHConfig, t.gw2SSHConfig), nil
+	return ssh.NewConfig(t.Name, aip, 22, t.Operator, t.PrivateKey, 22, "", t.GwSSHConfig, t.Gw2SSHConfig), nil
 }
 
 func (t TfHost) GetState(ctx context.Context) (hoststate.Enum, fail.Error) {
