@@ -68,7 +68,7 @@ func ListTerraformSubnets(inctx context.Context, svc iaas.Service, networkRef, s
 		return nil, xerr
 	}
 
-	results = maybe.([]*TfSubnet)
+	results = maybe.([]*TfSubnet) // nolint
 	for _, res := range results {
 		res.svc = svc
 	}
@@ -235,7 +235,7 @@ func (t TfSubnet) Delete(ctx context.Context) fail.Error {
 
 	count := 0
 	for _, tfh := range tfhs {
-		relic := tfh.(*TfHost)
+		relic := tfh.(*TfHost) // nolint
 		if relic.SubnetID == t.Identity {
 			count = count + 1
 		}

@@ -728,7 +728,7 @@ func renderTerraformNetworkFromFiles(inctx context.Context, svc iaas.Service, di
 		return fmt.Errorf("error creating terraform directory: %w", err)
 	}
 
-	ctp, xerr := svc.Render(inctx, abstract.ProviderResource, "customcluster", cfg.(providers.ConfigMap))
+	ctp, xerr := svc.Render(inctx, abstract.ProviderResource, "customcluster", cfg.(providers.ConfigMap)) // nolint
 	if xerr != nil {
 		return fmt.Errorf("error rendering terraform files: %w", xerr)
 	}
@@ -894,7 +894,7 @@ func renderTerraformSubNetworkFromFiles(inctx context.Context, svc iaas.Service,
 		return fmt.Errorf("error creating terraform directory: %w", err)
 	}
 
-	ctp, xerr := svc.Render(inctx, abstract.ProviderResource, "customcluster", cfg.(providers.ConfigMap))
+	ctp, xerr := svc.Render(inctx, abstract.ProviderResource, "customcluster", cfg.(providers.ConfigMap)) // nolint
 	if xerr != nil {
 		return fmt.Errorf("error rendering terraform files: %w", xerr)
 	}
@@ -1072,7 +1072,7 @@ func renderTerraformCustomClusterFromFiles(inctx context.Context, svc iaas.Servi
 		return fmt.Errorf("error creating terraform directory: %w", err)
 	}
 
-	ctp, xerr := svc.Render(inctx, abstract.ProviderResource, root, cfg.(providers.ConfigMap))
+	ctp, xerr := svc.Render(inctx, abstract.ProviderResource, root, cfg.(providers.ConfigMap)) // nolint
 	if xerr != nil {
 		return fmt.Errorf("error rendering terraform files: %w", xerr)
 	}
@@ -1986,7 +1986,7 @@ func LoadTerraformHosts(inctx context.Context, svc iaas.Service) ([]resources.Ho
 	if xerr != nil {
 		return nil, xerr
 	}
-	casted := maybe.([]*TfHost)
+	casted := maybe.([]*TfHost) // nolint
 	for _, v := range casted {
 		v.svc = svc
 		results = append(results, v)
@@ -2037,7 +2037,7 @@ func ListTerraformBuckets(inctx context.Context, svc iaas.Service) ([]*TfBucket,
 		return nil, xerr
 	}
 
-	results = maybe.([]*TfBucket)
+	results = maybe.([]*TfBucket) // nolint
 	for _, res := range results {
 		res.svc = svc
 	}
@@ -2067,7 +2067,7 @@ func ListTerraformVolumes(inctx context.Context, svc iaas.Service) ([]*TfVolume,
 		return nil, xerr
 	}
 
-	results = maybe.([]*TfVolume)
+	results = maybe.([]*TfVolume) // nolint
 	for _, res := range results {
 		res.svc = svc
 	}
@@ -2096,7 +2096,7 @@ func LoadTerraformVolume(inctx context.Context, svc iaas.Service, ref string) (*
 		return nil, xerr
 	}
 
-	atf := maybe.(*TfVolume)
+	atf := maybe.(*TfVolume) // nolint
 	return atf, nil
 }
 
@@ -2121,7 +2121,7 @@ func LoadTerraformHost(inctx context.Context, svc iaas.Service, ref string) (res
 		return nil, xerr
 	}
 
-	atf := maybe.(*TfHost)
+	atf := maybe.(*TfHost) // nolint
 	return atf, nil
 }
 
@@ -2146,7 +2146,7 @@ func LoadTerraformBucket(inctx context.Context, svc iaas.Service, ref string) (r
 		return nil, xerr
 	}
 
-	atf := maybe.(*TfBucket)
+	atf := maybe.(*TfBucket) // nolint
 	return atf, nil
 }
 
@@ -2198,7 +2198,7 @@ func ListTerraformNetworks(inctx context.Context, svc iaas.Service) (_ []*TfNetw
 		return nil, xerr
 	}
 
-	results = maybe.([]*TfNetwork)
+	results = maybe.([]*TfNetwork) // nolint
 	for _, res := range results {
 		res.svc = svc
 	}
@@ -2228,7 +2228,7 @@ func ListTerraformSGs(inctx context.Context, svc iaas.Service) ([]*TfSecurityGro
 	if xerr != nil {
 		return nil, xerr
 	}
-	results = maybe.([]*TfSecurityGroup)
+	results = maybe.([]*TfSecurityGroup) // nolint
 
 	for _, res := range results {
 		res.svc = svc

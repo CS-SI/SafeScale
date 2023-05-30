@@ -294,7 +294,7 @@ func (t TfVolume) GetAttachments(ctx context.Context) (*propertiesv1.VolumeAttac
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failure exporting from terraform state")
 	}
-	atts := tats.([]*TfVolumeAttachment)
+	atts := tats.([]*TfVolumeAttachment) // nolint
 
 	getNameFromId := func(id string) string {
 		if !strings.Contains(id, "/") {

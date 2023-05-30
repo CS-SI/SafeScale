@@ -401,7 +401,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 			}
 			if resource.Type == "azurerm_subnet" {
 				// recover the subnet information
-				name := resource.AttributeValues["name"].(string)
+				name := resource.AttributeValues["name"].(string) // nolint
 				if !(name == hint || name == fmt.Sprintf("subnet-%s", hint)) {
 					continue
 				}
@@ -533,7 +533,7 @@ func (s stack) ExportFromState(ctx context.Context, kind abstract.Enum, tfstate 
 					maycidr, ok := resource.AttributeValues["address_space"].([]any)
 					if ok {
 						if len(maycidr) > 0 {
-							cidr = maycidr[0].(string)
+							cidr = maycidr[0].(string) // nolint
 						}
 					}
 					identity := resource.AttributeValues["id"].(string) // nolint

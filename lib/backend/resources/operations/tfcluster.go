@@ -364,7 +364,7 @@ func (t TerraformCluster) verifyThereAreNoAttachments(ctx context.Context) error
 	if xerr != nil {
 		return fail.Wrap(xerr, "failure exporting from terraform state")
 	}
-	atts := tats.([]*TfVolumeAttachment)
+	atts := tats.([]*TfVolumeAttachment) // nolint
 
 	// if the attached host id of one attachment is in a cluster machine, bail
 	for _, v := range atts {
@@ -521,7 +521,7 @@ func (t TerraformCluster) ListMasters(ctx context.Context) (resources.IndexedLis
 	}
 	answer := make(resources.IndexedListOfClusterNodes)
 	for ind, host := range hosts {
-		aho := host.(*TfHost)
+		aho := host.(*TfHost) // nolint
 		if !strings.Contains(aho.Name, fmt.Sprintf("%s-master-", t.Name)) {
 			continue
 		}
@@ -555,7 +555,7 @@ func (t TerraformCluster) listMachines(ctx context.Context) (map[string][]*TfHos
 	var second *TfHost
 
 	for _, host := range hosts {
-		aho := host.(*TfHost)
+		aho := host.(*TfHost) // nolint
 		if aho.Name == fmt.Sprintf("gw-%s", t.Name) {
 			first = aho
 		}
@@ -591,7 +591,7 @@ func (t TerraformCluster) ListNodes(ctx context.Context) (resources.IndexedListO
 	}
 	answer := make(resources.IndexedListOfClusterNodes)
 	for ind, host := range hosts {
-		aho := host.(*TfHost)
+		aho := host.(*TfHost) // nolint
 		if !strings.Contains(aho.Name, fmt.Sprintf("%s-node-", t.Name)) {
 			continue
 		}

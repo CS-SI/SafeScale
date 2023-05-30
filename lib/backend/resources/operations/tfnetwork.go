@@ -191,7 +191,7 @@ func (t TfNetwork) Delete(ctx context.Context) fail.Error {
 
 	count := 0
 	for _, tfh := range tfhs {
-		relic := tfh.(*TfHost)
+		relic := tfh.(*TfHost) // nolint
 		for _, nid := range relic.NetworkIDs {
 			if nid == t.Identity {
 				count = count + 1
