@@ -64,7 +64,7 @@ func ListTerraformSubnets(inctx context.Context, svc iaas.Service, networkRef, s
 	// recover the subnet information
 	maybe, xerr := svc.ExportFromState(inctx, abstract.SubnetResource, tfstate, &TfSubnet{}, "")
 	if xerr != nil {
-		logrus.Warningf("failure exporting from state: %v", xerr)
+		logrus.WithContext(inctx).Warnf("failure exporting from state: %v", xerr)
 		return nil, xerr
 	}
 

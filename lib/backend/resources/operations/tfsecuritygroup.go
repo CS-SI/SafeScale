@@ -115,7 +115,7 @@ func (t TfSecurityGroup) GetName() string {
 }
 
 func (t TfSecurityGroup) AddRule(ctx context.Context, rule *abstract.SecurityGroupRule) fail.Error {
-	logrus.Warningf("AddRule: %s", litter.Sdump(rule))
+	// logrus.WithContext(inctx).Warningf("AddRule: %s", litter.Sdump(rule))
 
 	err := renderTerraformRuleFromFiles(ctx, t.svc, t.terraformWorkingDirectory, t, rule)
 	if err != nil {

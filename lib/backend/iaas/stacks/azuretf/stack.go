@@ -187,7 +187,7 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AzureConfiguration, 
 	_, err = git.PlainInit(defaultWorkPath, false)
 	if err != nil {
 		if err != git.ErrRepositoryAlreadyExists {
-			logrus.Warningf("failed to initialize git repository in %s: %v", defaultWorkPath, err)
+			logrus.WithContext(context.Background()).Warnf("failed to initialize git repository in %s: %v", defaultWorkPath, err)
 		}
 		return azStack, nil
 	}

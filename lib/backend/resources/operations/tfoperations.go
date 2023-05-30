@@ -1308,26 +1308,26 @@ func applyTerraform(inctx context.Context, svc iaas.Service, execPath string, aW
 
 	callback := func() error {
 		if ferr != nil {
-			logrus.Warningf("Running rollback 1/3")
+			logrus.WithContext(inctx).Debugf("Running rollback 1/3")
 			err := gitRevert(inctx, aWorkPath)
 			if err != nil {
 				return err
 			}
 
-			logrus.Warningf("Running rollback 2/3")
+			logrus.WithContext(inctx).Debugf("Running rollback 2/3")
 			tf, err := tfexec.NewTerraform(aWorkPath, execPath)
 			if err != nil {
 				return fmt.Errorf("error in rollback: running NewTerraform: %w", err)
 			}
 
-			logrus.Warningf("Running rollback 3/3")
+			logrus.WithContext(inctx).Debugf("Running rollback 3/3")
 			err = tf.Apply(inctx)
 			if err != nil {
-				logrus.Warningf("error in rollback: applying terraform in %s: %s", aWorkPath, err.Error())
+				logrus.WithContext(inctx).Debugf("error in rollback: applying terraform in %s: %s", aWorkPath, err.Error())
 			}
 
 			if err != nil {
-				logrus.Warningf("Running rollback 4/3, sleep 180s")
+				logrus.WithContext(inctx).Debugf("Running rollback 4/3, sleep 180s")
 				time.Sleep(180 * time.Second)
 				err = tf.Apply(inctx)
 				if err != nil {
@@ -2194,7 +2194,7 @@ func ListTerraformNetworks(inctx context.Context, svc iaas.Service) (_ []*TfNetw
 	// recover the subnet information
 	maybe, xerr := svc.ExportFromState(inctx, abstract.NetworkResource, tfstate, &TfNetwork{}, "")
 	if xerr != nil {
-		logrus.Warningf("failure exporting from state: %v", xerr)
+		logrus.WithContext(inctx).Warnf("failure exporting from state: %v", xerr)
 		return nil, xerr
 	}
 
