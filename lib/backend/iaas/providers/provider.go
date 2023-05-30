@@ -28,7 +28,7 @@ import (
 
 //go:generate minimock -o mocks/mock_provider.go -i github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers.Provider
 
-type unused struct {
+type unused2 struct {
 	unused tfjson.Config // this is hack in order to import terraform-json
 }
 

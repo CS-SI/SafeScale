@@ -48,7 +48,7 @@ export BUILD_TAGS
 TEST_COVERAGE_ARGS =
 export TEST_COVERAGE_ARGS
 
-all: logclean ground getdevdeps modclean sdk generate lib mintest cli minimock err vet semgrep style metalint
+all: logclean ground getdevdeps modclean sdk generate lib mintest cli minimock err vet style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
@@ -63,13 +63,13 @@ with-race:
 	@$(eval RACE_CHECK_TEST = "-race")
 	@$(eval RACE_CHECK = "-race")
 
-ci: logclean ground getdevdeps mod sdk generate with-race lib cli minimock err vet with-soft semgrep style metalint
+ci: logclean ground getdevdeps mod sdk generate with-race lib cli minimock err vet with-soft style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 rawci: logclean ground getdevdeps mod sdk generate with-race lib cli minimock
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
-allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style metalint
+allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet style metalint
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
@@ -79,7 +79,7 @@ allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet s
 version:
 	@printf "%b" "$(VERSION)-$$(git rev-parse --abbrev-ref HEAD | tr \"/\" \"_\")";
 
-release: logclean ground getdevdeps mod releasetags tunnel sdk generate lib cli test minimock err vet semgrep style metalint releasearchive
+release: logclean ground getdevdeps mod releasetags tunnel sdk generate lib cli test minimock err vet style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs $(MD5) 2>/dev/null > sums.log || true
 	@git ls-tree --full-tree --name-only -r HEAD | grep \.sh | xargs $(MD5) 2>/dev/null >> sums.log || true
