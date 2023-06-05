@@ -271,7 +271,14 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 			}
 			logrus.WithContext(ctx).Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", tenantName, metadataBucket.GetName())
 		} else {
-			return nullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
+			cliType, ok := tenant["clientType"].(string)
+			if ok {
+				if cliType != "terraform" {
+					return nullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
+				}
+			} else {
+				return nullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
+			}
 		}
 
 		// service is ready
