@@ -299,9 +299,6 @@ func (instance *bucket) Create(ctx context.Context, name string) (ferr fail.Erro
 			return xerr
 		}
 	}
-	if !valid.IsNil(&ab) {
-		return abstract.ResourceDuplicateError("bucket", name)
-	}
 
 	// -- create bucket
 	ab, xerr = svc.CreateBucket(ctx, name)

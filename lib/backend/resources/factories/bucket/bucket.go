@@ -18,6 +18,8 @@ package bucket
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
@@ -53,5 +55,20 @@ func List(ctx context.Context, svc iaas.Service, terraform bool) ([]resources.Bu
 		}
 		return answer, nil
 	}
-	return nil, fail.NotImplementedError("not implemented yet")
+
+	lib, xerr := svc.ListBuckets(ctx, objectstorage.RootPath)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var answer []resources.Bucket
+	for _, v := range lib {
+		bucket, xerr := Load(ctx, svc, v, terraform)
+		if xerr != nil {
+			logrus.WithContext(ctx).Debugf("failed to load bucket %s: %s", v, xerr.Error())
+			continue
+		}
+		answer = append(answer, bucket)
+	}
+	return answer, nil
 }
