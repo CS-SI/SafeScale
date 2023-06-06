@@ -2215,7 +2215,7 @@ func runWindow(inctx context.Context, count uint, windowSize uint, uat chan StdR
 	st.MaxRequests = uint32(count + windowSize)
 	st.ReadyToTrip = func(counts gobreaker.Counts) bool {
 		failureRatio := float64(counts.TotalFailures) / float64(counts.Requests)
-		return counts.Requests >= 6 && failureRatio >= 0.8
+		return counts.Requests >= 6 && failureRatio >= 0.9
 	}
 
 	cb := gobreaker.NewCircuitBreaker(st)
