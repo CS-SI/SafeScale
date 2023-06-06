@@ -52,6 +52,7 @@ type ClusterRequest struct {
 	FeatureParameters       []string            // contains parameter values of automatically installed Features
 	DefaultSshPort          uint                // default ssh port for gateways // nolint
 	Enabled                 []string            // enabled features
+	OperatorUsername        string              // username of the operator
 }
 
 // ClusterIdentity contains the bare minimum information about a cluster

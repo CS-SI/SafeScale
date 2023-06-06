@@ -779,7 +779,7 @@ func (instance *Subnet) unsafeCreateSubnet(inctx context.Context, req abstract.S
 				return ar, ar.rErr
 			}
 
-			// FIXME: OPP Disable VIP SG and port security
+			// FIXME: Disable VIP SG and port security
 
 			// Starting from here, remove Subnet from Network metadata if exiting with error
 			defer func() {

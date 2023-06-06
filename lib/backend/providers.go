@@ -17,15 +17,16 @@
 package backend
 
 // TODO: NOTICE Side-effects imports here
+// NOTICE: NOTICE Side-effects imports here
 
 // This file is used to automatically register all providers
 import (
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/aws"            // Imported to initialize tenants
+	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/azuretf"        // Imported to initialize tenants
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/cloudferro"     // Imported to initialize tenants
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/flexibleengine" // Imported to initialize tenants
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/gcp"            // Imported to initialize tenants
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/openstack"      // Imported to initialize tenants
-	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/opentelekom"    // Imported to initialize tenants
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/outscale"       // Imported to initialize tenants
 	_ "github.com/CS-SI/SafeScale/v22/lib/backend/iaas/providers/ovh"            // Imported to initialize tenants
 )

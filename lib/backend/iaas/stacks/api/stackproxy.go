@@ -18,6 +18,7 @@ package api
 
 import (
 	"context"
+	"github.com/hashicorp/terraform-json"
 	"time"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks"
@@ -78,6 +79,13 @@ func (s StackProxy) GetStackName() (_ string, ferr fail.Error) {
 
 	cfg, xerr := s.FullStack.GetStackName()
 	return cfg, xerr
+}
+
+func (s StackProxy) GetType() (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	theType, xerr := s.FullStack.GetType()
+	return theType, xerr
 }
 
 func (s StackProxy) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
@@ -616,4 +624,37 @@ func (s StackProxy) DeleteVolumeAttachment(ctx context.Context, serverID, id str
 		xerr.WithContext(ctx)
 	}
 	return xerr
+}
+
+func (s StackProxy) Render(ctx context.Context, kind abstract.Enum, workDir string, options map[string]any) (_ []abstract.RenderedContent, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	rendered, xerr := s.FullStack.Render(ctx, kind, workDir, options)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
+
+	return rendered, xerr
+}
+
+func (s StackProxy) GetTerraformState(ctx context.Context) (_ *tfjson.State, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	state, xerr := s.FullStack.GetTerraformState(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
+
+	return state, xerr
+}
+
+func (s StackProxy) ExportFromState(ctx context.Context, kind abstract.Enum, state *tfjson.State, input any, id string) (_ any, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	thing, xerr := s.FullStack.ExportFromState(ctx, kind, state, input, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
+
+	return thing, xerr
 }

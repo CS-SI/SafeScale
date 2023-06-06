@@ -85,7 +85,14 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 		return nil, fail.InvalidRequestError("cidr %s intersects with default docker network %s", req.CIDR, "172.17.0.0/16")
 	}
 
-	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -95,7 +102,7 @@ func (handler *subnetHandler) Create(networkRef string, req abstract.SubnetReque
 		return nil, fail.ConvertError(err)
 	}
 
-	subnetInstance, xerr := subnetfactory.New(handler.job.Service())
+	subnetInstance, xerr := subnetfactory.New(handler.job.Service(), isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -127,34 +134,45 @@ func (handler *subnetHandler) List(networkRef string, all bool) (_ []*abstract.S
 		return nil, fail.InvalidInstanceError()
 	}
 
-	var networkID string
-	if networkRef == "" {
-		withDefaultNetwork, xerr := handler.job.Service().HasDefaultNetwork(handler.job.Context())
-		if xerr != nil {
-			return nil, xerr
-		}
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
 
-		if withDefaultNetwork {
-			an, xerr := handler.job.Service().GetDefaultNetwork(handler.job.Context())
+	if !isTerraform {
+		var networkID string
+		if networkRef == "" {
+			withDefaultNetwork, xerr := handler.job.Service().HasDefaultNetwork(handler.job.Context())
 			if xerr != nil {
 				return nil, xerr
 			}
 
-			networkID = an.ID
-		}
-	} else {
-		networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
-		if xerr != nil {
-			return nil, xerr
+			if withDefaultNetwork {
+				an, xerr := handler.job.Service().GetDefaultNetwork(handler.job.Context())
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				networkID = an.ID
+			}
+		} else {
+			networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, isTerraform)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			_, err := networkInstance.GetID()
+			if err != nil {
+				return nil, fail.ConvertError(err)
+			}
 		}
 
-		_, err := networkInstance.GetID()
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
+		return subnetfactory.List(handler.job.Context(), handler.job.Service(), networkID, all, isTerraform)
 	}
 
-	return subnetfactory.List(handler.job.Context(), handler.job.Service(), networkID, all)
+	return subnetfactory.List(handler.job.Context(), handler.job.Service(), networkRef, all, isTerraform)
 }
 
 // Inspect returns infos on a subnet
@@ -176,7 +194,14 @@ func (handler *subnetHandler) Inspect(networkRef, subnetRef string) (_ resources
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
 	}
 
-	return subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	return subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef, isTerraform)
 }
 
 // Delete a/many subnet/s
@@ -198,13 +223,72 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 		return fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
 	}
 
-	newCtx := context.WithValue(handler.job.Context(), "force", force) // nolint
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
 
-	var (
-		networkInstance resources.Network
-		subnetInstance  resources.Subnet
-	)
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	if !isTerraform {
+		newCtx := context.WithValue(handler.job.Context(), "force", force) // nolint
+
+		var (
+			networkInstance resources.Network
+		)
+		subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef, isTerraform)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// consider a Subnet not found as a job done
+				debug.IgnoreError2(handler.job.Context(), xerr)
+				return nil
+			default:
+				return fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
+			}
+		}
+
+		clean := true
+		subnetID, err := subnetInstance.GetID()
+		if err != nil {
+			return fail.ConvertError(err)
+		}
+
+		networkInstance, xerr = subnetInstance.InspectNetwork(handler.job.Context())
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// consider a Subnet not found as a successful deletion
+				debug.IgnoreError2(handler.job.Context(), xerr)
+				clean = false
+			default:
+				return fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
+			}
+		}
+		if clean {
+			xerr = subnetInstance.Delete(newCtx)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// consider a Subnet not found as a job done
+					debug.IgnoreError2(handler.job.Context(), xerr)
+				default:
+					return fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
+				}
+			}
+		}
+
+		if networkInstance != nil {
+			xerr = networkInstance.AbandonSubnet(newCtx, subnetID)
+			if xerr != nil {
+				return xerr
+			}
+		}
+
+		return nil
+	}
+
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef, isTerraform)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -216,41 +300,9 @@ func (handler *subnetHandler) Delete(networkRef, subnetRef string, force bool) (
 		}
 	}
 
-	clean := true
-	subnetID, err := subnetInstance.GetID()
-	if err != nil {
-		return fail.ConvertError(err)
-	}
-
-	networkInstance, xerr = subnetInstance.InspectNetwork(handler.job.Context())
+	xerr = subnetInstance.Delete(handler.job.Context())
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// consider a Subnet not found as a successful deletion
-			debug.IgnoreError2(handler.job.Context(), xerr)
-			clean = false
-		default:
-			return fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
-		}
-	}
-	if clean {
-		xerr = subnetInstance.Delete(newCtx)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// consider a Subnet not found as a job done
-				debug.IgnoreError2(handler.job.Context(), xerr)
-			default:
-				return fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
-			}
-		}
-	}
-
-	if networkInstance != nil {
-		xerr = networkInstance.AbandonSubnet(newCtx, subnetID)
-		if xerr != nil {
-			return xerr
-		}
+		return xerr
 	}
 
 	return nil
@@ -281,12 +333,19 @@ func (handler *subnetHandler) BindSecurityGroup(networkRef, subnetRef, sgRef str
 		return fail.InvalidParameterError("enable", "must be either 'resources.SecurityGroupEnable' or 'resources.SecurityGroupDisable'")
 	}
 
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -313,12 +372,19 @@ func (handler *subnetHandler) UnbindSecurityGroup(networkRef, subnetRef, sgRef s
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef, isTerraform)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -354,12 +420,19 @@ func (handler *subnetHandler) EnableSecurityGroup(networkRef, subnetRef, sgRef s
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -391,12 +464,19 @@ func (handler *subnetHandler) DisableSecurityGroup(networkRef, subnetRef, sgRef 
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -428,7 +508,14 @@ func (handler *subnetHandler) ListSecurityGroups(networkRef, subnetRef string, s
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
 	}
 
-	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	subnetInstance, xerr := subnetfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, subnetRef, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}

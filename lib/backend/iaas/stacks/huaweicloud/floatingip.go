@@ -137,7 +137,7 @@ func (s stack) ListFloatingIPs() (pagination.Pager, fail.Error) {
 		return pagination.Pager{}, fail.InvalidInstanceError()
 	}
 
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips" // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + s.versions["networkclient"] + "/" + s.authOpts.ProjectID + "/publicips"
 	return pagination.NewPager(s.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
 		return floatingIPPage{pagination.LinkedPageBase{PageResult: r}}
 	}), nil
@@ -150,7 +150,7 @@ func (s stack) GetFloatingIP(ctx context.Context, id string) (*FloatingIP, fail.
 	}
 
 	r := getResult{}
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + s.versions["networkclient"] + "/" + s.authOpts.ProjectID + "/publicips/" + id
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -250,7 +250,7 @@ func (s stack) CreateFloatingIP(ctx context.Context, host *abstract.HostFull) (*
 	}
 
 	r := createResult{}
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips" // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + s.versions["networkclient"] + "/" + s.authOpts.ProjectID + "/publicips"
 	opts := gophercloud.RequestOpts{
 		JSONBody:     bb,
 		JSONResponse: &r.Body,
@@ -283,7 +283,7 @@ func (s stack) DeleteFloatingIP(ctx context.Context, id string) fail.Error {
 	}
 
 	r := deleteResult{}
-	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + s.versions["networkclient"] + "/" + s.authOpts.ProjectID + "/publicips/" + id
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},

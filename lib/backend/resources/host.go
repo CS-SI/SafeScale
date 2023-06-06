@@ -53,7 +53,7 @@ type Host interface {
 	GetDefaultSubnet(ctx context.Context) (Subnet, fail.Error)                                                             // returns the resources.Subnet instance corresponding to the default subnet of the host, with error handling
 	GetMounts(ctx context.Context) (*propertiesv1.HostMounts, fail.Error)                                                  // returns the mounts on the host
 	GetPrivateIP(ctx context.Context) (string, fail.Error)                                                                 // returns the IP address of the host on the default subnet, with error handling
-	GetPrivateIPOnSubnet(ctx context.Context, subnetID string) (string, fail.Error)                                        // returns the IP address of the host on the requested subnet, with error handling
+	GetPrivateIPOnSubnet(ctx context.Context, subnetID string) (string, fail.Error)                                        // returns the IP address of the host on the requested subnet, with error handling // never used
 	GetPublicIP(ctx context.Context) (string, fail.Error)                                                                  // returns the public IP address of the host, with error handling
 	GetShare(ctx context.Context, shareRef string) (*propertiesv1.HostShare, fail.Error)                                   // returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
 	GetShares(ctx context.Context) (*propertiesv1.HostShares, fail.Error)                                                  // returns the shares hosted on the host

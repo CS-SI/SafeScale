@@ -18,6 +18,7 @@ package providers
 
 import (
 	"context"
+	"github.com/hashicorp/terraform-json"
 	"regexp"
 	"time"
 
@@ -150,6 +151,13 @@ func (s ProviderProxy) GetStackName() (_ string, ferr fail.Error) {
 
 	cfg, xerr := s.Provider.GetStackName()
 	return cfg, xerr
+}
+
+func (s ProviderProxy) GetType() (_ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	theType, xerr := s.Provider.GetType()
+	return theType, xerr
 }
 
 func (s ProviderProxy) ListAvailabilityZones(ctx context.Context) (_ map[string]bool, ferr fail.Error) {
@@ -687,4 +695,37 @@ func (s ProviderProxy) DeleteVolumeAttachment(ctx context.Context, serverID, id 
 		xerr.WithContext(ctx)
 	}
 	return xerr
+}
+
+func (s ProviderProxy) Render(ctx context.Context, kind abstract.Enum, workDir string, options map[string]any) (_ []abstract.RenderedContent, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	rendered, xerr := s.Provider.Render(ctx, kind, workDir, options)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
+
+	return rendered, xerr
+}
+
+func (s ProviderProxy) GetTerraformState(ctx context.Context) (_ *tfjson.State, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	state, xerr := s.Provider.GetTerraformState(ctx)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
+
+	return state, xerr
+}
+
+func (s ProviderProxy) ExportFromState(ctx context.Context, kind abstract.Enum, state *tfjson.State, input any, id string) (_ any, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	thing, xerr := s.Provider.ExportFromState(ctx, kind, state, input, id)
+	if xerr != nil {
+		xerr.WithContext(ctx)
+	}
+
+	return thing, xerr
 }

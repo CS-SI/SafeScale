@@ -18,9 +18,10 @@ package huaweicloud
 
 import (
 	"context"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/debug"
@@ -37,6 +38,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/regions"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/pagination"
+
 	// Gophercloud OpenStack API
 	"github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
@@ -84,7 +86,7 @@ func NullStack() api.Stack { // nolint
 // New authenticates and return interface stack
 //
 //goland:noinspection GoExportedFuncWithUnexportedType
-func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
+func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions, serviceVerions map[string]string) (*stack, fail.Error) { // nolint
 	ctx := context.Background()
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
@@ -127,9 +129,13 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 
 	// TODO: detect versions instead of statically declare them
 	s.versions = map[string]string{
-		"compute": "v2",
-		"volume":  "v2",
-		"network": "v2",
+		"compute":       "v2",
+		"volume":        "v2",
+		"network":       "v2",
+		"networkclient": "v1",
+	}
+	for k, v := range serviceVerions {
+		s.versions[k] = v
 	}
 
 	// Openstack client
@@ -176,7 +182,8 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", s.versions["compute"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged Openstack service 'compute' version '%s'", s.versions["compute"])
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -194,7 +201,8 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -221,7 +229,8 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", s.versions["volumes"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged service 'volumes' version '%s'", s.versions["volume"])
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -1054,20 +1063,6 @@ func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, vaID string
 	)
 }
 
-func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) fail.Error {
-	if operation == "networklayers" {
-		abstractSubnet, ok := params["layer"].(*abstract.Subnet)
-		if !ok {
-			return fail.InvalidParameterError("params[layer]", "should be *abstract.Subnet")
-		}
-		// huaweicloud added a layer called "IPv4 SubnetID", which is returned as SubnetID but is not; Network is the real "OpenStack" Subnet ID
-		// FIXME: maybe huaweicloud has to be reviewed/rewritten not to use a mix of pure OpenStack API and customized Huaweicloud API?
-		abstractSubnet.ID = abstractSubnet.Network
-	}
-
-	return nil
-}
-
 // IsNull ...
 func (s *stack) IsNull() bool {
 	return s == nil || s.Driver == nil
@@ -1076,6 +1071,10 @@ func (s *stack) IsNull() bool {
 // GetStackName returns the name of the stack
 func (s stack) GetStackName() (string, fail.Error) {
 	return "huaweicloud", nil
+}
+
+func (s stack) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
 }
 
 // initVPC initializes the instance of the Networking/VPC if one is defined in tenant
@@ -1115,10 +1114,6 @@ func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, l
 
 	xerr := s.rpcSetMetadataOfInstance(ctx, id, lmap)
 	return xerr
-}
-
-func (s *stack) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
-	panic("implement me")
 }
 
 func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {

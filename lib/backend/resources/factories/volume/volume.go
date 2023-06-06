@@ -26,11 +26,22 @@ import (
 )
 
 // New creates an instance of resources.Volume
-func New(svc iaas.Service) (resources.Volume, fail.Error) {
+func New(svc iaas.Service, terraform bool) (resources.Volume, fail.Error) {
+	if terraform {
+		tv, err := operations.NewTerraformVolume(svc)
+		if err != nil {
+			return nil, err
+		}
+
+		return tv, nil
+	}
 	return operations.NewVolume(svc)
 }
 
 // Load loads the metadata of a volume and returns an instance of resources.Volume
-func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
+func Load(ctx context.Context, svc iaas.Service, ref string, terraform bool) (resources.Volume, fail.Error) {
+	if terraform {
+		return operations.LoadTerraformVolume(ctx, svc, ref)
+	}
 	return operations.LoadVolume(ctx, svc, ref)
 }

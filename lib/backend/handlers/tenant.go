@@ -495,8 +495,15 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		return xerr
 	}
 
+	isTerraform := false
+	pn, xerr := svc.GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
 	hostName := scannedHostPrefix + template.Name
-	host, xerr := hostfactory.New(svc)
+	host, xerr := hostfactory.New(svc, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -695,14 +702,20 @@ func (handler *tenantHandler) dumpImages(ctx context.Context) (ferr fail.Error) 
 func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr fail.Error) {
 	svc := handler.job.Service()
 
-	var xerr fail.Error
-	network, xerr = networkfactory.Load(handler.job.Context(), svc, scanNetworkName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	network, xerr = networkfactory.Load(handler.job.Context(), svc, scanNetworkName, isTerraform)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
 
-		network, xerr = networkfactory.New(svc)
+		network, xerr = networkfactory.New(svc, isTerraform)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -710,7 +723,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr 
 			Name: scanNetworkName,
 			CIDR: scanNetworkCIDR,
 		}
-		if xerr = network.Create(handler.job.Context(), req); xerr != nil {
+		if xerr = network.Create(handler.job.Context(), &req, nil); xerr != nil {
 			return nil, xerr
 		}
 		return network, xerr
@@ -721,13 +734,19 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, ferr 
 func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.Subnet, ferr fail.Error) {
 	svc := handler.job.Service()
 
-	var xerr fail.Error
-	subnet, xerr = subnetfactory.Load(handler.job.Context(), svc, scanNetworkName, scanSubnetName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	subnet, xerr = subnetfactory.Load(handler.job.Context(), svc, scanNetworkName, scanSubnetName, isTerraform)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return nil, xerr
 		}
-		subnet, xerr = subnetfactory.New(svc)
+		subnet, xerr = subnetfactory.New(svc, isTerraform)
 		if xerr != nil {
 			return nil, xerr
 		}

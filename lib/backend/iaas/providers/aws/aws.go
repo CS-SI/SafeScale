@@ -84,23 +84,49 @@ func New() providers.Provider {
 	return &provider{}
 }
 
-// Build builds a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
-	identityCfg, ok := params["identity"].(map[string]interface{})
-	if !ok {
-		return &provider{}, fail.SyntaxError("section 'identity' not found in tenants.toml")
+func recast(in any) (map[string]any, error) {
+	out := make(map[string]any)
+	if in == nil {
+		return out, nil
 	}
 
-	computeCfg, ok := params["compute"].(map[string]interface{})
+	if input, ok := in.(map[string]any); ok {
+		return input, nil
+	}
+
+	input, ok := in.(map[any]any)
 	if !ok {
-		return &provider{}, fail.SyntaxError("section compute not found in tenants.toml")
+		return nil, fmt.Errorf("invalid input type: %T", in)
+	}
+
+	for k, v := range input {
+		nk, ok := k.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid key type: %T", k)
+		}
+		out[nk] = v
+	}
+	return out, nil
+}
+
+// Build builds a new Client from configuration parameter
+func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
+	identityCfg, err := recast(params["identity"])
+	if err != nil {
+		return &provider{}, fail.ConvertError(err)
+	}
+
+	computeCfg, err := recast(params["compute"])
+	if err != nil {
+		return &provider{}, fail.ConvertError(err)
 	}
 
 	var networkName string
-	networkCfg, ok := params["network"].(map[string]interface{})
-	if ok {
-		networkName, _ = networkCfg["ProviderNetwork"].(string) // nolint
+	networkCfg, err := recast(params["network"])
+	if err != nil {
+		return &provider{}, fail.ConvertError(err)
 	}
+	networkName, _ = networkCfg["ProviderNetwork"].(string) // nolint
 	if networkName == "" {
 		networkName = "safescale"
 	}
@@ -115,7 +141,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	var owners []string
-	if _, ok = computeCfg["Owners"]; ok { // FIXME: OPP, undocumented....
+	if _, ok = computeCfg["Owners"]; ok { // FIXME: undocumented....
 		ownerList, ok := computeCfg["Owners"].(string)
 		if !ok {
 			logrus.WithContext(context.Background()).Debugf("error reading owners: %v", computeCfg["Owners"])
@@ -165,9 +191,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	projectID, _ := computeCfg["ProjectID"].(string)       // nolint
 	defaultImage, _ := computeCfg["DefaultImage"].(string) // nolint
 
-	maxLifeTime := 0
-	if _, ok := computeCfg["MaxLifetimeInHours"].(string); ok {
-		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
+	var maxLifeTime int64 = 0
+	if val, ok := computeCfg["MaxLifetimeInHours"].(int64); ok {
+		maxLifeTime = val
 	}
 
 	machineCreationLimit := 8
@@ -287,7 +313,7 @@ next:
 
 func getSuffix(params map[string]interface{}) string {
 	suffix := ""
-	if osto, ok := params["objectstorage"].(map[string]interface{}); ok {
+	if osto, err := recast(params["objectstorage"]); err == nil {
 		if val, ok := osto["Suffix"].(string); ok {
 			suffix = val
 			if suffix != "" {
@@ -295,7 +321,7 @@ func getSuffix(params map[string]interface{}) string {
 			}
 		}
 	}
-	if meta, ok := params["metadata"].(map[string]interface{}); ok {
+	if meta, err := recast(params["metadata"]); err == nil {
 		if val, ok := meta["Suffix"].(string); ok {
 			suffix = val
 		}

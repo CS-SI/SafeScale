@@ -1,0 +1,17 @@
+[[tenants]]
+    client = "aws"
+    name = "Test with valid AWS tenant"
+
+    [tenants.identity]
+        AccessKeyID = "ABCDEFGHIJK"
+        SecretAccessKey = "12345678abcdef"
+
+    [tenants.compute]
+        Region = "eu-central-1"
+        Zone = "eu-central-1a"
+
+    [tenants.objectstorage]
+        Type        = "s3"
+        AccessKey = "ABCDEFGHIJK"
+        SecretKey = "12345678abcdef"
+        Region      = "eu-central-1"

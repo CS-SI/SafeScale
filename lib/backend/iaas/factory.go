@@ -21,10 +21,15 @@ import (
 	"context"
 	"expvar"
 	"fmt"
+	"net"
+	"net/mail"
+	"net/url"
 	"os"
 	"regexp"
 	"sync"
 	"time"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/enums"
 
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
@@ -108,6 +113,12 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		}
 
 		tenantInCfg = true
+
+		xerr := validateTenant(tenant)
+		if xerr != nil {
+			return nullService(), xerr
+		}
+
 		provider, found = tenant["provider"].(string)
 		if !found {
 			provider, found = tenant["Provider"].(string)
@@ -130,26 +141,14 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 			continue
 		}
 
-		_, found = tenant["identity"].(map[string]interface{})
-		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'identity' found in tenant '%s', continuing.", name)
-		}
-		_, found = tenant["compute"].(map[string]interface{})
-		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'compute' found in tenant '%s', continuing.", name)
-		}
-		_, found = tenant["network"].(map[string]interface{})
-		if !found {
-			logrus.WithContext(ctx).Debugf("No section 'network' found in tenant '%s', continuing.", name)
-		}
-
 		_, tenantObjectStorageFound := tenant["objectstorage"]
 		_, tenantMetadataFound := tenant["metadata"]
 
 		// Initializes Provider
 		providerInstance, xerr := svc.Build(tenant)
 		if xerr != nil {
-			return nullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
+			//return nullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
+			return nullService(), xerr
 		}
 
 		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
@@ -261,7 +260,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 					}
 				}
 			}
-			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {
+			if metadataConfig, err := recast(tenant["metadata"]); err == nil {
 				if key, ok := metadataConfig["CryptKey"].(string); ok {
 					ek, err := crypt.NewEncryptionKey([]byte(key))
 					if err != nil {
@@ -272,7 +271,14 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 			}
 			logrus.WithContext(ctx).Infof("Setting default Tenant to '%s'; storing metadata in bucket '%s'", tenantName, metadataBucket.GetName())
 		} else {
-			return nullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
+			cliType, ok := tenant["clientType"].(string)
+			if ok {
+				if cliType != "terraform" {
+					return nullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
+				}
+			} else {
+				return nullService(), fail.SyntaxError("failed to build service: 'metadata' section (and 'objectstorage' as fallback) is missing in configuration file for tenant '%s'", tenantName)
+			}
 		}
 
 		// service is ready
@@ -280,7 +286,7 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 		newS.metadataBucket = metadataBucket
 		newS.metadataKey = metadataCryptKey
 
-		// FIXME: OPP, Wrong, this is input validation, and should be into Build.
+		// FIXME: Wrong, this is input validation, and should be into Build.
 		if xerr := validateRegexps(newS, tenant); xerr != nil {
 			return nullService(), xerr
 		}
@@ -303,29 +309,11 @@ func UseService(inctx context.Context, tenantName string, metadataVersion string
 	return nullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
 }
 
-// validateRegionName validates the availability of the region passed as parameter
-func validateRegionName(name string, allRegions []string) fail.Error { // nolint
-	// FIXME: Use this function
-	if len(allRegions) > 0 {
-		regionIsValidInput := false
-		for _, vr := range allRegions {
-			if name == vr {
-				regionIsValidInput = true
-			}
-		}
-		if !regionIsValidInput {
-			return fail.NotFoundError("region '%s' not found", name)
-		}
-	}
-
-	return nil
-}
-
 // validateRegexps validates regexp values from tenants file
 func validateRegexps(svc *service, tenant map[string]interface{}) fail.Error {
-	compute, ok := tenant["compute"].(map[string]interface{})
-	if !ok {
-		return fail.InvalidParameterError("tenant['compute']", "is not a map")
+	compute, err := recast(tenant["compute"])
+	if err != nil {
+		return fail.ConvertError(err)
 	}
 
 	res, xerr := validateRegexpsOfKeyword("WhitelistTemplateRegexp", compute["WhitelistTemplateRegexp"])
@@ -387,41 +375,68 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	var (
 		config objectstorage.Config
 		ok     bool
+		found  bool
 	)
 
-	identity, _ := tenant["identity"].(map[string]interface{})      // nolint
-	compute, _ := tenant["compute"].(map[string]interface{})        // nolint
-	ostorage, _ := tenant["objectstorage"].(map[string]interface{}) // nolint
+	identity, _ := recast(tenant["identity"])      // nolint
+	compute, _ := recast(tenant["compute"])        // nolint
+	ostorage, _ := recast(tenant["objectstorage"]) // nolint
+	client, _ := tenant["client"].(string)         // nolint
 
 	if config.Type, ok = ostorage["Type"].(string); !ok {
 		return config, fail.SyntaxError("missing setting 'Type' in 'objectstorage' section")
 	}
 
-	if config.Domain, ok = ostorage["Domain"].(string); !ok {
-		if config.Domain, ok = ostorage["DomainName"].(string); !ok {
-			if config.Domain, ok = compute["Domain"].(string); !ok {
-				if config.Domain, ok = compute["DomainName"].(string); !ok {
-					if config.Domain, ok = identity["Domain"].(string); !ok {
-						if config.Domain, ok = identity["DomainName"].(string); !ok {
-							config.Domain = authOpts.GetString("DomainName")
-						}
-					}
-				}
-			}
+	domainKeysToCheck := []string{
+		"Domain",
+		"DomainName",
+	}
+
+	found = false
+
+	for _, key := range domainKeysToCheck {
+		if val, ok := ostorage[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
+		} else if val, ok := compute[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
+		} else if val, ok := identity[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
 		}
 	}
+	if !found {
+		config.Domain = authOpts.GetString("DomainName")
+	}
+
 	config.TenantDomain = config.Domain
 
-	if config.Tenant, ok = ostorage["Tenant"].(string); !ok {
-		if config.Tenant, ok = ostorage["ProjectName"].(string); !ok {
-			if config.Tenant, ok = ostorage["ProjectID"].(string); !ok {
-				if config.Tenant, ok = compute["ProjectName"].(string); !ok {
-					if config.Tenant, ok = compute["ProjectID"].(string); !ok {
-						config.Tenant = authOpts.GetString("ProjectName")
-					}
-				}
-			}
+	tenantKeysToCheck := []string{
+		"Tenant",
+		"ProjectName",
+		"ProjectID",
+	}
+
+	found = false
+
+	for _, key := range tenantKeysToCheck {
+		if val, ok := ostorage[key].(string); ok {
+			config.Tenant = val
+			found = true
+			break
+		} else if val, ok := compute[key].(string); ok {
+			config.Tenant = val
+			found = true
+			break
 		}
+	}
+
+	if !found {
+		config.Tenant = authOpts.GetString("ProjectName")
 	}
 
 	config.AuthURL, _ = ostorage["AuthURL"].(string)   // nolint
@@ -430,41 +445,82 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		config.Direct, _ = ostorage["Direct"].(bool) // nolint
 	}
 
-	if config.User, ok = ostorage["AccessKey"].(string); !ok {
-		if config.User, ok = ostorage["OpenStackID"].(string); !ok {
-			if config.User, ok = ostorage["Username"].(string); !ok {
-				if config.User, ok = identity["OpenstackID"].(string); !ok {
-					config.User, _ = identity["Username"].(string) // nolint
-				}
+	if client != "gcp" {
+		userKeysToCheck := []string{
+			"AccessKey",
+			"OpenstackID",
+			"Username",
+		}
+
+		found = false
+
+		for _, key := range userKeysToCheck {
+			if val, ok := ostorage[key].(string); ok {
+				config.User = val
+				found = true
+				break
+			} else if val, ok := identity[key].(string); ok {
+				config.User = val
+				found = true
+				break
 			}
+		}
+
+		if !found {
+			return config, fail.SyntaxError("missing setting 'AccessKey', 'OpenstackID' or 'Username' field in 'identity' section")
 		}
 	}
 
-	if config.Key, ok = ostorage["ApplicationKey"].(string); !ok {
-		config.Key, _ = identity["ApplicationKey"].(string) // nolint
+	if client == "ovh" || client == "openstack" || client == "cloudferro" {
+		key := "ApplicationKey"
+
+		if val, ok := ostorage[key].(string); ok {
+			config.Key = val
+		} else if val, ok := identity[key].(string); ok {
+			config.Key = val
+		} else if tenant["client"].(string) != "aws" {
+			return config, fail.SyntaxError("missing setting 'ApplicationKey' in 'identity' section")
+		}
 	}
 
-	if config.SecretKey, ok = ostorage["SecretKey"].(string); !ok {
-		if config.SecretKey, ok = ostorage["OpenstackPassword"].(string); !ok {
-			if config.SecretKey, ok = ostorage["Password"].(string); !ok {
-				if config.SecretKey, ok = identity["SecretKey"].(string); !ok {
-					if config.SecretKey, ok = identity["OpenstackPassword"].(string); !ok {
-						config.SecretKey, _ = identity["Password"].(string) // nolint
-					}
-				}
-			}
+	secretKeyToCheck := []string{
+		"SecretKey",
+		"OpenstackPassword",
+		"Password",
+	}
+
+	found = false
+
+	for _, key := range secretKeyToCheck {
+		if val, ok := ostorage[key].(string); ok {
+			config.SecretKey = val
+			found = true
+			break
+		} else if val, ok := identity[key].(string); ok {
+			config.SecretKey = val
+			found = true
+			break
 		}
+	}
+
+	if !found {
+		return config, fail.SyntaxError("missing settings 'SecretKey' or 'OpenstackPassword' or 'Password' in 'identity' section")
 	}
 
 	if config.Region, ok = ostorage["Region"].(string); !ok {
 		config.Region, _ = compute["Region"].(string) // nolint
+		// TODO : Use validateRegionName function
 		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
 		// 	return config, err
 		// }
 	}
 
-	if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
-		config.AvailabilityZone, _ = compute["AvailabilityZone"].(string) // nolint
+	key := "AvailabilityZone"
+
+	if val, ok := ostorage[key].(string); ok {
+		config.AvailabilityZone = val
+	} else if val, ok := compute[key].(string); ok {
+		config.AvailabilityZone = val
 	}
 
 	for k, v := range identity {
@@ -477,7 +533,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 			if _, ok = v.(bool); ok {
 				continue
 			}
-			if k == "DNSList" {
+			if k == "DNSList" || k == "MaxLifetimeInHours" {
 				continue
 			}
 			return config, fail.InconsistentError("'compute' it's a map[string]string, and the key %s is not a string: %v", k, v)
@@ -546,14 +602,14 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 	var (
 		config objectstorage.Config
 		ok     bool
+		found  bool
 	)
 
-	// FIXME: This code is ancient and doesn't provide nor hints nor protection against formatting
-
-	identity, _ := tenant["identity"].(map[string]interface{})      // nolint
-	compute, _ := tenant["compute"].(map[string]interface{})        // nolint
-	ostorage, _ := tenant["objectstorage"].(map[string]interface{}) // nolint
-	metadata, _ := tenant["metadata"].(map[string]interface{})      // nolint
+	identity, _ := recast(tenant["identity"])      // nolint
+	compute, _ := recast(tenant["compute"])        // nolint
+	ostorage, _ := recast(tenant["objectstorage"]) // nolint
+	metadata, _ := recast(tenant["metadata"])      // nolint
+	client, _ := tenant["client"].(string)         // nolint
 
 	if config.Type, ok = metadata["Type"].(string); !ok {
 		if config.Type, ok = ostorage["Type"].(string); !ok {
@@ -561,40 +617,55 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		}
 	}
 
-	if config.Domain, ok = metadata["Domain"].(string); !ok {
-		if config.Domain, ok = metadata["DomainName"].(string); !ok {
-			if config.Domain, ok = ostorage["Domain"].(string); !ok {
-				if config.Domain, ok = ostorage["DomainName"].(string); !ok {
-					if config.Domain, ok = compute["Domain"].(string); !ok {
-						if config.Domain, ok = compute["DomainName"].(string); !ok {
-							if config.Domain, ok = identity["Domain"].(string); !ok {
-								if config.Domain, ok = identity["DomainName"].(string); !ok {
-									config.Domain = authOpts.GetString("DomainName") // nolint
-								}
-							}
-						}
-					}
-				}
-			}
+	var domainKeyToCheck = []string{
+		"Domain",
+		"DomainName",
+	}
+
+	found = false
+
+	for _, key := range domainKeyToCheck {
+		if val, ok := metadata[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
+		} else if val, ok := ostorage[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
+		} else if val, ok := compute[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
+		} else if val, ok := compute[key].(string); ok {
+			config.Domain = val
+			found = true
+			break
 		}
 	}
+
+	if !found {
+		config.Domain = authOpts.GetString("DomainName")
+	}
+
 	config.TenantDomain = config.Domain
 
-	if config.Tenant, ok = metadata["Tenant"].(string); !ok {
-		if config.Tenant, ok = metadata["ProjectName"].(string); !ok {
-			if config.Tenant, ok = metadata["ProjectID"].(string); !ok {
-				if config.Tenant, ok = ostorage["Tenant"].(string); !ok {
-					if config.Tenant, ok = ostorage["ProjectName"].(string); !ok {
-						if config.Tenant, ok = ostorage["ProjectID"].(string); !ok {
-							if config.Tenant, ok = compute["Tenant"].(string); !ok {
-								if config.Tenant, ok = compute["ProjectName"].(string); !ok {
-									config.Tenant, _ = compute["ProjectID"].(string) // nolint
-								}
-							}
-						}
-					}
-				}
-			}
+	var tenantKeysToCheck = []string{
+		"Tenant",
+		"ProjectName",
+		"ProjectID",
+	}
+
+	for _, key := range tenantKeysToCheck {
+		if val, ok := metadata[key].(string); ok {
+			config.Tenant = val
+			break
+		} else if val, ok := ostorage[key].(string); ok {
+			config.Tenant = val
+			break
+		} else if val, ok := compute[key].(string); ok {
+			config.Tenant = val
+			break
 		}
 	}
 
@@ -606,67 +677,126 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		config.Endpoint, _ = ostorage["Endpoint"].(string) // nolint
 	}
 
-	if config.User, ok = metadata["AccessKey"].(string); !ok {
-		if config.User, ok = metadata["OpenstackID"].(string); !ok {
-			if config.User, ok = metadata["Username"].(string); !ok {
-				if config.User, ok = ostorage["AccessKey"].(string); !ok {
-					if config.User, ok = ostorage["OpenStackID"].(string); !ok {
-						if config.User, ok = ostorage["Username"].(string); !ok {
-							if config.User, ok = identity["Username"].(string); !ok {
-								config.User, _ = identity["OpenstackID"].(string) // nolint
-							}
-						}
-					}
-				}
+	if client != "gcp" {
+		var userKeysToCheck = []string{
+			"AccessKey",
+			"OpenstackID",
+			"Username",
+		}
+
+		found = false
+
+		for _, key := range userKeysToCheck {
+			if val, ok := metadata[key].(string); ok {
+				config.User = val
+				found = true
+				break
+			} else if val, ok := ostorage[key].(string); ok {
+				config.User = val
+				found = true
+				break
+			} else if val, ok := identity[key].(string); ok {
+				config.User = val
+				found = true
+				break
 			}
+		}
+		if !found {
+			return config, fail.SyntaxError("missing setting 'AccessKey', 'OpenstackID' or 'Username' field in 'identity' section")
 		}
 	}
 
 	config.DNS, _ = compute["DNS"].(string) // nolint
 
-	if config.Key, ok = metadata["ApplicationKey"].(string); !ok {
-		if config.Key, ok = ostorage["ApplicationKey"].(string); !ok {
-			config.Key, _ = identity["ApplicationKey"].(string) // nolint
+	if client == "ovh" || client == "openstack" || client == "cloudferro" {
+		key := "ApplicationKey"
+		found = false
+
+		if val, ok := metadata[key].(string); ok {
+			config.Key = val
+			found = true
+		} else if val, ok := ostorage[key].(string); ok {
+			config.Key = val
+			found = true
+		} else if val, ok := identity[key].(string); ok {
+			config.Key = val
+			found = true
+		}
+		if !found {
+			return config, fail.SyntaxError("missing setting 'ApplicationKey' field in 'identity' section")
 		}
 	}
 
-	if config.SecretKey, ok = metadata["SecretKey"].(string); !ok {
-		if config.SecretKey, ok = metadata["AccessPassword"].(string); !ok {
-			if config.SecretKey, ok = metadata["OpenstackPassword"].(string); !ok {
-				if config.SecretKey, ok = metadata["Password"].(string); !ok {
-					if config.SecretKey, ok = ostorage["SecretKey"].(string); !ok {
-						if config.SecretKey, ok = ostorage["AccessPassword"].(string); !ok {
-							if config.SecretKey, ok = ostorage["OpenstackPassword"].(string); !ok {
-								if config.SecretKey, ok = ostorage["Password"].(string); !ok {
-									if config.SecretKey, ok = identity["SecretKey"].(string); !ok {
-										if config.SecretKey, ok = identity["AccessPassword"].(string); !ok {
-											if config.SecretKey, ok = identity["Password"].(string); !ok {
-												config.SecretKey, _ = identity["OpenstackPassword"].(string) // nolint
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+	var secretKeysToCheck = []string{
+		"SecretKey",
+		"OpenstackPassword",
+		"Password",
 	}
 
-	if config.Region, ok = metadata["Region"].(string); !ok {
-		if config.Region, ok = ostorage["Region"].(string); !ok {
-			config.Region, _ = compute["Region"].(string) // nolint
+	found = false
+
+	for _, key := range secretKeysToCheck {
+		if val, ok := metadata[key].(string); ok {
+			config.SecretKey = val
+			found = true
+			break
+		} else if val, ok := ostorage[key].(string); ok {
+			config.SecretKey = val
+			found = true
+			break
+		} else if val, ok := identity[key].(string); ok {
+			config.SecretKey = val
+			found = true
+			break
 		}
-		// FIXME: Wrong, this needs validation, but not ALL providers
-		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-		// 	return config, err
-		// }
+	}
+	if !found {
+		return config, fail.SyntaxError("missing setting 'SecretKey' or 'OpenstackPassword' or 'Password' field in 'identity' section")
 	}
 
-	if config.AvailabilityZone, ok = metadata["AvailabilityZone"].(string); !ok {
-		if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
-			config.AvailabilityZone, _ = compute["AvailabilityZone"].(string) // nolint
+	//if config.Region, ok = metadata["Region"].(string); !ok {
+	//	if config.Region, ok = ostorage["Region"].(string); !ok {
+	//		config.Region, _ = compute["Region"].(string) // nolint
+	//	}
+	//	// FIXME: Wrong, this needs validation, but not ALL providers
+	//	// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+	//	// 	return config, err
+	//	// }
+	//}
+
+	key := "Region"
+	found = false
+
+	if val, ok := metadata[key].(string); ok {
+		config.Region = val
+		found = true
+	} else if val, ok := ostorage[key].(string); ok {
+		config.Region = val
+		found = true
+	} else if val, ok := compute[key].(string); ok {
+		config.Region = val
+		found = true
+	}
+	if !found {
+		return config, fail.SyntaxError("missing setting 'Region' field in 'compute' section")
+	}
+
+	if client == "cloudferro" || client == "flexibleengine" {
+		key = "AvailabilityZone"
+		found = false
+
+		if val, ok := metadata[key].(string); ok {
+			config.AvailabilityZone = val
+			found = true
+		} else if val, ok := ostorage[key].(string); ok {
+			config.AvailabilityZone = val
+			found = true
+		} else if val, ok := compute[key].(string); ok {
+			config.AvailabilityZone = val
+			found = true
+		}
+		if !found {
+			return config, fail.SyntaxError("missing setting 'AvailabilityZone' field in 'compute' section")
 		}
 	}
 
@@ -773,15 +903,757 @@ func getTenantsFromViperCfg(v *viper.Viper) ([]map[string]interface{}, *viper.Vi
 		return nil, v, fail.SyntaxError("failed to convert tenants file to map[string]interface{}")
 	}
 
-	jsoned, err := json.Marshal(tenantsCfg)
-	if err != nil {
-		return nil, v, fail.ConvertError(err)
+	return tenantsCfg, v, nil
+}
+
+func recast(in any) (map[string]any, error) {
+	out := make(map[string]any)
+	if in == nil {
+		return out, nil
 	}
 
-	var out []map[string]interface{}
-	err = json.Unmarshal(jsoned, &out)
-	if err != nil {
-		return nil, v, fail.ConvertError(err)
+	if input, ok := in.(map[string]any); ok {
+		return input, nil
 	}
-	return out, v, nil
+
+	input, ok := in.(map[any]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid input type: %T", in)
+	}
+
+	for k, v := range input {
+		nk, ok := k.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid key type: %T", k)
+		}
+		out[nk] = v
+	}
+	return out, nil
+}
+
+// validateTenant makes sure the contents of tenants.toml or tenants.yaml are correct
+func validateTenant(tenant map[string]interface{}) fail.Error {
+	var (
+		name      string
+		client    enums.Client
+		err       error
+		team      map[string]interface{}
+		identity  map[string]interface{}
+		compute   map[string]interface{}
+		network   map[string]interface{}
+		ostorage  map[string]interface{}
+		metadata  map[string]interface{}
+		val       string
+		ok        bool
+		found     bool
+		searchKey string
+		section   string
+	)
+
+	var errors []fail.Error
+
+	tenantNameToCheck := []string{
+		"name",
+		"Name",
+	}
+
+	found = false
+
+	for _, key := range tenantNameToCheck {
+		if maybe, ok := tenant[key]; ok {
+			name, ok = maybe.(string)
+			if !ok {
+				errors = append(errors, fail.SyntaxError("Field 'name' for tenant MUST be a string"))
+			}
+
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		errors = append(errors, fail.SyntaxError("Missing field 'name' for tenant"))
+	}
+
+	providerKeysToCheck := []string{
+		"provider",
+		"Provider",
+		"client",
+		"Client",
+	}
+
+	found = false
+
+	for _, key := range providerKeysToCheck {
+		if maybe, ok := tenant[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s] is not a string", key))
+			} else {
+				client, err = enums.ParseClient(val)
+
+				if err != nil {
+					errors = append(errors, fail.ConvertError(err))
+				}
+			}
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		errors = append(errors, fail.SyntaxError("Missing field 'client' for tenant"))
+	}
+
+	providerKindKeysToCheck := []string{
+		"clientType",
+		"ClientType",
+	}
+
+	found = false
+
+	for _, key := range providerKindKeysToCheck {
+		if maybe, ok := tenant[key]; ok {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s] is not a string", key))
+			} else {
+				if val != "classic" && val != "terraform" {
+					errors = append(errors, fail.SyntaxError("only 'classic' and 'terraform' are allowed for '%s'", key))
+				}
+			}
+			found = true
+			break
+		}
+	}
+
+	maybe, ok := tenant["identity"]
+	if !ok {
+		errors = append(errors, fail.SyntaxError("No section 'identity' found for tenant %s", name))
+	} else {
+		if identity, ok = maybe.(map[string]interface{}); !ok {
+			identity, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity] is not a map[string]any"))
+			}
+		}
+	}
+
+	maybe, ok = tenant["compute"]
+	if !ok {
+		errors = append(errors, fail.SyntaxError("Missing field 'compute' for tenant"))
+	} else {
+		if compute, ok = maybe.(map[string]interface{}); !ok {
+			compute, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[compute] is not a map[string]any"))
+			}
+		}
+	}
+
+	maybe, ok = tenant["team"]
+	if ok {
+		if team, ok = maybe.(map[string]interface{}); !ok {
+			team, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[team] is not a map[string]any"))
+			}
+		}
+	}
+
+	maybe, ok = tenant["network"]
+	if ok {
+		network, ok = maybe.(map[string]interface{})
+		if !ok {
+			network, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[network] is not a map[string]any"))
+			}
+		}
+	}
+
+	maybe, ok = tenant["objectstorage"]
+	if ok {
+		ostorage, ok = maybe.(map[string]interface{})
+		if !ok {
+			ostorage, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[objectstorage] is not a map[string]any"))
+			}
+		}
+	}
+
+	maybe, ok = tenant["metadata"]
+	if ok {
+		metadata, ok = maybe.(map[string]interface{})
+		if !ok {
+			metadata, err = recast(maybe)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[metadata] is not a map[string]any"))
+			}
+		}
+	}
+
+	xerr := checkSection(tenant, Sections)
+	if xerr != nil {
+		errors = append(errors, xerr)
+	}
+
+	// validate the new "team" section
+	if team != nil {
+		if maybe, ok := team["TerraformVersion"]; ok {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of TerraformVersion is not a string"))
+			}
+		}
+
+		if maybe, ok := team["WithConsul"]; ok {
+			if _, ok := maybe.(bool); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of WithConsul is not a boolean"))
+			}
+		}
+
+		if maybe, ok := team["ConsulURL"]; ok {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of ConsulURL is not a string"))
+			} else {
+				_, err = url.ParseRequestURI(val)
+				if err != nil {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be a valid URL", "ConsulURL", "team"))
+				}
+			}
+		}
+	}
+
+	switch client {
+	case enums.GCP:
+		if maybe, ok = identity["User"]; ok {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity][User] is not a string"))
+			} else {
+				_, err := mail.ParseAddress(val)
+
+				if err != nil {
+					errors = append(errors, fail.SyntaxError("User in identity section must be a valid email"))
+				}
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("missing setting 'User' field in 'identity' section"))
+		}
+	case enums.Azure:
+		// ALL the following keys are mandatory and cannot be empty
+		userKeysToCheck := []string{
+			"ClientID",
+			"ClientSecret",
+			"TenantID",
+			"SubscriptionID",
+		}
+		for _, key := range userKeysToCheck {
+			var val string
+			if maybe, ok = identity[key]; !ok {
+				errors = append(errors, fail.SyntaxError("missing setting '%s' field in 'identity' section", key))
+			} else if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity][%s] is not a string", key))
+			}
+			if val == "" {
+				errors = append(errors, fail.SyntaxError("setting '%s' field in 'identity' section cannot be empty", key))
+			}
+		}
+	default:
+		userKeysToCheck := []string{
+			"AccessKey",
+			"OpenstackID",
+			"Username",
+		}
+
+		found = false
+
+		for _, key := range userKeysToCheck {
+			if maybe, ok = ostorage[key]; ok {
+				section = "objectstorage"
+				searchKey = key
+				found = true
+				break
+			} else if maybe, ok = identity[key]; ok {
+				section = "identity"
+				searchKey = key
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			errors = append(errors, fail.SyntaxError("missing setting 'AccessKey' field in 'identity' section"))
+		} else {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey))
+			} else if client == enums.Cloudferro && searchKey == "Username" {
+				_, err = mail.ParseAddress(val)
+
+				if err != nil {
+					errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a valid email address", section, searchKey))
+				}
+			} else {
+				if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section))
+				}
+			}
+		}
+	}
+
+	if client == enums.Outscale {
+		key := "UserID"
+		found = false
+
+		if maybe, ok = identity[key]; ok {
+			searchKey = key
+			section = "identity"
+			found = true
+		}
+
+		if !found {
+			errors = append(errors, fail.SyntaxError("missing setting 'UserID' field in 'identity' section"))
+		} else {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey))
+			} else {
+				if match, _ := regexp.Match("^[0-9]{1,64}$", []byte(val)); !match {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be numeric and between 1 and 64 characters long", searchKey, section))
+				}
+			}
+		}
+	}
+
+	if client == enums.OVH || client == enums.Cloudferro || client == enums.OpenStack {
+		key := "ApplicationKey"
+		found = false
+
+		if maybe, ok = ostorage[key]; ok {
+			searchKey = key
+			section = "objectstorage"
+			found = true
+		} else if maybe, ok = identity[key]; ok {
+			searchKey = key
+			section = "identity"
+			found = true
+		}
+
+		if !found {
+			errors = append(errors, fail.SyntaxError("missing setting 'ApplicationKey' field in 'identity' section"))
+		} else {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey))
+			} else {
+				if match, _ := regexp.Match("^[a-zA-Z0-9]{1,64}$", []byte(val)); !match {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric and between 1 and 64 characters long", searchKey, section))
+				}
+			}
+		}
+	}
+
+	secretKeyToCheck := []string{
+		"SecretKey",
+		"SecretAccessKey",
+		"OpenstackPassword",
+		"Password",
+	}
+
+	found = false
+
+	for _, key := range secretKeyToCheck {
+		if maybe, ok = metadata[key]; ok {
+			searchKey = key
+			section = "metadata"
+			found = true
+			break
+		}
+		if maybe, ok = ostorage[key]; ok {
+			searchKey = key
+			section = "objectstorage"
+			found = true
+			break
+		} else if maybe, ok = identity[key]; ok {
+			searchKey = key
+			section = "identity"
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		errors = append(errors, fail.SyntaxError("missing settings 'SecretKey' in 'identity' section"))
+	} else {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, searchKey))
+		} else if searchKey == "SecretKey" || searchKey == "SecretAccessKey" {
+			if match, _ := regexp.Match("^[a-zA-Z0-9+/]{1,64}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric and between 1 and 64 characters long", searchKey, section))
+			}
+		}
+	}
+
+	key := "IdentityEndpointVersion"
+
+	if maybe, ok = identity[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[identity][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "identity"))
+			}
+		}
+	}
+
+	key = "ComputeEndpointVersion"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[compute][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "compute"))
+			}
+		}
+	}
+
+	key = "VolumeEndpointVersion"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[compute][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "compute"))
+			}
+		}
+	}
+
+	key = "NetworkEndpointVersion"
+
+	if maybe, ok = network[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[network][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "network"))
+			}
+		}
+	}
+
+	key = "NetworkClientEndpointVersion"
+
+	if maybe, ok = network[key]; ok {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[network][%s] is not a string", key))
+		} else {
+			if match, _ := regexp.Match("^v[0-9]{1,2}.?[0-9]{0,3}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be v followed by number (ex : v1.0)", key, "network"))
+			}
+		}
+	}
+
+	if client == enums.Cloudferro || client == enums.FlexibleEngine {
+		key := "AvailabilityZone"
+		found = false
+
+		if maybe, ok = ostorage[key]; ok {
+			section = "objectstorage"
+			found = true
+		} else if maybe, ok = compute[key]; ok {
+			section = "compute"
+			found = true
+		}
+
+		if !found {
+			errors = append(errors, fail.SyntaxError("missing settings 'AvailabilityZone' in 'compute' section"))
+		} else {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
+			} else {
+				if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", key, section))
+				}
+			}
+		}
+	}
+
+	if metadata != nil || ostorage != nil {
+		var typeName string
+		key := "Type"
+		found = false
+
+		if maybe, ok = metadata[key]; ok {
+			section = "metadata"
+			found = true
+		} else if maybe, ok = ostorage[key]; ok {
+			section = "objectstorage"
+			found = true
+		}
+
+		if !found {
+			errors = append(errors, fail.SyntaxError("missing setting 'Type' in 'metadata' or 'objectstorage' section"))
+		} else {
+			if typeName, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
+			} else {
+				_, err := enums.ParseStorage(typeName)
+
+				if err != nil {
+					errors = append(errors, fail.ConvertError(err))
+				}
+			}
+		}
+	}
+
+	key = "Region"
+	found = false
+
+	if maybe, ok = metadata[key]; ok {
+		section = "metadata"
+		found = true
+	} else if maybe, ok = ostorage[key]; ok {
+		section = "objectstorage"
+		found = true
+	} else if maybe, ok = compute[key]; ok {
+		section = "compute"
+		found = true
+	}
+	if !found {
+		errors = append(errors, fail.SyntaxError("missing setting 'Region' field in 'compute' section"))
+	} else {
+		if val, ok = maybe.(string); !ok {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
+		} else {
+			if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", searchKey, section))
+			}
+		}
+	}
+
+	if client == enums.Outscale {
+		key := "Subregion"
+		found = false
+
+		if maybe, ok = compute[key]; ok {
+			section = "compute"
+			found = true
+		}
+
+		if !found {
+			errors = append(errors, fail.SyntaxError("missing setting 'Subregion' field in 'compute' section"))
+		} else {
+			if val, ok = maybe.(string); !ok {
+				errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
+			} else {
+				if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,64}$", []byte(val)); !match {
+					errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 64 characters long", key, section))
+				}
+			}
+		}
+
+	}
+
+	if client == enums.FlexibleEngine || client == enums.Outscale {
+		key = "VPCName"
+		found = false
+
+		if maybe, ok = network[key]; ok {
+			section = "network"
+			found = true
+		}
+
+		if val, ok = maybe.(string); !ok && found {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
+		} else if found {
+			if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,255}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 255 characters long", key, section))
+			}
+		}
+
+		key = "VPCCIDR"
+		found = false
+
+		if maybe, ok = network[key]; ok {
+			section = "network"
+			found = true
+		}
+
+		if val, ok = maybe.(string); !ok && found {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
+		} else if found {
+			_, _, err = net.ParseCIDR(val)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid CIDR", key, section))
+			}
+		}
+	}
+
+	key = "Endpoint"
+	found = false
+
+	if maybe, ok = metadata[key]; ok {
+		section = "metadata"
+		found = true
+	} else if maybe, ok = ostorage[key]; ok {
+		section = "objectstorage"
+		found = true
+	}
+
+	if val, ok = maybe.(string); !ok && found {
+		errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", section, key))
+	} else if found {
+		_, err = url.ParseRequestURI(val)
+		if err != nil {
+			errors = append(errors, fail.SyntaxError("%s in %s section must be a valid URL", key, section))
+		}
+	}
+
+	key = "WhitelistTemplateRegexp"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); ok {
+			_, err = regexp.Compile(val)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid regex", key, "compute"))
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "compute", key))
+		}
+	}
+
+	key = "BlacklistTemplateRegexp"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); ok {
+			_, err = regexp.Compile(val)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid regex", key, "compute"))
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "compute", key))
+		}
+	}
+
+	key = "MetadataBucketName"
+
+	if maybe, ok = metadata[key]; ok {
+		if val, ok = maybe.(string); ok {
+			if match, _ := regexp.Match("^[a-zA-Z0-9-]{1,255}$", []byte(val)); !match {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be alphanumeric (with -) and between 1 and 255 characters long", key, section))
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "metadata", key))
+		}
+	}
+
+	key = "S3"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); ok {
+			_, err = url.ParseRequestURI(val)
+
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid url", key, "compute"))
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "compute", key))
+		}
+	}
+
+	key = "EC2"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); ok {
+			_, err = url.ParseRequestURI(val)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid url", key, "compute"))
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "compute", key))
+		}
+	}
+
+	key = "SSM"
+
+	if maybe, ok = compute[key]; ok {
+		if val, ok = maybe.(string); ok {
+			_, err = url.ParseRequestURI(val)
+			if err != nil {
+				errors = append(errors, fail.SyntaxError("%s in %s section must be a valid url", key, "compute"))
+			}
+		} else {
+			errors = append(errors, fail.SyntaxError("Wrong type, the content of tenant[%s][%s] is not a string", "compute", key))
+		}
+	}
+
+	key = "MaxLifetimeInHours"
+
+	if maybe, ok = compute[key]; ok {
+		if _, ok := maybe.(int64); !ok {
+			errors = append(errors, fail.SyntaxError("%s in %s section must be an integer", key, "compute"))
+		} else if maybe.(int64) < 1 {
+			errors = append(errors, fail.SyntaxError("%s in %s section must be greater than 0", key, "compute"))
+		}
+	}
+
+	xerr = checkSection(team, TeamField)
+	if xerr != nil {
+		errors = append(errors, xerr)
+	}
+
+	xerr = checkSection(identity, IdentityField)
+	if xerr != nil {
+		errors = append(errors, xerr)
+	}
+
+	xerr = checkSection(compute, computeField)
+	if xerr != nil {
+		errors = append(errors, xerr)
+	}
+
+	xerr = checkSection(network, Networkfield)
+	if xerr != nil {
+		errors = append(errors, xerr)
+	}
+
+	xerr = checkSection(ostorage, OStorageField)
+	if xerr != nil {
+		errors = append(errors, xerr)
+	}
+
+	xerr = checkSection(metadata, MetadataField)
+	if xerr != nil {
+		errors = append(errors, xerr)
+	}
+
+	if len(errors) > 0 {
+		var msg string
+
+		for i, err := range errors {
+			if i != len(errors)-1 {
+				msg = msg + err.Error() + " | "
+			} else {
+				msg = msg + err.Error()
+			}
+		}
+
+		return fail.NewError(msg)
+	}
+
+	return nil
+}
+
+func checkSection(sections map[string]interface{}, fields []string) fail.Error {
+	section := make(map[string]interface{})
+	for k, v := range sections {
+		section[k] = v
+	}
+
+	for _, field := range fields {
+		delete(section, field)
+	}
+
+	if len(section) > 0 {
+		return fail.SyntaxError("unknown fields in tenant: %v", section)
+	}
+
+	return nil
 }

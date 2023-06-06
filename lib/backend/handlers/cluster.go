@@ -79,7 +79,14 @@ func (handler *clusterHandler) List() (_ []abstract.ClusterIdentity, ferr fail.E
 		return nil, fail.InvalidInstanceError()
 	}
 
-	return clusterfactory.List(handler.job.Context(), handler.job.Service())
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	return clusterfactory.List(handler.job.Context(), handler.job.Service(), isTerraform)
 }
 
 // Create creates a new cluster
@@ -95,7 +102,14 @@ func (handler *clusterHandler) Create(req abstract.ClusterRequest) (_ resources.
 		return nil, fail.InvalidInstanceError()
 	}
 
-	instance, xerr := clusterfactory.New(handler.job.Context(), handler.job.Service())
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := clusterfactory.New(handler.job.Context(), handler.job.Service(), isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -128,7 +142,14 @@ func (handler *clusterHandler) State(name string) (_ clusterstate.Enum, ferr fai
 		return clusterstate.Unknown, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return clusterstate.Unknown, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return clusterstate.Unknown, xerr
 	}
@@ -157,7 +178,14 @@ func (handler *clusterHandler) Inspect(name string) (_ resources.Cluster, ferr f
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	rc, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	rc, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "cluster load problem")
 	}
@@ -183,7 +211,14 @@ func (handler *clusterHandler) Start(name string) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -207,7 +242,14 @@ func (handler *clusterHandler) Stop(name string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -231,7 +273,14 @@ func (handler *clusterHandler) Delete(name string, force bool) (ferr fail.Error)
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -258,7 +307,14 @@ func (handler *clusterHandler) Expand(name string, sizing abstract.HostSizingReq
 		return nil, fail.InvalidParameterError("count", "must be at least 1")
 	}
 
-	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -286,7 +342,14 @@ func (handler *clusterHandler) Shrink(name string, count uint) (_ []*propertiesv
 		return nil, fail.InvalidParameterError("count", "must be at least 1")
 	}
 
-	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -310,7 +373,14 @@ func (handler *clusterHandler) ListNodes(name string) (_ resources.IndexedListOf
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -338,7 +408,15 @@ func (handler *clusterHandler) InspectNode(clusterName, nodeRef string) (_ resou
 	}
 
 	svc := handler.job.Service()
-	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), svc, clusterName)
+
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), svc, clusterName, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -348,12 +426,16 @@ func (handler *clusterHandler) InspectNode(clusterName, nodeRef string) (_ resou
 		return nil, xerr
 	}
 
-	id := idOfClusterMember(nodeList, nodeRef)
-	if id == "" {
-		return nil, fail.NotFoundError()
+	if !isTerraform {
+		id := idOfClusterMember(nodeList, nodeRef)
+		if id == "" {
+			return nil, fail.NotFoundError()
+		}
+
+		return hostfactory.Load(handler.job.Context(), svc, id, isTerraform)
 	}
 
-	return hostfactory.Load(handler.job.Context(), svc, id)
+	return hostfactory.Load(handler.job.Context(), svc, nodeRef, isTerraform)
 }
 
 // DeleteNode removes node(s) from a cluster
@@ -375,7 +457,14 @@ func (handler *clusterHandler) DeleteNode(clusterName, nodeRef string) (ferr fai
 		return fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
 	}
 
-	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -385,12 +474,16 @@ func (handler *clusterHandler) DeleteNode(clusterName, nodeRef string) (ferr fai
 		return xerr
 	}
 
-	id := idOfClusterMember(nodeList, nodeRef)
-	if id == "" {
-		return fail.NotFoundError()
+	if !isTerraform {
+		id := idOfClusterMember(nodeList, nodeRef)
+		if id == "" {
+			return fail.NotFoundError()
+		}
+
+		return clusterInstance.DeleteSpecificNode(handler.job.Context(), id, "")
 	}
 
-	return clusterInstance.DeleteSpecificNode(handler.job.Context(), id, "")
+	return clusterInstance.DeleteSpecificNode(handler.job.Context(), nodeRef, "")
 }
 
 // StopNode stops a node of the cluster
@@ -412,7 +505,14 @@ func (handler *clusterHandler) StopNode(clusterName, nodeRef string) (ferr fail.
 		return fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
 	}
 
-	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -427,7 +527,7 @@ func (handler *clusterHandler) StopNode(clusterName, nodeRef string) (ferr fail.
 		return fail.NotFoundError()
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -454,7 +554,14 @@ func (handler *clusterHandler) StartNode(clusterName, nodeRef string) (ferr fail
 		return fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
 	}
 
-	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -469,7 +576,7 @@ func (handler *clusterHandler) StartNode(clusterName, nodeRef string) (ferr fail
 		return fail.NotFoundError()
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -496,7 +603,14 @@ func (handler *clusterHandler) StateNode(clusterName, nodeRef string) (_ hoststa
 		return hoststate.Unknown, fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
 	}
 
-	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return hoststate.Unknown, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName, isTerraform)
 	if xerr != nil {
 		return hoststate.Unknown, xerr
 	}
@@ -511,7 +625,7 @@ func (handler *clusterHandler) StateNode(clusterName, nodeRef string) (_ hoststa
 		return hoststate.Unknown, fail.NotFoundError()
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id, isTerraform)
 	if xerr != nil {
 		return hoststate.Unknown, xerr
 	}
@@ -535,7 +649,14 @@ func (handler *clusterHandler) ListMasters(name string) (_ resources.IndexedList
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -559,7 +680,14 @@ func (handler *clusterHandler) FindAvailableMaster(name string) (_ resources.Hos
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -586,7 +714,14 @@ func (handler *clusterHandler) InspectMaster(clusterName, masterRef string) (_ r
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("masterRef")
 	}
 
-	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -596,12 +731,16 @@ func (handler *clusterHandler) InspectMaster(clusterName, masterRef string) (_ r
 		return nil, xerr
 	}
 
-	id := idOfClusterMember(masterList, masterRef)
-	if id == "" {
-		return nil, fail.NotFoundError()
+	if !isTerraform {
+		id := idOfClusterMember(masterList, masterRef)
+		if id == "" {
+			return nil, fail.NotFoundError()
+		}
+
+		return hostfactory.Load(handler.job.Context(), handler.job.Service(), id, isTerraform)
 	}
 
-	return hostfactory.Load(handler.job.Context(), handler.job.Service(), id)
+	return hostfactory.Load(handler.job.Context(), handler.job.Service(), masterRef, isTerraform)
 }
 
 // StopMaster stops a master of the Cluster
@@ -623,7 +762,14 @@ func (handler *clusterHandler) StopMaster(clusterName, masterRef string) (ferr f
 		return fail.InvalidParameterCannotBeEmptyStringError("masterRef")
 	}
 
-	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -638,7 +784,7 @@ func (handler *clusterHandler) StopMaster(clusterName, masterRef string) (ferr f
 		return fail.NotFoundError()
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -665,7 +811,14 @@ func (handler *clusterHandler) StartMaster(clusterName, masterRef string) (ferr 
 		return fail.InvalidParameterCannotBeEmptyStringError("masterRef")
 	}
 
-	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -680,7 +833,7 @@ func (handler *clusterHandler) StartMaster(clusterName, masterRef string) (ferr 
 		return fail.NotFoundError()
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -707,7 +860,14 @@ func (handler *clusterHandler) StateMaster(clusterName, masterRef string) (_ hos
 		return hoststate.Unknown, fail.InvalidParameterCannotBeEmptyStringError("masterRef")
 	}
 
-	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return hoststate.Unknown, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), clusterName, isTerraform)
 	if xerr != nil {
 		return hoststate.Unknown, xerr
 	}
@@ -722,7 +882,7 @@ func (handler *clusterHandler) StateMaster(clusterName, masterRef string) (_ hos
 		return hoststate.Unknown, fail.NotFoundError()
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id)
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), id, isTerraform)
 	if xerr != nil {
 		return hoststate.Unknown, xerr
 	}
@@ -734,9 +894,18 @@ func (handler *clusterHandler) StateMaster(clusterName, masterRef string) (_ hos
 func idOfClusterMember(list resources.IndexedListOfClusterNodes, ref string) string {
 	var id string
 	for _, v := range list {
-		if v.ID == ref || v.Name == ref {
+		if v.ID == ref {
 			id = v.ID
 			break
+		}
+		if v.Name == ref {
+			if v.ID != "" {
+				id = v.ID
+				break
+			} else {
+				id = v.Name
+				break
+			}
 		}
 	}
 	return id

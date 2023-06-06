@@ -2224,7 +2224,7 @@ func (s stack) rpcRemoveTagsFromInstance(ctx context.Context, hostID string, tag
 		return nil
 	}
 
-	// FIXME: OPP Missing Labels, GCP has all 3, metadata, tags and labels
+	// FIXME: Missing Labels, GCP has all 3, metadata, tags and labels
 
 	var opp *compute.Operation
 	xerr = stacks.RetryableRemoteCall(ctx,

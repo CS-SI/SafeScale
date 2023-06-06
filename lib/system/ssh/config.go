@@ -24,7 +24,7 @@ func NewConfig(hostname string, ipAddress string, port int, user string, private
 
 func NewConfigFrom(ac sshapi.Config) (*CommonConfig, fail.Error) {
 	if valid.IsNil(ac) {
-		return nil, fail.InvalidParameterCannotBeNilError("ac")
+		return nil, fail.NewError("parameter 'ac' cannot be nil")
 	}
 
 	hostname, _ := ac.GetHostname()

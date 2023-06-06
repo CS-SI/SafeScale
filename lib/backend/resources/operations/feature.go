@@ -264,13 +264,13 @@ func (instance *Feature) Applicable(ctx context.Context, tg resources.Targetable
 	// 1st check Feature is suitable for target
 	switch tg.TargetType() {
 	case featuretargettype.Cluster:
-		casted, ok := tg.(*Cluster)
+		casted, ok := tg.(*ClassicCluster)
 		if !ok {
-			return false, fail.InconsistentError("failed to cast target as '*Cluster'")
+			return false, fail.InconsistentError("failed to cast target as '*ClassicCluster'")
 		}
 		flavor, xerr := casted.GetFlavor(ctx)
 		if xerr != nil {
-			return false, fail.Wrap(xerr, "failed to get Cluster Flavor")
+			return false, fail.Wrap(xerr, "failed to get ClassicCluster Flavor")
 		}
 		if _, ok := instance.file.suitableFor[flavor.String()]; !ok {
 			return false, nil
@@ -359,7 +359,7 @@ func (instance *Feature) Check(ctx context.Context, target resources.Targetable,
 		}
 	case resources.Cluster:
 		var found bool
-		castedTarget, ok := target.(*Cluster)
+		castedTarget, ok := target.(*ClassicCluster)
 		if !ok {
 			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
 		}
@@ -856,7 +856,7 @@ func (instance Feature) controlledParameter(ctx context.Context, p string, targe
 			}
 		case featuretargettype.Cluster:
 			var xerr fail.Error
-			cluster, ok := target.(*Cluster)
+			cluster, ok := target.(*ClassicCluster)
 			if !ok {
 				return "", fail.InconsistentError("failed to cast target to 'resources.Host'")
 			}
