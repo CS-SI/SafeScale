@@ -1,0 +1,15 @@
+[[tenants]]
+name = "Test with AvailabilityZone in OStrorage"
+client = "flexibleengine"
+
+
+[tenants.identity]
+Username = "test"
+Password = "password"
+
+[tenants.compute]
+Region = "SBG5"
+
+[tenants.objectstorage]
+Type = "s3"
+AvailabilityZone = "eu-west-0b"

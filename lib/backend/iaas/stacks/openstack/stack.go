@@ -18,8 +18,9 @@ package openstack // Package openstack contains the implemenation of a stack for
 
 import (
 	context2 "context"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
@@ -151,7 +152,8 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged Openstack service 'compute' version '%s'", serviceVersions["compute"])
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -169,7 +171,8 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -196,7 +199,8 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", serviceVersions["volumes"])
+		// TODO : this should be a NotImplemented error but we use a generic one instead because NotImplemented is too verbose
+		return nil, fail.NewError("unmanaged service 'volumes' version '%s'", serviceVersions["volume"])
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -264,6 +268,10 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "openstack", nil
 }
 
+func (s stack) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
+}
+
 // Timings returns the instance containing current timeout settings
 func (s *stack) Timings() (temporal.Timings, fail.Error) {
 	if s == nil {
@@ -282,10 +290,6 @@ func (s *stack) UpdateTags(ctx context2.Context, kind abstract.Enum, id string, 
 
 	xerr := s.rpcSetMetadataOfInstance(ctx, id, lmap)
 	return xerr
-}
-
-func (s *stack) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
-	panic("implement me")
 }
 func (s *stack) DeleteTags(ctx context2.Context, kind abstract.Enum, id string, keys []string) fail.Error {
 	if kind != abstract.HostResource {

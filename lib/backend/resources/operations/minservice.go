@@ -14,6 +14,7 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/temporal"
 	"github.com/eko/gocache/v2/cache"
+	"github.com/hashicorp/terraform-json"
 	"io"
 	"regexp"
 	"sync"
@@ -23,6 +24,21 @@ import (
 type minService struct {
 	loc objectstorage.Location
 	aob abstract.ObjectStorageBucket
+}
+
+func (m minService) Render(ctx context.Context, kind abstract.Enum, workDir string, options map[string]any) ([]abstract.RenderedContent, fail.Error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m minService) GetTerraformState(ctx context.Context) (_ *tfjson.State, ferr fail.Error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m minService) ExportFromState(ctx context.Context, kind abstract.Enum, state *tfjson.State, input any, id string) (any, fail.Error) {
+	// TODO implement me
+	panic("implement me")
 }
 
 func (m minService) FilterImages(ctx context.Context, s string) ([]*abstract.Image, fail.Error) {
@@ -99,6 +115,10 @@ func (m minService) GetLock(enum abstract.Enum) (*sync.Mutex, fail.Error) {
 func (m minService) GetStackName() (string, fail.Error) {
 	//TODO implement me
 	panic("implement me")
+}
+
+func (s minService) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
 }
 
 func (m minService) ListAvailabilityZones(ctx context.Context) (map[string]bool, fail.Error) {
@@ -414,10 +434,6 @@ var MINTIMINGS = &temporal.MutableTimings{
 
 func (m minService) Timings() (temporal.Timings, fail.Error) {
 	return MINTIMINGS, nil
-}
-
-func (m minService) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
-	panic("implement me")
 }
 
 func (m minService) UpdateTags(ctx context.Context, kind abstract.Enum, id string, lmap map[string]string) fail.Error {

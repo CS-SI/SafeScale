@@ -1,0 +1,30 @@
+[[tenants]]
+    client = "outscale" # what happens if we put here a client we don't have ?
+    name = "Test with valid outscale tenant"
+
+    [tenants.identity]
+        AccessKey="hello there" #only alphanumeric with CAPS is valid
+        SecretKey="()//" #only alphanumeric is valid
+        UserID="___345" #only numeric is valid
+
+    [tenants.compute]
+        Region="eu-west-2" #only alphanumeric (with -) is valid
+        Subregion="eu-west-2a" #only alphanumeric (with -) is valid
+        Service="api"
+        DefaultVolumeSpeed="HDD"
+
+    [tenants.network]
+        VPCName = "Once upon a time there were four little Rabbits, and their names were Flopsy, Mopsy, Cotton-tail and Peter. They lived with their Mother in a sand-bank, underneath the root of a very big fir-tree." # length of ALL fields is LIMITED, this should fail badly just because of that
+        VPCCIDR = "14000.168.0.0/16" #this has to be a valid cidr
+
+    [tenants.objectstorage]
+        Type = "s3" #we only accept s3 and swift
+        Endpoint = "toto" #this has to be a valid url
+        AccessKey="hello there" #only alphanumeric with CAPS is valid
+        SecretKey="()//" #only alphanumeric is valid
+
+    [tenants.metadata]
+        Type = "s3" #we only accept s3 and swift
+        Endpoint = "toto" #this has to be a valid url
+        AccessKey="hello there" #only alphanumeric with CAPS is valid
+        SecretKey="()//" #only alphanumeric is valid

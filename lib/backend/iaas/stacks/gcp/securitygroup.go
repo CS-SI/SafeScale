@@ -211,7 +211,7 @@ func (s stack) InspectSecurityGroup(ctx context.Context, sgParam stacks.Security
 		return asg, fail.InvalidParameterError("sgParam", "must be consistent")
 	}
 
-	// FIXME: OPP, good behaviour DEPENDS on this
+	// FIXME: good behaviour DEPENDS on this
 	return asg, fail.NotImplementedError("no real Security Group resource proposed by gcp") // FIXME: Technical debt
 }
 

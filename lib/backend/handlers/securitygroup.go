@@ -84,12 +84,19 @@ func (handler *securityGroupHandler) Create(networkRef, sgName, description stri
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkRef")
 	}
 
-	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.New(handler.job.Service())
+	sgInstance, xerr := securitygroupfactory.New(handler.job.Service(), isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -123,7 +130,14 @@ func (handler *securityGroupHandler) Clear(sgRef string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -144,7 +158,14 @@ func (handler *securityGroupHandler) Reset(sgRef string) (ferr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -165,7 +186,14 @@ func (handler *securityGroupHandler) Inspect(sgRef string) (_ resources.Security
 		return nil, fail.InvalidInstanceError()
 	}
 
-	return securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	return securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 }
 
 // Delete a host
@@ -184,7 +212,14 @@ func (handler *securityGroupHandler) Delete(sgRef string, force bool) (ferr fail
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -192,7 +227,7 @@ func (handler *securityGroupHandler) Delete(sgRef string, force bool) (ferr fail
 	return sgInstance.Delete(handler.job.Context(), force)
 }
 
-// AddRule creates a new rule and add it to an eisting security group
+// AddRule creates a new rule and add it to an existing security group
 func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.SecurityGroupRule) (_ resources.SecurityGroup, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
@@ -211,7 +246,14 @@ func (handler *securityGroupHandler) AddRule(sgRef string, rule *abstract.Securi
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -243,7 +285,14 @@ func (handler *securityGroupHandler) DeleteRule(sgRef string, rule *abstract.Sec
 		return nil, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -282,7 +331,14 @@ func (handler *securityGroupHandler) Bonds(sgRef string, kind string) (_ []*prop
 		return nil, nil, fail.InvalidRequestError("invalid value '%s' in field 'Kind'", kind)
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return nil, nil, xerr
 	}

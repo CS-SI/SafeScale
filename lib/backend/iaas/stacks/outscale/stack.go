@@ -111,6 +111,10 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "outscale", nil
 }
 
+func (s stack) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
+}
+
 // New creates a new stack
 func New(options *ConfigurationOptions) (_ *stack, ferr fail.Error) { // nolint
 	if options == nil {
@@ -282,11 +286,6 @@ func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, l
 	_, xerr := s.rpcCreateTags(ctx, id, lmap)
 	return xerr
 }
-
-func (s *stack) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
-	panic("implement me")
-}
-
 func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()

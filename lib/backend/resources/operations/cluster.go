@@ -66,11 +66,11 @@ import (
 
 const (
 	clusterKind        = "cluster"
-	clustersFolderName = "clusters" // path to use to reach Cluster Definitions/Metadata
+	clustersFolderName = "clusters" // path to use to reach ClassicCluster Definitions/Metadata
 )
 
-// Cluster is the implementation of resources.Cluster interface
-type Cluster struct {
+// ClassicCluster is the implementation of resources.Cluster interface
+type ClassicCluster struct {
 	*MetadataCore
 
 	gateways []string
@@ -88,41 +88,8 @@ type Cluster struct {
 	randomDelayCh   <-chan int
 }
 
-// NewCluster is the constructor of resources.Cluster struct
-func NewCluster(inctx context.Context, svc iaas.Service) (_ *Cluster, ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
-
-	ctx, cancel := context.WithCancel(inctx)
-	defer cancel()
-
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
-	initial := &abstract.ClusterIdentity{}
-	coreInstance, xerr := NewCore(svc, clusterKind, clustersFolderName, initial)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	instance := &Cluster{
-		MetadataCore: coreInstance,
-		cluID:        initial,
-	}
-	xerr = instance.startRandomDelayGenerator(ctx, 0, 2000)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	instance.nodeIPs = make(data.IndexedListOfStrings)
-	instance.masterIPs = make(data.IndexedListOfStrings)
-
-	return instance, nil
-}
-
 // Exists checks if the resource actually exists in provider side (not in stow metadata)
-func (instance *Cluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
+func (instance *ClassicCluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -238,7 +205,7 @@ func (instance *Cluster) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 }
 
 // StartRandomDelayGenerator starts a Task to generate random delays, read from instance.randomDelayCh
-func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max int) fail.Error {
+func (instance *ClassicCluster) startRandomDelayGenerator(ctx context.Context, min, max int) fail.Error {
 	chint := make(chan int)
 	mrand.Seed(time.Now().UnixNano())
 
@@ -286,9 +253,14 @@ func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (d
 		ga, gerr := func() (_ resources.Cluster, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			clusterInstance, xerr := NewCluster(ctx, svc)
+			clusterInstanceRaw, xerr := NewCluster(ctx, svc)
 			if xerr != nil {
 				return nil, xerr
+			}
+
+			clusterInstance, ok := clusterInstanceRaw.(*ClassicCluster)
+			if !ok {
+				return nil, fail.InvalidParameterError("clusterInstanceRaw", "should have been a *ClassicCluster")
 			}
 
 			if xerr = clusterInstance.Read(ctx, name); xerr != nil {
@@ -418,7 +390,7 @@ func onClusterCacheMiss(inctx context.Context, svc iaas.Service, name string) (d
 }
 
 // updateCachedInformation updates information cached in the instance
-func (instance *Cluster) updateCachedInformation(inctx context.Context) fail.Error {
+func (instance *ClassicCluster) updateCachedInformation(inctx context.Context) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -461,12 +433,12 @@ func (instance *Cluster) updateCachedInformation(inctx context.Context) fail.Err
 }
 
 // IsNull tells if the instance should be considered as a null value
-func (instance *Cluster) IsNull() bool {
+func (instance *ClassicCluster) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || valid.IsNil(instance.MetadataCore)
 }
 
 // carry ...
-func (instance *Cluster) carry(inctx context.Context, clonable data.Clonable) (ferr fail.Error) {
+func (instance *ClassicCluster) carry(inctx context.Context, clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -488,8 +460,8 @@ func (instance *Cluster) carry(inctx context.Context, clonable data.Clonable) (f
 	return nil
 }
 
-// Create creates the necessary infrastructure of the Cluster
-func (instance *Cluster) Create(inctx context.Context, req abstract.ClusterRequest) fail.Error {
+// Create creates the necessary infrastructure of the ClassicCluster
+func (instance *ClassicCluster) Create(inctx context.Context, req abstract.ClusterRequest) fail.Error {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -520,7 +492,7 @@ func (instance *Cluster) Create(inctx context.Context, req abstract.ClusterReque
 				return xerr
 			}
 
-			logrus.WithContext(ctx).Tracef("Cluster creation finished with: %s", litter.Sdump(res))
+			logrus.WithContext(ctx).Tracef("ClassicCluster creation finished with: %s", litter.Sdump(res))
 
 			xerr = instance.regenerateClusterInventory(ctx)
 			if xerr != nil {
@@ -541,7 +513,7 @@ func (instance *Cluster) Create(inctx context.Context, req abstract.ClusterReque
 	}
 }
 
-func (instance *Cluster) Sdump(ctx context.Context) (_ string, ferr fail.Error) {
+func (instance *ClassicCluster) Sdump(ctx context.Context) (_ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -555,8 +527,8 @@ func (instance *Cluster) Sdump(ctx context.Context) (_ string, ferr fail.Error) 
 	return dumped, nil
 }
 
-// Deserialize reads json code and recreates Cluster metadata
-func (instance *Cluster) Deserialize(_ context.Context, buf []byte) (ferr fail.Error) {
+// Deserialize reads json code and recreates ClassicCluster metadata
+func (instance *ClassicCluster) Deserialize(_ context.Context, buf []byte) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -572,17 +544,17 @@ func (instance *Cluster) Deserialize(_ context.Context, buf []byte) (ferr fail.E
 }
 
 // bootstrap (re)connects controller with the appropriate Makers
-func (instance *Cluster) bootstrap(flavor clusterflavor.Enum) (ferr fail.Error) {
+func (instance *ClassicCluster) bootstrap(flavor clusterflavor.Enum) (ferr fail.Error) {
 	switch flavor {
 	case clusterflavor.BOH:
 	case clusterflavor.K8S:
 	default:
-		return fail.InvalidParameterError("unknown Cluster Flavor '%d'", flavor)
+		return fail.InvalidParameterError("unknown ClassicCluster Flavor '%d'", flavor)
 	}
 	return nil
 }
 
-func (instance *Cluster) getMaker(inctx context.Context) (clusterflavors.Makers, fail.Error) {
+func (instance *ClassicCluster) getMaker(inctx context.Context) (clusterflavors.Makers, fail.Error) {
 	fla, xerr := instance.unsafeGetFlavor(inctx)
 	if xerr != nil {
 		return clusterflavors.Makers{}, xerr
@@ -594,13 +566,13 @@ func (instance *Cluster) getMaker(inctx context.Context) (clusterflavors.Makers,
 	case clusterflavor.K8S:
 		return k8s.Makers, nil
 	default:
-		return clusterflavors.Makers{}, fail.InvalidParameterError("unknown Cluster Flavor '%d'", fla)
+		return clusterflavors.Makers{}, fail.InvalidParameterError("unknown ClassicCluster Flavor '%d'", fla)
 	}
 }
 
-// Browse walks through Cluster MetadataFolder and executes a callback for each entry
-// FIXME: adds a Cluster status check to prevent operations on removed clusters
-func (instance *Cluster) Browse(inctx context.Context, callback func(*abstract.ClusterIdentity) fail.Error) (ferr fail.Error) {
+// Browse walks through ClassicCluster MetadataFolder and executes a callback for each entry
+// FIXME: adds a ClassicCluster status check to prevent operations on removed clusters
+func (instance *ClassicCluster) Browse(inctx context.Context, callback func(*abstract.ClusterIdentity) fail.Error) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -628,8 +600,8 @@ func (instance *Cluster) Browse(inctx context.Context, callback func(*abstract.C
 	})
 }
 
-// GetIdentity returns the identity of the Cluster
-func (instance *Cluster) GetIdentity(ctx context.Context) (clusterIdentity abstract.ClusterIdentity, ferr fail.Error) {
+// GetIdentity returns the identity of the ClassicCluster
+func (instance *ClassicCluster) GetIdentity(ctx context.Context) (clusterIdentity abstract.ClusterIdentity, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -639,8 +611,8 @@ func (instance *Cluster) GetIdentity(ctx context.Context) (clusterIdentity abstr
 	return instance.unsafeGetIdentity(ctx)
 }
 
-// GetFlavor returns the flavor of the Cluster
-func (instance *Cluster) GetFlavor(ctx context.Context) (flavor clusterflavor.Enum, ferr fail.Error) {
+// GetFlavor returns the flavor of the ClassicCluster
+func (instance *ClassicCluster) GetFlavor(ctx context.Context) (flavor clusterflavor.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -650,8 +622,8 @@ func (instance *Cluster) GetFlavor(ctx context.Context) (flavor clusterflavor.En
 	return instance.unsafeGetFlavor(ctx)
 }
 
-// GetComplexity returns the complexity of the Cluster
-func (instance *Cluster) GetComplexity(ctx context.Context) (_ clustercomplexity.Enum, ferr fail.Error) {
+// GetComplexity returns the complexity of the ClassicCluster
+func (instance *ClassicCluster) GetComplexity(ctx context.Context) (_ clustercomplexity.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -661,9 +633,9 @@ func (instance *Cluster) GetComplexity(ctx context.Context) (_ clustercomplexity
 	return instance.unsafeGetComplexity(ctx)
 }
 
-// GetAdminPassword returns the password of the Cluster admin account
-// satisfies interface Cluster.Controller
-func (instance *Cluster) GetAdminPassword(_ context.Context) (adminPassword string, ferr fail.Error) {
+// GetAdminPassword returns the password of the ClassicCluster admin account
+// satisfies interface ClassicCluster.Controller
+func (instance *ClassicCluster) GetAdminPassword(_ context.Context) (adminPassword string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -673,8 +645,8 @@ func (instance *Cluster) GetAdminPassword(_ context.Context) (adminPassword stri
 	return instance.cluID.AdminPassword, nil
 }
 
-// GetKeyPair returns the key pair used in the Cluster
-func (instance *Cluster) GetKeyPair(_ context.Context) (keyPair *abstract.KeyPair, ferr fail.Error) {
+// GetKeyPair returns the key pair used in the ClassicCluster
+func (instance *ClassicCluster) GetKeyPair(_ context.Context) (keyPair *abstract.KeyPair, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -684,8 +656,8 @@ func (instance *Cluster) GetKeyPair(_ context.Context) (keyPair *abstract.KeyPai
 	return instance.cluID.Keypair, nil
 }
 
-// GetNetworkConfig returns subnet configuration of the Cluster
-func (instance *Cluster) GetNetworkConfig(ctx context.Context) (config *propertiesv3.ClusterNetwork, ferr fail.Error) {
+// GetNetworkConfig returns subnet configuration of the ClassicCluster
+func (instance *ClassicCluster) GetNetworkConfig(ctx context.Context) (config *propertiesv3.ClusterNetwork, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -718,8 +690,8 @@ func (instance *Cluster) GetNetworkConfig(ctx context.Context) (config *properti
 	return config, nil
 }
 
-// Start starts the Cluster
-func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
+// Start starts the ClassicCluster
+func (instance *ClassicCluster) Start(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -734,7 +706,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	// If the Cluster is in state Stopping or Stopped, do nothing
+	// If the ClassicCluster is in state Stopping or Stopped, do nothing
 	var prevState clusterstate.Enum
 	prevState, xerr = instance.unsafeGetState(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -743,11 +715,11 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 	}
 	switch prevState {
 	case clusterstate.Removed:
-		return fail.NotAvailableError("Cluster is being removed")
+		return fail.NotAvailableError("ClassicCluster is being removed")
 	case clusterstate.Stopping:
 		return nil
 	case clusterstate.Starting:
-		// If the Cluster is in state Starting, wait for it to finish its start procedure
+		// If the ClassicCluster is in state Starting, wait for it to finish its start procedure
 		xerr = retry.WhileUnsuccessful(
 			func() error {
 				select {
@@ -765,7 +737,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 					return nil
 				}
 
-				return fail.NewError("current state of Cluster is '%s'", state.String())
+				return fail.NewError("current state of ClassicCluster is '%s'", state.String())
 			},
 			timings.NormalDelay(),
 			timings.ExecutionTimeout(),
@@ -785,10 +757,10 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 	case clusterstate.Stopped, clusterstate.Degraded:
 		// continue
 	default:
-		return fail.NotAvailableError("failed to start Cluster because of it's current state: %s", prevState.String())
+		return fail.NotAvailableError("failed to start ClassicCluster because of it's current state: %s", prevState.String())
 	}
 
-	// First mark Cluster to be in state Starting
+	// First mark ClassicCluster to be in state Starting
 	xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
@@ -848,7 +820,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 				)
 			}
 
-			gatewayID = networkV3.GatewayID // FIXME: OPP I came here for
+			gatewayID = networkV3.GatewayID
 			secondaryGatewayID = networkV3.SecondaryGatewayID
 			return nil
 		})
@@ -856,7 +828,7 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 			return innerXErr
 		}
 
-		// Mark Cluster as state Starting
+		// Mark ClassicCluster as state Starting
 		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
@@ -922,8 +894,8 @@ func (instance *Cluster) Start(ctx context.Context) (ferr fail.Error) {
 	return nil
 }
 
-// Stop stops the Cluster
-func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
+// Stop stops the ClassicCluster
+func (instance *ClassicCluster) Stop(ctx context.Context) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -938,7 +910,7 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 		return xerr
 	}
 
-	// If the Cluster is stopped, do nothing
+	// If the ClassicCluster is stopped, do nothing
 	var prevState clusterstate.Enum
 	prevState, xerr = instance.unsafeGetState(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -947,7 +919,7 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 	}
 	switch prevState {
 	case clusterstate.Removed:
-		return fail.NotAvailableError("Cluster is being removed")
+		return fail.NotAvailableError("ClassicCluster is being removed")
 	case clusterstate.Stopped:
 		return nil
 	case clusterstate.Stopping:
@@ -965,11 +937,11 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 				}
 
 				if state == clusterstate.Removed {
-					return retry.StopRetryError(fail.NotAvailableError("Cluster is being removed"))
+					return retry.StopRetryError(fail.NotAvailableError("ClassicCluster is being removed"))
 				}
 
 				if state != clusterstate.Stopped {
-					return fail.NotAvailableError("current state of Cluster is '%s'", state.String())
+					return fail.NotAvailableError("current state of ClassicCluster is '%s'", state.String())
 				}
 
 				return nil
@@ -992,11 +964,11 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 	case clusterstate.Nominal, clusterstate.Degraded, clusterstate.Starting:
 		// continue
 	default:
-		// If the Cluster is not in state Nominal, Starting or Degraded, forbid to stop
-		return fail.NotAvailableError("failed to stop Cluster because of it's current state: %s", prevState.String())
+		// If the ClassicCluster is not in state Nominal, Starting or Degraded, forbid to stop
+		return fail.NotAvailableError("failed to stop ClassicCluster because of it's current state: %s", prevState.String())
 	}
 
-	// First mark Cluster to be in state Stopping
+	// First mark ClassicCluster to be in state Stopping
 	xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
@@ -1110,9 +1082,9 @@ func (instance *Cluster) Stop(ctx context.Context) (ferr fail.Error) {
 	})
 }
 
-// GetState returns the current state of the Cluster
+// GetState returns the current state of the ClassicCluster
 // Uses the "maker" ForceGetState
-func (instance *Cluster) GetState(ctx context.Context) (state clusterstate.Enum, ferr fail.Error) {
+func (instance *ClassicCluster) GetState(ctx context.Context) (state clusterstate.Enum, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	state = clusterstate.Unknown
@@ -1124,7 +1096,7 @@ func (instance *Cluster) GetState(ctx context.Context) (state clusterstate.Enum,
 }
 
 // AddNodes adds several nodes
-func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uint, def abstract.HostSizingRequirements, parameters data.Map, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
+func (instance *ClassicCluster) AddNodes(ctx context.Context, cluName string, count uint, def abstract.HostSizingRequirements, parameters data.Map, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1202,7 +1174,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 			})
 		}
 
-		// Cluster may have been created before ClusterDefaultV3, so still support this context
+		// ClassicCluster may have been created before ClusterDefaultV3, so still support this context
 		return props.Inspect(clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
 			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 			if !ok {
@@ -1332,7 +1304,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		}
 	}()
 
-	// configure what has to be done Cluster-wide
+	// configure what has to be done ClassicCluster-wide
 	makers, xerr := instance.getMaker(ctx)
 	if xerr != nil {
 		return nil, xerr
@@ -1352,7 +1324,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, cluName string, count uin
 		return nil, xerr
 	}
 
-	// At last join nodes to Cluster
+	// At last join nodes to ClassicCluster
 	xerr = instance.joinNodesFromList(ctx, nodes)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1420,7 +1392,7 @@ func complementHostDefinition(req abstract.HostSizingRequirements, def propertie
 }
 
 // DeleteSpecificNode deletes a node identified by its ID
-func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) (ferr fail.Error) {
+func (instance *ClassicCluster) DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1493,7 +1465,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 }
 
 // ListMasters lists the node instances corresponding to masters (if there is such masters in the flavor...)
-func (instance *Cluster) ListMasters(ctx context.Context) (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
+func (instance *ClassicCluster) ListMasters(ctx context.Context) (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1514,8 +1486,8 @@ func (instance *Cluster) ListMasters(ctx context.Context) (list resources.Indexe
 }
 
 // FindAvailableMaster returns ID of the first master available to execute order
-// satisfies interface Cluster.Cluster.Controller
-func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resources.Host, ferr fail.Error) {
+// satisfies interface ClassicCluster.ClassicCluster.Controller
+func (instance *ClassicCluster) FindAvailableMaster(ctx context.Context) (master resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	defer elapsed(ctx, "FindAvailableMaster")()
 
@@ -1535,9 +1507,9 @@ func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resour
 	return instance.unsafeFindAvailableMaster(ctx)
 }
 
-// ListNodes lists node instances corresponding to the nodes in the Cluster
-// satisfies interface Cluster.Controller
-func (instance *Cluster) ListNodes(ctx context.Context) (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
+// ListNodes lists node instances corresponding to the nodes in the ClassicCluster
+// satisfies interface ClassicCluster.Controller
+func (instance *ClassicCluster) ListNodes(ctx context.Context) (list resources.IndexedListOfClusterNodes, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1557,8 +1529,8 @@ func (instance *Cluster) ListNodes(ctx context.Context) (list resources.IndexedL
 	return res, xerr
 }
 
-// beingRemoved tells if the Cluster is currently marked as Removed (meaning a removal operation is running)
-func (instance *Cluster) beingRemoved(ctx context.Context) fail.Error {
+// beingRemoved tells if the ClassicCluster is currently marked as Removed (meaning a removal operation is running)
+func (instance *ClassicCluster) beingRemoved(ctx context.Context) fail.Error {
 	state, xerr := instance.unsafeGetState(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1566,14 +1538,14 @@ func (instance *Cluster) beingRemoved(ctx context.Context) fail.Error {
 	}
 
 	if state == clusterstate.Removed {
-		return fail.NotAvailableError("Cluster is being removed")
+		return fail.NotAvailableError("ClassicCluster is being removed")
 	}
 
 	return nil
 }
 
-// ListNodeNames lists the names of the nodes in the Cluster
-func (instance *Cluster) ListNodeNames(ctx context.Context) (list data.IndexedListOfStrings, ferr fail.Error) {
+// ListNodeNames lists the names of the nodes in the ClassicCluster
+func (instance *ClassicCluster) ListNodeNames(ctx context.Context) (list data.IndexedListOfStrings, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1615,7 +1587,7 @@ func (instance *Cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 }
 
 // deleteMaster deletes the master specified by its ID
-func (instance *Cluster) deleteMaster(ctx context.Context, host string) (ferr fail.Error) {
+func (instance *ClassicCluster) deleteMaster(ctx context.Context, host string) (ferr fail.Error) {
 	if valid.IsNil(instance) {
 		return fail.InvalidInstanceError()
 	}
@@ -1624,12 +1596,12 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host string) (ferr fa
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	// FIXME: OPP Bad idea, the first thing to go must be the resource, then the metadata; if not we can have zombie instances without metadata (it happened)
+	// FIXME: Bad idea, the first thing to go must be the resource, then the metadata; if not we can have zombie instances without metadata (it happened)
 	// which means that the code doing the "restore" never worked
 
 	xerr := instance.Alter(cleanupContextFrom(ctx), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-			// Removes master from Cluster properties
+			// Removes master from ClassicCluster properties
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1677,7 +1649,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host string) (ferr fa
 }
 
 // deleteNode deletes a node
-func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.ClusterNode, master *Host) (_ fail.Error) {
+func (instance *ClassicCluster) deleteNode(inctx context.Context, node *propertiesv3.ClusterNode, master *Host) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1740,7 +1712,7 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 				}
 			}
 
-			// host still exists, leave it from Cluster, if master is not null
+			// host still exists, leave it from ClassicCluster, if master is not null
 			if master != nil && !valid.IsNil(master) {
 				xerr = instance.leaveNodesFromList(ctx, []resources.Host{hostInstance}, master)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -1791,8 +1763,8 @@ func (instance *Cluster) deleteNode(inctx context.Context, node *propertiesv3.Cl
 	}
 }
 
-// Delete deletes the Cluster
-func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Error) {
+// Delete deletes the ClassicCluster
+func (instance *ClassicCluster) Delete(ctx context.Context, force bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -1833,8 +1805,8 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (ferr fail.Erro
 	return nil
 }
 
-// delete does the work to delete Cluster
-func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.Error) {
+// delete does the work to delete ClassicCluster
+func (instance *ClassicCluster) delete(inctx context.Context, cluName string) (_ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -1876,7 +1848,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 					if derr != nil {
 						_ = ferr.AddConsequence(
 							fail.Wrap(
-								derr, "cleaning up on %s, failed to set Cluster state to DEGRADED", ActionFromError(ferr),
+								derr, "cleaning up on %s, failed to set ClassicCluster state to DEGRADED", ActionFromError(ferr),
 							),
 						)
 					}
@@ -1887,9 +1859,9 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 				all            map[uint]*propertiesv3.ClusterNode
 				nodes, masters []uint
 			)
-			// Mark the Cluster as Removed and get nodes from properties
+			// Mark the ClassicCluster as Removed and get nodes from properties
 			xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				// Updates Cluster state to mark Cluster as Removing
+				// Updates ClassicCluster state to mark ClassicCluster as Removing
 				innerXErr := props.Alter(
 					clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 						stateV1, ok := clonable.(*propertiesv1.ClusterState)
@@ -2034,7 +2006,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 
 			if subnetInstance != nil && !valid.IsNil(subnetInstance) {
 				subnetName := subnetInstance.GetName()
-				logrus.WithContext(ctx).Debugf("Cluster Deleting Subnet '%s'", subnetName)
+				logrus.WithContext(ctx).Debugf("ClassicCluster Deleting Subnet '%s'", subnetName)
 				xerr = retry.WhileUnsuccessfulWithHardTimeout(
 					func() error {
 						select {
@@ -2157,7 +2129,7 @@ func (instance *Cluster) delete(inctx context.Context, cluName string) (_ fail.E
 }
 
 // extractNetworkingInfo returns the ID of the network from properties, taking care of ascending compatibility
-func (instance *Cluster) extractNetworkingInfo(ctx context.Context) (networkInstance resources.Network, deleteNetwork bool, subnetInstance resources.Subnet, ferr fail.Error) {
+func (instance *ClassicCluster) extractNetworkingInfo(ctx context.Context) (networkInstance resources.Network, deleteNetwork bool, subnetInstance resources.Subnet, ferr fail.Error) {
 	networkInstance, subnetInstance = nil, nil
 	deleteNetwork = false
 
@@ -2222,17 +2194,17 @@ func containsClusterNode(list []uint, numericalID uint) (bool, int) {
 
 // configureCluster ...
 // params contains a data.Map with primary and secondary getGateway hosts
-func (instance *Cluster) configureCluster(inctx context.Context, req abstract.ClusterRequest) (ferr fail.Error) {
+func (instance *ClassicCluster) configureCluster(inctx context.Context, req abstract.ClusterRequest) (ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
-	logrus.WithContext(ctx).Infof("[Cluster %s] configuring Cluster...", instance.GetName())
+	logrus.WithContext(ctx).Infof("[ClassicCluster %s] configuring ClassicCluster...", instance.GetName())
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			logrus.WithContext(ctx).Errorf("[Cluster %s] configuration failed: %s", instance.GetName(), ferr.Error())
+			logrus.WithContext(ctx).Errorf("[ClassicCluster %s] configuration failed: %s", instance.GetName(), ferr.Error())
 		} else {
-			logrus.WithContext(ctx).Infof("[Cluster %s] configuration successful.", instance.GetName())
+			logrus.WithContext(ctx).Infof("[ClassicCluster %s] configuration successful.", instance.GetName())
 		}
 	}()
 
@@ -2251,9 +2223,9 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 
 		parameters := efe
 
-		// FIXME: OPP This should use instance.AddFeature instead
+		// FIXME: This should use instance.AddFeature instead
 
-		// Install reverse-proxy feature on Cluster (gateways)
+		// Install reverse-proxy feature on ClassicCluster (gateways)
 		fla, xerr := instance.unsafeGetFlavor(inctx)
 		if xerr != nil {
 			chRes <- result{xerr}
@@ -2274,7 +2246,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 		default:
 		}
 
-		// Install remote-desktop feature on Cluster (all masters)
+		// Install remote-desktop feature on ClassicCluster (all masters)
 
 		// FIXME: Enable this ONLY after remotedesktop feature is UPDATED AND TESTED
 		// Also, EOL, unsafe, undocumented, 4 releases have passed since 1.0.0 was published
@@ -2292,7 +2264,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			}
 		}
 
-		// Install ansible feature on Cluster (all masters) // aaaand it's gone...
+		// Install ansible feature on ClassicCluster (all masters) // aaaand it's gone...
 		/*
 			xerr = instance.installAnsible(ctx, parameters)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -2333,7 +2305,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 			}
 		}
 
-		// configure what has to be done Cluster-wide
+		// configure what has to be done ClassicCluster-wide
 		makers, xerr := instance.getMaker(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -2359,7 +2331,7 @@ func (instance *Cluster) configureCluster(inctx context.Context, req abstract.Cl
 	}
 }
 
-func (instance *Cluster) determineRequiredNodes(ctx context.Context) (uint, uint, uint, fail.Error) {
+func (instance *ClassicCluster) determineRequiredNodes(ctx context.Context) (uint, uint, uint, fail.Error) {
 	makers, xerr := instance.getMaker(ctx)
 	if xerr != nil {
 		return 0, 0, 0, xerr
@@ -2407,7 +2379,7 @@ func realizeTemplate(tmplName string, adata map[string]interface{}, fileName str
 var ansibleScripts embed.FS
 
 // Regenerate ansible inventory
-func (instance *Cluster) regenerateClusterInventory(inctx context.Context) fail.Error {
+func (instance *ClassicCluster) regenerateClusterInventory(inctx context.Context) fail.Error {
 	// Check incoming parameters
 	if inctx == nil {
 		return fail.InvalidParameterCannotBeNilError("inctx")
@@ -2425,7 +2397,7 @@ func (instance *Cluster) regenerateClusterInventory(inctx context.Context) fail.
 	chRes := make(chan result)
 	go func() {
 		defer close(chRes)
-		logrus.WithContext(ctx).Infof("[Cluster %s] Update ansible inventory", instance.GetName())
+		logrus.WithContext(ctx).Infof("[ClassicCluster %s] Update ansible inventory", instance.GetName())
 
 		// Collect data
 		featureAnsibleInventoryInstalled := false
@@ -2487,7 +2459,7 @@ func (instance *Cluster) regenerateClusterInventory(inctx context.Context) fail.
 				return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", "nil")
 			}
 			if reflect.TypeOf(aci.Name).Kind() != reflect.String && aci.Name == "" {
-				return fail.InconsistentError("Cluster name must be a not empty string")
+				return fail.InconsistentError("ClassicCluster name must be a not empty string")
 			}
 
 			params["Clustername"] = aci.Name
@@ -2598,7 +2570,7 @@ func (instance *Cluster) regenerateClusterInventory(inctx context.Context) fail.
 			return
 		}
 
-		prerr := fmt.Sprintf("[Cluster %s] Update ansible inventory: ", instance.GetName())
+		prerr := fmt.Sprintf("[ClassicCluster %s] Update ansible inventory: ", instance.GetName())
 
 		// Feature ansible found ?
 		if !featureAnsibleInventoryInstalled {
@@ -2683,7 +2655,7 @@ func (instance *Cluster) regenerateClusterInventory(inctx context.Context) fail.
 	}
 }
 
-func (instance *Cluster) isFeatureDisabled(ctx context.Context, name string) (bool, fail.Error) {
+func (instance *ClassicCluster) isFeatureDisabled(ctx context.Context, name string) (bool, fail.Error) {
 	var disabled map[string]struct{}
 	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -2706,7 +2678,7 @@ func (instance *Cluster) isFeatureDisabled(ctx context.Context, name string) (bo
 	return false, nil
 }
 
-func (instance *Cluster) isFeatureInstalled(ctx context.Context, name string) (bool, fail.Error) {
+func (instance *ClassicCluster) isFeatureInstalled(ctx context.Context, name string) (bool, fail.Error) {
 	var installed map[string]*propertiesv1.ClusterInstalledFeature
 	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -2730,7 +2702,7 @@ func (instance *Cluster) isFeatureInstalled(ctx context.Context, name string) (b
 }
 
 // configureNodesFromList configures nodes from a list
-func (instance *Cluster) configureNodesFromList(ctx context.Context, name string, nodes []*propertiesv3.ClusterNode, parameters data.Map) (ferr fail.Error) {
+func (instance *ClassicCluster) configureNodesFromList(ctx context.Context, name string, nodes []*propertiesv3.ClusterNode, parameters data.Map) (ferr fail.Error) {
 	var disabled map[string]struct{}
 	xerr := instance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -2756,7 +2728,7 @@ func (instance *Cluster) configureNodesFromList(ctx context.Context, name string
 					node:        nodes[captured],
 					variables:   parameters,
 					clusterName: name,
-					request: abstract.ClusterRequest{ // FIXME: OPP This requires another hack
+					request: abstract.ClusterRequest{ // FIXME: This requires another hack
 						DisabledDefaultFeatures: disabled,
 					},
 				})
@@ -2773,12 +2745,12 @@ func (instance *Cluster) configureNodesFromList(ctx context.Context, name string
 	return nil
 }
 
-// joinNodesFromList makes nodes from a list join the Cluster
-func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propertiesv3.ClusterNode) fail.Error {
-	logrus.WithContext(ctx).Debugf("Joining nodes to Cluster...")
+// joinNodesFromList makes nodes from a list join the ClassicCluster
+func (instance *ClassicCluster) joinNodesFromList(ctx context.Context, nodes []*propertiesv3.ClusterNode) fail.Error {
+	logrus.WithContext(ctx).Debugf("Joining nodes to ClassicCluster...")
 
-	// Joins to Cluster is done sequentially, experience shows too many join at the same time
-	// may fail (depending on the Cluster Flavor)
+	// Joins to ClassicCluster is done sequentially, experience shows too many join at the same time
+	// may fail (depending on the ClassicCluster Flavor)
 	makers, xerr := instance.getMaker(ctx)
 	if xerr != nil {
 		return xerr
@@ -2802,12 +2774,12 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 	return nil
 }
 
-// leaveNodesFromList makes nodes from a list leave the Cluster
-func (instance *Cluster) leaveNodesFromList(ctx context.Context, hosts []resources.Host, selectedMaster resources.Host) (ferr fail.Error) {
-	logrus.WithContext(ctx).Debugf("Instructing nodes to leave Cluster...")
+// leaveNodesFromList makes nodes from a list leave the ClassicCluster
+func (instance *ClassicCluster) leaveNodesFromList(ctx context.Context, hosts []resources.Host, selectedMaster resources.Host) (ferr fail.Error) {
+	logrus.WithContext(ctx).Debugf("Instructing nodes to leave ClassicCluster...")
 
-	// Un-joins from Cluster are done sequentially, experience shows too many (un)join at the same time
-	// may fail (depending on the Cluster Flavor)
+	// Un-joins from ClassicCluster are done sequentially, experience shows too many (un)join at the same time
+	// may fail (depending on the ClassicCluster Flavor)
 	makers, xerr := instance.getMaker(ctx)
 	if xerr != nil {
 		return xerr
@@ -2826,8 +2798,8 @@ func (instance *Cluster) leaveNodesFromList(ctx context.Context, hosts []resourc
 	return nil
 }
 
-// BuildHostname builds a unique hostname in the Cluster
-func (instance *Cluster) buildHostname(ctx context.Context, core string, nodeType clusternodetype.Enum) (_ string, _ fail.Error) {
+// BuildHostname builds a unique hostname in the ClassicCluster
+func (instance *ClassicCluster) buildHostname(ctx context.Context, core string, nodeType clusternodetype.Enum) (_ string, _ fail.Error) {
 	var index int
 	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(
@@ -2859,7 +2831,7 @@ func (instance *Cluster) buildHostname(ctx context.Context, core string, nodeTyp
 }
 
 // ToProtocol converts instance to protocol.ClusterResponse message
-func (instance *Cluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterResponse, ferr fail.Error) {
+func (instance *ClassicCluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterResponse, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -3001,7 +2973,7 @@ func (instance *Cluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterRes
 }
 
 // Shrink reduces cluster size by 'count' nodes
-func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint) (_ []*propertiesv3.ClusterNode, ferr fail.Error) {
+func (instance *ClassicCluster) Shrink(ctx context.Context, cluName string, count uint) (_ []*propertiesv3.ClusterNode, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if valid.IsNil(instance) {
@@ -3101,7 +3073,7 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 			if derr != nil {
 				_ = ferr.AddConsequence(
 					fail.Wrap(
-						derr, "cleaning up on %s, failed to restore Cluster nodes metadata", ActionFromError(ferr),
+						derr, "cleaning up on %s, failed to restore ClassicCluster nodes metadata", ActionFromError(ferr),
 					),
 				)
 			}
@@ -3140,8 +3112,8 @@ func (instance *Cluster) Shrink(ctx context.Context, cluName string, count uint)
 	return removedNodes, nil
 }
 
-// IsFeatureInstalled tells if a Feature identified by name is installed on Cluster, using only metadata
-func (instance *Cluster) IsFeatureInstalled(inctx context.Context, name string) (_ bool, _ fail.Error) {
+// IsFeatureInstalled tells if a Feature identified by name is installed on ClassicCluster, using only metadata
+func (instance *ClassicCluster) IsFeatureInstalled(inctx context.Context, name string) (_ bool, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -3207,8 +3179,8 @@ func (instance *Cluster) IsFeatureInstalled(inctx context.Context, name string) 
 	}
 }
 
-func (instance *Cluster) changeStatusTo(ctx context.Context, stat clusterstate.Enum) fail.Error {
-	// Mark Cluster as state Degraded
+func (instance *ClassicCluster) changeStatusTo(ctx context.Context, stat clusterstate.Enum) fail.Error {
+	// Mark ClassicCluster as state Degraded
 	xerr := instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)

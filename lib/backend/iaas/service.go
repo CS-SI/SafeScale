@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	tfjson "github.com/hashicorp/terraform-json"
+	"github.com/sanity-io/litter"
 	"os"
 	"regexp"
 	"sort"
@@ -75,16 +77,8 @@ type Service interface {
 	objectstorage.Location
 }
 
-type Loader interface {
-	LoadHost(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadCluster(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadLabel(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadNetwork(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadShare(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadVolume(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadBucket(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
-	LoadSubnet(inctx context.Context, svc Service, netref string, ref string) (interface{}, fail.Error)
-	LoadSecurityGroup(inctx context.Context, svc Service, ref string) (interface{}, fail.Error)
+type unused struct {
+	unused tfjson.Config // this is hack in order to import terraform-json
 }
 
 // service is the implementation struct of interface Service
@@ -524,6 +518,11 @@ func (instance service) ListTemplatesBySizing(
 			return
 		}
 
+		if len(allTpls) == 0 {
+			chRes <- result{nil, fail.NewError("no template found")}
+			return
+		}
+
 		scannerTpls := map[string]bool{}
 		askedForSpecificScannerInfo := sizing.MinGPU >= 0 || sizing.MinCPUFreq != 0
 		if askedForSpecificScannerInfo {
@@ -717,6 +716,11 @@ func (instance service) ListTemplatesBySizing(
 			}
 		}
 
+		if len(selectedTpls) == 0 {
+			chRes <- result{nil, fail.NewError("no template found")}
+			return
+		}
+
 		sort.Sort(ByRankDRF(selectedTpls))
 		chRes <- result{selectedTpls, nil}
 
@@ -875,13 +879,16 @@ func (instance service) ListImages(inctx context.Context, all bool) ([]*abstract
 }
 
 // SearchImage search an image corresponding to OS Name
-func (instance service) SearchImage(inctx context.Context, osname string) (*abstract.Image, fail.Error) {
+func (instance service) SearchImage(inctx context.Context, inosname string) (*abstract.Image, fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
-	if osname == "" {
+	if inosname == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("osname")
 	}
+
+	// work in caps
+	osname := strings.ToUpper(inosname)
 
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
@@ -930,6 +937,14 @@ func (instance service) SearchImage(inctx context.Context, osname string) (*abst
 					minWFScore = wfScore
 					wfSelect = i
 				}
+			} else {
+				wfScore := 2 * smetrics.WagnerFischer(paddedNormalizedOSName, normalizedImageName, 1, 1, 2)
+				logrus.WithContext(ctx).Tracef("%*s (%s): Alternate, WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
+
+				if minWFScore == -1 || wfScore < minWFScore {
+					minWFScore = wfScore
+					wfSelect = i
+				}
 			}
 		}
 
@@ -938,7 +953,7 @@ func (instance service) SearchImage(inctx context.Context, osname string) (*abst
 			return
 		}
 
-		logrus.WithContext(ctx).Infof("Selected image: '%s' (ID='%s')", imgs[wfSelect].Name, imgs[wfSelect].ID)
+		logrus.WithContext(ctx).Infof("Selected image: '%s' (ID='%s'), '%s'", imgs[wfSelect].Name, imgs[wfSelect].ID, litter.Sdump(imgs[wfSelect]))
 		chRes <- result{imgs[wfSelect], nil}
 
 	}()

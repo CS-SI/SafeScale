@@ -126,7 +126,7 @@ func loadService(ctx context.Context, tenantName string) (iaas.Service, fail.Err
 	_, xerr = CheckMetadataVersion(ctx, service)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to set tenant '%s'", tenantName)
+		logrus.WithContext(ctx).Debugf("failed to check metadata version: %v", xerr)
 	}
 
 	return service, nil

@@ -18,29 +18,57 @@ package bucket
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
-	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"github.com/CS-SI/SafeScale/v22/lib/utils/fail"
 )
 
-// List retrieves all available buckets
-func List(ctx context.Context, svc iaas.Service) ([]string, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
-	return svc.ListBuckets(ctx, objectstorage.RootPath)
-}
-
 // New creates a bucket instance
-func New(svc iaas.Service) (resources.Bucket, fail.Error) { // nolint
+func New(svc iaas.Service, terraform bool) (resources.Bucket, fail.Error) { // nolint
+	if terraform {
+		return operations.NewTerraformBucket(svc)
+	}
 	return operations.NewBucket(svc)
 }
 
 // Load initializes the bucket with metadata from provider
-func Load(ctx context.Context, svc iaas.Service, name string) (resources.Bucket, fail.Error) { // nolint
+func Load(ctx context.Context, svc iaas.Service, name string, terraform bool) (resources.Bucket, fail.Error) { // nolint
+	if terraform {
+		return operations.LoadTerraformBucket(ctx, svc, name)
+	}
 	return operations.LoadBucket(ctx, svc, name)
+}
+
+func List(ctx context.Context, svc iaas.Service, terraform bool) ([]resources.Bucket, fail.Error) { // nolint
+	if terraform {
+		var answer []resources.Bucket
+		thelist, xerr := operations.ListTerraformBuckets(ctx, svc)
+		if xerr != nil {
+			return nil, xerr
+		}
+		for _, v := range thelist {
+			answer = append(answer, v)
+		}
+		return answer, nil
+	}
+
+	lib, xerr := svc.ListBuckets(ctx, objectstorage.RootPath)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var answer []resources.Bucket
+	for _, v := range lib {
+		bucket, xerr := Load(ctx, svc, v, terraform)
+		if xerr != nil {
+			logrus.WithContext(ctx).Debugf("failed to load bucket %s: %s", v, xerr.Error())
+			continue
+		}
+		answer = append(answer, bucket)
+	}
+	return answer, nil
 }

@@ -68,21 +68,40 @@ func (handler *bucketHandler) List(all bool) (_ []string, ferr fail.Error) {
 		return handler.job.Service().ListBuckets(handler.job.Context(), objectstorage.RootPath)
 	}
 
-	bucketBrowser, xerr := bucketfactory.New(handler.job.Service())
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	if !isTerraform {
+		bucketBrowser, xerr := bucketfactory.New(handler.job.Service(), isTerraform)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		var bucketList []string
+		xerr = bucketBrowser.Browse(handler.job.Context(), func(bucket *abstract.ObjectStorageBucket) fail.Error {
+			bucketList = append(bucketList, bucket.Name)
+			return nil
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+
+	bucketList, xerr := bucketfactory.List(handler.job.Context(), handler.job.Service(), isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	var bucketList []string
-	xerr = bucketBrowser.Browse(handler.job.Context(), func(bucket *abstract.ObjectStorageBucket) fail.Error {
-		bucketList = append(bucketList, bucket.Name)
-		return nil
-	})
-	if xerr != nil {
-		return nil, xerr
+	var names []string
+	for _, bucket := range bucketList {
+		names = append(names, bucket.GetName())
 	}
 
-	return bucketList, nil
+	return names, nil
 }
 
 // Create a bucket
@@ -100,8 +119,15 @@ func (handler *bucketHandler) Create(name string) (ferr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
 	svc := handler.job.Service()
-	rb, xerr := bucketfactory.Load(handler.job.Context(), svc, name)
+	rb, xerr := bucketfactory.Load(handler.job.Context(), svc, name, isTerraform)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
@@ -111,7 +137,7 @@ func (handler *bucketHandler) Create(name string) (ferr fail.Error) {
 		return fail.DuplicateError("bucket '%s' already exist", name)
 	}
 
-	rb, xerr = bucketfactory.New(svc)
+	rb, xerr = bucketfactory.New(svc, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -133,7 +159,14 @@ func (handler *bucketHandler) Delete(name string) (ferr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -227,8 +260,14 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, ferr fa
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	var xerr fail.Error
-	rb, xerr = bucketfactory.Load(handler.job.Context(), handler.job.Service(), name)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	rb, xerr = bucketfactory.Load(handler.job.Context(), handler.job.Service(), name, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -270,8 +309,15 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fai
 		}
 	}()
 
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
 	// Check bucket existence
-	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Service(), bucketName)
+	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Service(), bucketName, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -304,8 +350,15 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (ferr fail.Er
 		}
 	}()
 
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
 	// Check bucket existence
-	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Service(), bucketName)
+	rb, xerr := bucketfactory.Load(handler.job.Context(), handler.job.Service(), bucketName, isTerraform)
 	if xerr != nil {
 		return xerr
 	}

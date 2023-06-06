@@ -59,6 +59,9 @@ type AuthenticationOptions struct {
 	// ProjectName ...
 	ProjectName, ProjectID string
 
+	// Azure mappings (+ TenantID)
+	ClientID, ClientSecret, SubscriptionID string
+
 	// AllowReauth should be set to true if you grant permission for Gophercloud to
 	// cache your credentials in memory, and to allow Gophercloud to attempt to
 	// re-authenticate automatically if/when your token expires.  If you set it to
@@ -87,10 +90,6 @@ type AuthenticationOptions struct {
 	AK string
 	AS string
 	CK string
-	// // Name of the VPC (Virtual Private Cloud)
-	// DefaultNetworkName string
-	// // CIDR of the VPC
-	// DefaultNetworkCIDR string
 }
 
 // ConfigurationOptions are the stack configuration options
@@ -134,11 +133,21 @@ type ConfigurationOptions struct {
 	DefaultNetworkName string // contains the name of the Networking/VPC that is used by default (corresponds to keywords 'DefaultNetworkName' or 'NetworkName' in tenant section 'compute')
 	DefaultNetworkCIDR string // contains the CIDR of the default Networking/VPC
 
-	MaxLifeTime int
+	MaxLifeTime int64
 
 	Safe bool
 
 	ConcurrentMachineCreationLimit int
 
 	Timings *temporal.MutableTimings
+
+	TerraformCfg TerraformOptions
+}
+
+type TerraformOptions struct {
+	ConsulURL        string
+	WithConsul       bool
+	TerraformVersion string
+	ExecutablePath   string
+	WorkPath         string
 }

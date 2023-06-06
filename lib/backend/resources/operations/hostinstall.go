@@ -261,7 +261,7 @@ func (instance *Host) RegisterFeature(ctx context.Context, feat resources.Featur
 	})
 }
 
-// UnregisterFeature unregisters a Feature from Cluster metadata
+// UnregisterFeature unregisters a Feature from ClassicCluster metadata
 func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -291,7 +291,7 @@ func (instance *Host) UnregisterFeature(ctx context.Context, feat string) (ferr 
 	})
 }
 
-// ListEligibleFeatures returns a slice of features eligible to Cluster
+// ListEligibleFeatures returns a slice of features eligible to ClassicCluster
 func (instance *Host) ListEligibleFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
@@ -499,7 +499,7 @@ func (instance *Host) ComplementFeatureParameters(ctx context.Context, v data.Ma
 		v["PublicIP"] = v["EndpointIP"]
 	}
 
-	// Some Cluster-related values that need to exist
+	// Some ClassicCluster-related values that need to exist
 	v["ClusterFlavor"] = ""
 	v["ClusterAdminUsername"] = ""
 	v["ClusterAdminPassword"] = ""

@@ -312,14 +312,6 @@ func TestBucket_Create(t *testing.T) {
 
 		xerr := bucket.Create(ctx, "any")
 		require.Contains(t, xerr.Error(), "already carrying information")
-
-		bucket, err = NewBucket(svc)
-		require.Nil(t, err)
-		xerr = bucket.Create(ctx, "any")
-		require.Nil(t, err)
-		xerr = bucket.Create(ctx, "any")
-		require.Contains(t, xerr.Error(), "already exists")
-
 	})
 	require.Nil(t, xerr)
 

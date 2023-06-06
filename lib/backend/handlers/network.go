@@ -86,54 +86,77 @@ func (handler *networkHandler) Create(networkReq abstract.NetworkRequest, subnet
 		return nil, fail.InvalidRequestError("requested CIDR '%s' intersects with default docker network '%s'", "172.17.0.0/16")
 	}
 
-	networkInstance, xerr := networkfactory.New(handler.job.Service())
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
 	if xerr != nil {
 		return nil, xerr
 	}
+	isTerraform = pn == "terraform"
 
-	xerr = networkInstance.Create(handler.job.Context(), networkReq)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	defer func() {
-		ferr = debug.InjectPlannedFail(ferr)
-		if ferr != nil && !networkReq.KeepOnFailure {
-			if derr := networkInstance.Delete(context.Background()); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", networkReq.Name))
-			}
-		}
-	}()
-
-	if subnetReq != nil {
-		_, networkNet, _ := net.ParseCIDR(networkReq.CIDR)
-		subnetNet, xerr := netretry.FirstIncludedSubnet(*networkNet, 1)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to derive the CIDR of the Subnet from Network CIDR '%s'", networkReq.CIDR)
-		}
-
-		logrus.WithContext(handler.job.Context()).Debugf("Creating default Subnet of Network '%s' with CIDR '%s'", networkReq.Name, subnetNet.String())
-
-		if gwSizing == nil {
-			gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
-		}
-
-		subnetInstance, xerr := subnetfactory.New(handler.job.Service())
+	if !isTerraform {
+		networkInstance, xerr := networkfactory.New(handler.job.Service(), isTerraform)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		subnetReq.NetworkID, err = networkInstance.GetID()
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
-		subnetReq.Name = networkReq.Name
-		subnetReq.CIDR = subnetNet.String()
-		subnetReq.KeepOnFailure = networkReq.KeepOnFailure
-		xerr = subnetInstance.Create(handler.job.Context(), *subnetReq, gwName, gwSizing, nil)
+		xerr = networkInstance.Create(handler.job.Context(), &networkReq, nil)
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", networkReq.Name)
+			return nil, xerr
 		}
+
+		defer func() {
+			ferr = debug.InjectPlannedFail(ferr)
+			if ferr != nil && !networkReq.KeepOnFailure {
+				if derr := networkInstance.Delete(context.Background()); derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", networkReq.Name))
+				}
+			}
+		}()
+
+		if subnetReq != nil {
+			_, networkNet, _ := net.ParseCIDR(networkReq.CIDR)
+			subnetNet, xerr := netretry.FirstIncludedSubnet(*networkNet, 1)
+			if xerr != nil {
+				return nil, fail.Wrap(xerr, "failed to derive the CIDR of the Subnet from Network CIDR '%s'", networkReq.CIDR)
+			}
+
+			logrus.WithContext(handler.job.Context()).Debugf("Creating default Subnet of Network '%s' with CIDR '%s'", networkReq.Name, subnetNet.String())
+
+			if gwSizing == nil {
+				gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
+			}
+
+			subnetInstance, xerr := subnetfactory.New(handler.job.Service(), isTerraform)
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			subnetReq.NetworkID, err = networkInstance.GetID()
+			if err != nil {
+				return nil, fail.ConvertError(err)
+			}
+			subnetReq.Name = networkReq.Name
+			subnetReq.CIDR = subnetNet.String()
+			subnetReq.KeepOnFailure = networkReq.KeepOnFailure
+			xerr = subnetInstance.Create(handler.job.Context(), *subnetReq, gwName, gwSizing, nil)
+			if xerr != nil {
+				return nil, fail.Wrap(xerr, "failed to create subnet '%s'", networkReq.Name)
+			}
+		}
+
+		return networkInstance, nil
+	}
+
+	networkInstance, xerr := networkfactory.New(handler.job.Service(), isTerraform)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = networkInstance.Create(handler.job.Context(), &networkReq, &abstract.SubnetRequest{
+		GwSizing: gwSizing,
+	})
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	return networkInstance, nil
@@ -156,7 +179,14 @@ func (handler *networkHandler) List(all bool) (_ []*abstract.Network, ferr fail.
 		return handler.job.Service().ListNetworks(handler.job.Context())
 	}
 
-	return networkfactory.List(handler.job.Context(), handler.job.Service())
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	return networkfactory.List(handler.job.Context(), handler.job.Service(), isTerraform)
 }
 
 // Inspect returns infos on a network
@@ -176,7 +206,14 @@ func (handler *networkHandler) Inspect(networkRef string) (_ resources.Network, 
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("networkRef")
 	}
 
-	return networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	return networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, isTerraform)
 }
 
 // Delete a network
@@ -199,42 +236,57 @@ func (handler *networkHandler) Delete(networkRef string, force bool) (ferr fail.
 		logrus.Tracef("forcing network deletion")
 	}
 
-	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			abstractNetwork, xerr := handler.job.Service().InspectNetworkByName(handler.job.Context(), networkRef)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					abstractNetwork, xerr = handler.job.Service().InspectNetwork(handler.job.Context(), networkRef)
-					if xerr != nil {
-						switch xerr.(type) {
-						case *fail.ErrNotFound:
-							return fail.NotFoundError("failed to find Network '%s'", networkRef)
-						default:
-							return xerr
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	if !isTerraform {
+		networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, isTerraform)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				abstractNetwork, xerr := handler.job.Service().InspectNetworkByName(handler.job.Context(), networkRef)
+				if xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						abstractNetwork, xerr = handler.job.Service().InspectNetwork(handler.job.Context(), networkRef)
+						if xerr != nil {
+							switch xerr.(type) {
+							case *fail.ErrNotFound:
+								return fail.NotFoundError("failed to find Network '%s'", networkRef)
+							default:
+								return xerr
+							}
 						}
+					default:
+						return xerr
 					}
-				default:
-					return xerr
 				}
-			}
 
-			cfg, cerr := handler.job.Service().GetConfigurationOptions(handler.job.Context())
-			if cerr != nil {
-				return cerr
-			}
+				cfg, cerr := handler.job.Service().GetConfigurationOptions(handler.job.Context())
+				if cerr != nil {
+					return cerr
+				}
 
-			name, found := cfg.Get("DefaultNetworkName")
-			if found && name.(string) == abstractNetwork.Name {
-				return fail.InvalidRequestError("cannot delete default Network '%s' because its existence is not controlled by SafeScale", networkRef)
-			}
+				name, found := cfg.Get("DefaultNetworkName")
+				if found && name.(string) == abstractNetwork.Name {
+					return fail.InvalidRequestError("cannot delete default Network '%s' because its existence is not controlled by SafeScale", networkRef)
+				}
 
-			return fail.InvalidRequestError("network '%s' is not managed by SafeScale", networkRef)
-		default:
-			return xerr
+				return fail.InvalidRequestError("network '%s' is not managed by SafeScale", networkRef)
+			default:
+				return xerr
+			}
 		}
+		return networkInstance.Delete(handler.job.Context())
+	}
+
+	networkInstance, xerr := networkfactory.Load(handler.job.Context(), handler.job.Service(), networkRef, isTerraform)
+	if xerr != nil {
+		return xerr
 	}
 
 	return networkInstance.Delete(handler.job.Context())

@@ -17,6 +17,7 @@
 package handlers
 
 import (
+	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/operations"
 	"reflect"
 	"strings"
 
@@ -64,13 +65,15 @@ func NewVolumeHandler(job backend.Job) VolumeHandler {
 }
 
 // List returns the list of Volumes
-func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr fail.Error) {
+func (handler *volumeHandler) List(all bool) (_ []resources.Volume, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			ferr.WithContext(handler.job.Context())
 		}
 	}()
 	defer fail.OnPanic(&ferr)
+
+	var volumes []resources.Volume
 
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -81,22 +84,42 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, ferr f
 
 	ctx := handler.job.Context()
 
-	browseInstance, xerr := volumefactory.New(handler.job.Service())
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	browseInstance, xerr := volumefactory.New(handler.job.Service(), isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = browseInstance.Browse(ctx, func(volume *abstract.Volume) fail.Error {
-		volumeInstance, innerXErr := volumefactory.Load(handler.job.Context(), handler.job.Service(), volume.ID)
-		if innerXErr != nil {
-			return innerXErr
+	if !isTerraform {
+		xerr = browseInstance.Browse(ctx, func(volume *abstract.Volume) fail.Error {
+			volumeInstance, innerXErr := volumefactory.Load(handler.job.Context(), handler.job.Service(), volume.ID, isTerraform)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			volumes = append(volumes, volumeInstance)
+			return nil
+		})
+		if xerr != nil {
+			return nil, xerr
 		}
 
-		volumes = append(volumes, volumeInstance)
-		return nil
-	})
-	if xerr != nil {
-		return nil, xerr
+		return volumes, nil
+	}
+
+	vols, err := operations.ListTerraformVolumes(handler.job.Context(), handler.job.Service())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, vol := range vols {
+		volumes = append(volumes, vol)
 	}
 
 	return volumes, nil
@@ -123,7 +146,14 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 
 	ctx := handler.job.Context()
 
-	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref, isTerraform)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -133,27 +163,28 @@ func (handler *volumeHandler) Delete(ref string) (ferr fail.Error) {
 			return xerr
 		}
 	}
-
-	xerr = volumeInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
-			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			nbAttach := uint(len(volumeAttachmentsV1.Hosts))
-			if nbAttach > 0 {
-				var list []string
-				for _, v := range volumeAttachmentsV1.Hosts {
-					list = append(list, v)
+	if !isTerraform {
+		xerr = volumeInstance.Inspect(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
+				volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-				return fail.InvalidRequestError("still attached to %d host%s: %s", nbAttach, strprocess.Plural(nbAttach), strings.Join(list, ", "))
-			}
-			return nil
+
+				nbAttach := uint(len(volumeAttachmentsV1.Hosts))
+				if nbAttach > 0 {
+					var list []string
+					for _, v := range volumeAttachmentsV1.Hosts {
+						list = append(list, v)
+					}
+					return fail.InvalidRequestError("still attached to %d host%s: %s", nbAttach, strprocess.Plural(nbAttach), strings.Join(list, ", "))
+				}
+				return nil
+			})
 		})
-	})
-	if xerr != nil {
-		return xerr
+		if xerr != nil {
+			return xerr
+		}
 	}
 
 	return volumeInstance.Delete(ctx)
@@ -180,7 +211,14 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, ferr
 
 	ctx := handler.job.Context()
 
-	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	volumeInstance, xerr := volumefactory.Load(handler.job.Context(), handler.job.Service(), ref, isTerraform)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("volume", ref)
@@ -219,8 +257,14 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 		return nil, fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	var xerr fail.Error
-	objv, xerr = volumefactory.New(handler.job.Service())
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	objv, xerr = volumefactory.New(handler.job.Service(), isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -263,14 +307,21 @@ func (handler *volumeHandler) Attach(volumeRef string, hostRef string, path stri
 		return fail.InvalidParameterCannotBeEmptyStringError("format")
 	}
 
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
-	volumeInstance, xerr := volumefactory.Load(ctx, svc, volumeRef)
+	volumeInstance, xerr := volumefactory.Load(ctx, svc, volumeRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	hostInstance, xerr := hostfactory.Load(ctx, svc, hostRef)
+	hostInstance, xerr := hostfactory.Load(ctx, svc, hostRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -300,10 +351,17 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error
 		return fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
 	svc := handler.job.Service()
 	ctx := handler.job.Context()
 	// Load volume data
-	rv, xerr := volumefactory.Load(ctx, svc, volumeRef)
+	rv, xerr := volumefactory.Load(ctx, svc, volumeRef, isTerraform)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok || valid.IsNil(xerr) {
 			return xerr
@@ -314,7 +372,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (ferr fail.Error
 	// mountPath := ""
 
 	// Load rh data
-	rh, xerr := hostfactory.Load(ctx, svc, hostRef)
+	rh, xerr := hostfactory.Load(ctx, svc, hostRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}

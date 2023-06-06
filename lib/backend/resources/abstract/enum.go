@@ -17,4 +17,15 @@ const (
 	VolumeResource
 	ShareResource
 	FeatureResource
+
+	VariableResource
+	InitScript
+	ProviderResource
+	FirewallResource
+	CustomResource
+	GwInitScript
+	OutputResource
+	FirewallRuleResource
+	VolumeAttachmentResource
+	NicResource
 )
