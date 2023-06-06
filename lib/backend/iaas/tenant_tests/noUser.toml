@@ -1,0 +1,9 @@
+[[tenants]]
+    name = "Test with Tenant without user"
+    client = "aws"
+
+[tenants.identity]
+SecretKey = "1234567890"
+
+[tenants.compute]
+Region = "eu-west"

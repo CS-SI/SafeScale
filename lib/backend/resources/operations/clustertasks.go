@@ -55,8 +55,8 @@ import (
 	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 )
 
-// taskCreateCluster is the TaskAction that creates a Cluster
-func (instance *Cluster) taskCreateCluster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+// taskCreateCluster is the TaskAction that creates a ClassicCluster
+func (instance *ClassicCluster) taskCreateCluster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	req, ok := params.(abstract.ClusterRequest)
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "should be an abstract.ClusterRequest")
@@ -84,7 +84,7 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 		gres, gerr := func() (_ interface{}, ferr fail.Error) {
 			defer fail.OnPanic(&ferr)
 
-			// Check if Cluster exists in metadata; if yes, error
+			// Check if ClassicCluster exists in metadata; if yes, error
 			_, xerr := LoadCluster(ctx, instance.Service(), req.Name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -95,13 +95,13 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 					return nil, xerr
 				}
 			} else {
-				ar := result{nil, fail.DuplicateError("a Cluster named '%s' already exist", req.Name)}
+				ar := result{nil, fail.DuplicateError("a ClassicCluster named '%s' already exist", req.Name)}
 				return nil, ar.rErr
 			}
 
 			// this is the real constructor of the cluster, the one that populates the cluster with meaningful data
-			// FIXME: OPP Having this function here is a severe problem, this function should be IN LoadCluster
-			// Create first metadata of Cluster after initialization
+			// FIXME: Having this function here is a severe problem, this function should be IN LoadCluster
+			// Create first metadata of ClassicCluster after initialization
 			xerr = instance.firstLight(ctx, req)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -114,18 +114,18 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !req.KeepOnFailure && !cleanFailure {
-					logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
+					logrus.WithContext(ctx).Debugf("Cleaning up on %s, deleting metadata of ClassicCluster '%s'...", ActionFromError(ferr), req.Name)
 					if instance.MetadataCore != nil {
 						theID, _ := instance.GetID()
 
 						if derr := instance.MetadataCore.Delete(cleanupContextFrom(ctx)); derr != nil {
 							logrus.WithContext(cleanupContextFrom(ctx)).Errorf(
-								"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
+								"cleaning up on %s, failed to delete metadata of ClassicCluster '%s'", ActionFromError(ferr), req.Name,
 							)
 							_ = ferr.AddConsequence(derr)
 						} else {
 							logrus.WithContext(ctx).Debugf(
-								"Cleaning up on %s, successfully deleted metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
+								"Cleaning up on %s, successfully deleted metadata of ClassicCluster '%s'", ActionFromError(ferr), req.Name,
 							)
 						}
 
@@ -151,19 +151,19 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 				req.InitialNodeCount = privateNodeCount
 			}
 			if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
-				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
-				req.InitialNodeCount = privateNodeCount
+				logrus.WithContext(ctx).Warnf("[ClassicCluster %s] creating less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
+				// req.InitialNodeCount = privateNodeCount
 			}
 
 			if req.InitialMasterCount == 0 {
 				req.InitialMasterCount = privateMasterCount
 			}
 			if req.InitialMasterCount > 0 && req.InitialMasterCount < privateMasterCount {
-				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialMasterCount, privateMasterCount, req.Flavor.String())
-				req.InitialMasterCount = privateMasterCount
+				logrus.WithContext(ctx).Warnf("[ClassicCluster %s] creating less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", req.Name, req.InitialMasterCount, privateMasterCount, req.Flavor.String())
+				// req.InitialMasterCount = privateMasterCount
 			}
 
-			// Define the sizing dependencies for Cluster hosts
+			// Define the sizing dependencies for ClassicCluster hosts
 			if req.GatewaysDef.Image == "" {
 				req.GatewaysDef.Image = req.OS
 			}
@@ -321,14 +321,14 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 				return nil, xerr
 			}
 
-			// configure Cluster as a whole
+			// configure ClassicCluster as a whole
 			xerr = instance.configureCluster(ctx, req)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
 			}
 
-			// Sets nominal state of the new Cluster in metadata
+			// Sets nominal state of the new ClassicCluster in metadata
 			xerr = instance.Alter(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				// update metadata about disabled default features
 				innerXErr := props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -376,8 +376,8 @@ func (instance *Cluster) taskCreateCluster(inctx context.Context, params interfa
 
 }
 
-// firstLight contains the code leading to Cluster first metadata written
-func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterRequest) fail.Error {
+// firstLight contains the code leading to ClassicCluster first metadata written
+func (instance *ClassicCluster) firstLight(inctx context.Context, req abstract.ClusterRequest) fail.Error {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -394,7 +394,7 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 				return xerr
 			}
 
-			// FIXME: OPP This is the true cluster constructor
+			// FIXME: This is the true cluster constructor
 			// Initializes instance
 			ci := abstract.NewClusterIdentity()
 			ci.Name = req.Name
@@ -438,7 +438,7 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 					return fail.Wrap(innerXErr, "failed to disable features")
 				}
 
-				// Sets initial state of the new Cluster and create metadata
+				// Sets initial state of the new ClassicCluster and create metadata
 				innerXErr = props.Alter(
 					clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 						stateV1, ok := clonable.(*propertiesv1.ClusterState)
@@ -452,7 +452,7 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 					},
 				)
 				if innerXErr != nil {
-					return fail.Wrap(innerXErr, "failed to set initial state of Cluster")
+					return fail.Wrap(innerXErr, "failed to set initial state of ClassicCluster")
 				}
 
 				// sets default sizing from req
@@ -479,7 +479,7 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 					return innerXErr
 				}
 
-				// FUTURE: sets the Cluster composition (when we will be able to manage Cluster spread on several tenants...)
+				// FUTURE: sets the ClassicCluster composition (when we will be able to manage ClassicCluster spread on several tenants...)
 				innerXErr = props.Alter(clusterproperty.CompositeV1, func(clonable data.Clonable) fail.Error {
 					compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
 					if !ok {
@@ -537,8 +537,8 @@ func (instance *Cluster) firstLight(inctx context.Context, req abstract.ClusterR
 	}
 }
 
-// determineSizingRequirements calculates the sizings needed for the hosts of the Cluster
-func (instance *Cluster) determineSizingRequirements(inctx context.Context, req abstract.ClusterRequest) (
+// determineSizingRequirements calculates the sizings needed for the hosts of the ClassicCluster
+func (instance *ClassicCluster) determineSizingRequirements(inctx context.Context, req abstract.ClusterRequest) (
 	_ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, _ *abstract.HostSizingRequirements, xerr fail.Error,
 ) {
 	ctx, cancel := context.WithCancel(inctx)
@@ -736,8 +736,8 @@ func (instance *Cluster) determineSizingRequirements(inctx context.Context, req 
 
 }
 
-// createNetworkingResources creates the network and subnet for the Cluster
-func (instance *Cluster) createNetworkingResources(inctx context.Context, req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements) (_ resources.Network, _ resources.Subnet, _ fail.Error) {
+// createNetworkingResources creates the network and subnet for the ClassicCluster
+func (instance *ClassicCluster) createNetworkingResources(inctx context.Context, req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements) (_ resources.Network, _ resources.Subnet, _ fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -778,12 +778,12 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				networkInstance, xerr = LoadNetwork(ctx, svc, req.NetworkID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					ar := result{nil, nil, fail.Wrap(xerr, "failed to use network %s to contain Cluster Subnet", req.NetworkID)}
+					ar := result{nil, nil, fail.Wrap(xerr, "failed to use network %s to contain ClassicCluster Subnet", req.NetworkID)}
 					return ar, ar.rErr
 				}
 
 			} else {
-				logrus.WithContext(ctx).Debugf("[Cluster %s] creating Network '%s'", req.Name, req.Name)
+				logrus.WithContext(ctx).Debugf("[ClassicCluster %s] creating Network '%s'", req.Name, req.Name)
 				networkReq := abstract.NetworkRequest{
 					Name:          req.Name,
 					CIDR:          req.CIDR,
@@ -814,7 +814,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 					return ar, ar.rErr
 				}
 
-				xerr = networkInstance.Create(ctx, networkReq)
+				xerr = networkInstance.Create(ctx, &networkReq, nil)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					ar := result{nil, nil, fail.Wrap(xerr, "failed to create Network '%s'", req.Name)}
@@ -837,7 +837,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 							return fail.ConvertError(err)
 						}
 
-						networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the Cluster will be
+						networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the ClassicCluster will be
 						networkV3.CIDR = req.CIDR
 						return nil
 					},
@@ -860,7 +860,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 			cid, _ := instance.GetID()
 
 			// Creates Subnet
-			logrus.WithContext(ctx).Debugf("[Cluster %s] creating Subnet '%s'", req.Name, req.Name)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] creating Subnet '%s'", req.Name, req.Name)
 			subnetReq := abstract.SubnetRequest{
 				Name:           req.Name,
 				NetworkID:      nid,
@@ -951,7 +951,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				}
 			}
 
-			// Updates again Cluster metadata, propertiesv3.ClusterNetwork, with subnet infos
+			// Updates again ClassicCluster metadata, propertiesv3.ClusterNetwork, with subnet infos
 			xerr = instance.Alter(ctx, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
 					networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
@@ -1013,7 +1013,7 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 				return result{nil, nil, xerr}, xerr
 			}
 
-			logrus.WithContext(ctx).Debugf("[Cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, req.NetworkID, req.Name)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, req.NetworkID, req.Name)
 			return result{networkInstance, subnetInstance, nil}, nil
 		}() // nolint
 		chRes <- gres
@@ -1031,8 +1031,8 @@ func (instance *Cluster) createNetworkingResources(inctx context.Context, req ab
 
 }
 
-// createHostResources creates and configures hosts for the Cluster
-func (instance *Cluster) createHostResources(
+// createHostResources creates and configures hosts for the ClassicCluster
+func (instance *ClassicCluster) createHostResources(
 	inctx context.Context,
 	subnet resources.Subnet,
 	mastersDef abstract.HostSizingRequirements,
@@ -1122,8 +1122,8 @@ func (instance *Cluster) createHostResources(
 				cluReq.InitialMasterCount = masterCount
 			}
 			if cluReq.InitialMasterCount > 0 && cluReq.InitialMasterCount < masterCount {
-				logrus.WithContext(ctx).Warnf("[Cluster %s] cannot create less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", cluReq.Name, cluReq.InitialMasterCount, masterCount, cluReq.Flavor.String())
-				cluReq.InitialMasterCount = masterCount
+				logrus.WithContext(ctx).Warnf("[ClassicCluster %s] creating less than required minimum of Masters by the Flavor (%d requested, minimum being %d for flavor '%s')", cluReq.Name, cluReq.InitialMasterCount, masterCount, cluReq.Flavor.String())
+				// cluReq.InitialMasterCount = masterCount
 			}
 
 			// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
@@ -1207,7 +1207,7 @@ func (instance *Cluster) createHostResources(
 			}
 
 			// Starting from here, if exiting with error, delete nodes
-			// FIXME: OPP, another mistake
+			// FIXME: another lifecycle mistake
 			defer func() {
 				ferr = debug.InjectPlannedFail(ferr)
 				if ferr != nil && !keepOnFailure {
@@ -1364,7 +1364,7 @@ func complementSizingRequirements(req *abstract.HostSizingRequirements, def abst
 }
 
 // taskStartHost is the code called in a Task to start a Host
-func (instance *Cluster) taskStartHost(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskStartHost(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1442,7 +1442,7 @@ func (instance *Cluster) taskStartHost(inctx context.Context, params interface{}
 
 }
 
-func (instance *Cluster) taskStopHost(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskStopHost(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1509,7 +1509,7 @@ type taskInstallGatewayParameters struct {
 }
 
 // taskInstallGateway installs necessary components on one gateway
-func (instance *Cluster) taskInstallGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskInstallGateway(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1555,7 +1555,7 @@ func (instance *Cluster) taskInstallGateway(inctx context.Context, params interf
 				return result{nil, xerr}, xerr
 			}
 
-			// Installs dependencies as defined by Cluster Flavor (if it exists)
+			// Installs dependencies as defined by ClassicCluster Flavor (if it exists)
 			xerr = instance.installNodeRequirements(ctx, clusternodetype.Gateway, p.host, hostLabel, p.request)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -1589,7 +1589,7 @@ type taskCreateMastersParameters struct {
 }
 
 // taskCreateMasters creates masters
-func (instance *Cluster) taskCreateMasters(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskCreateMasters(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1631,7 +1631,7 @@ func (instance *Cluster) taskCreateMasters(inctx context.Context, params interfa
 			logrus.WithContext(ctx).Debugf("Creating %d master%s...", p.count, strprocess.Plural(p.count))
 
 			tcount := uint(math.Max(4, float64(p.count)))
-			timeout := time.Duration(tcount) * timings.HostCreationTimeout() // FIXME: OPP This became the timeout for the whole cluster creation....
+			timeout := time.Duration(tcount) * timings.HostCreationTimeout() // FIXME: This became the timeout for the whole cluster creation....
 
 			winSize := 8
 			st, xerr := instance.Service().GetProviderName()
@@ -1719,7 +1719,7 @@ type taskCreateMasterParameters struct {
 }
 
 // taskCreateMaster creates one master
-func (instance *Cluster) taskCreateMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskCreateMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	var xerr fail.Error
 
 	if valid.IsNil(instance) {
@@ -1817,7 +1817,7 @@ func (instance *Cluster) taskCreateMaster(inctx context.Context, params interfac
 					if derr != nil {
 						_ = ferr.AddConsequence(
 							fail.Wrap(
-								derr, "cleaning up on %s, failed to remove master from Cluster metadata", ActionFromError(ferr),
+								derr, "cleaning up on %s, failed to remove master from ClassicCluster metadata", ActionFromError(ferr),
 							),
 						)
 					}
@@ -2011,7 +2011,7 @@ type taskConfigureMastersParameters struct {
 }
 
 // taskConfigureMasters configure masters
-func (instance *Cluster) taskConfigureMasters(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskConfigureMasters(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -2037,7 +2037,7 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params inte
 			variables, _ := data.FromMap(p.variables)
 
 			iname := p.clusterName
-			logrus.WithContext(ctx).Debugf("[Cluster %s] Configuring masters...", iname)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] Configuring masters...", iname)
 
 			masters := p.masters
 
@@ -2084,7 +2084,7 @@ func (instance *Cluster) taskConfigureMasters(inctx context.Context, params inte
 				return result{nil, xerr}, xerr
 			}
 
-			logrus.WithContext(ctx).Debugf("[Cluster %s] masters configuration successful", iname)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] masters configuration successful", iname)
 			return result{nil, nil}, nil
 		}()
 		chRes <- gres
@@ -2110,7 +2110,7 @@ type taskConfigureMasterParameters struct {
 }
 
 // taskConfigureMaster configures one master
-func (instance *Cluster) taskConfigureMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskConfigureMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -2215,7 +2215,7 @@ func runWindow(inctx context.Context, count uint, windowSize uint, uat chan StdR
 	st.MaxRequests = uint32(count + windowSize)
 	st.ReadyToTrip = func(counts gobreaker.Counts) bool {
 		failureRatio := float64(counts.TotalFailures) / float64(counts.Requests)
-		return counts.Requests >= 6 && failureRatio >= 0.8
+		return counts.Requests >= 6 && failureRatio >= 0.9
 	}
 
 	cb := gobreaker.NewCircuitBreaker(st)
@@ -2343,7 +2343,7 @@ type StdResult struct {
 }
 
 // taskCreateNodes creates nodes
-func (instance *Cluster) taskCreateNodes(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskCreateNodes(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -2476,8 +2476,8 @@ func cleanupContextFrom(inctx context.Context) context.Context {
 	return context.Background()
 }
 
-// taskCreateNode creates a node in the Cluster
-func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+// taskCreateNode creates a node in the ClassicCluster
+func (instance *ClassicCluster) taskCreateNode(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	var xerr fail.Error
 
 	if valid.IsNil(instance) {
@@ -2566,7 +2566,7 @@ func (instance *Cluster) taskCreateNode(inctx context.Context, params interface{
 						})
 					})
 					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove node from Cluster metadata", ActionFromError(ferr)))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove node from ClassicCluster metadata", ActionFromError(ferr)))
 					}
 				}
 			}()
@@ -2800,7 +2800,7 @@ type taskConfigureNodesParameters struct {
 }
 
 // taskConfigureNodes configures nodes
-func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskConfigureNodes(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -2824,7 +2824,7 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interf
 			defer fail.OnPanic(&ferr)
 			clusterName := p.clusterName
 
-			logrus.WithContext(ctx).Debugf("[Cluster %s] configuring nodes...", clusterName)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] configuring nodes...", clusterName)
 
 			for _, node := range p.nodes {
 				if node.ID == "" {
@@ -2877,7 +2877,7 @@ func (instance *Cluster) taskConfigureNodes(inctx context.Context, params interf
 				tgMap[v.who] = v.what
 			}
 
-			logrus.WithContext(ctx).Debugf("[Cluster %s] nodes configuration successful: %v", clusterName, tgMap)
+			logrus.WithContext(ctx).Debugf("[ClassicCluster %s] nodes configuration successful: %v", clusterName, tgMap)
 			return result{tgMap, nil}, nil
 		}()
 		chRes <- gres
@@ -2902,7 +2902,7 @@ type taskConfigureNodeParameters struct {
 }
 
 // taskConfigureNode configure one node
-func (instance *Cluster) taskConfigureNode(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskConfigureNode(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -2957,7 +2957,7 @@ func (instance *Cluster) taskConfigureNode(inctx context.Context, params interfa
 				return result{nil, nil}, nil
 			}
 
-			// Now configures node specifically for Cluster flavor
+			// Now configures node specifically for ClassicCluster flavor
 			makers, xerr := instance.getMaker(ctx)
 			if xerr != nil {
 				return result{nil, xerr}, xerr
@@ -3005,7 +3005,7 @@ type taskDeleteNodeOnFailureParameters struct {
 }
 
 // taskDeleteNodeOnFailure deletes a node when a failure occurred
-func (instance *Cluster) taskDeleteNodeOnFailure(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskDeleteNodeOnFailure(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -3085,7 +3085,7 @@ type taskDeleteNodeParameters struct {
 	clusterName string
 }
 
-func (instance *Cluster) taskDeleteNodeWithCtx(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskDeleteNodeWithCtx(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -3166,7 +3166,7 @@ func (instance *Cluster) taskDeleteNodeWithCtx(inctx context.Context, params int
 }
 
 // taskDeleteMaster deletes one master
-func (instance *Cluster) taskDeleteMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskDeleteMaster(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -3249,7 +3249,7 @@ type taskRegenerateClusterInventoryParameters struct {
 }
 
 // taskRegenerateClusterInventory task to update a Host (master) ansible inventory
-func (instance *Cluster) taskRegenerateClusterInventory(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
+func (instance *ClassicCluster) taskRegenerateClusterInventory(inctx context.Context, params interface{}) (_ interface{}, _ fail.Error) {
 	if valid.IsNil(instance) {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -3291,7 +3291,7 @@ func (instance *Cluster) taskRegenerateClusterInventory(inctx context.Context, p
 }
 
 // updateClusterInventoryMaster updates a Host (master) ansible inventory
-func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, param taskRegenerateClusterInventoryParameters) (ferr fail.Error) {
+func (instance *ClassicCluster) updateClusterInventoryMaster(inctx context.Context, param taskRegenerateClusterInventoryParameters) (ferr fail.Error) {
 	ctx, cancel := context.WithCancel(inctx)
 	defer cancel()
 
@@ -3338,7 +3338,7 @@ func (instance *Cluster) updateClusterInventoryMaster(inctx context.Context, par
 			fmt.Sprintf("[ -f %sinventory.py ] && sudo rm -f %sinventory.py  || exit 0", target, target),
 			fmt.Sprintf("sudo mv %s_inventory.py %sinventory.py", target, target),
 		}
-		prerr := fmt.Sprintf("[Cluster %s, master %s] Ansible inventory update: ", iname, master.GetName())
+		prerr := fmt.Sprintf("[ClassicCluster %s, master %s] Ansible inventory update: ", iname, master.GetName())
 		errmsg := []string{
 			fmt.Sprintf("%sfail to clean up temporaries", prerr),
 			fmt.Sprintf("%sfail to move uploaded inventory", prerr),

@@ -1,0 +1,14 @@
+[[tenants]]
+    name = "Test with AppKey only in OStorage"
+    client = "ovh"
+
+    [tenants.identity]
+        Username = "test"
+        Password = "password"
+
+    [tenants.compute]
+        Region = "SBG5"
+
+    [tenants.objectstorage]
+        Type = "s3"
+        ApplicationKey = "1234567890"

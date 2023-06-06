@@ -1,0 +1,14 @@
+[[tenants]]
+name = "Test with tenannt without AvailabilityZone"
+client = "flexibleengine"
+
+
+[tenants.identity]
+Username = "test"
+Password = "password"
+
+[tenants.compute]
+Region = "SBG5"
+
+[tenants.objectstorage]
+Type = "s3"

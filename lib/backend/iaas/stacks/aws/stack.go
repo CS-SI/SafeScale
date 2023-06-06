@@ -66,6 +66,10 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "aws", nil
 }
 
+func (s stack) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
+}
+
 // GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
 	if valid.IsNil(s) {
@@ -167,10 +171,6 @@ func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, l
 
 	xerr := s.rpcCreateTags(ctx, []*string{&id}, tags)
 	return xerr
-}
-
-func (s *stack) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
-	panic("implement me")
 }
 
 func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {

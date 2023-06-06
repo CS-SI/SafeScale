@@ -110,193 +110,210 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (_ api.Conn
 		return nil, xerr
 	}
 
-	host, xerr := hostfactory.Load(ctx, svc, hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	host, xerr := hostfactory.Load(ctx, svc, hostRef, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	cfg, xerr := svc.GetConfigurationOptions(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-	var user string
-	if anon, ok := cfg.Get("OperatorUsername"); ok {
-		user, ok = anon.(string)
-		if !ok {
-			logrus.WithContext(ctx).Warnf("OperatorUsername is not a string, check your tenants.toml file. Using 'safescale' user instead.")
-		} else if user == "" {
-			logrus.WithContext(ctx).Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
-		}
-	}
-	if user == "" {
-		user = abstract.DefaultUser
-	}
-
-	ip, xerr := host.GetAccessIP(handler.job.Context())
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	sshConfig := ssh.NewConfig(host.GetName(), ip, 22, user, "", 0, "", nil, nil)
-
-	isSingle, xerr := host.IsSingle(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	isGateway, xerr := host.IsGateway(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if isSingle || isGateway {
-		xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			ahc, ok := clonable.(*abstract.HostCore)
-			if !ok {
-				return fail.InconsistentError("")
-			}
-
-			sshConfig.PrivateKey = ahc.PrivateKey
-			sshConfig.Port = int(ahc.SSHPort)
-			return nil
-		})
+	if !isTerraform {
+		cfg, xerr := svc.GetConfigurationOptions(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
-	} else {
-		var subnetInstance resources.Subnet
-		xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			ahc, ok := clonable.(*abstract.HostCore)
+		var user string
+		if anon, ok := cfg.Get("OperatorUsername"); ok {
+			user, ok = anon.(string)
 			if !ok {
-				return fail.InconsistentError("")
+				logrus.WithContext(ctx).Warnf("OperatorUsername is not a string, check your tenants.toml file. Using 'safescale' user instead.")
+			} else if user == "" {
+				logrus.WithContext(ctx).Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
 			}
+		}
+		if user == "" {
+			user = abstract.DefaultUser
+		}
 
-			sshConfig.PrivateKey = ahc.PrivateKey
-			sshConfig.Port = int(ahc.SSHPort)
-			return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
+		ip, xerr := host.GetAccessIP(handler.job.Context())
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		sshConfig := ssh.NewConfig(host.GetName(), ip, 22, user, "", 0, "", nil, nil)
+
+		isSingle, xerr := host.IsSingle(ctx)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		isGateway, xerr := host.IsGateway(ctx)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		if isSingle || isGateway {
+			xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				ahc, ok := clonable.(*abstract.HostCore)
 				if !ok {
-					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					return fail.InconsistentError("")
 				}
 
-				var subnetID string
-				if hnV2.DefaultSubnetID != "" {
-					subnetID = hnV2.DefaultSubnetID
-				} else {
-					for k := range hnV2.SubnetsByID {
-						subnetID = k
-						break
+				sshConfig.PrivateKey = ahc.PrivateKey
+				sshConfig.Port = int(ahc.SSHPort)
+				return nil
+			})
+			if xerr != nil {
+				return nil, xerr
+			}
+		} else {
+			var subnetInstance resources.Subnet
+			xerr = host.Inspect(ctx, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				ahc, ok := clonable.(*abstract.HostCore)
+				if !ok {
+					return fail.InconsistentError("")
+				}
+
+				sshConfig.PrivateKey = ahc.PrivateKey
+				sshConfig.Port = int(ahc.SSHPort)
+				return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+					hnV2, ok := clonable.(*propertiesv2.HostNetworking)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
-				}
-				if subnetID == "" {
-					return fail.InconsistentError("no default Subnet found for Host '%s'", ahc.Name)
-				}
 
-				var innerXErr fail.Error
-				subnetInstance, innerXErr = subnetfactory.Load(ctx, svc, "", subnetID)
-				return innerXErr
-			})
-		})
-		if xerr != nil {
-			return nil, xerr
-		}
-		if subnetInstance == nil {
-			return nil, fail.NotFoundError("failed to find default Subnet of Host")
-		}
-		if isGateway {
-			hs, err := host.ForceGetState(ctx)
-			if err != nil {
-				return nil, fail.Wrap(err, "cannot retrieve host properties")
-			}
-			if hs != hoststate.Started {
-				return nil, fail.NewError("cannot retrieve network properties when the gateway is not in 'started' state")
-			}
-		}
+					var subnetID string
+					if hnV2.DefaultSubnetID != "" {
+						subnetID = hnV2.DefaultSubnetID
+					} else {
+						for k := range hnV2.SubnetsByID {
+							subnetID = k
+							break
+						}
+					}
+					if subnetID == "" {
+						return fail.InconsistentError("no default Subnet found for Host '%s'", ahc.Name)
+					}
 
-		var (
-			gwahc *abstract.HostCore
-			ok    bool
-		)
-
-		// gets primary gateway information
-		gw, xerr := subnetInstance.InspectGateway(handler.job.Context(), true)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// Primary gateway not found ? let's try with the secondary one later...
-				debug.IgnoreError(xerr)
-			default:
-				return nil, xerr
-			}
-		} else {
-			xerr = gw.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				if gwahc, ok = clonable.(*abstract.HostCore); !ok {
-					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				return nil
+					var innerXErr fail.Error
+					subnetInstance, innerXErr = subnetfactory.Load(ctx, svc, "", subnetID, false)
+					return innerXErr
+				})
 			})
 			if xerr != nil {
 				return nil, xerr
 			}
-
-			if ip, xerr = gw.GetAccessIP(handler.job.Context()); xerr != nil {
-				return nil, xerr
+			if subnetInstance == nil {
+				return nil, fail.NotFoundError("failed to find default Subnet of Host")
+			}
+			if isGateway {
+				hs, err := host.ForceGetState(ctx)
+				if err != nil {
+					return nil, fail.Wrap(err, "cannot retrieve host properties")
+				}
+				if hs != hoststate.Started {
+					return nil, fail.NewError("cannot retrieve network properties when the gateway is not in 'started' state")
+				}
 			}
 
-			gwConfig, xerr := gw.GetSSHConfig(handler.job.Context())
+			var (
+				gwahc *abstract.HostCore
+				ok    bool
+			)
+
+			// gets primary gateway information
+			gw, xerr := subnetInstance.InspectGateway(handler.job.Context(), true)
 			if xerr != nil {
-				return nil, xerr
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// Primary gateway not found ? let's try with the secondary one later...
+					debug.IgnoreError(xerr)
+				default:
+					return nil, xerr
+				}
+			} else {
+				xerr = gw.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					if gwahc, ok = clonable.(*abstract.HostCore); !ok {
+						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					return nil
+				})
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				if ip, xerr = gw.GetAccessIP(handler.job.Context()); xerr != nil {
+					return nil, xerr
+				}
+
+				gwConfig, xerr := gw.GetSSHConfig(handler.job.Context())
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				thePort, _ := gwConfig.GetPort()
+
+				GatewayConfig := ssh.NewConfig(gw.GetName(), ip, int(thePort), user, gwahc.PrivateKey, 0, "", nil, nil)
+				sshConfig.GatewayConfig = GatewayConfig
 			}
 
-			thePort, _ := gwConfig.GetPort()
+			// gets secondary gateway information
+			gw = nil
+			gw, xerr = subnetInstance.InspectGateway(handler.job.Context(), false)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// If secondary gateway is not found, and previously failed to set primary gateway config, bail out
+					if sshConfig.GatewayConfig == nil {
+						return nil, fail.NotFoundError("failed to find a gateway to reach Host")
+					}
+				default:
+					return nil, xerr
+				}
+			} else {
+				xerr = gw.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					gwahc, ok = clonable.(*abstract.HostCore)
+					if !ok {
+						return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+					return nil
+				})
+				if xerr != nil {
+					return nil, xerr
+				}
 
-			GatewayConfig := ssh.NewConfig(gw.GetName(), ip, int(thePort), user, gwahc.PrivateKey, 0, "", nil, nil)
-			sshConfig.GatewayConfig = GatewayConfig
+				if ip, xerr = gw.GetAccessIP(handler.job.Context()); xerr != nil {
+					return nil, xerr
+				}
+
+				gwConfig, xerr := gw.GetSSHConfig(handler.job.Context())
+				if xerr != nil {
+					return nil, xerr
+				}
+
+				thePort, _ := gwConfig.GetPort()
+
+				GatewayConfig := ssh.NewConfig(gw.GetName(), ip, int(thePort), user, gwahc.PrivateKey, 0, "", nil, nil)
+				sshConfig.SecondaryGatewayConfig = GatewayConfig
+			}
 		}
 
-		// gets secondary gateway information
-		gw = nil
-		gw, xerr = subnetInstance.InspectGateway(handler.job.Context(), false)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				// If secondary gateway is not found, and previously failed to set primary gateway config, bail out
-				if sshConfig.GatewayConfig == nil {
-					return nil, fail.NotFoundError("failed to find a gateway to reach Host")
-				}
-			default:
-				return nil, xerr
-			}
-		} else {
-			xerr = gw.Inspect(ctx, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				gwahc, ok = clonable.(*abstract.HostCore)
-				if !ok {
-					return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				return nil
-			})
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			if ip, xerr = gw.GetAccessIP(handler.job.Context()); xerr != nil {
-				return nil, xerr
-			}
-
-			gwConfig, xerr := gw.GetSSHConfig(handler.job.Context())
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			thePort, _ := gwConfig.GetPort()
-
-			GatewayConfig := ssh.NewConfig(gw.GetName(), ip, int(thePort), user, gwahc.PrivateKey, 0, "", nil, nil)
-			sshConfig.SecondaryGatewayConfig = GatewayConfig
-		}
+		return sshfactory.NewConnector(sshConfig)
 	}
 
-	return sshfactory.NewConnector(sshConfig)
+	aCfg, xerr := host.GetSSHConfig(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// if it's terraform, use the terraform ssh config
+	return sshfactory.NewConnector(aCfg)
 }
 
 // WaitServerReady waits for remote SSH server to be ready. After timeout, fails
@@ -363,9 +380,16 @@ func (handler *sshHandler) Run(hostRef, cmd string) (_ int, _ string, _ string, 
 		return invalid, "", "", xerr
 	}
 
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+	isTerraform = pn == "terraform"
+
 	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
-			host, xerr := hostfactory.Load(ctx, handler.job.Service(), hostRef)
+			host, xerr := hostfactory.Load(ctx, handler.job.Service(), hostRef, isTerraform)
 			if xerr != nil {
 				return xerr
 			}
@@ -568,7 +592,14 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		upload = true
 	}
 
-	host, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
+	isTerraform = pn == "terraform"
+
+	host, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostName, isTerraform)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}

@@ -235,7 +235,7 @@ func (sg securityGroupConsumer) Reset(ref string, timeout time.Duration) error {
 }
 
 // AddRule ...
-func (sg securityGroupConsumer) AddRule(group string, rule *abstract.SecurityGroupRule, timeout time.Duration) error {
+func (sg securityGroupConsumer) AddRule(network string, group string, rule *abstract.SecurityGroupRule, timeout time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -254,8 +254,9 @@ func (sg securityGroupConsumer) AddRule(group string, rule *abstract.SecurityGro
 
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	req := &protocol.SecurityGroupRuleRequest{
-		Group: &protocol.Reference{Name: group},
-		Rule:  converters.SecurityGroupRuleFromAbstractToProtocol(rule),
+		ResourceGroup: &protocol.Reference{Name: network},
+		Group:         &protocol.Reference{Name: group},
+		Rule:          converters.SecurityGroupRuleFromAbstractToProtocol(rule),
 	}
 	_, err := service.AddRule(newCtx, req)
 	if err != nil {

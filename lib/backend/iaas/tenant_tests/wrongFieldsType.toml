@@ -1,0 +1,22 @@
+[[tenants]]
+name = "Tenant with wrong fields type"
+client = "cloudferro"
+
+[tenants.identity]
+AccessKey = 3
+ApplicationKey = 2
+SecretKey = 4
+
+[tenants.compute]
+AvailabilityZone = 5
+Region = 7
+WhitelistTemplateRegexp = 9
+
+[tenants.network]
+
+[tenants.objectstorage]
+Type = 6
+Endpoint = 8
+
+[tenants.metadata]
+MetadataBucketName = 10

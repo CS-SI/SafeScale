@@ -41,6 +41,9 @@ type SecurityGroupRule struct {
 	PortTo      int32                           `json:"port_to,omitempty"`     // last port of the rule
 	Sources     []string                        `json:"sources"`               // concerned sources (depending on Direction); can be array of IP ranges or array of Security Group IDs (no mix)
 	Targets     []string                        `json:"targets"`               // concerned source or target (depending on Direction); can be array of IP ranges or array of Security Group IDs (no mix)
+	Priority    int                             `json:"priority"`              // priority of the rule
+	Name        string                          `json:"name,omitempty"`        // name of the rule
+	Network     string                          `json:"network,omitempty"`     // network of the rule, needed for Azure
 }
 
 // IsNull tells if the Security Group Rule is a null value

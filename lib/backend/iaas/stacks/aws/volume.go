@@ -421,10 +421,6 @@ func (s stack) ListVolumeAttachments(ctx context.Context, serverID string) (_ []
 	return vas, nil
 }
 
-func (s stack) Migrate(ctx context.Context, operation string, params map[string]interface{}) (ferr fail.Error) {
-	return nil
-}
-
 // DeleteVolumeAttachment detach from server 'serverID' the volume 'id'
 func (s stack) DeleteVolumeAttachment(ctx context.Context, serverID, id string) (ferr fail.Error) {
 	if valid.IsNil(s) {

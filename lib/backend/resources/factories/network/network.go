@@ -19,7 +19,6 @@ package network
 
 import (
 	"context"
-
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources"
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -28,7 +27,7 @@ import (
 )
 
 // List returns a slice of *abstract.Network corresponding to managed networks
-func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Error) {
+func List(ctx context.Context, svc iaas.Service, terraform bool) ([]*abstract.Network, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -36,7 +35,27 @@ func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Erro
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	rn, xerr := New(svc)
+	if terraform {
+		var list []*abstract.Network
+		clul, err := operations.ListTerraformNetworks(ctx, svc)
+		if err != nil {
+			return nil, fail.ConvertError(err)
+		}
+
+		for _, v := range clul {
+			mk := abstract.Network{
+				Name: v.Name,
+				Tags: v.Tags,
+				ID:   v.Identity,
+				CIDR: v.CIDR,
+			}
+			list = append(list, &mk)
+		}
+
+		return list, nil
+	}
+
+	rn, xerr := New(svc, terraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -72,11 +91,17 @@ func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Erro
 }
 
 // New creates an instance of resources.Network
-func New(svc iaas.Service) (resources.Network, fail.Error) {
+func New(svc iaas.Service, terraform bool) (resources.Network, fail.Error) {
+	if terraform {
+		return operations.NewTerraformNetwork(svc)
+	}
 	return operations.NewNetwork(svc)
 }
 
 // Load loads the metadata of a network and returns an instance of resources.Network
-func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Network, fail.Error) {
+func Load(ctx context.Context, svc iaas.Service, ref string, terraform bool) (resources.Network, fail.Error) {
+	if terraform {
+		return operations.LoadTerraformNetwork(ctx, svc, ref)
+	}
 	return operations.LoadNetwork(ctx, svc, ref)
 }

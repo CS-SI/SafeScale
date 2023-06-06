@@ -63,9 +63,16 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 		return nil, fail.InvalidParameterError("in.TargetRef", "neither Name nor ID fields are provided")
 	}
 
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
 	switch targetType {
 	case featuretargettype.Host:
-		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef, isTerraform)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -83,7 +90,14 @@ func (handler *featureHandler) List(targetType featuretargettype.Enum, targetRef
 		return list, nil
 
 	case featuretargettype.Cluster:
-		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		isTerraform := false
+		pn, xerr := handler.job.Service().GetType()
+		if xerr != nil {
+			return nil, xerr
+		}
+		isTerraform = pn == "terraform"
+
+		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef, isTerraform)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -123,14 +137,21 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName) // BUG: Why do we want a factory that does NOT accept parameters ?
 	if xerr != nil {
 		return xerr
 	}
 
 	switch targetType {
 	case featuretargettype.Host:
-		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef, isTerraform)
 		if xerr != nil {
 			return xerr
 		}
@@ -158,7 +179,14 @@ func (handler *featureHandler) Check(targetType featuretargettype.Enum, targetRe
 		return xerr
 
 	case featuretargettype.Cluster:
-		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		isTerraform := false
+		pn, xerr := handler.job.Service().GetType()
+		if xerr != nil {
+			return xerr
+		}
+		isTerraform = pn == "terraform"
+
+		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef, isTerraform)
 		if xerr != nil {
 			return xerr
 		}
@@ -215,14 +243,21 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName) // BUG: Why do we want a factory that does NOT accept parameters ?
 	if xerr != nil {
 		return xerr
 	}
 
 	switch targetType {
 	case featuretargettype.Host:
-		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef, isTerraform)
 		if xerr != nil {
 			return xerr
 		}
@@ -245,7 +280,14 @@ func (handler *featureHandler) Add(targetType featuretargettype.Enum, targetRef,
 		return fail.ExecutionError(nil, results.AllErrorMessages())
 
 	case featuretargettype.Cluster:
-		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		isTerraform := false
+		pn, xerr := handler.job.Service().GetType()
+		if xerr != nil {
+			return xerr
+		}
+		isTerraform = pn == "terraform"
+
+		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef, isTerraform)
 		if xerr != nil {
 			return xerr
 		}
@@ -283,14 +325,21 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 		return fail.InvalidParameterCannotBeEmptyStringError("featureName")
 	}
 
-	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	feat, xerr := featurefactory.New(handler.job.Context(), handler.job.Service(), featureName) // BUG: Why do we want a factory that does NOT accept parameters ?
 	if xerr != nil {
 		return xerr
 	}
 
 	switch targetType {
 	case featuretargettype.Host:
-		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), targetRef, isTerraform)
 		if xerr != nil {
 			return xerr
 		}
@@ -313,7 +362,14 @@ func (handler *featureHandler) Remove(targetType featuretargettype.Enum, targetR
 		return fail.ExecutionError(nil, results.AllErrorMessages())
 
 	case featuretargettype.Cluster:
-		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef)
+		isTerraform := false
+		pn, xerr := handler.job.Service().GetType()
+		if xerr != nil {
+			return xerr
+		}
+		isTerraform = pn == "terraform"
+
+		clusterInstance, xerr := clusterfactory.Load(handler.job.Context(), handler.job.Service(), targetRef, isTerraform)
 		if xerr != nil {
 			return xerr
 		}

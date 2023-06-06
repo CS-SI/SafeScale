@@ -115,7 +115,7 @@ type worker struct {
 	startTime time.Time
 
 	host    *Host
-	cluster *Cluster
+	cluster *ClassicCluster
 
 	machines map[string]resources.Host
 
@@ -155,9 +155,9 @@ func newWorker(
 	switch target.TargetType() {
 	case featuretargettype.Cluster:
 		var ok bool
-		w.cluster, ok = target.(*Cluster)
+		w.cluster, ok = target.(*ClassicCluster)
 		if !ok {
-			return nil, fail.InconsistentError("target should be a *Cluster")
+			return nil, fail.InconsistentError("target should be a *ClassicCluster")
 		}
 		w.service = w.cluster.Service()
 	case featuretargettype.Host:
@@ -168,7 +168,7 @@ func newWorker(
 		}
 		w.service = w.host.Service()
 	default:
-		return nil, fail.InconsistentError("target should be either a *Cluster or a *Host, it's not: %v", target.TargetType())
+		return nil, fail.InconsistentError("target should be either a *ClassicCluster or a *Host, it's not: %v", target.TargetType())
 	}
 
 	if method != installmethod.None {

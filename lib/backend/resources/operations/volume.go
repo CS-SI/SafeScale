@@ -19,6 +19,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 
@@ -115,6 +116,11 @@ func (instance *volume) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 	if err != nil {
 		return false, fail.ConvertError(err)
 	}
+
+	if beta := os.Getenv("SAFESCALE_DETECT_CORRUPTION"); beta != "yes" {
+		return true, nil
+	}
+
 	_, xerr := instance.Service().InspectVolume(ctx, theID)
 	if xerr != nil {
 		switch xerr.(type) {

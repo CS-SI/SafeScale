@@ -18,6 +18,7 @@ package ovh
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -88,14 +89,50 @@ func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }
 
+func recast(in any) (map[string]any, error) {
+	out := make(map[string]any)
+	if in == nil {
+		return out, nil
+	}
+
+	if input, ok := in.(map[string]any); ok {
+		return input, nil
+	}
+
+	input, ok := in.(map[any]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid input type: %T", in)
+	}
+
+	for k, v := range input {
+		nk, ok := k.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid key type: %T", k)
+		}
+		out[nk] = v
+	}
+	return out, nil
+}
+
 // Build builds a new instance of Ovh using configuration parameters
 // Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	var validInput bool
 
-	identityParams, _ := params["identity"].(map[string]interface{}) // nolint
-	compute, _ := params["compute"].(map[string]interface{})         // nolint
-	// networkParams, _ := params["network"].(map[string]interface{}) // nolint
+	identityParams, err := recast(params["identity"])
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	compute, err := recast(params["compute"])
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	network, err := recast(params["network"])
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
 
 	applicationKey, _ := identityParams["ApplicationKey"].(string)       // nolint
 	openstackID, _ := identityParams["OpenstackID"].(string)             // nolint
@@ -175,14 +212,20 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		defaultImage = ovhDefaultImage
 	}
 
-	maxLifeTime := 0
-	if _, ok = compute["MaxLifetimeInHours"].(string); ok {
-		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	var maxLifeTime int64 = 0
+	if val, ok := compute["MaxLifetimeInHours"].(int64); ok {
+		maxLifeTime = val
 	}
 
 	machineCreationLimit := 8
 	if _, ok = compute["ConcurrentMachineCreationLimit"].(string); ok {
 		machineCreationLimit, _ = strconv.Atoi(compute["ConcurrentMachineCreationLimit"].(string))
+	}
+
+	if maybe, ok := network["ProviderNetwork"]; ok {
+		if val, ok := maybe.(string); ok {
+			externalNetwork = val
+		}
 	}
 
 	authOptions := stacks.AuthenticationOptions{
@@ -199,7 +242,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		CK:               alternateAPIConsumerKey,
 	}
 
-	err := validation.ValidateStruct(&authOptions,
+	err = validation.ValidateStruct(&authOptions,
 		validation.Field(&authOptions.Region, validation.Required, validation.Match(regexp.MustCompile("^[-a-zA-Z0-9-_]+$"))),
 		validation.Field(&authOptions.AvailabilityZone, validation.Required, validation.Match(regexp.MustCompile("^[-a-zA-Z0-9-_]+$"))),
 	)
@@ -251,6 +294,30 @@ next:
 
 	serviceVersions := map[string]string{"volume": "v2"}
 
+	if maybe, ok := compute["IdentityEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["identity"] = val
+		}
+	}
+
+	if maybe, ok := compute["ComputeEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["compute"] = val
+		}
+	}
+
+	if maybe, ok := compute["VolumeEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["volume"] = val
+		}
+	}
+
+	if maybe, ok := network["NetworkEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["network"] = val
+		}
+	}
+
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
 	if xerr != nil {
 		return nil, xerr
@@ -276,7 +343,7 @@ next:
 
 func getSuffix(params map[string]interface{}) string {
 	suffix := ""
-	if osto, ok := params["objectstorage"].(map[string]interface{}); ok {
+	if osto, err := recast(params["objectstorage"]); err == nil {
 		if val, ok := osto["Suffix"].(string); ok {
 			suffix = val
 			if suffix != "" {
@@ -284,7 +351,7 @@ func getSuffix(params map[string]interface{}) string {
 			}
 		}
 	}
-	if meta, ok := params["metadata"].(map[string]interface{}); ok {
+	if meta, err := recast(params["metadata"]); err == nil {
 		if val, ok := meta["Suffix"].(string); ok {
 			suffix = val
 		}

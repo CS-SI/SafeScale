@@ -1012,7 +1012,7 @@ var networkSecurityGroupRuleAdd = cli.Command{
 			}()
 		}
 
-		if err := ClientSession.SecurityGroup.AddRule(c.Args().Get(1), rule, 0); err != nil {
+		if err := ClientSession.SecurityGroup.AddRule(c.Args().Get(0), c.Args().Get(1), rule, 0); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "addition of a rule to a security-group", true).Error())))
 		}
@@ -1351,7 +1351,9 @@ var subnetInspect = cli.Command{
 			return err
 		}
 
-		mapped["state_label"] = subnetstate.Enum(mapped["state"].(float64)).String()
+		if _, ok := mapped["state"]; ok {
+			mapped["state_label"] = subnetstate.Enum(mapped["state"].(float64)).String()
+		}
 		mapped["gateway-failover"] = false
 		if gws, ok := mapped["gateways"]; ok {
 			if ok {

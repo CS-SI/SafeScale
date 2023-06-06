@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 	"net"
 	"net/http"
 	"os"
@@ -29,6 +28,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/CS-SI/SafeScale/v22/lib/utils/valid"
 
 	"github.com/oscarpicas/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
@@ -52,8 +53,9 @@ import (
 var profileCloseFunc = func() {}
 
 const (
-	defaultDaemonHost string = "localhost" // By default, safescaled only listen on localhost
-	defaultDaemonPort string = "50051"
+	defaultDaemonHost    string = "localhost" // By default, safescaled only listen on localhost
+	defaultDaemonPort    string = "50051"
+	defaultDaemonWebPort string = "50052"
 )
 
 func cleanup(onAbort bool) {
@@ -118,7 +120,8 @@ func work(c *cli.Context) {
 	}
 
 	go func() {
-		nl, err := net.Listen("tcp", ":50052")
+		webPort := assembleListenWebString(c)
+		nl, err := net.Listen("tcp", webPort)
 		if err != nil {
 			logrus.Fatalf("failed to listen: %v", err)
 		}
@@ -233,6 +236,47 @@ func createGrpcServer() *grpc.Server {
 }
 
 // assembleListenString constructs the listen string we will use in net.Listen()
+func assembleListenWebString(c *cli.Context) string {
+	// Get listen from parameters
+	listen := c.String("web")
+	if listen == "" {
+		listen = os.Getenv("SAFESCALED_WEB_LISTEN")
+	}
+	if listen != "" {
+		// Validate port part of the content of listen...
+		parts := strings.Split(listen, ":")
+		switch len(parts) {
+		case 1:
+			listen = parts[0] + ":" + defaultDaemonWebPort
+		case 2:
+			num, err := strconv.Atoi(parts[1])
+			if err != nil || num <= 0 {
+				logrus.Warnf("Parameter 'web' content is invalid (port cannot be '%s'): ignored.", parts[1])
+			}
+		default:
+			logrus.Warnf("Parameter 'web' content is invalid, ignored.")
+		}
+	}
+	// if listen is empty, get the port from env
+	if listen == "" {
+		if port := os.Getenv("SAFESCALED_WEB_PORT"); port != "" {
+			num, err := strconv.Atoi(port)
+			if err != nil || num <= 0 {
+				logrus.Warnf("Environment variable 'SAFESCALED_WEB_PORT' contains invalid content ('%s'): ignored.", port)
+			} else {
+				listen = defaultDaemonHost + ":" + port
+			}
+		}
+
+		// At last, if listen is empty, build it from defaults
+		if listen == "" {
+			listen = defaultDaemonHost + ":" + defaultDaemonWebPort
+		}
+	}
+
+	return listen
+}
+
 func assembleListenString(c *cli.Context) string {
 	// Get listen from parameters
 	listen := c.String("listen")
@@ -314,6 +358,10 @@ func main() {
 		&cli.StringFlag{
 			Name:  "listen, l",
 			Usage: "Listen on specified port `IP:PORT` (default: localhost:50051)",
+		},
+		&cli.StringFlag{
+			Name:  "web, w",
+			Usage: "Listen on specified port for GRPC Web `IP:PORT` (default: localhost:50052)",
 		},
 	}
 

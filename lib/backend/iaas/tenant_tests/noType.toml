@@ -1,0 +1,14 @@
+[[tenants]]
+name = "Test with tenant without type"
+client = "flexibleengine"
+
+
+[tenants.identity]
+Username = "test"
+Password = "password"
+
+[tenants.compute]
+Region = "SBG5"
+AvailabilityZone = "eu-west-0b"
+
+[tenants.objectstorage]

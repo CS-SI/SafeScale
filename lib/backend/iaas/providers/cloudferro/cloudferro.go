@@ -18,6 +18,7 @@ package cloudferro
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -89,9 +90,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	logrus.WithContext(context.Background()).Infof("Setting safety to: %t", isSafe)
 
-	maxLifeTime := 0
-	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
-		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	var maxLifeTime int64 = 0
+	if val, ok := compute["MaxLifetimeInHours"].(int64); ok {
+		maxLifeTime = val
 	}
 
 	machineCreationLimit := 8
@@ -198,7 +199,33 @@ next:
 		ConcurrentMachineCreationLimit: machineCreationLimit,
 	}
 
-	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)
+	serviceVersions := map[string]string{"volume": "v2"}
+
+	if maybe, ok := compute["IdentityEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["identity"] = val
+		}
+	}
+
+	if maybe, ok := compute["ComputeEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["compute"] = val
+		}
+	}
+
+	if maybe, ok := compute["VolumeEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["volume"] = val
+		}
+	}
+
+	if maybe, ok := network["NetworkEndpointVersion"]; ok {
+		if val, ok := maybe.(string); ok {
+			serviceVersions["network"] = val
+		}
+	}
+
+	stack, xerr := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -221,9 +248,34 @@ next:
 	return wp, nil
 }
 
+func recast(in any) (map[string]any, error) {
+	out := make(map[string]any)
+	if in == nil {
+		return out, nil
+	}
+
+	if input, ok := in.(map[string]any); ok {
+		return input, nil
+	}
+
+	input, ok := in.(map[any]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid input type: %T", in)
+	}
+
+	for k, v := range input {
+		nk, ok := k.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid key type: %T", k)
+		}
+		out[nk] = v
+	}
+	return out, nil
+}
+
 func getSuffix(params map[string]interface{}) string {
 	suffix := ""
-	if osto, ok := params["objectstorage"].(map[string]interface{}); ok {
+	if osto, err := recast(params["objectstorage"]); err == nil {
 		if val, ok := osto["Suffix"].(string); ok {
 			suffix = val
 			if suffix != "" {
@@ -231,7 +283,7 @@ func getSuffix(params map[string]interface{}) string {
 			}
 		}
 	}
-	if meta, ok := params["metadata"].(map[string]interface{}); ok {
+	if meta, err := recast(params["metadata"]); err == nil {
 		if val, ok := meta["Suffix"].(string); ok {
 			suffix = val
 		}

@@ -112,7 +112,7 @@ func Test_NewCluster(t *testing.T) {
 
 		cluster, xerr := NewCluster(ctx, svc)
 		require.Nil(t, xerr)
-		require.EqualValues(t, reflect.TypeOf(cluster).String(), "*operations.Cluster")
+		require.EqualValues(t, reflect.TypeOf(cluster).String(), "*operations.ClassicCluster")
 
 	})
 	require.Nil(t, err)
@@ -122,7 +122,7 @@ func TestCluster_Exists(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	exists, xerr := ocluster.Exists(ctx)
 	require.False(t, exists)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
@@ -165,7 +165,7 @@ func Test_LoadCluster(t *testing.T) {
 		svc._setLogLevel(2)
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
-		require.EqualValues(t, reflect.TypeOf(cluster).String(), "*operations.Cluster")
+		require.EqualValues(t, reflect.TypeOf(cluster).String(), "*operations.ClassicCluster")
 		require.EqualValues(t, cluster.GetName(), "ClusterName")
 
 	})
@@ -177,7 +177,7 @@ func TestCluster_IsNull(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	require.True(t, ocluster.IsNull())
 
 	err := NewServiceTest(t, func(svc *ServiceTest) {
@@ -190,9 +190,9 @@ func TestCluster_IsNull(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("Can't cast *resources.Cluster to *operations.Cluster")
+			t.Error("Can't cast *resources.ClassicCluster to *operations.ClassicCluster")
 		}
 		require.False(t, ocluster.IsNull())
 	})
@@ -215,7 +215,7 @@ func TestCluster_Create(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	xerr := ocluster.Create(ctx, createClusterRequest())
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
@@ -227,7 +227,7 @@ func TestCluster_Create(t *testing.T) {
 
 		ocluster, xerr = NewCluster(ctx, svc)
 		require.Nil(t, xerr)
-		require.EqualValues(t, reflect.TypeOf(ocluster).String(), "*operations.Cluster")
+		require.EqualValues(t, reflect.TypeOf(ocluster).String(), "*operations.ClassicCluster")
 
 		svc._setLogLevel(0)
 
@@ -380,7 +380,7 @@ func TestCluster_Sdump(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	_, xerr := ocluster.Sdump(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
@@ -394,9 +394,9 @@ func TestCluster_Sdump(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -419,7 +419,7 @@ func TestCluster_Deserialize(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	_, xerr := ocluster.Sdump(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
@@ -450,9 +450,9 @@ func TestCluster_Deserialize(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -478,9 +478,9 @@ func TestCluster_Browse(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -503,7 +503,7 @@ func TestCluster_GetIdentity(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	_, xerr := ocluster.GetIdentity(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
@@ -517,9 +517,9 @@ func TestCluster_GetIdentity(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -540,7 +540,7 @@ func TestCluster_GetFlavor(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	_, xerr := ocluster.GetFlavor(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
@@ -554,9 +554,9 @@ func TestCluster_GetFlavor(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -575,7 +575,7 @@ func TestCluster_GetComplexity(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	_, xerr := ocluster.GetComplexity(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
@@ -589,9 +589,9 @@ func TestCluster_GetComplexity(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -608,7 +608,7 @@ func TestCluster_GetAdminPassword(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	_, xerr := ocluster.GetAdminPassword(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
@@ -622,9 +622,9 @@ func TestCluster_GetAdminPassword(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -641,7 +641,7 @@ func TestCluster_GetKeyPair(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	_, xerr := ocluster.GetKeyPair(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
@@ -655,9 +655,9 @@ func TestCluster_GetKeyPair(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -675,7 +675,7 @@ func TestCluster_GetNetworkConfig(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	_, xerr := ocluster.GetNetworkConfig(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
@@ -689,9 +689,9 @@ func TestCluster_GetNetworkConfig(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -716,7 +716,7 @@ func TestCluster_StartStop(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	xerr := ocluster.Start(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
@@ -730,14 +730,14 @@ func TestCluster_StartStop(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
 		err := ocluster.Start(ctx)
-		require.Contains(t, err.Error(), "failed to start Cluster because of it's current state: Nominal")
+		require.Contains(t, err.Error(), "failed to start ClassicCluster because of it's current state: Nominal")
 
 		svc._setLogLevel(2)
 
@@ -750,7 +750,7 @@ func TestCluster_StartStop(t *testing.T) {
 		}{
 			{
 				state:   clusterstate.Removed,
-				xerrMsg: "Cluster is being removed",
+				xerrMsg: "ClassicCluster is being removed",
 			},
 			{
 				state:   clusterstate.Stopping,
@@ -770,7 +770,7 @@ func TestCluster_StartStop(t *testing.T) {
 			},
 			{
 				state:   88,
-				xerrMsg: "failed to start Cluster because of it's current state",
+				xerrMsg: "failed to start ClassicCluster because of it's current state",
 			},
 		}
 		for i := range tests {
@@ -805,7 +805,7 @@ func TestCluster_GetState(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	_, xerr := ocluster.GetState(ctx)
 	require.Contains(t, xerr.Error(), "invalid instance: in")
 
@@ -819,9 +819,9 @@ func TestCluster_GetState(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -838,7 +838,7 @@ func TestCluster_AddNodes(t *testing.T) {
 
 	ctx := context.Background()
 
-	var ocluster *Cluster = nil
+	var ocluster *ClassicCluster = nil
 	var hsizing = abstract.HostSizingRequirements{
 		MinCores:    1,
 		MaxCores:    8,
@@ -864,9 +864,9 @@ func TestCluster_AddNodes(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		_, ok := cluster.(*Cluster)
+		_, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -907,9 +907,9 @@ func TestCluster_ListMasters(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -937,9 +937,9 @@ func TestCluster_FindAvailableMaster(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -970,9 +970,9 @@ func TestCluster_ListNodes(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 
@@ -1002,9 +1002,9 @@ func TestCluster_ToProtocol(t *testing.T) {
 		cluster, xerr := LoadCluster(ctx, svc, "ClusterName")
 		require.Nil(t, xerr)
 
-		ocluster, ok := cluster.(*Cluster)
+		ocluster, ok := cluster.(*ClassicCluster)
 		if !ok {
-			t.Error("ressources.Cluster not castable to operation.Cluster")
+			t.Error("ressources.ClassicCluster not castable to operation.ClassicCluster")
 			t.FailNow()
 		}
 

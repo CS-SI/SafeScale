@@ -127,7 +127,7 @@ func executeScript(
 			}
 		}()
 
-		transferTime := 30 * time.Second // FIXME: OPP Hardcoded time
+		transferTime := 30 * time.Second // FIXME: Hardcoded time
 		filename := utils.TempFolder + "/" + name
 		xerr = retry.WhileUnsuccessful(
 			func() error {
