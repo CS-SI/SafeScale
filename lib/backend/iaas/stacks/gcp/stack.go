@@ -19,6 +19,7 @@ package gcp
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/CS-SI/SafeScale/v22/lib/backend/iaas/stacks/api"
 
 	"github.com/CS-SI/SafeScale/v22/lib/backend/resources/abstract"
@@ -60,6 +61,10 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "gcp", nil
 }
 
+func (s stack) GetType() (_ string, ferr fail.Error) {
+	return "classic", nil
+}
+
 // GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions(context.Context) (stacks.ConfigurationOptions, fail.Error) {
 	if valid.IsNil(s) || s.Config == nil {
@@ -77,7 +82,7 @@ func (s stack) GetRawAuthenticationOptions(context.Context) (stacks.Authenticati
 }
 
 // New Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
+func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
 	gcpStack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,
@@ -99,7 +104,14 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 		return &stack{}, fail.ConvertError(err)
 	}
 
-	gcpStack.selfLinkPrefix = `https://www.googleapis.com/compute/v1/projects/` + localCfg.ProjectID
+	versions := map[string]string{
+		"compute": "v1",
+	}
+	for k, v := range serviceVersions {
+		versions[k] = v
+	}
+
+	gcpStack.selfLinkPrefix = `https://www.googleapis.com/compute/` + versions["compute"] + `/projects/` + localCfg.ProjectID // FIXME: hardcoded endpoint
 	// gcpStack.searchPrefix = `.*/projects/` + localCfg.ProjectID + `/global`
 
 	if cfg.Timings != nil {
@@ -135,10 +147,6 @@ func (s *stack) UpdateTags(ctx context.Context, kind abstract.Enum, id string, l
 
 	xerr = s.rpcCreateLabels(ctx, id, lmap)
 	return xerr
-}
-
-func (s *stack) ListTags(ctx context.Context, kind abstract.Enum, id string) (map[string]string, fail.Error) {
-	panic("implement me")
 }
 
 func (s *stack) DeleteTags(ctx context.Context, kind abstract.Enum, id string, keys []string) fail.Error {

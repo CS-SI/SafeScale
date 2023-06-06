@@ -334,7 +334,12 @@ func (instance *label) ToProtocol(ctx context.Context, withHosts bool) (*protoco
 		for k, v := range labelHostsV1.ByID {
 			hostInstance, xerr := LoadHost(ctx, instance.Service(), k)
 			if xerr != nil {
-				return nil, xerr
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+				default:
+					return nil, xerr
+				}
+				continue
 			}
 			hosts = append(hosts, &protocol.LabelHostResponse{
 				Host: &protocol.Reference{

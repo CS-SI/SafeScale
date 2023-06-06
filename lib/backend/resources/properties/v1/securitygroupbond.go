@@ -61,5 +61,3 @@ func (sgb *SecurityGroupBond) Replace(p data.Clonable) (data.Clonable, error) {
 	*sgb = *src
 	return sgb, nil
 }
-
-// Note: no need to register this property, it is not used directly (component of other properties)

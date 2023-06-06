@@ -54,7 +54,7 @@ func minioIsRunning() (bool, error) {
 	return true, nil
 }
 
-type cloak struct { // FIXME: OPP The one problem
+type cloak struct {
 	Hosts    string
 	Gateways string
 	Masters  string

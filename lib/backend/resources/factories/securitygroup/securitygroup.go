@@ -39,23 +39,53 @@ func List(ctx context.Context, svc iaas.Service, all bool) ([]*abstract.Security
 		return svc.ListSecurityGroups(ctx, "")
 	}
 
-	sgInstance, xerr := New(svc)
+	isTerraform := false
+	pn, xerr := svc.GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	sgInstance, xerr := New(svc, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	var list []*abstract.SecurityGroup
-	xerr = sgInstance.Browse(ctx, func(asg *abstract.SecurityGroup) fail.Error {
-		list = append(list, asg)
-		return nil
-	})
-	return list, xerr
+	if !isTerraform {
+		var list []*abstract.SecurityGroup
+		xerr = sgInstance.Browse(ctx, func(asg *abstract.SecurityGroup) fail.Error {
+			list = append(list, asg)
+			return nil
+		})
+		return list, xerr
+	} else {
+		aho, xerr := operations.ListTerraformSGs(ctx, svc)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		var stage []*abstract.SecurityGroup
+
+		for _, v := range aho {
+			ahf := abstract.NewSecurityGroup()
+			ahf.Name = v.GetName()
+			ahf.ID, _ = v.GetID()
+
+			stage = append(stage, ahf)
+		}
+
+		return stage, nil
+	}
 }
 
 // New creates an instance of resources.SecurityGroup
-func New(svc iaas.Service) (_ resources.SecurityGroup, ferr fail.Error) {
+func New(svc iaas.Service, terraform bool) (_ resources.SecurityGroup, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	}
+
+	if terraform {
+		return operations.NewTerraformSecurityGroup(svc)
 	}
 
 	sgInstance, xerr := operations.NewSecurityGroup(svc)
@@ -67,6 +97,9 @@ func New(svc iaas.Service) (_ resources.SecurityGroup, ferr fail.Error) {
 }
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
-func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.SecurityGroup, ferr fail.Error) {
+func Load(ctx context.Context, svc iaas.Service, ref string, terraform bool) (_ resources.SecurityGroup, ferr fail.Error) {
+	if terraform {
+		return operations.LoadTerraformSecurityGroup(ctx, svc, ref)
+	}
 	return operations.LoadSecurityGroup(ctx, svc, ref)
 }

@@ -850,7 +850,7 @@ func (s stack) CreateVIP(ctx context.Context, networkID, subnetID, name string, 
 		return nil, xerr
 	}
 
-	// FIXME: OPP Now, and only for OVH, disable port security
+	// FIXME: Now, and only for OVH, disable port security
 	// _, _ = s.rpcChangePortSecurity(ctx, port.ID, false)
 
 	vip := abstract.NewVirtualIP()

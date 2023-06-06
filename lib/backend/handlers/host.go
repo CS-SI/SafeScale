@@ -88,7 +88,14 @@ func (handler *hostHandler) Start(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -117,7 +124,14 @@ func (handler *hostHandler) Stop(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -145,7 +159,14 @@ func (handler *hostHandler) Reboot(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -187,7 +208,14 @@ func (handler *hostHandler) Create(req abstract.HostRequest, sizing abstract.Hos
 		return nil, fail.InvalidInstanceError()
 	}
 
-	hostInstance, xerr := hostfactory.New(handler.job.Service())
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.New(handler.job.Service(), isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -216,7 +244,14 @@ func (handler *hostHandler) Status(ref string) (_ hoststate.Enum, ferr fail.Erro
 		return hoststate.Unknown, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return hoststate.Unknown, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref, isTerraform)
 	if xerr != nil {
 		return hoststate.Unknown, xerr
 	}
@@ -247,7 +282,14 @@ func (handler *hostHandler) Inspect(ref string) (_ resources.Host, ferr fail.Err
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -271,7 +313,14 @@ func (handler *hostHandler) Delete(ref string) (ferr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), ref, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -303,12 +352,19 @@ func (handler *hostHandler) BindSecurityGroup(hostRef, sgRef string, enable reso
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -340,12 +396,19 @@ func (handler *hostHandler) UnbindSecurityGroup(hostRef, sgRef string) (ferr fai
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -372,12 +435,19 @@ func (handler *hostHandler) EnableSecurityGroup(hostRef, sgRef string) (ferr fai
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -409,7 +479,14 @@ func (handler *hostHandler) DisableSecurityGroup(hostRef, sgRef string) (ferr fa
 		return fail.InvalidParameterCannotBeEmptyStringError("sgRef")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef, isTerraform)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -422,7 +499,7 @@ func (handler *hostHandler) DisableSecurityGroup(hostRef, sgRef string) (ferr fa
 		}
 	}
 
-	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef)
+	sgInstance, xerr := securitygroupfactory.Load(handler.job.Context(), handler.job.Service(), sgRef, isTerraform)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -465,7 +542,14 @@ func (handler *hostHandler) ListSecurityGroups(hostRef string) (_ []*propertiesv
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -482,40 +566,69 @@ func (handler *hostHandler) ListLabels(hostRef string, kind string) (_ []*protoc
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	var list []*protocol.LabelInspectResponse
-	xerr = hostInstance.Inspect(handler.job.Context(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
-			hlV1, ok := clonable.(*propertiesv1.HostLabels)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			for k := range hlV1.ByID {
-				labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Service(), k)
-				if innerXErr != nil {
-					return innerXErr
+	if !isTerraform {
+		var list []*protocol.LabelInspectResponse
+		xerr = hostInstance.Inspect(handler.job.Context(), func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(hostproperty.LabelsV1, func(clonable data.Clonable) fail.Error {
+				hlV1, ok := clonable.(*propertiesv1.HostLabels)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.HostLabels' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				item, innerXErr := labelInstance.ToProtocol(handler.job.Context(), false)
-				if innerXErr != nil {
-					return innerXErr
-				}
+				for k := range hlV1.ByID {
+					labelInstance, innerXErr := labelfactory.Load(handler.job.Context(), handler.job.Service(), k, isTerraform)
+					if innerXErr != nil {
+						return innerXErr
+					}
 
-				list = append(list, item)
-			}
-			return nil
+					item, innerXErr := labelInstance.ToProtocol(handler.job.Context(), false)
+					if innerXErr != nil {
+						return innerXErr
+					}
+
+					list = append(list, item)
+				}
+				return nil
+			})
 		})
-	})
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		return list, nil
+	}
+
+	var fact []*protocol.LabelInspectResponse
+	labels, xerr := hostInstance.ListLabels(handler.job.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return list, nil
+	for k, v := range labels {
+		item := &protocol.LabelInspectResponse{
+			Name:       k,
+			HasDefault: v != "",
+			Value:      v,
+		}
+		if xerr != nil {
+			return nil, xerr
+		}
+		fact = append(fact, item)
+	}
+
+	return fact, nil
 }
 
 // InspectLabel inspects a Label of a Host
@@ -530,47 +643,59 @@ func (handler *hostHandler) InspectLabel(hostRef, labelRef string) (_ resources.
 		return nil, "", fail.InvalidParameterCannotBeEmptyStringError("labelRef")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return nil, "", xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef, isTerraform)
 	if xerr != nil {
 		return nil, "", xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef, isTerraform)
 	if xerr != nil {
 		return nil, "", xerr
 	}
 
-	var outValue string
-	xerr = labelInstance.Inspect(handler.job.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			lhV1, ok := clonable.(*propertiesv1.LabelHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
+	if !isTerraform {
+		var outValue string
+		xerr = labelInstance.Inspect(handler.job.Context(), func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(labelproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+				lhV1, ok := clonable.(*propertiesv1.LabelHosts)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.LabelHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
 
-			hin, err := hostInstance.GetID()
-			if err != nil {
-				return fail.ConvertError(err)
-			}
+				hin, err := hostInstance.GetID()
+				if err != nil {
+					return fail.ConvertError(err)
+				}
 
-			outValue, ok = lhV1.ByID[hin]
-			if !ok {
-				return fail.NotFoundError()
-			}
+				outValue, ok = lhV1.ByID[hin]
+				if !ok {
+					return fail.NotFoundError()
+				}
 
-			return nil
+				return nil
+			})
 		})
-	})
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			return nil, "", fail.NotFoundError("failed to find Label '%s' bound to Host '%s'", labelInstance.GetName(), hostInstance.GetName())
-		default:
-			return nil, "", xerr
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				return nil, "", fail.NotFoundError("failed to find Label '%s' bound to Host '%s'", labelInstance.GetName(), hostInstance.GetName())
+			default:
+				return nil, "", xerr
+			}
 		}
+
+		return labelInstance, outValue, nil
 	}
 
-	return labelInstance, outValue, nil
+	val, _ := labelInstance.DefaultValue(handler.job.Context())
+	return labelInstance, val, nil
 }
 
 // BindLabel binds a Label to a Host
@@ -585,22 +710,23 @@ func (handler *hostHandler) BindLabel(hostRef, labelRef, value string) (ferr fai
 		return fail.InvalidParameterCannotBeEmptyStringError("labelRef")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	if value == "" {
-		value, xerr = labelInstance.DefaultValue(handler.job.Context())
-		if xerr != nil {
-			return xerr
-		}
-	}
 	xerr = hostInstance.BindLabel(handler.job.Context(), labelInstance, value)
 	if xerr != nil {
 		return xerr
@@ -621,12 +747,19 @@ func (handler *hostHandler) UnbindLabel(hostRef, labelRef string) (ferr fail.Err
 		return fail.InvalidParameterCannotBeEmptyStringError("labelRef")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -651,12 +784,19 @@ func (handler *hostHandler) UpdateLabel(hostRef, labelRef, value string) (ferr f
 		return fail.InvalidRequestError("neither name nor id given as reference of Label")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
@@ -681,12 +821,19 @@ func (handler *hostHandler) ResetLabel(hostRef, labelRef string) (ferr fail.Erro
 		return fail.InvalidParameterCannotBeEmptyStringError("labelRef")
 	}
 
-	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef)
+	isTerraform := false
+	pn, xerr := handler.job.Service().GetType()
+	if xerr != nil {
+		return xerr
+	}
+	isTerraform = pn == "terraform"
+
+	hostInstance, xerr := hostfactory.Load(handler.job.Context(), handler.job.Service(), hostRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}
 
-	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef)
+	labelInstance, xerr := labelfactory.Load(handler.job.Context(), handler.job.Service(), labelRef, isTerraform)
 	if xerr != nil {
 		return xerr
 	}

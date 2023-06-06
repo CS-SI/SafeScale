@@ -854,6 +854,7 @@ message ClusterCreateRequest {
 	repeated string parameters = 18; // contains optional parameters for automatically installed Features
 	uint32 default_ssh_port = 19;    // contains the default ssh port for cluster gateways
 	repeated string enabled = 20;
+	string operator_username = 21;  // contains the username of the operator creating the cluster
 }
 
 message ClusterResizeRequest {
@@ -1059,6 +1060,7 @@ message SecurityGroupRule {
 message SecurityGroupRuleRequest {
 	Reference group = 1;
 	SecurityGroupRule rule = 2;
+	Reference resource_group = 3;
 }
 
 message SecurityGroupRuleDeleteRequest {

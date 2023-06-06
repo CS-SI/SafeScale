@@ -179,6 +179,10 @@ func (instance *Host) Exists(ctx context.Context) (_ bool, ferr fail.Error) {
 		return false, fail.ConvertError(err)
 	}
 
+	if beta := os.Getenv("SAFESCALE_DETECT_CORRUPTION"); beta != "yes" {
+		return true, nil
+	}
+
 	_, xerr := instance.Service().InspectHost(ctx, theID)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -695,7 +699,7 @@ func (instance *Host) implCreate(
 			}
 
 			// Check if Host exists but is not managed by SafeScale
-			// FIXME: OPP Another mistake, we are not looking for the managed tag
+			// FIXME: Another mistake, we are not looking for the managed tag
 			_, xerr = svc.InspectHost(ctx, abstract.NewHostCore().SetName(hostReq.ResourceName))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -2301,7 +2305,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 				CIDR:          abstract.SingleHostNetworkCIDR,
 				KeepOnFailure: true,
 			}
-			xerr = networkInstance.Create(ctx, request)
+			xerr = networkInstance.Create(ctx, &request, nil)
 			if xerr != nil {
 				// handle a particular case of *fail.ErrDuplicate...
 				switch cerr := xerr.(type) {

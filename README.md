@@ -30,8 +30,6 @@ SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters 
 - SafeScale Infra to manage Cloud infrastructure (IaaS - Infrastructure as a Service)
 - SafeScale Platform to manage Cloud computing platforms (PaaS - Platform as a Service)
 
-![SafeScale](doc/img/SafeScale.png "SafeScale")
-
 ### SafeScale Infra
 
 SafeScale Infra offers an API to completely abstract the IaaS services offered by Cloud platforms providers.
@@ -44,8 +42,6 @@ It allows to:
 - Create / Destroy shares, Connect / Disconnect host to/from shares,
 - Create / Destroy clusters
 - Add / Remove "features" (software components) on hosts and clusters
-
-![SafeScale Infra](doc/img/SafeScale_Infra.png "SafeScale Infra")
 
 SafeScale Infra provides a complete abstraction overlay over underlying IaaS APIs to mask their heterogeneity.
 
@@ -137,6 +133,7 @@ SafeScale is currently under active development and does not yet offer all the a
     - AWS
     - GCP (Google Cloud Platform)
     - Outscale
+    - Azure (Work In Progress)
 
 
 ## Contributing

@@ -6,6 +6,9 @@ on:
       - master
       - develop
       - hotfixes
+      - 'experimental/**'
+      - 'feature/**'
+      - 'tasks/**'
       - 'release/**'
       - 'review/**'
       - 'pr/**'
@@ -14,6 +17,9 @@ on:
       - master
       - develop
       - hotfixes
+      - 'experimental/**'
+      - 'feature/**'
+      - 'tasks/**'
       - 'release/**'
       - 'review/**'
       - 'pr/**'

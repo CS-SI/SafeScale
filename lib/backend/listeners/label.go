@@ -179,7 +179,14 @@ func (s *LabelListener) Inspect(inctx context.Context, in *protocol.LabelInspect
 
 	ctx := job.Context()
 
-	instance, xerr := labelfactory.Load(ctx, job.Service(), ref)
+	isTerraform := false
+	pn, xerr := job.Service().GetType()
+	if xerr != nil {
+		return nil, xerr
+	}
+	isTerraform = pn == "terraform"
+
+	instance, xerr := labelfactory.Load(ctx, job.Service(), ref, isTerraform)
 	if xerr != nil {
 		return nil, xerr
 	}
