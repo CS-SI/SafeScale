@@ -606,6 +606,31 @@ func (instance *ClassicCluster) ExecuteScript(
 	}
 }
 
+func recast(in any) (map[string]any, error) {
+	out := make(map[string]any)
+	if in == nil {
+		return out, nil
+	}
+
+	if input, ok := in.(map[string]any); ok {
+		return input, nil
+	}
+
+	input, ok := in.(map[any]any)
+	if !ok {
+		return nil, fmt.Errorf("invalid input type: %T", in)
+	}
+
+	for k, v := range input {
+		nk, ok := k.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid key type: %T", k)
+		}
+		out[nk] = v
+	}
+	return out, nil
+}
+
 // installNodeRequirements ...
 func (instance *ClassicCluster) installNodeRequirements(
 	inctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string, pars abstract.ClusterRequest,
@@ -661,6 +686,16 @@ func (instance *ClassicCluster) installNodeRequirements(
 				chRes <- result{xerr}
 				return
 			}
+
+			for k, v := range tp {
+				ts, err := recast(v)
+				if err != nil {
+					tp[k] = v
+				} else {
+					tp[k] = ts
+				}
+			}
+
 			content := map[string]interface{}{
 				"tenants": []map[string]interface{}{tp},
 			}
